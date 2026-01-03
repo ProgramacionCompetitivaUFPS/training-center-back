@@ -1,7 +1,7 @@
 erDiagram
 
 
- %% ===== Main Entities =====
+ %% ===== Entidades principales =====
  User {
    string id PK
    string email UK
@@ -19,7 +19,7 @@ erDiagram
  Coach
  Contestant
  Member
- Lead {
+ Admin_Group {
    string user_id FK
    string group_id FK
  }
@@ -84,16 +84,15 @@ erDiagram
  }
 
 
- %% ===== Role Relationships (pseudo-entities for visualization only) =====
+ %% ===== Relaciones de roles (pseudo-entidades sólo para visualización) =====
  User ||--o{ Admin : is
  User ||--o{ Coach : is
  User ||--o{ Contestant : is
 
- %% Note: Admin has implicit permissions on ALL groups
- %% without requiring registration in GroupMember or Lead (system-level permissions)
 
- Coach ||--o{ Lead : may_have
- Lead }o--|| Group : administrates
+ Admin ||--o{ Admin_Group : may_have
+ Coach ||--o{ Admin_Group : may_have
+ Admin_Group }o--|| Group : administrates
 
 
  Member }o--|| Group : belongs_to
