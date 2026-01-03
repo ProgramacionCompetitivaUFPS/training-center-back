@@ -2,171 +2,229 @@
 
 **Created**: 2025-12-28
 
-Este documento centraliza la lógica de negocio completa del sistema de Group Management y las consideraciones de diseño que se están tomando en todas las specs relacionadas.
+This document centralizes the complete business logic of the Group Management system and design considerations being applied across all related specs.
 
 ---
 
-## 🔹 Concepto General
+## 🔹 General Concept
 
-* **`Group`** es una entidad raíz.
-* **No hay jerarquía** entre grupos (estructura plana).
-* Existe un **grupo global** que contiene a todos los usuarios automáticamente.
-* Los grupos pueden ser **visibles o no visibles**.
-* Los grupos pueden definir **cómo se ingresa**:
-  * Por **invitación** (solo admins invitan) - **requerido para grupos no visibles**
-  * Por **solicitud** (usuarios piden, admins aprueban) - **solo para grupos visibles**
-  * **Libre** (sin aprobación, ingreso automático) - **solo para grupos visibles**
-
----
-
-## 🔹 Roles Dentro del Grupo
-
-### Roles Disponibles
-* Solo existen **dos roles**:
-  * **Admin** (solo pueden ser coaches o system admin a nivel sistema)
-  * **Member** (cualquier usuario)
-
-### Permisos y Restricciones
-* El **system admin** tiene permisos globales sobre todos los grupos.
-* Un **coach** puede ser admin de uno o varios grupos.
-* Un **usuario** puede pertenecer a múltiples grupos.
-* Solo **coaches** y **system admins** pueden ser asignados como **Group Admin**.
+* **`Group`** is a root entity.
+* **No hierarchy** between groups (flat structure).
+* There is a **global group** that contains all users automatically.
+* Groups can be **visible or not visible**.
+* Groups can define **how users join**:
+  * By **invitation** (only leads invite) - **required for non-visible groups**
+  * By **request** (users request, leads approve) - **only for visible groups**
+  * **Open** (no approval, automatic entry) - **only for visible groups**
+* **User identification**: The system uses **nicknames** (unique) to identify users in group operations (creation, invitations, member management).
 
 ---
 
-## 🔹 Acceso y Visibilidad
+## 🔹 Roles Within the Group
 
-| Estado del grupo | Usuario no miembro             | Políticas de ingreso permitidas |
-| ---------------- | ------------------------------ | ------------------------------- |
-| **Visible**      | Puede ver todo en modo lectura | `INVITE`, `REQUEST`, `OPEN`     |
-| **No visible**   | No puede ver nada              | Solo `INVITE`                   |
+### Available Roles
+* Only **two roles** exist:
+  * **Lead** (can only be coaches or admin at system level)
+  * **Member** (any user)
 
-### Reglas de Interacción
-* Para **interactuar** (submissions, gestión, etc.) hay que ser **miembro**.
-* Para **administrar**, hay que ser **admin del grupo**.
-* Los no-miembros de grupos visibles pueden navegar contenido pero no participar.
-* **Restricción importante**: Grupos no visibles solo pueden usar política `INVITE` (no tiene sentido `OPEN` o `REQUEST` si nadie puede ver el grupo).
-
----
-
-## 🔹 Ingreso al Grupo
-
-### Métodos de Ingreso
-* **Invitaciones** y **solicitudes** solo pueden ser gestionadas por admins.
-* **Ingreso libre** → el usuario entra automáticamente como miembro.
-* El evento de ingreso se registra (ej. `joined_at`, método de ingreso).
-* Un admin puede **cambiar el modo de ingreso** en cualquier momento.
-
-### Flujos Específicos
-1. **Por Invitación (`INVITE`)**:
-   - Admin crea invitación con token UUID simple
-   - Usuario acepta/rechaza usando el token
-   - Invitaciones pueden tener fecha de expiración
-   - **Soporte para invitación por username o email**
-
-2. **Por Solicitud (`REQUEST`)**:
-   - Usuario crea solicitud de ingreso
-   - Admin aprueba/rechaza la solicitud
-   - **Solo funciona en grupos visibles** (restricción de política)
-
-3. **Ingreso Libre (`OPEN`)**:
-   - Usuario se une directamente sin aprobación
-   - **Solo funciona en grupos visibles** (restricción de política)
-   - Ingreso inmediato como miembro
+### Permissions and Restrictions
+* **Admin has implicit global permissions** on all groups without explicit membership.
+* A **coach** can be lead of one or several groups.
+* A **user** can belong to multiple groups.
+* Only **coaches** and **admins** can be assigned as **Lead** in a group.
+* **Admin** can manage any group without needing to be added as a member.
 
 ---
 
-## 🔹 Contenido del Grupo
+## 🔹 Access and Visibility
 
-### Entidades Asociadas
-* **Contests** y **materiales** **pertenecen al grupo**.
-* **Problemas** son entidades **globales y reutilizables**.
-* El **grupo global** puede tener materiales y contests públicos.
+| Group State       | Non-member User                 | Allowed Join Policies           |
+| ----------------- | ------------------------------- | ------------------------------- |
+| **Visible**       | Can see everything in read mode | `INVITE`, `REQUEST`, `OPEN`     |
+| **Not Visible**   | Cannot see anything             | Only `INVITE`                   |
 
-### Eliminación de Contenido
-* Si se **elimina un grupo**:
-  * Se eliminan **contests y materiales** (hard delete)
-  * Los **problemas siguen existiendo** (son globales)
-  * Las referencias históricas se conservan
-
----
-
-## 🔹 Eliminación y Persistencia
-
-### Eliminación de Grupos
-* **Eliminación de grupo**: **hard delete**.
-* **Excepción**: El grupo global **no puede eliminarse**.
-
-### Gestión de Usuarios
-* **Usuarios eliminados** del sistema → se **anonimizan** (según spec de user-management).
-* Las **referencias históricas se conservan** (submissions, membership history).
-* Los datos anónimos mantienen integridad referencial.
-
-### Reglas de Membresía
-* **Grupo global**: Los usuarios **no pueden salir** del grupo global.
-* **Otros grupos**: Los usuarios pueden salir voluntariamente.
-* **Último admin**: No se puede eliminar el último admin de un grupo.
+### Interaction Rules
+* To **interact** (submissions, management, etc.) you must be a **member**.
+* To **administer**, you must be a **group lead**.
+* Non-members of visible groups can browse content but not participate.
+* **Important restriction**: Non-visible groups can only use `INVITE` policy (no point in `OPEN` or `REQUEST` if no one can see the group).
 
 ---
 
-## 🔹 Grupo Global (Default Group)
+## 🔹 Joining the Group
 
-### Características Especiales
-* **Creado automáticamente** durante bootstrap del sistema.
-* **Todos los usuarios** son miembros automáticamente.
-* **No se puede eliminar** ni modificar su membresía manualmente.
-* **System admin** es admin del grupo global.
-* Marcado con `is_default = true`.
-* **Los usuarios pueden "ocultar" el grupo global** de su vista personal (soft hide) sin afectar la membresía real.
+### Join Methods
+* **Invitations** and **requests** can only be managed by leads.
+* **Open entry** → user automatically enters as member.
+* Join event is recorded (e.g. `joined_at`, join method).
+* A lead can **change the join mode** at any time.
 
-### Propósito
-* Contenedor para contests y materiales públicos.
-* Punto de referencia común para todos los usuarios.
-* Facilita la gestión de contenido global del sistema.
-* **Puede ocultarse de la UI** para usuarios que prefieren ver solo sus grupos específicos.
+### Specific Flows
+1. **By Invitation (`INVITE`)**:
+   - Lead creates invitation generating JWT token with 3-day TTL
+   - Can invite by **nickname**, email or user ID (resolved to user_id at creation)
+   - System sends email with URL containing the JWT token
+   - User accepts by clicking the URL in the email
+   - If the same user is re-invited, the previous record is deleted
+   - URL format: `https://training-center.com/groups/{groupId}/accept?token={jwt_token}`
 
----
+2. **By Request (`REQUEST`)**:
+   - User creates join request
+   - Lead approves/rejects the request
+   - **Only works on visible groups** (policy restriction)
 
-## 🔹 Consideraciones Técnicas
-
-### Seguridad
-* **Tokens de invitación**: UUID simples para facilitar implementación y debugging.
-* **Validación estándar** de tokens UUID.
-* **Tokens de un solo uso** (se invalidan al aceptar).
-* **Invitaciones por username o email** para mayor flexibilidad.
-
-### Concurrencia
-* **Transacciones** para operaciones de membresía críticas.
-* **Constraints de DB** para prevenir estados inconsistentes.
-* **Validación atómica** para reglas como "último admin".
-
-### Auditoría Selectiva
-* **Solo cambios críticos** se registran para reducir overhead:
-  * Creación/eliminación de grupos
-  * Cambios de rol (Member ↔ Admin)
-  * Adición/remoción de miembros por admin
-  * Cambios de políticas de grupo (visibilidad, join policy)
-* **No se auditan** operaciones menores como:
-  * Aceptación de invitaciones (ya registrado en `joined_at`)
-  * Listado de miembros o invitaciones
-  * Operaciones de solo lectura
-
-### Escalabilidad
-* **Sin límites hard-coded** en número de miembros por grupo.
-* **Índices apropiados** para consultas de membresía.
-* **Paginación** en listados de miembros e invitaciones.
+3. **Open Entry (`OPEN`)**:
+   - User joins directly without approval
+   - **Only works on visible groups** (policy restriction)
+   - Immediate entry as member
 
 ---
 
-## 🔹 Specs Relacionadas
+## 🔹 Group Content
 
-### Specs Implementadas
-1. **[Create group](Create%20group/spec.md)** - Creación de grupos con configuración inicial
-2. **[Join group](Join%20group/spec.md)** - Flujos de ingreso desde perspectiva del usuario
-3. **[Invite to group](Invite%20to%20group/spec.md)** - Sistema de invitaciones
-4. **[Manage group members](Manage%20group%20members/spec.md)** - Gestión administrativa de membresía
+### Associated Entities
+* **Contests** and **materials** **belong to the group**.
+* **Problems** are **global and reusable** entities.
+* The **global group** can have public materials and contests.
 
-### Dependencias de Implementación
+### Content Deletion
+* If a **group is deleted**:
+  * **Contests and materials** are deleted (hard delete)
+  * **Problems continue to exist** (they are global)
+  * Historical references are preserved
+
+---
+
+## 🔹 Deletion and Persistence
+
+### Group Deletion
+* **Group deletion**: **hard delete**.
+* **Exception**: The global group **cannot be deleted**.
+
+### User Management
+* **Deleted users** from the system → are **anonymized** (according to user-management spec).
+* **Historical references are preserved** (submissions, membership history).
+* Anonymous data maintains referential integrity.
+
+### Membership Rules
+* **Global group**: Users **cannot leave** the global group.
+* **Other groups**: Users can leave voluntarily.
+* **Last lead**: The last lead of a group cannot be removed.
+
+---
+
+## 🔹 Admin - Implicit Global Permissions
+
+### Fundamental Rule
+* **Admin (system role) has implicit permissions** on ALL groups without requiring explicit membership.
+* Admin can perform any group management operation without being added as member or lead.
+* No registration in `GroupMember` table required - permissions are at system role level.
+
+### Permission Verification
+**Authorization logic** for group operations:
+```
+User authorized IF:
+  - User has ADMIN role (system) 
+  OR
+  - User is LEAD of the group (explicit membership)
+```
+
+### Implementation
+* **Verification at each endpoint**: Before any management operation, verify system role.
+* **No membership registration**: Admin does NOT appear in `GroupMember` of any group.
+* **Full permissions**: Admin can create, modify, delete groups and manage members.
+* **No restrictions**: Admin can operate on visible and non-visible groups equally.
+
+### Allowed Operations
+Admin can perform:
+* ✅ Create groups
+* ✅ Modify configuration of any group (name, visibility, policies)
+* ✅ Add/remove members from any group
+* ✅ Change member roles (Member ↔ Lead)
+* ✅ View pending invitations of any group
+* ✅ Create invitations for any group
+* ✅ Delete groups (except global group)
+* ✅ Manage group content (contests, materials)
+
+### UI Considerations
+* **Member listings**: Admin does NOT appear in member/lead lists (has no membership).
+* **Permission indicator**: UI can show "Access as Admin" message when Admin manages a group.
+* **No self-assignment**: Admin does NOT need to add themselves as lead to manage groups.
+
+### Purpose
+* **Global supervision**: Admin has complete visibility and control of the system.
+* **Emergency management**: Admin can intervene in any group immediately.
+* **Separation of concerns**: System role ≠ Group role.
+* **Scalability**: Does not pollute membership tables with unnecessary records.
+
+---
+
+## 🔹 Global Group (Default Group)
+
+### Special Characteristics
+* **Automatically created** during system bootstrap.
+* **All users** are members automatically.
+* **Cannot be deleted** or have its membership modified manually.
+* **Admin** is lead of the global group (explicit membership in this special case).
+* Marked with `is_default = true`.
+* **Users can "hide" the global group** from their personal view (soft hide) without affecting actual membership.
+
+### Purpose
+* Container for public contests and materials.
+* Common reference point for all users.
+* Facilitates management of global system content.
+* **Can be hidden from the UI** for users who prefer to see only their specific groups.
+
+---
+
+## 🔹 Technical Considerations
+
+### User Identification
+* **Nicknames as identifiers**: All group operations use nicknames instead of UUIDs for better user experience.
+* **Unique nicknames**: The `nickname` field in the User entity is unique at system level.
+* **Nickname validation**: System validates nickname existence before critical operations.
+* **Automatic resolution**: Nicknames are resolved to user_id internally to maintain referential integrity.
+
+### Security
+* **Invitation tokens**: JWT with signed payload containing user_id, group_id and expiry.
+* **Fixed 3-day TTL**: All invitations automatically expire after 3 days.
+* **JWT validation**: Signature, expiry and payload verification before accepting invitation.
+* **Single-use tokens**: Record is deleted when accepted or when re-inviting.
+* **Invitations by nickname or email**: Resolved to user_id at creation time.
+* **Email sending**: URL with JWT token sent to user's registered email.
+
+### Concurrency
+* **Transactions** for critical membership operations.
+* **DB constraints** to prevent inconsistent states.
+* **Atomic validation** for rules like "last lead".
+
+### Selective Auditing
+* **Only critical changes** are logged to reduce overhead:
+  * Group creation/deletion
+  * Role changes (Member ↔ Lead)
+  * Member addition/removal by lead
+  * Group policy changes (visibility, join policy)
+* **Not audited** minor operations such as:
+  * Invitation acceptance (already recorded in `joined_at`)
+  * Member or invitation listings
+  * Read-only operations
+
+### Scalability
+* **No limits** on number of members per group.
+* **Appropriate indexes** for membership queries.
+* **Pagination** in member and invitation listings.
+
+---
+
+## 🔹 Related Specs
+
+### Implemented Specs
+1. **[Create group](Create%20group/spec.md)** - Group creation with initial configuration
+2. **[Join group](Join%20group/spec.md)** - Join flows from user perspective
+3. **[Invite to group](Invite%20to%20group/spec.md)** - Invitation system
+4. **[Manage group members](Manage%20group%20members/spec.md)** - Administrative membership management
+
+### Implementation Dependencies
 ```
 Create Group (base)
     ↓
@@ -175,110 +233,129 @@ Join Group (P1) ← Invite to Group (P2)
 Manage Group Members (P2-P3)
 ```
 
-### Specs Futuras (Consideradas)
-* **Update Group** - Modificar metadatos, políticas de ingreso, visibilidad
-* **Delete Group** - Eliminación segura con manejo de contenido asociado
-* **Group Dashboard** - Vista "Mis Grupos" con filtros, búsqueda y gestión de visibilidad
-* **Group Analytics** - Métricas de participación y actividad
-* **Bulk Operations** - Gestión masiva de miembros e invitaciones
+### Future Specs (Considered)
+* **Update Group** - Modify metadata, join policies, visibility
+* **Delete Group** - Safe deletion with associated content handling
+* **Group Dashboard** - "My Groups" view with filters, search and visibility management
+* **Group Analytics** - Participation and activity metrics
+* **Bulk Operations** - Mass management of members and invitations
 
 ---
 
-## 🔹 Confirmaciones Finales
+## 🔹 Final Confirmations
 
-### Nomenclatura
-* **Nombre definitivo**: **Group** (no "Team", "Organization", etc.)
-* **Consistencia** con el resto del sistema en naming y estructura.
+### Nomenclature
+* **Final name**: **Group** (not "Team", "Organization", etc.)
+* **Consistency** with the rest of the system in naming and structure.
 
-### Alineación con Proyecto
-* Las specs de grupos siguen **exactamente la misma estructura** que las demás specs.
-* **No se inventan secciones nuevas** ni se rompe la consistencia.
-* **Códigos de error** siguen las convenciones establecidas.
+### Project Alignment
+* Group specs follow **exactly the same structure** as other specs.
+* **No new sections invented** nor consistency broken.
+* **Error codes** follow established conventions.
 
-### Alcance del Spec de Creación
-El spec de **Create Group** incluye:
-* ✅ Creación del grupo con metadatos
-* ✅ Asignación automática del creador como admin
-* ✅ Configuración de políticas (visibilidad, ingreso)
-* ✅ Relaciones iniciales (miembros/admins opcionales)
-* ✅ Validaciones y restricciones de negocio
+### 📋 Creation Spec Scope
+The **Create Group** spec includes:
+* ✅ Group creation with metadata
+* ✅ Automatic assignment of creator as lead
+* ✅ Policy configuration (visibility, join)
+* ✅ Initial relationships: add members and leads by **nickname** optionally
+* ✅ Business validations and restrictions:
+  * Nickname existence validation
+  * Role validation for leads (only Coaches/Admin)
+  * Silent deduplication of nicknames in same list
+  * Creator handling in lists (auto-lead, rejection if in members)
+  * Detection of nicknames in both lists
+* ✅ Detailed errors with complete problem information
 
 ---
 
-## � **cMejoras de Usabilidad y Mantenibilidad**
+## 🔹 Usability and Maintainability Improvements
 
-### **Dashboard "Mis Grupos"**
-* **Vista centralizada** de todos los grupos del usuario
-* **Filtros**: Por rol (Admin/Member), visibilidad, actividad reciente
-* **Búsqueda**: Por nombre de grupo, descripción, tags
-* **Gestión de visibilidad**: Opción de ocultar/mostrar grupo global
-* **Acciones rápidas**: Salir de grupo, ver invitaciones pendientes
+### **"My Groups" Dashboard**
+* **Centralized view** of all user's groups
+* **Filters**: By role (Admin/Member), visibility, recent activity
+* **Search**: By group name, description, tags
+* **Visibility management**: Option to hide/show global group
+* **Quick actions**: Leave group, view pending invitations
 
-### **Invitaciones Mejoradas**
-* **Por username**: Invitar usuarios conocidos sin necesidad de email
-* **Por email**: Para usuarios externos que aún no tienen cuenta
-* **Tokens UUID**: Simples, debuggeables, suficientemente seguros
-* **Vista previa**: Mostrar información del grupo antes de aceptar
+### **Improved Invitations**
+* **By nickname**: Invite known users without needing to know their UUID (resolved to user_id at creation)
+* **By email**: For registered users inviting by their email (resolved to user_id at creation)
+* **JWT tokens**: Signed, with 3-day TTL, contain user_id and group_id in payload
+* **Automatic sending**: Email with acceptance URL sent automatically
+* **Re-invitation**: Deletes previous invitation and generates new token with new expiration
+* **Preview**: Show group information before accepting
+* **Nickname validation**: System verifies existence before creating invitation
 
-### **Políticas Simplificadas**
-* **Combinaciones válidas reducidas**:
+### **Simplified Policies**
+* **Reduced valid combinations**:
   * `VISIBLE + INVITE` ✅
   * `VISIBLE + REQUEST` ✅  
   * `VISIBLE + OPEN` ✅
   * `NOT_VISIBLE + INVITE` ✅
-  * ~~`NOT_VISIBLE + REQUEST`~~ ❌ (sin sentido)
-  * ~~`NOT_VISIBLE + OPEN`~~ ❌ (sin sentido)
+  * ~~`NOT_VISIBLE + REQUEST`~~ ❌ (makes no sense)
+  * ~~`NOT_VISIBLE + OPEN`~~ ❌ (makes no sense)
 
-### **Auditoría Inteligente**
-* **Se registra**:
-  * Creación/eliminación de grupos
-  * Cambios de rol Admin ↔ Member
-  * Adición/remoción manual de miembros
-  * Cambios de políticas de grupo
-* **No se registra**:
-  * Aceptación de invitaciones (ya en `joined_at`)
-  * Consultas de solo lectura
-  * Operaciones automáticas del sistema
-
----
-
-## 🔹 Decisiones de Diseño Clave
-
-### ¿Por qué estructura plana?
-* **Simplicidad**: Evita complejidad de permisos jerárquicos
-* **Flexibilidad**: Los usuarios pueden estar en múltiples grupos independientes
-* **Escalabilidad**: Más fácil de consultar y mantener
-
-### ¿Por qué solo 2 roles?
-* **Claridad**: Distinción simple entre administradores y miembros
-* **Suficiencia**: Cubre todos los casos de uso identificados
-* **Extensibilidad**: Se puede expandir en el futuro si es necesario
-
-### ¿Por qué grupo global obligatorio?
-* **Contenido público**: Lugar para contests/materiales accesibles a todos
-* **Referencia común**: Todos los usuarios tienen al menos una membresía
-* **Bootstrapping**: Facilita la inicialización del sistema
-
-### ¿Por qué restricciones de política por visibilidad?
-* **Lógica**: No tiene sentido que un grupo no visible permita ingreso libre (`OPEN`) o por solicitud (`REQUEST`)
-* **Simplicidad**: Reduce combinaciones de 6 a 4 casos válidos
-* **Usabilidad**: Evita configuraciones confusas para los administradores
-
-### ¿Por qué tokens UUID simples?
-* **Simplicidad**: Más fácil de implementar, debuggear y mantener
-* **Suficiencia**: Para invitaciones internas, UUID provee suficiente entropía
-* **Performance**: Generación y validación más rápida que tokens criptográficos complejos
-
-### ¿Por qué auditoría selectiva?
-* **Performance**: Reduce significativamente el volumen de logs
-* **Mantenibilidad**: Menos datos que limpiar y gestionar
-* **Enfoque**: Se concentra en cambios que realmente importan para compliance y debugging
-
-### ¿Por qué opción de ocultar grupo global?
-* **Usabilidad**: Usuarios avanzados pueden enfocarse en sus grupos específicos
-* **Flexibilidad**: Mantiene la funcionalidad sin forzar la visibilidad
-* **Adopción**: Facilita la transición para usuarios que prefieren interfaces limpias
+### **Intelligent Auditing**
+* **Logged**:
+  * Group creation/deletion
+  * Admin ↔ Member role changes
+  * Manual member addition/removal
+  * Group policy changes
+* **Not logged**:
+  * Invitation acceptance (already in `joined_at`)
+  * Read-only queries
+  * Automatic system operations
 
 ---
 
-*Este documento debe actualizarse cuando se tomen nuevas decisiones de diseño o se implementen specs adicionales.*
+## 🔹 Key Design Decisions
+
+### Why flat structure?
+* **Simplicity**: Avoids complexity of hierarchical permissions
+* **Flexibility**: Users can be in multiple independent groups
+* **Scalability**: Easier to query and maintain
+
+### Why only 2 roles?
+* **Clarity**: Simple distinction between leaders and members
+* **Sufficiency**: Covers all identified use cases
+* **Extensibility**: Can be expanded in the future if needed
+
+### Why mandatory global group?
+* **Public content**: Place for contests/materials accessible to all
+* **Common reference**: All users have at least one membership
+* **Bootstrapping**: Facilitates system initialization
+
+### Why policy restrictions by visibility?
+* **Logic**: Makes no sense for a non-visible group to allow open entry (`OPEN`) or by request (`REQUEST`)
+* **Simplicity**: Reduces combinations from 6 to 4 valid cases
+* **Usability**: Avoids confusing configurations for group leaders
+
+### Why JWT tokens with 3-day TTL?
+* **Enhanced security**: Signed JWT prevents token manipulation
+* **Self-contained**: Token includes user_id and group_id without DB query on first validation
+* **Fixed TTL**: 3 days is sufficient for user to check email and accept, without prolonged risk
+* **Operational simplicity**: No cleanup job required - JWT expires automatically
+* **Industry standard**: JWT is widely supported and understood
+
+### Why selective auditing?
+* **Performance**: Significantly reduces log volume
+* **Maintainability**: Less data to clean and manage
+* **Focus**: Concentrates on changes that really matter for compliance and debugging
+
+### Why Admin has implicit permissions without membership?
+* **Clean architecture**: Separates system permissions from group permissions
+* **Clean membership table**: `GroupMember` only contains real user memberships
+* **Clearer UI**: Users don't see "phantom admin" in their groups
+* **Scalability**: Doesn't pollute tables with unnecessary admin records
+* **Flexibility**: Facilitates adding more system roles in the future
+* **Necessary supervision**: Admin requires immediate access without barriers
+
+### Why option to hide global group?
+* **Usability**: Advanced users can focus on their specific groups
+* **Flexibility**: Maintains functionality without forcing visibility
+* **Adoption**: Facilitates transition for users who prefer clean interfaces
+
+---
+
+*This document should be updated when new design decisions are made or additional specs are implemented.*

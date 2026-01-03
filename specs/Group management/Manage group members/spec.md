@@ -4,94 +4,100 @@
 
 ## User Scenarios & Testing *(mandatory)*
 
-### User Story 1 - Admin adds member directly (Priority: P1)
+### User Story 1 - Lead adds member directly (Priority: P1)
 
-As a Group Admin, I want to add users as members directly so that I can quickly populate groups without requiring invitation flows.
+As a Lead, I want to add users as members directly by providing their nicknames so that I can quickly populate groups without requiring invitation flows.
 
 **Why this priority**: Direct member addition is essential for administrative control, bulk enrollment, and situations where invitation flows are unnecessary overhead.
 
-**Independent Test**: Authenticated Group Admin POST `/api/groups/{g}/members` with valid user ID. Verify membership created with `role = MEMBER` and `joined_at` timestamp.
+**Independent Test**: Authenticated Lead POST `/api/groups/{g}/members` with valid nickname. Verify membership created with `role = MEMBER` and `joined_at` timestamp.
 
 **Acceptance Scenarios**:
 
-1. **Scenario**: Admin adds user as member
+1. **Scenario**: Lead adds user as member by nickname
 
-   * **Given** requesting user is admin of group `g`
-   * **And** target user exists and is not already a member
-   * **When** admin adds user with `role = MEMBER`
+   * **Given** requesting user is lead of group `g`
+   * **And** target nickname exists and is not already a member
+   * **When** lead adds user by nickname with `role = MEMBER`
    * **Then** membership is created immediately
    * **And** `joined_at` timestamp is recorded
    * **And** audit log entry is created
 
-2. **Scenario**: Admin adds user as admin
+2. **Scenario**: Lead adds user as lead by nickname
 
-   * **Given** requesting user is admin of group `g`
-   * **And** target user is a Coach or System Admin
-   * **When** admin adds user with `role = ADMIN`
-   * **Then** membership is created with admin privileges
+   * **Given** requesting user is lead of group `g`
+   * **And** target nickname corresponds to a Coach or Admin
+   * **When** lead adds user by nickname with `role = LEAD`
+   * **Then** membership is created with lead privileges
    * **And** target user can now manage the group
 
-3. **Scenario**: Admin attempts to add regular user as admin
+3. **Scenario**: Lead attempts to add regular user as lead by nickname
 
-   * **Given** target user has role `CONTESTANT` (not Coach/System Admin)
-   * **When** admin tries to add them with `role = ADMIN`
-   * **Then** system rejects with 400 (`INVALID_ADMIN_ASSIGNMENT`)
+   * **Given** target nickname corresponds to a user with role `CONTESTANT` (not Coach/Admin)
+   * **When** lead tries to add them with `role = LEAD`
+   * **Then** system rejects with 400 (`INVALID_LEAD_ASSIGNMENT`)
 
-4. **Scenario**: Admin adds user who is already member
+4. **Scenario**: Lead adds user by nickname who is already member
 
-   * **Given** target user is already a member
-   * **When** admin tries to add them again
+   * **Given** target nickname is already a member
+   * **When** lead tries to add them again
    * **Then** system rejects with 409 (`ALREADY_MEMBER`)
 
-5. **Scenario**: Non-admin attempts to add member
+5. **Scenario**: Lead attempts to add non-existent nickname
 
-   * **Given** requesting user is not admin of the group
+   * **Given** target nickname doesn't exist in the system
+   * **When** lead tries to add them
+   * **Then** system rejects with 404 (`NICKNAME_NOT_FOUND`)
+
+6. **Scenario**: Non-lead attempts to add member
+
+   * **Given** requesting user is not lead of the group
    * **When** they try to add a member
    * **Then** system rejects with 403 (`INSUFFICIENT_PERMISSIONS`)
 
 ---
 
-### User Story 2 - Admin removes member (Priority: P2)
+### User Story 2 - Lead removes member (Priority: P2)
 
-As a Group Admin, I want to remove members from the group so that I can manage group composition and remove inactive or inappropriate members.
+As a Lead, I want to remove members from the group so that I can manage group composition and remove inactive or inappropriate members.
 
 **Why this priority**: Member removal is necessary for group management, handling policy violations, and maintaining group quality.
 
-**Independent Test**: Admin DELETE `/api/groups/{g}/members/{userId}`. Verify membership deleted and audit log created. Ensure cannot remove last admin.
+**Independent Test**: Lead DELETE `/api/groups/{g}/members/{userId}`. Verify membership deleted and audit log created. Ensure cannot remove last lead.
 
 **Acceptance Scenarios**:
 
-1. **Scenario**: Admin removes regular member
+1. **Scenario**: Lead removes regular member
 
-   * **Given** requesting user is admin of group `g`
-   * **And** target user is a member (not admin)
-   * **When** admin removes the member
+   * **Given** requesting user is lead of group `g`
+   * **And** target user is a member (not lead)
+   * **When** lead removes the member
    * **Then** membership is deleted
    * **And** audit log records the removal with reason
 
-2. **Scenario**: Admin removes another admin
+2. **Scenario**: Lead removes another lead
 
-   * **Given** group has multiple admins
-   * **And** requesting user is admin
-   * **When** admin removes another admin
+   * **Given** group has multiple leads
+   * **And** requesting user is lead
+   * **When** lead removes another lead
    * **Then** membership is deleted
-   * **And** remaining admins can still manage group
+   * **And** remaining leads can still manage group
 
-3. **Scenario**: Admin attempts to remove last admin
+3. **Scenario**: Lead attempts to remove last lead
 
-   * **Given** only one admin exists in the group
-   * **When** admin tries to remove themselves or be removed
-   * **Then** system rejects with 400 (`CANNOT_REMOVE_LAST_ADMIN`)
+   * **Given** only one lead exists in the group
+   * **When** lead tries to remove themselves or be removed
+   * **Then** system rejects with 400 (`CANNOT_REMOVE_LAST_LEAD`)
 
-4. **Scenario**: Admin removes member from global group
+4. **Scenario**: Lead removes member from global group
 
    * **Given** group is the global default group (`is_default = true`)
-   * **When** admin tries to remove any member
+   * **When** lead tries to remove any member
    * **Then** system rejects with 400 (`CANNOT_REMOVE_FROM_GLOBAL_GROUP`)
 
-5. **Scenario**: Non-admin attempts to remove member
+5. **Scenario**: Non-lead attempts to remove member
 
-   * **Given** requesting user is not admin
+   * **Given** requesting user is not lead
    * **When** they try to remove a member
    * **Then** system rejects with 403 (`INSUFFICIENT_PERMISSIONS`)
 
@@ -99,39 +105,39 @@ As a Group Admin, I want to remove members from the group so that I can manage g
 
 ### User Story 3 - Change member role (Priority: P3)
 
-As a Group Admin, I want to promote members to admin or demote admins to members so that I can adjust group leadership as needed.
+As a Lead, I want to promote members to lead or demote leads to members so that I can adjust group leadership as needed.
 
 **Why this priority**: Role management allows for delegation of administrative duties and adjustment of group governance structure.
 
-**Independent Test**: Admin PATCH `/api/groups/{g}/members/{userId}` with new role. Verify role updated and constraints enforced (only Coaches can be admins).
+**Independent Test**: Lead PATCH `/api/groups/{g}/members/{userId}` with new role. Verify role updated and constraints enforced (only Coaches can be leads).
 
 **Acceptance Scenarios**:
 
-1. **Scenario**: Admin promotes member to admin
+1. **Scenario**: Lead promotes member to lead
 
-   * **Given** target user is a Coach or System Admin
+   * **Given** target user is a Coach or Admin
    * **And** currently has `role = MEMBER`
-   * **When** admin promotes them to `role = ADMIN`
-   * **Then** role is updated and user gains admin privileges
+   * **When** lead promotes them to `role = LEAD`
+   * **Then** role is updated and user gains lead privileges
 
-2. **Scenario**: Admin demotes admin to member
+2. **Scenario**: Lead demotes lead to member
 
-   * **Given** group has multiple admins
-   * **And** target user is currently admin
-   * **When** admin demotes them to `role = MEMBER`
-   * **Then** role is updated and user loses admin privileges
+   * **Given** group has multiple leads
+   * **And** target user is currently lead
+   * **When** lead demotes them to `role = MEMBER`
+   * **Then** role is updated and user loses lead privileges
 
-3. **Scenario**: Admin attempts to promote non-coach to admin
+3. **Scenario**: Lead attempts to promote non-coach to lead
 
    * **Given** target user is `CONTESTANT` (not Coach)
-   * **When** admin tries to promote them to admin
-   * **Then** system rejects with 400 (`INVALID_ADMIN_ASSIGNMENT`)
+   * **When** lead tries to promote them to lead
+   * **Then** system rejects with 400 (`INVALID_LEAD_ASSIGNMENT`)
 
-4. **Scenario**: Admin attempts to demote last admin
+4. **Scenario**: Lead attempts to demote last lead
 
-   * **Given** only one admin exists
-   * **When** admin tries to demote themselves to member
-   * **Then** system rejects with 400 (`CANNOT_REMOVE_LAST_ADMIN`)
+   * **Given** only one lead exists
+   * **When** lead tries to demote themselves to member
+   * **Then** system rejects with 400 (`CANNOT_REMOVE_LAST_LEAD`)
 
 ---
 
@@ -148,7 +154,7 @@ As a Group Member, I want to leave a group voluntarily so that I can stop partic
 1. **Scenario**: Member leaves regular group
 
    * **Given** user is member of non-global group
-   * **And** user is not the last admin (if admin)
+   * **And** user is not the last lead (if lead)
    * **When** user leaves the group
    * **Then** membership is removed
    * **And** user loses access to group content
@@ -159,11 +165,11 @@ As a Group Member, I want to leave a group voluntarily so that I can stop partic
    * **When** user tries to leave
    * **Then** system rejects with 400 (`CANNOT_LEAVE_GLOBAL_GROUP`)
 
-3. **Scenario**: Last admin attempts to leave
+3. **Scenario**: Last lead attempts to leave
 
-   * **Given** user is the only admin of the group
+   * **Given** user is the only lead of the group
    * **When** user tries to leave
-   * **Then** system rejects with 400 (`CANNOT_LEAVE_AS_LAST_ADMIN`)
+   * **Then** system rejects with 400 (`CANNOT_LEAVE_AS_LAST_LEAD`)
 
 4. **Scenario**: Non-member attempts to leave
 
@@ -187,23 +193,23 @@ As a Group Member, I want to leave a group voluntarily so that I can stop partic
 
 ### Functional Requirements
 
-* **FR-M-001**: System MUST allow Group Admins to add users as members directly.
-* **FR-M-002**: System MUST allow Group Admins to assign `ADMIN` role only to Coaches and System Admins.
-* **FR-M-003**: System MUST allow Group Admins to remove members except from global group.
-* **FR-M-004**: System MUST prevent removal of the last admin from any group.
-* **FR-M-005**: System MUST allow Group Admins to change member roles (promote/demote).
+* **FR-M-001**: System MUST allow Leads to add users as members directly.
+* **FR-M-002**: System MUST allow Leads to assign `LEAD` role only to Coaches and Admins.
+* **FR-M-003**: System MUST allow Leads to remove members except from global group.
+* **FR-M-004**: System MUST prevent removal of the last lead from any group.
+* **FR-M-005**: System MUST allow Leads to change member roles (promote/demote).
 * **FR-M-006**: System MUST allow members to leave groups voluntarily except global group.
-* **FR-M-007**: System MUST prevent members from leaving if they are the last admin.
+* **FR-M-007**: System MUST prevent members from leaving if they are the last lead.
 * **FR-M-008**: System MUST record `joined_at` timestamp for direct additions.
 * **FR-M-009**: System MUST create audit logs for critical membership changes (add, remove, role changes, not routine queries).
 * **FR-M-010**: System MUST preserve historical references when members are removed.
-* **FR-M-011**: System MUST validate user existence before membership operations.
+* **FR-M-011**: System MUST validate nickname existence before membership operations.
 * **FR-M-012**: System MUST enforce that global group membership cannot be modified.
 * **FR-M-013**: System MUST handle concurrent membership changes safely using transactions.
 * **FR-M-014**: System MUST ensure audit logs capture actor, target, action, timestamp, and reason for critical operations only.
-* **FR-M-015**: System MUST ensure only Coaches and System Admins can be assigned Group Admin role.
+* **FR-M-015**: System MUST ensure only Coaches and Admins can be assigned Lead role.
 * **FR-M-016**: System MUST ensure global group membership is immutable - users cannot be added/removed manually.
-* **FR-M-017**: System MUST ensure every group has at least one admin at all times.
+* **FR-M-017**: System MUST ensure every group has at least one lead at all times.
 * **FR-M-018**: System MUST preserve historical data when members are removed.
 * **FR-M-019**: System MUST ensure member removal does not delete user account, only group membership.
 * **FR-M-020**: System MUST ensure role changes are immediate and affect user permissions instantly.
@@ -215,7 +221,7 @@ As a Group Member, I want to leave a group voluntarily so that I can stop partic
   * **Core attributes**:
     * `group_id` (UUID)
     * `user_id` (UUID)
-    * `role` (enum: `ADMIN`, `MEMBER`)
+    * `role` (enum: `LEAD`, `MEMBER`)
     * `joined_at` (timestamp)
     * `added_by` (UUID, who added them)
     * `join_method` (enum: `DIRECT_ADD`, `INVITATION`, `REQUEST_APPROVED`, `OPEN_JOIN`)
@@ -236,90 +242,311 @@ As a Group Member, I want to leave a group voluntarily so that I can stop partic
 
 ### Measurable Outcomes
 
-* **SC-M-001**: Group Admins can add members directly and membership is created with proper timestamps.
-* **SC-M-002**: Only Coaches/System Admins can be assigned Group Admin role; others are rejected.
-* **SC-M-003**: Admins can remove members except when it would leave zero admins.
-* **SC-M-004**: Members can leave groups except global group and when they're last admin.
+* **SC-M-001**: Leads can add members directly and membership is created with proper timestamps.
+* **SC-M-002**: Only Coaches/Admins can be assigned Lead role; others are rejected.
+* **SC-M-003**: Leads can remove members except when it would leave zero leads.
+* **SC-M-004**: Members can leave groups except global group and when they're last lead.
 * **SC-M-005**: Role changes are applied immediately and validated against business rules.
 * **SC-M-006**: Critical membership operations are recorded in audit logs with complete information (routine queries are not logged).
 * **SC-M-007**: Concurrent membership operations don't create inconsistent states.
 * **SC-M-008**: Historical data is preserved when members are removed from groups.
 
-## Example API (informational, optional)
+## API Contract
 
-**Add Member** — `POST /api/groups/{groupId}/members`
+### POST /api/groups/{groupId}/members
 
+Add a user as a member or lead to the group.
+
+**Headers**:
+| Header | Type | Required | Description |
+|--------|------|----------|-------------|
+| Authorization | string | Yes | Bearer token for Lead authentication |
+
+**Path Parameters**:
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| groupId | string | Yes | ID of the group |
+
+**Request Body**:
 ```json
 {
-  "user_id": "user-uuid-123",
-  "role": "MEMBER",
-  "reason": "Course enrollment"
+  "nickname": "string",
+  "role": "string",
+  "reason": "string"
 }
 ```
 
-**Success Response** (201 Created)
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| nickname | string | Yes | Nickname of the user to add |
+| role | string | Yes | Role for the user: `MEMBER` or `LEAD` |
+| reason | string | No | Reason for adding the user |
+
+**Responses**:
+
+#### 201 Created
+Member added successfully.
+
 ```json
 {
-  "group_id": "group-uuid-456",
-  "user_id": "user-uuid-123",
-  "role": "MEMBER",
-  "joined_at": "2025-12-28T12:00:00Z",
-  "added_by": "admin-uuid-789",
+  "group_id": "string",
+  "user_id": "string",
+  "nickname": "string",
+  "role": "string",
+  "joined_at": "string",
+  "added_by": "string",
   "join_method": "DIRECT_ADD"
 }
 ```
 
-**Remove Member** — `DELETE /api/groups/{groupId}/members/{userId}`
-
-Query parameters:
-- `reason` (optional): Reason for removal
-
-**Success Response** (204 No Content)
-
-**Change Role** — `PATCH /api/groups/{groupId}/members/{userId}`
+#### 400 Bad Request
+Validation error in the request.
 
 ```json
 {
-  "role": "ADMIN",
-  "reason": "Promoting to co-instructor"
+  "error": "INVALID_LEAD_ASSIGNMENT",
+  "message": "Only Coaches and Admins can be assigned as leads"
 }
 ```
 
-**Success Response** (200 OK)
+#### 403 Forbidden
+User does not have permission to add members.
+
 ```json
 {
-  "group_id": "group-uuid-456",
-  "user_id": "user-uuid-123",
-  "role": "ADMIN",
-  "joined_at": "2025-12-20T10:00:00Z",
-  "role_changed_at": "2025-12-28T12:00:00Z"
+  "error": "INSUFFICIENT_PERMISSIONS",
+  "message": "Only leads can add members to the group"
 }
 ```
 
-**Leave Group** — `DELETE /api/groups/{groupId}/members/me`
+#### 404 Not Found
+Nickname not found.
 
-**Success Response** (204 No Content)
+```json
+{
+  "error": "NICKNAME_NOT_FOUND",
+  "message": "The specified nickname does not exist"
+}
+```
 
-**Error Responses**
-* `403 INSUFFICIENT_PERMISSIONS` — non-admin attempting admin operation
-* `400 INVALID_ADMIN_ASSIGNMENT` — trying to make non-coach an admin
-* `400 CANNOT_REMOVE_LAST_ADMIN` — removing last admin
-* `400 CANNOT_LEAVE_GLOBAL_GROUP` — trying to leave global group
-* `400 CANNOT_REMOVE_FROM_GLOBAL_GROUP` — admin trying to remove from global
-* `409 ALREADY_MEMBER` — adding existing member
-* `404 NOT_A_MEMBER` — operating on non-member
+#### 409 Conflict
+User is already a member.
+
+```json
+{
+  "error": "ALREADY_MEMBER",
+  "message": "User is already a member of this group"
+}
+```
+
+---
+
+### DELETE /api/groups/{groupId}/members/{nickname}
+
+Remove a member from the group.
+
+**Headers**:
+| Header | Type | Required | Description |
+|--------|------|----------|-------------|
+| Authorization | string | Yes | Bearer token for Lead authentication |
+
+**Path Parameters**:
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| groupId | string | Yes | ID of the group |
+| nickname | string | Yes | Nickname of the user to remove |
+
+**Query Parameters**:
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| reason | string | No | Reason for removal |
+
+**Responses**:
+
+#### 204 No Content
+Member removed successfully.
+
+#### 400 Bad Request
+Cannot remove member due to business rule violation.
+
+```json
+{
+  "error": "CANNOT_REMOVE_LAST_LEAD",
+  "message": "Cannot remove the last lead from the group"
+}
+```
+
+```json
+{
+  "error": "CANNOT_REMOVE_FROM_GLOBAL_GROUP",
+  "message": "Cannot remove members from the global group"
+}
+```
+
+#### 403 Forbidden
+User does not have permission to remove members.
+
+```json
+{
+  "error": "INSUFFICIENT_PERMISSIONS",
+  "message": "Only leads can remove members from the group"
+}
+```
+
+#### 404 Not Found
+Member not found in group.
+
+```json
+{
+  "error": "NOT_A_MEMBER",
+  "message": "User is not a member of this group"
+}
+```
+
+---
+
+### PATCH /api/groups/{groupId}/members/{nickname}
+
+Change a member's role in the group.
+
+**Headers**:
+| Header | Type | Required | Description |
+|--------|------|----------|-------------|
+| Authorization | string | Yes | Bearer token for Lead authentication |
+
+**Path Parameters**:
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| groupId | string | Yes | ID of the group |
+| nickname | string | Yes | Nickname of the user |
+
+**Request Body**:
+```json
+{
+  "role": "string",
+  "reason": "string"
+}
+```
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| role | string | Yes | New role for the user: `MEMBER` or `LEAD` |
+| reason | string | No | Reason for the role change |
+
+**Responses**:
+
+#### 200 OK
+Role changed successfully.
+
+```json
+{
+  "group_id": "string",
+  "user_id": "string",
+  "nickname": "string",
+  "role": "string",
+  "joined_at": "string",
+  "role_changed_at": "string"
+}
+```
+
+#### 400 Bad Request
+Cannot change role due to business rule violation.
+
+```json
+{
+  "error": "INVALID_LEAD_ASSIGNMENT",
+  "message": "Only Coaches and Admins can be assigned as leads"
+}
+```
+
+```json
+{
+  "error": "CANNOT_REMOVE_LAST_LEAD",
+  "message": "Cannot demote the last lead of the group"
+}
+```
+
+#### 403 Forbidden
+User does not have permission to change roles.
+
+```json
+{
+  "error": "INSUFFICIENT_PERMISSIONS",
+  "message": "Only leads can change member roles"
+}
+```
+
+#### 404 Not Found
+Member not found in group.
+
+```json
+{
+  "error": "NOT_A_MEMBER",
+  "message": "User is not a member of this group"
+}
+```
+
+---
+
+### DELETE /api/groups/{groupId}/members/me
+
+Leave a group voluntarily.
+
+**Headers**:
+| Header | Type | Required | Description |
+|--------|------|----------|-------------|
+| Authorization | string | Yes | Bearer token for user authentication |
+
+**Path Parameters**:
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| groupId | string | Yes | ID of the group |
+
+**Responses**:
+
+#### 204 No Content
+Successfully left the group.
+
+#### 400 Bad Request
+Cannot leave group due to business rule violation.
+
+```json
+{
+  "error": "CANNOT_LEAVE_GLOBAL_GROUP",
+  "message": "Cannot leave the global group"
+}
+```
+
+```json
+{
+  "error": "CANNOT_LEAVE_AS_LAST_LEAD",
+  "message": "Cannot leave as the last lead of the group"
+}
+```
+
+#### 404 Not Found
+User is not a member of the group.
+
+```json
+{
+  "error": "NOT_A_MEMBER",
+  "message": "You are not a member of this group"
+}
+```
 
 ## Notes / Implementation hints
 
 * Use database transactions for membership operations to maintain consistency
 * Implement soft deletion for audit purposes - keep membership records with `removed_at` timestamp
 * Consider batch operations for bulk member addition/removal
-* Validate user system roles before assigning group admin role
+* Validate user system roles before assigning group lead role
 * Preserve foreign key references in historical data when members are removed
 * Rate limit membership operations to prevent abuse
 * Consider notification system for membership changes
 * Implement member search/filtering for large groups
 * Support bulk role changes for administrative efficiency
 * Ensure cascade handling when users are deleted/anonymized system-wide
+* Nickname validation should use the unique `nickname` field from User entity
+* All member operations use nicknames as identifiers for better user experience and consistency
 
 ---

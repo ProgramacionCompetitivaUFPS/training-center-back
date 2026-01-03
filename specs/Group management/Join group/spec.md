@@ -6,11 +6,11 @@
 
 ### User Story 1 - Request to join a group (Priority: P1)
 
-As a user, I want to request to join a group with REQUEST policy so that admins can review and approve my membership.
+As a user, I want to request to join a group with REQUEST policy so that leads can review and approve my membership.
 
-**Why this priority**: Request-to-join is the primary mechanism for users to express interest in joining controlled groups. This enables organic growth while maintaining admin control over membership.
+**Why this priority**: Request-to-join is the primary mechanism for users to express interest in joining controlled groups. This enables organic growth while maintaining lead control over membership.
 
-**Independent Test**: Authenticated user POST `/api/groups/{g}/requests` for a group with `join_policy = REQUEST`. Verify request record created with `status = PENDING` and admins can view/approve it.
+**Independent Test**: Authenticated user POST `/api/groups/{g}/requests` for a group with `join_policy = REQUEST`. Verify request record created with `status = PENDING` and leads can view/approve it.
 
 **Acceptance Scenarios**:
 
@@ -83,41 +83,48 @@ As a user, I want to join an open group immediately so that I can access group c
 
 ### User Story 3 - Accept invitation (Priority: P3)
 
-As an invited user, I want to accept an invitation so I can join the group that invited me.
+As an invited user, I want to accept an invitation using the URL sent to my email so I can join the group that invited me.
 
 **Why this priority**: Invitation acceptance completes the invitation flow and enables consent-based membership for private groups.
 
-**Independent Test**: Use valid invitation token to accept invitation. Verify membership created and invitation status updated to `ACCEPTED`.
+**Independent Test**: Use valid JWT token from invitation URL to accept invitation. Verify membership created and invitation record deleted.
 
 **Acceptance Scenarios**:
 
 1. **Scenario**: User accepts valid invitation
 
-   * **Given** invitation exists with valid token and `status = PENDING`
-   * **And** invitation is not expired
+   * **Given** user clicks invitation URL with valid JWT token
+   * **And** JWT token is not expired (within 3 days)
+   * **And** user_id in JWT payload matches authenticated user
    * **When** invitee accepts invitation using token
    * **Then** membership is created with `role = MEMBER`
-   * **And** invitation `status` becomes `ACCEPTED`
+   * **And** invitation record is deleted from database
    * **And** `joined_at` timestamp is recorded
 
 2. **Scenario**: User accepts expired invitation
 
-   * **Given** invitation token exists but `expires_at` has passed
+   * **Given** JWT token exists but expiry has passed (>3 days old)
    * **When** user tries to accept
    * **Then** system rejects with 400 (`INVITATION_EXPIRED`)
 
-3. **Scenario**: User accepts invalid token
+3. **Scenario**: User accepts invalid or tampered token
 
-   * **Given** token is malformed or doesn't exist
+   * **Given** JWT token is malformed, has invalid signature, or doesn't exist
    * **When** user tries to accept
-   * **Then** system rejects with 404 (`INVITATION_NOT_FOUND`)
+   * **Then** system rejects with 400 (`INVALID_TOKEN`)
 
 4. **Scenario**: User accepts invitation when already member
 
    * **Given** user is already a member of the group (race condition)
    * **When** user tries to accept invitation
    * **Then** system returns 409 (`ALREADY_MEMBER`)
-   * **And** invitation status becomes `CONSUMED`
+
+5. **Scenario**: User accepts old invitation after new one was sent
+
+   * **Given** lead re-invited user (old invitation record was deleted)
+   * **And** user clicks old invitation URL with old JWT token
+   * **When** user tries to accept with old token
+   * **Then** system rejects with 400 (`INVALID_TOKEN`) - invitation record doesn't exist
 
 ---
 
@@ -125,10 +132,12 @@ As an invited user, I want to accept an invitation so I can join the group that 
 
 * User requests to join group that gets deleted before approval
 * Multiple concurrent join requests from same user
-* User accepts invitation after being added directly by admin
+* User accepts invitation after being added directly by lead
 * Join request for group that changes join policy before approval
 * User tries to join global group (should be automatic, not manual)
 * Rate limiting on join requests to prevent spam
+* User clicks old invitation URL after lead re-sent new invitation
+* JWT token is manually modified or tampered with
 
 ## Requirements *(mandatory)*
 
@@ -136,18 +145,19 @@ As an invited user, I want to accept an invitation so I can join the group that 
 
 * **FR-J-001**: System MUST allow users to create join requests for groups with `join_policy = REQUEST`.
 * **FR-J-002**: System MUST allow users to join groups directly when `join_policy = OPEN`.
-* **FR-J-003**: System MUST allow users to accept invitations using valid tokens.
+* **FR-J-003**: System MUST allow users to accept invitations using valid JWT tokens.
 * **FR-J-004**: System MUST restrict join operations to visible groups (`visibility = VISIBLE`) unless user has invitation.
 * **FR-J-005**: System MUST prevent duplicate memberships - reject if user already member.
 * **FR-J-006**: System MUST create GroupMember records with `role = MEMBER` and `joined_at` timestamp.
-* **FR-J-007**: System MUST validate invitation tokens and expiry before acceptance.
-* **FR-J-008**: System MUST update invitation status to `ACCEPTED` or `CONSUMED` appropriately.
+* **FR-J-007**: System MUST validate JWT signature, expiry (3 days), and payload before acceptance.
+* **FR-J-008**: System MUST delete invitation record after successful acceptance (single-use enforcement).
 * **FR-J-009**: System MUST enforce join policy restrictions - reject inappropriate join methods.
 * **FR-J-010**: System MUST record audit logs for critical join operations (membership creation, not routine queries).
 * **FR-J-011**: System MUST handle concurrent join attempts gracefully using DB constraints.
-* **FR-J-012**: System MUST validate invitation tokens using standard UUID validation (no timing attack considerations needed for UUID tokens).
+* **FR-J-012**: System MUST validate JWT tokens - reject tampered or invalid tokens with 400 (`INVALID_TOKEN`).
 * **FR-J-013**: System MUST ensure users can only join visible groups unless they have valid invitation.
 * **FR-J-014**: System MUST prevent manual joining of global group (membership is automatic).
+* **FR-J-015**: System MUST verify user_id in JWT payload matches authenticated user accepting invitation.
 
 ### Key Entities *(include if feature involves data)*
 
@@ -166,7 +176,7 @@ As an invited user, I want to accept an invitation so I can join the group that 
   * **Core attributes**:
     * `group_id` (UUID)
     * `user_id` (UUID)
-    * `role` (enum: `MEMBER` for joins, `ADMIN` assigned separately)
+    * `role` (enum: `MEMBER` for joins, `LEAD` assigned separately)
     * `joined_at` (timestamp)
 
 ## Success Criteria *(mandatory)*
@@ -175,67 +185,213 @@ As an invited user, I want to accept an invitation so I can join the group that 
 
 * **SC-J-001**: Users can create join requests for REQUEST groups and receive 201 Created response.
 * **SC-J-002**: Users can join OPEN groups directly and membership is created immediately.
-* **SC-J-003**: Users can accept valid invitations and membership is created with proper timestamps.
+* **SC-J-003**: Users can accept valid JWT invitations and membership is created with proper timestamps.
 * **SC-J-004**: Invalid join attempts (wrong policy, already member, etc.) are rejected with appropriate error codes.
 * **SC-J-005**: All join operations are logged in audit trail with actor and timestamp.
 * **SC-J-006**: Concurrent join attempts are handled without creating duplicate memberships.
+* **SC-J-007**: Expired or tampered JWT tokens are rejected appropriately.
 
-## Example API (informational, optional)
+## API Contract
 
-**Create Join Request** — `POST /api/groups/{groupId}/requests`
+### POST /api/groups/{groupId}/requests
 
+Create a join request for a group with REQUEST policy.
+
+**Headers**:
+| Header | Type | Required | Description |
+|--------|------|----------|-------------|
+| Authorization | string | Yes | Bearer token for user authentication |
+
+**Path Parameters**:
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| groupId | string | Yes | ID of the group |
+
+**Request Body**:
 ```json
 {
-  "message": "I'm interested in joining this algorithms course"
+  "message": "string"
 }
 ```
 
-**Success Response** (201 Created)
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| message | string | No | Optional message explaining why user wants to join |
+
+**Responses**:
+
+#### 201 Created
+Join request created successfully.
+
 ```json
 {
-  "id": "request-uuid-123",
-  "group_id": "group-uuid-456",
+  "id": "string",
+  "group_id": "string",
   "status": "PENDING",
-  "message": "I'm interested in joining this algorithms course",
-  "created_at": "2025-12-28T12:00:00Z"
+  "message": "string",
+  "created_at": "string"
 }
 ```
 
-**Join Open Group** — `POST /api/groups/{groupId}/join`
+#### 400 Bad Request
+Cannot create join request due to policy violation.
 
-**Success Response** (201 Created)
 ```json
 {
-  "group_id": "group-uuid-456",
-  "user_id": "user-uuid-789",
-  "role": "MEMBER",
-  "joined_at": "2025-12-28T12:00:00Z"
+  "error": "INVALID_JOIN_POLICY",
+  "message": "This group does not accept join requests"
 }
 ```
 
-**Accept Invitation** — `POST /api/groups/{groupId}/invitations/{token}/accept`
+#### 404 Not Found
+Group not found or not visible.
 
-**Success Response** (200 OK)
 ```json
 {
-  "group_id": "group-uuid-456",
-  "user_id": "user-uuid-789",
-  "role": "MEMBER",
-  "joined_at": "2025-12-28T12:00:00Z"
+  "error": "GROUP_NOT_FOUND",
+  "message": "Group not found or not visible"
 }
 ```
 
-**Error Responses**
-* `400 INVALID_JOIN_POLICY` — wrong join method for group policy
-* `400 INVITATION_EXPIRED` — invitation token expired
-* `404 GROUP_NOT_FOUND` — group not visible or doesn't exist
-* `404 INVITATION_NOT_FOUND` — invalid invitation token
-* `409 ALREADY_MEMBER` — user already member of group
+#### 409 Conflict
+User is already a member.
+
+```json
+{
+  "error": "ALREADY_MEMBER",
+  "message": "You are already a member of this group"
+}
+```
+
+---
+
+### POST /api/groups/{groupId}/join
+
+Join an open group directly without approval.
+
+**Headers**:
+| Header | Type | Required | Description |
+|--------|------|----------|-------------|
+| Authorization | string | Yes | Bearer token for user authentication |
+
+**Path Parameters**:
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| groupId | string | Yes | ID of the group |
+
+**Responses**:
+
+#### 201 Created
+Successfully joined the group.
+
+```json
+{
+  "group_id": "string",
+  "user_id": "string",
+  "role": "MEMBER",
+  "joined_at": "string"
+}
+```
+
+#### 400 Bad Request
+Cannot join group directly.
+
+```json
+{
+  "error": "DIRECT_JOIN_NOT_ALLOWED",
+  "message": "This group does not allow direct joining"
+}
+```
+
+#### 404 Not Found
+Group not found or not visible.
+
+```json
+{
+  "error": "GROUP_NOT_FOUND",
+  "message": "Group not found or not visible"
+}
+```
+
+#### 409 Conflict
+User is already a member.
+
+```json
+{
+  "error": "ALREADY_MEMBER",
+  "message": "You are already a member of this group"
+}
+```
+
+---
+
+### POST /api/groups/{groupId}/accept
+
+Accept an invitation using JWT token from email URL.
+
+**Headers**:
+| Header | Type | Required | Description |
+|--------|------|----------|-------------|
+| Authorization | string | Yes | Bearer token for user authentication |
+
+**Path Parameters**:
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| groupId | string | Yes | ID of the group |
+
+**Query Parameters**:
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| token | string | Yes | JWT invitation token from email URL |
+
+**Responses**:
+
+#### 200 OK
+Invitation accepted successfully and membership created.
+
+```json
+{
+  "group_id": "string",
+  "user_id": "string",
+  "role": "MEMBER",
+  "joined_at": "string"
+}
+```
+
+#### 400 Bad Request
+Invitation cannot be accepted due to expiry or invalid token.
+
+```json
+{
+  "error": "INVITATION_EXPIRED",
+  "message": "The invitation has expired (>3 days old)"
+}
+```
+
+```json
+{
+  "error": "INVALID_TOKEN",
+  "message": "Invalid, tampered, or non-existent invitation token"
+}
+```
+
+#### 409 Conflict
+User is already a member.
+
+```json
+{
+  "error": "ALREADY_MEMBER",
+  "message": "You are already a member of this group"
+}
+```
 
 ## Notes / Implementation hints
 
 * Join requests should include rate limiting (e.g., max 5 requests per user per hour)
-* Invitation tokens are simple UUIDs - standard validation, no timing attack considerations needed
+* Use JWT library to validate invitation tokens - check signature, expiry, and payload
+* JWT tokens for invitations have fixed 3-day TTL and contain user_id and group_id in payload
+* Verify user_id in JWT payload matches authenticated user accepting invitation
+* Delete invitation record after successful acceptance (single-use enforcement)
 * Use database constraints to prevent duplicate memberships on concurrent requests
 * Consider soft-deleting join requests rather than hard deletion for audit purposes
 * Global group membership should be handled by user creation flow, not join endpoints
@@ -244,5 +400,7 @@ As an invited user, I want to accept an invitation so I can join the group that 
 * Direct joining is only valid for groups with `OPEN` policy
 * Invitation acceptance works regardless of group join policy
 * Non-visible groups only support `INVITE` policy, so join requests and direct joins are not applicable
+* Invitation URL format: `https://training-center.com/groups/{groupId}/accept?token={jwt_token}`
+* Handle edge case where user clicks old invitation URL after lead re-sent new invitation (invitation record deleted)
 
 ---
