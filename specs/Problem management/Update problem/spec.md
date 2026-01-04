@@ -15,36 +15,43 @@ As a Coach or Admin who has created a problem, I want to update the problem's me
 **Acceptance Scenarios**:
 
 1. **Scenario**: Successful metadata update
-   - **Given** a problem exists with status `NOT_VISIBLE`
+   - **Given** a problem exists with status `DRAFT`
    - **And** the authenticated user is the author, Admin, or a modifier
    - **When** they submit an update request with partial data (e.g., only statement)
    - **Then** the system updates only the provided fields
    - **And** returns the updated problem data
 
 2. **Scenario**: Update multiple fields at once
-   - **Given** a problem exists with status `NOT_VISIBLE`
+   - **Given** a problem exists with status `DRAFT`
    - **And** the authenticated user is the author or Admin
    - **When** they submit an update with title, statement, timeLimit, and memoryLimit
    - **Then** the system updates all provided fields
    - **And** `updatedAt` timestamp is refreshed
 
-3. **Scenario**: Update VISIBLE problem blocked
-   - **Given** a problem exists with status `VISIBLE`
+3. **Scenario**: Update PUBLISHED problem blocked
+   - **Given** a problem exists with status `PUBLISHED`
    - **When** the author attempts to update metadata
-   - **Then** the system rejects with 400 Bad Request (PROBLEM_IS_VISIBLE)
+   - **Then** the system rejects with 400 Bad Request (PROBLEM_IS_PUBLISHED)
    - **And** suggests unpublishing first to make changes
 
 4. **Scenario**: Unauthorized update attempt
-   - **Given** a problem exists with status `NOT_VISIBLE`
+   - **Given** a problem exists with status `DRAFT`
    - **And** the authenticated user is neither the author, an Admin, nor a modifier
    - **When** they attempt to update metadata
    - **Then** the system rejects with 403 Forbidden (INSUFFICIENT_PERMISSIONS)
 
 5. **Scenario**: Modifier updates metadata
-   - **Given** a problem exists with status `NOT_VISIBLE`
+   - **Given** a problem exists with status `DRAFT`
    - **And** the authenticated user has been assigned as a modifier for this problem
    - **When** they update the statement
    - **Then** the system accepts the update
+
+9. **Scenario**: Update accessibility from PRIVATE to PUBLIC
+   - **Given** a problem exists with status `DRAFT` and accessibility `PRIVATE`
+   - **And** the authenticated user is the author, Admin, or a modifier
+   - **When** they update accessibility to `PUBLIC`
+   - **Then** the system updates the accessibility
+   - **And** returns the updated problem data
 
 6. **Scenario**: Invalid time/memory limit
    - **Given** a Coach or Admin is authenticated
@@ -76,26 +83,26 @@ As a Coach or Admin who has created a problem, I want to upload test cases, solu
 **Acceptance Scenarios**:
 
 1. **Scenario**: Upload test cases file
-   - **Given** a problem exists with status `NOT_VISIBLE`
+   - **Given** a problem exists with status `DRAFT`
    - **And** the authenticated user is the author, Admin, or a modifier
    - **When** they upload a test cases ZIP file
    - **Then** the system stores the file and associates it with the problem
    - **And** validates ZIP structure follows ICPC format
 
 2. **Scenario**: Upload solution file
-   - **Given** a problem exists with status `NOT_VISIBLE`
+   - **Given** a problem exists with status `DRAFT`
    - **And** the authenticated user is the author, Admin, or a modifier
    - **When** they upload a solution file (Python, C++, or Java)
    - **Then** the system stores the file as a solution for validation
 
 3. **Scenario**: Upload optional checker
-   - **Given** a problem exists with status `NOT_VISIBLE`
+   - **Given** a problem exists with status `DRAFT`
    - **And** the authenticated user is the author, Admin, or a modifier
    - **When** they upload a checker file
    - **Then** the system stores the file as the custom checker
 
 4. **Scenario**: Upload optional validator
-   - **Given** a problem exists with status `NOT_VISIBLE`
+   - **Given** a problem exists with status `DRAFT`
    - **And** the authenticated user is the author, Admin, or a modifier
    - **When** they upload a validator file
    - **Then** the system stores the file as the input validator
@@ -106,14 +113,14 @@ As a Coach or Admin who has created a problem, I want to upload test cases, solu
    - **When** they upload a new test cases file
    - **Then** the system replaces the previous file with the new one
 
-6. **Scenario**: Upload to VISIBLE problem
-   - **Given** a problem exists with status `VISIBLE`
+6. **Scenario**: Upload to PUBLISHED problem
+   - **Given** a problem exists with status `PUBLISHED`
    - **When** the author attempts to upload files
-   - **Then** the system rejects with 400 Bad Request (PROBLEM_IS_VISIBLE)
+   - **Then** the system rejects with 400 Bad Request (PROBLEM_IS_PUBLISHED)
    - **And** suggests unpublishing first to make changes
 
 7. **Scenario**: Unauthorized upload attempt
-   - **Given** a problem exists with status `NOT_VISIBLE`
+   - **Given** a problem exists with status `DRAFT`
    - **And** the authenticated user is neither the author, an Admin, nor a modifier
    - **When** they attempt to upload files
    - **Then** the system rejects with 403 Forbidden (INSUFFICIENT_PERMISSIONS)
@@ -131,7 +138,7 @@ As a Coach or Admin, I want to delete a specific file from a problem so that I c
 **Acceptance Scenarios**:
 
 1. **Scenario**: Delete test cases file
-   - **Given** a problem exists with status `NOT_VISIBLE`
+   - **Given** a problem exists with status `DRAFT`
    - **And** has a test cases file uploaded
    - **And** the authenticated user is the author, Admin, or a modifier
    - **When** they delete the test cases file
@@ -143,13 +150,13 @@ As a Coach or Admin, I want to delete a specific file from a problem so that I c
    - **When** they delete a specific solution by filename
    - **Then** only that solution is removed
 
-3. **Scenario**: Delete file from VISIBLE problem
-   - **Given** a problem exists with status `VISIBLE`
+3. **Scenario**: Delete file from PUBLISHED problem
+   - **Given** a problem exists with status `PUBLISHED`
    - **When** the author attempts to delete a file
-   - **Then** the system rejects with 400 Bad Request (PROBLEM_IS_VISIBLE)
+   - **Then** the system rejects with 400 Bad Request (PROBLEM_IS_PUBLISHED)
 
 4. **Scenario**: Unauthorized delete attempt
-   - **Given** a problem exists with status `NOT_VISIBLE`
+   - **Given** a problem exists with status `DRAFT`
    - **And** the authenticated user is neither the author, an Admin, nor a modifier
    - **When** they attempt to delete a file
    - **Then** the system rejects with 403 Forbidden (INSUFFICIENT_PERMISSIONS)
@@ -229,7 +236,7 @@ As a problem author or Admin, I want to assign other users as modifiers so that 
 
 Update problem metadata.
 
-> **Important**: Only the problem author, Admin, or modifier can update. Problem must be in `NOT_VISIBLE` status. Use partial updates - only provided fields are modified. The slug is NOT regenerated if title changes.
+> **Important**: Only the problem author, Admin, or modifier can update. Problem must be in `DRAFT` status. Use partial updates - only provided fields are modified. The slug is NOT regenerated if title changes.
 
 **Headers**:
 
@@ -252,7 +259,8 @@ Update problem metadata.
   "statement": "Updated statement in LaTeX...",
   "timeLimit": 3000,
   "memoryLimit": 512,
-  "tags": ["math", "beginner", "implementation"]
+  "tags": ["math", "beginner", "implementation"],
+  "accessibility": "PUBLIC"
 }
 ```
 
@@ -263,6 +271,7 @@ Update problem metadata.
 | timeLimit | integer | No | Time limit in milliseconds (> 0, max: 300000) |
 | memoryLimit | integer | No | Memory limit in MiB (> 0, max: 2048) |
 | tags | string[] | No | Array of tags from system's predefined list |
+| accessibility | string | No | Problem accessibility: `PUBLIC` or `PRIVATE` |
 
 **Responses**:
 
@@ -277,7 +286,8 @@ Problem updated successfully.
   "timeLimit": 3000,
   "memoryLimit": 512,
   "tags": ["math", "beginner", "implementation"],
-  "status": "NOT_VISIBLE",
+  "status": "DRAFT",
+  "accessibility": "PUBLIC",
   "author": {
     "nickname": "coach_john",
     "name": "John Smith"
@@ -300,12 +310,12 @@ Problem updated successfully.
 ```
 
 #### 400 Bad Request
-Validation error or problem is VISIBLE.
+Validation error or problem is PUBLISHED.
 
 ```json
 {
-  "error": "PROBLEM_IS_VISIBLE",
-  "message": "Cannot update a visible problem. Unpublish first to make changes."
+  "error": "PROBLEM_IS_PUBLISHED",
+  "message": "Cannot update a published problem. Unpublish first to make changes."
 }
 ```
 
@@ -358,7 +368,7 @@ Problem not found.
 
 Upload files for a problem (test cases, solution, checker, validator).
 
-> **Important**: Only the problem author, Admin, or modifier can upload files. Problem must be in `NOT_VISIBLE` status. Files are uploaded directly to the backend. Use multipart/form-data.
+> **Important**: Only the problem author, Admin, or modifier can upload files. Problem must be in `DRAFT` status. Files are uploaded directly to the backend. Use multipart/form-data.
 
 **Headers**:
 
@@ -425,7 +435,7 @@ File uploaded successfully.
 ```
 
 #### 400 Bad Request
-Invalid file, problem is VISIBLE, or file too large.
+Invalid file, problem is PUBLISHED, or file too large.
 
 ```json
 {
@@ -436,8 +446,8 @@ Invalid file, problem is VISIBLE, or file too large.
 
 ```json
 {
-  "error": "PROBLEM_IS_VISIBLE",
-  "message": "Cannot upload files to a visible problem. Unpublish first."
+  "error": "PROBLEM_IS_PUBLISHED",
+  "message": "Cannot upload files to a published problem. Unpublish first."
 }
 ```
 
@@ -501,12 +511,12 @@ File deleted successfully.
 ```
 
 #### 400 Bad Request
-Problem is VISIBLE.
+Problem is PUBLISHED.
 
 ```json
 {
-  "error": "PROBLEM_IS_VISIBLE",
-  "message": "Cannot delete files from a visible problem. Unpublish first."
+  "error": "PROBLEM_IS_PUBLISHED",
+  "message": "Cannot delete files from a published problem. Unpublish first."
 }
 ```
 
@@ -696,13 +706,14 @@ Problem not found.
 
 **Metadata Updates**
 - **FR-001**: The system MUST allow partial updates to problem metadata (only provided fields are modified).
-- **FR-002**: The system MUST only allow updates to problems with status `NOT_VISIBLE`.
+- **FR-002**: The system MUST only allow updates to problems with status `DRAFT`.
 - **FR-003**: The system MUST only allow the problem author, Admin, or assigned modifiers to update a problem.
 - **FR-004**: The system MUST NOT regenerate the slug when title is updated.
 - **FR-005**: The system MUST validate timeLimit as positive integer ≤ 300000 milliseconds if provided.
 - **FR-006**: The system MUST validate memoryLimit as positive integer ≤ 2048 MiB if provided.
 - **FR-007**: The system MUST validate tags against the system's predefined tag list if provided.
 - **FR-008**: Tags MUST always be optional.
+- **FR-008b**: The system MUST allow updating accessibility (`PUBLIC` or `PRIVATE`) by the author, Admin, or assigned modifiers.
 
 **File Uploads**
 - **FR-009**: The system MUST accept direct file uploads via multipart/form-data.
@@ -712,11 +723,11 @@ Problem not found.
 - **FR-013**: The system MUST enforce file size limits (200 MB for test cases, 10 MB for others).
 - **FR-014**: The system MUST allow replacing existing files with new uploads.
 - **FR-015**: The system MUST allow multiple solution files to be uploaded.
-- **FR-016**: The system MUST only allow file uploads when problem status is `NOT_VISIBLE`.
+- **FR-016**: The system MUST only allow file uploads when problem status is `DRAFT`.
 
 **File Deletion**
 - **FR-017**: The system MUST allow deleting individual files from problems.
-- **FR-018**: The system MUST only allow file deletion when problem status is `NOT_VISIBLE`.
+- **FR-018**: The system MUST only allow file deletion when problem status is `DRAFT`.
 - **FR-019**: For solutions, the system MUST allow specifying which solution to delete by filename.
 
 **Modifiers**
@@ -744,7 +755,8 @@ Referenced from Create Problem spec:
   - `timeLimit` (integer, milliseconds, nullable, max: 300000)
   - `memoryLimit` (integer, MiB, nullable, max: 2048)
   - `tags` (array of strings, always optional, from predefined list)
-  - `status` (enum: `NOT_VISIBLE` | `VISIBLE`)
+  - `status` (enum: `DRAFT` | `PUBLISHED`)
+  - `accessibility` (enum: `PUBLIC` | `PRIVATE`, default: `PRIVATE`)
   - `authorId` (string, UUID, FK to User)
   - `modifierIds` (array of UUIDs, FK to User, users with edit permissions)
   - `testCasesFileKey` (string, nullable, reference to test cases ZIP)
@@ -754,9 +766,13 @@ Referenced from Create Problem spec:
   - `createdAt` (timestamp)
   - `updatedAt` (timestamp)
 
-> **Problem States**:
-> - `NOT_VISIBLE`: Problem is being built. Can have partial data. Can be updated.
-> - `VISIBLE`: Problem is complete and published. Cannot be modified (must unpublish first via Publish Problem spec).
+> **Problem Status** (publication state):
+> - `DRAFT`: Problem is being built. Can have partial data. Can be updated.
+> - `PUBLISHED`: Problem is complete and published. Cannot be modified (must unpublish first via Publish Problem spec).
+
+> **Problem Accessibility** (who can add it to contests):
+> - `PRIVATE`: Only the problem's modifiers (author + assigned modifiers) can add this problem to a contest. Default for all new problems.
+> - `PUBLIC`: Any contest creator can add this problem to their contest.
 
 ### Supported File Types
 
@@ -772,6 +788,7 @@ Referenced from Create Problem spec:
 | Action | Author | Admin | Modifier | Contestant |
 |--------|--------|-------|----------|------------|
 | Update metadata | ✅ | ✅ | ✅ | ❌ |
+| Update accessibility | ✅ | ✅ | ✅ | ❌ |
 | Upload files | ✅ | ✅ | ✅ | ❌ |
 | Delete files | ✅ | ✅ | ✅ | ❌ |
 | Add modifier | ✅ | ✅ | ❌ | ❌ |
@@ -787,7 +804,7 @@ Referenced from Create Problem spec:
 
 - **SC-001**: Problem metadata can be updated via `PUT /problems/{slug}` with HTTP 200.
 - **SC-002**: Only provided fields are modified during update (partial updates work).
-- **SC-003**: Updates are blocked for problems with status `VISIBLE` (HTTP 400).
+- **SC-003**: Updates are blocked for problems with status `PUBLISHED` (HTTP 400).
 - **SC-004**: Files can be uploaded via `POST /problems/{slug}/files` with HTTP 200.
 - **SC-005**: Files can be deleted via `DELETE /problems/{slug}/files/{fileType}` with HTTP 200.
 - **SC-006**: Test cases ZIP structure is validated against ICPC format on upload.
@@ -804,7 +821,7 @@ Referenced from Create Problem spec:
 
 - **Slug immutability**: The slug is generated once at creation and never changes, even if title is updated.
 - **File replacement**: Uploading a file of the same type replaces the existing file.
-- **VISIBLE state**: To modify a VISIBLE problem, it must first be unpublished via the Publish Problem spec.
+- **PUBLISHED state**: To modify a PUBLISHED problem, it must first be unpublished via the Publish Problem spec.
 - **Related specs**:
   - Create Problem: Initial problem creation
   - Publish Problem: Publishing and unpublishing problems

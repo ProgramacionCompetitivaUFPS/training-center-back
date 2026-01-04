@@ -18,7 +18,7 @@ As an Admin or a Coach, I want to create a Group so that a collection of users c
 
 * **Given** a Coach is authenticated
 * **When** they submit a valid CreateGroup request with `name`, optional `description`, `visibility = VISIBLE`, `join_policy = REQUEST`
-* **Then** the system returns 201 Created with the created Group data (id, slug, created_at)
+* **Then** the system returns 201 Created with the created Group data (id, name, created_at)
 * **And** the creator is recorded as Lead and member (`role = LEAD`)
 * **And** `visibility` and `join_policy` are stored correctly
 * **And** the group initially has zero contests/materials and zero members except the creator
@@ -141,21 +141,21 @@ As a Coach or Admin, I want to optionally add initial members and leads at creat
 
 ---
 
-### User Story 3 - Slug/Name uniqueness and reserved names (Priority: P2)
+### User Story 3 - Name uniqueness and reserved names (Priority: P2)
 
-As a System, I want group names/slugs to be unique (and some reserved names forbidden) so URL/lookup collisions and reserved groups (global) cannot be created accidentally.
+As a System, I want group names to be unique (and some reserved names forbidden) so collisions and reserved groups (global) cannot be created accidentally.
 
-**Why this priority**: Naming collisions cause confusion and break direct-linking.
+**Why this priority**: Naming collisions cause confusion for users.
 
-**Independent Test**: Attempt to create duplicate name/slug; attempt to create group with reserved name `global` etc.
+**Independent Test**: Attempt to create duplicate name; attempt to create group with reserved name `global` etc.
 
 **Acceptance Scenarios**:
 
-1. **Scenario**: Create with duplicate slug
+1. **Scenario**: Create with duplicate name
 
-* **Given** a Group with slug `algorithms-2025` exists
-* **When** another coach tries to create a group with name that maps to same slug
-* **Then** the system rejects with 409 Conflict (`SLUG_ALREADY_EXISTS`)
+* **Given** a Group with name `Algorithms 2025` exists
+* **When** another coach tries to create a group with the same name
+* **Then** the system rejects with 409 Conflict (`NAME_ALREADY_EXISTS`)
 
 2. **Scenario**: Create group with reserved name
 
@@ -171,7 +171,7 @@ As a System, I want group names/slugs to be unique (and some reserved names forb
 * Creating a group with `join_policy = OPEN` but `visibility = NOT_VISIBLE` → This combination is invalid; system must reject (`INVALID_POLICY_COMBINATION`) because non-visible groups cannot allow open joining.
 * Creating a group with `join_policy = REQUEST` but `visibility = NOT_VISIBLE` → This combination is invalid; system must reject (`INVALID_POLICY_COMBINATION`) because users cannot request to join groups they cannot see.
 * What happens when Admin attempts to set `is_default = true` in the create endpoint? → Creation endpoints must reject attempts to set `is_default`; only bootstrap/migration may set it (`FORBIDDEN_FIELD`).
-* Name/slug normalization: whitespace/diacritics/uppercase must be normalized before uniqueness checks; collisions after normalization must be treated as conflicts.
+* Name normalization: whitespace must be trimmed; name comparison for uniqueness is case-insensitive.
 * Creator is always added as LEAD automatically; system ensures at least one lead exists (the creator).
 * Duplicate nicknames in the same list → silently deduplicated before processing.
 * Creator's nickname in `initial_lead_nicknames` → silently ignored (already LEAD).
@@ -188,10 +188,10 @@ As a System, I want group names/slugs to be unique (and some reserved names forb
 * **FR-001**: System MUST allow Admins and Coaches to create Groups.
 * **FR-002**: System MUST reject group creation attempts by non-Coach, non-Admin users with 403 (`INSUFFICIENT_PERMISSIONS`).
 * **FR-003**: When a group is created, the creator MUST be added as a Group member and assigned role `LEAD` for that group.
-* **FR-004**: Groups MUST have attributes: `id`, `name`, `slug`, `description`, `visibility` (`VISIBLE` | `NOT_VISIBLE`), `join_policy` (`INVITE` | `REQUEST` | `OPEN`), `created_by`, `created_at`, `is_default` (boolean), `members_count`.
+* **FR-004**: Groups MUST have attributes: `id`, `name`, `description`, `visibility` (`VISIBLE` | `NOT_VISIBLE`), `join_policy` (`INVITE` | `REQUEST` | `OPEN`), `created_by`, `created_at`, `is_default` (boolean), `members_count`.
 * **FR-005**: System MUST record membership entries (`GroupMember`) for the creator with `role = LEAD` and `joined_at` timestamp.
 * **FR-006**: System MUST enforce that only Admins and Coaches (system-level roles) can be assigned the LEAD role inside a group.
-* **FR-007**: System MUST persist groups with a unique `slug`. Attempts to create with an existing slug MUST fail (409 `SLUG_ALREADY_EXISTS`).
+* **FR-007**: System MUST persist groups with a unique `name` (case-insensitive). Attempts to create with an existing name MUST fail (409 `NAME_ALREADY_EXISTS`).
 * **FR-008**: System MUST allow optional `initial_member_nicknames` and `initial_lead_nicknames` in request payload. When provided, all nicknames MUST be validated to exist and initial_lead nicknames MUST be validated as Coaches or Admin.
 * **FR-009**: System MUST store `visibility` and `join_policy` and enforce these rules at runtime (discovery, join flows).
 * **FR-010**: System MUST record `joined_at` for every initial added member and for the creator when group is created.
@@ -199,7 +199,7 @@ As a System, I want group names/slugs to be unique (and some reserved names forb
 * **FR-012**: System MUST prevent creation of groups with zero members. (Creator is always added; attempts to explicitly clear members on create are invalid.)
 * **FR-013**: System MUST validate combinations of `visibility` and `join_policy`. Groups with `visibility = NOT_VISIBLE` MUST only allow `join_policy = INVITE`.
 * **FR-014**: System MUST record `created_by` with the creator user id.
-* **FR-015**: System MUST return meaningful error codes/messages for invalid inputs (e.g., `RESERVED_NAME`, `SLUG_ALREADY_EXISTS`, `INVALID_LEAD_ASSIGNMENT`, `INVALID_POLICY_COMBINATION`, `FORBIDDEN_FIELD`, `DUPLICATE_NICKNAME_IN_LISTS`, `INVALID_INITIAL_MEMBERS`).
+* **FR-015**: System MUST return meaningful error codes/messages for invalid inputs (e.g., `RESERVED_NAME`, `NAME_ALREADY_EXISTS`, `INVALID_LEAD_ASSIGNMENT`, `INVALID_POLICY_COMBINATION`, `FORBIDDEN_FIELD`, `DUPLICATE_NICKNAME_IN_LISTS`, `INVALID_INITIAL_MEMBERS`).
 * **FR-016**: System MUST capture critical group creation events in audit logs (who created, timestamp, group configuration).
 * **FR-017**: System MUST ensure only Admins and Coaches can be assigned Lead role.
 * **FR-018**: System MUST create a default/global Group during bootstrap that contains all users and cannot be deleted.
@@ -222,8 +222,7 @@ As a System, I want group names/slugs to be unique (and some reserved names forb
   * **Core attributes**:
 
     * `id` (UUID)
-    * `name` (string)
-    * `slug` (string, unique, URL-safe)
+    * `name` (string, unique, case-insensitive)
     * `description` (text, optional)
     * `visibility` (enum: `VISIBLE`, `NOT_VISIBLE`)
     * `join_policy` (enum: `INVITE`, `REQUEST`, `OPEN`)
@@ -264,7 +263,7 @@ As a System, I want group names/slugs to be unique (and some reserved names forb
 
 * **SC-001**: 100% of CreateGroup requests from valid Admins/Coaches result in a persistent Group record with creator assigned as LEAD (tested via automated integration tests).
 * **SC-002**: Attempted group creation by non-authorized users is rejected with 403 in all tested cases.
-* **SC-003**: The system enforces slug uniqueness: attempts to create duplicate slugs fail with 409 (`SLUG_ALREADY_EXISTS`).
+* **SC-003**: The system enforces name uniqueness: attempts to create duplicate names fail with 409 (`NAME_ALREADY_EXISTS`).
 * **SC-004**: The system enforces LEAD assignment rules: only Coaches/Admins can be assigned as group LEAD; invalid assignments rejected with 400.
 * **SC-005**: The bootstrap process guarantees existence of the global default group upon system start (test: after migration/bootstrap, the `global` group exists and contains all users; cannot be deleted).
 * **SC-006**: Visibility + join_policy rules are enforced: `NOT_VISIBLE` + `OPEN` combination is rejected at create time; `VISIBLE` groups allow non-member read-only discovery.
@@ -312,7 +311,6 @@ Group created successfully.
 {
   "id": "string",
   "name": "string",
-  "slug": "string",
   "description": "string",
   "visibility": "string",
   "join_policy": "string",
@@ -382,19 +380,19 @@ User does not have permission to create groups.
 ```
 
 #### 409 Conflict
-Group slug already exists.
+Group name already exists.
 
 ```json
 {
-  "error": "SLUG_ALREADY_EXISTS",
-  "message": "A group with this slug already exists"
+  "error": "NAME_ALREADY_EXISTS",
+  "message": "A group with this name already exists"
 }
 ```
 
 ## Notes / Implementation hints
 
-* Slug generation must be deterministic and normalized (lowercase, remove punctuation, collapse spaces, strip diacritics).
-* Enforce uniqueness at DB level (unique index on `slug`) and in application logic to return user-friendly errors.
+* Name comparison for uniqueness should be case-insensitive.
+* Enforce uniqueness at DB level (unique index on lowercase `name`) and in application logic to return user-friendly errors.
 * `is_default` must not be writable by regular endpoints — only migration/bootstrap scripts should set it.
 * When `initial_member_nicknames` or `initial_lead_nicknames` are provided, treat group creation as atomic (either all validations pass and all members added, or reject with detailed errors).
 * All nickname validations must happen before any database writes: validate existence, validate roles for leads, check for duplicates across lists.

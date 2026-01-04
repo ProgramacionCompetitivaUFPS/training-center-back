@@ -1,7 +1,7 @@
 erDiagram
 
 
- %% ===== Entidades principales =====
+ %% ===== Main Entities =====
  User {
    string id PK
    string email UK
@@ -19,7 +19,7 @@ erDiagram
  Coach
  Contestant
  Member
- Admin_Group {
+ Lead {
    string user_id FK
    string group_id FK
  }
@@ -34,10 +34,13 @@ erDiagram
  }
  Contest {
    string id PK
+   string name
+   string description
    string group_id FK
    string ownerId FK
    timestamp startTime
    timestamp endTime
+   integer penalty
    timestamp createdAt
  }
  Standing {
@@ -56,6 +59,7 @@ erDiagram
    string id PK
    string contest_id FK
    string problem_id FK
+   integer order
  }
  Submission {
    string id PK
@@ -74,6 +78,7 @@ erDiagram
    integer memoryLimit
    string[] tags
    string status
+   string accessibility
    string authorId FK
    string testCasesFileKey
    string checkerFileKey
@@ -84,15 +89,16 @@ erDiagram
  }
 
 
- %% ===== Relaciones de roles (pseudo-entidades sólo para visualización) =====
+ %% ===== Role Relationships (pseudo-entities for visualization only) =====
  User ||--o{ Admin : is
  User ||--o{ Coach : is
  User ||--o{ Contestant : is
 
+ %% Note: Admin has implicit permissions on ALL groups
+ %% without requiring registration in GroupMember or Lead (system-level permissions)
 
- Admin ||--o{ Admin_Group : may_have
- Coach ||--o{ Admin_Group : may_have
- Admin_Group }o--|| Group : administrates
+ Coach ||--o{ Lead : may_have
+ Lead }o--|| Group : administrates
 
 
  Member }o--|| Group : belongs_to

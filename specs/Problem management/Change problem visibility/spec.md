@@ -6,16 +6,16 @@
 
 ### User Story 1 – Publish problem (Priority: P1)
 
-As a Coach or Admin with a complete problem, I want to publish it so that it becomes `VISIBLE` and available for use in contests and practice sessions.
+As a Coach or Admin with a complete problem, I want to publish it so that it becomes `PUBLISHED` and available for use in contests and practice sessions.
 
 **Why this priority**: Publishing is the final step that makes problems available to contestants. The validation ensures problem quality before publication.
 
-**Independent Test**: This user story can be tested independently by consuming the `POST /problems/{slug}/publish` endpoint for a complete problem, validating that status changes to `VISIBLE` after successful validation.
+**Independent Test**: This user story can be tested independently by consuming the `POST /problems/{slug}/publish` endpoint for a complete problem, validating that status changes to `PUBLISHED` after successful validation.
 
 **Acceptance Scenarios**:
 
 1. **Scenario**: Successful publication
-   - **Given** a problem exists with status `NOT_VISIBLE`
+   - **Given** a problem exists with status `DRAFT`
    - **And** has all required data (title, statement, timeLimit, memoryLimit, test cases, at least one solution)
    - **And** the authenticated user is the author, Admin, or a modifier
    - **When** publish is triggered
@@ -23,11 +23,11 @@ As a Coach or Admin with a complete problem, I want to publish it so that it bec
      - Compiles checker/validator if provided
      - Executes solution against all test cases
      - Verifies solution produces correct output
-   - **And** if validation passes, changes status to `VISIBLE`
+   - **And** if validation passes, changes status to `PUBLISHED`
    - **And** returns success response with validation logs
 
 2. **Scenario**: Publication fails - missing required fields
-   - **Given** a problem exists with status `NOT_VISIBLE`
+   - **Given** a problem exists with status `DRAFT`
    - **And** is missing required fields (e.g., statement, test cases)
    - **When** publish is triggered
    - **Then** the system rejects with 400 Bad Request
@@ -66,13 +66,13 @@ As a Coach or Admin with a complete problem, I want to publish it so that it bec
    - **Then** the system rejects with 400 Bad Request
    - **And** returns logs indicating which inputs failed validation
 
-8. **Scenario**: Publish already VISIBLE problem
-   - **Given** a problem exists with status `VISIBLE`
+8. **Scenario**: Publish already PUBLISHED problem
+   - **Given** a problem exists with status `PUBLISHED`
    - **When** publish is attempted again
-   - **Then** the system rejects with 409 Conflict (ALREADY_VISIBLE)
+   - **Then** the system rejects with 409 Conflict (ALREADY_PUBLISHED)
 
 9. **Scenario**: Unauthorized publish attempt
-   - **Given** a problem exists with status `NOT_VISIBLE`
+   - **Given** a problem exists with status `DRAFT`
    - **And** the authenticated user is neither the author, an Admin, nor a modifier
    - **When** they attempt to publish
    - **Then** the system rejects with 403 Forbidden (INSUFFICIENT_PERMISSIONS)
@@ -90,24 +90,24 @@ As a Coach or Admin, I want to unpublish a problem so that I can make changes to
 
 **Why this priority**: Allows corrections and updates to published problems. Lower priority as it's not part of the initial creation flow.
 
-**Independent Test**: This user story can be tested independently by consuming the `POST /problems/{slug}/unpublish` endpoint, validating that status changes from `VISIBLE` to `NOT_VISIBLE`.
+**Independent Test**: This user story can be tested independently by consuming the `POST /problems/{slug}/unpublish` endpoint, validating that status changes from `PUBLISHED` to `DRAFT`.
 
 **Acceptance Scenarios**:
 
 1. **Scenario**: Successful unpublish
-   - **Given** a problem exists with status `VISIBLE`
+   - **Given** a problem exists with status `PUBLISHED`
    - **And** the authenticated user is the author, Admin, or a modifier
    - **When** unpublish is triggered
-   - **Then** the system changes status to `NOT_VISIBLE`
+   - **Then** the system changes status to `DRAFT`
    - **And** returns success response
 
-2. **Scenario**: Unpublish NOT_VISIBLE problem
-   - **Given** a problem exists with status `NOT_VISIBLE`
+2. **Scenario**: Unpublish DRAFT problem
+   - **Given** a problem exists with status `DRAFT`
    - **When** unpublish is attempted
-   - **Then** the system rejects with 409 Conflict (ALREADY_NOT_VISIBLE)
+   - **Then** the system rejects with 409 Conflict (ALREADY_DRAFT)
 
 3. **Scenario**: Unauthorized unpublish attempt
-   - **Given** a problem exists with status `VISIBLE`
+   - **Given** a problem exists with status `PUBLISHED`
    - **And** the authenticated user is neither the author, an Admin, nor a modifier
    - **When** they attempt to unpublish
    - **Then** the system rejects with 403 Forbidden (INSUFFICIENT_PERMISSIONS)
@@ -144,7 +144,7 @@ As a Coach or Admin, I want to unpublish a problem so that I can make changes to
 
 ### POST /problems/{slug}/publish
 
-Validate and publish a problem, changing status from `NOT_VISIBLE` to `VISIBLE`.
+Validate and publish a problem, changing status from `DRAFT` to `PUBLISHED`.
 
 > **Important**: This endpoint triggers full validation:
 > - Verifies all required fields are present
@@ -193,14 +193,14 @@ Problem published successfully.
 ```json
 {
   "slug": "sum-of-two-numbers",
-  "status": "VISIBLE",
+  "status": "PUBLISHED",
   "message": "Problem published successfully",
   "validationLogs": [
     "✓ Required fields validated",
     "✓ Test cases ZIP structure valid (5 sample, 20 secret cases)",
     "✓ Solution compiled successfully",
     "✓ Solution passed all 25 test cases",
-    "✓ Problem is now VISIBLE"
+    "✓ Problem is now PUBLISHED"
   ],
   "validationSummary": {
     "sampleCases": 5,
@@ -374,11 +374,11 @@ Problem not found.
 ```
 
 #### 409 Conflict
-Problem is already VISIBLE.
+Problem is already PUBLISHED.
 
 ```json
 {
-  "error": "ALREADY_VISIBLE",
+  "error": "ALREADY_PUBLISHED",
   "message": "Problem is already published"
 }
 ```
@@ -387,7 +387,7 @@ Problem is already VISIBLE.
 
 ### POST /problems/{slug}/unpublish
 
-Unpublish a problem, changing status from `VISIBLE` to `NOT_VISIBLE`.
+Unpublish a problem, changing status from `PUBLISHED` to `DRAFT`.
 
 > **Important**: Unpublishing allows modifications to the problem. The problem will no longer be available for contests/practice until republished.
 
@@ -411,7 +411,7 @@ Problem unpublished successfully.
 ```json
 {
   "slug": "sum-of-two-numbers",
-  "status": "NOT_VISIBLE",
+  "status": "DRAFT",
   "message": "Problem unpublished successfully. You can now make changes."
 }
 ```
@@ -447,11 +447,11 @@ Problem not found.
 ```
 
 #### 409 Conflict
-Problem is already NOT_VISIBLE.
+Problem is already DRAFT.
 
 ```json
 {
-  "error": "ALREADY_NOT_VISIBLE",
+  "error": "ALREADY_DRAFT",
   "message": "Problem is already unpublished"
 }
 ```
@@ -485,12 +485,12 @@ Problem is already NOT_VISIBLE.
 - **FR-012**: Validation logs MUST include specific test case names that failed.
 - **FR-013**: Validation logs MUST include expected vs actual output for wrong answers.
 - **FR-014**: Validation logs MUST include compilation errors with line numbers.
-- **FR-015**: The system MUST change status to `VISIBLE` only after successful validation.
-- **FR-016**: The system MUST NOT allow re-publishing an already `VISIBLE` problem.
+- **FR-015**: The system MUST change status to `PUBLISHED` only after successful validation.
+- **FR-016**: The system MUST NOT allow re-publishing an already `PUBLISHED` problem.
 
 **Unpublication**
-- **FR-017**: The system MUST allow changing status from `VISIBLE` to `NOT_VISIBLE`.
-- **FR-018**: The system MUST NOT allow unpublishing an already `NOT_VISIBLE` problem.
+- **FR-017**: The system MUST allow changing status from `PUBLISHED` to `DRAFT`.
+- **FR-018**: The system MUST NOT allow unpublishing an already `DRAFT` problem.
 
 **Permissions**
 - **FR-019**: The system MUST only allow the problem author, Admin, or assigned modifiers to publish.
@@ -512,7 +512,8 @@ Referenced from Create Problem spec:
   - `timeLimit` (integer, milliseconds, required for publication)
   - `memoryLimit` (integer, MiB, required for publication)
   - `tags` (array of strings, always optional)
-  - `status` (enum: `NOT_VISIBLE` | `VISIBLE`)
+  - `status` (enum: `DRAFT` | `PUBLISHED`)
+  - `accessibility` (enum: `PUBLIC` | `PRIVATE`, default: `PRIVATE`)
   - `authorId` (string, UUID, FK to User)
   - `modifierIds` (array of UUIDs, FK to User)
   - `testCasesFileKey` (string, required for publication)
@@ -521,9 +522,13 @@ Referenced from Create Problem spec:
   - `validatorFileKey` (string, optional)
   - `updatedAt` (timestamp)
 
-> **Problem States**:
-> - `NOT_VISIBLE`: Problem is being built. Can be modified. Not available for contests/practice.
-> - `VISIBLE`: Problem is complete and published. Cannot be modified (must unpublish first). Available for contests/practice.
+> **Problem Status** (publication state):
+> - `DRAFT`: Problem is being built. Can be modified. Not available for contests/practice.
+> - `PUBLISHED`: Problem is complete and published. Cannot be modified (must unpublish first). Available for contests/practice.
+
+> **Problem Accessibility** (who can add it to contests):
+> - `PRIVATE`: Only the problem's modifiers (author + assigned modifiers) can add this problem to a contest. Default for all new problems.
+> - `PUBLIC`: Any contest creator can add this problem to their contest.
 
 ### Validation Process
 
@@ -559,7 +564,7 @@ The publish endpoint triggers a comprehensive validation pipeline:
    ├─ Enforce time limit
    └─ Enforce memory limit
 
-8. If all pass → status = VISIBLE
+8. If all pass → status = PUBLISHED
    If any fail → return detailed error logs
 ```
 
@@ -583,11 +588,11 @@ The publish endpoint triggers a comprehensive validation pipeline:
 - **SC-005**: Publication executes solutions against all test cases.
 - **SC-006**: All solutions must pass all test cases for successful publication.
 - **SC-007**: Failed validation returns detailed logs with specific failures.
-- **SC-008**: Successful publication changes status to `VISIBLE`.
-- **SC-009**: Already VISIBLE problems return 409 Conflict on publish attempt.
+- **SC-008**: Successful publication changes status to `PUBLISHED`.
+- **SC-009**: Already PUBLISHED problems return 409 Conflict on publish attempt.
 - **SC-010**: Problems can be unpublished via `POST /problems/{slug}/unpublish` with HTTP 200.
-- **SC-011**: Unpublishing changes status to `NOT_VISIBLE`.
-- **SC-012**: Already NOT_VISIBLE problems return 409 Conflict on unpublish attempt.
+- **SC-011**: Unpublishing changes status to `DRAFT`.
+- **SC-012**: Already DRAFT problems return 409 Conflict on unpublish attempt.
 - **SC-013**: Only author, Admin, or modifiers can publish/unpublish.
 - **SC-014**: Contestants receive HTTP 403 on publish/unpublish attempts.
 - **SC-015**: No internal IDs are returned in any response.

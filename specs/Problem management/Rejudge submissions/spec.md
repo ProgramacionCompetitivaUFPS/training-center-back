@@ -226,7 +226,7 @@ As an Admin, I want to rejudge a specific submission regardless of test case upd
 - Submission code reference is invalid or missing (should fail gracefully).
 - Standing calculation fails during rejudge (should log error, not block rejudge).
 - Admin rejudges while contest owner simultaneously rejudges same submissions.
-- Rejudge request for a problem with status NOT_VISIBLE (should be allowed - submissions exist from when problem was VISIBLE).
+- Rejudge request for a problem with status DRAFT (should be allowed - submissions exist from when problem was PUBLISHED).
 - Network interruption during asynchronous rejudging.
 
 ---
@@ -650,7 +650,7 @@ Submission not found.
 - **FR-021**: The system MUST validate that the contest owner is the authenticated user (for contest rejudge).
 - **FR-022**: The system MUST validate that submissions belong to the authenticated user (for contestant manual rejudge).
 - **FR-023**: The system MUST reject contestant manual rejudge requests for submissions in active contests.
-- **FR-024**: The system MUST allow rejudging submissions of problems with status NOT_VISIBLE (submissions may exist from when problem was VISIBLE).
+- **FR-024**: The system MUST allow rejudging submissions of problems with status DRAFT (submissions may exist from when problem was PUBLISHED).
 
 **General**
 - **FR-025**: The system MUST NOT return internal IDs in responses (except where needed as identifiers).
@@ -663,7 +663,8 @@ Submission not found.
   Key attributes:
   - `slug` (string, unique)
   - `testCasesUpdatedAt` (timestamp, updated when test cases are uploaded)
-  - `status` (enum: `NOT_VISIBLE` | `VISIBLE`)
+  - `status` (enum: `DRAFT` | `PUBLISHED`)
+  - `accessibility` (enum: `PUBLIC` | `PRIVATE`, default: `PRIVATE`)
   - Other attributes from Create Problem spec
 
 - **Submission**: Represents a contestant's solution attempt.  

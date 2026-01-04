@@ -10,14 +10,14 @@ As a Coach or Admin, I want to create a new problem by providing at least a titl
 
 **Why this priority**: Problem creation is the foundation for the platform's core functionality. Allowing incremental creation with minimal initial data provides a better user experience and enables coaches to work on problems over time.
 
-**Independent Test**: This user story can be tested independently by consuming the `POST /problems` endpoint with valid authentication (Coach or Admin role), validating that a problem is created with status `NOT_VISIBLE` and a unique auto-generated slug.
+**Independent Test**: This user story can be tested independently by consuming the `POST /problems` endpoint with valid authentication (Coach or Admin role), validating that a problem is created with status `DRAFT`, accessibility `PRIVATE`, and a unique auto-generated slug.
 
 **Acceptance Scenarios**:
 
 1. **Scenario**: Successful problem creation with only title
    - **Given** a Coach or Admin is authenticated
    - **When** they submit a problem creation request with only a title
-   - **Then** the system creates the problem with status `NOT_VISIBLE`
+   - **Then** the system creates the problem with status `DRAFT` and accessibility `PRIVATE`
    - **And** generates a unique slug from the title (lowercase, alphanumeric, hyphens)
    - **And** sets the authenticated user as the problem author
    - **And** returns the created problem data
@@ -26,7 +26,7 @@ As a Coach or Admin, I want to create a new problem by providing at least a titl
    - **Given** a Coach or Admin is authenticated
    - **When** they submit a problem creation request with title, statement, timeLimit, memoryLimit, and tags
    - **Then** the system creates the problem with all provided data
-   - **And** status is `NOT_VISIBLE`
+   - **And** status is `DRAFT` and accessibility is `PRIVATE`
    - **And** returns the created problem data
 
 3. **Scenario**: Contestant attempts to create problem
@@ -79,7 +79,7 @@ As a Coach or Admin, I want to create a new problem by uploading a complete ICPC
    - **And** has a valid ICPC-format ZIP with all required files
    - **When** they upload the ZIP to import
    - **Then** the system extracts all data (title from problem.yaml, statement, test cases, etc.)
-   - **And** creates the problem with status `NOT_VISIBLE`
+   - **And** creates the problem with status `DRAFT` and accessibility `PRIVATE`
    - **And** returns the created problem data
 
 2. **Scenario**: Import ZIP with missing required files
@@ -170,7 +170,8 @@ Problem created successfully.
   "timeLimit": 2000,
   "memoryLimit": 256,
   "tags": ["math", "beginner"],
-  "status": "NOT_VISIBLE",
+  "status": "DRAFT",
+  "accessibility": "PRIVATE",
   "author": {
     "nickname": "coach_john",
     "name": "John Smith"
@@ -317,7 +318,8 @@ Problem imported successfully.
   "timeLimit": 2000,
   "memoryLimit": 256,
   "tags": [],
-  "status": "NOT_VISIBLE",
+  "status": "DRAFT",
+  "accessibility": "PRIVATE",
   "author": {
     "nickname": "coach_john",
     "name": "John Smith"
@@ -395,7 +397,7 @@ User does not have permission.
 - **FR-003**: The system MUST auto-generate a unique slug from the title (lowercase, alphanumeric, hyphens only).
 - **FR-004**: If the generated slug already exists, the system MUST append a numeric suffix to make it unique.
 - **FR-005**: The slug MUST be limited to 100 characters maximum.
-- **FR-006**: The system MUST set problem status to `NOT_VISIBLE` when created.
+- **FR-006**: The system MUST set problem status to `DRAFT` and accessibility to `PRIVATE` when created.
 - **FR-007**: The system MUST set the authenticated user as the problem author.
 - **FR-008**: The system MUST normalize the title using Unicode NFKC normalization.
 - **FR-009**: The system MUST validate timeLimit as positive integer ≤ 300000 milliseconds if provided.
@@ -429,7 +431,8 @@ User does not have permission.
   - `timeLimit` (integer, milliseconds, nullable, max: 300000)
   - `memoryLimit` (integer, MiB, nullable, max: 2048)
   - `tags` (array of strings, always optional, from predefined list)
-  - `status` (enum: `NOT_VISIBLE` | `VISIBLE`, default: `NOT_VISIBLE`)
+  - `status` (enum: `DRAFT` | `PUBLISHED`, default: `DRAFT`)
+  - `accessibility` (enum: `PUBLIC` | `PRIVATE`, default: `PRIVATE`)
   - `authorId` (string, UUID, FK to User)
   - `modifierIds` (array of UUIDs, FK to User, empty on creation)
   - `testCasesFileKey` (string, nullable, reference to test cases ZIP)
@@ -439,9 +442,13 @@ User does not have permission.
   - `createdAt` (timestamp)
   - `updatedAt` (timestamp)
 
-> **Problem States**:
-> - `NOT_VISIBLE`: Problem is being built. Can have partial data. Not available for contests/practice.
-> - `VISIBLE`: Problem is complete and published. Available for contests/practice.
+> **Problem Status** (publication state):
+> - `DRAFT`: Problem is being built. Can have partial data. Can be modified. Not available for contests/practice.
+> - `PUBLISHED`: Problem is complete and published. Cannot be modified (must unpublish first). Available for contests/practice.
+
+> **Problem Accessibility** (who can add it to contests):
+> - `PRIVATE`: Only the problem's modifiers (author + assigned modifiers) can add this problem to a contest. Default for all new problems.
+> - `PUBLIC`: Any contest creator can add this problem to their contest.
 
 ### Slug Generation Algorithm
 
@@ -473,7 +480,7 @@ Tags are loaded from an external configuration file at application startup. They
 - **SC-001**: Coach and Admin users can create problems with only a title via `POST /problems` with HTTP 201.
 - **SC-002**: Slug is auto-generated from title (lowercase, alphanumeric, hyphens).
 - **SC-003**: Duplicate slugs are handled with numeric suffixes.
-- **SC-004**: Problems are created with status `NOT_VISIBLE`.
+- **SC-004**: Problems are created with status `DRAFT` and accessibility `PRIVATE`.
 - **SC-005**: Authenticated user is set as the problem author.
 - **SC-006**: Optional fields (statement, timeLimit, memoryLimit, tags) can be provided at creation.
 - **SC-007**: ICPC-format ZIP can be imported via `POST /problems/import` with HTTP 201.
@@ -489,7 +496,7 @@ Tags are loaded from an external configuration file at application startup. They
 
 - **Idempotency**: If `Idempotency-Key` header is provided and a request with the same key was already processed, return the same response without creating a duplicate.
 - **Title length**: Consider enforcing a maximum title length (e.g., 200 characters).
-- **Import vs Create**: Import creates a more complete problem in one step, but still requires publication to become `VISIBLE`.
+- **Import vs Create**: Import creates a more complete problem in one step, but still requires publication to become `PUBLISHED`.
 - **Related specs**:
   - Update Problem: For modifying metadata, uploading files, publishing/unpublishing
   - Delete Problem: For removing problems (to be defined)

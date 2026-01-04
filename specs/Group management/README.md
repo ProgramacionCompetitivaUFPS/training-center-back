@@ -90,8 +90,10 @@ This document centralizes the complete business logic of the Group Management sy
 ### Content Deletion
 * If a **group is deleted**:
   * **Contests and materials** are deleted (hard delete)
+  * **Standings** are deleted (hard delete) - they have no meaning without the contest
+  * **Submissions are preserved** with `contest_id = NULL` (orphaned but remain in user history)
   * **Problems continue to exist** (they are global)
-  * Historical references are preserved
+  * **Memberships, invitations, and join requests** are deleted
 
 ---
 
@@ -220,23 +222,30 @@ Admin can perform:
 
 ### Implemented Specs
 1. **[Create group](Create%20group/spec.md)** - Group creation with initial configuration
-2. **[Join group](Join%20group/spec.md)** - Join flows from user perspective
-3. **[Invite to group](Invite%20to%20group/spec.md)** - Invitation system
-4. **[Manage group members](Manage%20group%20members/spec.md)** - Administrative membership management
+2. **[Update group](Update%20group/spec.md)** - Update group metadata and policies (with automatic handling of pending requests)
+3. **[Delete group](Delete%20group/spec.md)** - Safe deletion with confirmation and associated content handling
+4. **[Join group](Join%20group/spec.md)** - User perspective: direct join (OPEN), request-to-join (REQUEST), invitation acceptance (INVITE), view/cancel own request
+5. **[Manage join requests](Manage%20join%20requests/spec.md)** - Lead perspective: view, approve, and reject join requests
+6. **[Invite to group](Invite%20to%20group/spec.md)** - Invitation system with JWT tokens
+7. **[Manage group members](Manage%20group%20members/spec.md)** - Administrative membership management
 
 ### Implementation Dependencies
 ```
 Create Group (base)
     ↓
+Update Group (P1) ← (modify metadata and policies)
+    ↓
+Delete Group (P1) ← (requires confirmation, handles associated content)
+    ↓
 Join Group (P1) ← Invite to Group (P2)
     ↓                    ↓
+Manage Join Requests (P1) ← (completes REQUEST flow)
+    ↓
 Manage Group Members (P2-P3)
 ```
 
 ### Future Specs (Considered)
-* **Update Group** - Modify metadata, join policies, visibility
-* **Delete Group** - Safe deletion with associated content handling
-* **Group Dashboard** - "My Groups" view with filters, search and visibility management
+* **View Groups** - List groups, search, filter, "My Groups" dashboard
 * **Group Analytics** - Participation and activity metrics
 * **Bulk Operations** - Mass management of members and invitations
 
