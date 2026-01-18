@@ -157,7 +157,7 @@ Group deleted successfully.
   "deletionSummary": {
     "contestsDeleted": 5,
     "materialsDeleted": 12,
-    "standingsDeleted": 150,
+    "standingCollectionsDeleted": 10,
     "submissionsOrphaned": 1250,
     "membersRemoved": 45
   }
@@ -242,6 +242,8 @@ Group not found.
 * **FR-DG-010**: The system MUST delete all contests associated with the group (hard delete).
 * **FR-DG-011**: The system MUST delete all materials associated with the group (hard delete).
 * **FR-DG-012**: The system MUST delete all standings associated with the group's contests (hard delete).
+* **FR-DG-012.1**: For each deleted contest, the system MUST delete the NoSQL collection `contest_{contestId}_standings` (active standings).
+* **FR-DG-012.2**: For each deleted contest, the system MUST delete the NoSQL collection `contest_{contestId}_standings_final` (final snapshot) if it exists.
 * **FR-DG-013**: The system MUST delete all group memberships (`GroupMember` records).
 * **FR-DG-014**: The system MUST delete all pending join requests for the group.
 * **FR-DG-015**: The system MUST delete all pending invitations for the group.
@@ -274,8 +276,10 @@ Group not found.
 * **Material**: Hard deleted (cascade from Group)
   * `material.group_id` references deleted group
   
-* **Standing**: Hard deleted (cascade from Contest)
-  * `standing.contest_id` references deleted contest
+* **Standing (NoSQL Collections)**: Hard deleted (cascade from Contest)
+  * For each contest: `contest_{contestId}_standings` collection deleted
+  * For each contest: `contest_{contestId}_standings_final` collection deleted (if exists)
+  * All participant registration and standing documents removed
   
 * **Submission**: Preserved but orphaned
   * `submission.contest_id` set to `NULL`
@@ -313,7 +317,7 @@ Group not found.
 * **SC-DG-005**: Attempting to delete global group returns HTTP 403 (CANNOT_DELETE_GLOBAL_GROUP).
 * **SC-DG-006**: Non-leads and non-admins receive HTTP 403 (INSUFFICIENT_PERMISSIONS).
 * **SC-DG-007**: All contests and materials are deleted with the group.
-* **SC-DG-008**: All standings are deleted with the contests.
+* **SC-DG-008**: All standings are deleted with the contests (NoSQL collections `contest_{contestId}_standings` and `contest_{contestId}_standings_final` for each contest).
 * **SC-DG-009**: Submissions are preserved with `contest_id = NULL`.
 * **SC-DG-010**: Deletion summary includes counts of all affected entities.
 * **SC-DG-011**: Groups with active contests can be deleted.

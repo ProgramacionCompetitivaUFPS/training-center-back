@@ -85,33 +85,39 @@ As a Lead of a group, I want to create a contest within my group so that members
 
 ---
 
-### User Story 2 – Coach/Admin creates contest in global group (Priority: P1)
+### User Story 2 – Lead creates contest in global group (Priority: P1)
 
-As a Coach or Admin, I want to create a contest in the global group so that all platform users can participate in public competitions.
+As a Lead of the global group (Admin or assigned Coach), I want to create a contest in the global group so that all platform users can participate in public competitions.
 
 **Why this priority**: Global contests are essential for platform-wide events and open competitions.
 
-**Independent Test**: This user story can be tested independently by consuming the `POST /api/groups/{globalGroupId}/contests` endpoint with Coach or Admin authentication, validating that the contest is created in the global group.
+**Independent Test**: This user story can be tested independently by consuming the `POST /api/groups/{globalGroupId}/contests` endpoint with Lead authentication (Admin or Coach who is lead of global group), validating that the contest is created in the global group.
 
 **Acceptance Scenarios**:
 
-1. **Scenario**: Coach creates contest in global group
+1. **Scenario**: Lead (Coach) creates contest in global group
    * **Given** the global group exists (`is_default = true`)
-   * **And** the authenticated user has Coach role
+   * **And** the authenticated user has Coach role and is a Lead of the global group
    * **When** they submit a valid contest creation request for the global group
    * **Then** the system creates the contest in the global group
    * **And** sets the Coach as the contest owner
    * **And** returns the created contest data
 
-2. **Scenario**: Admin creates contest in global group
+2. **Scenario**: Admin (Lead) creates contest in global group
    * **Given** the global group exists (`is_default = true`)
-   * **And** the authenticated user has Admin role
+   * **And** the authenticated user has Admin role (automatically Lead of global group)
    * **When** they submit a valid contest creation request for the global group
    * **Then** the system creates the contest in the global group
    * **And** sets the Admin as the contest owner
    * **And** returns the created contest data
 
-3. **Scenario**: Contestant attempts to create contest in global group
+3. **Scenario**: Coach (non-Lead) attempts to create contest in global group
+   * **Given** the global group exists (`is_default = true`)
+   * **And** the authenticated user has Coach role but is NOT a Lead of the global group
+   * **When** they attempt to create a contest in the global group
+   * **Then** the system rejects with 403 Forbidden (INSUFFICIENT_PERMISSIONS)
+
+4. **Scenario**: Contestant attempts to create contest in global group
    * **Given** the global group exists (`is_default = true`)
    * **And** the authenticated user has Contestant role
    * **When** they attempt to create a contest in the global group
@@ -125,13 +131,13 @@ As an Admin, I want to create a contest in any group so that I can assist with a
 
 **Why this priority**: Admin override capability is important but secondary to normal usage flows.
 
-**Independent Test**: This user story can be tested independently by consuming the `POST /api/groups/{groupId}/contests` endpoint with Admin authentication on a group where they are not a member.
+**Independent Test**: This user story can be tested independently by consuming the `POST /api/groups/{groupId}/contests` endpoint with Admin authentication on a group where they are not a lead.
 
 **Acceptance Scenarios**:
 
-1. **Scenario**: Admin creates contest in group they don't belong to
+1. **Scenario**: Admin creates contest in group they don't lead
    * **Given** a group exists
-   * **And** the authenticated user has Admin role (not a member of the group)
+   * **And** the authenticated user has Admin role (has implicit permissions on all groups)
    * **When** they submit a valid contest creation request
    * **Then** the system creates the contest
    * **And** sets the Admin as the contest owner
@@ -160,8 +166,8 @@ Create a new contest within a group.
 
 > **Important**: 
 > - For regular groups: only Leads can create contests
-> - For global group: any Coach or Admin can create contests
-> - Admin can create contests in any group
+> - For global group: only Leads of the global group can create contests (Admin and assigned Coaches)
+> - Admin can create contests in any group (has implicit Lead permissions)
 > - Problems can be added at creation time if they meet accessibility requirements
 > - Problems must be in PUBLISHED status
 
@@ -188,6 +194,7 @@ Create a new contest within a group.
   "startTime": "2026-01-10T14:00:00Z",
   "endTime": "2026-01-10T19:00:00Z",
   "penalty": 20,
+  "enablePostContest": false,
   "problems": ["sum-of-two-numbers", "longest-path", "matrix-multiplication"]
 }
 ```
@@ -199,6 +206,7 @@ Create a new contest within a group.
 | startTime | string (ISO 8601) | Yes | Contest start time (must be in the future) |
 | endTime | string (ISO 8601) | Yes | Contest end time (must be after startTime) |
 | penalty | integer | No | Penalty in minutes for wrong submission (default: 20, min: 0, max: 1440) |
+| enablePostContest | boolean | No | Enable post-competition phase (default: false). If enabled, registered users can submit after endTime but submissions won't affect standings |
 | problems | string[] | No | Array of problem slugs to add to the contest |
 
 **Responses**:
@@ -215,6 +223,7 @@ Contest created successfully.
   "endTime": "2026-01-10T19:00:00Z",
   "duration": 300,
   "penalty": 20,
+  "enablePostContest": false,
   "group": {
     "id": "a1b2c3d4-e5f6-7890-1234-567890123456",
     "name": "Training Camp 2026"
@@ -343,12 +352,14 @@ Group or problem not found.
 
 **Contest Creation**
 * **FR-CC-001**: The system MUST allow Leads to create contests in their groups.
-* **FR-CC-002**: The system MUST allow Coach or Admin to create contests in the global group.
-* **FR-CC-003**: The system MUST allow Admin to create contests in any group.
+* **FR-CC-002**: The system MUST allow only Leads of the global group to create contests in the global group (Admin is automatically Lead, and Admin can assign other Coaches as Leads).
+* **FR-CC-003**: The system MUST allow Admin to create contests in any group (has implicit Lead permissions).
 * **FR-CC-004**: The system MUST set the authenticated user as the contest owner.
 * **FR-CC-005**: The system MUST require name, startTime, and endTime fields.
 * **FR-CC-006**: The system MUST set default penalty to 20 minutes if not provided.
 * **FR-CC-007**: The system MUST validate penalty is between 0 and 1440 minutes.
+* **FR-CC-007.1**: The system MUST set default `enablePostContest` to false if not provided.
+* **FR-CC-007.2**: The system MUST allow setting `enablePostContest` to true at contest creation.
 
 **Time Validation**
 * **FR-CC-008**: The system MUST reject contests where startTime is in the past.
@@ -366,10 +377,11 @@ Group or problem not found.
 
 **Permissions**
 * **FR-CC-018**: For regular groups, only Leads can create contests.
-* **FR-CC-019**: For the global group, any Coach or Admin can create contests.
-* **FR-CC-020**: Admin has implicit permission to create contests in any group.
-* **FR-CC-021**: Members who are not Leads MUST NOT be able to create contests in regular groups.
-* **FR-CC-022**: Contestants MUST NOT be able to create contests in the global group.
+* **FR-CC-019**: For the global group, only Leads of the global group can create contests.
+* **FR-CC-020**: Admin has implicit Lead permission to create contests in any group.
+* **FR-CC-021**: Members who are not Leads MUST NOT be able to create contests in any group.
+* **FR-CC-022**: Coaches who are not Leads of the global group MUST NOT be able to create contests in the global group.
+* **FR-CC-023**: Contestants MUST NOT be able to create contests in any group.
 
 **Response**
 * **FR-CC-023**: The system MUST return the created contest with computed status.
@@ -385,6 +397,7 @@ Group or problem not found.
   * `startTime` (timestamp, required, must be in future at creation)
   * `endTime` (timestamp, required, must be after startTime)
   * `penalty` (integer, default: 20, range: 0-1440 minutes)
+  * `enablePostContest` (boolean, default: false)
   * `group_id` (string, UUID, FK to Group)
   * `owner_id` (string, UUID, FK to User)
   * `createdAt` (timestamp)
@@ -402,11 +415,11 @@ Group or problem not found.
 
 ### Permission Matrix
 
-| Role | Regular Group (as Lead) | Regular Group (as Member) | Global Group |
-|------|------------------------|--------------------------|--------------|
-| Admin | ✅ | ✅ (implicit) | ✅ |
-| Coach | ✅ (if Lead) | ❌ | ✅ |
-| Contestant | ❌ | ❌ | ❌ |
+| Role | Regular Group (as Lead) | Regular Group (as Member) | Global Group (as Lead) | Global Group (as Member) |
+|------|------------------------|--------------------------|----------------------|------------------------|
+| Admin | ✅ | ✅ (implicit Lead) | ✅ (auto Lead) | N/A |
+| Coach | ✅ | ❌ | ✅ | ❌ |
+| Contestant | ❌ | ❌ | ❌ | ❌ |
 
 ### Problem Accessibility Rules
 
@@ -422,7 +435,7 @@ Group or problem not found.
 ### Measurable Outcomes
 
 * **SC-CC-001**: Leads can create contests in their groups via `POST /api/groups/{groupId}/contests` with HTTP 201.
-* **SC-CC-002**: Coach/Admin can create contests in global group with HTTP 201.
+* **SC-CC-002**: Leads of the global group (Admin and assigned Coaches) can create contests in global group with HTTP 201.
 * **SC-CC-003**: Admin can create contests in any group with HTTP 201.
 * **SC-CC-004**: Contest is created with provided data and default penalty if not specified.
 * **SC-CC-005**: Problems can be added at creation time if accessibility rules are satisfied.

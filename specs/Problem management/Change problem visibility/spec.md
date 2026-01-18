@@ -1,6 +1,10 @@
-# Feature Specification: Publish Problem
+# Feature Specification: Change Problem Visibility
 
 **Created**: 2025-12-20
+
+> This spec covers two aspects of problem visibility:
+> - **Status** (`DRAFT` ↔ `PUBLISHED`): Controls whether the problem can be modified and used in contests
+> - **Accessibility** (`PRIVATE` ↔ `PUBLIC`): Controls who can add the problem to contests
 
 ## User Scenarios & Testing *(mandatory)*
 
@@ -124,8 +128,91 @@ As a Coach or Admin, I want to unpublish a problem so that I can make changes to
 
 ---
 
+### User Story 3 – Change problem accessibility (Priority: P2)
+
+As a Coach or Admin, I want to change a problem's accessibility between `PRIVATE` and `PUBLIC` so that I can control who can add the problem to contests, regardless of the problem's publication status.
+
+**Why this priority**: Allows flexible control over problem distribution. Can be done independently of the publish/unpublish flow.
+
+**Independent Test**: This user story can be tested independently by consuming the `PATCH /problems/{slug}/accessibility` endpoint, validating that accessibility changes without affecting the problem's status.
+
+**Acceptance Scenarios**:
+
+1. **Scenario**: Change accessibility from PRIVATE to PUBLIC (DRAFT problem)
+   - **Given** a problem exists with status `DRAFT` and accessibility `PRIVATE`
+   - **And** the authenticated user is the author, Admin, or a modifier
+   - **When** they change accessibility to `PUBLIC`
+   - **Then** the system updates the accessibility
+   - **And** the problem status remains `DRAFT`
+   - **And** returns success response with updated accessibility
+
+2. **Scenario**: Change accessibility from PRIVATE to PUBLIC (PUBLISHED problem)
+   - **Given** a problem exists with status `PUBLISHED` and accessibility `PRIVATE`
+   - **And** the authenticated user is the author, Admin, or a modifier
+   - **When** they change accessibility to `PUBLIC`
+   - **Then** the system updates the accessibility
+   - **And** the problem status remains `PUBLISHED`
+   - **And** any contest creator can now add this problem to their contests
+
+3. **Scenario**: Change accessibility from PUBLIC to PRIVATE (DRAFT problem)
+   - **Given** a problem exists with status `DRAFT` and accessibility `PUBLIC`
+   - **And** the authenticated user is the author, Admin, or a modifier
+   - **When** they change accessibility to `PRIVATE`
+   - **Then** the system updates the accessibility
+   - **And** the problem status remains `DRAFT`
+
+4. **Scenario**: Change accessibility from PUBLIC to PRIVATE (PUBLISHED problem)
+   - **Given** a problem exists with status `PUBLISHED` and accessibility `PUBLIC`
+   - **And** the authenticated user is the author, Admin, or a modifier
+   - **When** they change accessibility to `PRIVATE`
+   - **Then** the system updates the accessibility
+   - **And** the problem status remains `PUBLISHED`
+   - **And** only modifiers can now add this problem to new contests
+   - **And** existing contest associations are NOT affected
+   - **And** existing submissions continue to execute normally
+
+5. **Scenario**: Problem in contest remains accessible after changing to PRIVATE
+   - **Given** a problem exists with accessibility `PUBLIC` and status `PUBLISHED`
+   - **And** the problem is added to contest C1 (by a non-modifier)
+   - **And** user U1 is registered to contest C1
+   - **When** the problem's accessibility is changed to `PRIVATE`
+   - **Then** user U1 can still submit solutions to the problem within contest C1
+   - **And** user U1 cannot access the problem outside of contest C1 (e.g., in public problem listings)
+   - **And** the problem cannot be added to new contests by non-modifiers
+
+6. **Scenario**: Change accessibility to same value (no-op)
+   - **Given** a problem exists with accessibility `PUBLIC`
+   - **When** they change accessibility to `PUBLIC`
+   - **Then** the system returns success (idempotent operation)
+   - **And** no changes are made
+
+7. **Scenario**: Unauthorized accessibility change attempt
+   - **Given** a problem exists
+   - **And** the authenticated user is neither the author, an Admin, nor a modifier
+   - **When** they attempt to change accessibility
+   - **Then** the system rejects with 403 Forbidden (INSUFFICIENT_PERMISSIONS)
+
+8. **Scenario**: Unauthenticated request
+   - **Given** the request does not include valid authentication credentials
+   - **When** an accessibility change request is submitted
+   - **Then** the system rejects with 401 Unauthorized
+
+9. **Scenario**: Problem not found
+   - **Given** the slug does not match any existing problem
+   - **When** accessibility change is attempted
+   - **Then** the system rejects with 404 Not Found
+
+10. **Scenario**: Invalid accessibility value
+    - **Given** a problem exists
+    - **And** the authenticated user is authorized
+    - **When** they submit an invalid accessibility value (e.g., "RESTRICTED")
+    - **Then** the system rejects with 400 Bad Request (INVALID_ACCESSIBILITY)
+
+---
+
 ### Edge Cases
 
+**Publication:**
 - Concurrent publish requests for the same problem.
 - Solution timeout during validation (recommended max: 10 minutes total).
 - Checker/validator compilation errors with non-ASCII error messages.
@@ -137,6 +224,16 @@ As a Coach or Admin, I want to unpublish a problem so that I can make changes to
 - Unpublish problem that's currently in use in an active contest.
 - Network interruption during validation.
 - Validation server unavailable.
+
+**Accessibility:**
+- Change accessibility while problem is being used in an active contest.
+- Change from PUBLIC to PRIVATE when the problem is already added to contests by non-modifiers:
+  - The problem is NOT removed from existing contests (association remains intact)
+  - Registered participants can still submit solutions to the problem within those contests
+  - Users lose access to the problem from outside the contest (cannot view it in public problem lists)
+  - Only new contest additions are restricted to modifiers
+- Concurrent accessibility change requests for the same problem.
+- User submits to a problem that was PUBLIC when they started but became PRIVATE before submission completed (submission should succeed if user has access via contest registration).
 
 ---
 
@@ -256,7 +353,7 @@ Validation failed. Returns detailed logs of what failed.
     },
     {
       "case": "secret/12",
-      "verdict": "RUNTIME_ERROR",
+      "status": "RUNTIME_EXCEPTION",
       "details": "SIGSEGV"
     }
   ]
@@ -458,6 +555,99 @@ Problem is already DRAFT.
 
 ---
 
+### PATCH /problems/{slug}/accessibility
+
+Change a problem's accessibility between `PRIVATE` and `PUBLIC`.
+
+> **Important**: This endpoint can be used regardless of the problem's status (`DRAFT` or `PUBLISHED`). It does NOT require unpublishing the problem first. Changing accessibility does not affect the problem's status.
+
+> **Behavior when changing from PUBLIC to PRIVATE**:
+> - Existing contest associations are NOT affected (problems already added to contests remain there)
+> - Existing submissions continue to execute normally
+> - Users who submitted to this problem retain access to their submissions
+> - Only new contest additions are restricted to modifiers
+
+**Headers**:
+
+| Header | Type | Required | Description |
+|--------|------|----------|-------------|
+| Authorization | string | Yes | Bearer token for authentication |
+| Content-Type | string | Yes | application/json |
+
+**Path Parameters**:
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| slug | string | Yes | The unique slug of the problem |
+
+**Request Body**:
+
+```json
+{
+  "accessibility": "PUBLIC"
+}
+```
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| accessibility | string | Yes | New accessibility value: `PUBLIC` or `PRIVATE` |
+
+**Responses**:
+
+#### 200 OK
+Accessibility changed successfully.
+
+```json
+{
+  "slug": "sum-of-two-numbers",
+  "accessibility": "PUBLIC",
+  "status": "PUBLISHED",
+  "message": "Problem accessibility changed to PUBLIC"
+}
+```
+
+#### 400 Bad Request
+Invalid accessibility value.
+
+```json
+{
+  "error": "INVALID_ACCESSIBILITY",
+  "message": "Invalid accessibility value. Allowed values: PUBLIC, PRIVATE"
+}
+```
+
+#### 401 Unauthorized
+Authentication failed.
+
+```json
+{
+  "error": "UNAUTHORIZED",
+  "message": "Invalid or missing authentication token"
+}
+```
+
+#### 403 Forbidden
+User does not have permission.
+
+```json
+{
+  "error": "INSUFFICIENT_PERMISSIONS",
+  "message": "Only the problem author, Admin, or assigned modifiers can change this problem's accessibility"
+}
+```
+
+#### 404 Not Found
+Problem not found.
+
+```json
+{
+  "error": "NOT_FOUND",
+  "message": "Problem not found"
+}
+```
+
+---
+
 ## Requirements *(mandatory)*
 
 ### Functional Requirements
@@ -492,13 +682,24 @@ Problem is already DRAFT.
 - **FR-017**: The system MUST allow changing status from `PUBLISHED` to `DRAFT`.
 - **FR-018**: The system MUST NOT allow unpublishing an already `DRAFT` problem.
 
+**Accessibility**
+- **FR-019**: The system MUST allow changing accessibility between `PUBLIC` and `PRIVATE`.
+- **FR-020**: The system MUST allow changing accessibility regardless of problem status (`DRAFT` or `PUBLISHED`).
+- **FR-021**: Changing accessibility MUST NOT affect the problem's status.
+- **FR-022**: When changing from `PUBLIC` to `PRIVATE`, existing contest associations MUST NOT be affected.
+- **FR-023**: When changing from `PUBLIC` to `PRIVATE`, existing submissions MUST continue to execute normally.
+- **FR-024**: When changing from `PUBLIC` to `PRIVATE`, users who submitted to this problem MUST retain access to their submissions.
+- **FR-025**: When changing from `PUBLIC` to `PRIVATE`, registered participants in contests containing the problem MUST retain the ability to submit solutions within those contests.
+- **FR-026**: The system MUST validate that accessibility is either `PUBLIC` or `PRIVATE`.
+
 **Permissions**
-- **FR-019**: The system MUST only allow the problem author, Admin, or assigned modifiers to publish.
-- **FR-020**: The system MUST only allow the problem author, Admin, or assigned modifiers to unpublish.
+- **FR-027**: The system MUST only allow the problem author, Admin, or assigned modifiers to publish.
+- **FR-028**: The system MUST only allow the problem author, Admin, or assigned modifiers to unpublish.
+- **FR-029**: The system MUST only allow the problem author, Admin, or assigned modifiers to change accessibility.
 
 **General**
-- **FR-021**: The system MUST NOT return internal IDs in any response.
-- **FR-022**: The system MUST update the `updatedAt` timestamp on status change.
+- **FR-030**: The system MUST NOT return internal IDs in any response.
+- **FR-031**: The system MUST update the `updatedAt` timestamp on status or accessibility change.
 
 ### Key Entities
 
@@ -506,7 +707,7 @@ Referenced from Create Problem spec:
 
 - **Problem**: Represents a programming problem.  
   Key attributes for publication:
-  - `slug` (string, unique, identifier)
+  - `slug` (string, unique, user-provided, 3-70 chars, immutable)
   - `title` (string, required)
   - `statement` (string, LaTeX format, required for publication)
   - `timeLimit` (integer, milliseconds, required for publication)
@@ -520,6 +721,7 @@ Referenced from Create Problem spec:
   - `solutionFileKeys` (array of strings, at least 1 required for publication)
   - `checkerFileKey` (string, optional)
   - `validatorFileKey` (string, optional)
+  - `problemJudgingUpdatedAt` (timestamp, nullable, updated when judging components are uploaded)
   - `updatedAt` (timestamp)
 
 > **Problem Status** (publication state):
@@ -574,6 +776,7 @@ The publish endpoint triggers a comprehensive validation pipeline:
 |--------|--------|-------|----------|------------|
 | Publish | ✅ | ✅ | ✅ | ❌ |
 | Unpublish | ✅ | ✅ | ✅ | ❌ |
+| Change accessibility | ✅ | ✅ | ✅ | ❌ |
 
 ---
 
@@ -581,6 +784,7 @@ The publish endpoint triggers a comprehensive validation pipeline:
 
 ### Measurable Outcomes
 
+**Publication:**
 - **SC-001**: Complete problems can be published via `POST /problems/{slug}/publish` with HTTP 200.
 - **SC-002**: Publication validates all required fields.
 - **SC-003**: Publication validates test cases ZIP structure (ICPC format).
@@ -593,9 +797,20 @@ The publish endpoint triggers a comprehensive validation pipeline:
 - **SC-010**: Problems can be unpublished via `POST /problems/{slug}/unpublish` with HTTP 200.
 - **SC-011**: Unpublishing changes status to `DRAFT`.
 - **SC-012**: Already DRAFT problems return 409 Conflict on unpublish attempt.
-- **SC-013**: Only author, Admin, or modifiers can publish/unpublish.
-- **SC-014**: Contestants receive HTTP 403 on publish/unpublish attempts.
-- **SC-015**: No internal IDs are returned in any response.
+
+**Accessibility:**
+- **SC-013**: Problem accessibility can be changed via `PATCH /problems/{slug}/accessibility` with HTTP 200.
+- **SC-014**: Accessibility can be changed for both `DRAFT` and `PUBLISHED` problems.
+- **SC-015**: Changing accessibility does NOT affect problem status.
+- **SC-016**: Invalid accessibility values return HTTP 400.
+- **SC-017**: When changing from PUBLIC to PRIVATE, existing contest associations remain intact.
+- **SC-018**: When changing from PUBLIC to PRIVATE, existing submissions continue to work.
+- **SC-019**: When changing from PUBLIC to PRIVATE, registered contest participants can still submit to the problem within those contests.
+
+**Permissions & General:**
+- **SC-020**: Only author, Admin, or modifiers can publish/unpublish/change accessibility.
+- **SC-021**: Contestants receive HTTP 403 on publish/unpublish/accessibility change attempts.
+- **SC-022**: No internal IDs are returned in any response.
 
 ---
 
@@ -606,9 +821,20 @@ The publish endpoint triggers a comprehensive validation pipeline:
 - **Checker behavior**: If no checker is provided, exact string comparison (ignoring trailing whitespace on lines) is used.
 - **Multiple solutions**: If multiple solutions are uploaded, all must pass all test cases.
 - **Partial re-validation**: Future optimization could cache compilation results to speed up re-publication.
+- **Accessibility vs Status**: These are independent dimensions:
+  - **Status** (`DRAFT`/`PUBLISHED`) controls whether the problem can be modified and used in contests.
+  - **Accessibility** (`PRIVATE`/`PUBLIC`) controls WHO can add the problem to contests.
+  - A problem can be `PUBLISHED` + `PRIVATE` (only modifiers can add it to contests) or `PUBLISHED` + `PUBLIC` (anyone can add it).
+- **Accessibility change is non-destructive**: Changing from `PUBLIC` to `PRIVATE`:
+  - Does NOT remove the problem from existing contests
+  - Does NOT invalidate existing submissions
+  - Does NOT affect registered participants' ability to submit within contests
+  - Only restricts who can ADD the problem to NEW contests (modifiers only)
+  - Users lose public access to the problem (cannot view outside of contests they're registered to)
 - **Related specs**:
   - Create Problem: Initial problem creation
-  - Update Problem: Modifying metadata and files
+  - Update Problem: Modifying metadata and files (includes accessibility change for DRAFT problems)
+  - Submit Solution: Submission access rules based on problem accessibility
   - Re-judge: Triggered when problem is modified after being used in submissions
 
 

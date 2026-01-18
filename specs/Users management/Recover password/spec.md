@@ -62,7 +62,7 @@ As a user who has received a recovery code, I want to submit the code along with
    - **Then** the system rejects the operation with an invalid code error
 
 3. **Scenario**: Expired verification code
-   - **Given** the recovery code has expired (after 10 minutes)
+   - **Given** the recovery code has expired (after 15 minutes)
    - **When** the user submits the expired code
    - **Then** the system rejects the operation indicating the code has expired
 
@@ -248,7 +248,7 @@ No pending recovery request or email not found.
 - **FR-001**: The system MUST allow users to request a password recovery code via a public endpoint.
 - **FR-002**: The system MUST generate a 6-digit numeric verification code and send it to the registered email.
 - **FR-003**: The system MUST return an ambiguous response regardless of whether the email exists in the system.
-- **FR-004**: The system MUST expire recovery codes after 10 minutes.
+- **FR-004**: The system MUST expire recovery codes after 15 minutes.
 - **FR-005**: The system MUST limit recovery requests to 5 per email per hour.
 - **FR-006**: The system MUST invalidate previous recovery codes when a new one is requested.
 - **FR-007**: The system MUST validate that the new password meets complexity requirements (min 8 chars, 1 uppercase, 1 special char, 1 number).
@@ -271,7 +271,7 @@ No pending recovery request or email not found.
   - `userId` (string, reference to User)
   - `email` (string)
   - `verificationCode` (string, 6-digit numeric code)
-  - `expiresAt` (timestamp, 10 minutes from creation)
+  - `expiresAt` (timestamp, 15 minutes from creation)
   - `status` (enum: PENDING, COMPLETED, EXPIRED)
   - `createdAt` (timestamp)
 
@@ -287,7 +287,7 @@ No pending recovery request or email not found.
 
 - **SC-001**: The system returns an ambiguous response for password recovery requests regardless of email existence.
 - **SC-002**: The system successfully sends a 6-digit recovery code to registered emails.
-- **SC-003**: Recovery codes expire after 10 minutes.
+- **SC-003**: Recovery codes expire after 15 minutes.
 - **SC-004**: The system enforces a rate limit of 5 requests per email per hour.
 - **SC-005**: The system validates password complexity (8+ chars, 1 uppercase, 1 special char, 1 number).
 - **SC-006**: All active sessions are invalidated upon successful password reset.

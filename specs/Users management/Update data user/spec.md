@@ -160,9 +160,10 @@ User not found for the authenticated token.
   - `email` (string, unique, immutable via this endpoint)
   - `password` (string, hashed, immutable via this endpoint)
   - `name` (string, **mutable**)
-  - `nickname` (string, optional, **mutable**)
+  - `nickname` (string, optional, **mutable**, stored in lowercase)
   - `institution` (string, optional, **mutable**)
-  - `role` (string, immutable via this endpoint)
+  - `role` (enum: ADMIN | COACH | CONTESTANT, immutable via this endpoint)
+  - `status` (enum: ACTIVE | DEACTIVATED, immutable via this endpoint)
   - `createdAt` (timestamp, immutable)
   - `updatedAt` (timestamp, nullable, updated on modification)
 

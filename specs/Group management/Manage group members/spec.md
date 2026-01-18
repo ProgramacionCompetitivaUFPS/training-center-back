@@ -95,6 +95,13 @@ As a Lead, I want to remove members from the group so that I can manage group co
    * **When** lead tries to remove any member
    * **Then** system rejects with 400 (`CANNOT_REMOVE_FROM_GLOBAL_GROUP`)
 
+4a. **Scenario**: Lead attempts to remove Admin as lead from global group
+
+   * **Given** group is the global default group (`is_default = true`)
+   * **And** Admin is lead of the global group (by default)
+   * **When** another lead tries to remove Admin or change Admin's role
+   * **Then** system rejects with 400 (`CANNOT_REMOVE_ADMIN_FROM_GLOBAL_GROUP`)
+
 5. **Scenario**: Non-lead attempts to remove member
 
    * **Given** requesting user is not lead
@@ -209,6 +216,7 @@ As a Group Member, I want to leave a group voluntarily so that I can stop partic
 * **FR-M-014**: System MUST ensure audit logs capture actor, target, action, timestamp, and reason for critical operations only.
 * **FR-M-015**: System MUST ensure only Coaches and Admins can be assigned Lead role.
 * **FR-M-016**: System MUST ensure global group membership is immutable - users cannot be added/removed manually.
+* **FR-M-016.1**: System MUST ensure Admin cannot be removed as lead of the global group by any user, including other leads.
 * **FR-M-017**: System MUST ensure every group has at least one lead at all times.
 * **FR-M-018**: System MUST preserve historical data when members are removed.
 * **FR-M-019**: System MUST ensure member removal does not delete user account, only group membership.
@@ -383,6 +391,13 @@ Cannot remove member due to business rule violation.
 }
 ```
 
+```json
+{
+  "error": "CANNOT_REMOVE_ADMIN_FROM_GLOBAL_GROUP",
+  "message": "Admin cannot be removed as lead from the global group"
+}
+```
+
 #### 403 Forbidden
 User does not have permission to remove members.
 
@@ -463,6 +478,13 @@ Cannot change role due to business rule violation.
 {
   "error": "CANNOT_REMOVE_LAST_LEAD",
   "message": "Cannot demote the last lead of the group"
+}
+```
+
+```json
+{
+  "error": "CANNOT_REMOVE_ADMIN_FROM_GLOBAL_GROUP",
+  "message": "Admin cannot be removed as lead from the global group"
 }
 ```
 

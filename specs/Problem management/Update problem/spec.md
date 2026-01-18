@@ -220,7 +220,7 @@ As a problem author or Admin, I want to assign other users as modifiers so that 
 ### Edge Cases
 
 - Concurrent update requests for the same problem.
-- Update title to something that conflicts with existing slug (slug is NOT regenerated on update).
+- Attempt to update slug (should be rejected - slug is immutable).
 - File size limits exceeded.
 - Network interruption during file uploads.
 - Invalid ZIP structure in test cases file (validation on upload).
@@ -259,6 +259,10 @@ Update problem metadata.
   "statement": "Updated statement in LaTeX...",
   "timeLimit": 3000,
   "memoryLimit": 512,
+  "languageOverrides": [
+    { "language": "python310", "timeLimit": 6000 },
+    { "language": "java17", "memoryLimit": 1024 }
+  ],
   "tags": ["math", "beginner", "implementation"],
   "accessibility": "PUBLIC"
 }
@@ -268,10 +272,13 @@ Update problem metadata.
 |-------|------|----------|-------------|
 | title | string | No | Problem title (normalized Unicode NFKC) |
 | statement | string | No | Problem statement in LaTeX format |
-| timeLimit | integer | No | Time limit in milliseconds (> 0, max: 300000) |
-| memoryLimit | integer | No | Memory limit in MiB (> 0, max: 2048) |
+| timeLimit | integer | No | Default time limit in milliseconds for all languages (> 0, max from Virtual Object `maxTimeLimitGlobal`) |
+| memoryLimit | integer | No | Default memory limit in MiB for all languages (> 0, max from Virtual Object `maxMemoryLimitGlobal`) |
+| languageOverrides | array | No | Language-specific overrides. Only specify languages that need different limits than the defaults. |
 | tags | string[] | No | Array of tags from system's predefined list |
 | accessibility | string | No | Problem accessibility: `PUBLIC` or `PRIVATE` |
+
+> **Note**: See the Platform README for Virtual Object configuration including `maxTimeLimitGlobal`, `maxMemoryLimitGlobal`, and language-specific maximums.
 
 **Responses**:
 
@@ -285,6 +292,10 @@ Problem updated successfully.
   "statement": "Updated statement in LaTeX...",
   "timeLimit": 3000,
   "memoryLimit": 512,
+  "languageOverrides": [
+    { "language": "python310", "timeLimit": 6000 },
+    { "language": "java17", "memoryLimit": 1024 }
+  ],
   "tags": ["math", "beginner", "implementation"],
   "status": "DRAFT",
   "accessibility": "PUBLIC",
@@ -708,9 +719,13 @@ Problem not found.
 - **FR-001**: The system MUST allow partial updates to problem metadata (only provided fields are modified).
 - **FR-002**: The system MUST only allow updates to problems with status `DRAFT`.
 - **FR-003**: The system MUST only allow the problem author, Admin, or assigned modifiers to update a problem.
-- **FR-004**: The system MUST NOT regenerate the slug when title is updated.
-- **FR-005**: The system MUST validate timeLimit as positive integer ≤ 300000 milliseconds if provided.
-- **FR-006**: The system MUST validate memoryLimit as positive integer ≤ 2048 MiB if provided.
+- **FR-004**: The system MUST NOT allow updating the slug (slug is immutable after creation).
+- **FR-005**: The system MUST validate timeLimit as positive integer ≤ `maxTimeLimitGlobal` from Virtual Object if provided.
+- **FR-006**: The system MUST validate memoryLimit as positive integer ≤ `maxMemoryLimitGlobal` from Virtual Object if provided.
+- **FR-006.1**: The system MUST validate languageOverrides array if provided.
+- **FR-006.2**: The system MUST validate that each entry's `language` field is a valid language identifier supported by the platform.
+- **FR-006.3**: The system MUST validate that each override's timeLimit (if provided) does not exceed the maximum from Virtual Object for that language.
+- **FR-006.4**: The system MUST validate that each override's memoryLimit (if provided) does not exceed the maximum from Virtual Object for that language.
 - **FR-007**: The system MUST validate tags against the system's predefined tag list if provided.
 - **FR-008**: Tags MUST always be optional.
 - **FR-008b**: The system MUST allow updating accessibility (`PUBLIC` or `PRIVATE`) by the author, Admin, or assigned modifiers.
@@ -724,6 +739,8 @@ Problem not found.
 - **FR-014**: The system MUST allow replacing existing files with new uploads.
 - **FR-015**: The system MUST allow multiple solution files to be uploaded.
 - **FR-016**: The system MUST only allow file uploads when problem status is `DRAFT`.
+- **FR-016b**: The system MUST update `problemJudgingUpdatedAt` timestamp when uploading judging components (testCases, checker, validator).
+- **FR-016c**: The system MUST NOT update `problemJudgingUpdatedAt` when uploading solution files.
 
 **File Deletion**
 - **FR-017**: The system MUST allow deleting individual files from problems.
@@ -749,11 +766,12 @@ Referenced from Create Problem spec:
 
 - **Problem**: Represents a programming problem.  
   Key attributes:
-  - `slug` (string, unique, auto-generated, lowercase alphanumeric with hyphens)
+  - `slug` (string, unique, user-provided, lowercase alphanumeric with hyphens, 3-70 chars, immutable)
   - `title` (string, required)
   - `statement` (string, LaTeX format, nullable)
-  - `timeLimit` (integer, milliseconds, nullable, max: 300000)
-  - `memoryLimit` (integer, MiB, nullable, max: 2048)
+  - `timeLimit` (integer, milliseconds, nullable, default for all languages, max from Virtual Object)
+  - `memoryLimit` (integer, MiB, nullable, default for all languages, max from Virtual Object)
+  - `languageOverrides` (array, nullable, language-specific limit overrides)
   - `tags` (array of strings, always optional, from predefined list)
   - `status` (enum: `DRAFT` | `PUBLISHED`)
   - `accessibility` (enum: `PUBLIC` | `PRIVATE`, default: `PRIVATE`)
@@ -763,8 +781,16 @@ Referenced from Create Problem spec:
   - `solutionFileKeys` (array of strings, references to solution files)
   - `checkerFileKey` (string, nullable, reference to checker file)
   - `validatorFileKey` (string, nullable, reference to validator file)
+  - `problemJudgingUpdatedAt` (timestamp, nullable, updated when judging components are uploaded)
   - `createdAt` (timestamp)
   - `updatedAt` (timestamp)
+
+> **problemJudgingUpdatedAt**: This timestamp is automatically updated whenever any judging component is uploaded:
+> - Test cases (`fileType=testCases`)
+> - Checker (`fileType=checker`)
+> - Validator (`fileType=validator`)
+>
+> This timestamp is used by the Rejudge system to determine which submissions need rejudging. See Rejudge Submissions spec for details.
 
 > **Problem Status** (publication state):
 > - `DRAFT`: Problem is being built. Can have partial data. Can be updated.
@@ -814,16 +840,20 @@ Referenced from Create Problem spec:
 - **SC-010**: Contestant users attempting operations receive HTTP 403.
 - **SC-011**: No internal IDs are returned in any response.
 - **SC-012**: `updatedAt` is refreshed on every modification.
+- **SC-013**: `problemJudgingUpdatedAt` is updated when testCases, checker, or validator files are uploaded.
+- **SC-014**: `problemJudgingUpdatedAt` is NOT updated when solution files are uploaded.
 
 ---
 
 ## Optional Notes
 
-- **Slug immutability**: The slug is generated once at creation and never changes, even if title is updated.
+- **Slug immutability**: The slug is provided by the user at creation and cannot be changed afterwards.
 - **File replacement**: Uploading a file of the same type replaces the existing file.
 - **PUBLISHED state**: To modify a PUBLISHED problem, it must first be unpublished via the Publish Problem spec.
+- **Judging components and rejudge**: When uploading test cases, checker, or validator, the `problemJudgingUpdatedAt` timestamp is updated. This timestamp is used by the Rejudge system to identify submissions that need rejudging (submissions where `submittedAt < problemJudgingUpdatedAt`).
 - **Related specs**:
   - Create Problem: Initial problem creation
   - Publish Problem: Publishing and unpublishing problems
+  - Rejudge Submissions: Rejudging submissions when judging components change
   - Delete Problem: Removing problems (to be defined)
 

@@ -80,7 +80,7 @@ As a user who has requested account deactivation, I want to confirm the operatio
    - **And** the code remains valid if attempts have not been exhausted
 
 3. **Scenario**: Expired confirmation code
-   - **Given** the confirmation code has expired (after 10 minutes)
+   - **Given** the confirmation code has expired (after 15 minutes)
    - **When** the user attempts to confirm with the expired code
    - **Then** the system rejects with 400 Bad Request (EXPIRED_CODE)
 
@@ -342,7 +342,7 @@ Confirmation attempts exhausted. Must wait before retrying.
 - **FR-004**: The system MUST validate that the user exists and is ACTIVE before processing the deactivation request.
 - **FR-005**: When requesting deactivation, the system MUST generate a 6-digit numeric confirmation code.
 - **FR-006**: The system MUST send the confirmation code to the user's email address.
-- **FR-007**: The confirmation code MUST expire after 10 minutes from its generation.
+- **FR-007**: The confirmation code MUST expire after 15 minutes from its generation.
 - **FR-008**: When requesting a new confirmation code, the system MUST invalidate the previous code.
 
 **Confirmation & Rate Limiting**
@@ -400,7 +400,7 @@ Confirmation attempts exhausted. Must wait before retrying.
   - `id` (string, UUID)
   - `userId` (string, reference to User)
   - `verificationCode` (string, 6-digit numeric code)
-  - `expiresAt` (timestamp, 10 minutes from creation)
+  - `expiresAt` (timestamp, 15 minutes from creation)
   - `attempts` (integer, failed attempts count, max 5)
   - `blockedUntil` (timestamp, nullable, 1-hour block after exhausting attempts)
   - `status` (enum: PENDING, CONFIRMED, EXPIRED, BLOCKED)
@@ -432,7 +432,7 @@ Confirmation attempts exhausted. Must wait before retrying.
 - **SC-001**: Deactivation request returns HTTP 200 with confirmation code sent via email.
 - **SC-002**: ADMIN users receive HTTP 403 when attempting self-deactivation.
 - **SC-003**: Successful confirmation returns HTTP 204 with sessions invalidated and email unlinked.
-- **SC-004**: Confirmation code expires after 10 minutes.
+- **SC-004**: Confirmation code expires after 15 minutes.
 - **SC-005**: The system allows a maximum of 5 confirmation attempts with the same code.
 - **SC-006**: After exhausting 5 attempts, the system blocks new attempts for 1 hour.
 - **SC-007**: A deactivated user cannot authenticate through any method (password or Google OAuth).

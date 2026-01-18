@@ -90,7 +90,7 @@ This document centralizes the complete business logic of the Group Management sy
 ### Content Deletion
 * If a **group is deleted**:
   * **Contests and materials** are deleted (hard delete)
-  * **Standings** are deleted (hard delete) - they have no meaning without the contest
+  * **Standings** are deleted (hard delete) - NoSQL collections `contest_{contestId}_standings` and `contest_{contestId}_standings_final` are deleted for each contest
   * **Submissions are preserved** with `contest_id = NULL` (orphaned but remain in user history)
   * **Problems continue to exist** (they are global)
   * **Memberships, invitations, and join requests** are deleted
@@ -112,6 +112,7 @@ This document centralizes the complete business logic of the Group Management sy
 * **Global group**: Users **cannot leave** the global group.
 * **Other groups**: Users can leave voluntarily.
 * **Last lead**: The last lead of a group cannot be removed.
+* **Admin in global group**: Admin cannot be removed as lead of the global group (even by other leads).
 
 ---
 
@@ -140,13 +141,14 @@ User authorized IF:
 ### Allowed Operations
 Admin can perform:
 * ✅ Create groups
-* ✅ Modify configuration of any group (name, visibility, policies)
-* ✅ Add/remove members from any group
-* ✅ Change member roles (Member ↔ Lead)
+* ✅ Modify configuration of any group (name, visibility, policies) - **except global group**
+* ✅ Add/remove members from any group - **except global group membership**
+* ✅ Change member roles (Member ↔ Lead) - **except cannot remove self as lead from global group**
 * ✅ View pending invitations of any group
 * ✅ Create invitations for any group
 * ✅ Delete groups (except global group)
 * ✅ Manage group content (contests, materials)
+* ✅ Add other leads to global group (Coaches or Admins only)
 
 ### UI Considerations
 * **Member listings**: Admin does NOT appear in member/lead lists (has no membership).
@@ -168,6 +170,9 @@ Admin can perform:
 * **All users** are members automatically.
 * **Cannot be deleted** or have its membership modified manually.
 * **Admin** is lead of the global group (explicit membership in this special case).
+* **Admin cannot be removed as lead** of the global group.
+* **Admin can add other leads** to the global group (must be Coaches or Admins).
+* **Other leads of the global group** have full permissions to manage the group and create contests, but cannot remove Admin as lead.
 * Marked with `is_default = true`.
 * **Users can "hide" the global group** from their personal view (soft hide) without affecting actual membership.
 

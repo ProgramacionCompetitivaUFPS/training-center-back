@@ -6,25 +6,25 @@
 
 ### User Story 1 – Create a new problem with minimal data (Priority: P1)
 
-As a Coach or Admin, I want to create a new problem by providing at least a title so that I can start building the problem incrementally and publish it when ready.
+As a Coach or Admin, I want to create a new problem by providing a slug and title so that I can start building the problem incrementally and publish it when ready.
 
 **Why this priority**: Problem creation is the foundation for the platform's core functionality. Allowing incremental creation with minimal initial data provides a better user experience and enables coaches to work on problems over time.
 
-**Independent Test**: This user story can be tested independently by consuming the `POST /problems` endpoint with valid authentication (Coach or Admin role), validating that a problem is created with status `DRAFT`, accessibility `PRIVATE`, and a unique auto-generated slug.
+**Independent Test**: This user story can be tested independently by consuming the `POST /problems` endpoint with valid authentication (Coach or Admin role), validating that a problem is created with status `DRAFT`, accessibility `PRIVATE`, and the provided slug.
 
 **Acceptance Scenarios**:
 
-1. **Scenario**: Successful problem creation with only title
+1. **Scenario**: Successful problem creation with slug and title
    - **Given** a Coach or Admin is authenticated
-   - **When** they submit a problem creation request with only a title
+   - **When** they submit a problem creation request with slug and title
    - **Then** the system creates the problem with status `DRAFT` and accessibility `PRIVATE`
-   - **And** generates a unique slug from the title (lowercase, alphanumeric, hyphens)
+   - **And** uses the provided slug as the unique identifier
    - **And** sets the authenticated user as the problem author
    - **And** returns the created problem data
 
 2. **Scenario**: Successful problem creation with full metadata
    - **Given** a Coach or Admin is authenticated
-   - **When** they submit a problem creation request with title, statement, timeLimit, memoryLimit, and tags
+   - **When** they submit a problem creation request with slug, title, statement, timeLimit, memoryLimit, and tags
    - **Then** the system creates the problem with all provided data
    - **And** status is `DRAFT` and accessibility is `PRIVATE`
    - **And** returns the created problem data
@@ -39,14 +39,14 @@ As a Coach or Admin, I want to create a new problem by providing at least a titl
    - **When** a problem creation request is submitted
    - **Then** the system rejects with 401 Unauthorized
 
-5. **Scenario**: Missing title
+5. **Scenario**: Missing slug or title
    - **Given** a Coach or Admin is authenticated
-   - **When** the request omits the title field
-   - **Then** the system rejects with 400 Bad Request indicating title is required
+   - **When** the request omits the slug or title field
+   - **Then** the system rejects with 400 Bad Request indicating the missing required field
 
 6. **Scenario**: Invalid time limit or memory limit
    - **Given** a Coach or Admin is authenticated
-   - **And** timeLimit or memoryLimit is zero, negative, or exceeds maximum allowed value
+   - **And** timeLimit or memoryLimit is zero, negative, or exceeds maximum allowed value from Virtual Object
    - **When** they submit the problem creation request
    - **Then** the system rejects with 400 Bad Request indicating invalid limits
 
@@ -56,11 +56,26 @@ As a Coach or Admin, I want to create a new problem by providing at least a titl
    - **When** they submit the problem creation request
    - **Then** the system rejects with 400 Bad Request indicating invalid tags
 
-8. **Scenario**: Title generates duplicate slug
-   - **Given** a problem with slug "sum-of-two-numbers" already exists
-   - **When** a Coach creates a new problem with title "Sum of Two Numbers"
-   - **Then** the system generates a unique slug (e.g., "sum-of-two-numbers-1")
-   - **And** the problem is created successfully
+8. **Scenario**: Slug already exists
+   - **Given** a problem with slug "sum-two-numbers" already exists
+   - **When** a Coach creates a new problem with slug "sum-two-numbers"
+   - **Then** the system rejects with 409 Conflict (SLUG_ALREADY_EXISTS)
+   - **And** returns a message indicating the slug is already in use
+
+9. **Scenario**: Slug too short
+   - **Given** a Coach or Admin is authenticated
+   - **When** they submit a problem with slug "ab" (less than 3 characters)
+   - **Then** the system rejects with 400 Bad Request (SLUG_TOO_SHORT)
+
+10. **Scenario**: Slug too long
+    - **Given** a Coach or Admin is authenticated
+    - **When** they submit a problem with slug exceeding 70 characters
+    - **Then** the system rejects with 400 Bad Request (SLUG_TOO_LONG)
+
+11. **Scenario**: Slug with invalid format
+    - **Given** a Coach or Admin is authenticated
+    - **When** they submit a problem with slug containing invalid characters (uppercase, spaces, special chars)
+    - **Then** the system rejects with 400 Bad Request (INVALID_SLUG_FORMAT)
 
 ---
 
@@ -111,10 +126,10 @@ As a Coach or Admin, I want to create a new problem by uploading a complete ICPC
 ### Edge Cases
 
 - Problem title with Unicode characters requiring normalization (NFKC).
-- Slug auto-generation from title with special characters (e.g., "¿Qué pasa?" → "que-pasa").
-- Problem title that generates very long slug (truncation may be needed, max 100 chars).
-- Title with only special characters (should be rejected or fallback to UUID-based slug).
-- Concurrent creation requests with same title (should generate unique slugs).
+- User-provided slug with invalid format (uppercase, special chars, consecutive hyphens).
+- User-provided slug that's too short (< 3 chars) or too long (> 70 chars).
+- User-provided slug that already exists (duplicate detection).
+- Concurrent creation requests with same slug (race condition handling).
 - Import ZIP with corrupted files.
 - Import ZIP with unsupported file formats.
 - Import ZIP with very large test case files.
@@ -141,21 +156,40 @@ Create a new problem with metadata.
 
 ```json
 {
+  "slug": "sum-two-numbers",
   "title": "Sum of Two Numbers",
   "statement": "Given two integers a and b, return their sum.",
   "timeLimit": 2000,
   "memoryLimit": 256,
+  "languageOverrides": [
+    { "language": "python310", "timeLimit": 4000 },
+    { "language": "java17", "memoryLimit": 512 }
+  ],
   "tags": ["math", "beginner"]
 }
 ```
 
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
+| slug | string | Yes | Unique problem identifier (3-70 chars, lowercase alphanumeric with hyphens only) |
 | title | string | Yes | Problem title (normalized Unicode NFKC) |
 | statement | string | No | Problem statement in LaTeX format |
-| timeLimit | integer | No | Time limit in milliseconds (> 0, max: 300000) |
-| memoryLimit | integer | No | Memory limit in MiB (> 0, max: 2048) |
+| timeLimit | integer | No | Default time limit in milliseconds for all languages (> 0, max from Virtual Object `maxTimeLimitGlobal`) |
+| memoryLimit | integer | No | Default memory limit in MiB for all languages (> 0, max from Virtual Object `maxMemoryLimitGlobal`) |
+| languageOverrides | array | No | Language-specific overrides. Only specify languages that need different limits than the defaults. |
 | tags | string[] | No | Array of tags from system's predefined list (always optional) |
+
+**languageOverrides array structure**:
+
+Each entry specifies overrides for a specific language. Only include languages that need different limits.
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| language | string | Yes | Language identifier (e.g., `cpp20`, `java17`, `python310`) |
+| timeLimit | integer | No | Override time limit for this language (> 0, must not exceed max from Virtual Object for this language) |
+| memoryLimit | integer | No | Override memory limit for this language (> 0, must not exceed max from Virtual Object for this language) |
+
+> **Note**: See the Platform README for Virtual Object configuration including `maxTimeLimitGlobal`, `maxMemoryLimitGlobal`, and language-specific maximums.
 
 **Responses**:
 
@@ -164,11 +198,15 @@ Problem created successfully.
 
 ```json
 {
-  "slug": "sum-of-two-numbers",
+  "slug": "sum-two-numbers",
   "title": "Sum of Two Numbers",
   "statement": "Given two integers a and b, return their sum.",
   "timeLimit": 2000,
   "memoryLimit": 256,
+  "languageOverrides": [
+    { "language": "python310", "timeLimit": 4000 },
+    { "language": "java17", "memoryLimit": 512 }
+  ],
   "tags": ["math", "beginner"],
   "status": "DRAFT",
   "accessibility": "PRIVATE",
@@ -189,7 +227,41 @@ Problem created successfully.
 ```
 
 #### 400 Bad Request
-Validation error (missing title, invalid limits, invalid tags).
+Validation error (missing fields, invalid slug format, invalid limits, invalid tags).
+
+```json
+{
+  "error": "VALIDATION_ERROR",
+  "message": "Invalid request data",
+  "details": [
+    {
+      "field": "slug",
+      "message": "Slug is required"
+    }
+  ]
+}
+```
+
+```json
+{
+  "error": "SLUG_TOO_SHORT",
+  "message": "Slug must be at least 3 characters long"
+}
+```
+
+```json
+{
+  "error": "SLUG_TOO_LONG",
+  "message": "Slug must not exceed 70 characters"
+}
+```
+
+```json
+{
+  "error": "INVALID_SLUG_FORMAT",
+  "message": "Slug must contain only lowercase letters, numbers, and hyphens. Cannot start/end with hyphen or have consecutive hyphens."
+}
+```
 
 ```json
 {
@@ -227,6 +299,16 @@ Validation error (missing title, invalid limits, invalid tags).
       "message": "Invalid tag 'unknown-tag'. Valid tags: math, beginner, dp, graphs, ..."
     }
   ]
+}
+```
+
+#### 409 Conflict
+Slug already exists.
+
+```json
+{
+  "error": "SLUG_ALREADY_EXISTS",
+  "message": "A problem with slug 'sum-two-numbers' already exists"
 }
 ```
 
@@ -393,15 +475,23 @@ User does not have permission.
 
 **Problem Creation (Minimal)**
 - **FR-001**: The system MUST allow only users with Coach or Admin roles to create problems.
-- **FR-002**: The system MUST require only the `title` field to create a problem.
-- **FR-003**: The system MUST auto-generate a unique slug from the title (lowercase, alphanumeric, hyphens only).
-- **FR-004**: If the generated slug already exists, the system MUST append a numeric suffix to make it unique.
-- **FR-005**: The slug MUST be limited to 100 characters maximum.
+- **FR-002**: The system MUST require `slug` and `title` fields to create a problem.
+- **FR-003**: The system MUST validate that the slug is unique across all problems.
+- **FR-004**: If the slug already exists, the system MUST reject with 409 Conflict (SLUG_ALREADY_EXISTS).
+- **FR-005**: The slug MUST be between 3 and 70 characters.
+- **FR-005.1**: The slug MUST contain only lowercase letters (a-z), numbers (0-9), and hyphens (-).
+- **FR-005.2**: The slug MUST NOT start or end with a hyphen.
+- **FR-005.3**: The slug MUST NOT contain consecutive hyphens.
 - **FR-006**: The system MUST set problem status to `DRAFT` and accessibility to `PRIVATE` when created.
 - **FR-007**: The system MUST set the authenticated user as the problem author.
 - **FR-008**: The system MUST normalize the title using Unicode NFKC normalization.
-- **FR-009**: The system MUST validate timeLimit as positive integer ≤ 300000 milliseconds if provided.
-- **FR-010**: The system MUST validate memoryLimit as positive integer ≤ 2048 MiB if provided.
+- **FR-009**: The system MUST validate timeLimit as positive integer ≤ `maxTimeLimitGlobal` from Virtual Object if provided.
+- **FR-010**: The system MUST validate memoryLimit as positive integer ≤ `maxMemoryLimitGlobal` from Virtual Object if provided.
+- **FR-010.1**: The system MUST validate languageOverrides array if provided.
+- **FR-010.2**: The system MUST validate that each entry's `language` field is a valid language identifier supported by the platform.
+- **FR-010.3**: The system MUST validate that each override's timeLimit (if provided) does not exceed the maximum from Virtual Object for that language.
+- **FR-010.4**: The system MUST validate that each override's memoryLimit (if provided) does not exceed the maximum from Virtual Object for that language.
+- **FR-010.5**: The system MUST validate that timeLimit and memoryLimit in languageOverrides are positive integers when provided.
 - **FR-011**: The system MUST validate tags against the system's predefined tag list if provided.
 - **FR-012**: Tags MUST always be optional (not required for creation or publication).
 
@@ -425,11 +515,12 @@ User does not have permission.
 
 - **Problem**: Represents a programming problem.  
   Key attributes:
-  - `slug` (string, unique, auto-generated, lowercase alphanumeric with hyphens, max 100 chars)
+  - `slug` (string, unique, user-provided, lowercase alphanumeric with hyphens, 3-70 chars)
   - `title` (string, required, normalized NFKC)
   - `statement` (string, LaTeX format, nullable)
-  - `timeLimit` (integer, milliseconds, nullable, max: 300000)
-  - `memoryLimit` (integer, MiB, nullable, max: 2048)
+  - `timeLimit` (integer, milliseconds, nullable, default for all languages, max from Virtual Object)
+  - `memoryLimit` (integer, MiB, nullable, default for all languages, max from Virtual Object)
+  - `languageOverrides` (array, nullable, language-specific limit overrides)
   - `tags` (array of strings, always optional, from predefined list)
   - `status` (enum: `DRAFT` | `PUBLISHED`, default: `DRAFT`)
   - `accessibility` (enum: `PUBLIC` | `PRIVATE`, default: `PRIVATE`)
@@ -439,8 +530,11 @@ User does not have permission.
   - `solutionFileKeys` (array of strings, references to solution files)
   - `checkerFileKey` (string, nullable, reference to checker file)
   - `validatorFileKey` (string, nullable, reference to validator file)
+  - `problemJudgingUpdatedAt` (timestamp, nullable, updated when judging components are uploaded)
   - `createdAt` (timestamp)
   - `updatedAt` (timestamp)
+
+> **problemJudgingUpdatedAt**: This timestamp is automatically updated whenever any judging component is uploaded (test cases, checker, or validator). Used by the Rejudge system to determine which submissions need rejudging. See Rejudge Submissions spec for details.
 
 > **Problem Status** (publication state):
 > - `DRAFT`: Problem is being built. Can have partial data. Can be modified. Not available for contests/practice.
@@ -450,22 +544,31 @@ User does not have permission.
 > - `PRIVATE`: Only the problem's modifiers (author + assigned modifiers) can add this problem to a contest. Default for all new problems.
 > - `PUBLIC`: Any contest creator can add this problem to their contest.
 
-### Slug Generation Algorithm
+### Slug Validation Rules
 
-1. Normalize title using Unicode NFKC
-2. Convert to lowercase
-3. Replace spaces and underscores with hyphens
-4. Remove all characters except alphanumeric and hyphens
-5. Collapse multiple consecutive hyphens into single hyphen
-6. Trim leading/trailing hyphens
-7. Truncate to 100 characters
-8. If slug already exists, append "-1", "-2", etc. until unique
+The slug is provided by the user and must follow these rules:
 
-**Examples**:
-- "Sum of Two Numbers" → "sum-of-two-numbers"
-- "¿Qué pasa?" → "que-pasa"
-- "Problem   #1!!!" → "problem-1"
-- "Sum of Two Numbers" (duplicate) → "sum-of-two-numbers-1"
+| Rule | Description |
+|------|-------------|
+| Length | 3-70 characters |
+| Characters | Only lowercase letters (a-z), numbers (0-9), and hyphens (-) |
+| Format | Cannot start or end with hyphen |
+| Format | Cannot contain consecutive hyphens (--) |
+| Uniqueness | Must be unique across all problems |
+
+**Valid examples**:
+- `sum-two-numbers` ✅
+- `prob-001` ✅
+- `dp-knapsack` ✅
+- `a1b` ✅
+
+**Invalid examples**:
+- `ab` ❌ (too short, < 3 chars)
+- `Sum-Two-Numbers` ❌ (uppercase not allowed)
+- `-sum-two-` ❌ (cannot start/end with hyphen)
+- `sum--two` ❌ (consecutive hyphens not allowed)
+- `sum two` ❌ (spaces not allowed)
+- `probléma` ❌ (special characters not allowed)
 
 ### Tags
 
@@ -477,9 +580,9 @@ Tags are loaded from an external configuration file at application startup. They
 
 ### Measurable Outcomes
 
-- **SC-001**: Coach and Admin users can create problems with only a title via `POST /problems` with HTTP 201.
-- **SC-002**: Slug is auto-generated from title (lowercase, alphanumeric, hyphens).
-- **SC-003**: Duplicate slugs are handled with numeric suffixes.
+- **SC-001**: Coach and Admin users can create problems with slug and title via `POST /problems` with HTTP 201.
+- **SC-002**: Slug is provided by user and validated (3-70 chars, lowercase alphanumeric with hyphens).
+- **SC-003**: Duplicate slugs are rejected with 409 Conflict (SLUG_ALREADY_EXISTS).
 - **SC-004**: Problems are created with status `DRAFT` and accessibility `PRIVATE`.
 - **SC-005**: Authenticated user is set as the problem author.
 - **SC-006**: Optional fields (statement, timeLimit, memoryLimit, tags) can be provided at creation.

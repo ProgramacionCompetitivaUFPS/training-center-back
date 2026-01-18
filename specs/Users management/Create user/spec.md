@@ -20,6 +20,7 @@ As a system contestant, I want to register by creating an account so that I can 
    - **Given** no user is registered with the provided email
    - **When** valid user registration data is submitted
    - **Then** the system creates the user and returns their data with a unique identifier and creation date
+   - **And** the user is automatically added as a member of the global group
 
 2. **Scenario**: Duplicate email
    - **Given** a user already exists with the provided email
@@ -71,10 +72,16 @@ Register a new user in the system.
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
 | email | string | Yes | User's email address (must be unique) |
-| password | string | Yes | User's password for authentication |
+| password | string | Yes | User's password for authentication (must meet security requirements) |
 | name | string | Yes | User's full name |
 | nickname | string | No | User's display name or alias |
 | institution | string | No | User's institution or organization |
+
+**Password Requirements**:
+- Minimum 8 characters
+- At least 1 uppercase letter (A-Z)
+- At least 1 special character (!@#$%^&*()_+-=[]{}|;:',.<>?/)
+- At least 1 number (0-9)
 
 **Responses**:
 
@@ -135,10 +142,12 @@ The email is already registered.
 - **FR-003**: The system MUST validate the email format before persisting the user.
 - **FR-004**: The system MUST validate the presence of required fields (email, password, name).
 - **FR-004.1**: The system MUST securely hash the password before storing it.
+- **FR-004.2**: The system MUST enforce password security rules: minimum 8 characters, at least 1 uppercase letter, at least 1 special character, at least 1 number.
 - **FR-005**: The system MUST automatically generate a unique identifier (id) for each user (not returned in responses).
 - **FR-005.1**: The system MUST store nicknames in lowercase, regardless of the input case provided.
 - **FR-006**: The system MUST assign the CONTESTANT role to the new user. Other roles (ADMIN, COACH) are assigned through separate administrative processes.
-- **FR-007**: The system MUST persist the user’s creation date.
+- **FR-006.1**: The system MUST automatically add the new user as a member of the global group upon creation.
+- **FR-007**: The system MUST persist the user's creation date.
 - **FR-008**: The system MUST return validation errors with a consistent structure and clear messages.
 
 ### Key Entities
@@ -149,10 +158,12 @@ The email is already registered.
   - `email` (string, unique)
   - `password` (string, hashed, never returned in responses)
   - `name` (string)
-  - `nickname` (string, optional)
+  - `nickname` (string, optional, stored in lowercase)
   - `institution` (string, optional)
-  - `role` (string, default: CONTESTANT)
+  - `role` (enum: ADMIN | COACH | CONTESTANT, default: CONTESTANT)
+  - `status` (enum: ACTIVE | DEACTIVATED, default: ACTIVE, immutable via user actions except self-deactivation)
   - `createdAt` (timestamp)
+  - `updatedAt` (timestamp, nullable, null on creation)
 
 ## Success Criteria *(mandatory)*
 

@@ -40,15 +40,16 @@ SCHEDULED ──(startTime reached)──> ACTIVE ──(endTime reached)──>
 
 | Role | Regular Group | Global Group |
 |------|--------------|--------------|
-| **Admin** | ✅ Any group | ✅ |
-| **Coach** | ✅ Only if Lead | ✅ |
+| **Admin** | ✅ Any group | ✅ (as Lead of global group) |
+| **Coach** | ✅ Only if Lead | ✅ Only if Lead of global group |
 | **Contestant** | ❌ | ❌ |
 
 ### Contest Management (Update, Delete, Manage Problems)
 
-* **Contest Owner**: Full control over their contest
-* **Group Lead**: Can manage contests in their group
-* **Admin**: Can manage any contest
+* **Contest Owner**: Can lock/unlock their contest
+* **Group Lead**: Can manage contests in their group (all Leads can update and delete, including in global group)
+* **Admin**: Can manage any contest (can lock/unlock and delete any contest, has implicit Lead permissions)
+* **Locked Contests**: Cannot be modified or deleted except by owner or admin (who can lock/unlock)
 
 ---
 
@@ -58,11 +59,17 @@ SCHEDULED ──(startTime reached)──> ACTIVE ──(endTime reached)──>
 
 | Attribute | Type | Required | Description |
 |-----------|------|----------|-------------|
-| `name` | string | Yes | Contest name (max 200 chars) |
-| `description` | string | No | Contest description (max 5000 chars) |
-| `startTime` | timestamp | Yes | When the contest starts (UTC) |
-| `endTime` | timestamp | Yes | When the contest ends (UTC) |
-| `penalty` | integer | No | Penalty in minutes per wrong submission (default: 20) |
+| `name` | string | Yes | Contest name (max 200 chars, mutable) |
+| `description` | string | No | Contest description (max 5000 chars, mutable) |
+| `startTime` | timestamp | Yes | When the contest starts (UTC, mutable, must be in future) |
+| `endTime` | timestamp | Yes | When the contest ends (UTC, mutable, must be in future, cannot modify if postcompetition active) |
+| `penalty` | integer | No | Penalty in minutes per wrong submission (default: 20, range: 0-1440, mutable) |
+| `enablePostContest` | boolean | No | Enable post-competition phase (default: false, mutable) |
+| `locked` | boolean | No | Lock status (default: false, mutable by owner/admin only) |
+| `group_id` | UUID | Yes | Group identifier (immutable) |
+| `owner_id` | UUID | Yes | Contest creator identifier (immutable) |
+| `createdAt` | timestamp | Yes | Creation timestamp (immutable) |
+| `updatedAt` | timestamp | No | Last update timestamp (updated on modification) |
 
 ### Scoring
 
@@ -76,13 +83,19 @@ SCHEDULED ──(startTime reached)──> ACTIVE ──(endTime reached)──>
 
 ## 🔹 Problems in Contests
 
-### Adding Problems
+### Adding/Removing/Reordering Problems
 
-* Problems can be added at contest creation or later
+* Problems can be added at contest creation or later via updates
+* Problems can be removed from contests
+* When a problem is removed, submissions to that problem have `contest_id` set to `null` (no longer associated with the contest)
+* Problems can be reordered within contests
 * Problems must be in `PUBLISHED` status
 * **Accessibility rules**:
   * `PUBLIC` problems: any authorized user can add
   * `PRIVATE` problems: only problem modifiers can add
+* **Standing recalculation**:
+  * Adding problems does NOT trigger Standing recalculation (no submissions exist yet)
+  * Removing problems during ACTIVE contests triggers Standing recalculation
 
 ### Problem Visibility During Contest
 
@@ -99,21 +112,66 @@ SCHEDULED ──(startTime reached)──> ACTIVE ──(endTime reached)──>
 
 ## 🔹 Participants
 
-### Registration (Future Spec)
+### Registration
 
-* Participants must register before or during the contest
-* Group members may have automatic registration (configurable)
-* Global contests are open to all users
+* Participants must register before the contest starts (status SCHEDULED)
+* Only Members can register (Leads and Admins cannot register)
+* Registration is idempotent (registering twice returns success)
+* Participants can unregister before contest starts
+* Cannot unregister once contest has started (ACTIVE or FINISHED)
+* If user is removed from group before contest starts: automatic unregistration
+* If user is removed from group after contest starts: remains registered but cannot access
+* No limit on number of participants
 
 ### Submissions
 
-* Participants can submit solutions only during `ACTIVE` status
+* Participants can submit solutions during `ACTIVE` status
+* If `enablePostContest = true`, registered users can also submit after `endTime` (postcompetition phase)
 * Submissions are linked to both the contest and the problem
 * Each submission is judged against the problem's test cases
+* Submissions during postcompetition (`submittedAt > endTime`) do NOT affect standings
+
+---
+
+## 🔹 Postcompetition Phase
+
+### Concept
+
+* **Postcompetition** is an optional phase that allows registered users to continue submitting after the contest ends
+* Submissions during postcompetition are judged normally but do NOT affect standings
+* Standing is frozen at `endTime` and remains visible but immutable during postcompetition
+
+### Activation
+
+* Postcompetition is controlled by the `enablePostContest` field (default: false)
+* Can be enabled before contest ends: Will start automatically after `endTime`
+* Can be enabled after contest ends: Starts immediately when enabled
+* Once enabled, postcompetition continues indefinitely (until disabled)
+
+### Behavior
+
+* **Submissions**: Registered users can submit solutions during postcompetition
+* **Standing**: Frozen at `endTime`, visible but immutable
+* **Identification**: Submissions during postcompetition are identified by `submittedAt > endTime` and having `contest_id`
+* **Judging**: Submissions are judged normally against problem test cases
+* **Standing Impact**: Submissions do NOT affect standings (standing remains frozen)
+
+### Restrictions
+
+* **Cannot disable**: Postcompetition cannot be disabled (`enablePostContest` from true to false) if submissions exist after `endTime`
+* **Cannot modify endTime**: When postcompetition is active (submissions exist after `endTime`), `endTime` cannot be extended or reduced
+* **Can reduce endTime**: Only if no postcompetition submissions exist, and only to time >= last submission before original `endTime`
 
 ---
 
 ## 🔹 Standings
+
+### Data Architecture
+
+* **NoSQL Document Storage**: Registration and Standing data are stored together in NoSQL documents
+* **One Collection Per Contest**: Each contest has its own collection `contest_{contestId}_standings` for optimal performance
+* **Document Structure**: Each document contains registration info and standing data for one participant
+* **Final Snapshot**: When contest ends, a snapshot collection `contest_{contestId}_standings_final` is created for historical records
 
 ### Calculation
 
@@ -122,12 +180,19 @@ SCHEDULED ──(startTime reached)──> ACTIVE ──(endTime reached)──>
   2. Secondary: Total time including penalties (ascending)
 * Time is calculated from contest start to accepted submission
 * Penalties added for each wrong submission before acceptance
+* **Penalty calculation**: Only added when problem is first accepted = (attempts - 1) * contestPenalty
 
 ### Updates
 
-* Standings are updated in real-time during `ACTIVE` contests
-* Standings are **frozen** for `FINISHED` contests
-* If a contest is deleted, standings are deleted (submissions preserved)
+* Standings are updated in real-time during `ACTIVE` contests using atomic operations
+* Standings are **frozen** at `endTime` (when contest ends)
+* Standings remain visible but immutable during postcompetition phase
+* Standings are recalculated when:
+  * Problems are removed during ACTIVE contests (submissions to removed problems have `contest_id` set to `null`)
+  * Penalty is changed during ACTIVE contests
+* When a problem is added to a contest, standings are NOT recalculated (no submissions exist yet)
+* Submissions during postcompetition do NOT affect standings (standing is frozen at endTime)
+* If a contest is deleted, the standings collection is deleted (final snapshot also deleted if exists, submissions preserved)
 
 ---
 
@@ -142,7 +207,8 @@ SCHEDULED ──(startTime reached)──> ACTIVE ──(endTime reached)──>
 ### Global Group
 
 * Special group accessible to all users
-* Any Coach or Admin can create contests
+* Only Leads of the global group can create contests (Admin and any Coaches added as leads)
+* Admin is automatically lead of the global group and can add other leads
 * All platform users can participate
 
 ---
@@ -154,10 +220,13 @@ SCHEDULED ──(startTime reached)──> ACTIVE ──(endTime reached)──>
 | Entity | Action |
 |--------|--------|
 | Contest | Hard delete |
-| Contest_Problem | Hard delete (problem links) |
-| Standings | Hard delete |
-| Submissions | Preserved with `contest_id = NULL` |
-| Registrations | Hard delete |
+| Contest_Problem | Hard delete (cascade) |
+| Standing Collection | Hard delete (`contest_{contestId}_standings`) |
+| Final Snapshot | Deleted (`contest_{contestId}_standings_final` deleted if exists) |
+| Submission | Preserved with `contest_id = NULL` (orphaned) |
+| Problem | NOT deleted (global entities) |
+
+> **Note**: Both the NoSQL collection `contest_{contestId}_standings` and the final snapshot `contest_{contestId}_standings_final` are deleted when the contest is deleted (if they exist).
 
 ### When the Parent Group is Deleted
 
@@ -173,6 +242,11 @@ SCHEDULED ──(startTime reached)──> ACTIVE ──(endTime reached)──>
 * All times stored in **UTC**
 * Client responsible for timezone conversion
 * Status computed on each request based on server time
+* `startTime` and `endTime` must always be in the future (cannot be set to past)
+* `endTime` must be after `startTime`
+* Times can be modified even after contest has started (but must remain in future)
+* `endTime` cannot be modified when postcompetition is active (submissions exist after endTime)
+* `endTime` can only be reduced to time >= last submission before original endTime
 
 ### Concurrency
 
@@ -193,13 +267,12 @@ SCHEDULED ──(startTime reached)──> ACTIVE ──(endTime reached)──>
 ### Implemented Specs
 
 1. **[Create contest](Create%20contest/spec.md)** - Contest creation with initial problems
+2. **[Update contest](Update%20contest/spec.md)** - Modify contest details, problems, times, penalty, and lock/unlock functionality
+3. **[Delete contest](Delete%20contest/spec.md)** - Remove contest and handle associated data (Contest_Problem, Standing, Register deleted; submissions orphaned)
+4. **[Register to contest](Register%20to%20contest/spec.md)** - Participant registration and unregistration (Members only, before contest starts)
 
 ### Future Specs (Planned)
 
-* **Update contest** - Modify contest details before start
-* **Delete contest** - Remove contest with content handling
-* **Manage contest problems** - Add/remove problems
-* **Register to contest** - Participant registration
 * **View contest** - Contest details and problem list
 * **Contest standings** - Rankings and leaderboard
 * **Submit solution** - Problem submissions (may be separate module)
@@ -209,18 +282,20 @@ SCHEDULED ──(startTime reached)──> ACTIVE ──(endTime reached)──>
 ```
 Create Contest (base)
     ↓
-Update Contest (P1) ← (modify before start)
+Update Contest (P1) ✅ ← (modify details, problems, times, penalty, lock/unlock)
     ↓
-Manage Contest Problems (P1) ← (add/remove problems)
+Delete Contest (P1) ✅ ← (remove contest, handle associated data)
     ↓
-Register to Contest (P1) ← (participant registration)
+Register to Contest (P1) ✅ ← (participant registration and unregistration)
     ↓
 View Contest (P2) ← (public information)
     ↓
 Contest Standings (P2) ← (rankings)
     ↓
-Delete Contest (P3)
+Submit Solution (P1) ← (requires registration)
 ```
+
+> **Note**: Update Contest includes functionality for managing problems (add/remove/reorder), so a separate "Manage Contest Problems" spec is not needed.
 
 ---
 
@@ -249,6 +324,48 @@ Delete Contest (P3)
 * **Administrative needs**: Platform management and support
 * **Emergency**: Can assist groups when needed
 * **Consistency**: Follows same pattern as other admin permissions
+
+### Why allow Admin to lock/unlock contests?
+
+* **Administrative override**: Admins need to fix issues when contest owners are unavailable
+* **Support**: Can assist groups when contest owners need help
+* **Consistency**: Follows same pattern as other admin override capabilities
+* **Protection**: Admins can lock contests to prevent accidental modifications
+
+### Why allow updates during active contests?
+
+* **Flexibility**: Contest organizers need to adapt to changing circumstances
+* **Error correction**: Allows fixing mistakes discovered during the contest
+* **Problem management**: Enables adding/removing problems as needed
+* **Time adjustments**: Allows extending or reducing contest duration
+
+### Why lock contests?
+
+* **Data integrity**: Prevents accidental modifications after contest ends
+* **Historical accuracy**: Preserves contest state for historical records
+* **Fairness**: Ensures standings remain unchanged after contest completion
+* **Control**: Contest owners can lock contests when they're satisfied with the state
+
+### Why orphan submissions instead of deleting them?
+
+* **Data preservation**: Submissions represent user work and should be preserved
+* **Analytics**: Orphaned submissions can still be analyzed for problem statistics
+* **User history**: Users can see their submission history even if contest is deleted
+* **Problem statistics**: Problems maintain their submission statistics across contests
+
+### Why can't locked contests be deleted?
+
+* **Safety**: Prevents accidental deletion of important contests
+* **Explicit action**: Requires intentional unlock before deletion
+* **Audit trail**: Ensures deletion is a deliberate action, not accidental
+
+### Why postcompetition phase?
+
+* **Learning opportunity**: Allows participants to continue practicing after contest ends
+* **Fairness**: Standing is frozen at endTime, ensuring final rankings are preserved
+* **Flexibility**: Contest organizers can enable/disable based on their needs
+* **Data preservation**: Submissions during postcompetition are preserved for learning purposes
+* **No standing impact**: Ensures contest integrity - only submissions during official contest time affect rankings
 
 ---
 

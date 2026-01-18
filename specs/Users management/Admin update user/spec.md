@@ -237,13 +237,14 @@ Target user not found.
   - `email` (string, unique, **mutable by admin**)
   - `password` (string, hashed, immutable via this endpoint)
   - `name` (string, **mutable**)
-  - `nickname` (string, optional, **mutable**)
+  - `nickname` (string, optional, **mutable**, stored in lowercase)
   - `institution` (string, optional, **mutable**)
-  - `role` (string, **mutable by admin**, except ADMIN)
+  - `role` (enum: ADMIN | COACH | CONTESTANT, **mutable by admin**, except ADMIN)
+  - `status` (enum: ACTIVE | DEACTIVATED, immutable via this endpoint - see [Admin Deactivate User](../Admin%20deactivate%20user/spec.md))
   - `createdAt` (timestamp, immutable)
   - `updatedAt` (timestamp, nullable, updated on modification)
 
-> **Note**: Through this feature, administrators can update mutable fields (`name`, `nickname`, `institution`) and privileged fields (`email`, `role`), except assigning the ADMIN role.
+> **Note**: Through this feature, administrators can update mutable fields (`name`, `nickname`, `institution`) and privileged fields (`email`, `role`), except assigning the ADMIN role. To deactivate a user, see [Admin Deactivate User](../Admin%20deactivate%20user/spec.md).
 
 ### Supported Roles
 

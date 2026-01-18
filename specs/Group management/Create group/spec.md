@@ -64,7 +64,9 @@ As an Admin or a Coach, I want to create a Group so that a collection of users c
 * **When** the system bootstraps data
 * **Then** a special Group (the "global" group) exists with `is_default = true`
 * **And** all existing and future users are members of the global group automatically
+* **And** Admin is automatically added as lead of the global group
 * **And** this group cannot be deleted and users cannot leave it
+* **And** Admin cannot be removed as lead of the global group
 
 ---
 
@@ -203,6 +205,8 @@ As a System, I want group names to be unique (and some reserved names forbidden)
 * **FR-016**: System MUST capture critical group creation events in audit logs (who created, timestamp, group configuration).
 * **FR-017**: System MUST ensure only Admins and Coaches can be assigned Lead role.
 * **FR-018**: System MUST create a default/global Group during bootstrap that contains all users and cannot be deleted.
+* **FR-018.1**: System MUST add Admin as lead of the global group during bootstrap.
+* **FR-018.2**: System MUST prevent Admin from being removed as lead of the global group.
 * **FR-019**: System MUST ensure groups have at least one lead member at all times.
 * **FR-020**: System MUST make all membership changes auditable with timestamps and role information.
 * **FR-021**: System MUST validate all nicknames in `initial_member_nicknames` and `initial_lead_nicknames` exist before creating group.
@@ -265,7 +269,7 @@ As a System, I want group names to be unique (and some reserved names forbidden)
 * **SC-002**: Attempted group creation by non-authorized users is rejected with 403 in all tested cases.
 * **SC-003**: The system enforces name uniqueness: attempts to create duplicate names fail with 409 (`NAME_ALREADY_EXISTS`).
 * **SC-004**: The system enforces LEAD assignment rules: only Coaches/Admins can be assigned as group LEAD; invalid assignments rejected with 400.
-* **SC-005**: The bootstrap process guarantees existence of the global default group upon system start (test: after migration/bootstrap, the `global` group exists and contains all users; cannot be deleted).
+* **SC-005**: The bootstrap process guarantees existence of the global default group upon system start (test: after migration/bootstrap, the `global` group exists and contains all users; Admin is lead; cannot be deleted; Admin cannot be removed as lead).
 * **SC-006**: Visibility + join_policy rules are enforced: `NOT_VISIBLE` + `OPEN` combination is rejected at create time; `VISIBLE` groups allow non-member read-only discovery.
 * **SC-007**: For created groups, `joined_at` timestamps are present for the creator and any provided initial members by nickname (verified by unit tests).
 * **SC-008**: Deleting a non-global group triggers hard delete and removes associated contests and materials (integration test coverage).
