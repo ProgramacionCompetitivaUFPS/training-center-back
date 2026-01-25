@@ -194,6 +194,24 @@ SCHEDULED ──(startTime reached)──> ACTIVE ──(endTime reached)──>
 * Submissions during postcompetition do NOT affect standings (standing is frozen at endTime)
 * If a contest is deleted, the standings collection is deleted (final snapshot also deleted if exists, submissions preserved)
 
+### Freeze (Optional)
+
+* **`freezeMinutes`** (integer, nullable, default: 60) - Minutes before `endTime` to freeze standings
+* When `freezeMinutes` is set, standings freeze at `endTime - freezeMinutes`
+* During freeze:
+  * Regular users see submissions after freeze time as "pending" (?)
+  * Leads and Admin can view real-time standings with `?realtime=true`
+* When `freezeMinutes = null`, no freeze is applied
+* After contest ends, full standings are revealed (freeze lifted)
+
+### Real-Time Updates (SSE)
+
+* **Server-Sent Events** endpoint: `GET /contests/{id}/standings/stream`
+* Sends incremental updates when standings change
+* Event types: `snapshot`, `update`, `freeze`, `contest_ended`, `ping`
+* Only available for ACTIVE contests
+* Respects freeze rules (unless Leads/Admin with `?realtime=true`)
+
 ---
 
 ## 🔹 Relationship with Groups
@@ -270,12 +288,30 @@ SCHEDULED ──(startTime reached)──> ACTIVE ──(endTime reached)──>
 2. **[Update contest](Update%20contest/spec.md)** - Modify contest details, problems, times, penalty, and lock/unlock functionality
 3. **[Delete contest](Delete%20contest/spec.md)** - Remove contest and handle associated data (Contest_Problem, Standing, Register deleted; submissions orphaned)
 4. **[Register to contest](Register%20to%20contest/spec.md)** - Participant registration and unregistration (Members only, before contest starts)
+5. **[View contest](View%20contest/spec.md)** - Contest details, problem list, and contest listing with filters
+6. **[View contest standings](View%20contest%20standings/spec.md)** - ICPC-style rankings with freeze support and SSE real-time updates
 
 ### Future Specs (Planned)
 
-* **View contest** - Contest details and problem list
-* **Contest standings** - Rankings and leaderboard
-* **Submit solution** - Problem submissions (may be separate module)
+* **View postcompetition progress** (`GET /contests/{id}/postcompetition`)
+  - Shows per-user progress during postcompetition
+  - Which problems each user is attempting/has solved after contest ended
+  - Does NOT affect official standings
+
+* **View contest submissions** (`GET /contests/{id}/submissions`)
+  - Filter by `phase`: `competition` | `postcompetition` | `all`
+  - Shows submission list with verdict, time, memory
+
+* **Export standings** (`GET /contests/{id}/standings/export`)
+  - CSV, PDF, Excel formats
+  - For official records and certificates
+
+### Future Frontend Features
+
+* **Standing Freeze Visualizer**
+  - Animated "unfreeze" replay after contest ends
+  - Shows how standings evolved during freeze period
+  - Data already available in `contest_{contestId}_standings_final` with full history
 
 ### Implementation Dependencies
 
@@ -288,11 +324,13 @@ Delete Contest (P1) ✅ ← (remove contest, handle associated data)
     ↓
 Register to Contest (P1) ✅ ← (participant registration and unregistration)
     ↓
-View Contest (P2) ← (public information)
+View Contest (P1) ✅ ← (contest details, problem list, listing)
     ↓
-Contest Standings (P2) ← (rankings)
+View Contest Standings (P1) ✅ ← (ICPC rankings, freeze, SSE)
     ↓
-Submit Solution (P1) ← (requires registration)
+View Postcompetition Progress (P2) ← (per-user progress after contest)
+    ↓
+View Contest Submissions (P2) ← (submission list, filters)
 ```
 
 > **Note**: Update Contest includes functionality for managing problems (add/remove/reorder), so a separate "Manage Contest Problems" spec is not needed.

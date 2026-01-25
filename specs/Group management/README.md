@@ -89,7 +89,8 @@ This document centralizes the complete business logic of the Group Management sy
 
 ### Content Deletion
 * If a **group is deleted**:
-  * **Contests and materials** are deleted (hard delete)
+  * **Contests** are deleted (hard delete)
+  * **Materials** are deleted (hard delete) - including all associated URLs and tags
   * **Standings** are deleted (hard delete) - NoSQL collections `contest_{contestId}_standings` and `contest_{contestId}_standings_final` are deleted for each contest
   * **Submissions are preserved** with `contest_id = NULL` (orphaned but remain in user history)
   * **Problems continue to exist** (they are global)

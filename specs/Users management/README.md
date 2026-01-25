@@ -32,7 +32,9 @@ Users Management handles all user-related operations in the platform, including 
 | `password` | string | Yes | Hashed password, never returned in responses |
 | `name` | string | Yes | User's full name |
 | `nickname` | string | No | Display name/alias, stored in lowercase, unique |
-| `institution` | string | No | User's institution or organization |
+| `country` | string | Yes | User's country |
+| `city` | string | Yes | User's city |
+| `institution` | string | Yes | User's institution or organization |
 | `role` | enum | Auto | ADMIN, COACH, or CONTESTANT (default: CONTESTANT) |
 | `status` | enum | Auto | ACTIVE or DEACTIVATED (default: ACTIVE) |
 | `createdAt` | timestamp | Auto | Account creation timestamp |

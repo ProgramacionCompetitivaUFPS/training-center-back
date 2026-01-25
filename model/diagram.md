@@ -8,7 +8,9 @@ User {
   string email UK "nullable after deactivation"
   string password "hashed"
   string name
-  string institution
+  string country "required"
+  string city "required"
+  string institution "required"
   string nickname UK "lowercase, anonymized after deactivation"
   enum role "ADMIN | COACH | CONTESTANT"
   enum status "ACTIVE | DEACTIVATED"
@@ -21,7 +23,7 @@ Group {
   string id PK
   string name
   string description
-  boolean is_default "default false"
+  boolean isGlobal "default false"
   timestamp createdAt
   timestamp updatedAt
 }
@@ -37,8 +39,8 @@ Problem {
   string[] tags "optional, from predefined list"
   enum status "DRAFT | PUBLISHED"
   enum accessibility "PUBLIC | PRIVATE"
-  string author_id FK
-  string[] modifier_ids FK "array of User IDs"
+  string authorId FK
+  string[] modifierIds FK "array of User IDs"
   string testCasesFileKey "nullable"
   string[] solutionFileKeys "array"
   string checkerFileKey "nullable"
@@ -53,10 +55,11 @@ Contest {
   string name
   string description
   string group_id FK
-  string owner_id FK
+  string ownerId FK
   timestamp startTime
   timestamp endTime
   integer penalty "minutes, max 1440"
+  integer freezeMinutes "nullable, default 60"
   boolean locked "default false"
   boolean enablePostContest "default false"
   timestamp createdAt
@@ -67,7 +70,7 @@ Contest_Problem {
   string id PK
   string contest_id FK
   string problem_id FK
-  integer order "order in contest"
+  integer position "order in contest"
 }
 
 Submission {
@@ -75,24 +78,32 @@ Submission {
   string problem_id FK
   string contest_id FK "nullable"
   string contestant_id FK
-  enum status "PENDING | RUNNING | ACCEPTED | WRONG_ANSWER | etc"
+  enum status "PENDING | RUNNING | ACCEPTED | WRONG_ANSWER | TLE | MLE | RE | CE | PE"
   string language "cpp20, java17, python310"
-  string compiler "g++, javac, py"
+  string compiler "g++, javac, pypy3"
   string filePath "storage path/key"
   string fileHash "SHA256"
   integer fileSize "bytes"
   timestamp submittedAt "captured immediately on request"
-  timestamp judgedAt "nullable"
-  integer processingTime "milliseconds, nullable"
-  enum result "same as status, nullable until judged"
+  timestamp judgedAt "nullable, set when judging completes"
+  integer executionTime "milliseconds, max across all cases"
+  integer memoryUsed "KB, max across all cases"
+  string compilationLog "nullable, only for CE, max 10KB"
 }
 
 Material {
   string id PK
   string group_id FK
-  string title
-  string url
+  string author_id FK
+  string title "1-200 chars"
+  string content "Markdown with embedded URLs, max 50000 chars"
+  string[] tags "user-defined, lowercase + numbers + hyphens + underscores"
+  enum status "DRAFT | PUBLISHED"
+  boolean pinned "default false"
+  timestamp pinnedAt "nullable"
+  timestamp publishedAt "nullable"
   timestamp createdAt
+  timestamp updatedAt
 }
 
 
@@ -113,7 +124,7 @@ GroupMember {
 %% - contest_{contestId}_standings_final (snapshot)
 
 ContestParticipant {
-  string contestant_id PK
+  string contestantId PK
   timestamp registeredAt
   integer problemsSolved "0 on registration"
   integer penalty "total penalty in minutes"
@@ -125,7 +136,7 @@ ContestParticipant {
 
 PasswordRecoveryRequest {
   string id PK
-  string user_id FK
+  string userId FK
   string email
   string verificationCode "6-digit"
   timestamp expiresAt "15 minutes"
@@ -135,7 +146,7 @@ PasswordRecoveryRequest {
 
 EmailChangeRequest {
   string id PK
-  string user_id FK
+  string userId FK
   string newEmail
   string verificationCode "6-digit"
   timestamp expiresAt "15 minutes"
@@ -145,7 +156,7 @@ EmailChangeRequest {
 
 DeactivationRequest {
   string id PK
-  string user_id FK
+  string userId FK
   string verificationCode "6-digit"
   timestamp expiresAt "15 minutes"
   integer attempts "max 5"
@@ -156,14 +167,14 @@ DeactivationRequest {
 
 DeactivationAuditLog {
   string id PK
-  string user_id FK
+  string userId FK
   string originalEmail
   string originalNickname
   timestamp occurredAt
   string ip "nullable"
   string userAgent "nullable"
   enum deactivationType "SELF | ADMIN"
-  string admin_id FK "nullable, only for ADMIN type"
+  string adminId FK "nullable, only for ADMIN type"
 }
 
 RecoveryRateLimit {
@@ -173,7 +184,7 @@ RecoveryRateLimit {
 }
 
 PasswordUpdateAttempt {
-  string user_id PK
+  string userId PK
   integer failedAttempts
   timestamp lastAttemptAt
   timestamp cooldownUntil "nullable"
@@ -203,6 +214,11 @@ GroupMember }o--|| Group : belongs_to
 
 Group ||--o{ Material : has
 Group ||--o{ Contest : organizes
+
+%% ===== Material Relationships =====
+
+Material }o--|| User : authored_by
+Material }o--|| Group : belongs_to
 
 
 %% ===== Problem Relationships =====

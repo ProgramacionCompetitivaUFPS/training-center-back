@@ -194,6 +194,7 @@ Create a new contest within a group.
   "startTime": "2026-01-10T14:00:00Z",
   "endTime": "2026-01-10T19:00:00Z",
   "penalty": 20,
+  "freezeMinutes": 60,
   "enablePostContest": false,
   "problems": ["sum-of-two-numbers", "longest-path", "matrix-multiplication"]
 }
@@ -206,6 +207,7 @@ Create a new contest within a group.
 | startTime | string (ISO 8601) | Yes | Contest start time (must be in the future) |
 | endTime | string (ISO 8601) | Yes | Contest end time (must be after startTime) |
 | penalty | integer | No | Penalty in minutes for wrong submission (default: 20, min: 0, max: 1440) |
+| freezeMinutes | integer | No | Minutes before endTime to freeze standings (default: 60, null = no freeze) |
 | enablePostContest | boolean | No | Enable post-competition phase (default: false). If enabled, registered users can submit after endTime but submissions won't affect standings |
 | problems | string[] | No | Array of problem slugs to add to the contest |
 
@@ -223,6 +225,7 @@ Contest created successfully.
   "endTime": "2026-01-10T19:00:00Z",
   "duration": 300,
   "penalty": 20,
+  "freezeMinutes": 60,
   "enablePostContest": false,
   "group": {
     "id": "a1b2c3d4-e5f6-7890-1234-567890123456",

@@ -65,6 +65,8 @@ Register a new user in the system.
   "password": "string",
   "name": "string",
   "nickname": "string",
+  "country": "string",
+  "city": "string",
   "institution": "string"
 }
 ```
@@ -75,7 +77,9 @@ Register a new user in the system.
 | password | string | Yes | User's password for authentication (must meet security requirements) |
 | name | string | Yes | User's full name |
 | nickname | string | No | User's display name or alias |
-| institution | string | No | User's institution or organization |
+| country | string | Yes | User's country |
+| city | string | Yes | User's city |
+| institution | string | Yes | User's institution or organization |
 
 **Password Requirements**:
 - Minimum 8 characters
@@ -93,6 +97,8 @@ User created successfully.
   "email": "user@example.com",
   "name": "John Doe",
   "nickname": "johnd",
+  "country": "United States",
+  "city": "Cambridge",
   "institution": "MIT",
   "role": "CONTESTANT",
   "createdAt": "2025-12-13T10:30:00Z"
@@ -140,7 +146,7 @@ The email is already registered.
 - **FR-001**: The system MUST allow users to register via a public registration endpoint.
 - **FR-002**: The system MUST ensure that each user email is unique across the whole system.
 - **FR-003**: The system MUST validate the email format before persisting the user.
-- **FR-004**: The system MUST validate the presence of required fields (email, password, name).
+- **FR-004**: The system MUST validate the presence of required fields (email, password, name, country, city, institution).
 - **FR-004.1**: The system MUST securely hash the password before storing it.
 - **FR-004.2**: The system MUST enforce password security rules: minimum 8 characters, at least 1 uppercase letter, at least 1 special character, at least 1 number.
 - **FR-005**: The system MUST automatically generate a unique identifier (id) for each user (not returned in responses).
@@ -159,7 +165,9 @@ The email is already registered.
   - `password` (string, hashed, never returned in responses)
   - `name` (string)
   - `nickname` (string, optional, stored in lowercase)
-  - `institution` (string, optional)
+  - `country` (string, required)
+  - `city` (string, required)
+  - `institution` (string, required)
   - `role` (enum: ADMIN | COACH | CONTESTANT, default: CONTESTANT)
   - `status` (enum: ACTIVE | DEACTIVATED, default: ACTIVE, immutable via user actions except self-deactivation)
   - `createdAt` (timestamp)

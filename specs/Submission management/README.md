@@ -88,7 +88,7 @@ The Submission Management module uses a Virtual Object for system-wide configura
 
 * **Problem Management**: Problem creation with languageOverrides
 * **Contest Management**: Contest registration and standings
-* **Judge System**: Asynchronous judging of submissions
+* **[Judge System](../Judge%20System/README.md)**: Asynchronous judging of submissions (microservice)
 
 ## Key Design Decisions
 
@@ -127,7 +127,7 @@ Create Problem with languageOverrides ✅
     ↓
 Submit Solution ✅ ← (requires languageOverrides)
     ↓
-Judge System (external)
+Judge System ✅ ← (microservice, evaluates submissions)
     ↓
 Standing Updates (in Contest Management)
 ```
