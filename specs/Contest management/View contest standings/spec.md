@@ -241,11 +241,14 @@ Retrieve standings for a contest.
     {
       "rank": 1,
       "participant": {
-        "id": "user-456",
-        "nickname": "speed_coder",
-        "country": "Colombia",
-        "city": "Medellín",
-        "institution": "Universidad EAFIT"
+        "id": "team-123",
+        "type": "TEAM",
+        "displayName": "Team Alpha (alice, bob, carol)",
+        "name": "Team Alpha",
+        "members": ["alice", "bob", "carol"],
+        "country": null,
+        "city": null,
+        "institution": null
       },
       "problemsSolved": 3,
       "totalPenalty": 125,
@@ -277,7 +280,10 @@ Retrieve standings for a contest.
       "rank": 2,
       "participant": {
         "id": "user-789",
+        "type": "INDIVIDUAL",
+        "displayName": "algo_master",
         "nickname": "algo_master",
+        "members": null,
         "country": "México",
         "city": "Ciudad de México",
         "institution": "UNAM"
@@ -371,7 +377,15 @@ Retrieve standings for a contest.
 | problems | array | Problem positions and display titles (A, B, C...) |
 | standings | array | Ranked list of participants |
 | standings[].rank | integer | Current rank (1-indexed) |
-| standings[].participant | object | User info (id, nickname, country, city, institution) |
+| standings[].participant | object | Participant info (team or individual) |
+| standings[].participant.id | string | User ID or Team ID |
+| standings[].participant.type | enum | `TEAM` or `INDIVIDUAL` |
+| standings[].participant.displayName | string | Formatted display name (see below) |
+| standings[].participant.members | array | Team member nicknames (null for individuals) |
+| standings[].participant.nickname | string | User nickname (null for teams) |
+| standings[].participant.country | string | Country (null for teams) |
+| standings[].participant.city | string | City (null for teams) |
+| standings[].participant.institution | string | Institution (null for teams) |
 | standings[].problemsSolved | integer | Number of problems solved |
 | standings[].totalPenalty | integer | Total time + penalties in minutes |
 | standings[].problems | array | Per-problem results |
@@ -390,6 +404,18 @@ Retrieve standings for a contest.
 | WRONG_ANSWER | Attempted but not solved | -{attempts} |
 | PENDING | Submission(s) during freeze, unknown result | ? or ?{attempts} |
 | NOT_ATTEMPTED | No submissions | - |
+
+**Display Name Format**:
+
+The `displayName` field is formatted based on participant type and contest settings:
+
+| Type | showTeamMembers | Format | Example |
+|------|-----------------|--------|---------|
+| INDIVIDUAL | - | `@{nickname}` | `algo_master` |
+| TEAM | false | `{teamName}` | `Team Alpha` |
+| TEAM | true | `{teamName} ({member1}, {member2}, ...)` | `Team Alpha (alice, bob, carol)` |
+
+> **Note**: For teams, `country`, `city`, and `institution` are NULL. Filtering by these fields only applies to individual participants.
 
 **Error Responses**:
 

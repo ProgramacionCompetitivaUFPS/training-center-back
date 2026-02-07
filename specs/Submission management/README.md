@@ -14,10 +14,15 @@ Submission Management handles the core functionality of submitting solutions to 
   * Stored in path: `{problemId}/{userId}/general/{submissionId}.{ext}`
 
 * **Contest Submissions**: Submissions to problems within contests
-  * Requires registration to the contest
+  * Requires registration to the contest (individually or as team member)
   * Only allowed during ACTIVE contests or postcompetition (if enabled)
-  * Stored in path: `{problemId}/{userId}/{contestId}/{submissionId}.{ext}`
+  * Stored in path: `{problemId}/{submittedBy}/{contestId}/{submissionId}.{ext}`
   * May or may not affect standings depending on submission time
+  
+  **Team Support**: For team-based contests, the system automatically resolves:
+  1. Check if user is registered individually (fast O(1) lookup)
+  2. Check if user is in a team's `selectedMembers` (slower lookup)
+  3. Submission linked to user via `submittedBy`, standing updates use `standingId` (userId or teamId)
 
 ### Supported Languages
 
@@ -67,13 +72,25 @@ Submission Management handles the core functionality of submitting solutions to 
 ## Implemented Specs
 
 1. **[Submit solution](Submit%20solution/spec.md)** - Submit solutions to problems (practice and contest mode)
+2. **[View submission](View%20submission/spec.md)** - View submission details and source code
+3. **[View submission list](View%20submission%20list/spec.md)** - List user's submissions with filtering
 
 ## Future Specs (Planned)
 
-* **View submission** - View submission details and source code
-* **View submission list** - List user's submissions with filtering
-* **View contest submissions** - List submissions in a contest
+* **View contest submissions** - List submissions in a contest (see [Contest management](../Contest%20management/README.md))
 * **Download submission** - Download source code file
+
+## Submission Visibility
+
+Submissions have a visibility attribute (`PUBLIC` or `PRIVATE`):
+
+| Visibility | Who Can View |
+|------------|-------------|
+| **PUBLIC** | Any authenticated user |
+| **PRIVATE** | Author, Admin, Lead (in their contests), Team members (same contest) |
+
+* Default visibility: **PRIVATE**
+* Only the author can change visibility
 
 ## Virtual Object: System Configuration
 

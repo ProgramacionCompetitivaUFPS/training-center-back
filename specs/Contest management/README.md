@@ -112,7 +112,25 @@ SCHEDULED ──(startTime reached)──> ACTIVE ──(endTime reached)──>
 
 ## 🔹 Participants
 
-### Registration
+### Participation Modes
+
+Contests support different participation configurations:
+
+| Mode | Description |
+|------|-------------|
+| `INDIVIDUAL` | Only individual users can register (default) |
+| `TEAM` | Only teams can register |
+| `MIXED` | Both individuals and teams can register |
+
+### Team Configuration (for TEAM/MIXED modes)
+
+| Attribute | Type | Description |
+|-----------|------|-------------|
+| `teamSizeMin` | integer | Minimum selectedMembers required (nullable) |
+| `teamSizeMax` | integer | Maximum selectedMembers allowed (nullable) |
+| `showTeamMembers` | boolean | Show member names in standings (default: false) |
+
+### Individual Registration
 
 * Participants must register before the contest starts (status SCHEDULED)
 * Only Members can register (Leads and Admins cannot register)
@@ -123,11 +141,19 @@ SCHEDULED ──(startTime reached)──> ACTIVE ──(endTime reached)──>
 * If user is removed from group after contest starts: remains registered but cannot access
 * No limit on number of participants
 
+### Team Registration
+
+* See [Team management specs](../Team%20management/README.md) for full details
+* Teams register via separate endpoint with selectedMembers
+* All selectedMembers must be group members (if contest belongs to a group)
+* A user can only participate ONCE per contest (individually OR as part of one team)
+
 ### Submissions
 
 * Participants can submit solutions during `ACTIVE` status
 * If `enablePostContest = true`, registered users can also submit after `endTime` (postcompetition phase)
 * Submissions are linked to both the contest and the problem
+* For team submissions, the system automatically resolves team attribution based on selectedMembers lookup
 * Each submission is judged against the problem's test cases
 * Submissions during postcompetition (`submittedAt > endTime`) do NOT affect standings
 

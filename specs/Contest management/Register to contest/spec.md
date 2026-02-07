@@ -626,10 +626,12 @@ Registration and Standing data are stored together in a NoSQL document database 
 
 **Collection Naming**: `contest_{contestId}_standings`
 
-**Document Structure**:
+**Unified Document Structure** (supports both individuals and teams):
 ```json
 {
-  "contestantId": "550e8400-e29b-41d4-a716-446655440000",
+  "id": "550e8400-e29b-41d4-a716-446655440000",
+  "type": "INDIVIDUAL",
+  "displayName": "speed_coder",
   "registeredAt": "2026-01-10T10:00:00Z",
   "problemsSolved": 2,
   "penalty": 45,
@@ -654,9 +656,27 @@ Registration and Standing data are stored together in a NoSQL document database 
 }
 ```
 
+**Team Document Example** (for TEAM/MIXED modes):
+```json
+{
+  "id": "team-550e8400-e29b-41d4",
+  "type": "TEAM",
+  "displayName": "Team Alpha",
+  "members": ["alice", "bob", "carol"],
+  "registeredAt": "2026-01-10T10:00:00Z",
+  "problemsSolved": 3,
+  "penalty": 80,
+  "problems": {...},
+  "lastUpdated": "2026-01-10T12:15:00Z"
+}
+```
+
 **Field Descriptions**:
-* `contestantId` (string, UUID): Unique identifier of the registered user (document key)
-* `registeredAt` (timestamp): When the user registered to the contest
+* `id` (string, UUID): Unique identifier - **either userId or teamId** (document key)
+* `type` (enum): `INDIVIDUAL` or `TEAM` - identifies what the id represents
+* `displayName` (string): User's nickname or team name (for standings display)
+* `members` (array, optional): Team member nicknames (only for TEAM type, if showTeamMembers is true)
+* `registeredAt` (timestamp): When the participant registered to the contest
 * `problemsSolved` (integer): Total number of problems solved (accepted submissions)
 * `penalty` (integer): Total penalty in minutes (sum of penalties from all solved problems)
 * `problems` (object): Map of problem slugs to problem-specific data
@@ -674,7 +694,7 @@ Registration and Standing data are stored together in a NoSQL document database 
 ### Collection Management
 
 **Active Collection**: `contest_{contestId}_standings`
-* Created when first user registers
+* Created when first participant registers (individual or team)
 * Updated in real-time during contest
 * Used for live standings and ranking queries
 * Deleted when contest is deleted
@@ -687,9 +707,10 @@ Registration and Standing data are stored together in a NoSQL document database 
 ### Indexes
 
 **Required Indexes**:
-* Primary Key: `contestantId` (unique)
+* Primary Key: `id` (unique)
 * Ranking Index: `problemsSolved` (descending) + `penalty` (ascending) for efficient ranking queries
 * Registration Index: `registeredAt` (ascending) for ordered registration list
+* Type Index: `type` for filtering by participant type (optional)
 
 ### Atomic Operations
 
@@ -709,8 +730,11 @@ All standing updates use atomic operations to ensure consistency:
 
 ### Key Entities
 
-* **Register/Standing Document**: Represents a participant's registration and standing data in a NoSQL document.
-  * `contestantId` (string, UUID, document key)
+* **Standing Document**: Represents a participant's (individual or team) registration and standing data in a NoSQL document.
+  * `id` (string, UUID, document key) - **userId OR teamId**
+  * `type` (enum: INDIVIDUAL, TEAM)
+  * `displayName` (string, nickname or team name)
+  * `members` (array, optional, team member nicknames)
   * `registeredAt` (timestamp, when registration was created)
   * `problemsSolved` (integer, total problems solved)
   * `penalty` (integer, total penalty in minutes)
@@ -720,7 +744,7 @@ All standing updates use atomic operations to ensure consistency:
   * **Deletion**: Collection deleted when contest is deleted
   * **Snapshot**: Final snapshot created in `contest_{contestId}_standings_final` when contest ends (deleted when contest is deleted)
 
-> **Registration Rules**:
+> **Registration Rules (Individual)**:
 > * Only Members can register (not Leads, not Admin)
 > * Registration only allowed for SCHEDULED contests
 > * Registration is idempotent
@@ -728,6 +752,11 @@ All standing updates use atomic operations to ensure consistency:
 > * If user removed from group before contest starts: automatic unregistration (document deleted)
 > * If user removed from group after contest starts: document preserved but access denied
 > * Document created on registration, updated with standing data when contest starts
+
+> **Registration Rules (Team)**:
+> * See [Team management specs](../../Team%20management/README.md) for full team registration rules
+> * Teams register via separate endpoint with selectedMembers
+> * Standing document uses teamId as the `id` field
 
 ### Permission Matrix
 

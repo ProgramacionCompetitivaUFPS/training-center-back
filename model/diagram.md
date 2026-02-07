@@ -22,8 +22,10 @@ User {
 Group {
   string id PK
   string name
-  string description
+  string description "nullable"
   boolean isGlobal "default false"
+  enum visibility "VISIBLE | NOT_VISIBLE"
+  enum joinPolicy "INVITE | REQUEST | OPEN"
   timestamp createdAt
   timestamp updatedAt
 }
@@ -53,9 +55,14 @@ Problem {
 Contest {
   string id PK
   string name
-  string description
-  string group_id FK
+  string description "nullable"
+  string groupId FK
   string ownerId FK
+  enum status "SCHEDULED | ACTIVE | FINISHED"
+  enum participationMode "INDIVIDUAL | TEAM | MIXED"
+  integer teamSizeMin "nullable, for TEAM/MIXED modes"
+  integer teamSizeMax "nullable, for TEAM/MIXED modes"
+  boolean showTeamMembers "default false, show member names in standings"
   timestamp startTime
   timestamp endTime
   integer penalty "minutes, max 1440"
@@ -68,17 +75,18 @@ Contest {
 
 Contest_Problem {
   string id PK
-  string contest_id FK
-  string problem_id FK
+  string contestId FK
+  string problemId FK
   integer position "order in contest"
 }
 
 Submission {
   string id PK
-  string problem_id FK
-  string contest_id FK "nullable"
-  string contestant_id FK
-  enum status "PENDING | RUNNING | ACCEPTED | WRONG_ANSWER | TLE | MLE | RE | CE | PE"
+  string problemId FK
+  string contestId FK "nullable"
+  string submittedBy FK "FK to User - who submitted"
+  string standingId FK "nullable, userId OR teamId for standings"
+  enum status "PENDING | RUNNING | ACCEPTED | WRONG_ANSWER | TIME_LIMIT_EXCEEDED | MEMORY_LIMIT_EXCEEDED | RUNTIME_EXCEPTION | COMPILATION_ERROR | PRESENTATION_ERROR | SYSTEM_ERROR"
   string language "cpp20, java17, python310"
   string compiler "g++, javac, pypy3"
   string filePath "storage path/key"
@@ -93,8 +101,8 @@ Submission {
 
 Material {
   string id PK
-  string group_id FK
-  string author_id FK
+  string groupId FK
+  string authorId FK
   string title "1-200 chars"
   string content "Markdown with embedded URLs, max 50000 chars"
   string[] tags "user-defined, lowercase + numbers + hyphens + underscores"
@@ -107,14 +115,81 @@ Material {
 }
 
 
+%% ===== Team Management =====
+
+Team {
+  string id PK
+  string name "1-100 chars"
+  string createdBy FK "no special privileges"
+  timestamp createdAt
+}
+
+TeamMember {
+  string id PK
+  string teamId FK
+  string userId FK
+  timestamp joinedAt
+}
+
+TeamInvitation {
+  string id PK
+  string teamId FK
+  string inviteeUserId FK
+  string invitedBy FK
+  timestamp createdAt
+}
+
+ContestTeamParticipant {
+  string id PK
+  string contestId FK
+  string teamId FK
+  string[] selectedMembers FK "max defined by contest.teamSizeMax"
+  timestamp registeredAt
+}
+
+
 %% ===== Group Membership =====
 
 GroupMember {
   string id PK
-  string user_id FK
-  string group_id FK
+  string userId FK
+  string groupId FK
   enum memberRole "MEMBER | LEAD"
   timestamp joinedAt
+}
+
+
+%% ===== Group Invitations (JWT-based) =====
+
+GroupInvitation {
+  string id PK
+  string groupId FK
+  string inviteeUserId FK "resolved at creation time"
+  string token "JWT with user_id, group_id, exp (3-day TTL)"
+  timestamp createdAt
+}
+
+
+%% ===== Join Requests =====
+
+JoinRequest {
+  string id PK
+  string groupId FK
+  string requesterUserId FK
+  string message "nullable, why user wants to join"
+  enum status "PENDING | APPROVED | REJECTED"
+  timestamp createdAt
+}
+
+
+%% ===== Judge Pool Configuration (Dynamic) =====
+
+JudgePoolConfig {
+  string id PK "always 'default' (singleton)"
+  json containerPool "min/max per language"
+  json scaling "scaling parameters"
+  timestamp updatedAt
+  string updatedBy FK "Admin user ID"
 }
 
 
@@ -214,6 +289,15 @@ GroupMember }o--|| Group : belongs_to
 
 Group ||--o{ Material : has
 Group ||--o{ Contest : organizes
+Group ||--o{ GroupInvitation : has
+Group ||--o{ JoinRequest : has
+
+
+%% ===== Invitation & Join Request Relationships =====
+
+User ||--o{ GroupInvitation : invited_to
+User ||--o{ JoinRequest : requests_to_join
+
 
 %% ===== Material Relationships =====
 
@@ -237,10 +321,23 @@ Contest ||--o{ ContestParticipant : has_participants
 
 
 %% ===== Submission Relationships =====
+%% Note: standingId is polymorphic (userId OR teamId)
 
 Submission }o--|| User : submitted_by
 Submission }o--|| Problem : solves
 Submission }o--o| Contest : may_belong_to
+
+
+%% ===== Team Relationships =====
+
+User ||--o{ Team : creates
+User ||--o{ TeamMember : has
+TeamMember }o--|| Team : belongs_to
+User ||--o{ TeamInvitation : invited_to
+User ||--o{ TeamInvitation : invites
+TeamInvitation }o--|| Team : for_team
+Team ||--o{ ContestTeamParticipant : registers_to
+Contest ||--o{ ContestTeamParticipant : has_teams
 
 
 %% ===== User Security Relationships =====

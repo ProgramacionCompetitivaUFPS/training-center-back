@@ -438,15 +438,22 @@ Contest, group, or problem not found.
 * **FR-SS-012.8**: Users MUST be able to access their own submissions even if the problem becomes PRIVATE.
 
 **Submission Creation (In Contest)**
-* **FR-SS-013**: The system MUST validate that the user is registered to the contest before accepting submission.
+* **FR-SS-013**: The system MUST validate that the user is a registered participant (individually or as part of a team's selectedMembers) before accepting submission.
+* **FR-SS-013.1**: The system MUST first check if user is registered individually (fast O(1) lookup by userId).
+* **FR-SS-013.2**: If user is registered individually, submission MUST use `standingId = userId`.
+* **FR-SS-013.3**: If user is NOT registered individually, the system MUST check if user is in `selectedMembers` of any team registered to the contest.
+* **FR-SS-013.4**: If user is in a team's selectedMembers, submission MUST use `standingId = teamId`.
+* **FR-SS-013.5**: If user is neither registered individually nor in a team, reject with `NOT_REGISTERED`.
 * **FR-SS-014**: The system MUST validate that the problem is part of the contest.
 * **FR-SS-015**: The system MUST reject submissions when contest status is SCHEDULED.
 * **FR-SS-016**: The system MUST allow submissions when contest status is ACTIVE.
 * **FR-SS-017**: The system MUST reject submissions when contest status is FINISHED and `enablePostContest = false`.
 * **FR-SS-018**: The system MUST allow submissions when contest status is FINISHED and `enablePostContest = true` (postcompetition).
-* **FR-SS-019**: The system MUST store source code file in storage with path: `{problemId}/{userId}/{contestId}/{submissionId}.{ext}` for contest submissions.
+* **FR-SS-019**: The system MUST store source code file in storage with path: `{problemId}/{submittedBy}/{contestId}/{submissionId}.{ext}` for contest submissions.
 * **FR-SS-020**: The system MUST associate submission with contest (`contest_id` field).
 * **FR-SS-020.1**: The system MUST capture `submittedAt` timestamp IMMEDIATELY when the request is received, before any validation or processing.
+* **FR-SS-020.2**: The system MUST store `submittedBy` (userId) as the FK to User - this is the primary link.
+* **FR-SS-020.3**: The system MUST store `standingId` (userId or teamId) to identify which standing document to update.
 * **FR-SS-021**: The system MUST determine if submission affects standings by comparing `submittedAt` (captured at request receipt) with `contest.endTime`.
 
 **File Handling**
@@ -477,7 +484,7 @@ Contest, group, or problem not found.
 * **FR-SS-038.2**: The system MUST allow RUNNING submissions to complete even if problem status becomes DRAFT.
 
 **Standing Updates**
-* **FR-SS-039**: The system MUST update contest Standing when submission is judged in ACTIVE contest.
+* **FR-SS-039**: The system MUST update contest Standing using `standingId` (userId or teamId) when submission is judged in ACTIVE contest.
 * **FR-SS-040**: The system MUST NOT update contest Standing when submission is judged in FINISHED contest.
 * **FR-SS-041**: The system MUST NOT update contest Standing for submissions during postcompetition (submittedAt > endTime).
 
@@ -497,7 +504,8 @@ Contest, group, or problem not found.
   * `id` (string, UUID, PK)
   * `problem_id` (string, UUID, FK to Problem)
   * `contest_id` (string, UUID, FK to Contest, nullable)
-  * `contestant_id` (string, UUID, FK to User)
+  * `submittedBy` (string, UUID, FK to User) - **primary link to user who submitted**
+  * `standingId` (string, UUID, nullable) - userId OR teamId, determines which standing document to update
   * `status` (enum: PENDING | RUNNING | ACCEPTED | WRONG_ANSWER | RUNTIME_EXCEPTION | TIME_LIMIT_EXCEEDED | MEMORY_LIMIT_EXCEEDED | COMPILATION_ERROR | PRESENTATION_ERROR)
   * `language` (string: cpp20, java17, python310)
   * `compiler` (string: g++, javac, py - includes version info)

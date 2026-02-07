@@ -6,7 +6,7 @@ This document defines the global configuration for the Training & Judge Center p
 
 ## Virtual Object Configuration
 
-The Virtual Object contains platform-wide settings that constrain problem limits and other global parameters.
+The Virtual Object contains platform-wide settings that constrain problem limits, sandbox configuration, and other global parameters. These settings are **static** and require a deployment to change (for security reasons).
 
 ### Time and Memory Limits
 
@@ -71,21 +71,81 @@ In this example:
 - Python submissions use: 4000ms, 256 MiB (time overridden)
 - Java submissions use: 2000ms, 512 MiB (memory overridden)
 
-### Supported Languages
+---
 
-| Language ID | Description |
-|-------------|-------------|
-| cpp20 | C++ 20 |
-| java17 | Java 17 |
-| python310 | Python 3.10 |
+## Sandbox Configuration (Static)
 
-> **Note**: Additional languages may be added in the future. The platform will validate that `languageOverrides` entries have valid `language` identifiers.
+The sandbox configuration defines security-critical settings for code execution. These settings are **static** and require a deployment to change to prevent accidental or malicious misconfiguration.
+
+```json
+{
+  "sandbox": {
+    "path": "/sandbox",
+    "sizeMB": 64,
+    "useTmpfs": true,
+    "maxOutputSizeMB": 64,
+    "maxProcesses": 1,
+    "networkEnabled": false,
+    "readOnlyFilesystem": true
+  },
+  "compilation": {
+    "timeoutSeconds": 30,
+    "memoryLimitMB": 512,
+    "outputLimitMB": 10
+  },
+  "checker": {
+    "timeoutSeconds": 30
+  }
+}
+```
+
+| Field | Type | Description |
+|-------|------|-------------|
+| sandbox.path | string | Directory where user code executes (only writable location) |
+| sandbox.sizeMB | integer | Maximum size of sandbox directory (tmpfs limit) |
+| sandbox.useTmpfs | boolean | If true, sandbox uses RAM-based tmpfs for faster I/O and instant cleanup |
+| sandbox.maxOutputSizeMB | integer | Maximum size of user program output |
+| sandbox.maxProcesses | integer | Maximum number of processes (1 = no fork bombs) |
+| sandbox.networkEnabled | boolean | Whether network access is allowed (always false for security) |
+| sandbox.readOnlyFilesystem | boolean | Whether filesystem is read-only except /sandbox |
+| compilation.timeoutSeconds | integer | Maximum time for compilation phase |
+| compilation.memoryLimitMB | integer | Maximum memory for compilation |
+| compilation.outputLimitMB | integer | Maximum compilation log size |
+| checker.timeoutSeconds | integer | Maximum time for custom checker execution |
+
+---
+
+## Supported Languages
+
+Each language has a dedicated container image that may include multiple compiler versions.
+
+### C++ Family (image: `judge-runner:cpp`)
+
+| Language ID | Compiler | Compile Command | Run Command |
+|-------------|----------|-----------------|-------------|
+| cpp17 | g++ 12 | `g++ -std=c++17 -O2 -o solution solution.cpp` | `./solution` |
+| cpp20 | g++ 12 | `g++ -std=c++20 -O2 -o solution solution.cpp` | `./solution` |
+
+### Java Family (image: `judge-runner:java`)
+
+| Language ID | Compiler | Compile Command | Run Command |
+|-------------|----------|-----------------|-------------|
+| java17 | javac 17 | `javac -encoding UTF-8 Solution.java` | `java Solution` |
+
+### Python Family (image: `judge-runner:python`)
+
+| Language ID | Interpreter | Syntax Check | Run Command |
+|-------------|-------------|--------------|-------------|
+| python310 | pypy3 | `pypy3 -m py_compile solution.py` | `pypy3 solution.py` |
+
+> **Note**: Additional languages and versions may be added in the future. Each language family shares a container image for efficient resource usage. The platform validates that `languageOverrides` entries have valid `language` identifiers.
+
 
 ---
 
 ## Related Specifications
 
-- [Create Problem](./Problem%20management/Create%20problem/spec.md)
-- [Update Problem](./Problem%20management/Update%20problem/spec.md)
-- [Submit Solution](./Submission%20management/Submit%20solution/spec.md)
+- [Create Problem](./specs/Problem%20management/Create%20problem/spec.md)
+- [Update Problem](./specs/Problem%20management/Update%20problem/spec.md)
+- [Judge Submission](./specs/Judge%20System/Judge%20submission/spec.md)
 

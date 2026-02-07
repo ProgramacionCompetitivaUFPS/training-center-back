@@ -372,12 +372,11 @@ Imported problems are created with status `DRAFT` and accessibility `PRIVATE`.
 2. **[Update problem](Update%20problem/spec.md)** - Metadata updates, file uploads, modifier management
 3. **[Change problem visibility](Change%20problem%20visibility/spec.md)** - Publish/unpublish and accessibility changes
 4. **[Rejudge submissions](Rejudge%20submissions/spec.md)** - Rejudging when judging components change
+5. **[View problem](View%20problem/spec.md)** - View problem details and list problems with filters and pagination
 
 ### Future Specs (Planned)
 
 * **Delete problem** - Remove problems (handle submissions, contest associations)
-* **View problem** - Problem details for contestants and modifiers
-* **Search problems** - Filter by tags, accessibility, author
 
 ### Implementation Dependencies
 
@@ -390,9 +389,9 @@ Change Problem Visibility (P1) ✅ ← (publish/unpublish, accessibility)
     ↓
 Rejudge Submissions (P1) ✅ ← (when judging components change)
     ↓
-Delete Problem (P2) ← (handle associations)
+View Problem (P1) ✅ ← (single view + list with filters/pagination)
     ↓
-View Problem (P2) ← (public information)
+Delete Problem (P2) ← (handle associations)
 ```
 
 ---

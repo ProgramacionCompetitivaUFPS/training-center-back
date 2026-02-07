@@ -298,10 +298,10 @@ The renderer automatically detects and enhances:
 2. **[Update material](Update%20material/spec.md)** - Modify material content and tags
 3. **[Delete material](Delete%20material/spec.md)** - Remove material permanently
 4. **[Change material visibility](Change%20material%20visibility/spec.md)** - Publish/unpublish and pin/unpin
+5. **[View material](View%20material/spec.md)** - List materials in a group with filters, sorting, and pagination
 
 ### Future Specs (Planned)
 
-* **View materials** - List and filter materials in a group
 * **Search materials** - Full-text search within group materials
 
 ### Implementation Dependencies
@@ -309,13 +309,13 @@ The renderer automatically detects and enhances:
 ```
 Create Material (base)
     ↓
-Update Material (P1) ← (modify content, tags)
+Update Material (P1) ✅ ← (modify content, tags)
     ↓
-Delete Material (P1) ← (permanent removal)
+Delete Material (P1) ✅ ← (permanent removal)
     ↓
-Change Material Visibility (P1) ← (publish/unpublish, pin/unpin)
+Change Material Visibility (P1) ✅ ← (publish/unpublish, pin/unpin)
     ↓
-View Materials (P2) ← (listing with filters)
+View Materials (P1) ✅ ← (listing with filters, sorting, pagination)
 ```
 
 ---

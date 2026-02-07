@@ -280,6 +280,7 @@ As the Judge System, I want to retry on transient errors so that temporary failu
 5. Update status to RUNNING
 6. Download source code from Cloud Storage
 7. Fetch problem data (limits, test cases, checker)
+8. Claim container from pool (by language)
 ```
 
 ### Phase 2: Compilation
@@ -287,30 +288,33 @@ As the Judge System, I want to retry on transient errors so that temporary failu
 ```
 For compiled languages (C++, Java):
 
-1. Create compilation container
-2. Copy source code to container
-3. Execute compile command with limits:
-   - Time: 30 seconds
-   - Memory: 512 MB
-   - Output: 10 MB
-4. Capture stdout, stderr, exit code
-5. If exit code != 0:
+1. Copy source code to /sandbox/ in claimed container
+2. Execute compile command with limits:
+   - Time: 30 seconds (from VObject.compilation.timeoutSeconds)
+   - Memory: 512 MB (from VObject.compilation.memoryLimitMB)
+   - Output: 10 MB (from VObject.compilation.outputLimitMB)
+3. Capture stdout, stderr, exit code
+4. If exit code != 0:
    - Extract compilation log (truncate to 10KB)
    - Set status = COMPILATION_ERROR
+   - Clean sandbox: rm -rf /sandbox/*
+   - Return container to pool
    - Update database
    - DONE
-6. If exit code == 0:
-   - Keep compiled binary for execution
+5. If exit code == 0:
+   - Keep compiled binary in /sandbox/
    - Continue to Phase 3
 
 For interpreted languages (Python):
 
-1. Run syntax check: `pypy3 -m py_compile solution.py`
-2. If syntax error:
+1. Copy source code to /sandbox/
+2. Run syntax check: `pypy3 -m py_compile /sandbox/solution.py`
+3. If syntax error:
    - Set status = COMPILATION_ERROR
    - Store error message
+   - Clean sandbox, return container to pool
    - DONE
-3. Continue to Phase 3
+4. Continue to Phase 3
 ```
 
 ### Phase 3: Execution
@@ -318,21 +322,21 @@ For interpreted languages (Python):
 ```
 For each test case (in order):
 
-1. Create execution container with limits:
+1. Container already has limits configured:
    - CPU: 1 core
    - Memory: {problem.memoryLimit} MiB (or language override)
    - Time: {problem.timeLimit} ms (or language override)
-   - Processes: 1
+   - Processes: 1 (seccomp)
    - Network: disabled
-   - Filesystem: read-only
+   - Filesystem: read-only except /sandbox
 
-2. Prepare files:
-   - Input: /home/judge/input.txt
-   - (Compiled binary or source)
+2. Prepare files in /sandbox/:
+   - Input: /sandbox/input.txt
+   - Solution binary/source already present
 
 3. Execute with timeout:
    - Start timer
-   - Run: ./solution < input.txt > output.txt 2> stderr.txt
+   - Run: /sandbox/solution < /sandbox/input.txt > /sandbox/output.txt 2> /sandbox/stderr.txt
    - Wait for completion or timeout
 
 4. Capture metrics:
@@ -378,25 +382,103 @@ For each test case (in order):
 3. If contest submission with submittedAt ≤ endTime:
    - Update standing document atomically
 
-4. Clean up:
-   - Delete temporary files
-   - Destroy container
+4. Clean up sandbox:
+   - rm -rf /sandbox/* (fast cleanup, ~10-20ms)
+   - Return container to pool
 
 5. DONE
 ```
 
 ---
 
+## Container Pool Architecture
+
+### Overview
+
+Instead of creating a new container for each submission (high overhead), the system maintains a **persistent pool of containers** organized by language. This eliminates container startup time (~300ms) and replaces it with fast sandbox cleanup (~10-20ms).
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                  Container Pool Manager                      │
+│                                                              │
+│  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐          │
+│  │ cpp20 Pool  │  │ java17 Pool │  │python310 Pool│          │
+│  │ [min: 1]    │  │ [min: 1]    │  │ [min: 1]    │          │
+│  │ [max: 10]   │  │ [max: 5]    │  │ [max: 5]    │          │
+│  └─────────────┘  └─────────────┘  └─────────────┘          │
+└─────────────────────────────────────────────────────────────┘
+```
+
+### Container Lifecycle
+
+```
+1. CLAIM    → Worker takes idle container from pool
+2. COPY     → Files copied to /sandbox/
+3. COMPILE  → (if needed) Compile in /sandbox/
+4. EXECUTE  → Run against all test cases
+5. CLEANUP  → rm -rf /sandbox/* (10-20ms)
+6. RETURN   → Container returned to pool as "idle"
+```
+
+### Pool Configuration (Dynamic via Admin API)
+
+Pool settings can be modified at runtime without redeployment via Admin API:
+
+```json
+// GET/PUT /admin/judge/pool-config
+{
+  "containerPool": {
+    "cpp20":     { "min": 1, "max": 10 },
+    "java17":    { "min": 1, "max": 5 },
+    "python310": { "min": 1, "max": 5 }
+  },
+  "scaling": {
+    "scaleUpThreshold": 3,
+    "scaleDownDelayMinutes": 5,
+    "cooldownSeconds": 30
+  }
+}
+```
+
+| Field | Description |
+|-------|-------------|
+| `containerPool.<lang>.min` | Minimum containers always running (warm pool) |
+| `containerPool.<lang>.max` | Maximum containers during peak load |
+| `scaling.scaleUpThreshold` | Create new container if queue depth exceeds this |
+| `scaling.scaleDownDelayMinutes` | Wait time before scaling down idle containers |
+| `scaling.cooldownSeconds` | Minimum time between scaling operations |
+
+### Pool Status Endpoint
+
+```json
+// GET /admin/judge/pool-status
+{
+  "cpp20": { "active": 2, "idle": 1, "queued": 5 },
+  "java17": { "active": 0, "idle": 1, "queued": 0 },
+  "python310": { "active": 1, "idle": 0, "queued": 3 }
+}
+```
+
+### Auto-Scaling Behavior
+
+| Condition | Action |
+|-----------|--------|
+| `queuedSubmissions > scaleUpThreshold` | Create new container (up to max) |
+| `idleContainers > 0` for `scaleDownDelayMinutes` | Destroy excess containers (down to min) |
+| Config change detected | Apply changes gradually (drain → destroy → create) |
+
+---
+
 ## Docker Container Specification
 
-### Execution Container
+### Persistent Container Configuration
 
 ```yaml
 # docker-compose.yml (for development)
 version: "3.8"
 services:
-  judge-runner:
-    image: judge-runner:latest
+  judge-cpp20:
+    image: judge-runner:cpp20
     runtime: runsc  # gVisor for security
     security_opt:
       - no-new-privileges:true
@@ -404,43 +486,62 @@ services:
       - ALL
     read_only: true
     tmpfs:
-      - /tmp:size=64M,mode=1777
+      - /sandbox:size=64M,mode=1777,uid=1000,gid=1000
     network_mode: none
     deploy:
       resources:
         limits:
           cpus: "1"
-          memory: ${MEMORY_LIMIT}M
+          memory: 2048M  # Max from VObject
         reservations:
           cpus: "0.5"
           memory: 128M
+    restart: unless-stopped
+
+  judge-java17:
+    image: judge-runner:java17
+    # ... same security config ...
+    
+  judge-python310:
+    image: judge-runner:python310
+    # ... same security config ...
 ```
 
-### Dockerfile
+### Dockerfile (per language)
 
 ```dockerfile
 FROM ubuntu:22.04
 
-# Install compilers
+# Install compiler (example: C++20)
 RUN apt-get update && apt-get install -y --no-install-recommends \
     g++-12 \
-    openjdk-17-jdk-headless \
-    pypy3 \
     && rm -rf /var/lib/apt/lists/* \
     && ln -s /usr/bin/g++-12 /usr/bin/g++
 
 # Create judge user
 RUN useradd -m -s /bin/bash -u 1000 judge
 
-# Set up working directory
-WORKDIR /home/judge
-RUN chown judge:judge /home/judge
+# Create sandbox directory (will be tmpfs mount)
+RUN mkdir -p /sandbox && chown judge:judge /sandbox
 
+WORKDIR /sandbox
 USER judge
 
-# Default command (overridden at runtime)
-CMD ["/bin/bash"]
+# Keep container running, waiting for work
+CMD ["sleep", "infinity"]
 ```
+
+### Security Layers
+
+| Layer | Purpose |
+|-------|--------|
+| **gVisor (runsc)** | Syscall interception and filtering |
+| **read-only filesystem** | Prevent system modification |
+| **tmpfs /sandbox** | RAM-based, size-limited, instant cleanup |
+| **seccomp** | Block dangerous syscalls (fork, socket, etc.) |
+| **rlimits** | CPU time, memory, file size limits |
+| **non-root user** | uid=1000 (judge), no privileges |
+| **network=none** | No network access |
 
 ---
 
