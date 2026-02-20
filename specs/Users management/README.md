@@ -105,13 +105,14 @@ Several features use 6-digit numeric verification codes sent via email:
 | [Admin update user](Admin%20update%20user/spec.md) | `PUT /admin/users/{id}` | Admin updates user data/role |
 | [Self deactivate user](Self%20deactivated%20user/spec.md) | `POST /users/deactivation/*` | Self-deactivation with confirmation |
 | [Admin deactivate user](Admin%20deactivate%20user/spec.md) | `POST /admin/users/{id}/deactivate` | Admin deactivates any user |
+| [List users](List%20users/spec.md) | `GET /admin/users` | Admin lists all users with filters and search |
+| [User activity dashboard](User%20activity%20dashboard/spec.md) | `GET /users/me/dashboard` | View personal activity dashboard with statistics |
 
 ## Future Specs (Planned)
 
 | Spec | Endpoint | Description |
 |------|----------|-------------|
 | Admin reactivate user | `POST /admin/users/{id}/reactivate` | Admin reactivates deactivated user |
-| List users | `GET /admin/users` | Admin lists all users with filters |
 
 ## Permission Matrix
 
@@ -119,6 +120,7 @@ Several features use 6-digit numeric verification codes sent via email:
 |--------|------------|-------|-------|
 | Register (create account) | ✅ | ✅ | ✅ |
 | View own profile | ✅ | ✅ | ✅ |
+| View own dashboard | ✅ | ✅ | ✅ |
 | View other active profiles | ✅ (public fields) | ✅ (public fields) | ✅ (all fields) |
 | View Admin profiles | ❌ | ❌ | ✅ |
 | Update own profile | ✅ | ✅ | ✅ |
@@ -127,6 +129,7 @@ Several features use 6-digit numeric verification codes sent via email:
 | Self-deactivate | ✅ | ✅ | ❌ |
 | Update other users | ❌ | ❌ | ✅ |
 | Deactivate other users | ❌ | ❌ | ✅ |
+| List all users | ❌ | ❌ | ✅ |
 
 ## Profile Visibility Rules
 

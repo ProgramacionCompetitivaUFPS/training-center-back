@@ -222,6 +222,16 @@ Admin can perform:
 * **Appropriate indexes** for membership queries.
 * **Pagination** in member and invitation listings.
 
+### User Preferences
+* **Storage**: User preferences (like `hideGlobalGroup`) are stored in a JSON field in the `User` table.
+* **Field name**: `preferences` (json type)
+* **Example structure**: `{"hideGlobalGroup": false, "theme": "dark", "language": "en"}`
+* **Flexibility**: JSON format allows adding new preferences without schema changes.
+* **Default values**: System provides sensible defaults when preference is not set.
+* **Scope**: Preferences are user-specific and affect only their personal view/experience.
+
+> **Note**: The `hideGlobalGroup` preference only affects the `GET /users/me/groups` endpoint (My Groups dashboard). The global group still appears in `GET /groups` (list all groups) and can be accessed via `GET /groups/{id}` normally.
+
 ---
 
 ## 🔹 Related Specs
@@ -234,6 +244,7 @@ Admin can perform:
 5. **[Manage join requests](Manage%20join%20requests/spec.md)** - Lead perspective: view, approve, and reject join requests
 6. **[Invite to group](Invite%20to%20group/spec.md)** - Invitation system with JWT tokens
 7. **[Manage group members](Manage%20group%20members/spec.md)** - Administrative membership management
+8. **[View groups](View%20groups/spec.md)** - List groups, search, filter, and "My Groups" dashboard with user preferences
 
 ### Implementation Dependencies
 ```
@@ -248,10 +259,11 @@ Join Group (P1) ← Invite to Group (P2)
 Manage Join Requests (P1) ← (completes REQUEST flow)
     ↓
 Manage Group Members (P2-P3)
+    ↓
+View Groups (P2) ← (discovery, search, dashboard)
 ```
 
 ### Future Specs (Considered)
-* **View Groups** - List groups, search, filter, "My Groups" dashboard
 * **Group Analytics** - Participation and activity metrics
 * **Bulk Operations** - Mass management of members and invitations
 

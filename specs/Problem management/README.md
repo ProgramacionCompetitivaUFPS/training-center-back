@@ -373,10 +373,12 @@ Imported problems are created with status `DRAFT` and accessibility `PRIVATE`.
 3. **[Change problem visibility](Change%20problem%20visibility/spec.md)** - Publish/unpublish and accessibility changes
 4. **[Rejudge submissions](Rejudge%20submissions/spec.md)** - Rejudging when judging components change
 5. **[View problem](View%20problem/spec.md)** - View problem details and list problems with filters and pagination
+6. **[Problem statistics](Problem%20statistics/spec.md)** - View comprehensive problem statistics (acceptance rate, verdict distribution, user metrics)
+7. **[Delete problem](Delete%20problem/spec.md)** - Permanently delete problems while preserving submission history
 
 ### Future Specs (Planned)
 
-* **Delete problem** - Remove problems (handle submissions, contest associations)
+None - all planned specs have been implemented.
 
 ### Implementation Dependencies
 
@@ -391,7 +393,9 @@ Rejudge Submissions (P1) ✅ ← (when judging components change)
     ↓
 View Problem (P1) ✅ ← (single view + list with filters/pagination)
     ↓
-Delete Problem (P2) ← (handle associations)
+Problem Statistics (P2) ✅ ← (acceptance rate, verdict distribution, user metrics)
+    ↓
+Delete Problem (P3) ✅ ← (permanent deletion, preserve submissions)
 ```
 
 ---
@@ -440,6 +444,13 @@ Delete Problem (P2) ← (handle associations)
 * **Fairness**: Contest participants shouldn't lose access mid-contest
 * **Stability**: Existing contest associations remain valid
 * **Control**: Only restricts future additions
+
+### Why statistics only for PUBLISHED problems?
+
+* **Data quality**: DRAFT problems may have incomplete or test submissions
+* **Public information**: Statistics are meant to help evaluate problem difficulty
+* **Consistency**: Only validated, complete problems should have public metrics
+* **Testing isolation**: Submissions during problem development shouldn't affect public statistics
 
 ---
 

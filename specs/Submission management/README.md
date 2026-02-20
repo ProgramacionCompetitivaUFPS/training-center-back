@@ -74,11 +74,11 @@ Submission Management handles the core functionality of submitting solutions to 
 1. **[Submit solution](Submit%20solution/spec.md)** - Submit solutions to problems (practice and contest mode)
 2. **[View submission](View%20submission/spec.md)** - View submission details and source code
 3. **[View submission list](View%20submission%20list/spec.md)** - List user's submissions with filtering
+4. **[Download submission](Download%20submission/spec.md)** - Download source code file
 
 ## Future Specs (Planned)
 
 * **View contest submissions** - List submissions in a contest (see [Contest management](../Contest%20management/README.md))
-* **Download submission** - Download source code file
 
 ## Submission Visibility
 

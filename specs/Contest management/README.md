@@ -316,17 +316,9 @@ Contests support different participation configurations:
 4. **[Register to contest](Register%20to%20contest/spec.md)** - Participant registration and unregistration (Members only, before contest starts)
 5. **[View contest](View%20contest/spec.md)** - Contest details, problem list, and contest listing with filters
 6. **[View contest standings](View%20contest%20standings/spec.md)** - ICPC-style rankings with freeze support and SSE real-time updates
+7. **[View contest submissions](View%20contest%20submissions/spec.md)** - List all submissions in a contest with visibility rules, freeze support, and filtering by phase/problem/user
 
 ### Future Specs (Planned)
-
-* **View postcompetition progress** (`GET /contests/{id}/postcompetition`)
-  - Shows per-user progress during postcompetition
-  - Which problems each user is attempting/has solved after contest ended
-  - Does NOT affect official standings
-
-* **View contest submissions** (`GET /contests/{id}/submissions`)
-  - Filter by `phase`: `competition` | `postcompetition` | `all`
-  - Shows submission list with verdict, time, memory
 
 * **Export standings** (`GET /contests/{id}/standings/export`)
   - CSV, PDF, Excel formats
@@ -354,9 +346,9 @@ View Contest (P1) ✅ ← (contest details, problem list, listing)
     ↓
 View Contest Standings (P1) ✅ ← (ICPC rankings, freeze, SSE)
     ↓
-View Postcompetition Progress (P2) ← (per-user progress after contest)
+View Contest Submissions (P1) ✅ ← (submission list, visibility, freeze, filters)
     ↓
-View Contest Submissions (P2) ← (submission list, filters)
+Export Standings (P2) ← (CSV, PDF, Excel export)
 ```
 
 > **Note**: Update Contest includes functionality for managing problems (add/remove/reorder), so a separate "Manage Contest Problems" spec is not needed.

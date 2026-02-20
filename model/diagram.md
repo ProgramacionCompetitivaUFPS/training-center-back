@@ -14,6 +14,7 @@ User {
   string nickname UK "lowercase, anonymized after deactivation"
   enum role "ADMIN | COACH | CONTESTANT"
   enum status "ACTIVE | DEACTIVATED"
+  json preferences "nullable, user preferences like hideGlobalGroup"
   timestamp deactivatedAt "nullable"
   timestamp createdAt
   timestamp updatedAt "nullable"
@@ -87,6 +88,7 @@ Submission {
   string submittedBy FK "FK to User - who submitted"
   string standingId FK "nullable, userId OR teamId for standings"
   enum status "PENDING | RUNNING | ACCEPTED | WRONG_ANSWER | TIME_LIMIT_EXCEEDED | MEMORY_LIMIT_EXCEEDED | RUNTIME_EXCEPTION | COMPILATION_ERROR | PRESENTATION_ERROR | SYSTEM_ERROR"
+  enum visibility "PUBLIC | PRIVATE, default PRIVATE"
   string language "cpp20, java17, python310"
   string compiler "g++, javac, pypy3"
   string filePath "storage path/key"
