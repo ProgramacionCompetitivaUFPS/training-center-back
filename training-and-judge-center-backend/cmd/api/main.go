@@ -7,9 +7,11 @@ import (
 	"net/http"
 	"os"
 
+	appuser "github.com/training-judge-center/backend/internal/application/user"
 	"github.com/training-judge-center/backend/internal/config"
 	"github.com/training-judge-center/backend/internal/platform/postgres"
 	"github.com/training-judge-center/backend/internal/server"
+	"github.com/training-judge-center/backend/internal/server/handler"
 )
 
 func main() {
@@ -25,7 +27,13 @@ func main() {
 
 	slog.Info("database connected successfully")
 
-	router := server.NewRouter()
+	userRepo := postgres.NewUserRepository(dbPool)
+	createUserUC := appuser.NewCreateUserUseCase(userRepo)
+	userHandler := handler.NewUserHandler(createUserUC)
+
+	router := server.NewRouter(&server.Handlers{
+		User: userHandler,
+	})
 
 	slog.Info("server starting", "port", cfg.Port)
 

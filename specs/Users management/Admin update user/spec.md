@@ -237,7 +237,7 @@ Target user not found.
   - `email` (string, unique, **mutable by admin**)
   - `password` (string, hashed, immutable via this endpoint)
   - `name` (string, **mutable**)
-  - `nickname` (string, optional, **mutable**, stored in lowercase)
+  - `nickname` (string, required, **mutable**, stored in lowercase)
   - `institution` (string, optional, **mutable**)
   - `role` (enum: ADMIN | COACH | CONTESTANT, **mutable by admin**, except ADMIN)
   - `status` (enum: ACTIVE | DEACTIVATED, immutable via this endpoint - see [Admin Deactivate User](../Admin%20deactivate%20user/spec.md))

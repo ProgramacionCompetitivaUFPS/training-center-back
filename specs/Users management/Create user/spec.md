@@ -76,7 +76,7 @@ Register a new user in the system.
 | email | string | Yes | User's email address (must be unique) |
 | password | string | Yes | User's password for authentication (must meet security requirements) |
 | name | string | Yes | User's full name |
-| nickname | string | No | User's display name or alias |
+| nickname | string | Yes | User's display name or alias |
 | country | string | Yes | User's country |
 | city | string | Yes | User's city |
 | institution | string | Yes | User's institution or organization |
@@ -164,7 +164,7 @@ The email is already registered.
   - `email` (string, unique)
   - `password` (string, hashed, never returned in responses)
   - `name` (string)
-  - `nickname` (string, optional, stored in lowercase)
+  - `nickname` (string, required, stored in lowercase)
   - `country` (string, required)
   - `city` (string, required)
   - `institution` (string, required)
