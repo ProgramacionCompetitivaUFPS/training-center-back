@@ -1,25 +1,35 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"log/slog"
 	"net/http"
 	"os"
 
+	"github.com/training-judge-center/backend/internal/config"
+	"github.com/training-judge-center/backend/internal/platform/postgres"
 	"github.com/training-judge-center/backend/internal/server"
 )
 
 func main() {
-	port := os.Getenv("PORT")
-	if port == "" {
-		port = "8080"
+	cfg := config.Load()
+	ctx := context.Background()
+
+	dbPool, err := postgres.NewConnectionPool(ctx, cfg)
+	if err != nil {
+		slog.Error("failed to connect to database", "error", err)
+		os.Exit(1)
 	}
+	defer dbPool.Close()
+
+	slog.Info("database connected successfully")
 
 	router := server.NewRouter()
 
-	slog.Info("server starting", "port", port)
+	slog.Info("server starting", "port", cfg.Port)
 
-	if err := http.ListenAndServe(fmt.Sprintf(":%s", port), router); err != nil {
+	if err := http.ListenAndServe(fmt.Sprintf(":%s", cfg.Port), router); err != nil {
 		slog.Error("server failed to start", "error", err)
 		os.Exit(1)
 	}
