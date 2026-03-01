@@ -25,7 +25,16 @@ func main() {
 
 	slog.Info("database connected successfully")
 
-	router := server.NewRouter()
+	userRepo := postgres.NewUserRepository(dbPool)
+	createUserUC := appuser.NewCreateUserUseCase(userRepo)
+	userHandler := handler.NewUserHandler(createUserUC)
+
+	authHandler := handler.NewAuthHandler(cfg.GoogleClientID)
+
+	router := server.NewRouter(cfg, &server.Handlers{
+		User: userHandler,
+		Auth: authHandler,
+	})
 
 	slog.Info("server starting", "port", cfg.Port)
 
