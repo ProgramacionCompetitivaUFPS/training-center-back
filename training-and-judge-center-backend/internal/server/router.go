@@ -3,14 +3,20 @@ package server
 import (
 	"github.com/go-chi/chi/v5"
 	chimw "github.com/go-chi/chi/v5/middleware"
+	"github.com/training-judge-center/backend/internal/domain/user"
 	"github.com/training-judge-center/backend/internal/server/handler"
 )
 
 type Handlers struct {
 	User *handler.UserHandler
+	Auth *handler.AuthHandler
 }
 
-func NewRouter(h *Handlers) *chi.Mux {
+type Services struct {
+	TokenService user.TokenService
+}
+
+func NewRouter(h *Handlers, s *Services) *chi.Mux {
 	r := chi.NewRouter()
 
 	r.Use(chimw.Logger)
@@ -20,8 +26,11 @@ func NewRouter(h *Handlers) *chi.Mux {
 	healthHandler := handler.NewHealthHandler()
 	r.Get("/ping", healthHandler.Ping)
 
-	r.Route("/users", func(r chi.Router) {
-		r.Post("/", h.User.Create)
+	// Public routes
+	r.Post("/users", h.User.Create)
+
+	r.Route("/auth", func(r chi.Router) {
+		r.Post("/login", h.Auth.Login)
 	})
 
 	return r

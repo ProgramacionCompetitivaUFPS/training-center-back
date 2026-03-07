@@ -3,6 +3,7 @@ package postgres
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/training-judge-center/backend/internal/domain/user"
@@ -63,4 +64,55 @@ func (r *UserRepository) ExistsByNickname(ctx context.Context, nickname user.Nic
 	}
 
 	return exists, nil
+}
+
+func (r *UserRepository) FindByEmail(ctx context.Context, email user.Email) (*user.User, error) {
+	query := `
+		SELECT id, email, password, name, nickname, country, city, institution, role, status, created_at, updated_at, deactivated_at
+		FROM users
+		WHERE email = $1`
+
+	var u user.User
+	var emailStr, passwordHash, nicknameStr, roleStr, statusStr string
+	var updatedAt, deactivatedAt *time.Time
+
+	err := r.pool.QueryRow(ctx, query, email.String()).Scan(
+		&u.ID,
+		&emailStr,
+		&passwordHash,
+		&u.Name,
+		&nicknameStr,
+		&u.Country,
+		&u.City,
+		&u.Institution,
+		&roleStr,
+		&statusStr,
+		&u.CreatedAt,
+		&updatedAt,
+		&deactivatedAt,
+	)
+	if err != nil {
+		if err.Error() == "no rows in result set" {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("failed to find user by email: %w", err)
+	}
+
+	parsedEmail, _ := user.NewEmail(emailStr)
+	u.Email = parsedEmail
+	u.Password = user.NewPasswordFromHash(passwordHash)
+
+	parsedNickname, _ := user.NewNickname(nicknameStr)
+	u.Nickname = parsedNickname
+
+	parsedRole, _ := user.NewRole(roleStr)
+	u.Role = parsedRole
+
+	parsedStatus, _ := user.NewStatus(statusStr)
+	u.Status = parsedStatus
+
+	u.UpdatedAt = updatedAt
+	u.DeactivatedAt = deactivatedAt
+
+	return &u, nil
 }

@@ -9,6 +9,7 @@ import (
 
 	appuser "github.com/training-judge-center/backend/internal/application/user"
 	"github.com/training-judge-center/backend/internal/config"
+	jwtplatform "github.com/training-judge-center/backend/internal/platform/jwt"
 	"github.com/training-judge-center/backend/internal/platform/postgres"
 	"github.com/training-judge-center/backend/internal/server"
 	"github.com/training-judge-center/backend/internal/server/handler"
@@ -27,13 +28,27 @@ func main() {
 
 	slog.Info("database connected successfully")
 
+	// Platform adapters
 	userRepo := postgres.NewUserRepository(dbPool)
-	createUserUC := appuser.NewCreateUserUseCase(userRepo)
-	userHandler := handler.NewUserHandler(createUserUC)
+	jwtService := jwtplatform.NewService(cfg.JWTSecret, cfg.JWTExpirationHours)
 
-	router := server.NewRouter(&server.Handlers{
-		User: userHandler,
-	})
+	// Use Cases
+	createUserUC := appuser.NewCreateUserUseCase(userRepo)
+	loginUC := appuser.NewLoginUseCase(userRepo, jwtService)
+
+	// Handlers
+	userHandler := handler.NewUserHandler(createUserUC)
+	authHandler := handler.NewAuthHandler(loginUC)
+
+	router := server.NewRouter(
+		&server.Handlers{
+			User: userHandler,
+			Auth: authHandler,
+		},
+		&server.Services{
+			TokenService: jwtService,
+		},
+	)
 
 	slog.Info("server starting", "port", cfg.Port)
 
@@ -42,3 +57,4 @@ func main() {
 		os.Exit(1)
 	}
 }
+
