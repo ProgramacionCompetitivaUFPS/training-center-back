@@ -1,0 +1,29 @@
+{
+  "maxTimeLimitGlobal": 300000,
+  "maxMemoryLimitGlobal": 2048,
+  "languageOverrides": [
+    {
+      "language": "cpp20",
+      "maxTimeLimit": 300000,
+      "maxMemoryLimit": 2048
+    },
+    {
+      "language": "java17",
+      "maxTimeLimit": 400000,
+      "maxMemoryLimit": 2048
+    },
+    {
+      "language": "python310",
+      "maxTimeLimit": 600000,
+      "maxMemoryLimit": 2048
+    }
+  ],
+  "tags": [
+    "math",
+    "beginner",
+    "dp",
+    "graphs",
+    "greedy",
+    "strings"
+  ]
+}
