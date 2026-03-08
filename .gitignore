@@ -1,0 +1,4 @@
+# Agent skills (local / no compartir)
+.agent/
+.cursor/
+.consistency_guide.md
