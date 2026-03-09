@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"os"
 
+	_ "github.com/jackc/pgx/v5/stdlib"
 	"github.com/pressly/goose/v3"
 	"github.com/training-judge-center/backend/internal/config"
 	"github.com/training-judge-center/backend/internal/platform/postgres"
@@ -31,7 +32,7 @@ func main() {
 	}
 	defer pool.Close()
 
-	gooseDB, err := goose.OpenDBWithDriver("postgres", pool.Config().ConnString())
+	gooseDB, err := goose.OpenDBWithDriver("pgx", pool.Config().ConnString())
 	if err != nil {
 		slog.Error("failed to open db for goose", "error", err)
 		os.Exit(1)
