@@ -10,5 +10,5 @@ type PlatformSettingsService interface {
 	GetGlobalLimits() (maxTimeLimit, maxMemoryLimit int)
 	GetLanguageLimit(language string) *LanguageLimit
 	IsValidTag(tag string) bool
-	GetValidTags() []string
+	GetAllowedTags() map[string]struct{}
 }

@@ -21,6 +21,10 @@ func NewAccessibilityPrivate() Accessibility {
 	return Accessibility{value: "PRIVATE"}
 }
 
+func NewAccessibilityPublic() Accessibility {
+	return Accessibility{value: "PUBLIC"}
+}
+
 func (a Accessibility) String() string {
 	return a.value
 }

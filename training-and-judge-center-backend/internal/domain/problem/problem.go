@@ -9,8 +9,8 @@ type Problem struct {
 	Slug          Slug
 	Title         Title
 	Statement     *string
-	TimeLimit     *int
-	MemoryLimit   *int
+	TimeLimit     *TimeLimit
+	MemoryLimit   *MemoryLimit
 	LangOverrides []LanguageOverride
 	Tags          Tags
 	Status        Status
@@ -26,8 +26,8 @@ func NewProblem(
 	slug Slug,
 	title Title,
 	statement *string,
-	timeLimit *int,
-	memoryLimit *int,
+	timeLimit *TimeLimit,
+	memoryLimit *MemoryLimit,
 	langOverrides []LanguageOverride,
 	tags Tags,
 	authorID string,

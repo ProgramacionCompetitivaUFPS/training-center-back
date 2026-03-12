@@ -142,14 +142,26 @@ func (h *ProblemHandler) buildResponse(p *problem.Problem, display *user.Display
 		})
 	}
 
+	var tl *int
+	if p.TimeLimit != nil {
+		v := p.TimeLimit.Value()
+		tl = &v
+	}
+
+	var ml *int
+	if p.MemoryLimit != nil {
+		v := p.MemoryLimit.Value()
+		ml = &v
+	}
+
 	tags := p.Tags.Values()
 
 	return problemResponse{
 		Slug:          p.Slug.String(),
 		Title:         p.Title.String(),
 		Statement:     p.Statement,
-		TimeLimit:     p.TimeLimit,
-		MemoryLimit:   p.MemoryLimit,
+		TimeLimit:     tl,
+		MemoryLimit:   ml,
 		LangOverrides: overrides,
 		Tags:          tags,
 		Status:        p.Status.String(),

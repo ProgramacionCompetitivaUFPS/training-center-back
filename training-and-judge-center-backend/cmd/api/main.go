@@ -42,23 +42,13 @@ func main() {
 	if cfg.MockAuth {
 		slog.Info("running in MOCK_AUTH mode")
 		displayProvider = platformUser.NewMockDisplayProvider()
-		
-		problemHandler := handler.NewProblemHandler(createProblemUseCase, displayProvider)
-		router := server.NewRouter(cfg, &server.Handlers{Problem: problemHandler})
-
-		slog.Info("server starting", "port", cfg.Port)
-		if err := http.ListenAndServe(fmt.Sprintf(":%s", cfg.Port), router); err != nil {
-			slog.Error("server failed to start", "error", err)
-			os.Exit(1)
-		}
-		return
+	} else {
+		// Provide a fallback or real implementation
+		displayProvider = platformUser.NewMockDisplayProvider()
 	}
 
 	problemHandler := handler.NewProblemHandler(createProblemUseCase, displayProvider)
-
-	router := server.NewRouter(cfg, &server.Handlers{
-		Problem: problemHandler,
-	})
+	router := server.NewRouter(cfg, &server.Handlers{Problem: problemHandler})
 
 	slog.Info("server starting", "port", cfg.Port)
 	if err := http.ListenAndServe(fmt.Sprintf(":%s", cfg.Port), router); err != nil {

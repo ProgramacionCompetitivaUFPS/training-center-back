@@ -6,7 +6,7 @@ type Tags struct {
 	values []string
 }
 
-func NewTags(values []string) (Tags, error) {
+func NewTags(values []string, allowedTags map[string]struct{}) (Tags, error) {
 	if values == nil {
 		return Tags{values: []string{}}, nil
 	}
@@ -27,6 +27,14 @@ func NewTags(values []string) (Tags, error) {
 			fieldErrs = append(fieldErrs, apperror.FieldError{
 				Field:   "tags",
 				Message: "Duplicate tag: " + tag,
+			})
+			continue
+		}
+
+		if _, valid := allowedTags[tag]; !valid {
+			fieldErrs = append(fieldErrs, apperror.FieldError{
+				Field:   "tags",
+				Message: "Invalid tag: " + tag,
 			})
 			continue
 		}

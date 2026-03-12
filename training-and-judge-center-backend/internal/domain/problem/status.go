@@ -21,6 +21,10 @@ func NewStatusDraft() Status {
 	return Status{value: "DRAFT"}
 }
 
+func NewStatusPublished() Status {
+	return Status{value: "PUBLISHED"}
+}
+
 func (s Status) String() string {
 	return s.value
 }

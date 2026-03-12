@@ -8,7 +8,14 @@ type LanguageOverride struct {
 	memoryLimit *int
 }
 
-func NewLanguageOverride(language string, timeLimit *int, memoryLimit *int) (LanguageOverride, error) {
+func NewLanguageOverride(
+	language string,
+	timeLimit *int,
+	memoryLimit *int,
+	langLimit *LanguageLimit,
+	globalMaxTime int,
+	globalMaxMemory int,
+) (LanguageOverride, error) {
 	var fieldErrs []apperror.FieldError
 
 	if language == "" {
@@ -30,6 +37,34 @@ func NewLanguageOverride(language string, timeLimit *int, memoryLimit *int) (Lan
 			Field:   "languageOverrides.memoryLimit",
 			Message: "Memory limit must be positive",
 		})
+	}
+
+	if langLimit != nil {
+		if timeLimit != nil && *timeLimit > 0 && *timeLimit > langLimit.MaxTimeLimit {
+			fieldErrs = append(fieldErrs, apperror.FieldError{
+				Field:   "languageOverrides.timeLimit",
+				Message: "Exceeds maximum time limit for " + language,
+			})
+		}
+		if memoryLimit != nil && *memoryLimit > 0 && *memoryLimit > langLimit.MaxMemoryLimit {
+			fieldErrs = append(fieldErrs, apperror.FieldError{
+				Field:   "languageOverrides.memoryLimit",
+				Message: "Exceeds maximum memory limit for " + language,
+			})
+		}
+	} else if language != "" {
+		if timeLimit != nil && *timeLimit > 0 && *timeLimit > globalMaxTime {
+			fieldErrs = append(fieldErrs, apperror.FieldError{
+				Field:   "languageOverrides.timeLimit",
+				Message: "Exceeds global maximum time limit for " + language,
+			})
+		}
+		if memoryLimit != nil && *memoryLimit > 0 && *memoryLimit > globalMaxMemory {
+			fieldErrs = append(fieldErrs, apperror.FieldError{
+				Field:   "languageOverrides.memoryLimit",
+				Message: "Exceeds global maximum memory limit for " + language,
+			})
+		}
 	}
 
 	if len(fieldErrs) > 0 {

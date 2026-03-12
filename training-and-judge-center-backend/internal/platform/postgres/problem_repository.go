@@ -3,7 +3,9 @@ package postgres
 import (
 	"context"
 	"encoding/json"
+	"errors"
 
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/training-judge-center/backend/internal/domain/problem"
 	"github.com/training-judge-center/backend/pkg/apperror"
@@ -51,13 +53,25 @@ func (r *ProblemRepository) Save(ctx context.Context, p *problem.Problem) error 
 		return apperror.NewInternal()
 	}
 
+	var tl *int
+	if p.TimeLimit != nil {
+		v := p.TimeLimit.Value()
+		tl = &v
+	}
+
+	var ml *int
+	if p.MemoryLimit != nil {
+		v := p.MemoryLimit.Value()
+		ml = &v
+	}
+
 	_, err = r.db.Exec(ctx, query,
 		p.ID,
 		slug,
 		title,
 		p.Statement,
-		p.TimeLimit,
-		p.MemoryLimit,
+		tl,
+		ml,
 		p.Tags.Values(),
 		status,
 		accessibility,
@@ -69,6 +83,10 @@ func (r *ProblemRepository) Save(ctx context.Context, p *problem.Problem) error 
 	)
 
 	if err != nil {
+		var pgErr *pgconn.PgError
+		if errors.As(err, &pgErr) && pgErr.Code == "23505" && pgErr.ConstraintName == "problems_slug_key" {
+			return &problem.ErrSlugAlreadyExists{Slug: slug}
+		}
 		return apperror.NewInternal()
 	}
 

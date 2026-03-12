@@ -11,6 +11,14 @@ func NewValidation(details []FieldError) *AppError {
 	}
 }
 
+func NewBadRequest(code, message string) *AppError {
+	return &AppError{
+		Code:       code,
+		Message:    message,
+		StatusCode: http.StatusBadRequest,
+	}
+}
+
 func NewConflict(code, message string) *AppError {
 	return &AppError{
 		Code:       code,

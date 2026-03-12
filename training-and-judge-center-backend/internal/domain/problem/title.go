@@ -22,6 +22,12 @@ func NewTitle(value string) (Title, error) {
 	normalized := norm.NFKC.String(value)
 	trimmed := strings.TrimFunc(normalized, unicode.IsSpace)
 
+	if len(trimmed) > 255 {
+		return Title{}, apperror.NewValidation([]apperror.FieldError{
+			{Field: "title", Message: "Title must not exceed 255 characters"},
+		})
+	}
+
 	return Title{value: trimmed}, nil
 }
 

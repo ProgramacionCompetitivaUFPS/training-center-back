@@ -2,6 +2,7 @@ package problem
 
 import (
 	"context"
+	"errors"
 
 	"github.com/google/uuid"
 	"github.com/training-judge-center/backend/internal/domain/problem"
@@ -47,16 +48,12 @@ func (usecase *CreateProblemUseCase) Execute(ctx context.Context, input CreatePr
 		return nil, apperror.NewForbidden("INSUFFICIENT_PERMISSIONS", "Only Coach and Admin users can create problems")
 	}
 
-	var fieldErrs []apperror.FieldError
-
 	slug, err := problem.NewSlug(input.Slug)
 	if err != nil {
-		if valErr, ok := err.(*apperror.AppError); ok {
-			fieldErrs = append(fieldErrs, valErr.Details...)
-		} else {
-			return nil, apperror.NewInternal()
-		}
+		return nil, err
 	}
+
+	var fieldErrs []apperror.FieldError
 
 	title, err := problem.NewTitle(input.Title)
 	if err != nil {
@@ -69,22 +66,45 @@ func (usecase *CreateProblemUseCase) Execute(ctx context.Context, input CreatePr
 
 	globalMaxTime, globalMaxMemory := usecase.platformSettings.GetGlobalLimits()
 
-	if input.TimeLimit != nil && *input.TimeLimit > globalMaxTime {
-		fieldErrs = append(fieldErrs, apperror.FieldError{
-			Field:   "timeLimit",
-			Message: "Exceeds global maximum time limit",
-		})
+	var timeLimit *problem.TimeLimit
+	if input.TimeLimit != nil {
+		tl, err := problem.NewTimeLimit(*input.TimeLimit, globalMaxTime)
+		if err != nil {
+			if valErr, ok := err.(*apperror.AppError); ok {
+				fieldErrs = append(fieldErrs, valErr.Details...)
+			} else {
+				return nil, apperror.NewInternal()
+			}
+		} else {
+			timeLimit = &tl
+		}
 	}
-	if input.MemoryLimit != nil && *input.MemoryLimit > globalMaxMemory {
-		fieldErrs = append(fieldErrs, apperror.FieldError{
-			Field:   "memoryLimit",
-			Message: "Exceeds global maximum memory limit",
-		})
+
+	var memoryLimit *problem.MemoryLimit
+	if input.MemoryLimit != nil {
+		ml, err := problem.NewMemoryLimit(*input.MemoryLimit, globalMaxMemory)
+		if err != nil {
+			if valErr, ok := err.(*apperror.AppError); ok {
+				fieldErrs = append(fieldErrs, valErr.Details...)
+			} else {
+				return nil, apperror.NewInternal()
+			}
+		} else {
+			memoryLimit = &ml
+		}
 	}
 
 	var validOverrides []problem.LanguageOverride
 	for _, override := range input.LangOverrides {
-		langOverride, err := problem.NewLanguageOverride(override.Language, override.TimeLimit, override.MemoryLimit)
+		langLimit := usecase.platformSettings.GetLanguageLimit(override.Language)
+		langOverride, err := problem.NewLanguageOverride(
+			override.Language,
+			override.TimeLimit,
+			override.MemoryLimit,
+			langLimit,
+			globalMaxTime,
+			globalMaxMemory,
+		)
 		if err != nil {
 			if valErr, ok := err.(*apperror.AppError); ok {
 				fieldErrs = append(fieldErrs, valErr.Details...)
@@ -93,55 +113,16 @@ func (usecase *CreateProblemUseCase) Execute(ctx context.Context, input CreatePr
 			}
 			continue
 		}
-
-		langMax := usecase.platformSettings.GetLanguageLimit(langOverride.Language())
-
-		if langMax != nil {
-			if langOverride.TimeLimit() != nil && *langOverride.TimeLimit() > langMax.MaxTimeLimit {
-				fieldErrs = append(fieldErrs, apperror.FieldError{
-					Field:   "languageOverrides.timeLimit",
-					Message: "Exceeds language maximum time limit for " + langOverride.Language(),
-				})
-			}
-			if langOverride.MemoryLimit() != nil && *langOverride.MemoryLimit() > langMax.MaxMemoryLimit {
-				fieldErrs = append(fieldErrs, apperror.FieldError{
-					Field:   "languageOverrides.memoryLimit",
-					Message: "Exceeds language maximum memory limit for " + langOverride.Language(),
-				})
-			}
-		} else {
-			if langOverride.TimeLimit() != nil && *langOverride.TimeLimit() > globalMaxTime {
-				fieldErrs = append(fieldErrs, apperror.FieldError{
-					Field:   "languageOverrides.timeLimit",
-					Message: "Exceeds global maximum time limit for " + langOverride.Language(),
-				})
-			}
-			if langOverride.MemoryLimit() != nil && *langOverride.MemoryLimit() > globalMaxMemory {
-				fieldErrs = append(fieldErrs, apperror.FieldError{
-					Field:   "languageOverrides.memoryLimit",
-					Message: "Exceeds global maximum memory limit for " + langOverride.Language(),
-				})
-			}
-		}
-
 		validOverrides = append(validOverrides, langOverride)
 	}
 
-	tags, err := problem.NewTags(input.Tags)
+	allowedTags := usecase.platformSettings.GetAllowedTags()
+	tags, err := problem.NewTags(input.Tags, allowedTags)
 	if err != nil {
 		if valErr, ok := err.(*apperror.AppError); ok {
 			fieldErrs = append(fieldErrs, valErr.Details...)
 		} else {
 			return nil, apperror.NewInternal()
-		}
-	}
-
-	for _, tag := range input.Tags {
-		if !usecase.platformSettings.IsValidTag(tag) {
-			fieldErrs = append(fieldErrs, apperror.FieldError{
-				Field:   "tags",
-				Message: "Invalid tag: " + tag,
-			})
 		}
 	}
 
@@ -163,14 +144,18 @@ func (usecase *CreateProblemUseCase) Execute(ctx context.Context, input CreatePr
 		slug,
 		title,
 		input.Statement,
-		input.TimeLimit,
-		input.MemoryLimit,
+		timeLimit,
+		memoryLimit,
 		validOverrides,
 		tags,
 		input.CurrentUser.ID,
 	)
 
 	if err := usecase.repo.Save(ctx, newProblem); err != nil {
+		var slugErr *problem.ErrSlugAlreadyExists
+		if errors.As(err, &slugErr) {
+			return nil, apperror.NewConflict("SLUG_ALREADY_EXISTS", "A problem with slug '"+slugErr.Slug+"' already exists")
+		}
 		return nil, apperror.NewInternal()
 	}
 

@@ -61,6 +61,6 @@ func (p *VirtualObjectProvider) IsValidTag(tag string) bool {
 	return ok
 }
 
-func (p *VirtualObjectProvider) GetValidTags() []string {
-	return p.tagsList
+func (p *VirtualObjectProvider) GetAllowedTags() map[string]struct{} {
+	return p.allowedTags
 }

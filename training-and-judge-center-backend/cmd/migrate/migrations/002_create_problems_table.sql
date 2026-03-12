@@ -8,6 +8,7 @@ CREATE TABLE IF NOT EXISTS problems (
     statement TEXT,
     time_limit INTEGER,
     memory_limit INTEGER,
+    lang_overrides JSONB DEFAULT '[]'::jsonb,
     tags TEXT[],
     status VARCHAR(50) NOT NULL DEFAULT 'DRAFT',
     accessibility VARCHAR(50) NOT NULL DEFAULT 'PRIVATE',
@@ -17,9 +18,7 @@ CREATE TABLE IF NOT EXISTS problems (
     updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
 );
 
-ALTER TABLE problems ADD COLUMN lang_overrides JSONB DEFAULT '[]'::jsonb;
-
 -- +goose Down
 -- SQL in this section is executed when the migration is rolled back.
 
-DROP TABLE IF NOT EXISTS problems;
+DROP TABLE IF EXISTS problems;
