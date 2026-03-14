@@ -11,13 +11,20 @@ import (
 
 type mockUserRepository struct {
 	saveFn             func(ctx context.Context, user *domain.User) error
+	updateFn           func(ctx context.Context, user *domain.User) error
 	existsByEmailFn    func(ctx context.Context, email domain.Email) (bool, error)
 	existsByNicknameFn func(ctx context.Context, nickname domain.Nickname) (bool, error)
 	findByEmailFn      func(ctx context.Context, email domain.Email) (*domain.User, error)
+	findByIDFn         func(ctx context.Context, id string) (*domain.User, error)
+	findByNicknameFn   func(ctx context.Context, nickname domain.Nickname) (*domain.User, error)
 }
 
 func (m *mockUserRepository) Save(ctx context.Context, user *domain.User) error {
 	return m.saveFn(ctx, user)
+}
+
+func (m *mockUserRepository) Update(ctx context.Context, user *domain.User) error {
+	return m.updateFn(ctx, user)
 }
 
 func (m *mockUserRepository) ExistsByEmail(ctx context.Context, email domain.Email) (bool, error) {
@@ -32,12 +39,23 @@ func (m *mockUserRepository) FindByEmail(ctx context.Context, email domain.Email
 	return m.findByEmailFn(ctx, email)
 }
 
+func (m *mockUserRepository) FindByID(ctx context.Context, id string) (*domain.User, error) {
+	return m.findByIDFn(ctx, id)
+}
+
+func (m *mockUserRepository) FindByNickname(ctx context.Context, nickname domain.Nickname) (*domain.User, error) {
+	return m.findByNicknameFn(ctx, nickname)
+}
+
 func newNoConflictRepo() *mockUserRepository {
 	return &mockUserRepository{
 		saveFn:             func(_ context.Context, _ *domain.User) error { return nil },
+		updateFn:           func(_ context.Context, _ *domain.User) error { return nil },
 		existsByEmailFn:    func(_ context.Context, _ domain.Email) (bool, error) { return false, nil },
 		existsByNicknameFn: func(_ context.Context, _ domain.Nickname) (bool, error) { return false, nil },
 		findByEmailFn:      func(_ context.Context, _ domain.Email) (*domain.User, error) { return nil, nil },
+		findByIDFn:         func(_ context.Context, _ string) (*domain.User, error) { return nil, nil },
+		findByNicknameFn:   func(_ context.Context, _ domain.Nickname) (*domain.User, error) { return nil, nil },
 	}
 }
 
