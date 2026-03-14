@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/training-judge-center/backend/internal/domain/user"
 )
@@ -42,6 +43,32 @@ func (r *UserRepository) Save(ctx context.Context, u *user.User) error {
 	return nil
 }
 
+func (r *UserRepository) Update(ctx context.Context, u *user.User) error {
+	query := `
+		UPDATE users
+		SET name = $1, nickname = $2, institution = $3, email = $4, password = $5,
+		    role = $6, status = $7, updated_at = $8, deactivated_at = $9
+		WHERE id = $10`
+
+	_, err := r.pool.Exec(ctx, query,
+		u.Name,
+		u.Nickname.String(),
+		u.Institution,
+		u.Email.String(),
+		u.Password.Hash(),
+		u.Role.String(),
+		u.Status.String(),
+		u.UpdatedAt,
+		u.DeactivatedAt,
+		u.ID,
+	)
+	if err != nil {
+		return fmt.Errorf("failed to update user: %w", err)
+	}
+
+	return nil
+}
+
 func (r *UserRepository) ExistsByEmail(ctx context.Context, email user.Email) (bool, error) {
 	query := `SELECT EXISTS(SELECT 1 FROM users WHERE email = $1)`
 
@@ -66,17 +93,14 @@ func (r *UserRepository) ExistsByNickname(ctx context.Context, nickname user.Nic
 	return exists, nil
 }
 
-func (r *UserRepository) FindByEmail(ctx context.Context, email user.Email) (*user.User, error) {
-	query := `
-		SELECT id, email, password, name, nickname, country, city, institution, role, status, created_at, updated_at, deactivated_at
-		FROM users
-		WHERE email = $1`
+const userColumns = `id, email, password, name, nickname, country, city, institution, role, status, created_at, updated_at, deactivated_at`
 
+func scanUser(row pgx.Row) (*user.User, error) {
 	var u user.User
 	var emailStr, passwordHash, nicknameStr, roleStr, statusStr string
 	var updatedAt, deactivatedAt *time.Time
 
-	err := r.pool.QueryRow(ctx, query, email.String()).Scan(
+	err := row.Scan(
 		&u.ID,
 		&emailStr,
 		&passwordHash,
@@ -95,7 +119,7 @@ func (r *UserRepository) FindByEmail(ctx context.Context, email user.Email) (*us
 		if err.Error() == "no rows in result set" {
 			return nil, nil
 		}
-		return nil, fmt.Errorf("failed to find user by email: %w", err)
+		return nil, err
 	}
 
 	parsedEmail, _ := user.NewEmail(emailStr)
@@ -116,3 +140,34 @@ func (r *UserRepository) FindByEmail(ctx context.Context, email user.Email) (*us
 
 	return &u, nil
 }
+
+func (r *UserRepository) FindByEmail(ctx context.Context, email user.Email) (*user.User, error) {
+	query := `SELECT ` + userColumns + ` FROM users WHERE email = $1`
+
+	u, err := scanUser(r.pool.QueryRow(ctx, query, email.String()))
+	if err != nil {
+		return nil, fmt.Errorf("failed to find user by email: %w", err)
+	}
+	return u, nil
+}
+
+func (r *UserRepository) FindByID(ctx context.Context, id string) (*user.User, error) {
+	query := `SELECT ` + userColumns + ` FROM users WHERE id = $1`
+
+	u, err := scanUser(r.pool.QueryRow(ctx, query, id))
+	if err != nil {
+		return nil, fmt.Errorf("failed to find user by id: %w", err)
+	}
+	return u, nil
+}
+
+func (r *UserRepository) FindByNickname(ctx context.Context, nickname user.Nickname) (*user.User, error) {
+	query := `SELECT ` + userColumns + ` FROM users WHERE LOWER(nickname) = LOWER($1)`
+
+	u, err := scanUser(r.pool.QueryRow(ctx, query, nickname.String()))
+	if err != nil {
+		return nil, fmt.Errorf("failed to find user by nickname: %w", err)
+	}
+	return u, nil
+}
+
