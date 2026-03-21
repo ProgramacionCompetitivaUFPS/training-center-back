@@ -35,9 +35,13 @@ func main() {
 	// Use Cases
 	createUserUC := appuser.NewCreateUserUseCase(userRepo)
 	loginUC := appuser.NewLoginUseCase(userRepo, jwtService)
+	getUserProfileUC := appuser.NewGetUserProfileUseCase(userRepo)
+	updateUserUC := appuser.NewUpdateUserUseCase(userRepo)
+	updatePasswordUC := appuser.NewUpdatePasswordUseCase(userRepo)
+	adminUpdateUserUC := appuser.NewAdminUpdateUserUseCase(userRepo)
 
 	// Handlers
-	userHandler := handler.NewUserHandler(createUserUC)
+	userHandler := handler.NewUserHandler(createUserUC, getUserProfileUC, updateUserUC, updatePasswordUC, adminUpdateUserUC)
 	authHandler := handler.NewAuthHandler(loginUC)
 
 	router := server.NewRouter(
