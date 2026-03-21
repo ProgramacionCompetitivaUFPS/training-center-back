@@ -180,3 +180,148 @@ func (r *UserRepository) FindByNickname(ctx context.Context, nickname user.Nickn
 	return u, nil
 }
 
+// sortColumnMap maps domain sort field names to safe SQL column names.
+// This whitelist is the protection against SQL injection in ORDER BY.
+var sortColumnMap = map[string]string{
+	"createdAt":     "created_at",
+	"name":          "name",
+	"nickname":      "nickname",
+	"email":         "email",
+	"deactivatedAt": "deactivated_at",
+}
+
+func (r *UserRepository) FindAll(ctx context.Context, filter user.UserFilter) ([]*user.User, int, error) {
+	args := []interface{}{}
+	conditions := []string{}
+	n := 1
+
+	// Filter by roles (OR logic)
+	if len(filter.Roles) > 0 {
+		placeholders := make([]string, len(filter.Roles))
+		for i, role := range filter.Roles {
+			placeholders[i] = fmt.Sprintf("$%d", n)
+			args = append(args, role.String())
+			n++
+		}
+		conditions = append(conditions, fmt.Sprintf("role IN (%s)", joinStrings(placeholders, ", ")))
+	}
+
+	// Filter by status
+	if filter.Status != nil {
+		conditions = append(conditions, fmt.Sprintf("status = $%d", n))
+		args = append(args, filter.Status.String())
+		n++
+	}
+
+	// Filter by country (case-insensitive exact match)
+	if filter.Country != "" {
+		conditions = append(conditions, fmt.Sprintf("LOWER(country) = LOWER($%d)", n))
+		args = append(args, filter.Country)
+		n++
+	}
+
+	// Filter by city
+	if filter.City != "" {
+		conditions = append(conditions, fmt.Sprintf("LOWER(city) = LOWER($%d)", n))
+		args = append(args, filter.City)
+		n++
+	}
+
+	// Filter by institution
+	if filter.Institution != "" {
+		conditions = append(conditions, fmt.Sprintf("LOWER(institution) = LOWER($%d)", n))
+		args = append(args, filter.Institution)
+		n++
+	}
+
+	// Text search
+	if filter.SearchTerm != "" {
+		searchPattern := "%" + filter.SearchTerm + "%"
+		switch filter.SearchField {
+		case "name":
+			conditions = append(conditions, fmt.Sprintf("name ILIKE $%d", n))
+			args = append(args, searchPattern)
+			n++
+		case "nickname":
+			conditions = append(conditions, fmt.Sprintf("nickname ILIKE $%d", n))
+			args = append(args, searchPattern)
+			n++
+		case "email":
+			conditions = append(conditions, fmt.Sprintf("email ILIKE $%d", n))
+			args = append(args, searchPattern)
+			n++
+		case "institution":
+			conditions = append(conditions, fmt.Sprintf("institution ILIKE $%d", n))
+			args = append(args, searchPattern)
+			n++
+		default: // "all"
+			conditions = append(conditions, fmt.Sprintf(
+				"(name ILIKE $%d OR nickname ILIKE $%d OR email ILIKE $%d OR institution ILIKE $%d)",
+				n, n, n, n,
+			))
+			args = append(args, searchPattern)
+			n++
+		}
+	}
+
+	whereClause := ""
+	if len(conditions) > 0 {
+		whereClause = "WHERE " + joinStrings(conditions, " AND ")
+	}
+
+	// Safe ORDER BY using whitelist
+	colName := sortColumnMap[filter.Sort]
+	if colName == "" {
+		colName = "created_at"
+	}
+	order := "DESC"
+	if filter.Order == "asc" {
+		order = "ASC"
+	}
+	orderClause := fmt.Sprintf("ORDER BY %s %s NULLS LAST", colName, order)
+
+	// COUNT query for pagination metadata
+	countQuery := fmt.Sprintf(`SELECT COUNT(*) FROM users %s`, whereClause)
+	var totalCount int
+	if err := r.pool.QueryRow(ctx, countQuery, args...).Scan(&totalCount); err != nil {
+		return nil, 0, fmt.Errorf("failed to count users: %w", err)
+	}
+
+	// Main query with pagination
+	offset := (filter.Page - 1) * filter.Limit
+	dataQuery := fmt.Sprintf(
+		`SELECT %s FROM users %s %s LIMIT $%d OFFSET $%d`,
+		userColumns, whereClause, orderClause, n, n+1,
+	)
+	args = append(args, filter.Limit, offset)
+
+	rows, err := r.pool.Query(ctx, dataQuery, args...)
+	if err != nil {
+		return nil, 0, fmt.Errorf("failed to list users: %w", err)
+	}
+	defer rows.Close()
+
+	var users []*user.User
+	for rows.Next() {
+		u, err := scanUser(rows)
+		if err != nil {
+			return nil, 0, fmt.Errorf("failed to scan user row: %w", err)
+		}
+		if u != nil {
+			users = append(users, u)
+		}
+	}
+
+	return users, totalCount, nil
+}
+
+func joinStrings(parts []string, sep string) string {
+	result := ""
+	for i, p := range parts {
+		if i > 0 {
+			result += sep
+		}
+		result += p
+	}
+	return result
+}

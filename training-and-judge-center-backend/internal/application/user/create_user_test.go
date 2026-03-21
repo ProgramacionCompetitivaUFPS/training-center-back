@@ -17,6 +17,7 @@ type mockUserRepository struct {
 	findByEmailFn      func(ctx context.Context, email domain.Email) (*domain.User, error)
 	findByIDFn         func(ctx context.Context, id string) (*domain.User, error)
 	findByNicknameFn   func(ctx context.Context, nickname domain.Nickname) (*domain.User, error)
+	findAllFn          func(ctx context.Context, filter domain.UserFilter) ([]*domain.User, int, error)
 }
 
 func (m *mockUserRepository) Save(ctx context.Context, user *domain.User) error {
@@ -47,6 +48,10 @@ func (m *mockUserRepository) FindByNickname(ctx context.Context, nickname domain
 	return m.findByNicknameFn(ctx, nickname)
 }
 
+func (m *mockUserRepository) FindAll(ctx context.Context, filter domain.UserFilter) ([]*domain.User, int, error) {
+	return m.findAllFn(ctx, filter)
+}
+
 func newNoConflictRepo() *mockUserRepository {
 	return &mockUserRepository{
 		saveFn:             func(_ context.Context, _ *domain.User) error { return nil },
@@ -56,6 +61,7 @@ func newNoConflictRepo() *mockUserRepository {
 		findByEmailFn:      func(_ context.Context, _ domain.Email) (*domain.User, error) { return nil, nil },
 		findByIDFn:         func(_ context.Context, _ string) (*domain.User, error) { return nil, nil },
 		findByNicknameFn:   func(_ context.Context, _ domain.Nickname) (*domain.User, error) { return nil, nil },
+		findAllFn:          func(_ context.Context, _ domain.UserFilter) ([]*domain.User, int, error) { return nil, 0, nil },
 	}
 }
 
