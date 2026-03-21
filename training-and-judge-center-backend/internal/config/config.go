@@ -14,6 +14,12 @@ type Config struct {
 	DBName             string
 	JWTSecret          string
 	JWTExpirationHours int
+	SMTPHost           string
+	SMTPPort           string
+	SMTPUser           string
+	SMTPPassword       string
+	SMTPFrom           string
+	RedisURL           string
 }
 
 func Load() *Config {
@@ -26,6 +32,12 @@ func Load() *Config {
 		DBName:             getEnv("DB_NAME", "training_center"),
 		JWTSecret:          getEnv("JWT_SECRET", "dev-secret-change-me"),
 		JWTExpirationHours: getEnvAsInt("JWT_EXPIRATION_HOURS", 24),
+		SMTPHost:           getEnv("SMTP_HOST", "localhost"),
+		SMTPPort:           getEnv("SMTP_PORT", "1025"),
+		SMTPUser:           getEnv("SMTP_USER", ""),
+		SMTPPassword:       getEnv("SMTP_PASSWORD", ""),
+		SMTPFrom:           getEnv("SMTP_FROM", "noreply@trainingcenter.com"),
+		RedisURL:           getEnv("REDIS_URL", "localhost:6379"),
 	}
 }
 
