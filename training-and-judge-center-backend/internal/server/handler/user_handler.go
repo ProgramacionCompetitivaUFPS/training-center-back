@@ -11,6 +11,7 @@ type UserHandler struct {
 	updatePassword      *appuser.UpdatePasswordUseCase
 	adminUpdateUser     *appuser.AdminUpdateUserUseCase
 	adminDeactivateUser *appuser.AdminDeactivateUserUseCase
+	listUsers           *appuser.ListUsersUseCase
 }
 
 func NewUserHandler(
@@ -20,6 +21,7 @@ func NewUserHandler(
 	updatePassword *appuser.UpdatePasswordUseCase,
 	adminUpdateUser *appuser.AdminUpdateUserUseCase,
 	adminDeactivateUser *appuser.AdminDeactivateUserUseCase,
+	listUsers *appuser.ListUsersUseCase,
 ) *UserHandler {
 	return &UserHandler{
 		createUser:          createUser,
@@ -28,5 +30,6 @@ func NewUserHandler(
 		updatePassword:      updatePassword,
 		adminUpdateUser:     adminUpdateUser,
 		adminDeactivateUser: adminDeactivateUser,
+		listUsers:           listUsers,
 	}
 }

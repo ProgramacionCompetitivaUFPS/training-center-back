@@ -40,9 +40,10 @@ func main() {
 	updatePasswordUC := appuser.NewUpdatePasswordUseCase(userRepo)
 	adminUpdateUserUC := appuser.NewAdminUpdateUserUseCase(userRepo)
 	adminDeactivateUserUC := appuser.NewAdminDeactivateUserUseCase(userRepo)
+	listUsersUC := appuser.NewListUsersUseCase(userRepo)
 
 	// Handlers
-	userHandler := handler.NewUserHandler(createUserUC, getUserProfileUC, updateUserUC, updatePasswordUC, adminUpdateUserUC, adminDeactivateUserUC)
+	userHandler := handler.NewUserHandler(createUserUC, getUserProfileUC, updateUserUC, updatePasswordUC, adminUpdateUserUC, adminDeactivateUserUC, listUsersUC)
 	authHandler := handler.NewAuthHandler(loginUC)
 
 	router := server.NewRouter(

@@ -49,6 +49,7 @@ func NewRouter(h *Handlers, s *Services) *chi.Mux {
 		r.Use(middleware.Auth(s.TokenService))
 		r.Use(middleware.RequireRole(user.RoleAdmin))
 
+		r.Get("/users", h.User.ListUsers)
 		r.Put("/users/{id}", h.User.AdminUpdateUser)
 		r.Post("/users/{id}/deactivate", h.User.AdminDeactivateUser)
 	})
