@@ -50,3 +50,12 @@ func NewInternal() *AppError {
 		StatusCode: http.StatusInternalServerError,
 	}
 }
+
+func NewTooManyRequests(retryAfter int) *AppError {
+	return &AppError{
+		Code:       "RATE_LIMIT_EXCEEDED",
+		Message:    "Too many requests. Please try again later",
+		StatusCode: http.StatusTooManyRequests,
+		RetryAfter: retryAfter,
+	}
+}

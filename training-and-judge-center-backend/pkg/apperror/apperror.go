@@ -9,6 +9,7 @@ type AppError struct {
 	Code       string       `json:"error"`
 	Message    string       `json:"message"`
 	Details    []FieldError `json:"details,omitempty"`
+	RetryAfter int          `json:"retryAfter,omitempty"`
 	StatusCode int          `json:"-"`
 }
 
