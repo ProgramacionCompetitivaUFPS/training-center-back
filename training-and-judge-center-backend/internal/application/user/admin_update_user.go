@@ -78,7 +78,7 @@ func (uc *AdminUpdateUserUseCase) Execute(ctx context.Context, targetID string, 
 		newEmail, err := user.NewEmail(*input.Email)
 		if err != nil {
 			fieldErrors = append(fieldErrors, apperror.FieldError{Field: "email", Message: err.Error()})
-		} else if newEmail.String() != foundUser.Email.String() {
+		} else if foundUser.Email == nil || newEmail.String() != foundUser.Email.String() {
 			exists, err := uc.repo.ExistsByEmail(ctx, newEmail)
 			if err != nil {
 				return nil, apperror.NewInternal()
@@ -86,7 +86,7 @@ func (uc *AdminUpdateUserUseCase) Execute(ctx context.Context, targetID string, 
 			if exists {
 				fieldErrors = append(fieldErrors, apperror.FieldError{Field: "email", Message: "Email already exists"})
 			} else {
-				foundUser.Email = newEmail
+				foundUser.Email = &newEmail
 			}
 		}
 	}

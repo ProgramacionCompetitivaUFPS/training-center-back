@@ -41,12 +41,14 @@ func (h *UserHandler) AdminUpdateUser(w http.ResponseWriter, r *http.Request) {
 	}
 
 	resp := fullUserResponse{
-		Email:       result.Email.String(),
 		Name:        result.Name,
 		Nickname:    result.Nickname.String(),
 		Institution: result.Institution,
 		Role:        result.Role.String(),
 		CreatedAt:   result.CreatedAt.Format("2006-01-02T15:04:05Z"),
+	}
+	if result.Email != nil {
+		resp.Email = result.Email.String()
 	}
 	if result.UpdatedAt != nil {
 		resp.UpdatedAt = result.UpdatedAt.Format("2006-01-02T15:04:05Z")

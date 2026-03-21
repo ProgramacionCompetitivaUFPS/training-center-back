@@ -31,7 +31,7 @@ func newActiveUser() *domain.User {
 
 	return &domain.User{
 		ID:          "user-uuid-123",
-		Email:       email,
+		Email:       &email,
 		Password:    password,
 		Name:        "Test User",
 		Nickname:    nickname,

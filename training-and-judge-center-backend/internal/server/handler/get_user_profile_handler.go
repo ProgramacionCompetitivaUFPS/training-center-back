@@ -80,7 +80,6 @@ func (h *UserHandler) GetByNickname(w http.ResponseWriter, r *http.Request) {
 
 func buildFullResponse(result *appuser.UserProfileOutput) fullUserResponse {
 	resp := fullUserResponse{
-		Email:       result.User.Email.String(),
 		Name:        result.User.Name,
 		Nickname:    result.User.Nickname.String(),
 		Country:     result.User.Country,
@@ -88,6 +87,9 @@ func buildFullResponse(result *appuser.UserProfileOutput) fullUserResponse {
 		Institution: result.User.Institution,
 		Role:        result.User.Role.String(),
 		CreatedAt:   result.User.CreatedAt.Format("2006-01-02T15:04:05Z"),
+	}
+	if result.User.Email != nil {
+		resp.Email = result.User.Email.String()
 	}
 	if result.User.UpdatedAt != nil {
 		resp.UpdatedAt = result.User.UpdatedAt.Format("2006-01-02T15:04:05Z")

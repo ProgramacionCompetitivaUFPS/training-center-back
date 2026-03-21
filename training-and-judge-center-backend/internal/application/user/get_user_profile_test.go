@@ -18,7 +18,7 @@ func newUserWithRole(id string, role domain.Role, status domain.Status) *domain.
 
 	return &domain.User{
 		ID:          id,
-		Email:       email,
+		Email:       &email,
 		Password:    password,
 		Name:        "User " + id,
 		Nickname:    nickname,

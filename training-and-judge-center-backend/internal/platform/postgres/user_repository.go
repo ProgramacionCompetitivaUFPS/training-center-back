@@ -50,11 +50,16 @@ func (r *UserRepository) Update(ctx context.Context, u *user.User) error {
 		    role = $6, status = $7, updated_at = $8, deactivated_at = $9
 		WHERE id = $10`
 
+	var emailVal interface{}
+	if u.Email != nil {
+		emailVal = u.Email.String()
+	}
+
 	_, err := r.pool.Exec(ctx, query,
 		u.Name,
 		u.Nickname.String(),
 		u.Institution,
-		u.Email.String(),
+		emailVal,
 		u.Password.Hash(),
 		u.Role.String(),
 		u.Status.String(),
@@ -97,7 +102,8 @@ const userColumns = `id, email, password, name, nickname, country, city, institu
 
 func scanUser(row pgx.Row) (*user.User, error) {
 	var u user.User
-	var emailStr, passwordHash, nicknameStr, roleStr, statusStr string
+	var emailStr *string
+	var passwordHash, nicknameStr, roleStr, statusStr string
 	var updatedAt, deactivatedAt *time.Time
 
 	err := row.Scan(
@@ -122,8 +128,11 @@ func scanUser(row pgx.Row) (*user.User, error) {
 		return nil, err
 	}
 
-	parsedEmail, _ := user.NewEmail(emailStr)
-	u.Email = parsedEmail
+	if emailStr != nil {
+		parsedEmail, _ := user.NewEmail(*emailStr)
+		u.Email = &parsedEmail
+	}
+
 	u.Password = user.NewPasswordFromHash(passwordHash)
 
 	parsedNickname, _ := user.NewNickname(nicknameStr)
