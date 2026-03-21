@@ -1,0 +1,117 @@
+package user
+
+import (
+	"context"
+	"fmt"
+	"log/slog"
+	"net/http"
+	"time"
+
+	"github.com/training-judge-center/backend/internal/domain/notification"
+	"github.com/training-judge-center/backend/internal/domain/user"
+	"github.com/training-judge-center/backend/pkg/apperror"
+)
+
+type ConfirmEmailChangeInput struct {
+	UserID string
+	Code   string
+}
+
+type ConfirmEmailChangeUseCase struct {
+	userRepo        user.UserRepository
+	emailChangeRepo user.EmailChangeRepository
+	emailSender     notification.EmailSender
+}
+
+func NewConfirmEmailChangeUseCase(
+	userRepo user.UserRepository,
+	emailChangeRepo user.EmailChangeRepository,
+	emailSender notification.EmailSender,
+) *ConfirmEmailChangeUseCase {
+	return &ConfirmEmailChangeUseCase{
+		userRepo:        userRepo,
+		emailChangeRepo: emailChangeRepo,
+		emailSender:     emailSender,
+	}
+}
+
+func (uc *ConfirmEmailChangeUseCase) Execute(ctx context.Context, input ConfirmEmailChangeInput) (*user.Email, error) {
+	// 1. Verify User exists
+	u, err := uc.userRepo.FindByID(ctx, input.UserID)
+	if err != nil {
+		return nil, apperror.NewInternal()
+	}
+	if u == nil {
+		return nil, apperror.NewUnauthorized("INVALID_CREDENTIALS", "Invalid credentials")
+	}
+
+	// 2. Find request by code and user ID
+	req, err := uc.emailChangeRepo.FindByCodeAndUserID(ctx, input.Code, input.UserID)
+	if err != nil {
+		return nil, apperror.NewInternal()
+	}
+	
+	// According to spec, if not found or expired -> return INVALID_CODE (400)
+	if req == nil {
+		return nil, &apperror.AppError{
+			Code:       "INVALID_CODE",
+			Message:    "The verification code is invalid or has expired",
+			StatusCode: http.StatusBadRequest,
+		}
+	}
+
+	// 3. Verify it's pending and not expired
+	if req.Status != user.StatusPending || req.IsExpired(time.Now()) {
+		return nil, &apperror.AppError{
+			Code:       "INVALID_CODE",
+			Message:    "The verification code is invalid or has expired",
+			StatusCode: http.StatusBadRequest,
+		}
+	}
+
+	// 4. Double check the new email is STILL unique globally (FR-006)
+	emailExists, err := uc.userRepo.ExistsByEmail(ctx, req.NewEmail)
+	if err != nil {
+		return nil, apperror.NewInternal()
+	}
+	if emailExists {
+		return nil, apperror.NewConflict("EMAIL_ALREADY_EXISTS", "The email address is already in use")
+	}
+
+	oldEmail := u.Email.String()
+
+	// 5. Update the user's email
+	u.Email = &req.NewEmail
+	u.UpdatedAt = func() *time.Time { t := time.Now(); return &t }()
+	
+	if err := uc.userRepo.Update(ctx, u); err != nil {
+		return nil, apperror.NewInternal()
+	}
+
+	// 6. Mark the request as USED
+	req.MarkAsUsed(time.Now())
+	if err := uc.emailChangeRepo.Update(ctx, req); err != nil {
+		slog.Error("failed to mark email change request as used", "request_id", req.ID, "error", err)
+	}
+
+	// 7. Send Security Notifications
+	// To Old Email
+	if err := uc.emailSender.Send(ctx,
+		oldEmail,
+		"Security Alert: Your Email Was Changed",
+		"Your account email has been successfully changed to a new one. If you did not make this change, please contact support immediately.",
+	); err != nil {
+		slog.Error("failed to send security alert to old email", "email", oldEmail, "error", err)
+	}
+	
+	// To New Email
+	if err := uc.emailSender.Send(ctx,
+		req.NewEmail.String(),
+		"Email successfully updated",
+		fmt.Sprintf("Hello %s, your email address has been successfully verified and updated on our platform.", u.Name),
+	); err != nil {
+		slog.Error("failed to send confirmation to new email", "email", req.NewEmail.String(), "error", err)
+	}
+
+	return &req.NewEmail, nil
+}

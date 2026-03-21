@@ -50,10 +50,10 @@ func main() {
 	// Platform adapters
 	userRepo := postgres.NewUserRepository(dbPool)
 	_ = postgres.NewPasswordRecoveryRepository(dbPool) // Instantiated for future UseCases
-	_ = postgres.NewEmailChangeRepository(dbPool)      // Instantiated for future UseCases
+	emailChangeRepo := postgres.NewEmailChangeRepository(dbPool)
 	jwtService := jwtplatform.NewService(cfg.JWTSecret, cfg.JWTExpirationHours)
 	emailSender := email.NewSMTPSender(cfg.SMTPHost, cfg.SMTPPort, cfg.SMTPUser, cfg.SMTPPassword, cfg.SMTPFrom)
-	_ = ratelimit.NewRedisRateLimiter(redisClient) // Instantiated for future UseCases
+	redisRateLimiter := ratelimit.NewRedisRateLimiter(redisClient)
 
 	// Use Cases
 	createUserUC := appuser.NewCreateUserUseCase(userRepo)
@@ -64,9 +64,11 @@ func main() {
 	adminUpdateUserUC := appuser.NewAdminUpdateUserUseCase(userRepo)
 	adminDeactivateUserUC := appuser.NewAdminDeactivateUserUseCase(userRepo)
 	listUsersUC := appuser.NewListUsersUseCase(userRepo)
+	requestEmailChangeUC := appuser.NewRequestEmailChangeUseCase(userRepo, emailChangeRepo, emailSender)
+	confirmEmailChangeUC := appuser.NewConfirmEmailChangeUseCase(userRepo, emailChangeRepo, emailSender)
 
 	// Handlers
-	userHandler := handler.NewUserHandler(createUserUC, getUserProfileUC, updateUserUC, updatePasswordUC, adminUpdateUserUC, adminDeactivateUserUC, listUsersUC)
+	userHandler := handler.NewUserHandler(createUserUC, getUserProfileUC, updateUserUC, updatePasswordUC, adminUpdateUserUC, adminDeactivateUserUC, listUsersUC, requestEmailChangeUC, confirmEmailChangeUC, redisRateLimiter)
 	authHandler := handler.NewAuthHandler(loginUC)
 
 	router := server.NewRouter(

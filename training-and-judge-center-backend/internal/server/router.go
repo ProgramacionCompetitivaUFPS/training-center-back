@@ -42,6 +42,8 @@ func NewRouter(h *Handlers, s *Services) *chi.Mux {
 		r.Get("/users/{nickname}", h.User.GetByNickname)
 		r.Put("/users", h.User.UpdateProfile)
 		r.Put("/users/password", h.User.UpdatePassword)
+		r.Post("/users/email-change/request", h.User.RequestEmailChange)
+		r.Post("/users/email-change/confirm", h.User.ConfirmEmailChange)
 	})
 
 	// Protected routes — admin only

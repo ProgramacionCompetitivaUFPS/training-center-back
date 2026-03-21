@@ -3,6 +3,7 @@ package postgres
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -84,6 +85,57 @@ func (r *EmailChangeRepository) Update(ctx context.Context, req *user.EmailChang
 	)
 	if err != nil {
 		return fmt.Errorf("failed to update email change request: %w", err)
+	}
+	return nil
+}
+
+func (r *EmailChangeRepository) FindByCodeAndUserID(ctx context.Context, code string, userID string) (*user.EmailChangeRequest, error) {
+	query := `
+		SELECT id, user_id, new_email, code, status, expires_at, created_at, updated_at
+		FROM email_change_requests
+		WHERE code = $1 AND user_id = $2`
+
+	var req user.EmailChangeRequest
+	var statusStr, emailStr string
+	err := r.pool.QueryRow(ctx, query, code, userID).Scan(
+		&req.ID,
+		&req.UserID,
+		&emailStr,
+		&req.Code,
+		&statusStr,
+		&req.ExpiresAt,
+		&req.CreatedAt,
+		&req.UpdatedAt,
+	)
+
+	if err != nil {
+		if err == pgx.ErrNoRows {
+			return nil, nil // Not found
+		}
+		return nil, fmt.Errorf("failed to find email change request by code: %w", err)
+	}
+
+	req.Status = user.RequestStatus(statusStr)
+	parsedEmail, _ := user.NewEmail(emailStr)
+	req.NewEmail = parsedEmail
+
+	return &req, nil
+}
+
+func (r *EmailChangeRepository) InvalidatePendingByUserID(ctx context.Context, userID string) error {
+	query := `
+		UPDATE email_change_requests
+		SET status = $1, updated_at = $2
+		WHERE user_id = $3 AND status = $4`
+
+	_, err := r.pool.Exec(ctx, query,
+		string(user.StatusExpired),
+		time.Now(),
+		userID,
+		string(user.StatusPending),
+	)
+	if err != nil {
+		return fmt.Errorf("failed to invalidate pending email change requests: %w", err)
 	}
 	return nil
 }

@@ -2,6 +2,7 @@ package handler
 
 import (
 	appuser "github.com/training-judge-center/backend/internal/application/user"
+	"github.com/training-judge-center/backend/internal/domain/ratelimit"
 )
 
 type UserHandler struct {
@@ -12,6 +13,9 @@ type UserHandler struct {
 	adminUpdateUser     *appuser.AdminUpdateUserUseCase
 	adminDeactivateUser *appuser.AdminDeactivateUserUseCase
 	listUsers           *appuser.ListUsersUseCase
+	requestEmailChange  *appuser.RequestEmailChangeUseCase
+	confirmEmailChange  *appuser.ConfirmEmailChangeUseCase
+	rateLimiter         ratelimit.RateLimiter
 }
 
 func NewUserHandler(
@@ -22,6 +26,9 @@ func NewUserHandler(
 	adminUpdateUser *appuser.AdminUpdateUserUseCase,
 	adminDeactivateUser *appuser.AdminDeactivateUserUseCase,
 	listUsers *appuser.ListUsersUseCase,
+	requestEmailChange *appuser.RequestEmailChangeUseCase,
+	confirmEmailChange *appuser.ConfirmEmailChangeUseCase,
+	rateLimiter ratelimit.RateLimiter,
 ) *UserHandler {
 	return &UserHandler{
 		createUser:          createUser,
@@ -31,5 +38,8 @@ func NewUserHandler(
 		adminUpdateUser:     adminUpdateUser,
 		adminDeactivateUser: adminDeactivateUser,
 		listUsers:           listUsers,
+		requestEmailChange:  requestEmailChange,
+		confirmEmailChange:  confirmEmailChange,
+		rateLimiter:         rateLimiter,
 	}
 }
