@@ -15,8 +15,8 @@ func NewNickname(value string) (Nickname, error) {
 		return Nickname{}, fmt.Errorf("nickname is required")
 	}
 
-	if len(trimmed) < 3 || len(trimmed) > 20 {
-		return Nickname{}, fmt.Errorf("nickname must be between 3 and 20 characters")
+	if len(trimmed) < 3 || len(trimmed) > 30 {
+		return Nickname{}, fmt.Errorf("nickname must be between 3 and 30 characters")
 	}
 
 	return Nickname{value: trimmed}, nil

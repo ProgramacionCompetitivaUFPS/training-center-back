@@ -10,17 +10,6 @@ import (
 	"github.com/training-judge-center/backend/pkg/apperror"
 )
 
-type mockEmailSender struct {
-	sendFn func(ctx context.Context, to, subject, body string) error
-}
-
-func (m *mockEmailSender) Send(ctx context.Context, to, subject, body string) error {
-	if m.sendFn != nil {
-		return m.sendFn(ctx, to, subject, body)
-	}
-	return nil
-}
-
 func TestUpdatePassword_Success(t *testing.T) {
 	repo := newNoConflictRepo()
 	activeUser := newUserWithRole("user-1", domain.RoleContestant, domain.StatusActive)
@@ -31,7 +20,8 @@ func TestUpdatePassword_Success(t *testing.T) {
 		return nil, nil
 	}
 	mockEmail := &mockEmailSender{}
-	uc := NewUpdatePasswordUseCase(repo, mockEmail)
+	mockInv := &mockSessionInvalidator{}
+	uc := NewUpdatePasswordUseCase(repo, mockEmail, mockInv)
 
 	err := uc.Execute(context.Background(), "user-1", UpdatePasswordInput{
 		CurrentPassword: "Secret1!",
@@ -54,7 +44,8 @@ func TestUpdatePassword_Success(t *testing.T) {
 func TestUpdatePassword_UserNotFound(t *testing.T) {
 	repo := newNoConflictRepo()
 	mockEmail := &mockEmailSender{}
-	uc := NewUpdatePasswordUseCase(repo, mockEmail)
+	mockInv := &mockSessionInvalidator{}
+	uc := NewUpdatePasswordUseCase(repo, mockEmail, mockInv)
 
 	err := uc.Execute(context.Background(), "nonexistent", UpdatePasswordInput{
 		CurrentPassword: "Secret1!",
@@ -83,7 +74,8 @@ func TestUpdatePassword_WrongCurrentPassword(t *testing.T) {
 		return activeUser, nil
 	}
 	mockEmail := &mockEmailSender{}
-	uc := NewUpdatePasswordUseCase(repo, mockEmail)
+	mockInv := &mockSessionInvalidator{}
+	uc := NewUpdatePasswordUseCase(repo, mockEmail, mockInv)
 
 	err := uc.Execute(context.Background(), "user-1", UpdatePasswordInput{
 		CurrentPassword: "WrongPassword1!",
@@ -115,7 +107,8 @@ func TestUpdatePassword_WeakNewPassword(t *testing.T) {
 		return activeUser, nil
 	}
 	mockEmail := &mockEmailSender{}
-	uc := NewUpdatePasswordUseCase(repo, mockEmail)
+	mockInv := &mockSessionInvalidator{}
+	uc := NewUpdatePasswordUseCase(repo, mockEmail, mockInv)
 
 	err := uc.Execute(context.Background(), "user-1", UpdatePasswordInput{
 		CurrentPassword: "Secret1!",
@@ -144,7 +137,8 @@ func TestUpdatePassword_SamePassword(t *testing.T) {
 		return activeUser, nil
 	}
 	mockEmail := &mockEmailSender{}
-	uc := NewUpdatePasswordUseCase(repo, mockEmail)
+	mockInv := &mockSessionInvalidator{}
+	uc := NewUpdatePasswordUseCase(repo, mockEmail, mockInv)
 
 	err := uc.Execute(context.Background(), "user-1", UpdatePasswordInput{
 		CurrentPassword: "Secret1!",
@@ -172,7 +166,8 @@ func TestUpdatePassword_RepositoryFindError(t *testing.T) {
 		return nil, errors.New("db connection lost")
 	}
 	mockEmail := &mockEmailSender{}
-	uc := NewUpdatePasswordUseCase(repo, mockEmail)
+	mockInv := &mockSessionInvalidator{}
+	uc := NewUpdatePasswordUseCase(repo, mockEmail, mockInv)
 
 	err := uc.Execute(context.Background(), "user-1", UpdatePasswordInput{
 		CurrentPassword: "Secret1!",
@@ -201,7 +196,8 @@ func TestUpdatePassword_RepositoryUpdateError(t *testing.T) {
 		return errors.New("db update failed")
 	}
 	mockEmail := &mockEmailSender{}
-	uc := NewUpdatePasswordUseCase(repo, mockEmail)
+	mockInv := &mockSessionInvalidator{}
+	uc := NewUpdatePasswordUseCase(repo, mockEmail, mockInv)
 
 	err := uc.Execute(context.Background(), "user-1", UpdatePasswordInput{
 		CurrentPassword: "Secret1!",

@@ -17,6 +17,8 @@ type UserHandler struct {
 	confirmEmailChange    *appuser.ConfirmEmailChangeUseCase
 	requestPasswordRecovery *appuser.RequestPasswordRecoveryUseCase
 	resetPassword           *appuser.ResetPasswordUseCase
+	requestDeactivation   *appuser.RequestDeactivationUseCase
+	confirmDeactivation   *appuser.ConfirmDeactivationUseCase
 	rateLimiter           ratelimit.RateLimiter
 }
 
@@ -32,6 +34,8 @@ func NewUserHandler(
 	confirmEmailChange *appuser.ConfirmEmailChangeUseCase,
 	requestPasswordRecovery *appuser.RequestPasswordRecoveryUseCase,
 	resetPassword *appuser.ResetPasswordUseCase,
+	requestDeactivation *appuser.RequestDeactivationUseCase,
+	confirmDeactivation *appuser.ConfirmDeactivationUseCase,
 	rateLimiter ratelimit.RateLimiter,
 ) *UserHandler {
 	return &UserHandler{
@@ -46,6 +50,8 @@ func NewUserHandler(
 		confirmEmailChange:    confirmEmailChange,
 		requestPasswordRecovery: requestPasswordRecovery,
 		resetPassword:           resetPassword,
+		requestDeactivation:   requestDeactivation,
+		confirmDeactivation:   confirmDeactivation,
 		rateLimiter:           rateLimiter,
 	}
 }

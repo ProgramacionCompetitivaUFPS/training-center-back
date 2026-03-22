@@ -2,17 +2,23 @@ package user
 
 import (
 	"context"
+	"log/slog"
+	"time"
 
 	"github.com/training-judge-center/backend/internal/domain/user"
 	"github.com/training-judge-center/backend/pkg/apperror"
 )
 
 type AdminDeactivateUserUseCase struct {
-	repo user.UserRepository
+	repo               user.UserRepository
+	sessionInvalidator user.SessionInvalidator
 }
 
-func NewAdminDeactivateUserUseCase(repo user.UserRepository) *AdminDeactivateUserUseCase {
-	return &AdminDeactivateUserUseCase{repo: repo}
+func NewAdminDeactivateUserUseCase(repo user.UserRepository, sessionInvalidator user.SessionInvalidator) *AdminDeactivateUserUseCase {
+	return &AdminDeactivateUserUseCase{
+		repo:               repo,
+		sessionInvalidator: sessionInvalidator,
+	}
 }
 
 func (uc *AdminDeactivateUserUseCase) Execute(ctx context.Context, requesterID, targetID string) error {
@@ -41,6 +47,11 @@ func (uc *AdminDeactivateUserUseCase) Execute(ctx context.Context, requesterID, 
 
 	if err := uc.repo.Update(ctx, foundUser); err != nil {
 		return apperror.NewInternal()
+	}
+
+	now := time.Now()
+	if err := uc.sessionInvalidator.InvalidateAllUserSessions(ctx, foundUser.ID, now); err != nil {
+		slog.Error("failed to invalidate sessions after admin deactivation", "user_id", foundUser.ID, "error", err)
 	}
 
 	return nil

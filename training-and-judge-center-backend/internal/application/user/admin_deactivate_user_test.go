@@ -5,6 +5,7 @@ import (
 	"errors"
 	"net/http"
 	"testing"
+	"time"
 
 	domain "github.com/training-judge-center/backend/internal/domain/user"
 	"github.com/training-judge-center/backend/pkg/apperror"
@@ -19,11 +20,24 @@ func TestAdminDeactivateUser_Success(t *testing.T) {
 		}
 		return nil, nil
 	}
-	uc := NewAdminDeactivateUserUseCase(repo)
+	invCalled := false
+	invalidator := &mockSessionInvalidator{
+		invalidateAllUserSessionsFn: func(ctx context.Context, userID string, timestamp time.Time) error {
+			invCalled = true
+			if userID != "target-1" {
+				t.Errorf("expected target-1, got %s", userID)
+			}
+			return nil
+		},
+	}
+	uc := NewAdminDeactivateUserUseCase(repo, invalidator)
 
 	err := uc.Execute(context.Background(), "admin-1", "target-1")
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
+	}
+	if !invCalled {
+		t.Error("expected session invalidator to be called")
 	}
 	if target.Status != domain.StatusDeactivated {
 		t.Errorf("expected status DEACTIVATED, got %s", target.Status)
@@ -41,7 +55,7 @@ func TestAdminDeactivateUser_Success(t *testing.T) {
 
 func TestAdminDeactivateUser_SelfDeactivation(t *testing.T) {
 	repo := newNoConflictRepo()
-	uc := NewAdminDeactivateUserUseCase(repo)
+	uc := NewAdminDeactivateUserUseCase(repo, &mockSessionInvalidator{})
 
 	err := uc.Execute(context.Background(), "admin-1", "admin-1")
 	if err == nil {
@@ -61,7 +75,7 @@ func TestAdminDeactivateUser_SelfDeactivation(t *testing.T) {
 
 func TestAdminDeactivateUser_TargetNotFound(t *testing.T) {
 	repo := newNoConflictRepo()
-	uc := NewAdminDeactivateUserUseCase(repo)
+	uc := NewAdminDeactivateUserUseCase(repo, &mockSessionInvalidator{})
 
 	err := uc.Execute(context.Background(), "admin-1", "nonexistent")
 	if err == nil {
@@ -79,7 +93,7 @@ func TestAdminDeactivateUser_CannotDeactivateAdmin(t *testing.T) {
 	repo.findByIDFn = func(_ context.Context, _ string) (*domain.User, error) {
 		return adminTarget, nil
 	}
-	uc := NewAdminDeactivateUserUseCase(repo)
+	uc := NewAdminDeactivateUserUseCase(repo, &mockSessionInvalidator{})
 
 	err := uc.Execute(context.Background(), "admin-1", "admin-2")
 	if err == nil {
@@ -105,7 +119,7 @@ func TestAdminDeactivateUser_AlreadyDeactivated_Idempotent(t *testing.T) {
 		updateCalled = true
 		return nil
 	}
-	uc := NewAdminDeactivateUserUseCase(repo)
+	uc := NewAdminDeactivateUserUseCase(repo, &mockSessionInvalidator{})
 
 	err := uc.Execute(context.Background(), "admin-1", "target-1")
 	if err != nil {
@@ -121,7 +135,7 @@ func TestAdminDeactivateUser_RepositoryFindError(t *testing.T) {
 	repo.findByIDFn = func(_ context.Context, _ string) (*domain.User, error) {
 		return nil, errors.New("db error")
 	}
-	uc := NewAdminDeactivateUserUseCase(repo)
+	uc := NewAdminDeactivateUserUseCase(repo, &mockSessionInvalidator{})
 
 	err := uc.Execute(context.Background(), "admin-1", "target-1")
 	if err == nil {
@@ -142,7 +156,7 @@ func TestAdminDeactivateUser_RepositoryUpdateError(t *testing.T) {
 	repo.updateFn = func(_ context.Context, _ *domain.User) error {
 		return errors.New("db update failed")
 	}
-	uc := NewAdminDeactivateUserUseCase(repo)
+	uc := NewAdminDeactivateUserUseCase(repo, &mockSessionInvalidator{})
 
 	err := uc.Execute(context.Background(), "admin-1", "target-1")
 	if err == nil {

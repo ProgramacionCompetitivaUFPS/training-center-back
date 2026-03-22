@@ -5,31 +5,10 @@ import (
 	"errors"
 	"net/http"
 	"testing"
-	"time"
 
 	domain "github.com/training-judge-center/backend/internal/domain/user"
 	"github.com/training-judge-center/backend/pkg/apperror"
 )
-
-func newUserWithRole(id string, role domain.Role, status domain.Status) *domain.User {
-	email, _ := domain.NewEmail(id + "@example.com")
-	password, _ := domain.NewPassword("Secret1!")
-	nickname, _ := domain.NewNickname(id)
-
-	return &domain.User{
-		ID:          id,
-		Email:       &email,
-		Password:    password,
-		Name:        "User " + id,
-		Nickname:    nickname,
-		Country:     "Colombia",
-		City:        "Cúcuta",
-		Institution: "UFPS",
-		Role:        role,
-		Status:      status,
-		CreatedAt:   time.Date(2025, 12, 13, 10, 0, 0, 0, time.UTC),
-	}
-}
 
 func TestGetMyProfile_Success(t *testing.T) {
 	repo := newNoConflictRepo()

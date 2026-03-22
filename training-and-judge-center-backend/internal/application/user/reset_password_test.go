@@ -9,25 +9,6 @@ import (
 	"github.com/training-judge-center/backend/pkg/apperror"
 )
 
-type mockSessionInvalidator struct {
-	invalidateAllUserSessionsFn func(ctx context.Context, userID string, timestamp time.Time) error
-	isSessionRevokedFn          func(ctx context.Context, userID string, tokenIssuedAt time.Time) (bool, error)
-}
-
-func (m *mockSessionInvalidator) InvalidateAllUserSessions(ctx context.Context, userID string, timestamp time.Time) error {
-	if m.invalidateAllUserSessionsFn != nil {
-		return m.invalidateAllUserSessionsFn(ctx, userID, timestamp)
-	}
-	return nil
-}
-
-func (m *mockSessionInvalidator) IsSessionRevoked(ctx context.Context, userID string, tokenIssuedAt time.Time) (bool, error) {
-	if m.isSessionRevokedFn != nil {
-		return m.isSessionRevokedFn(ctx, userID, tokenIssuedAt)
-	}
-	return false, nil
-}
-
 func TestResetPassword_Success(t *testing.T) {
 	userRepo := newNoConflictRepo()
 	activeUser := newUserWithRole("user-1", domain.RoleContestant, domain.StatusActive)

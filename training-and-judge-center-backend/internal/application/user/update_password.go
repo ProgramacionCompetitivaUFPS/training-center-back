@@ -2,6 +2,7 @@ package user
 
 import (
 	"context"
+	"log/slog"
 	"time"
 
 	"github.com/training-judge-center/backend/internal/domain/notification"
@@ -15,12 +16,17 @@ type UpdatePasswordInput struct {
 }
 
 type UpdatePasswordUseCase struct {
-	repo        user.UserRepository
-	emailSender notification.EmailSender
+	repo               user.UserRepository
+	emailSender        notification.EmailSender
+	sessionInvalidator user.SessionInvalidator
 }
 
-func NewUpdatePasswordUseCase(repo user.UserRepository, email notification.EmailSender) *UpdatePasswordUseCase {
-	return &UpdatePasswordUseCase{repo: repo, emailSender: email}
+func NewUpdatePasswordUseCase(repo user.UserRepository, email notification.EmailSender, sessionInvalidator user.SessionInvalidator) *UpdatePasswordUseCase {
+	return &UpdatePasswordUseCase{
+		repo:               repo,
+		emailSender:        email,
+		sessionInvalidator: sessionInvalidator,
+	}
 }
 
 func (uc *UpdatePasswordUseCase) Execute(ctx context.Context, userID string, input UpdatePasswordInput) error {
@@ -57,6 +63,11 @@ func (uc *UpdatePasswordUseCase) Execute(ctx context.Context, userID string, inp
 
 	if err := uc.repo.Update(ctx, foundUser); err != nil {
 		return apperror.NewInternal()
+	}
+
+	// Invalidate all active sessions for this user
+	if err := uc.sessionInvalidator.InvalidateAllUserSessions(ctx, foundUser.ID, now); err != nil {
+		slog.Error("failed to invalidate sessions after password update", "user_id", foundUser.ID, "error", err)
 	}
 
 	subject := "Security Alert: Password Changed"

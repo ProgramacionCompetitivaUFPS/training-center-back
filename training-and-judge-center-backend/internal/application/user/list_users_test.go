@@ -11,7 +11,7 @@ import (
 )
 
 func newListUsersRepo(users []*domain.User, total int, repoErr error) *mockUserRepository {
-	repo := newNoConflictRepo()
+	repo := &mockUserRepository{}
 	repo.findAllFn = func(_ context.Context, _ domain.UserFilter) ([]*domain.User, int, error) {
 		return users, total, repoErr
 	}

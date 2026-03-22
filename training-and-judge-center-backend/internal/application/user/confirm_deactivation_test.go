@@ -1,0 +1,197 @@
+package user
+
+import (
+	"context"
+	"testing"
+	"time"
+
+	domain "github.com/training-judge-center/backend/internal/domain/user"
+	"github.com/training-judge-center/backend/pkg/apperror"
+)
+
+type mockAuditRepo struct {
+	saveFn func(ctx context.Context, log *domain.DeactivationAuditLog) error
+}
+
+func (m *mockAuditRepo) Save(ctx context.Context, log *domain.DeactivationAuditLog) error {
+	if m.saveFn != nil {
+		return m.saveFn(ctx, log)
+	}
+	return nil
+}
+
+func TestConfirmDeactivation_Success(t *testing.T) {
+	userRepo := newNoConflictRepo()
+	activeUser := newUserWithRole("user-1", domain.RoleContestant, domain.StatusActive)
+	emailStr := "user@example.com"
+	em, _ := domain.NewEmail(emailStr)
+	activeUser.Email = &em
+
+	userRepo.findByIDFn = func(_ context.Context, id string) (*domain.User, error) {
+		if id == "user-1" {
+			return activeUser, nil
+		}
+		return nil, nil
+	}
+	userRepo.updateFn = func(ctx context.Context, u *domain.User) error {
+		if u.Status != domain.StatusDeactivated {
+			t.Errorf("expected DEACTIVATED status, got %s", u.Status)
+		}
+		if u.Email != nil {
+			t.Errorf("expected Email to be nil, got %v", u.Email)
+		}
+		return nil
+	}
+
+	deactRepo := &mockDeactivationRepo{
+		findPendingByUserIDFn: func(ctx context.Context, userID string) (*domain.DeactivationRequest, error) {
+			return &domain.DeactivationRequest{
+				ID:               "req-1",
+				UserID:           "user-1",
+				VerificationCode: "123456",
+				Status:           domain.DeactivationStatusPending,
+				ExpiresAt:        time.Now().Add(10 * time.Minute),
+			}, nil
+		},
+		updateFn: func(ctx context.Context, req *domain.DeactivationRequest) error {
+			if req.Status != domain.DeactivationStatusConfirmed {
+				t.Errorf("expected expected CONFIRMED, got %s", req.Status)
+			}
+			return nil
+		},
+	}
+
+	auditCalled := false
+	auditRepo := &mockAuditRepo{
+		saveFn: func(ctx context.Context, log *domain.DeactivationAuditLog) error {
+			auditCalled = true
+			if log.OriginalEmail != "user@example.com" {
+				t.Errorf("expected audit email to be user@example.com, got %s", log.OriginalEmail)
+			}
+			return nil
+		},
+	}
+
+	invCalled := false
+	invalidator := &mockSessionInvalidator{
+		invalidateAllUserSessionsFn: func(ctx context.Context, userID string, timestamp time.Time) error {
+			invCalled = true
+			return nil
+		},
+	}
+	
+	emailSent := false
+	mockEmail := &mockEmailSender{
+		sendFn: func(ctx context.Context, to, subject, body string) error {
+			emailSent = true
+			return nil
+		},
+	}
+
+	uc := NewConfirmDeactivationUseCase(userRepo, deactRepo, auditRepo, mockEmail, invalidator)
+
+	err := uc.Execute(context.Background(), ConfirmDeactivationInput{
+		UserID:    "user-1",
+		Code:      "123456",
+	})
+
+	if err != nil {
+		t.Fatalf("expected nil, got %v", err)
+	}
+	if !invCalled {
+		t.Error("expected session invalidator to be called")
+	}
+	if !auditCalled {
+		t.Error("expected audit log to be saved")
+	}
+	if !emailSent {
+		t.Error("expected confirmation email to be sent")
+	}
+}
+
+func TestConfirmDeactivation_InvalidCode(t *testing.T) {
+	userRepo := newNoConflictRepo()
+	activeUser := newUserWithRole("user-1", domain.RoleContestant, domain.StatusActive)
+	userRepo.findByIDFn = func(_ context.Context, id string) (*domain.User, error) {
+		return activeUser, nil
+	}
+
+	deactRepo := &mockDeactivationRepo{
+		findPendingByUserIDFn: func(ctx context.Context, userID string) (*domain.DeactivationRequest, error) {
+			return &domain.DeactivationRequest{
+				ID:               "req-1",
+				UserID:           "user-1",
+				VerificationCode: "123456",
+				Status:           domain.DeactivationStatusPending,
+				ExpiresAt:        time.Now().Add(10 * time.Minute),
+				Attempts:         0,
+			}, nil
+		},
+		updateFn: func(ctx context.Context, req *domain.DeactivationRequest) error {
+			if req.Attempts != 1 {
+				t.Errorf("expected attempts to be incremented to 1, got %d", req.Attempts)
+			}
+			return nil
+		},
+	}
+
+	uc := NewConfirmDeactivationUseCase(userRepo, deactRepo, &mockAuditRepo{}, &mockEmailSender{}, &mockSessionInvalidator{})
+
+	err := uc.Execute(context.Background(), ConfirmDeactivationInput{
+		UserID: "user-1",
+		Code:   "000000",
+	})
+
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+	appErr, ok := err.(*apperror.AppError)
+	if !ok || appErr.Code != "INVALID_CODE" {
+		t.Errorf("expected INVALID_CODE, got %v", err)
+	}
+}
+
+func TestConfirmDeactivation_ExceedAttemptsAndBlock(t *testing.T) {
+	userRepo := newNoConflictRepo()
+	activeUser := newUserWithRole("user-1", domain.RoleContestant, domain.StatusActive)
+	userRepo.findByIDFn = func(_ context.Context, id string) (*domain.User, error) {
+		return activeUser, nil
+	}
+
+	deactRepo := &mockDeactivationRepo{
+		findPendingByUserIDFn: func(ctx context.Context, userID string) (*domain.DeactivationRequest, error) {
+			return &domain.DeactivationRequest{
+				ID:               "req-1",
+				UserID:           "user-1",
+				VerificationCode: "123456",
+				Status:           domain.DeactivationStatusPending,
+				ExpiresAt:        time.Now().Add(10 * time.Minute),
+				Attempts:         4, // Next failure will hit 5 and block
+			}, nil
+		},
+		updateFn: func(ctx context.Context, req *domain.DeactivationRequest) error {
+			if req.Status != domain.DeactivationStatusBlocked {
+				t.Errorf("expected status to change to BLOCKED, got %s", req.Status)
+			}
+			if req.BlockedUntil == nil {
+				t.Error("expected blockedUntil to be set")
+			}
+			return nil
+		},
+	}
+
+	uc := NewConfirmDeactivationUseCase(userRepo, deactRepo, &mockAuditRepo{}, &mockEmailSender{}, &mockSessionInvalidator{})
+
+	err := uc.Execute(context.Background(), ConfirmDeactivationInput{
+		UserID: "user-1",
+		Code:   "000000",
+	})
+
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+	appErr, ok := err.(*apperror.AppError)
+	if !ok || appErr.Code != "MAX_ATTEMPTS_EXCEEDED" {
+		t.Errorf("expected MAX_ATTEMPTS_EXCEEDED, got %v", err)
+	}
+}

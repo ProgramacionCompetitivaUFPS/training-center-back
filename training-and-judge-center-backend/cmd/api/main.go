@@ -52,6 +52,8 @@ func main() {
 	userRepo := postgres.NewUserRepository(dbPool)
 	passwordRecoveryRepo := postgres.NewPasswordRecoveryRepository(dbPool)
 	emailChangeRepo := postgres.NewEmailChangeRepository(dbPool)
+	deactRepo := postgres.NewDeactivationRequestRepository(dbPool)
+	auditRepo := postgres.NewDeactivationAuditLogRepository(dbPool)
 	jwtService := jwtplatform.NewService(cfg.JWTSecret, cfg.JWTExpirationHours)
 	emailSender := email.NewSMTPSender(cfg.SMTPHost, cfg.SMTPPort, cfg.SMTPUser, cfg.SMTPPassword, cfg.SMTPFrom)
 	redisRateLimiter := ratelimit.NewRedisRateLimiter(redisClient)
@@ -62,17 +64,19 @@ func main() {
 	loginUC := appuser.NewLoginUseCase(userRepo, jwtService)
 	getUserProfileUC := appuser.NewGetUserProfileUseCase(userRepo)
 	updateUserUC := appuser.NewUpdateUserUseCase(userRepo)
-	updatePasswordUC := appuser.NewUpdatePasswordUseCase(userRepo, emailSender)
+	updatePasswordUC := appuser.NewUpdatePasswordUseCase(userRepo, emailSender, sessionInvalidator)
 	adminUpdateUserUC := appuser.NewAdminUpdateUserUseCase(userRepo)
-	adminDeactivateUserUC := appuser.NewAdminDeactivateUserUseCase(userRepo)
+	adminDeactivateUserUC := appuser.NewAdminDeactivateUserUseCase(userRepo, sessionInvalidator)
 	listUsersUC := appuser.NewListUsersUseCase(userRepo)
 	requestEmailChangeUC := appuser.NewRequestEmailChangeUseCase(userRepo, emailChangeRepo, emailSender)
 	confirmEmailChangeUC := appuser.NewConfirmEmailChangeUseCase(userRepo, emailChangeRepo, emailSender)
 	requestPasswordRecoveryUC := appuser.NewRequestPasswordRecoveryUseCase(userRepo, passwordRecoveryRepo, emailSender)
 	resetPasswordUC := appuser.NewResetPasswordUseCase(userRepo, passwordRecoveryRepo, sessionInvalidator)
+	requestDeactUC := appuser.NewRequestDeactivationUseCase(userRepo, deactRepo, emailSender)
+	confirmDeactUC := appuser.NewConfirmDeactivationUseCase(userRepo, deactRepo, auditRepo, emailSender, sessionInvalidator)
 
 	// Handlers
-	userHandler := handler.NewUserHandler(createUserUC, getUserProfileUC, updateUserUC, updatePasswordUC, adminUpdateUserUC, adminDeactivateUserUC, listUsersUC, requestEmailChangeUC, confirmEmailChangeUC, requestPasswordRecoveryUC, resetPasswordUC, redisRateLimiter)
+	userHandler := handler.NewUserHandler(createUserUC, getUserProfileUC, updateUserUC, updatePasswordUC, adminUpdateUserUC, adminDeactivateUserUC, listUsersUC, requestEmailChangeUC, confirmEmailChangeUC, requestPasswordRecoveryUC, resetPasswordUC, requestDeactUC, confirmDeactUC, redisRateLimiter)
 	authHandler := handler.NewAuthHandler(loginUC)
 
 	router := server.NewRouter(
