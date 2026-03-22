@@ -12,7 +12,7 @@ type contextKey string
 
 const claimsKey contextKey = "claims"
 
-func Auth(tokenService user.TokenService) func(http.Handler) http.Handler {
+func Auth(tokenService user.TokenService, sessionInvalidator user.SessionInvalidator) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			authHeader := r.Header.Get("Authorization")
@@ -31,6 +31,16 @@ func Auth(tokenService user.TokenService) func(http.Handler) http.Handler {
 				w.WriteHeader(http.StatusUnauthorized)
 				w.Write([]byte(`{"error":"UNAUTHORIZED","message":"Invalid or missing authentication token"}`))
 				return
+			}
+
+			if sessionInvalidator != nil {
+				revoked, err := sessionInvalidator.IsSessionRevoked(r.Context(), claims.UserID, claims.IssuedAt)
+				if err != nil || revoked {
+					w.Header().Set("Content-Type", "application/json")
+					w.WriteHeader(http.StatusUnauthorized)
+					w.Write([]byte(`{"error":"UNAUTHORIZED","message":"Invalid or missing authentication token"}`))
+					return
+				}
 			}
 
 			ctx := context.WithValue(r.Context(), claimsKey, claims)

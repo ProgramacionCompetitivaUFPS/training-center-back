@@ -58,8 +58,9 @@ func (s *Service) ValidateToken(tokenString string) (*user.TokenClaims, error) {
 	}
 
 	return &user.TokenClaims{
-		UserID: claims.Subject,
-		Email:  claims.Email,
-		Role:   claims.Role,
+		UserID:   claims.Subject,
+		Email:    claims.Email,
+		Role:     claims.Role,
+		IssuedAt: claims.IssuedAt.Time,
 	}, nil
 }

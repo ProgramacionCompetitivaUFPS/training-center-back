@@ -12,10 +12,12 @@ type UserHandler struct {
 	updatePassword      *appuser.UpdatePasswordUseCase
 	adminUpdateUser     *appuser.AdminUpdateUserUseCase
 	adminDeactivateUser *appuser.AdminDeactivateUserUseCase
-	listUsers           *appuser.ListUsersUseCase
-	requestEmailChange  *appuser.RequestEmailChangeUseCase
-	confirmEmailChange  *appuser.ConfirmEmailChangeUseCase
-	rateLimiter         ratelimit.RateLimiter
+	listUsers             *appuser.ListUsersUseCase
+	requestEmailChange    *appuser.RequestEmailChangeUseCase
+	confirmEmailChange    *appuser.ConfirmEmailChangeUseCase
+	requestPasswordRecovery *appuser.RequestPasswordRecoveryUseCase
+	resetPassword           *appuser.ResetPasswordUseCase
+	rateLimiter           ratelimit.RateLimiter
 }
 
 func NewUserHandler(
@@ -28,18 +30,22 @@ func NewUserHandler(
 	listUsers *appuser.ListUsersUseCase,
 	requestEmailChange *appuser.RequestEmailChangeUseCase,
 	confirmEmailChange *appuser.ConfirmEmailChangeUseCase,
+	requestPasswordRecovery *appuser.RequestPasswordRecoveryUseCase,
+	resetPassword *appuser.ResetPasswordUseCase,
 	rateLimiter ratelimit.RateLimiter,
 ) *UserHandler {
 	return &UserHandler{
-		createUser:          createUser,
-		getUserProfile:      getUserProfile,
-		updateUser:          updateUser,
-		updatePassword:      updatePassword,
-		adminUpdateUser:     adminUpdateUser,
-		adminDeactivateUser: adminDeactivateUser,
-		listUsers:           listUsers,
-		requestEmailChange:  requestEmailChange,
-		confirmEmailChange:  confirmEmailChange,
-		rateLimiter:         rateLimiter,
+		createUser:            createUser,
+		getUserProfile:        getUserProfile,
+		updateUser:            updateUser,
+		updatePassword:        updatePassword,
+		adminUpdateUser:       adminUpdateUser,
+		adminDeactivateUser:   adminDeactivateUser,
+		listUsers:             listUsers,
+		requestEmailChange:    requestEmailChange,
+		confirmEmailChange:    confirmEmailChange,
+		requestPasswordRecovery: requestPasswordRecovery,
+		resetPassword:           resetPassword,
+		rateLimiter:           rateLimiter,
 	}
 }

@@ -13,6 +13,7 @@ import (
 	jwtplatform "github.com/training-judge-center/backend/internal/platform/jwt"
 	"github.com/training-judge-center/backend/internal/platform/postgres"
 	"github.com/training-judge-center/backend/internal/platform/ratelimit"
+	redisplatform "github.com/training-judge-center/backend/internal/platform/redis"
 	"github.com/training-judge-center/backend/internal/server"
 	"github.com/redis/go-redis/v9"
 	"github.com/training-judge-center/backend/internal/server/handler"
@@ -49,11 +50,12 @@ func main() {
 
 	// Platform adapters
 	userRepo := postgres.NewUserRepository(dbPool)
-	_ = postgres.NewPasswordRecoveryRepository(dbPool) // Instantiated for future UseCases
+	passwordRecoveryRepo := postgres.NewPasswordRecoveryRepository(dbPool)
 	emailChangeRepo := postgres.NewEmailChangeRepository(dbPool)
 	jwtService := jwtplatform.NewService(cfg.JWTSecret, cfg.JWTExpirationHours)
 	emailSender := email.NewSMTPSender(cfg.SMTPHost, cfg.SMTPPort, cfg.SMTPUser, cfg.SMTPPassword, cfg.SMTPFrom)
 	redisRateLimiter := ratelimit.NewRedisRateLimiter(redisClient)
+	sessionInvalidator := redisplatform.NewSessionInvalidator(redisClient)
 
 	// Use Cases
 	createUserUC := appuser.NewCreateUserUseCase(userRepo)
@@ -66,9 +68,11 @@ func main() {
 	listUsersUC := appuser.NewListUsersUseCase(userRepo)
 	requestEmailChangeUC := appuser.NewRequestEmailChangeUseCase(userRepo, emailChangeRepo, emailSender)
 	confirmEmailChangeUC := appuser.NewConfirmEmailChangeUseCase(userRepo, emailChangeRepo, emailSender)
+	requestPasswordRecoveryUC := appuser.NewRequestPasswordRecoveryUseCase(userRepo, passwordRecoveryRepo, emailSender)
+	resetPasswordUC := appuser.NewResetPasswordUseCase(userRepo, passwordRecoveryRepo, sessionInvalidator)
 
 	// Handlers
-	userHandler := handler.NewUserHandler(createUserUC, getUserProfileUC, updateUserUC, updatePasswordUC, adminUpdateUserUC, adminDeactivateUserUC, listUsersUC, requestEmailChangeUC, confirmEmailChangeUC, redisRateLimiter)
+	userHandler := handler.NewUserHandler(createUserUC, getUserProfileUC, updateUserUC, updatePasswordUC, adminUpdateUserUC, adminDeactivateUserUC, listUsersUC, requestEmailChangeUC, confirmEmailChangeUC, requestPasswordRecoveryUC, resetPasswordUC, redisRateLimiter)
 	authHandler := handler.NewAuthHandler(loginUC)
 
 	router := server.NewRouter(
@@ -77,7 +81,8 @@ func main() {
 			Auth: authHandler,
 		},
 		&server.Services{
-			TokenService: jwtService,
+			TokenService:      jwtService,
+			SessionInvalidator: sessionInvalidator,
 		},
 	)
 

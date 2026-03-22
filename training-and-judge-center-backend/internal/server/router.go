@@ -14,7 +14,8 @@ type Handlers struct {
 }
 
 type Services struct {
-	TokenService user.TokenService
+	TokenService       user.TokenService
+	SessionInvalidator user.SessionInvalidator
 }
 
 func NewRouter(h *Handlers, s *Services) *chi.Mux {
@@ -29,6 +30,8 @@ func NewRouter(h *Handlers, s *Services) *chi.Mux {
 
 	// Public routes
 	r.Post("/users", h.User.Create)
+	r.Post("/password/forgot", h.User.RequestPasswordRecovery)
+	r.Post("/password/reset", h.User.ResetPassword)
 
 	r.Route("/auth", func(r chi.Router) {
 		r.Post("/login", h.Auth.Login)
@@ -36,7 +39,7 @@ func NewRouter(h *Handlers, s *Services) *chi.Mux {
 
 	// Protected routes — authenticated users
 	r.Group(func(r chi.Router) {
-		r.Use(middleware.Auth(s.TokenService))
+		r.Use(middleware.Auth(s.TokenService, s.SessionInvalidator))
 
 		r.Get("/users/me", h.User.GetMyProfile)
 		r.Get("/users/{nickname}", h.User.GetByNickname)
@@ -48,7 +51,7 @@ func NewRouter(h *Handlers, s *Services) *chi.Mux {
 
 	// Protected routes — admin only
 	r.Route("/admin", func(r chi.Router) {
-		r.Use(middleware.Auth(s.TokenService))
+		r.Use(middleware.Auth(s.TokenService, s.SessionInvalidator))
 		r.Use(middleware.RequireRole(user.RoleAdmin))
 
 		r.Get("/users", h.User.ListUsers)
