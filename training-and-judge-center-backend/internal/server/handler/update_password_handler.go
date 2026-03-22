@@ -2,6 +2,7 @@ package handler
 
 import (
 	"encoding/json"
+	"log/slog"
 	"net/http"
 	"time"
 
@@ -37,8 +38,8 @@ func (h *UserHandler) UpdatePassword(w http.ResponseWriter, r *http.Request) {
 	rateKey := "rate_limit:update_password:" + claims.UserID
 	allowed, err := h.rateLimiter.Allow(r.Context(), rateKey, 5, 1*time.Hour)
 	if err != nil {
-		// Log error but continue? Or fail safe? Usually fail safe is better for security, but here we'll log and continue if it's a Redis error to avoid blocking the user.
-		// However, a better approach is to fail if we can't verify the rate limit.
+		// Fail-Safe: If we can't verify the rate limit (e.g. Redis down), we block the request to prevent potential brute-force.
+		slog.Error("failed to verify rate limit for update password", "user_id", claims.UserID, "error", err)
 		respondJSON(w, http.StatusInternalServerError, map[string]string{
 			"error":   "INTERNAL_ERROR",
 			"message": "An internal error occurred while processing your request",
