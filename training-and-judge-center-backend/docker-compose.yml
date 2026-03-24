@@ -44,9 +44,14 @@ services:
       DB_NAME: ${POSTGRES_DB}
       MOCK_AUTH: ${MOCK_AUTH:-0}
       VIRTUAL_OBJECT_CONFIG: /config/virtual_object.json
+      STORAGE_BACKEND: ${STORAGE_BACKEND:-local}
+      STORAGE_LOCAL_DIR: /data/uploads
+    volumes:
+      - problem_uploads:/data/uploads
     depends_on:
       migrate:
         condition: service_completed_successfully
 
 volumes:
   postgres_data:
+  problem_uploads:
