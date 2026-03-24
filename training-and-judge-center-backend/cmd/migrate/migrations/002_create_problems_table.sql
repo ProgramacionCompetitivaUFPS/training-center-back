@@ -14,6 +14,11 @@ CREATE TABLE IF NOT EXISTS problems (
     accessibility VARCHAR(50) NOT NULL DEFAULT 'PRIVATE',
     author_id UUID NOT NULL,
     modifiers_ids UUID[] DEFAULT '{}',
+    test_cases_key TEXT,
+    solutions JSONB DEFAULT '[]'::jsonb,
+    checker JSONB,
+    validator JSONB,
+    judging_updated_at TIMESTAMP WITH TIME ZONE,
     created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
 );
