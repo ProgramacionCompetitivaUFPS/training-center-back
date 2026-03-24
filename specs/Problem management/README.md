@@ -87,6 +87,7 @@ When changing from `PUBLIC` to `PRIVATE`:
 | Publish/Unpublish | ✅ | ✅ | ✅ | ❌ |
 | Add modifier | ✅ | ✅ | ❌ | ❌ |
 | Remove modifier | ✅ | ✅ | ❌ | ❌ |
+| List modifiers | ✅ | ✅ | ✅ | ❌ |
 | Delete problem | ✅ | ✅ | ❌ | ❌ |
 
 ### Modifiers
@@ -355,6 +356,10 @@ Imported problems are created with status `DRAFT` and accessibility `PRIVATE`.
 * Index on `status` and `accessibility` for filtering
 * File uploads go directly to storage service
 
+### Infrastructure & Deployment
+
+* **Storage Privileges**: When using `LocalStorageRepository` with Docker Volumes, ensure the container's execution user has write permissions to the mapped host directory to avoid `Permission Denied` errors during local `os.MkdirAll` operations.
+
 ### Validation
 
 * All text normalized using Unicode NFKC
@@ -378,7 +383,7 @@ Imported problems are created with status `DRAFT` and accessibility `PRIVATE`.
 
 ### Future Specs (Planned)
 
-None - all planned specs have been implemented.
+1. **[Background Cleanup Job]** - Implement a cron or background job to periodically delete orphaned UUID folders left in Storage by failed file uploads.
 
 ### Implementation Dependencies
 
