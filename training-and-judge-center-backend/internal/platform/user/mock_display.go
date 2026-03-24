@@ -40,3 +40,8 @@ func (m *MockDisplayProvider) GetDisplays(_ context.Context, userIDs []string) (
 	}
 	return out, nil
 }
+
+func (m *MockDisplayProvider) ExistsByID(_ context.Context, userID string) (bool, error) {
+	_, exists := m.users[userID]
+	return exists, nil
+}
