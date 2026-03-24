@@ -6,6 +6,12 @@ import (
 )
 
 type VirtualObjectProvider struct {
+	languageExtensions    map[string]string
+	uploadMaxConcurrency  int
+	maxFileCountSample    int
+	maxFileSizeTestCaseMB int
+	maxFileCountTestCase  int
+	maxFileSizeDefaultMB  int
 	globalMaxTimeLimit   int
 	globalMaxMemoryLimit int
 	languages            map[string]problem.LanguageLimit
@@ -37,12 +43,58 @@ func NewVirtualObjectProvider(cfg *config.VirtualObject) *VirtualObjectProvider 
 	}
 
 	return &VirtualObjectProvider{
+		languageExtensions:    cfg.LanguageExtensions,
+		uploadMaxConcurrency:  cfg.UploadMaxConcurrency,
+		maxFileCountSample:    cfg.MaxFileCountSample,
+		maxFileSizeTestCaseMB: cfg.MaxFileSizeTestCaseMB,
+		maxFileCountTestCase:  cfg.MaxFileCountTestCase,
+		maxFileSizeDefaultMB:  cfg.MaxFileSizeDefaultMB,
 		globalMaxTimeLimit:   cfg.MaxTimeLimitGlobal,
 		globalMaxMemoryLimit: cfg.MaxMemoryLimitGlobal,
 		languages:            langs,
 		allowedTags:          tagsMap,
 		tagsList:             cfg.Tags,
 	}
+}
+
+func (p *VirtualObjectProvider) GetLanguageByExtension(ext string) (string, bool) {
+	lang, ok := p.languageExtensions[ext]
+	return lang, ok
+}
+
+func (p *VirtualObjectProvider) GetUploadMaxConcurrency() int {
+	if p.uploadMaxConcurrency <= 0 {
+		return 10 // Default fallback
+	}
+	return p.uploadMaxConcurrency
+}
+
+func (p *VirtualObjectProvider) GetMaxFileCountSample() int {
+	if p.maxFileCountSample <= 0 {
+		return 10 // Default fallback
+	}
+	return p.maxFileCountSample
+}
+
+func (p *VirtualObjectProvider) GetMaxFileSizeDefaultMB() int {
+	if p.maxFileSizeDefaultMB <= 0 {
+		return 10 // Default fallback
+	}
+	return p.maxFileSizeDefaultMB
+}
+
+func (p *VirtualObjectProvider) GetMaxFileSizeTestCaseMB() int {
+	if p.maxFileSizeTestCaseMB <= 0 {
+		return 200 // Default fallback
+	}
+	return p.maxFileSizeTestCaseMB
+}
+
+func (p *VirtualObjectProvider) GetMaxFileCountTestCase() int {
+	if p.maxFileCountTestCase <= 0 {
+		return 10000 // Default fallback
+	}
+	return p.maxFileCountTestCase
 }
 
 func (p *VirtualObjectProvider) GetGlobalLimits() (int, int) {

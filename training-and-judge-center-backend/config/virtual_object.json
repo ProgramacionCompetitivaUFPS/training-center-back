@@ -1,4 +1,14 @@
 {
+  "uploadMaxConcurrency": 10,
+  "languageExtensions": {
+    ".py": "python310",
+    ".cpp": "cpp20",
+    ".java": "java17"
+  },
+  "maxFileCountSample": 10,
+  "maxFileSizeTestCaseMB": 200,
+  "maxFileCountTestCase": 10000,
+  "maxFileSizeDefaultMB": 10,
   "maxTimeLimitGlobal": 300000,
   "maxMemoryLimitGlobal": 2048,
   "languageOverrides": [

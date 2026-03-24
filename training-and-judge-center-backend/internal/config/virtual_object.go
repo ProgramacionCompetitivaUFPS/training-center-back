@@ -6,16 +6,22 @@ import (
 )
 
 type LanguageLimit struct {
-	Language      string `json:"language"`
-	MaxTimeLimit  int    `json:"maxTimeLimit"`
-	MaxMemoryLimit int   `json:"maxMemoryLimit"`
+	Language       string `json:"language"`
+	MaxTimeLimit   int    `json:"maxTimeLimit"`
+	MaxMemoryLimit int    `json:"maxMemoryLimit"`
 }
 
 type VirtualObject struct {
-	MaxTimeLimitGlobal  int             `json:"maxTimeLimitGlobal"`
-	MaxMemoryLimitGlobal int            `json:"maxMemoryLimitGlobal"`
-	LanguageOverrides   []LanguageLimit `json:"languageOverrides"`
-	Tags                []string        `json:"tags"`
+	LanguageExtensions    map[string]string `json:"languageExtensions"`
+	UploadMaxConcurrency  int             `json:"uploadMaxConcurrency"`
+	MaxFileCountSample    int             `json:"maxFileCountSample"`
+	MaxFileSizeTestCaseMB int             `json:"maxFileSizeTestCaseMB"`
+	MaxFileCountTestCase  int             `json:"maxFileCountTestCase"`
+	MaxFileSizeDefaultMB  int             `json:"maxFileSizeDefaultMB"`
+	MaxTimeLimitGlobal   int             `json:"maxTimeLimitGlobal"`
+	MaxMemoryLimitGlobal int             `json:"maxMemoryLimitGlobal"`
+	LanguageOverrides    []LanguageLimit `json:"languageOverrides"`
+	Tags                 []string        `json:"tags"`
 }
 
 func loadVirtualObject() *VirtualObject {
@@ -33,4 +39,3 @@ func loadVirtualObject() *VirtualObject {
 
 	return &vo
 }
-
