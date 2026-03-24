@@ -20,15 +20,15 @@ func NewSlug(value string) (Slug, error) {
 	}
 
 	if len(value) < 3 {
-		return Slug{}, apperror.NewBadRequest("SLUG_TOO_SHORT", "Slug must be at least 3 characters long")
+		return Slug{}, apperror.NewBadRequest(ErrCodeSlugTooShort, "Slug must be at least 3 characters long")
 	}
 
 	if len(value) > 70 {
-		return Slug{}, apperror.NewBadRequest("SLUG_TOO_LONG", "Slug must not exceed 70 characters")
+		return Slug{}, apperror.NewBadRequest(ErrCodeSlugTooLong, "Slug must not exceed 70 characters")
 	}
 
 	if !slugRegex.MatchString(value) {
-		return Slug{}, apperror.NewBadRequest("INVALID_SLUG_FORMAT", "Slug must contain only lowercase letters, numbers, and hyphens. Cannot start/end with hyphen or have consecutive hyphens.")
+		return Slug{}, apperror.NewBadRequest(ErrCodeSlugInvalidFormat, "Slug must contain only lowercase letters, numbers, and hyphens. Cannot start/end with hyphen or have consecutive hyphens.")
 	}
 
 	return Slug{value: value}, nil

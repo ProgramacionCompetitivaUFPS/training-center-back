@@ -28,3 +28,7 @@ func NewStatusPublished() Status {
 func (s Status) String() string {
 	return s.value
 }
+
+func (s Status) IsPublished() bool {
+	return s.value == "PUBLISHED"
+}

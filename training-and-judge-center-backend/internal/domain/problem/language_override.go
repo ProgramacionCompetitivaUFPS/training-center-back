@@ -89,3 +89,11 @@ func (lo LanguageOverride) TimeLimit() *int {
 func (lo LanguageOverride) MemoryLimit() *int {
 	return lo.memoryLimit
 }
+
+func RestoreLanguageOverride(language string, timeLimit *int, memoryLimit *int) LanguageOverride {
+	return LanguageOverride{
+		language:    language,
+		timeLimit:   timeLimit,
+		memoryLimit: memoryLimit,
+	}
+}

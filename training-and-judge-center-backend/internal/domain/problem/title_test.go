@@ -45,15 +45,15 @@ func TestNewTitle(t *testing.T) {
 			wantErr:  true,
 		},
 		{
-			name:     "Title too long (256 chars)",
-			input:    strings.Repeat("a", 256),
+			name:     "Title too long (201 chars)",
+			input:    strings.Repeat("a", 201),
 			expected: "",
 			wantErr:  true,
 		},
 		{
-			name:     "Title exactly at max length (255 chars)",
-			input:    strings.Repeat("a", 255),
-			expected: strings.Repeat("a", 255),
+			name:     "Title exactly at max length (200 chars)",
+			input:    strings.Repeat("a", 200),
+			expected: strings.Repeat("a", 200),
 			wantErr:  false,
 		},
 	}

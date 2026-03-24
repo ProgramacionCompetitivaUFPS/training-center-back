@@ -31,8 +31,8 @@ func TestNewLanguageOverride(t *testing.T) {
 		{
 			name:            "Valid limits for known language",
 			language:        "cpp20",
-			timeLimit:       timePtr(1000), // Exact max allowed for cpp
-			memoryLimit:     timePtr(256),  // Exact max allowed for cpp
+			timeLimit:       timePtr(1000),
+			memoryLimit:     timePtr(256),
 			langLimit:       cppLimit,
 			globalMaxTime:   globalMaxTime,
 			globalMaxMemory: globalMaxMemory,
@@ -41,18 +41,18 @@ func TestNewLanguageOverride(t *testing.T) {
 		{
 			name:            "Time limit exceeds known language max",
 			language:        "cpp20",
-			timeLimit:       timePtr(1001), // Exceeds 1000
+			timeLimit:       timePtr(1001),
 			memoryLimit:     timePtr(256),
 			langLimit:       cppLimit,
-			globalMaxTime:   globalMaxTime,  // Notice global gives up to 3000
+			globalMaxTime:   globalMaxTime,
 			globalMaxMemory: globalMaxMemory,
-			wantErr:         true, // Should fail because LangLimit takes precedence
+			wantErr:         true,
 		},
 		{
 			name:            "Valid limits for unknown language (fallback to globals)",
 			language:        "rust1.75",
-			timeLimit:       timePtr(3000), // Max global
-			memoryLimit:     timePtr(512),  // Max global
+			timeLimit:       timePtr(3000),
+			memoryLimit:     timePtr(512),
 			langLimit:       nil,
 			globalMaxTime:   globalMaxTime,
 			globalMaxMemory: globalMaxMemory,
@@ -61,7 +61,7 @@ func TestNewLanguageOverride(t *testing.T) {
 		{
 			name:            "Time limit exceeds global max for unknown language",
 			language:        "rust1.75",
-			timeLimit:       timePtr(3001), // Exceeds global max
+			timeLimit:       timePtr(3001),
 			memoryLimit:     timePtr(512),
 			langLimit:       nil,
 			globalMaxTime:   globalMaxTime,

@@ -9,10 +9,10 @@ import (
 
 func TestNewSlug(t *testing.T) {
 	tests := []struct {
-		name        string
-		input       string
-		wantErr     bool
-		errCode     string
+		name    string
+		input   string
+		wantErr bool
+		errCode string
 	}{
 		{
 			name:    "Valid slug",
@@ -33,7 +33,7 @@ func TestNewSlug(t *testing.T) {
 			name:    "Empty slug",
 			input:   "",
 			wantErr: true,
-			errCode: "VALIDATION_ERROR", // Because it has FieldError details
+			errCode: "VALIDATION_ERROR",
 		},
 		{
 			name:    "Slug too short",
