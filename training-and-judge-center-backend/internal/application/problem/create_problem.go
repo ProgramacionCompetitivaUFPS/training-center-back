@@ -3,6 +3,7 @@ package problem
 import (
 	"context"
 	"errors"
+	"log/slog"
 
 	"github.com/google/uuid"
 	"github.com/training-judge-center/backend/internal/domain/problem"
@@ -45,7 +46,7 @@ func NewCreateProblemUseCase(repo problem.Repository, platformSettings problem.P
 
 func (usecase *CreateProblemUseCase) Execute(ctx context.Context, input CreateProblemInput) (*CreateProblemResult, error) {
 	if input.CurrentUser.Role != user.RoleCoach && input.CurrentUser.Role != user.RoleAdmin {
-		return nil, apperror.NewForbidden("INSUFFICIENT_PERMISSIONS", "Only Coach and Admin users can create problems")
+		return nil, apperror.NewForbidden(apperror.ErrCodeForbidden, "Only Coach and Admin users can create problems")
 	}
 
 	slug, err := problem.NewSlug(input.Slug)
@@ -57,7 +58,8 @@ func (usecase *CreateProblemUseCase) Execute(ctx context.Context, input CreatePr
 
 	title, err := problem.NewTitle(input.Title)
 	if err != nil {
-		if valErr, ok := err.(*apperror.AppError); ok {
+		var valErr *apperror.AppError
+		if errors.As(err, &valErr) {
 			fieldErrs = append(fieldErrs, valErr.Details...)
 		} else {
 			return nil, apperror.NewInternal()
@@ -70,7 +72,8 @@ func (usecase *CreateProblemUseCase) Execute(ctx context.Context, input CreatePr
 	if input.TimeLimit != nil {
 		tl, err := problem.NewTimeLimit(*input.TimeLimit, globalMaxTime)
 		if err != nil {
-			if valErr, ok := err.(*apperror.AppError); ok {
+			var valErr *apperror.AppError
+			if errors.As(err, &valErr) {
 				fieldErrs = append(fieldErrs, valErr.Details...)
 			} else {
 				return nil, apperror.NewInternal()
@@ -84,7 +87,8 @@ func (usecase *CreateProblemUseCase) Execute(ctx context.Context, input CreatePr
 	if input.MemoryLimit != nil {
 		ml, err := problem.NewMemoryLimit(*input.MemoryLimit, globalMaxMemory)
 		if err != nil {
-			if valErr, ok := err.(*apperror.AppError); ok {
+			var valErr *apperror.AppError
+			if errors.As(err, &valErr) {
 				fieldErrs = append(fieldErrs, valErr.Details...)
 			} else {
 				return nil, apperror.NewInternal()
@@ -106,7 +110,8 @@ func (usecase *CreateProblemUseCase) Execute(ctx context.Context, input CreatePr
 			globalMaxMemory,
 		)
 		if err != nil {
-			if valErr, ok := err.(*apperror.AppError); ok {
+			var valErr *apperror.AppError
+			if errors.As(err, &valErr) {
 				fieldErrs = append(fieldErrs, valErr.Details...)
 			} else {
 				return nil, apperror.NewInternal()
@@ -119,7 +124,8 @@ func (usecase *CreateProblemUseCase) Execute(ctx context.Context, input CreatePr
 	allowedTags := usecase.platformSettings.GetAllowedTags()
 	tags, err := problem.NewTags(input.Tags, allowedTags)
 	if err != nil {
-		if valErr, ok := err.(*apperror.AppError); ok {
+		var valErr *apperror.AppError
+		if errors.As(err, &valErr) {
 			fieldErrs = append(fieldErrs, valErr.Details...)
 		} else {
 			return nil, apperror.NewInternal()
@@ -132,10 +138,11 @@ func (usecase *CreateProblemUseCase) Execute(ctx context.Context, input CreatePr
 
 	exists, err := usecase.repo.ExistsBySlug(ctx, slug)
 	if err != nil {
+		slog.ErrorContext(ctx, "failed to check problem existence by slug", "error", err, "slug", slug.String())
 		return nil, apperror.NewInternal()
 	}
 	if exists {
-		return nil, apperror.NewConflict("SLUG_ALREADY_EXISTS", "A problem with that slug already exists")
+		return nil, apperror.NewConflict(ErrCodeProblemSlugAlreadyExists, "A problem with that slug already exists")
 	}
 
 	newID := uuid.New().String()
@@ -154,8 +161,9 @@ func (usecase *CreateProblemUseCase) Execute(ctx context.Context, input CreatePr
 	if err := usecase.repo.Save(ctx, newProblem); err != nil {
 		var slugErr *problem.ErrSlugAlreadyExists
 		if errors.As(err, &slugErr) {
-			return nil, apperror.NewConflict("SLUG_ALREADY_EXISTS", "A problem with slug '"+slugErr.Slug+"' already exists")
+			return nil, apperror.NewConflict(ErrCodeProblemSlugAlreadyExists, "A problem with slug '"+slugErr.Slug+"' already exists")
 		}
+		slog.ErrorContext(ctx, "failed to save new problem", "error", err, "slug", slug.String())
 		return nil, apperror.NewInternal()
 	}
 
