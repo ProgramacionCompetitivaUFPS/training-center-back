@@ -4,7 +4,7 @@ import "net/http"
 
 func NewValidation(details []FieldError) *AppError {
 	return &AppError{
-		Code:       "VALIDATION_ERROR",
+		Code:       ErrCodeValidationError,
 		Message:    "Invalid request data",
 		Details:    details,
 		StatusCode: http.StatusBadRequest,
@@ -53,7 +53,7 @@ func NewForbidden(code, message string) *AppError {
 
 func NewInternal() *AppError {
 	return &AppError{
-		Code:       "INTERNAL_ERROR",
+		Code:       ErrCodeInternalError,
 		Message:    "An unexpected error occurred",
 		StatusCode: http.StatusInternalServerError,
 	}
