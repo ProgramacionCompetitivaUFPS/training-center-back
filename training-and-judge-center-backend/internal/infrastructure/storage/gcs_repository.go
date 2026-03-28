@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"cloud.google.com/go/storage"
+	"google.golang.org/api/iterator"
 	appProblem "github.com/training-judge-center/backend/internal/application/problem"
 )
 
@@ -45,6 +46,25 @@ func (r *GCSProblemFileRepository) DeleteFile(ctx context.Context, path string) 
 			return nil
 		}
 		return fmt.Errorf("failed to delete GCS object %s: %w", path, err)
+	}
+	return nil
+}
+
+func (r *GCSProblemFileRepository) DeleteFilesWithPrefix(ctx context.Context, prefix string) error {
+	it := r.client.Bucket(r.bucket).Objects(ctx, &storage.Query{Prefix: prefix})
+	for {
+		attrs, err := it.Next()
+		if err == iterator.Done {
+			break
+		}
+		if err != nil {
+			return fmt.Errorf("failed to list GCS objects with prefix %s: %w", prefix, err)
+		}
+		if err := r.client.Bucket(r.bucket).Object(attrs.Name).Delete(ctx); err != nil {
+			if err != storage.ErrObjectNotExist {
+				return fmt.Errorf("failed to delete GCS object %s: %w", attrs.Name, err)
+			}
+		}
 	}
 	return nil
 }

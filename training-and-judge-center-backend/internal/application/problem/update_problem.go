@@ -46,7 +46,7 @@ func (uc *UpdateProblemUseCase) Execute(ctx context.Context, input UpdateProblem
 
 	p, err := uc.repo.FindBySlug(ctx, slug)
 	if err != nil {
-		return nil, apperror.NewNotFound(apperror.ErrCodeNotFound, "Problem not found")
+		return nil, err
 	}
 
 	if p.Status.IsPublished() {
@@ -161,7 +161,11 @@ func (uc *UpdateProblemUseCase) Execute(ctx context.Context, input UpdateProblem
 		return nil, apperror.NewValidation(fieldErrs)
 	}
 
-	p.UpdateMetadata(title, &input.Statement, timeLimit, memoryLimit, validOverrides, tags)
+	var statementPtr **string
+	if input.Statement != nil {
+		statementPtr = &input.Statement
+	}
+	p.UpdateMetadata(title, statementPtr, timeLimit, memoryLimit, validOverrides, tags)
 
 	if accessibility != nil {
 		p.UpdateAccessibility(*accessibility)

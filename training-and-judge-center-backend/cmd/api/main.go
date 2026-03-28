@@ -15,6 +15,7 @@ import (
 	"github.com/training-judge-center/backend/internal/infrastructure/parser"
 	infraSt "github.com/training-judge-center/backend/internal/infrastructure/storage"
 	platformConfig "github.com/training-judge-center/backend/internal/platform/config"
+	platformParser "github.com/training-judge-center/backend/internal/platform/parser"
 	"github.com/training-judge-center/backend/internal/platform/postgres"
 	platformUser "github.com/training-judge-center/backend/internal/platform/user"
 	"github.com/training-judge-center/backend/internal/server"
@@ -68,6 +69,7 @@ func main() {
 		settingsProvider.GetMaxFileCountTestCase(),
 		settingsProvider.GetMaxFileCountSample(),
 	)
+	zipParserAdapter := platformParser.NewICPCParserAdapter(icpcParser)
 
 	var userProvider appProblem.UserProvider
 	if cfg.MockAuth {
@@ -81,7 +83,7 @@ func main() {
 	// Use Cases
 	createProblemUseCase := appProblem.NewCreateProblemUseCase(problemRepo, settingsProvider)
 	updateProblemUseCase := appProblem.NewUpdateProblemUseCase(problemRepo, settingsProvider)
-	uploadProblemFilesUseCase := appProblem.NewUploadProblemFilesUseCase(problemRepo, fileStorage, icpcParser, settingsProvider)
+	uploadProblemFilesUseCase := appProblem.NewUploadProblemFilesUseCase(problemRepo, fileStorage, zipParserAdapter, settingsProvider)
 	deleteProblemFileUseCase := appProblem.NewDeleteProblemFileUseCase(problemRepo, fileStorage)
 	addModifierUseCase := appProblem.NewAddModifierUseCase(problemRepo, userProvider)
 	removeModifierUseCase := appProblem.NewRemoveModifierUseCase(problemRepo)

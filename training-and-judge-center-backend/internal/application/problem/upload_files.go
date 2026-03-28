@@ -12,7 +12,6 @@ import (
 
 	"github.com/training-judge-center/backend/internal/domain/problem"
 	"github.com/training-judge-center/backend/internal/domain/user"
-	"github.com/training-judge-center/backend/internal/infrastructure/parser"
 	"github.com/training-judge-center/backend/pkg/apperror"
 )
 
@@ -39,28 +38,29 @@ type UploadProblemFilesResult struct {
 }
 
 type fileAction struct {
-	toDeleteOnFailure []string
-	toDeleteOnSuccess []string
+	toDeleteOnFailure       []string
+	toDeleteOnSuccess       []string
+	prefixToDeleteOnSuccess string
 }
 
 type UploadProblemFilesUseCase struct {
-	repo       problem.Repository
-	storage    ProblemFileRepository
-	icpcParser *parser.ICPCParser
-	settings   problem.PlatformSettingsService
+	repo      problem.Repository
+	storage   ProblemFileRepository
+	zipParser ZipParser
+	settings  problem.PlatformSettingsService
 }
 
 func NewUploadProblemFilesUseCase(
 	repo problem.Repository,
 	storage ProblemFileRepository,
-	icpcParser *parser.ICPCParser,
+	zipParser ZipParser,
 	settings problem.PlatformSettingsService,
 ) *UploadProblemFilesUseCase {
 	return &UploadProblemFilesUseCase{
-		repo:       repo,
-		storage:    storage,
-		icpcParser: icpcParser,
-		settings:   settings,
+		repo:      repo,
+		storage:   storage,
+		zipParser: zipParser,
+		settings:  settings,
 	}
 }
 
@@ -72,7 +72,7 @@ func (uc *UploadProblemFilesUseCase) Execute(ctx context.Context, input UploadPr
 
 	p, err := uc.repo.FindBySlug(ctx, slug)
 	if err != nil {
-		return nil, apperror.NewNotFound(apperror.ErrCodeNotFound, "Problem not found")
+		return nil, err
 	}
 
 	if p.Status.IsPublished() {
@@ -113,6 +113,7 @@ func (uc *UploadProblemFilesUseCase) Execute(ctx context.Context, input UploadPr
 	}
 
 	uc.cleanupFiles(ctx, action.toDeleteOnSuccess)
+	uc.cleanupPrefix(ctx, action.prefixToDeleteOnSuccess)
 
 	return &UploadProblemFilesResult{
 		Message:  "File uploaded successfully",
@@ -130,8 +131,17 @@ func (uc *UploadProblemFilesUseCase) cleanupFiles(ctx context.Context, keys []st
 	}
 }
 
+func (uc *UploadProblemFilesUseCase) cleanupPrefix(ctx context.Context, prefix string) {
+	if prefix == "" {
+		return
+	}
+	if err := uc.storage.DeleteFilesWithPrefix(ctx, prefix); err != nil {
+		slog.ErrorContext(ctx, "failed to cleanup storage prefix", "prefix", prefix, "error", err)
+	}
+}
+
 func (uc *UploadProblemFilesUseCase) handleTestCases(ctx context.Context, p *problem.Problem, input UploadProblemFilesInput) (fileAction, error) {
-	sampleFiles, err := uc.icpcParser.ParseTestCasesZip(input.FileData)
+	sampleFiles, err := uc.zipParser.ParseTestCasesZip(input.FileData)
 	if err != nil {
 		return fileAction{}, err
 	}
@@ -172,8 +182,7 @@ func (uc *UploadProblemFilesUseCase) handleTestCases(ctx context.Context, p *pro
 
 	action := fileAction{toDeleteOnFailure: allNewKeys}
 	if p.TestCasesKey != nil {
-		oldZipKey := fmt.Sprintf("%s/testcases.zip", *p.TestCasesKey)
-		action.toDeleteOnSuccess = []string{oldZipKey}
+		action.prefixToDeleteOnSuccess = *p.TestCasesKey
 	}
 
 	p.SetTestCases(basePath)
@@ -212,12 +221,15 @@ func (uc *UploadProblemFilesUseCase) handleSolution(ctx context.Context, p *prob
 		return fileAction{}, apperror.NewInternal()
 	}
 
-	_ = p.AddSolution(solutionObj)
-
 	action := fileAction{}
 	if isNewKey {
 		action.toDeleteOnFailure = []string{fileKey}
 	}
+
+	if old := p.AddSolution(solutionObj); old != nil && old.FileKey() != fileKey {
+		action.toDeleteOnSuccess = []string{old.FileKey()}
+	}
+
 	return action, nil
 }
 

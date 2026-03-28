@@ -55,3 +55,11 @@ func (r *LocalStorageRepository) DeleteFile(ctx context.Context, path string) er
 
 	return nil
 }
+
+func (r *LocalStorageRepository) DeleteFilesWithPrefix(ctx context.Context, prefix string) error {
+	fullPath := r.resolvePath(prefix)
+	if err := os.RemoveAll(fullPath); err != nil && !os.IsNotExist(err) {
+		return fmt.Errorf("failed to remove directory %s: %w", fullPath, err)
+	}
+	return nil
+}
