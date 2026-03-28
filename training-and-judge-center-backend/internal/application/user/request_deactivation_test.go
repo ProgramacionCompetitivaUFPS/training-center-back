@@ -89,7 +89,7 @@ func TestRequestDeactivation_Success(t *testing.T) {
 	}
 
 	uc := NewRequestDeactivationUseCase(userRepo, deactRepo, mockEmail)
-	err := uc.Execute(context.Background(), "user-1")
+	err := uc.Execute(context.Background(), RequestDeactivationInput{UserID: "user-1"})
 	
 	if err != nil {
 		t.Fatalf("expected nil, got %v", err)
@@ -107,7 +107,7 @@ func TestRequestDeactivation_AdminForbidden(t *testing.T) {
 	}
 
 	uc := NewRequestDeactivationUseCase(userRepo, &mockDeactivationRepo{}, &mockEmailSender{})
-	err := uc.Execute(context.Background(), "admin-1")
+	err := uc.Execute(context.Background(), RequestDeactivationInput{UserID: "admin-1"})
 	
 	if err == nil {
 		t.Fatal("expected error, got nil")
@@ -125,7 +125,7 @@ func TestRequestDeactivation_UserNotFound(t *testing.T) {
 	}
 
 	uc := NewRequestDeactivationUseCase(userRepo, &mockDeactivationRepo{}, &mockEmailSender{})
-	err := uc.Execute(context.Background(), "non-existent")
+	err := uc.Execute(context.Background(), RequestDeactivationInput{UserID: "non-existent"})
 	
 	if err == nil {
 		t.Fatal("expected error, got nil")

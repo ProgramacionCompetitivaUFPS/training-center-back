@@ -27,7 +27,8 @@ func TestAdminUpdateUser_Success_AllFields(t *testing.T) {
 	newEmail := "updated@example.com"
 	newRole := "COACH"
 
-	result, err := uc.Execute(context.Background(), "target-1", AdminUpdateUserInput{
+	result, err := uc.Execute(context.Background(), AdminUpdateUserInput{
+		TargetID:    "target-1",
 		Name:        &newName,
 		Nickname:    &newNick,
 		Institution: &newInst,
@@ -63,7 +64,8 @@ func TestAdminUpdateUser_Success_PartialUpdate(t *testing.T) {
 	uc := NewAdminUpdateUserUseCase(repo)
 
 	newName := "Only Name"
-	result, err := uc.Execute(context.Background(), "target-1", AdminUpdateUserInput{
+	result, err := uc.Execute(context.Background(), AdminUpdateUserInput{
+		TargetID: "target-1",
 		Name: &newName,
 	})
 	if err != nil {
@@ -82,7 +84,8 @@ func TestAdminUpdateUser_UserNotFound(t *testing.T) {
 	uc := NewAdminUpdateUserUseCase(repo)
 
 	newName := "Some Name"
-	_, err := uc.Execute(context.Background(), "nonexistent", AdminUpdateUserInput{
+	_, err := uc.Execute(context.Background(), AdminUpdateUserInput{
+		TargetID: "nonexistent",
 		Name: &newName,
 	})
 	if err == nil {
@@ -105,7 +108,7 @@ func TestAdminUpdateUser_EmptyPayload(t *testing.T) {
 	repo := newNoConflictRepo()
 	uc := NewAdminUpdateUserUseCase(repo)
 
-	_, err := uc.Execute(context.Background(), "target-1", AdminUpdateUserInput{})
+	_, err := uc.Execute(context.Background(), AdminUpdateUserInput{TargetID: "target-1"})
 	if err == nil {
 		t.Fatal("expected error, got nil")
 	}
@@ -128,7 +131,8 @@ func TestAdminUpdateUser_CannotAssignAdminRole(t *testing.T) {
 	uc := NewAdminUpdateUserUseCase(repo)
 
 	adminRole := "ADMIN"
-	_, err := uc.Execute(context.Background(), "target-1", AdminUpdateUserInput{
+	_, err := uc.Execute(context.Background(), AdminUpdateUserInput{
+		TargetID: "target-1",
 		Role: &adminRole,
 	})
 	if err == nil {
@@ -159,7 +163,8 @@ func TestAdminUpdateUser_EmailAlreadyExists(t *testing.T) {
 	uc := NewAdminUpdateUserUseCase(repo)
 
 	takenEmail := "taken@example.com"
-	_, err := uc.Execute(context.Background(), "target-1", AdminUpdateUserInput{
+	_, err := uc.Execute(context.Background(), AdminUpdateUserInput{
+		TargetID: "target-1",
 		Email: &takenEmail,
 	})
 	if err == nil {
@@ -186,7 +191,8 @@ func TestAdminUpdateUser_RepositoryFindError(t *testing.T) {
 	uc := NewAdminUpdateUserUseCase(repo)
 
 	newName := "Some Name"
-	_, err := uc.Execute(context.Background(), "target-1", AdminUpdateUserInput{
+	_, err := uc.Execute(context.Background(), AdminUpdateUserInput{
+		TargetID: "target-1",
 		Name: &newName,
 	})
 	if err == nil {
@@ -214,7 +220,8 @@ func TestAdminUpdateUser_RepositoryUpdateError(t *testing.T) {
 	uc := NewAdminUpdateUserUseCase(repo)
 
 	newName := "New Name"
-	_, err := uc.Execute(context.Background(), "target-1", AdminUpdateUserInput{
+	_, err := uc.Execute(context.Background(), AdminUpdateUserInput{
+		TargetID: "target-1",
 		Name: &newName,
 	})
 	if err == nil {
@@ -239,7 +246,8 @@ func TestAdminUpdateUser_InvalidRole(t *testing.T) {
 	uc := NewAdminUpdateUserUseCase(repo)
 
 	badRole := "SUPERUSER"
-	_, err := uc.Execute(context.Background(), "target-1", AdminUpdateUserInput{
+	_, err := uc.Execute(context.Background(), AdminUpdateUserInput{
+		TargetID: "target-1",
 		Role: &badRole,
 	})
 	if err == nil {

@@ -11,6 +11,10 @@ import (
 	"github.com/training-judge-center/backend/pkg/apperror"
 )
 
+type RequestDeactivationInput struct {
+	UserID string
+}
+
 type RequestDeactivationUseCase struct {
 	userRepo        user.UserRepository
 	deactRepo       user.DeactivationRequestRepository
@@ -29,25 +33,17 @@ func NewRequestDeactivationUseCase(
 	}
 }
 
-func (uc *RequestDeactivationUseCase) Execute(ctx context.Context, userID string) error {
-	foundUser, err := uc.userRepo.FindByID(ctx, userID)
+func (uc *RequestDeactivationUseCase) Execute(ctx context.Context, input RequestDeactivationInput) error {
+	foundUser, err := uc.userRepo.FindByID(ctx, input.UserID)
 	if err != nil {
 		return apperror.NewInternal()
 	}
 	if foundUser == nil || foundUser.Status == user.StatusDeactivated {
-		return &apperror.AppError{
-			Code:       "NOT_FOUND",
-			Message:    "User not found",
-			StatusCode: 404,
-		}
+		return apperror.NewNotFound("NOT_FOUND", "User not found")
 	}
 
 	if foundUser.Role == user.RoleAdmin {
-		return &apperror.AppError{
-			Code:       "FORBIDDEN",
-			Message:    "Administrators cannot deactivate their own account",
-			StatusCode: 403,
-		}
+		return apperror.NewForbidden("FORBIDDEN", "Administrators cannot deactivate their own account")
 	}
 
 	now := time.Now()
@@ -79,11 +75,7 @@ func (uc *RequestDeactivationUseCase) Execute(ctx context.Context, userID string
 
 	body := fmt.Sprintf("You requested to deactivate your account.\n\nYour confirmation code is: %s\n\nThis code will expire in 15 minutes. Note: Confirming this code will completely anonymize your account and log you out immediately.", code)
 	if err := uc.emailSender.Send(ctx, foundUser.Email.String(), "Account Deactivation Code", body); err != nil {
-		return &apperror.AppError{
-			Code:       "INTERNAL_SERVER_ERROR",
-			Message:    "Failed to send verification email",
-			StatusCode: 503,
-		}
+		return apperror.NewServiceUnavailable("INTERNAL_SERVER_ERROR", "Failed to send verification email")
 	}
 
 	return nil

@@ -32,7 +32,7 @@ func TestAdminDeactivateUser_Success(t *testing.T) {
 	}
 	uc := NewAdminDeactivateUserUseCase(repo, invalidator)
 
-	err := uc.Execute(context.Background(), "admin-1", "target-1")
+	err := uc.Execute(context.Background(), AdminDeactivateUserInput{RequesterID: "admin-1", TargetID: "target-1"})
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
@@ -57,7 +57,7 @@ func TestAdminDeactivateUser_SelfDeactivation(t *testing.T) {
 	repo := newNoConflictRepo()
 	uc := NewAdminDeactivateUserUseCase(repo, &mockSessionInvalidator{})
 
-	err := uc.Execute(context.Background(), "admin-1", "admin-1")
+	err := uc.Execute(context.Background(), AdminDeactivateUserInput{RequesterID: "admin-1", TargetID: "admin-1"})
 	if err == nil {
 		t.Fatal("expected error, got nil")
 	}
@@ -65,8 +65,8 @@ func TestAdminDeactivateUser_SelfDeactivation(t *testing.T) {
 	if !ok {
 		t.Fatalf("expected *apperror.AppError, got %T", err)
 	}
-	if appErr.Code != "CANNOT_SELF_DEACTIVATE" {
-		t.Errorf("expected code CANNOT_SELF_DEACTIVATE, got %q", appErr.Code)
+	if appErr.Code != domain.ErrCodeCannotSelfDeactivate {
+		t.Errorf("expected code %q, got %q", domain.ErrCodeCannotSelfDeactivate, appErr.Code)
 	}
 	if appErr.StatusCode != http.StatusForbidden {
 		t.Errorf("expected status 403, got %d", appErr.StatusCode)
@@ -77,12 +77,12 @@ func TestAdminDeactivateUser_TargetNotFound(t *testing.T) {
 	repo := newNoConflictRepo()
 	uc := NewAdminDeactivateUserUseCase(repo, &mockSessionInvalidator{})
 
-	err := uc.Execute(context.Background(), "admin-1", "nonexistent")
+	err := uc.Execute(context.Background(), AdminDeactivateUserInput{RequesterID: "admin-1", TargetID: "nonexistent"})
 	if err == nil {
 		t.Fatal("expected error, got nil")
 	}
 	appErr := err.(*apperror.AppError)
-	if appErr.Code != "NOT_FOUND" {
+	if appErr.Code != apperror.ErrCodeNotFound {
 		t.Errorf("expected code NOT_FOUND, got %q", appErr.Code)
 	}
 }
@@ -95,13 +95,13 @@ func TestAdminDeactivateUser_CannotDeactivateAdmin(t *testing.T) {
 	}
 	uc := NewAdminDeactivateUserUseCase(repo, &mockSessionInvalidator{})
 
-	err := uc.Execute(context.Background(), "admin-1", "admin-2")
+	err := uc.Execute(context.Background(), AdminDeactivateUserInput{RequesterID: "admin-1", TargetID: "admin-2"})
 	if err == nil {
 		t.Fatal("expected error, got nil")
 	}
 	appErr := err.(*apperror.AppError)
-	if appErr.Code != "CANNOT_DEACTIVATE_ADMIN" {
-		t.Errorf("expected code CANNOT_DEACTIVATE_ADMIN, got %q", appErr.Code)
+	if appErr.Code != domain.ErrCodeCannotDeactivateAdmin {
+		t.Errorf("expected code %q, got %q", domain.ErrCodeCannotDeactivateAdmin, appErr.Code)
 	}
 	if appErr.StatusCode != http.StatusForbidden {
 		t.Errorf("expected status 403, got %d", appErr.StatusCode)
@@ -121,7 +121,7 @@ func TestAdminDeactivateUser_AlreadyDeactivated_Idempotent(t *testing.T) {
 	}
 	uc := NewAdminDeactivateUserUseCase(repo, &mockSessionInvalidator{})
 
-	err := uc.Execute(context.Background(), "admin-1", "target-1")
+	err := uc.Execute(context.Background(), AdminDeactivateUserInput{RequesterID: "admin-1", TargetID: "target-1"})
 	if err != nil {
 		t.Fatalf("expected no error for already deactivated user, got %v", err)
 	}
@@ -137,7 +137,7 @@ func TestAdminDeactivateUser_RepositoryFindError(t *testing.T) {
 	}
 	uc := NewAdminDeactivateUserUseCase(repo, &mockSessionInvalidator{})
 
-	err := uc.Execute(context.Background(), "admin-1", "target-1")
+	err := uc.Execute(context.Background(), AdminDeactivateUserInput{RequesterID: "admin-1", TargetID: "target-1"})
 	if err == nil {
 		t.Fatal("expected error, got nil")
 	}
@@ -158,7 +158,7 @@ func TestAdminDeactivateUser_RepositoryUpdateError(t *testing.T) {
 	}
 	uc := NewAdminDeactivateUserUseCase(repo, &mockSessionInvalidator{})
 
-	err := uc.Execute(context.Background(), "admin-1", "target-1")
+	err := uc.Execute(context.Background(), AdminDeactivateUserInput{RequesterID: "admin-1", TargetID: "target-1"})
 	if err == nil {
 		t.Fatal("expected error, got nil")
 	}

@@ -2,13 +2,13 @@ package user
 
 import (
 	"context"
-	"time"
 
 	"github.com/training-judge-center/backend/internal/domain/user"
 	"github.com/training-judge-center/backend/pkg/apperror"
 )
 
 type AdminUpdateUserInput struct {
+	TargetID    string
 	Name        *string
 	Nickname    *string
 	Institution *string
@@ -24,14 +24,14 @@ func NewAdminUpdateUserUseCase(repo user.UserRepository) *AdminUpdateUserUseCase
 	return &AdminUpdateUserUseCase{repo: repo}
 }
 
-func (uc *AdminUpdateUserUseCase) Execute(ctx context.Context, targetID string, input AdminUpdateUserInput) (*user.User, error) {
+func (uc *AdminUpdateUserUseCase) Execute(ctx context.Context, input AdminUpdateUserInput) (*user.User, error) {
 	if input.Name == nil && input.Nickname == nil && input.Institution == nil && input.Email == nil && input.Role == nil {
 		return nil, apperror.NewValidation([]apperror.FieldError{
 			{Field: "body", Message: "At least one updatable field must be provided"},
 		})
 	}
 
-	foundUser, err := uc.repo.FindByID(ctx, targetID)
+	foundUser, err := uc.repo.FindByID(ctx, input.TargetID)
 	if err != nil {
 		return nil, apperror.NewInternal()
 	}
@@ -40,12 +40,17 @@ func (uc *AdminUpdateUserUseCase) Execute(ctx context.Context, targetID string, 
 	}
 
 	var fieldErrors []apperror.FieldError
+	var nameToUpdate *string
+	var nicknameToUpdate *user.Nickname
+	var institutionToUpdate *string
+	var emailToUpdate *user.Email
+	var roleToUpdate *user.Role
 
 	if input.Name != nil {
 		if *input.Name == "" {
 			fieldErrors = append(fieldErrors, apperror.FieldError{Field: "name", Message: "Name cannot be empty"})
 		} else {
-			foundUser.Name = *input.Name
+			nameToUpdate = input.Name
 		}
 	}
 
@@ -61,7 +66,7 @@ func (uc *AdminUpdateUserUseCase) Execute(ctx context.Context, targetID string, 
 			if exists {
 				fieldErrors = append(fieldErrors, apperror.FieldError{Field: "nickname", Message: "The nickname is already in use"})
 			} else {
-				foundUser.Nickname = newNickname
+				nicknameToUpdate = &newNickname
 			}
 		}
 	}
@@ -70,7 +75,7 @@ func (uc *AdminUpdateUserUseCase) Execute(ctx context.Context, targetID string, 
 		if *input.Institution == "" {
 			fieldErrors = append(fieldErrors, apperror.FieldError{Field: "institution", Message: "Institution cannot be empty"})
 		} else {
-			foundUser.Institution = *input.Institution
+			institutionToUpdate = input.Institution
 		}
 	}
 
@@ -86,7 +91,7 @@ func (uc *AdminUpdateUserUseCase) Execute(ctx context.Context, targetID string, 
 			if exists {
 				fieldErrors = append(fieldErrors, apperror.FieldError{Field: "email", Message: "Email already exists"})
 			} else {
-				foundUser.Email = &newEmail
+				emailToUpdate = &newEmail
 			}
 		}
 	}
@@ -98,7 +103,7 @@ func (uc *AdminUpdateUserUseCase) Execute(ctx context.Context, targetID string, 
 		} else if newRole == user.RoleAdmin {
 			fieldErrors = append(fieldErrors, apperror.FieldError{Field: "role", Message: "Cannot assign ADMIN role through this endpoint"})
 		} else {
-			foundUser.Role = newRole
+			roleToUpdate = &newRole
 		}
 	}
 
@@ -106,8 +111,7 @@ func (uc *AdminUpdateUserUseCase) Execute(ctx context.Context, targetID string, 
 		return nil, apperror.NewValidation(fieldErrors)
 	}
 
-	now := time.Now()
-	foundUser.UpdatedAt = &now
+	foundUser.Update(nameToUpdate, nicknameToUpdate, institutionToUpdate, emailToUpdate, roleToUpdate)
 
 	if err := uc.repo.Update(ctx, foundUser); err != nil {
 		return nil, apperror.NewInternal()

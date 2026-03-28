@@ -86,7 +86,7 @@ func TestRequestPasswordRecovery_Success(t *testing.T) {
 	}
 
 	uc := NewRequestPasswordRecoveryUseCase(userRepo, recoveryRepo, mockEmail)
-	err := uc.Execute(context.Background(), "user@example.com")
+	err := uc.Execute(context.Background(), RequestPasswordRecoveryInput{Email: "user@example.com"})
 	
 	if err != nil {
 		t.Fatalf("expected nil, got %v", err)
@@ -112,7 +112,7 @@ func TestRequestPasswordRecovery_AmbiguousResponseWhenNotFound(t *testing.T) {
 	}
 
 	uc := NewRequestPasswordRecoveryUseCase(userRepo, recoveryRepo, mockEmail)
-	err := uc.Execute(context.Background(), "unknown@example.com")
+	err := uc.Execute(context.Background(), RequestPasswordRecoveryInput{Email: "unknown@example.com"})
 	
 	if err != nil {
 		t.Fatalf("expected nil, got %v", err)
@@ -124,7 +124,7 @@ func TestRequestPasswordRecovery_AmbiguousResponseWhenNotFound(t *testing.T) {
 
 func TestRequestPasswordRecovery_InvalidEmail(t *testing.T) {
 	uc := NewRequestPasswordRecoveryUseCase(newNoConflictRepo(), &mockPasswordRecoveryRepo{}, &mockEmailSender{})
-	err := uc.Execute(context.Background(), "not-an-email")
+	err := uc.Execute(context.Background(), RequestPasswordRecoveryInput{Email: "not-an-email"})
 	
 	if err == nil {
 		t.Fatal("expected error, got nil")

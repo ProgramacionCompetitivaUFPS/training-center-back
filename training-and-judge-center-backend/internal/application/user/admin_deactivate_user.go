@@ -9,6 +9,11 @@ import (
 	"github.com/training-judge-center/backend/pkg/apperror"
 )
 
+type AdminDeactivateUserInput struct {
+	RequesterID string
+	TargetID    string
+}
+
 type AdminDeactivateUserUseCase struct {
 	repo               user.UserRepository
 	sessionInvalidator user.SessionInvalidator
@@ -21,21 +26,21 @@ func NewAdminDeactivateUserUseCase(repo user.UserRepository, sessionInvalidator 
 	}
 }
 
-func (uc *AdminDeactivateUserUseCase) Execute(ctx context.Context, requesterID, targetID string) error {
-	if requesterID == targetID {
-		return apperror.NewForbidden("CANNOT_SELF_DEACTIVATE", "Administrators cannot deactivate their own account")
+func (uc *AdminDeactivateUserUseCase) Execute(ctx context.Context, input AdminDeactivateUserInput) error {
+	if input.RequesterID == input.TargetID {
+		return apperror.NewForbidden(user.ErrCodeCannotSelfDeactivate, "Administrators cannot deactivate their own account")
 	}
 
-	foundUser, err := uc.repo.FindByID(ctx, targetID)
+	foundUser, err := uc.repo.FindByID(ctx, input.TargetID)
 	if err != nil {
 		return apperror.NewInternal()
 	}
 	if foundUser == nil {
-		return apperror.NewNotFound("NOT_FOUND", "User not found")
+		return apperror.NewNotFound(apperror.ErrCodeNotFound, "User not found")
 	}
 
 	if foundUser.Role == user.RoleAdmin {
-		return apperror.NewForbidden("CANNOT_DEACTIVATE_ADMIN", "Cannot deactivate another administrator")
+		return apperror.NewForbidden(user.ErrCodeCannotDeactivateAdmin, "Cannot deactivate another administrator")
 	}
 
 	// Idempotent: already deactivated users return success immediately

@@ -33,7 +33,8 @@ func (h *UserHandler) UpdateProfile(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	result, err := h.updateUser.Execute(r.Context(), claims.UserID, appuser.UpdateUserInput{
+	result, err := h.updateUser.Execute(r.Context(), appuser.UpdateUserInput{
+		UserID:      claims.UserID,
 		Name:        req.Name,
 		Nickname:    req.Nickname,
 		Institution: req.Institution,

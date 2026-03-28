@@ -4,6 +4,7 @@ import (
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
+	appuser "github.com/training-judge-center/backend/internal/application/user"
 	"github.com/training-judge-center/backend/internal/server/middleware"
 )
 
@@ -19,7 +20,10 @@ func (h *UserHandler) AdminDeactivateUser(w http.ResponseWriter, r *http.Request
 
 	targetID := chi.URLParam(r, "id")
 
-	if err := h.adminDeactivateUser.Execute(r.Context(), claims.UserID, targetID); err != nil {
+	if err := h.adminDeactivateUser.Execute(r.Context(), appuser.AdminDeactivateUserInput{
+		RequesterID: claims.UserID,
+		TargetID:    targetID,
+	}); err != nil {
 		respondError(w, err)
 		return
 	}

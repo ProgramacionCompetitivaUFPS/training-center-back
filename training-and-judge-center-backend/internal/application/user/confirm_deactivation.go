@@ -48,11 +48,7 @@ func (uc *ConfirmDeactivationUseCase) Execute(ctx context.Context, input Confirm
 		return apperror.NewInternal()
 	}
 	if foundUser == nil || foundUser.Status == user.StatusDeactivated {
-		return &apperror.AppError{
-			Code:       "ALREADY_DEACTIVATED",
-			Message:    "User account is already deactivated or doesn't exist",
-			StatusCode: 409,
-		}
+		return apperror.NewConflict("ALREADY_DEACTIVATED", "User account is already deactivated or doesn't exist")
 	}
 
 	req, err := uc.deactRepo.FindPendingByUserID(ctx, input.UserID)
@@ -60,64 +56,40 @@ func (uc *ConfirmDeactivationUseCase) Execute(ctx context.Context, input Confirm
 		return apperror.NewInternal()
 	}
 	if req == nil {
-		return &apperror.AppError{
-			Code:       "NOT_FOUND",
-			Message:    "No pending deactivation request found",
-			StatusCode: 404,
-		}
+		return apperror.NewNotFound(apperror.ErrCodeNotFound, "No pending deactivation request found")
 	}
 
 	now := time.Now()
 
 	// Handle Blocked State
-	if req.Status == user.DeactivationStatusBlocked && req.BlockedUntil != nil {
+	if req.IsBlocked() && req.BlockedUntil != nil {
 		if now.Before(*req.BlockedUntil) {
-			return &apperror.AppError{
-				Code:       "MAX_ATTEMPTS_EXCEEDED",
-				Message:    "Maximum confirmation attempts exceeded. Please try again later",
-				StatusCode: 429,
+			retryAfter := int(req.BlockedUntil.Sub(now).Seconds())
+			if retryAfter < 0 {
+				retryAfter = 0
 			}
+			return apperror.NewTooManyRequests("MAX_ATTEMPTS_EXCEEDED", "Maximum confirmation attempts exceeded. Please try again later", retryAfter)
 		}
-		// Block expired. Let them try again, but ideally they need a new code if it expired over an hour.
-		// Wait, FR-012 says requesting a new code doesn't reset attempts, but what happens when 1 hour passes?
-		// They can request a new code. But here they are trying to *confirm* the old code? 
-		// Actually, if the 1-hour block is over, the old code is mathematically expired anyway (15m is less than 1h). So it will hit EXPIRED_CODE below.
 	}
 
 	// Code expiration validation
 	if now.After(req.ExpiresAt) {
-		req.Status = user.DeactivationStatusExpired
-		req.UpdatedAt = now
+		req.MarkAsExpired()
 		_ = uc.deactRepo.Update(ctx, req)
-		return &apperror.AppError{
-			Code:       "EXPIRED_CODE",
-			Message:    "The confirmation code has expired. Please request a new one",
-			StatusCode: 400,
-		}
+		return apperror.NewBadRequest("EXPIRED_CODE", "The confirmation code has expired. Please request a new one")
 	}
 
 	// Code match validation
 	if req.VerificationCode != input.Code {
-		req.Attempts++
-		req.UpdatedAt = now
-		if req.Attempts >= 5 {
-			req.Status = user.DeactivationStatusBlocked
-			blockedUntil := now.Add(time.Hour)
-			req.BlockedUntil = &blockedUntil
+		req.RegisterFailure()
+
+		if req.IsBlocked() {
 			_ = uc.deactRepo.Update(ctx, req)
-			return &apperror.AppError{
-				Code:       "MAX_ATTEMPTS_EXCEEDED",
-				Message:    "Maximum confirmation attempts exceeded. Please try again later",
-				StatusCode: 429,
-			}
+			return apperror.NewTooManyRequests("MAX_ATTEMPTS_EXCEEDED", "Maximum confirmation attempts exceeded. Please try again later", 3600)
 		}
 
 		_ = uc.deactRepo.Update(ctx, req)
-		return &apperror.AppError{
-			Code:       "INVALID_CODE",
-			Message:    "The confirmation code is invalid",
-			StatusCode: 400,
-		}
+		return apperror.NewBadRequest("INVALID_CODE", "The confirmation code is invalid")
 	}
 
 	// Execution: Deactivate
@@ -134,8 +106,7 @@ func (uc *ConfirmDeactivationUseCase) Execute(ctx context.Context, input Confirm
 	}
 
 	// Close request
-	req.Status = user.DeactivationStatusConfirmed
-	req.UpdatedAt = now
+	req.Confirm()
 	if err := uc.deactRepo.Update(ctx, req); err != nil {
 		return apperror.NewInternal()
 	}

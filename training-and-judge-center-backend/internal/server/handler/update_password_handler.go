@@ -54,7 +54,8 @@ func (h *UserHandler) UpdatePassword(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := h.updatePassword.Execute(r.Context(), claims.UserID, appuser.UpdatePasswordInput{
+	if err := h.updatePassword.Execute(r.Context(), appuser.UpdatePasswordInput{
+		UserID:          claims.UserID,
 		CurrentPassword: req.CurrentPassword,
 		NewPassword:     req.NewPassword,
 	}); err != nil {

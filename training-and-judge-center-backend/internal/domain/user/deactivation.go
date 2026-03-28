@@ -26,6 +26,30 @@ type DeactivationRequest struct {
 	UpdatedAt        time.Time
 }
 
+func (r *DeactivationRequest) MarkAsExpired() {
+	r.Status = DeactivationStatusExpired
+	r.UpdatedAt = time.Now()
+}
+
+func (r *DeactivationRequest) RegisterFailure() {
+	r.Attempts++
+	r.UpdatedAt = time.Now()
+	if r.Attempts >= 5 {
+		r.Status = DeactivationStatusBlocked
+		blockedUntil := time.Now().Add(time.Hour)
+		r.BlockedUntil = &blockedUntil
+	}
+}
+
+func (r *DeactivationRequest) IsBlocked() bool {
+	return r.Status == DeactivationStatusBlocked
+}
+
+func (r *DeactivationRequest) Confirm() {
+	r.Status = DeactivationStatusConfirmed
+	r.UpdatedAt = time.Now()
+}
+
 type DeactivationAuditLog struct {
 	ID               string
 	UserID           string

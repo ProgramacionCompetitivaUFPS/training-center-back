@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"log/slog"
 	"math/big"
-	"net/http"
 	"time"
 
 	"github.com/google/uuid"
@@ -40,7 +39,6 @@ func NewRequestEmailChangeUseCase(
 }
 
 func (uc *RequestEmailChangeUseCase) Execute(ctx context.Context, input RequestEmailChangeInput) error {
-	// 1. Verify User exists
 	u, err := uc.userRepo.FindByID(ctx, input.UserID)
 	if err != nil {
 		return apperror.NewInternal()
@@ -49,12 +47,10 @@ func (uc *RequestEmailChangeUseCase) Execute(ctx context.Context, input RequestE
 		return apperror.NewUnauthorized("INVALID_CREDENTIALS", "Invalid credentials")
 	}
 
-	// 2. Verify Password
 	if !u.Password.Compare(input.Password) {
 		return apperror.NewUnauthorized("INVALID_CREDENTIALS", "Invalid credentials")
 	}
 
-	// 3. Validate new email
 	parsedNewEmail, err := user.NewEmail(input.NewEmail)
 	if err != nil {
 		return apperror.NewValidation([]apperror.FieldError{
@@ -62,7 +58,6 @@ func (uc *RequestEmailChangeUseCase) Execute(ctx context.Context, input RequestE
 		})
 	}
 
-	// 4. Ensure new email is unique globally
 	emailExists, err := uc.userRepo.ExistsByEmail(ctx, parsedNewEmail)
 	if err != nil {
 		return apperror.NewInternal()
@@ -71,12 +66,10 @@ func (uc *RequestEmailChangeUseCase) Execute(ctx context.Context, input RequestE
 		return apperror.NewConflict("EMAIL_ALREADY_EXISTS", "The email address is already in use")
 	}
 
-	// 5. Invalidate previous pending requests for this user
 	if err := uc.emailChangeRepo.InvalidatePendingByUserID(ctx, input.UserID); err != nil {
 		return apperror.NewInternal()
 	}
 
-	// 6. Generate 6-digit confirmation code
 	code, err := generateSixDigitCode()
 	if err != nil {
 		return apperror.NewInternal()
@@ -85,7 +78,6 @@ func (uc *RequestEmailChangeUseCase) Execute(ctx context.Context, input RequestE
 	now := time.Now()
 	expiresAt := now.Add(15 * time.Minute)
 
-	// 7. Store the verification request
 	req := &user.EmailChangeRequest{
 		ID:        uuid.New().String(),
 		UserID:    input.UserID,
@@ -100,17 +92,12 @@ func (uc *RequestEmailChangeUseCase) Execute(ctx context.Context, input RequestE
 		return apperror.NewInternal()
 	}
 
-	// 8. Send Email
 	subject := "Verify your new email address"
 	body := fmt.Sprintf("Your email verification code is: %s. It will expire in 15 minutes.", code)
 	
 	if err := uc.emailSender.Send(ctx, input.NewEmail, subject, body); err != nil {
 		slog.Error("failed to send verification email", "email", input.NewEmail, "error", err)
-		return &apperror.AppError{
-			Code:       "EMAIL_DELIVERY_FAILED",
-			Message:    "We couldn't deliver the verification code to your email. Please try again later.",
-			StatusCode: http.StatusServiceUnavailable,
-		}
+		return apperror.NewServiceUnavailable("EMAIL_DELIVERY_FAILED", "We couldn't deliver the verification code to your email. Please try again later.")
 	}
 
 	return nil

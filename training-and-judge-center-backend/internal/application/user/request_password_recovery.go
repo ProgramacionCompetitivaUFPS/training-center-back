@@ -11,6 +11,10 @@ import (
 	"github.com/training-judge-center/backend/pkg/apperror"
 )
 
+type RequestPasswordRecoveryInput struct {
+	Email string
+}
+
 type RequestPasswordRecoveryUseCase struct {
 	userRepo     user.UserRepository
 	recoveryRepo user.PasswordRecoveryRepository
@@ -29,8 +33,8 @@ func NewRequestPasswordRecoveryUseCase(
 	}
 }
 
-func (uc *RequestPasswordRecoveryUseCase) Execute(ctx context.Context, emailStr string) error {
-	emailVO, err := user.NewEmail(emailStr)
+func (uc *RequestPasswordRecoveryUseCase) Execute(ctx context.Context, input RequestPasswordRecoveryInput) error {
+	emailVO, err := user.NewEmail(input.Email)
 	if err != nil {
 		return apperror.NewValidation([]apperror.FieldError{
 			{Field: "email", Message: "Invalid email format"},
@@ -75,11 +79,7 @@ func (uc *RequestPasswordRecoveryUseCase) Execute(ctx context.Context, emailStr 
 
 	body := fmt.Sprintf("Your password recovery code is: %s\nThis code will expire in 15 minutes.", code)
 	if err := uc.emailSender.Send(ctx, foundUser.Email.String(), "Password Recovery Code", body); err != nil {
-		return &apperror.AppError{
-			Code:       "INTERNAL_SERVER_ERROR",
-			Message:    "Failed to send email to the provided address",
-			StatusCode: 503,
-		}
+		return apperror.NewServiceUnavailable("INTERNAL_SERVER_ERROR", "Failed to send email to the provided address")
 	}
 
 	return nil

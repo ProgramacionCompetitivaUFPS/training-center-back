@@ -28,7 +28,8 @@ func (h *UserHandler) AdminUpdateUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	result, err := h.adminUpdateUser.Execute(r.Context(), targetID, appuser.AdminUpdateUserInput{
+	result, err := h.adminUpdateUser.Execute(r.Context(), appuser.AdminUpdateUserInput{
+		TargetID:    targetID,
 		Name:        req.Name,
 		Nickname:    req.Nickname,
 		Institution: req.Institution,

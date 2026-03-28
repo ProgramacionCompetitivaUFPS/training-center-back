@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"time"
 
+	appuser "github.com/training-judge-center/backend/internal/application/user"
 	"github.com/training-judge-center/backend/pkg/apperror"
 )
 
@@ -50,7 +51,7 @@ func (h *UserHandler) RequestPasswordRecovery(w http.ResponseWriter, r *http.Req
 		return
 	}
 
-	if err := h.requestPasswordRecovery.Execute(ctx, body.Email); err != nil {
+	if err := h.requestPasswordRecovery.Execute(ctx, appuser.RequestPasswordRecoveryInput{Email: body.Email}); err != nil {
 		respondError(w, err)
 		return
 	}

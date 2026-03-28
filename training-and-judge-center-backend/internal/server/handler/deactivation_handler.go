@@ -20,7 +20,7 @@ func (h *UserHandler) RequestDeactivation(w http.ResponseWriter, r *http.Request
 	userID := claims.UserID
 	ctx := r.Context()
 
-	if err := h.requestDeactivation.Execute(ctx, userID); err != nil {
+	if err := h.requestDeactivation.Execute(ctx, appuser.RequestDeactivationInput{UserID: userID}); err != nil {
 		respondError(w, err)
 		return
 	}

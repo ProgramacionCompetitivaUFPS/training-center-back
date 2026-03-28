@@ -11,6 +11,7 @@ import (
 )
 
 type UpdatePasswordInput struct {
+	UserID          string
 	CurrentPassword string
 	NewPassword     string
 }
@@ -29,8 +30,8 @@ func NewUpdatePasswordUseCase(repo user.UserRepository, email notification.Email
 	}
 }
 
-func (uc *UpdatePasswordUseCase) Execute(ctx context.Context, userID string, input UpdatePasswordInput) error {
-	foundUser, err := uc.repo.FindByID(ctx, userID)
+func (uc *UpdatePasswordUseCase) Execute(ctx context.Context, input UpdatePasswordInput) error {
+	foundUser, err := uc.repo.FindByID(ctx, input.UserID)
 	if err != nil {
 		return apperror.NewInternal()
 	}
@@ -57,9 +58,8 @@ func (uc *UpdatePasswordUseCase) Execute(ctx context.Context, userID string, inp
 		})
 	}
 
+	foundUser.UpdatePassword(newPassword)
 	now := time.Now()
-	foundUser.Password = newPassword
-	foundUser.UpdatedAt = &now
 
 	if err := uc.repo.Update(ctx, foundUser); err != nil {
 		return apperror.NewInternal()

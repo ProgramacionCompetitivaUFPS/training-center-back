@@ -23,7 +23,8 @@ func TestUpdateUser_Success_AllFields(t *testing.T) {
 	}
 	uc := NewUpdateUserUseCase(repo)
 
-	result, err := uc.Execute(context.Background(), "user-1", UpdateUserInput{
+	result, err := uc.Execute(context.Background(), UpdateUserInput{
+		UserID:      "user-1",
 		Name:        strPtr("Updated Name"),
 		Nickname:    strPtr("updatednick"),
 		Institution: strPtr("New University"),
@@ -56,7 +57,8 @@ func TestUpdateUser_Success_PartialUpdate(t *testing.T) {
 	}
 	uc := NewUpdateUserUseCase(repo)
 
-	result, err := uc.Execute(context.Background(), "user-1", UpdateUserInput{
+	result, err := uc.Execute(context.Background(), UpdateUserInput{
+		UserID: "user-1",
 		Name: strPtr("Only Name Changed"),
 	})
 	if err != nil {
@@ -74,7 +76,7 @@ func TestUpdateUser_NoFieldsProvided(t *testing.T) {
 	repo := newNoConflictRepo()
 	uc := NewUpdateUserUseCase(repo)
 
-	_, err := uc.Execute(context.Background(), "user-1", UpdateUserInput{})
+	_, err := uc.Execute(context.Background(), UpdateUserInput{UserID: "user-1"})
 	if err == nil {
 		t.Fatal("expected error, got nil")
 	}
@@ -95,7 +97,8 @@ func TestUpdateUser_UserNotFound(t *testing.T) {
 	repo := newNoConflictRepo()
 	uc := NewUpdateUserUseCase(repo)
 
-	_, err := uc.Execute(context.Background(), "nonexistent", UpdateUserInput{
+	_, err := uc.Execute(context.Background(), UpdateUserInput{
+		UserID: "nonexistent",
 		Name: strPtr("New Name"),
 	})
 	if err == nil {
@@ -119,7 +122,8 @@ func TestUpdateUser_EmptyNameValidation(t *testing.T) {
 	}
 	uc := NewUpdateUserUseCase(repo)
 
-	_, err := uc.Execute(context.Background(), "user-1", UpdateUserInput{
+	_, err := uc.Execute(context.Background(), UpdateUserInput{
+		UserID: "user-1",
 		Name: strPtr(""),
 	})
 	if err == nil {
@@ -146,7 +150,8 @@ func TestUpdateUser_NicknameAlreadyExists(t *testing.T) {
 	}
 	uc := NewUpdateUserUseCase(repo)
 
-	_, err := uc.Execute(context.Background(), "user-1", UpdateUserInput{
+	_, err := uc.Execute(context.Background(), UpdateUserInput{
+		UserID:   "user-1",
 		Nickname: strPtr("taken-nick"),
 	})
 	if err == nil {
@@ -170,7 +175,8 @@ func TestUpdateUser_SameNicknameNoConflict(t *testing.T) {
 	}
 	uc := NewUpdateUserUseCase(repo)
 
-	result, err := uc.Execute(context.Background(), "user-1", UpdateUserInput{
+	result, err := uc.Execute(context.Background(), UpdateUserInput{
+		UserID:   "user-1",
 		Nickname: strPtr("user-1"),
 	})
 	if err != nil {
@@ -192,7 +198,8 @@ func TestUpdateUser_RepositoryUpdateError(t *testing.T) {
 	}
 	uc := NewUpdateUserUseCase(repo)
 
-	_, err := uc.Execute(context.Background(), "user-1", UpdateUserInput{
+	_, err := uc.Execute(context.Background(), UpdateUserInput{
+		UserID: "user-1",
 		Name: strPtr("New Name"),
 	})
 	if err == nil {
@@ -216,7 +223,8 @@ func TestUpdateUser_NicknameLowercased(t *testing.T) {
 	}
 	uc := NewUpdateUserUseCase(repo)
 
-	result, err := uc.Execute(context.Background(), "user-1", UpdateUserInput{
+	result, err := uc.Execute(context.Background(), UpdateUserInput{
+		UserID:   "user-1",
 		Nickname: strPtr("MyNewNick"),
 	})
 	if err != nil {

@@ -35,11 +35,7 @@ func NewResetPasswordUseCase(
 func (uc *ResetPasswordUseCase) Execute(ctx context.Context, input ResetPasswordInput) error {
 	emailVO, err := user.NewEmail(input.Email)
 	if err != nil {
-		return &apperror.AppError{
-			Code:       "NOT_FOUND",
-			Message:    "No pending password recovery request found",
-			StatusCode: 404,
-		}
+		return apperror.NewNotFound("NOT_FOUND", "No pending password recovery request found")
 	}
 
 	foundUser, err := uc.userRepo.FindByEmail(ctx, emailVO)
@@ -47,11 +43,7 @@ func (uc *ResetPasswordUseCase) Execute(ctx context.Context, input ResetPassword
 		return apperror.NewInternal()
 	}
 	if foundUser == nil || foundUser.Status == user.StatusDeactivated {
-		return &apperror.AppError{
-			Code:       "NOT_FOUND",
-			Message:    "No pending password recovery request found",
-			StatusCode: 404,
-		}
+		return apperror.NewNotFound("NOT_FOUND", "No pending password recovery request found")
 	}
 
 	req, err := uc.recoveryRepo.FindPendingByUserID(ctx, foundUser.ID)
@@ -59,20 +51,12 @@ func (uc *ResetPasswordUseCase) Execute(ctx context.Context, input ResetPassword
 		return apperror.NewInternal()
 	}
 	if req == nil {
-		return &apperror.AppError{
-			Code:       "NOT_FOUND",
-			Message:    "No pending password recovery request found",
-			StatusCode: 404,
-		}
+		return apperror.NewNotFound("NOT_FOUND", "No pending password recovery request found")
 	}
 
 	now := time.Now()
 	if req.IsExpired(now) || req.Code != input.Code {
-		return &apperror.AppError{
-			Code:       "INVALID_CODE",
-			Message:    "The recovery code is invalid or has expired",
-			StatusCode: 400,
-		}
+		return apperror.NewBadRequest("INVALID_CODE", "The recovery code is invalid or has expired")
 	}
 
 	newPassword, err := user.NewPassword(input.NewPassword)
@@ -82,8 +66,7 @@ func (uc *ResetPasswordUseCase) Execute(ctx context.Context, input ResetPassword
 		})
 	}
 
-	foundUser.Password = newPassword
-	foundUser.UpdatedAt = &now
+	foundUser.UpdatePassword(newPassword)
 
 	if err := uc.userRepo.Update(ctx, foundUser); err != nil {
 		return apperror.NewInternal()

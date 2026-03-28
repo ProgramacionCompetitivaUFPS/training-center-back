@@ -2,13 +2,13 @@ package user
 
 import (
 	"context"
-	"time"
 
 	"github.com/training-judge-center/backend/internal/domain/user"
 	"github.com/training-judge-center/backend/pkg/apperror"
 )
 
 type UpdateUserInput struct {
+	UserID      string
 	Name        *string
 	Nickname    *string
 	Institution *string
@@ -22,14 +22,14 @@ func NewUpdateUserUseCase(repo user.UserRepository) *UpdateUserUseCase {
 	return &UpdateUserUseCase{repo: repo}
 }
 
-func (uc *UpdateUserUseCase) Execute(ctx context.Context, userID string, input UpdateUserInput) (*user.User, error) {
+func (uc *UpdateUserUseCase) Execute(ctx context.Context, input UpdateUserInput) (*user.User, error) {
 	if input.Name == nil && input.Nickname == nil && input.Institution == nil {
 		return nil, apperror.NewValidation([]apperror.FieldError{
 			{Field: "body", Message: "At least one updatable field must be provided"},
 		})
 	}
 
-	foundUser, err := uc.repo.FindByID(ctx, userID)
+	foundUser, err := uc.repo.FindByID(ctx, input.UserID)
 	if err != nil {
 		return nil, apperror.NewInternal()
 	}
@@ -38,12 +38,15 @@ func (uc *UpdateUserUseCase) Execute(ctx context.Context, userID string, input U
 	}
 
 	var fieldErrors []apperror.FieldError
+	var nameToUpdate *string
+	var nicknameToUpdate *user.Nickname
+	var institutionToUpdate *string
 
 	if input.Name != nil {
 		if *input.Name == "" {
 			fieldErrors = append(fieldErrors, apperror.FieldError{Field: "name", Message: "Name cannot be empty"})
 		} else {
-			foundUser.Name = *input.Name
+			nameToUpdate = input.Name
 		}
 	}
 
@@ -59,7 +62,7 @@ func (uc *UpdateUserUseCase) Execute(ctx context.Context, userID string, input U
 			if exists {
 				return nil, apperror.NewConflict("NICKNAME_ALREADY_EXISTS", "The nickname is already in use")
 			}
-			foundUser.Nickname = newNickname
+			nicknameToUpdate = &newNickname
 		}
 	}
 
@@ -67,7 +70,7 @@ func (uc *UpdateUserUseCase) Execute(ctx context.Context, userID string, input U
 		if *input.Institution == "" {
 			fieldErrors = append(fieldErrors, apperror.FieldError{Field: "institution", Message: "Institution cannot be empty"})
 		} else {
-			foundUser.Institution = *input.Institution
+			institutionToUpdate = input.Institution
 		}
 	}
 
@@ -75,8 +78,7 @@ func (uc *UpdateUserUseCase) Execute(ctx context.Context, userID string, input U
 		return nil, apperror.NewValidation(fieldErrors)
 	}
 
-	now := time.Now()
-	foundUser.UpdatedAt = &now
+	foundUser.Update(nameToUpdate, nicknameToUpdate, institutionToUpdate, nil, nil)
 
 	if err := uc.repo.Update(ctx, foundUser); err != nil {
 		return nil, apperror.NewInternal()

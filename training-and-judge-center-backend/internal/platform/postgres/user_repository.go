@@ -2,7 +2,9 @@ package postgres
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -101,53 +103,51 @@ func (r *UserRepository) ExistsByNickname(ctx context.Context, nickname user.Nic
 const userColumns = `id, email, password, name, nickname, country, city, institution, role, status, created_at, updated_at, deactivated_at`
 
 func scanUser(row pgx.Row) (*user.User, error) {
-	var u user.User
+	var id, name, country, city, institution string
 	var emailStr *string
 	var passwordHash, nicknameStr, roleStr, statusStr string
+	var createdAt time.Time
 	var updatedAt, deactivatedAt *time.Time
 
 	err := row.Scan(
-		&u.ID,
+		&id,
 		&emailStr,
 		&passwordHash,
-		&u.Name,
+		&name,
 		&nicknameStr,
-		&u.Country,
-		&u.City,
-		&u.Institution,
+		&country,
+		&city,
+		&institution,
 		&roleStr,
 		&statusStr,
-		&u.CreatedAt,
+		&createdAt,
 		&updatedAt,
 		&deactivatedAt,
 	)
 	if err != nil {
-		if err.Error() == "no rows in result set" {
+		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, nil
 		}
 		return nil, err
 	}
 
-	if emailStr != nil {
-		parsedEmail, _ := user.NewEmail(*emailStr)
-		u.Email = &parsedEmail
-	}
+	u := user.RestoreUser(
+		id,
+		emailStr,
+		passwordHash,
+		name,
+		nicknameStr,
+		country,
+		city,
+		institution,
+		roleStr,
+		statusStr,
+		createdAt,
+		updatedAt,
+		deactivatedAt,
+	)
 
-	u.Password = user.NewPasswordFromHash(passwordHash)
-
-	parsedNickname, _ := user.NewNickname(nicknameStr)
-	u.Nickname = parsedNickname
-
-	parsedRole, _ := user.NewRole(roleStr)
-	u.Role = parsedRole
-
-	parsedStatus, _ := user.NewStatus(statusStr)
-	u.Status = parsedStatus
-
-	u.UpdatedAt = updatedAt
-	u.DeactivatedAt = deactivatedAt
-
-	return &u, nil
+	return u, nil
 }
 
 func (r *UserRepository) FindByEmail(ctx context.Context, email user.Email) (*user.User, error) {
@@ -203,7 +203,7 @@ func (r *UserRepository) FindAll(ctx context.Context, filter user.UserFilter) ([
 			args = append(args, role.String())
 			n++
 		}
-		conditions = append(conditions, fmt.Sprintf("role IN (%s)", joinStrings(placeholders, ", ")))
+		conditions = append(conditions, fmt.Sprintf("role IN (%s)", strings.Join(placeholders, ", ")))
 	}
 
 	// Filter by status
@@ -266,7 +266,7 @@ func (r *UserRepository) FindAll(ctx context.Context, filter user.UserFilter) ([
 
 	whereClause := ""
 	if len(conditions) > 0 {
-		whereClause = "WHERE " + joinStrings(conditions, " AND ")
+		whereClause = "WHERE " + strings.Join(conditions, " AND ")
 	}
 
 	// Safe ORDER BY using whitelist
@@ -312,16 +312,10 @@ func (r *UserRepository) FindAll(ctx context.Context, filter user.UserFilter) ([
 		}
 	}
 
+	if err := rows.Err(); err != nil {
+		return nil, 0, fmt.Errorf("error iterating user rows: %w", err)
+	}
+
 	return users, totalCount, nil
 }
 
-func joinStrings(parts []string, sep string) string {
-	result := ""
-	for i, p := range parts {
-		if i > 0 {
-			result += sep
-		}
-		result += p
-	}
-	return result
-}
