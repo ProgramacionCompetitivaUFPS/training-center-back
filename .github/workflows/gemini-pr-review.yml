@@ -1,0 +1,49 @@
+name: Gemini AI PR Reviewer
+
+# Se activa al abrir, actualizar o reabrir un Pull Request
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+# Permisos necesarios para leer el código y comentar en el PR
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  review:
+    runs-on: ubuntu-latest
+    # Evita que se ejecuten múltiples revisiones si haces commits seguidos
+    concurrency:
+      group: ${{ github.workflow }}-${{ github.event.pull_request.number }}
+      cancel-in-progress: true
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+        with:
+          # fetch-depth: 0 permite ver todo el historial para comparar ramas correctamente
+          fetch-depth: 0
+
+      - name: Run Gemini PR Review
+        # Usamos la versión v1 (estable) del revisor de la comunidad
+        uses: truongnh1992/gemini-ai-code-reviewer@v1
+        with:
+          # Token generado automáticamente por GitHub para esta ejecución
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          
+          # Tu clave de API configurada en Settings > Secrets > Actions
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          
+          # Usamos el modelo Pro por el gran volumen de cambios en tus PRs
+          GEMINI_MODEL: gemini-1.5-pro
+          
+          # Configuración de idioma y respuesta
+          language: Spanish
+          
+          # Ajuste para que la IA sea detallada en sus explicaciones
+          # Excluimos archivos autogenerados, binarios y configuraciones del agente local para ahorrar tokens:
+          EXCLUDE: "**/go.sum, .agent/**, **/*.exe, **/.env*"
+
+          # Parámetro de seguridad para que no se corte la respuesta en PRs masivos
+          MAX_TOKENS: 8000
