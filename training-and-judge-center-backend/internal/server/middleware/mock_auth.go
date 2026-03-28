@@ -34,13 +34,11 @@ func MockAuth(next http.Handler) http.Handler {
 		}
 
 		key := r.Header.Get(mockUserHeader)
-		if key == "" {
-			key = "coach_john"
-		}
-
 		mu, ok := mockUsers[key]
 		if !ok {
-			mu = mockUsers["coach_john"]
+			// No user set → handlers will return 401 Unauthorized
+			next.ServeHTTP(w, r)
+			return
 		}
 
 		ctx := context.WithValue(r.Context(), currentUserKey, user.CurrentUser{
