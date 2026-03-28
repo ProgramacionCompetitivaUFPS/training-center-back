@@ -27,7 +27,7 @@ jobs:
 
       - name: Run Gemini PR Review
         # Usamos la versión v1 (estable) del revisor de la comunidad
-        uses: truongnh1992/gemini-ai-code-reviewer@v1
+        uses: truongnh1992/gemini-ai-code-reviewer@v9.2.1
         with:
           # Token generado automáticamente por GitHub para esta ejecución
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
