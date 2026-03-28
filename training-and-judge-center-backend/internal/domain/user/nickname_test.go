@@ -12,7 +12,7 @@ func TestNewNickname_Valid(t *testing.T) {
 		{"uppercase normalized", "JohnDoe", "johndoe"},
 		{"with spaces trimmed", "  john  ", "john"},
 		{"min length 3", "abc", "abc"},
-		{"max length 20", "abcdefghijklmnopqrst", "abcdefghijklmnopqrst"},
+		{"max length 30", "abcdefghijklmnopqrstuvwxyzabcd", "abcdefghijklmnopqrstuvwxyzabcd"},
 	}
 
 	for _, tt := range tests {
@@ -36,7 +36,7 @@ func TestNewNickname_Invalid(t *testing.T) {
 		{"empty string", ""},
 		{"only spaces", "   "},
 		{"too short (2 chars)", "ab"},
-		{"too long (21 chars)", "abcdefghijklmnopqrstu"},
+		{"too long (31 chars)", "abcdefghijklmnopqrstuvwxyzabcde"},
 	}
 
 	for _, tt := range tests {
