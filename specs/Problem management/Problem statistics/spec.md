@@ -10,7 +10,7 @@ As an authenticated user with access to a problem, I want to view comprehensive 
 
 **Why this priority**: This feature significantly improves user experience by helping users evaluate problem difficulty before attempting, assists authors in improving problems based on data, and provides valuable information for coaches when selecting problems for training. However, it's not critical for basic system functionality as users can still view and solve problems without statistics.
 
-**Independent Test**: This user story can be tested independently by consuming the `GET /problems/{slug}/statistics` endpoint with valid authentication and different problem visibility scenarios, validating that statistics are correctly calculated and access control is properly enforced.
+**Independent Test**: This user story can be tested independently by consuming the `GET /problems/p/{slug}/statistics` endpoint with valid authentication and different problem visibility scenarios, validating that statistics are correctly calculated and access control is properly enforced.
 
 **Acceptance Scenarios**:
 
@@ -18,7 +18,7 @@ As an authenticated user with access to a problem, I want to view comprehensive 
    - **Given** a problem with status PUBLISHED exists
    - **And** the problem has multiple submissions from different users and languages
    - **And** a user is authenticated (any role)
-   - **When** the user requests GET /problems/{slug}/statistics
+   - **When** the user requests GET /problems/p/{slug}/statistics
    - **Then** the system returns HTTP 200 with complete statistics including:
      - Total submissions count
      - Unique users who attempted (at least one submission)
@@ -31,14 +31,14 @@ As an authenticated user with access to a problem, I want to view comprehensive 
    - **Given** a problem with status PUBLISHED exists
    - **And** the problem has zero submissions
    - **And** a user is authenticated
-   - **When** the user requests GET /problems/{slug}/statistics
+   - **When** the user requests GET /problems/p/{slug}/statistics
    - **Then** the system returns HTTP 200 with message indicating no statistics available
    - **And** the response includes: `{"message": "No submissions yet for this problem", "totalSubmissions": 0}`
 
 3. **Scenario**: Attempt to view statistics for draft problem
    - **Given** a problem with status DRAFT exists
    - **And** a user is authenticated (any role, including modifier or Admin)
-   - **When** the user requests GET /problems/{slug}/statistics
+   - **When** the user requests GET /problems/p/{slug}/statistics
    - **Then** the system rejects with HTTP 403 Forbidden
    - **And** returns error code PROBLEM_NOT_PUBLISHED
    - **And** message indicates statistics are only available for published problems
@@ -50,7 +50,7 @@ As an authenticated user with access to a problem, I want to view comprehensive 
 
 5. **Scenario**: Problem not found
    - **Given** no problem exists with the provided slug
-   - **When** a user requests GET /problems/{slug}/statistics
+   - **When** a user requests GET /problems/p/{slug}/statistics
    - **Then** the system returns HTTP 404 Not Found
 
 6. **Scenario**: Statistics with multiple languages
@@ -94,7 +94,7 @@ As an authenticated user with access to a problem, I want to view comprehensive 
 
 ## API Contract
 
-### GET /problems/{slug}/statistics
+### GET /problems/p/{slug}/statistics
 
 Retrieve comprehensive statistics for a specific problem including submission counts, user metrics, acceptance rates by language, and verdict distribution.
 
@@ -238,7 +238,7 @@ Problem with the specified slug does not exist.
 ### Functional Requirements
 
 **Access Control**
-- **FR-001**: The system MUST allow authenticated users to view statistics for PUBLISHED problems via GET /problems/{slug}/statistics.
+- **FR-001**: The system MUST allow authenticated users to view statistics for PUBLISHED problems via GET /problems/p/{slug}/statistics.
 - **FR-002**: The system MUST reject requests for DRAFT problems with HTTP 403 Forbidden, regardless of user role.
 - **FR-003**: The system MUST reject unauthenticated requests with HTTP 401 Unauthorized.
 - **FR-004**: The system MUST return HTTP 404 Not Found for non-existent problem slugs.
@@ -321,7 +321,7 @@ Problem with the specified slug does not exist.
 
 ### Measurable Outcomes
 
-- **SC-001**: Authenticated users can view statistics for PUBLISHED problems via GET /problems/{slug}/statistics with HTTP 200.
+- **SC-001**: Authenticated users can view statistics for PUBLISHED problems via GET /problems/p/{slug}/statistics with HTTP 200.
 - **SC-002**: Requests for DRAFT problems receive HTTP 403 Forbidden regardless of user role.
 - **SC-003**: Unauthenticated requests receive HTTP 401 Unauthorized.
 - **SC-004**: Non-existent problem slugs return HTTP 404 Not Found.

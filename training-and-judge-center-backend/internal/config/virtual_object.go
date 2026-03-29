@@ -12,6 +12,7 @@ type LanguageLimit struct {
 }
 
 type VirtualObject struct {
+	SupportedLanguages    []string          `json:"supportedLanguages"`
 	LanguageExtensions    map[string]string `json:"languageExtensions"`
 	UploadMaxConcurrency  int             `json:"uploadMaxConcurrency"`
 	MaxFileCountSample    int             `json:"maxFileCountSample"`

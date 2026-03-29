@@ -2,6 +2,7 @@ package problem
 
 import (
 	"errors"
+	"io"
 	"log/slog"
 	"net/http"
 	"strings"
@@ -57,8 +58,8 @@ func (h *Handler) UploadFiles(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	fileData := make([]byte, fileHeader.Size)
-	if _, err := file.Read(fileData); err != nil {
+	fileData, err := io.ReadAll(file)
+	if err != nil {
 		slog.Error("Failed to read uploaded file", "error", err, "slug", slug)
 		handler.WriteJSON(w, http.StatusInternalServerError, apperror.NewInternal())
 		return

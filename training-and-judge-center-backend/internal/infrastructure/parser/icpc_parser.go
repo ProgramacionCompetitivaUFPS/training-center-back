@@ -68,8 +68,9 @@ func (p *ICPCParser) ParseTestCasesZip(zipData []byte) ([]ExtractedFile, error) 
 			continue
 		}
 
-		isSample := strings.HasPrefix(cleanPath, "data/sample/")
-		isSecret := strings.HasPrefix(cleanPath, "data/secret/")
+		searchPath := "/" + cleanPath
+		isSample := strings.Contains(searchPath, "/data/sample/")
+		isSecret := strings.Contains(searchPath, "/data/secret/")
 		if isSample {
 			hasSampleDir = true
 		} else if isSecret {

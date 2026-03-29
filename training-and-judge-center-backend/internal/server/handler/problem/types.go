@@ -59,10 +59,15 @@ type authorResp struct {
 	Name     string `json:"name"`
 }
 
+type solutionResp struct {
+	Filename string `json:"filename"`
+	Language string `json:"language"`
+}
+
 type filesResp struct {
-	TestCases bool          `json:"testCases"`
-	Solutions []interface{} `json:"solutions"`
-	Checker   bool          `json:"checker"`
+	TestCases bool           `json:"testCases"`
+	Solutions []solutionResp `json:"solutions"`
+	Checker   bool           `json:"checker"`
 	Validator bool          `json:"validator"`
 }
 
@@ -95,6 +100,14 @@ func buildResponse(p *domainProblem.Problem, display *user.Display) problemRespo
 
 	tags := p.Tags.Values()
 
+	solutions := make([]solutionResp, 0, len(p.Solutions))
+	for _, sol := range p.Solutions {
+		solutions = append(solutions, solutionResp{
+			Filename: sol.Filename(),
+			Language: sol.Language(),
+		})
+	}
+
 	return problemResponse{
 		Slug:          p.Slug.String(),
 		Title:         p.Title.String(),
@@ -108,10 +121,10 @@ func buildResponse(p *domainProblem.Problem, display *user.Display) problemRespo
 		Author:        author,
 		Modifiers:     []interface{}{},
 		Files: filesResp{
-			TestCases: false,
-			Solutions: []interface{}{},
-			Checker:   false,
-			Validator: false,
+			TestCases: p.TestCasesKey != nil,
+			Solutions: solutions,
+			Checker:   p.Checker != nil,
+			Validator: p.Validator != nil,
 		},
 		CreatedAt: p.CreatedAt.Format("2006-01-02T15:04:05Z"),
 		UpdatedAt: p.UpdatedAt.Format("2006-01-02T15:04:05Z"),

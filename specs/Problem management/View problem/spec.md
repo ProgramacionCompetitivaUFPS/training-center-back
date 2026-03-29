@@ -10,14 +10,14 @@ As an authenticated user, I want to view detailed information about a specific p
 
 **Why this priority**: Viewing problem details is essential for users to understand what they need to solve. Without this feature, users cannot see problem statements, time/memory limits, or any other critical information needed to work with problems.
 
-**Independent Test**: This user story can be tested independently by consuming the `GET /problems/{slug}` endpoint with different user types (Admin, modifier, regular user) and problem states (DRAFT, PUBLISHED), validating correct responses and access control without depending on other system features.
+**Independent Test**: This user story can be tested independently by consuming the `GET /problems/p/{slug}` endpoint with different user types (Admin, modifier, regular user) and problem states (DRAFT, PUBLISHED), validating correct responses and access control without depending on other system features.
 
 **Acceptance Scenarios**:
 
 1. **Scenario**: View published problem as any authenticated user
    - **Given** a problem with status PUBLISHED exists
    - **And** a user is authenticated (any role)
-   - **When** the user requests GET /problems/{slug}
+   - **When** the user requests GET /problems/p/{slug}
    - **Then** the system returns HTTP 200 with complete problem metadata
    - **And** the response includes title, statement, limits, tags, status, accessibility, and author information
    - **And** the response does NOT include modifiers list or file indicators (user is not a modifier)
@@ -25,21 +25,21 @@ As an authenticated user, I want to view detailed information about a specific p
 2. **Scenario**: View draft problem as modifier
    - **Given** a problem with status DRAFT exists
    - **And** a user is authenticated and is a modifier (author or assigned modifier) for that problem
-   - **When** the user requests GET /problems/{slug}
+   - **When** the user requests GET /problems/p/{slug}
    - **Then** the system returns HTTP 200 with complete problem metadata
    - **And** the response includes modifiers list and file availability indicators
 
 3. **Scenario**: View draft problem as Admin
    - **Given** a problem with status DRAFT exists
    - **And** a user is authenticated with ADMIN role
-   - **When** the user requests GET /problems/{slug}
+   - **When** the user requests GET /problems/p/{slug}
    - **Then** the system returns HTTP 200 with complete problem metadata
    - **And** the response includes modifiers list and file availability indicators
 
 4. **Scenario**: Non-modifier attempts to view draft problem
    - **Given** a problem with status DRAFT exists
    - **And** a user is authenticated but is NOT a modifier or Admin
-   - **When** the user requests GET /problems/{slug}
+   - **When** the user requests GET /problems/p/{slug}
    - **Then** the system rejects with HTTP 403 Forbidden
    - **And** returns error code INSUFFICIENT_PERMISSIONS
 
@@ -50,7 +50,7 @@ As an authenticated user, I want to view detailed information about a specific p
 
 6. **Scenario**: Problem not found
    - **Given** no problem exists with the provided slug
-   - **When** a user requests GET /problems/{slug}
+   - **When** a user requests GET /problems/p/{slug}
    - **Then** the system returns HTTP 404 Not Found
 
 ---
@@ -153,7 +153,7 @@ As an authenticated user, I want to list problems with optional filters and pagi
 
 ## API Contract
 
-### GET /problems/{slug}
+### GET /problems/p/{slug}
 
 View detailed information about a specific problem.
 
@@ -379,8 +379,8 @@ Authentication failed.
 ### Functional Requirements
 
 **Single Problem View**
-- **FR-001**: The system MUST allow authenticated users to view PUBLISHED problems via GET /problems/{slug}
-- **FR-002**: The system MUST allow modifiers (author or assigned modifiers) and Admin to view DRAFT problems via GET /problems/{slug}
+- **FR-001**: The system MUST allow authenticated users to view PUBLISHED problems via GET /problems/p/{slug}
+- **FR-002**: The system MUST allow modifiers (author or assigned modifiers) and Admin to view DRAFT problems via GET /problems/p/{slug}
 - **FR-003**: The system MUST reject requests from non-modifiers attempting to view DRAFT problems with HTTP 403 Forbidden
 - **FR-004**: The system MUST reject unauthenticated requests with HTTP 401 Unauthorized
 - **FR-005**: The system MUST return HTTP 404 Not Found for non-existent problem slugs
@@ -463,8 +463,8 @@ Authentication failed.
 
 ### Measurable Outcomes
 
-- **SC-001**: Authenticated users can view PUBLISHED problems via GET /problems/{slug} with HTTP 200
-- **SC-002**: Modifiers and Admin can view DRAFT problems via GET /problems/{slug} with HTTP 200
+- **SC-001**: Authenticated users can view PUBLISHED problems via GET /problems/p/{slug} with HTTP 200
+- **SC-002**: Modifiers and Admin can view DRAFT problems via GET /problems/p/{slug} with HTTP 200
 - **SC-003**: Non-modifiers attempting to view DRAFT problems receive HTTP 403 Forbidden
 - **SC-004**: Unauthenticated requests receive HTTP 401 Unauthorized
 - **SC-005**: Non-existent problem slugs return HTTP 404 Not Found

@@ -1,4 +1,9 @@
 {
+  "supportedLanguages": [
+    "cpp20",
+    "java17",
+    "python310"
+  ],
   "uploadMaxConcurrency": 10,
   "languageExtensions": {
     ".py": "python310",

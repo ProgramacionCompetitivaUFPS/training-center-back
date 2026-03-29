@@ -29,7 +29,7 @@ func NewRouter(cfg *config.Config, h *Handlers) *chi.Mux {
 		}
 		r.Post("/", h.Problem.Create)
 
-		r.Route("/{slug}", func(r chi.Router) {
+		r.Route("/p/{slug}", func(r chi.Router) {
 			r.Put("/", h.Problem.Update)
 
 			r.Route("/files", func(r chi.Router) {

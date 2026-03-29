@@ -56,6 +56,21 @@ As a Coach or Admin, I want to create a new problem by providing a slug and titl
    - **When** they submit the problem creation request
    - **Then** the system rejects with 400 Bad Request indicating invalid tags
 
+12. **Scenario**: Unsupported language in languageOverrides
+    - **Given** a Coach or Admin is authenticated
+    - **When** they submit a problem with a language in `languageOverrides` that is not supported by the platform (not in Virtual Object `supportedLanguages` list)
+    - **Then** the system rejects with 400 Bad Request and field `languageOverrides.language` indicating the unsupported language
+
+13. **Scenario**: Duplicate language in languageOverrides
+    - **Given** a Coach or Admin is authenticated
+    - **When** they submit a problem with the same language appearing more than once in `languageOverrides`
+    - **Then** the system rejects with 400 Bad Request and field `languageOverrides.language` indicating the duplicate language
+
+14. **Scenario**: Statement exceeds maximum length
+    - **Given** a Coach or Admin is authenticated
+    - **When** they submit a problem with a `statement` field exceeding 150,000 characters
+    - **Then** the system rejects with 400 Bad Request and field `statement`
+
 8. **Scenario**: Slug already exists
    - **Given** a problem with slug "sum-two-numbers" already exists
    - **When** a Coach creates a new problem with slug "sum-two-numbers"
@@ -142,7 +157,7 @@ As a Coach or Admin, I want to create a new problem by uploading a complete ICPC
 
 Create a new problem with metadata.
 
-> **Important**: Only users with Coach or Admin roles can create problems. The minimum required field is `title`. All other fields can be added later via the Update Problem spec (`PUT /problems/{slug}`).
+> **Important**: Only users with Coach or Admin roles can create problems. The minimum required field is `title`. All other fields can be added later via the Update Problem spec (`PUT /problems/p/{slug}`).
 
 **Headers**:
 
@@ -488,12 +503,14 @@ User does not have permission.
 - **FR-009**: The system MUST validate timeLimit as positive integer ≤ `maxTimeLimitGlobal` from Virtual Object if provided.
 - **FR-010**: The system MUST validate memoryLimit as positive integer ≤ `maxMemoryLimitGlobal` from Virtual Object if provided.
 - **FR-010.1**: The system MUST validate languageOverrides array if provided.
-- **FR-010.2**: The system MUST validate that each entry's `language` field is a valid language identifier supported by the platform.
+- **FR-010.2**: The system MUST validate that each entry's `language` field is a valid language identifier supported by the platform (present in Virtual Object `supportedLanguages`). If not supported, reject with VALIDATION_ERROR.
 - **FR-010.3**: The system MUST validate that each override's timeLimit (if provided) does not exceed the maximum from Virtual Object for that language.
 - **FR-010.4**: The system MUST validate that each override's memoryLimit (if provided) does not exceed the maximum from Virtual Object for that language.
 - **FR-010.5**: The system MUST validate that timeLimit and memoryLimit in languageOverrides are positive integers when provided.
+- **FR-010.6**: The system MUST reject with VALIDATION_ERROR if the same language appears more than once in `languageOverrides`.
 - **FR-011**: The system MUST validate tags against the system's predefined tag list if provided.
 - **FR-012**: Tags MUST always be optional (not required for creation or publication).
+- **FR-025**: The system MUST validate that `statement` does not exceed 150,000 characters when provided.
 
 **Problem Import (ZIP)**
 - **FR-013**: The system MUST accept ICPC-format ZIP packages for problem import.

@@ -7,6 +7,7 @@ type LanguageLimit struct {
 }
 
 type PlatformSettingsService interface {
+	IsLanguageSupported(language string) bool
 	GetLanguageByExtension(ext string) (string, bool)
 	GetUploadMaxConcurrency() int
 	GetMaxFileCountSample() int

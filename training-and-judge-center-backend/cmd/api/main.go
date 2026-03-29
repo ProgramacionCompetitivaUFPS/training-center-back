@@ -13,10 +13,11 @@ import (
 	appProblem "github.com/training-judge-center/backend/internal/application/problem"
 	"github.com/training-judge-center/backend/internal/config"
 	"github.com/training-judge-center/backend/internal/infrastructure/parser"
+	infraPostgres "github.com/training-judge-center/backend/internal/infrastructure/postgres"
 	infraSt "github.com/training-judge-center/backend/internal/infrastructure/storage"
 	platformConfig "github.com/training-judge-center/backend/internal/platform/config"
 	platformParser "github.com/training-judge-center/backend/internal/platform/parser"
-	"github.com/training-judge-center/backend/internal/platform/postgres"
+	platformPostgres "github.com/training-judge-center/backend/internal/platform/postgres"
 	platformUser "github.com/training-judge-center/backend/internal/platform/user"
 	"github.com/training-judge-center/backend/internal/server"
 	"github.com/training-judge-center/backend/internal/server/handler/problem"
@@ -26,7 +27,7 @@ func main() {
 	cfg := config.Load()
 	ctx := context.Background()
 
-	dbPool, err := postgres.NewConnectionPool(ctx, cfg)
+	dbPool, err := platformPostgres.NewConnectionPool(ctx, cfg)
 	if err != nil {
 		slog.Error("failed to connect to database", "error", err)
 		os.Exit(1)
@@ -35,7 +36,7 @@ func main() {
 	slog.Info("database connected successfully")
 
 	// Repositories & Services
-	problemRepo := postgres.NewProblemRepository(dbPool)
+	problemRepo := infraPostgres.NewProblemRepository(dbPool)
 	settingsProvider := platformConfig.NewVirtualObjectProvider(cfg.VirtualObject)
 
 	// File Storage

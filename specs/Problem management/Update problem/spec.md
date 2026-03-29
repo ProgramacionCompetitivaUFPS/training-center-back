@@ -10,7 +10,7 @@ As a Coach or Admin who has created a problem, I want to update the problem's me
 
 **Why this priority**: Allows iterative refinement of problems. Essential for the incremental problem creation workflow.
 
-**Independent Test**: This user story can be tested independently by consuming the `PUT /problems/{slug}` endpoint with valid authentication and partial updates, validating that only provided fields are modified.
+**Independent Test**: This user story can be tested independently by consuming the `PUT /problems/p/{slug}` endpoint with valid authentication and partial updates, validating that only provided fields are modified.
 
 **Acceptance Scenarios**:
 
@@ -78,7 +78,7 @@ As a Coach or Admin who has created a problem, I want to upload test cases, solu
 
 **Why this priority**: Files are essential to complete problem setup. Direct upload to backend simplifies the flow and allows incremental file uploads.
 
-**Independent Test**: This user story can be tested independently by uploading files to `POST /problems/{slug}/files` endpoint, validating that files are stored and associated with the problem.
+**Independent Test**: This user story can be tested independently by uploading files to `POST /problems/p/{slug}/files` endpoint, validating that files are stored and associated with the problem.
 
 **Acceptance Scenarios**:
 
@@ -133,7 +133,7 @@ As a Coach or Admin, I want to delete a specific file from a problem so that I c
 
 **Why this priority**: Allows correction of file uploads without needing to replace. Secondary to upload functionality.
 
-**Independent Test**: This user story can be tested independently by consuming the `DELETE /problems/{slug}/files/{fileType}` endpoint, validating that the file is removed from the problem.
+**Independent Test**: This user story can be tested independently by consuming the `DELETE /problems/p/{slug}/files/{fileType}` endpoint, validating that the file is removed from the problem.
 
 **Acceptance Scenarios**:
 
@@ -232,7 +232,7 @@ As a problem author or Admin, I want to assign other users as modifiers so that 
 
 ## API Contract
 
-### PUT /problems/{slug}
+### PUT /problems/p/{slug}
 
 Update problem metadata.
 
@@ -375,7 +375,7 @@ Problem not found.
 
 ---
 
-### POST /problems/{slug}/files
+### POST /problems/p/{slug}/files
 
 Upload files for a problem (test cases, solution, checker, validator).
 
@@ -480,7 +480,7 @@ Problem not found.
 
 ---
 
-### DELETE /problems/{slug}/files/{fileType}
+### DELETE /problems/p/{slug}/files/{fileType}
 
 Delete a specific file from a problem.
 
@@ -542,7 +542,7 @@ Problem or file not found.
 
 ---
 
-### POST /problems/{slug}/modifiers
+### POST /problems/p/{slug}/modifiers
 
 Add a modifier to a problem.
 
@@ -625,7 +625,7 @@ Problem not found.
 
 ---
 
-### DELETE /problems/{slug}/modifiers/{nickname}
+### DELETE /problems/p/{slug}/modifiers/{nickname}
 
 Remove a modifier from a problem.
 
@@ -667,7 +667,7 @@ Problem or modifier not found.
 
 ---
 
-### GET /problems/{slug}/modifiers
+### GET /problems/p/{slug}/modifiers
 
 List all modifiers for a problem.
 
@@ -828,11 +828,11 @@ Referenced from Create Problem spec:
 
 ### Measurable Outcomes
 
-- **SC-001**: Problem metadata can be updated via `PUT /problems/{slug}` with HTTP 200.
+- **SC-001**: Problem metadata can be updated via `PUT /problems/p/{slug}` with HTTP 200.
 - **SC-002**: Only provided fields are modified during update (partial updates work).
 - **SC-003**: Updates are blocked for problems with status `PUBLISHED` (HTTP 400).
-- **SC-004**: Files can be uploaded via `POST /problems/{slug}/files` with HTTP 200.
-- **SC-005**: Files can be deleted via `DELETE /problems/{slug}/files/{fileType}` with HTTP 200.
+- **SC-004**: Files can be uploaded via `POST /problems/p/{slug}/files` with HTTP 200.
+- **SC-005**: Files can be deleted via `DELETE /problems/p/{slug}/files/{fileType}` with HTTP 200.
 - **SC-006**: Test cases ZIP structure is validated against ICPC format on upload.
 - **SC-007**: Only problem author, Admin, or assigned modifiers can modify problems.
 - **SC-008**: Modifiers can be added/removed only by the author or Admin.

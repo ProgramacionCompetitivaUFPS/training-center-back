@@ -20,7 +20,15 @@ func NewTitle(value string) (Title, error) {
 	}
 
 	normalized := norm.NFKC.String(value)
-	trimmed := strings.TrimFunc(normalized, unicode.IsSpace)
+	trimmed := strings.TrimFunc(normalized, func(r rune) bool {
+		return unicode.IsSpace(r) || unicode.Is(unicode.Cf, r)
+	})
+
+	if trimmed == "" {
+		return Title{}, apperror.NewValidation([]apperror.FieldError{
+			{Field: "title", Message: "Title is required"},
+		})
+	}
 
 	if len(trimmed) > 200 {
 		return Title{}, apperror.NewValidation([]apperror.FieldError{

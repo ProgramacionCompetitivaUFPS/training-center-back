@@ -107,9 +107,34 @@ func (uc *UpdateProblemUseCase) Execute(ctx context.Context, input UpdateProblem
 		}
 	}
 
+	if input.Statement != nil && len([]rune(*input.Statement)) > 150_000 {
+		fieldErrs = append(fieldErrs, apperror.FieldError{
+			Field:   "statement",
+			Message: "Statement must not exceed 150,000 characters",
+		})
+	}
+
 	var validOverrides []problem.LanguageOverride
 	if input.LangOverrides != nil {
+		seenLangs := make(map[string]struct{}, len(input.LangOverrides))
 		for _, override := range input.LangOverrides {
+			if override.Language != "" && !uc.platformSettings.IsLanguageSupported(override.Language) {
+				fieldErrs = append(fieldErrs, apperror.FieldError{
+					Field:   "languageOverrides.language",
+					Message: "Unsupported language: " + override.Language,
+				})
+				continue
+			}
+
+			if _, exists := seenLangs[override.Language]; exists {
+				fieldErrs = append(fieldErrs, apperror.FieldError{
+					Field:   "languageOverrides.language",
+					Message: "Duplicate language override: " + override.Language,
+				})
+				continue
+			}
+			seenLangs[override.Language] = struct{}{}
+
 			langLimit := uc.platformSettings.GetLanguageLimit(override.Language)
 			langOverride, err := problem.NewLanguageOverride(
 				override.Language,

@@ -15,6 +15,7 @@ type VirtualObjectProvider struct {
 	globalMaxTimeLimit   int
 	globalMaxMemoryLimit int
 	languages            map[string]problem.LanguageLimit
+	supportedLanguages   map[string]struct{}
 	allowedTags          map[string]struct{}
 	tagsList             []string
 }
@@ -22,9 +23,10 @@ type VirtualObjectProvider struct {
 func NewVirtualObjectProvider(cfg *config.VirtualObject) *VirtualObjectProvider {
 	if cfg == nil {
 		return &VirtualObjectProvider{
-			languages:   make(map[string]problem.LanguageLimit),
-			allowedTags: make(map[string]struct{}),
-			tagsList:    []string{},
+			languages:          make(map[string]problem.LanguageLimit),
+			supportedLanguages: make(map[string]struct{}),
+			allowedTags:        make(map[string]struct{}),
+			tagsList:           []string{},
 		}
 	}
 
@@ -42,6 +44,11 @@ func NewVirtualObjectProvider(cfg *config.VirtualObject) *VirtualObjectProvider 
 		tagsMap[t] = struct{}{}
 	}
 
+	supportedMap := make(map[string]struct{}, len(cfg.SupportedLanguages))
+	for _, l := range cfg.SupportedLanguages {
+		supportedMap[l] = struct{}{}
+	}
+
 	return &VirtualObjectProvider{
 		languageExtensions:    cfg.LanguageExtensions,
 		uploadMaxConcurrency:  cfg.UploadMaxConcurrency,
@@ -52,9 +59,15 @@ func NewVirtualObjectProvider(cfg *config.VirtualObject) *VirtualObjectProvider 
 		globalMaxTimeLimit:   cfg.MaxTimeLimitGlobal,
 		globalMaxMemoryLimit: cfg.MaxMemoryLimitGlobal,
 		languages:            langs,
+		supportedLanguages:   supportedMap,
 		allowedTags:          tagsMap,
 		tagsList:             cfg.Tags,
 	}
+}
+
+func (p *VirtualObjectProvider) IsLanguageSupported(language string) bool {
+	_, ok := p.supportedLanguages[language]
+	return ok
 }
 
 func (p *VirtualObjectProvider) GetLanguageByExtension(ext string) (string, bool) {

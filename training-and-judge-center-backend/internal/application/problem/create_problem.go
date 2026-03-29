@@ -66,6 +66,13 @@ func (usecase *CreateProblemUseCase) Execute(ctx context.Context, input CreatePr
 		}
 	}
 
+	if input.Statement != nil && len([]rune(*input.Statement)) > 150_000 {
+		fieldErrs = append(fieldErrs, apperror.FieldError{
+			Field:   "statement",
+			Message: "Statement must not exceed 150,000 characters",
+		})
+	}
+
 	globalMaxTime, globalMaxMemory := usecase.platformSettings.GetGlobalLimits()
 
 	var timeLimit *problem.TimeLimit
@@ -98,8 +105,26 @@ func (usecase *CreateProblemUseCase) Execute(ctx context.Context, input CreatePr
 		}
 	}
 
+	seenLangs := make(map[string]struct{}, len(input.LangOverrides))
 	var validOverrides []problem.LanguageOverride
 	for _, override := range input.LangOverrides {
+		if override.Language != "" && !usecase.platformSettings.IsLanguageSupported(override.Language) {
+			fieldErrs = append(fieldErrs, apperror.FieldError{
+				Field:   "languageOverrides.language",
+				Message: "Unsupported language: " + override.Language,
+			})
+			continue
+		}
+
+		if _, exists := seenLangs[override.Language]; exists {
+			fieldErrs = append(fieldErrs, apperror.FieldError{
+				Field:   "languageOverrides.language",
+				Message: "Duplicate language override: " + override.Language,
+			})
+			continue
+		}
+		seenLangs[override.Language] = struct{}{}
+
 		langLimit := usecase.platformSettings.GetLanguageLimit(override.Language)
 		langOverride, err := problem.NewLanguageOverride(
 			override.Language,
@@ -134,15 +159,6 @@ func (usecase *CreateProblemUseCase) Execute(ctx context.Context, input CreatePr
 
 	if len(fieldErrs) > 0 {
 		return nil, apperror.NewValidation(fieldErrs)
-	}
-
-	exists, err := usecase.repo.ExistsBySlug(ctx, slug)
-	if err != nil {
-		slog.ErrorContext(ctx, "failed to check problem existence by slug", "error", err, "slug", slug.String())
-		return nil, apperror.NewInternal()
-	}
-	if exists {
-		return nil, apperror.NewConflict(ErrCodeProblemSlugAlreadyExists, "A problem with that slug already exists")
 	}
 
 	newID := uuid.New().String()

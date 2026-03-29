@@ -10,14 +10,14 @@ As a problem author or Admin, I want to permanently delete a problem from the sy
 
 **Why this priority**: Problem deletion is an administrative operation that is infrequently needed. Most problems remain in the system indefinitely. However, it's useful for removing duplicate, test, or inappropriate problems. It's P3 because the system functions normally without this feature.
 
-**Independent Test**: This user story can be tested independently by consuming the `DELETE /problems/{slug}` endpoint with proper confirmation, validating that the problem and its associations are deleted while submissions are preserved.
+**Independent Test**: This user story can be tested independently by consuming the `DELETE /problems/p/{slug}` endpoint with proper confirmation, validating that the problem and its associations are deleted while submissions are preserved.
 
 **Acceptance Scenarios**:
 
 1. **Scenario**: Successful deletion with confirmation
    - **Given** a problem exists (any status: DRAFT or PUBLISHED)
    - **And** the authenticated user is the author or Admin
-   - **When** they request DELETE /problems/{slug} with correct slug confirmation in body
+   - **When** they request DELETE /problems/p/{slug} with correct slug confirmation in body
    - **Then** the system performs hard delete of:
      - Problem record
      - All problem files (test cases, solutions, checker, validator)
@@ -28,7 +28,7 @@ As a problem author or Admin, I want to permanently delete a problem from the sy
 2. **Scenario**: Deletion without confirmation
    - **Given** a problem exists
    - **And** the authenticated user is the author or Admin
-   - **When** they request DELETE /problems/{slug} without confirmation in body
+   - **When** they request DELETE /problems/p/{slug} without confirmation in body
    - **Then** the system rejects with HTTP 400 Bad Request
    - **And** returns error indicating confirmation is required
 
@@ -97,12 +97,12 @@ As a problem author or Admin, I want to permanently delete a problem from the sy
 
 12. **Scenario**: Access deleted problem
     - **Given** a problem was successfully deleted
-    - **When** any user attempts to view the problem via GET /problems/{slug}
+    - **When** any user attempts to view the problem via GET /problems/p/{slug}
     - **Then** the system returns HTTP 404 Not Found
 
 13. **Scenario**: Access statistics of deleted problem
     - **Given** a problem was successfully deleted
-    - **When** any user attempts to view statistics via GET /problems/{slug}/statistics
+    - **When** any user attempts to view statistics via GET /problems/p/{slug}/statistics
     - **Then** the system returns HTTP 404 Not Found
 
 14. **Scenario**: View submission after problem deletion
@@ -129,7 +129,7 @@ As a problem author or Admin, I want to permanently delete a problem from the sy
 
 ## API Contract
 
-### DELETE /problems/{slug}
+### DELETE /problems/p/{slug}
 
 Permanently delete a problem from the system, including all files and contest associations, while preserving submission history.
 
@@ -258,8 +258,8 @@ Problem with the specified slug does not exist.
 - **FR-023**: The problem_id field in submissions MUST remain intact after problem deletion.
 
 **Post-Deletion Behavior**
-- **FR-024**: After deletion, GET /problems/{slug} MUST return HTTP 404 Not Found.
-- **FR-025**: After deletion, GET /problems/{slug}/statistics MUST return HTTP 404 Not Found.
+- **FR-024**: After deletion, GET /problems/p/{slug} MUST return HTTP 404 Not Found.
+- **FR-025**: After deletion, GET /problems/p/{slug}/statistics MUST return HTTP 404 Not Found.
 - **FR-026**: After deletion, the problem slug MUST become available for reuse by new problems.
 - **FR-027**: The system MUST return HTTP 204 No Content for successful deletions.
 
