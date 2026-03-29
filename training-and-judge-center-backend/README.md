@@ -10,7 +10,7 @@
 Un solo comando levanta PostgreSQL, ejecuta migraciones y arranca el backend:
 
 ```bash
-docker-compose --env-file .env.example up --build -d
+docker-compose --env-file .env up --build -d
 ```
 
 Verifica que todo esté corriendo:

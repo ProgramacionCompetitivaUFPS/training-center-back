@@ -52,6 +52,7 @@ func (usecase *DeleteProblemFileUseCase) Execute(ctx context.Context, input Dele
 	}
 
 	var storageKeyToDelete string
+	var deleteByPrefix bool
 
 	fileType := strings.ToLower(input.FileType)
 	switch fileType {
@@ -63,6 +64,7 @@ func (usecase *DeleteProblemFileUseCase) Execute(ctx context.Context, input Dele
 			return apperror.NewNotFound(ErrCodeProblemFileNotFound, "This problem has no test cases to delete")
 		}
 		storageKeyToDelete = *foundProblem.TestCasesKey
+		deleteByPrefix = true
 		foundProblem.RemoveTestCases()
 
 	case FileTypeSolution:
@@ -112,8 +114,14 @@ func (usecase *DeleteProblemFileUseCase) Execute(ctx context.Context, input Dele
 		return apperror.NewInternal()
 	}
 
-	if err := usecase.fileStorage.DeleteFile(ctx, storageKeyToDelete); err != nil {
-		slog.ErrorContext(ctx, "file reference removed from DB but storage deletion failed (orphaned file)", "key", storageKeyToDelete, "error", err)
+	if deleteByPrefix {
+		if err := usecase.fileStorage.DeleteFilesWithPrefix(ctx, storageKeyToDelete); err != nil {
+			slog.ErrorContext(ctx, "file reference removed from DB but storage prefix deletion failed (orphaned files)", "prefix", storageKeyToDelete, "error", err)
+		}
+	} else {
+		if err := usecase.fileStorage.DeleteFile(ctx, storageKeyToDelete); err != nil {
+			slog.ErrorContext(ctx, "file reference removed from DB but storage deletion failed (orphaned file)", "key", storageKeyToDelete, "error", err)
+		}
 	}
 
 	return nil

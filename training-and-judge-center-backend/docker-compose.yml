@@ -46,6 +46,7 @@ services:
       VIRTUAL_OBJECT_CONFIG: /config/virtual_object.json
       STORAGE_BACKEND: ${STORAGE_BACKEND:-local}
       STORAGE_LOCAL_DIR: /data/uploads
+      GCS_BUCKET: ${GCS_BUCKET:-}
     volumes:
       - problem_uploads:/data/uploads
     depends_on:

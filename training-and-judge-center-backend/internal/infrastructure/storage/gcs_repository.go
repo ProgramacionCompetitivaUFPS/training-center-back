@@ -5,8 +5,9 @@ import (
 	"fmt"
 
 	"cloud.google.com/go/storage"
-	"google.golang.org/api/iterator"
 	appProblem "github.com/training-judge-center/backend/internal/application/problem"
+	"golang.org/x/sync/errgroup"
+	"google.golang.org/api/iterator"
 )
 
 type GCSProblemFileRepository struct {
@@ -52,6 +53,8 @@ func (r *GCSProblemFileRepository) DeleteFile(ctx context.Context, path string) 
 
 func (r *GCSProblemFileRepository) DeleteFilesWithPrefix(ctx context.Context, prefix string) error {
 	it := r.client.Bucket(r.bucket).Objects(ctx, &storage.Query{Prefix: prefix})
+
+	var names []string
 	for {
 		attrs, err := it.Next()
 		if err == iterator.Done {
@@ -60,11 +63,27 @@ func (r *GCSProblemFileRepository) DeleteFilesWithPrefix(ctx context.Context, pr
 		if err != nil {
 			return fmt.Errorf("failed to list GCS objects with prefix %s: %w", prefix, err)
 		}
-		if err := r.client.Bucket(r.bucket).Object(attrs.Name).Delete(ctx); err != nil {
-			if err != storage.ErrObjectNotExist {
-				return fmt.Errorf("failed to delete GCS object %s: %w", attrs.Name, err)
-			}
-		}
+		names = append(names, attrs.Name)
 	}
-	return nil
+
+	if len(names) == 0 {
+		return nil
+	}
+
+	g, gCtx := errgroup.WithContext(ctx)
+	g.SetLimit(10)
+
+	for _, name := range names {
+		name := name
+		g.Go(func() error {
+			if err := r.client.Bucket(r.bucket).Object(name).Delete(gCtx); err != nil {
+				if err != storage.ErrObjectNotExist {
+					return fmt.Errorf("failed to delete GCS object %s: %w", name, err)
+				}
+			}
+			return nil
+		})
+	}
+
+	return g.Wait()
 }

@@ -1,11 +1,13 @@
 package problem
 
 import (
+	"context"
 	"errors"
 	"io"
 	"log/slog"
 	"net/http"
 	"strings"
+	"time"
 
 	appProblem "github.com/training-judge-center/backend/internal/application/problem"
 	"github.com/training-judge-center/backend/internal/server/handler"
@@ -65,7 +67,10 @@ func (h *Handler) UploadFiles(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	res, ucErr := h.uploadUC.Execute(r.Context(), appProblem.UploadProblemFilesInput{
+	ctx, cancel := context.WithTimeout(r.Context(), 2*time.Minute)
+	defer cancel()
+
+	res, ucErr := h.uploadUC.Execute(ctx, appProblem.UploadProblemFilesInput{
 		Slug:        slug,
 		FileType:    fileType,
 		FileName:    fileHeader.Filename,
@@ -101,7 +106,10 @@ func (h *Handler) DeleteFile(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	ucErr := h.deleteFileUC.Execute(r.Context(), appProblem.DeleteProblemFileInput{
+	ctx, cancel := context.WithTimeout(r.Context(), 30*time.Second)
+	defer cancel()
+
+	ucErr := h.deleteFileUC.Execute(ctx, appProblem.DeleteProblemFileInput{
 		Slug:        slug,
 		FileType:    fileType,
 		FileName:    fileName,

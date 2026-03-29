@@ -8,7 +8,6 @@ import (
 	"os"
 
 	googleStorage "cloud.google.com/go/storage"
-	"google.golang.org/api/option"
 
 	appProblem "github.com/training-judge-center/backend/internal/application/problem"
 	"github.com/training-judge-center/backend/internal/config"
@@ -47,7 +46,7 @@ func main() {
 			slog.Error("GCS_BUCKET env var is required when STORAGE_BACKEND=gcs")
 			os.Exit(1)
 		}
-		gcsClient, err := googleStorage.NewClient(ctx, option.WithoutAuthentication())
+		gcsClient, err := googleStorage.NewClient(ctx)
 		if err != nil {
 			slog.Error("failed to create GCS client", "error", err)
 			os.Exit(1)
