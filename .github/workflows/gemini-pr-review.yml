@@ -43,14 +43,8 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           
-          # Usamos el modelo Pro sugerido en la nueva plantilla para mayor profundidad
-          GEMINI_MODEL: gemini-2.5-pro
+          # Usamos gemini-2.5-flash para asegurar disponibilidad en el nivel gratuito
+          GEMINI_MODEL: gemini-2.5-flash
           
-          # Configuración de idioma y respuesta
-          language: Spanish
-          
-          # Excluimos archivos autogenerados, binarios y archivos de configuración que no requieren revisión lógica
+          # Excluimos archivos autogenerados, binarios y otros archivos ruidosos
           EXCLUDE: "**/go.sum, .agent/**, **/*.exe, **/.env*, *.md, *.txt, package-lock.json, *.yml, *.yaml"
-
-          # Parámetro de seguridad para que no se corte la respuesta en PRs masivos
-          MAX_TOKENS: 8000
