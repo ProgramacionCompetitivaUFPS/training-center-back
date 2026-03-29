@@ -73,8 +73,11 @@ func (uc *RequestDeactivationUseCase) Execute(ctx context.Context, input Request
 		return apperror.NewInternal()
 	}
 
-	body := fmt.Sprintf("You requested to deactivate your account.\n\nYour confirmation code is: %s\n\nThis code will expire in 15 minutes. Note: Confirming this code will completely anonymize your account and log you out immediately.", code)
-	if err := uc.emailSender.Send(ctx, foundUser.Email.String(), "Account Deactivation Code", body); err != nil {
+	if err := uc.emailSender.Send(ctx, notification.EmailMessage{
+		To:      foundUser.Email.String(),
+		Subject: "Account Deactivation Code",
+		Body:    fmt.Sprintf("You requested to deactivate your account.\n\nYour confirmation code is: %s\n\nThis code will expire in 15 minutes. Note: Confirming this code will completely anonymize your account and log you out immediately.", code),
+	}); err != nil {
 		return apperror.NewServiceUnavailable("INTERNAL_SERVER_ERROR", "Failed to send verification email")
 	}
 

@@ -145,8 +145,8 @@ func TestUpdateUser_NicknameAlreadyExists(t *testing.T) {
 	repo.findByIDFn = func(_ context.Context, _ string) (*domain.User, error) {
 		return activeUser, nil
 	}
-	repo.existsByNicknameFn = func(_ context.Context, _ domain.Nickname) (bool, error) {
-		return true, nil
+	repo.updateFn = func(_ context.Context, _ *domain.User) error {
+		return domain.ErrNicknameConflict
 	}
 	uc := NewUpdateUserUseCase(repo)
 

@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/training-judge-center/backend/internal/domain/notification"
 	domain "github.com/training-judge-center/backend/internal/domain/user"
 	"github.com/training-judge-center/backend/pkg/apperror"
 )
@@ -55,7 +56,7 @@ func TestConfirmEmailChange_Success(t *testing.T) {
 
 	emailsSent := 0
 	mockEmailSender := &mockEmailSender{
-		sendFn: func(ctx context.Context, to, subject, body string) error {
+		sendFn: func(ctx context.Context, msg notification.EmailMessage) error {
 			emailsSent++
 			return nil
 		},

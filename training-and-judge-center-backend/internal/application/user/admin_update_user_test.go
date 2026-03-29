@@ -157,8 +157,8 @@ func TestAdminUpdateUser_EmailAlreadyExists(t *testing.T) {
 	repo.findByIDFn = func(_ context.Context, _ string) (*domain.User, error) {
 		return targetUser, nil
 	}
-	repo.existsByEmailFn = func(_ context.Context, _ domain.Email) (bool, error) {
-		return true, nil
+	repo.updateFn = func(_ context.Context, _ *domain.User) error {
+		return domain.ErrEmailConflict
 	}
 	uc := NewAdminUpdateUserUseCase(repo)
 
@@ -175,11 +175,8 @@ func TestAdminUpdateUser_EmailAlreadyExists(t *testing.T) {
 	if !ok {
 		t.Fatalf("expected *apperror.AppError, got %T", err)
 	}
-	if appErr.Code != "VALIDATION_ERROR" {
-		t.Errorf("expected code VALIDATION_ERROR, got %q", appErr.Code)
-	}
-	if len(appErr.Details) == 0 || appErr.Details[0].Field != "email" {
-		t.Errorf("expected field error on email, got %v", appErr.Details)
+	if appErr.Code != "EMAIL_ALREADY_EXISTS" {
+		t.Errorf("expected code EMAIL_ALREADY_EXISTS, got %q", appErr.Code)
 	}
 }
 

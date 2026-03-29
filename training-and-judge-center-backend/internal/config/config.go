@@ -1,6 +1,7 @@
 package config
 
 import (
+	"log/slog"
 	"os"
 	"strconv"
 )
@@ -30,7 +31,7 @@ func Load() *Config {
 		DBUser:             getEnv("DB_USER", "postgres"),
 		DBPassword:         getEnv("DB_PASSWORD", "postgres"),
 		DBName:             getEnv("DB_NAME", "training_center"),
-		JWTSecret:          getEnv("JWT_SECRET", "dev-secret-change-me"),
+		JWTSecret:          getRequiredEnv("JWT_SECRET"),
 		JWTExpirationHours: getEnvAsInt("JWT_EXPIRATION_HOURS", 24),
 		SMTPHost:           getEnv("SMTP_HOST", "localhost"),
 		SMTPPort:           getEnv("SMTP_PORT", "1025"),
@@ -39,6 +40,15 @@ func Load() *Config {
 		SMTPFrom:           getEnv("SMTP_FROM", "noreply@trainingcenter.com"),
 		RedisURL:           getEnv("REDIS_URL", "localhost:6379"),
 	}
+}
+
+func getRequiredEnv(key string) string {
+	value := os.Getenv(key)
+	if value == "" {
+		slog.Error("required environment variable is not set — application cannot start", "key", key)
+		os.Exit(1)
+	}
+	return value
 }
 
 func getEnv(key, fallback string) string {

@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/training-judge-center/backend/internal/domain/user"
 )
@@ -70,6 +71,15 @@ func (r *UserRepository) Update(ctx context.Context, u *user.User) error {
 		u.ID,
 	)
 	if err != nil {
+		var pgErr *pgconn.PgError
+		if errors.As(err, &pgErr) && pgErr.Code == "23505" {
+			switch pgErr.ConstraintName {
+			case "users_nickname_key":
+				return user.ErrNicknameConflict
+			case "users_email_key":
+				return user.ErrEmailConflict
+			}
+		}
 		return fmt.Errorf("failed to update user: %w", err)
 	}
 

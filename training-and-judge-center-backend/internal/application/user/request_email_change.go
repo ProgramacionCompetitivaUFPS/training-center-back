@@ -92,10 +92,11 @@ func (uc *RequestEmailChangeUseCase) Execute(ctx context.Context, input RequestE
 		return apperror.NewInternal()
 	}
 
-	subject := "Verify your new email address"
-	body := fmt.Sprintf("Your email verification code is: %s. It will expire in 15 minutes.", code)
-	
-	if err := uc.emailSender.Send(ctx, input.NewEmail, subject, body); err != nil {
+	if err := uc.emailSender.Send(ctx, notification.EmailMessage{
+		To:      input.NewEmail,
+		Subject: "Verify your new email address",
+		Body:    fmt.Sprintf("Your email verification code is: %s. It will expire in 15 minutes.", code),
+	}); err != nil {
 		slog.Error("failed to send verification email", "email", input.NewEmail, "error", err)
 		return apperror.NewServiceUnavailable("EMAIL_DELIVERY_FAILED", "We couldn't deliver the verification code to your email. Please try again later.")
 	}

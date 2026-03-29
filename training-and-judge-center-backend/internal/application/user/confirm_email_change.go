@@ -66,30 +66,29 @@ func (uc *ConfirmEmailChangeUseCase) Execute(ctx context.Context, input ConfirmE
 
 	oldEmail := u.Email.String()
 
+	req.MarkAsUsed(time.Now())
+	if err := uc.emailChangeRepo.Update(ctx, req); err != nil {
+		return nil, apperror.NewInternal()
+	}
+
 	u.Update(nil, nil, nil, &req.NewEmail, nil)
-	
 	if err := uc.userRepo.Update(ctx, u); err != nil {
 		return nil, apperror.NewInternal()
 	}
 
-	req.MarkAsUsed(time.Now())
-	if err := uc.emailChangeRepo.Update(ctx, req); err != nil {
-		slog.Error("failed to mark email change request as used", "request_id", req.ID, "error", err)
-	}
-
-	if err := uc.emailSender.Send(ctx,
-		oldEmail,
-		"Security Alert: Your Email Was Changed",
-		"Your account email has been successfully changed to a new one. If you did not make this change, please contact support immediately.",
-	); err != nil {
+	if err := uc.emailSender.Send(ctx, notification.EmailMessage{
+		To:      oldEmail,
+		Subject: "Security Alert: Your Email Was Changed",
+		Body:    "Your account email has been successfully changed to a new one. If you did not make this change, please contact support immediately.",
+	}); err != nil {
 		slog.Error("failed to send security alert to old email", "email", oldEmail, "error", err)
 	}
 	
-	if err := uc.emailSender.Send(ctx,
-		req.NewEmail.String(),
-		"Email successfully updated",
-		fmt.Sprintf("Hello %s, your email address has been successfully verified and updated on our platform.", u.Name),
-	); err != nil {
+	if err := uc.emailSender.Send(ctx, notification.EmailMessage{
+		To:      req.NewEmail.String(),
+		Subject: "Email successfully updated",
+		Body:    fmt.Sprintf("Hello %s, your email address has been successfully verified and updated on our platform.", u.Name),
+	}); err != nil {
 		slog.Error("failed to send confirmation to new email", "email", req.NewEmail.String(), "error", err)
 	}
 

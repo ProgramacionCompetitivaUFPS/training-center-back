@@ -4,16 +4,17 @@ import (
 	"context"
 	"time"
 
+	"github.com/training-judge-center/backend/internal/domain/notification"
 	domain "github.com/training-judge-center/backend/internal/domain/user"
 )
 
 type mockEmailSender struct {
-	sendFn func(ctx context.Context, to, subject, body string) error
+	sendFn func(ctx context.Context, msg notification.EmailMessage) error
 }
 
-func (m *mockEmailSender) Send(ctx context.Context, to, subject, body string) error {
+func (m *mockEmailSender) Send(ctx context.Context, msg notification.EmailMessage) error {
 	if m.sendFn != nil {
-		return m.sendFn(ctx, to, subject, body)
+		return m.sendFn(ctx, msg)
 	}
 	return nil
 }

@@ -35,7 +35,9 @@ func NewResetPasswordUseCase(
 func (uc *ResetPasswordUseCase) Execute(ctx context.Context, input ResetPasswordInput) error {
 	emailVO, err := user.NewEmail(input.Email)
 	if err != nil {
-		return apperror.NewNotFound("NOT_FOUND", "No pending password recovery request found")
+		return apperror.NewValidation([]apperror.FieldError{
+			{Field: "email", Message: err.Error()},
+		})
 	}
 
 	foundUser, err := uc.userRepo.FindByEmail(ctx, emailVO)
@@ -66,9 +68,7 @@ func (uc *ResetPasswordUseCase) Execute(ctx context.Context, input ResetPassword
 		})
 	}
 
-	foundUser.UpdatePassword(newPassword)
-
-	if err := uc.userRepo.Update(ctx, foundUser); err != nil {
+	if err := uc.sessionInvalidator.InvalidateAllUserSessions(ctx, foundUser.ID, now); err != nil {
 		return apperror.NewInternal()
 	}
 
@@ -77,8 +77,8 @@ func (uc *ResetPasswordUseCase) Execute(ctx context.Context, input ResetPassword
 		return apperror.NewInternal()
 	}
 
-	// Invalidate all sessions
-	if err := uc.sessionInvalidator.InvalidateAllUserSessions(ctx, foundUser.ID, now); err != nil {
+	foundUser.UpdatePassword(newPassword)
+	if err := uc.userRepo.Update(ctx, foundUser); err != nil {
 		return apperror.NewInternal()
 	}
 

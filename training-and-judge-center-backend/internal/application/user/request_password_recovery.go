@@ -77,8 +77,11 @@ func (uc *RequestPasswordRecoveryUseCase) Execute(ctx context.Context, input Req
 		return apperror.NewInternal()
 	}
 
-	body := fmt.Sprintf("Your password recovery code is: %s\nThis code will expire in 15 minutes.", code)
-	if err := uc.emailSender.Send(ctx, foundUser.Email.String(), "Password Recovery Code", body); err != nil {
+	if err := uc.emailSender.Send(ctx, notification.EmailMessage{
+		To:      foundUser.Email.String(),
+		Subject: "Password Recovery Code",
+		Body:    fmt.Sprintf("Your password recovery code is: %s\nThis code will expire in 15 minutes.", code),
+	}); err != nil {
 		return apperror.NewServiceUnavailable("INTERNAL_SERVER_ERROR", "Failed to send email to the provided address")
 	}
 

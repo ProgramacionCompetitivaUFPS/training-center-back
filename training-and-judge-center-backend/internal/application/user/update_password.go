@@ -58,21 +58,25 @@ func (uc *UpdatePasswordUseCase) Execute(ctx context.Context, input UpdatePasswo
 		})
 	}
 
-	foundUser.UpdatePassword(newPassword)
 	now := time.Now()
 
+	if err := uc.sessionInvalidator.InvalidateAllUserSessions(ctx, foundUser.ID, now); err != nil {
+		slog.Error("failed to invalidate sessions before password update", "user_id", foundUser.ID, "error", err)
+		return apperror.NewInternal()
+	}
+
+	foundUser.UpdatePassword(newPassword)
 	if err := uc.repo.Update(ctx, foundUser); err != nil {
 		return apperror.NewInternal()
 	}
 
-	// Invalidate all active sessions for this user
-	if err := uc.sessionInvalidator.InvalidateAllUserSessions(ctx, foundUser.ID, now); err != nil {
-		slog.Error("failed to invalidate sessions after password update", "user_id", foundUser.ID, "error", err)
+	if err := uc.emailSender.Send(ctx, notification.EmailMessage{
+		To:      foundUser.Email.String(),
+		Subject: "Security Alert: Password Changed",
+		Body:    "Your password has been changed successfully. If you did not make this change, please contact support immediately.",
+	}); err != nil {
+		slog.Error("failed to send password changed email", "user_id", foundUser.ID, "email", foundUser.Email.String(), "error", err)
 	}
-
-	subject := "Security Alert: Password Changed"
-	body := "Your password has been changed successfully. If you did not make this change, please contact support immediately."
-	_ = uc.emailSender.Send(ctx, foundUser.Email.String(), subject, body)
 
 	return nil
 }

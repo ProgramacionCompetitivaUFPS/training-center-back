@@ -130,8 +130,11 @@ func (uc *ConfirmDeactivationUseCase) Execute(ctx context.Context, input Confirm
 
 	// Send final email
 	if originalEmailStr != "" {
-		body := "Your account has been successfully deactivated based on your request. Your identity and email have been anonymized."
-		_ = uc.emailSender.Send(ctx, originalEmailStr, "Account Deactivated", body)
+		_ = uc.emailSender.Send(ctx, notification.EmailMessage{
+			To:      originalEmailStr,
+			Subject: "Account Deactivated",
+			Body:    "Your account has been successfully deactivated based on your request. Your identity and email have been anonymized.",
+		})
 	}
 
 	return nil

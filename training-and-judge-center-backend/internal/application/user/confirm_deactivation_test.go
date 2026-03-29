@@ -5,6 +5,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/training-judge-center/backend/internal/domain/notification"
 	domain "github.com/training-judge-center/backend/internal/domain/user"
 	"github.com/training-judge-center/backend/pkg/apperror"
 )
@@ -82,7 +83,7 @@ func TestConfirmDeactivation_Success(t *testing.T) {
 	
 	emailSent := false
 	mockEmail := &mockEmailSender{
-		sendFn: func(ctx context.Context, to, subject, body string) error {
+		sendFn: func(ctx context.Context, msg notification.EmailMessage) error {
 			emailSent = true
 			return nil
 		},

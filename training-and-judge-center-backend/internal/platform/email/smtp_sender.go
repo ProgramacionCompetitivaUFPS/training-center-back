@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 	"net/smtp"
+
+	"github.com/training-judge-center/backend/internal/domain/notification"
 )
 
 type SMTPSender struct {
@@ -24,18 +26,18 @@ func NewSMTPSender(host, port, username, password, from string) *SMTPSender {
 	}
 }
 
-func (s *SMTPSender) Send(ctx context.Context, to, subject, body string) error {
+func (s *SMTPSender) Send(ctx context.Context, msg notification.EmailMessage) error {
 	auth := smtp.PlainAuth("", s.username, s.password, s.host)
 
-	msg := []byte("To: " + to + "\r\n" +
+	raw := []byte("To: " + msg.To + "\r\n" +
 		"From: " + s.from + "\r\n" +
-		"Subject: " + subject + "\r\n" +
+		"Subject: " + msg.Subject + "\r\n" +
 		"MIME-Version: 1.0\r\n" +
 		"Content-Type: text/plain; charset=\"utf-8\"\r\n" +
-		"\r\n" + body)
+		"\r\n" + msg.Body)
 
 	addr := fmt.Sprintf("%s:%s", s.host, s.port)
-	if err := smtp.SendMail(addr, auth, s.from, []string{to}, msg); err != nil {
+	if err := smtp.SendMail(addr, auth, s.from, []string{msg.To}, raw); err != nil {
 		return fmt.Errorf("failed to send email: %w", err)
 	}
 

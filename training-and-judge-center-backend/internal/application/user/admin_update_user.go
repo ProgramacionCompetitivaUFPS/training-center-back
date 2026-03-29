@@ -2,6 +2,7 @@ package user
 
 import (
 	"context"
+	"errors"
 
 	"github.com/training-judge-center/backend/internal/domain/user"
 	"github.com/training-judge-center/backend/pkg/apperror"
@@ -59,15 +60,7 @@ func (uc *AdminUpdateUserUseCase) Execute(ctx context.Context, input AdminUpdate
 		if err != nil {
 			fieldErrors = append(fieldErrors, apperror.FieldError{Field: "nickname", Message: err.Error()})
 		} else if newNickname.String() != foundUser.Nickname.String() {
-			exists, err := uc.repo.ExistsByNickname(ctx, newNickname)
-			if err != nil {
-				return nil, apperror.NewInternal()
-			}
-			if exists {
-				fieldErrors = append(fieldErrors, apperror.FieldError{Field: "nickname", Message: "The nickname is already in use"})
-			} else {
-				nicknameToUpdate = &newNickname
-			}
+			nicknameToUpdate = &newNickname
 		}
 	}
 
@@ -84,15 +77,7 @@ func (uc *AdminUpdateUserUseCase) Execute(ctx context.Context, input AdminUpdate
 		if err != nil {
 			fieldErrors = append(fieldErrors, apperror.FieldError{Field: "email", Message: err.Error()})
 		} else if foundUser.Email == nil || newEmail.String() != foundUser.Email.String() {
-			exists, err := uc.repo.ExistsByEmail(ctx, newEmail)
-			if err != nil {
-				return nil, apperror.NewInternal()
-			}
-			if exists {
-				fieldErrors = append(fieldErrors, apperror.FieldError{Field: "email", Message: "Email already exists"})
-			} else {
-				emailToUpdate = &newEmail
-			}
+			emailToUpdate = &newEmail
 		}
 	}
 
@@ -114,6 +99,12 @@ func (uc *AdminUpdateUserUseCase) Execute(ctx context.Context, input AdminUpdate
 	foundUser.Update(nameToUpdate, nicknameToUpdate, institutionToUpdate, emailToUpdate, roleToUpdate)
 
 	if err := uc.repo.Update(ctx, foundUser); err != nil {
+		if errors.Is(err, user.ErrNicknameConflict) {
+			return nil, apperror.NewConflict("NICKNAME_ALREADY_EXISTS", "The nickname is already in use")
+		}
+		if errors.Is(err, user.ErrEmailConflict) {
+			return nil, apperror.NewConflict("EMAIL_ALREADY_EXISTS", "The email is already in use")
+		}
 		return nil, apperror.NewInternal()
 	}
 
