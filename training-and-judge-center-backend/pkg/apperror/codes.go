@@ -2,6 +2,7 @@ package apperror
 
 // Universal / Generic Error Codes
 const (
+	ErrCodeInvalidPackage  = "INVALID_PACKAGE"
 	ErrCodeNotFound        = "NOT_FOUND"
 	ErrCodeUnauthorized    = "UNAUTHORIZED"
 	ErrCodeForbidden       = "FORBIDDEN"

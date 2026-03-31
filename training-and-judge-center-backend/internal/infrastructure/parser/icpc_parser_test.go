@@ -24,7 +24,7 @@ func createZipBuffer(files map[string][]byte) []byte {
 }
 
 func TestICPCParser_ValidArchive(t *testing.T) {
-	p := parser.NewICPCParser(200, 10000, 10)
+	p := parser.NewICPCParser(200, 2, 10000, 10, nil)
 
 	zipData := createZipBuffer(map[string][]byte{
 		"data/sample/1.in":  []byte("1 2"),
@@ -47,7 +47,7 @@ func TestICPCParser_ValidArchive(t *testing.T) {
 }
 
 func TestICPCParser_InvalidExtension(t *testing.T) {
-	p := parser.NewICPCParser(200, 10000, 10)
+	p := parser.NewICPCParser(200, 2, 10000, 10, nil)
 
 	zipData := createZipBuffer(map[string][]byte{
 		"data/sample/1.in":  []byte("1 2"),
@@ -70,7 +70,7 @@ func TestICPCParser_InvalidExtension(t *testing.T) {
 }
 
 func TestICPCParser_PathTraversal(t *testing.T) {
-	p := parser.NewICPCParser(200, 10000, 10)
+	p := parser.NewICPCParser(200, 2, 10000, 10, nil)
 
 	zipData := createZipBuffer(map[string][]byte{
 		"data/sample/1.in":            []byte("1 2"),
@@ -84,7 +84,7 @@ func TestICPCParser_PathTraversal(t *testing.T) {
 }
 
 func TestICPCParser_MissingContentDir(t *testing.T) {
-	p := parser.NewICPCParser(200, 10000, 10)
+	p := parser.NewICPCParser(200, 2, 10000, 10, nil)
 
 	zipData := createZipBuffer(map[string][]byte{
 		"some_other_dir/1.in": []byte("1 2"),
@@ -97,7 +97,7 @@ func TestICPCParser_MissingContentDir(t *testing.T) {
 }
 
 func TestICPCParser_TooManySamples(t *testing.T) {
-	p := parser.NewICPCParser(200, 10000, 1)
+	p := parser.NewICPCParser(200, 2, 10000, 1, nil)
 
 	zipData := createZipBuffer(map[string][]byte{
 		"data/sample/1.in": []byte("1 2"),

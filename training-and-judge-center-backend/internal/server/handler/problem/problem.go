@@ -7,6 +7,7 @@ import (
 
 type Handler struct {
 	createUC         *appProblem.CreateProblemUseCase
+	importUC         *appProblem.ImportProblemUseCase
 	updateUC         *appProblem.UpdateProblemUseCase
 	uploadUC         *appProblem.UploadProblemFilesUseCase
 	deleteFileUC     *appProblem.DeleteProblemFileUseCase
@@ -19,6 +20,7 @@ type Handler struct {
 
 func NewHandler(
 	createUC *appProblem.CreateProblemUseCase,
+	importUC *appProblem.ImportProblemUseCase,
 	updateUC *appProblem.UpdateProblemUseCase,
 	uploadUC *appProblem.UploadProblemFilesUseCase,
 	deleteFileUC *appProblem.DeleteProblemFileUseCase,
@@ -30,6 +32,7 @@ func NewHandler(
 ) *Handler {
 	return &Handler{
 		createUC:         createUC,
+		importUC:         importUC,
 		updateUC:         updateUC,
 		uploadUC:         uploadUC,
 		deleteFileUC:     deleteFileUC,

@@ -3,6 +3,7 @@ package problem
 import (
 	"encoding/json"
 	"errors"
+	"io"
 	"log/slog"
 	"net/http"
 
@@ -119,4 +120,71 @@ func (h *Handler) Update(w http.ResponseWriter, r *http.Request) {
 	p := result.Problem
 	authorDisplay, _ := h.userProvider.GetDisplay(r.Context(), p.AuthorID)
 	handler.WriteJSON(w, http.StatusOK, buildResponse(p, authorDisplay))
+}
+
+func (h *Handler) Import(w http.ResponseWriter, r *http.Request) {
+	currentUser := middleware.GetCurrentUser(r.Context())
+	if currentUser == nil {
+		handler.WriteJSON(w, http.StatusUnauthorized, apperror.AppError{
+			Code:    apperror.ErrCodeUnauthorized,
+			Message: "Invalid or missing authentication token",
+		})
+		return
+	}
+
+	maxUploadBytes := int64(h.settings.GetMaxFileSizeTestCaseMB()) << 20
+	if err := r.ParseMultipartForm(maxUploadBytes); err != nil {
+		handler.WriteJSON(w, http.StatusRequestEntityTooLarge, apperror.AppError{
+			Code:    apperror.ErrCodePayloadTooLarge,
+			Message: "File exceeds maximum allowed size",
+		})
+		return
+	}
+
+	slug := r.FormValue("slug")
+	if slug == "" {
+		handler.WriteJSON(w, http.StatusBadRequest, apperror.AppError{
+			Code:    apperror.ErrCodeValidationError,
+			Message: "Missing required form field 'slug'",
+		})
+		return
+	}
+
+	file, _, err := r.FormFile("file")
+	if err != nil {
+		handler.WriteJSON(w, http.StatusBadRequest, apperror.AppError{
+			Code:    apperror.ErrCodeValidationError,
+			Message: "Missing required form field 'file'",
+		})
+		return
+	}
+	defer file.Close()
+
+	zipData, err := io.ReadAll(io.LimitReader(file, maxUploadBytes+1))
+	if err != nil {
+		slog.ErrorContext(r.Context(), "import: failed to read uploaded file", "error", err)
+		handler.WriteJSON(w, http.StatusInternalServerError, apperror.NewInternal())
+		return
+	}
+	if int64(len(zipData)) > maxUploadBytes {
+		handler.WriteJSON(w, http.StatusRequestEntityTooLarge, apperror.AppError{
+			Code:    apperror.ErrCodePayloadTooLarge,
+			Message: "File exceeds maximum allowed size",
+		})
+		return
+	}
+
+	result, ucErr := h.importUC.Execute(r.Context(), appProblem.ImportProblemInput{
+		Slug:        slug,
+		ZipData:     zipData,
+		CurrentUser: *currentUser,
+	})
+	if ucErr != nil {
+		handler.WriteError(w, ucErr)
+		return
+	}
+
+	p := result.Problem
+	authorDisplay, _ := h.userProvider.GetDisplay(r.Context(), p.AuthorID)
+	handler.WriteJSON(w, http.StatusCreated, buildResponse(p, authorDisplay))
 }

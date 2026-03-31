@@ -66,10 +66,13 @@ func main() {
 
 	icpcParser := parser.NewICPCParser(
 		settingsProvider.GetMaxFileSizeTestCaseMB(),
+		settingsProvider.GetMaxFileSizeDefaultMB(),
 		settingsProvider.GetMaxFileCountTestCase(),
 		settingsProvider.GetMaxFileCountSample(),
+		cfg.VirtualObject.LanguageExtensions,
 	)
 	zipParserAdapter := platformParser.NewICPCParserAdapter(icpcParser)
+	packageParserAdapter := platformParser.NewICPCPackageParserAdapter(icpcParser)
 
 	var userProvider appProblem.UserProvider
 	if cfg.MockAuth {
@@ -82,6 +85,7 @@ func main() {
 
 	// Use Cases
 	createProblemUseCase := appProblem.NewCreateProblemUseCase(problemRepo, settingsProvider)
+	importProblemUseCase := appProblem.NewImportProblemUseCase(problemRepo, fileStorage, packageParserAdapter, settingsProvider)
 	updateProblemUseCase := appProblem.NewUpdateProblemUseCase(problemRepo, settingsProvider)
 	uploadProblemFilesUseCase := appProblem.NewUploadProblemFilesUseCase(problemRepo, fileStorage, zipParserAdapter, settingsProvider)
 	deleteProblemFileUseCase := appProblem.NewDeleteProblemFileUseCase(problemRepo, fileStorage)
@@ -91,6 +95,7 @@ func main() {
 
 	problemHandler := problem.NewHandler(
 		createProblemUseCase,
+		importProblemUseCase,
 		updateProblemUseCase,
 		uploadProblemFilesUseCase,
 		deleteProblemFileUseCase,

@@ -107,9 +107,9 @@ As a Coach or Admin, I want to create a new problem by uploading a complete ICPC
 1. **Scenario**: Successful import from valid ZIP
    - **Given** a Coach or Admin is authenticated
    - **And** has a valid ICPC-format ZIP with all required files
-   - **When** they upload the ZIP to import
+   - **When** they upload the ZIP to import and provide a valid unique 'slug'
    - **Then** the system extracts all data (title from problem.yaml, statement, test cases, etc.)
-   - **And** creates the problem with status `DRAFT` and accessibility `PRIVATE`
+   - **And** creates the problem with status `DRAFT` and accessibility `PRIVATE` under the provided slug
    - **And** returns the created problem data
 
 2. **Scenario**: Import ZIP with missing required files
@@ -136,6 +136,11 @@ As a Coach or Admin, I want to create a new problem by uploading a complete ICPC
    - **When** they attempt to upload
    - **Then** the system rejects with 400 Bad Request (FILE_TOO_LARGE)
 
+6. **Scenario**: Import ZIP with already existing slug
+   - **Given** a Coach or Admin is authenticated
+   - **When** they attempt to upload a ZIP with a 'slug' that already exists in the database
+   - **Then** the system rejects with 409 Conflict (SLUG_ALREADY_EXISTS) before unzipping
+   
 ---
 
 ### Edge Cases
@@ -367,6 +372,7 @@ Create a new problem by importing an ICPC-format ZIP package.
 
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
+| slug | string | Yes | Unique problem identifier (3-70 chars, lowercase alphanumeric with hyphens only). Overrides any slug found in `problem.yaml` |
 | file | file | Yes | The ICPC-format ZIP file to import |
 
 **Expected ZIP Structure (ICPC Format)**:
@@ -384,18 +390,17 @@ problem-package.zip/
 │       ├── 01.in
 │       ├── 01.ans
 │       └── ...
-├── submissions/              # Optional solutions
-│   └── accepted/
-│       └── solution.cpp
-├── output_validators/        # Optional custom checker
-│   └── validator.cpp
-└── input_validators/         # Optional input validator
-    └── validator.cpp
+├── solutions/              # Optional solutions
+│   └── solution_1.cpp
+│   └── solution_2.py
+├── checker.cpp               # Optional custom checker
+└── validator.cpp             # Optional input validator
 ```
 
 **problem.yaml Example**:
 ```yaml
 name: Sum of Two Numbers
+slug: sum-two-numbers
 time_limit: 2.0
 memory_limit: 256
 author: coach_john
@@ -442,7 +447,20 @@ Problem imported successfully.
 ```
 
 #### 400 Bad Request
-Invalid ZIP file or missing required files.
+Validation errors (missing fields, invalid slug format) or invalid ZIP file.
+
+```json
+{
+  "error": "VALIDATION_ERROR",
+  "message": "Invalid request data",
+  "details": [
+    {
+      "field": "slug",
+      "message": "Slug is required"
+    }
+  ]
+}
+```
 
 ```json
 {

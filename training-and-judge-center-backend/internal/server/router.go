@@ -28,6 +28,7 @@ func NewRouter(cfg *config.Config, h *Handlers) *chi.Mux {
 			r.Use(middleware.MockAuth)
 		}
 		r.Post("/", h.Problem.Create)
+		r.Post("/import", h.Problem.Import)
 
 		r.Route("/p/{slug}", func(r chi.Router) {
 			r.Put("/", h.Problem.Update)
