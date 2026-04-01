@@ -83,6 +83,10 @@ func (p *ICPCParser) ParseTestCasesZip(zipData []byte) ([]ExtractedFile, error) 
 		return nil, err
 	}
 
+	if err := p.validateMetadataFileSizes(pz, prefix); err != nil {
+		return nil, err
+	}
+
 	validCount, sampleFiles, hasSampleDir, hasSecretDir, err := p.parseTestCases(pz, prefix, true)
 	if err != nil {
 		return nil, err
@@ -110,6 +114,10 @@ func (p *ICPCParser) ParsePackageZip(zipData []byte) (*ParsedPackage, error) {
 
 	prefix, yamlFile, err := p.detectRootPrefix(pz, AnchorYAML)
 	if err != nil {
+		return nil, err
+	}
+
+	if err := p.validateMetadataFileSizes(pz, prefix); err != nil {
 		return nil, err
 	}
 
@@ -363,6 +371,23 @@ func (p *ICPCParser) detectRootPrefix(pz *ParsedZip, anchor AnchorType) (string,
 	return candidates[0], yamlFile, nil
 }
 
+func (p *ICPCParser) validateMetadataFileSizes(pz *ParsedZip, prefix string) error {
+	for _, czf := range pz.Files {
+		if czf.IsDir {
+			continue
+		}
+		stripped := strings.TrimPrefix(czf.CleanPath, prefix)
+		isTestData := strings.HasPrefix("/"+stripped, "/data/sample/") ||
+			strings.HasPrefix("/"+stripped, "/data/secret/")
+		if !isTestData && czf.File.UncompressedSize64 > uint64(p.maxMetadataFileBytes) {
+			return apperror.NewValidation([]apperror.FieldError{
+				{Field: "file", Message: fmt.Sprintf("Auxiliary file '%s' exceeds the allowed limit of %d bytes.", czf.CleanPath, p.maxMetadataFileBytes)},
+			})
+		}
+	}
+	return nil
+}
+
 func invalidPackage(logs []string) error {
 	return apperror.NewBadRequest(apperror.ErrCodeInvalidPackage, fmt.Sprintf("Invalid ICPC problem package: %s", strings.Join(logs, "; ")))
 }
@@ -393,15 +418,6 @@ func (p *ICPCParser) prepareZip(zipData []byte) (*ParsedZip, error) {
 		}
 
 		isDir := f.FileInfo().IsDir()
-		
-		isTestData := strings.HasPrefix("/"+cleanPath, "/data/")
-		if !isDir && !isTestData {
-			if f.UncompressedSize64 > uint64(p.maxMetadataFileBytes) {
-				return nil, apperror.NewValidation([]apperror.FieldError{
-					{Field: "file", Message: fmt.Sprintf("Archivos sospechosos detectados. El archivo auxiliar '%s' excede el limite permitido de %d bytes.", cleanPath, p.maxMetadataFileBytes)},
-				})
-			}
-		}
 
 		if !isDir {
 			fileCount++

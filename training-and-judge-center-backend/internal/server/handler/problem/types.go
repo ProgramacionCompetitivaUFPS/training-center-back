@@ -113,7 +113,7 @@ func buildResponse(p *domainProblem.Problem, display *user.Display) problemRespo
 	return problemResponse{
 		Slug:          p.Slug.String(),
 		Title:         p.Title.String(),
-		Statement:     p.Statement,
+		Statement:     p.Statement.Value(),
 		TimeLimit:     tl,
 		MemoryLimit:   ml,
 		LangOverrides: overrides,

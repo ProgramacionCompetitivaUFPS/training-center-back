@@ -66,11 +66,14 @@ func (usecase *CreateProblemUseCase) Execute(ctx context.Context, input CreatePr
 		}
 	}
 
-	if input.Statement != nil && len([]rune(*input.Statement)) > 150_000 {
-		fieldErrs = append(fieldErrs, apperror.FieldError{
-			Field:   "statement",
-			Message: "Statement must not exceed 150,000 characters",
-		})
+	stmt, err := problem.NewStatement(input.Statement)
+	if err != nil {
+		var valErr *apperror.AppError
+		if errors.As(err, &valErr) {
+			fieldErrs = append(fieldErrs, valErr.Details...)
+		} else {
+			return nil, apperror.NewInternal()
+		}
 	}
 
 	globalMaxTime, globalMaxMemory := usecase.platformSettings.GetGlobalLimits()
@@ -166,7 +169,7 @@ func (usecase *CreateProblemUseCase) Execute(ctx context.Context, input CreatePr
 		newID,
 		slug,
 		title,
-		input.Statement,
+		stmt,
 		timeLimit,
 		memoryLimit,
 		validOverrides,

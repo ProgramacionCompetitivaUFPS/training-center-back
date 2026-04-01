@@ -95,7 +95,7 @@ func (r *ProblemRepository) Save(ctx context.Context, p *problem.Problem) error 
 		p.ID,
 		slug,
 		title,
-		p.Statement,
+		p.Statement.Value(),
 		tl,
 		ml,
 		p.Tags.Values(),

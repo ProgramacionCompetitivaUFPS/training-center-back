@@ -15,6 +15,11 @@ import (
 	"github.com/training-judge-center/backend/pkg/apperror"
 )
 
+const (
+	multipartMemoryPaddingBytes = 50 << 20 // 50 MB extra for form fields and metadata
+	uploadContextTimeout        = 2 * time.Minute
+)
+
 func (h *Handler) UploadFiles(w http.ResponseWriter, r *http.Request) {
 	currentUser := middleware.GetCurrentUser(r.Context())
 	if currentUser == nil {
@@ -32,7 +37,7 @@ func (h *Handler) UploadFiles(w http.ResponseWriter, r *http.Request) {
 	maxDefaultBytes := int64(h.settings.GetMaxFileSizeDefaultMB()) << 20
 
 	// Parse form with dynamic memory logic (TestCase limit + 50MB padding)
-	maxMemory := maxTestCaseBytes + (50 << 20)
+	maxMemory := maxTestCaseBytes + multipartMemoryPaddingBytes
 	err := r.ParseMultipartForm(maxMemory)
 	if err != nil {
 		handler.WriteJSON(w, http.StatusBadRequest, apperror.AppError{Code: apperror.ErrCodeBadRequest, Message: "Failed to parse multipart form"})
@@ -67,7 +72,7 @@ func (h *Handler) UploadFiles(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	ctx, cancel := context.WithTimeout(r.Context(), 2*time.Minute)
+	ctx, cancel := context.WithTimeout(r.Context(), uploadContextTimeout)
 	defer cancel()
 
 	res, ucErr := h.uploadUC.Execute(ctx, appProblem.UploadProblemFilesInput{

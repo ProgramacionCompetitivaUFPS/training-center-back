@@ -42,3 +42,7 @@ func NewTitle(value string) (Title, error) {
 func (t Title) String() string {
 	return t.value
 }
+
+func RestoreTitle(value string) Title {
+	return Title{value: value}
+}

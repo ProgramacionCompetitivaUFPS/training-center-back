@@ -25,3 +25,7 @@ func NewTimeLimit(value int, maxGlobal int) (TimeLimit, error) {
 func (t TimeLimit) Value() int {
 	return t.value
 }
+
+func RestoreTimeLimit(value int) TimeLimit {
+	return TimeLimit{value: value}
+}

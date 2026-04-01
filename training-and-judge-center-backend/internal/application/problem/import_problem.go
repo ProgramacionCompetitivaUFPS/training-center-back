@@ -134,7 +134,7 @@ func (uc *ImportProblemUseCase) Execute(ctx context.Context, input ImportProblem
 		newID,
 		slug,
 		title,
-		pkg.Statement,
+		problem.RestoreStatement(pkg.Statement),
 		timeLimit,
 		memoryLimit,
 		nil,
@@ -244,7 +244,7 @@ func (uc *ImportProblemUseCase) uploadVerifier(
 	ext := strings.ToLower(filepath.Ext(cleanName))
 	lang, ok := uc.platformSettings.GetLanguageByExtension(ext)
 	if !ok {
-		return apperror.NewBadRequest(apperror.ErrCodeInvalidPackage, fmt.Sprintf("Unsupported %s file extension: %s", fileType, ext))
+		return apperror.NewBadRequest(ErrCodeProblemUnsupportedFileExt, fmt.Sprintf("Unsupported %s file extension: %s", fileType, ext))
 	}
 	fileKey := fmt.Sprintf("problems/%s/%s/%s", slugStr, fileType, cleanName)
 

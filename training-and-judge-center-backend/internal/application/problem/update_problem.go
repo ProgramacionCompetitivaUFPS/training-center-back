@@ -107,13 +107,6 @@ func (uc *UpdateProblemUseCase) Execute(ctx context.Context, input UpdateProblem
 		}
 	}
 
-	if input.Statement != nil && len([]rune(*input.Statement)) > 150_000 {
-		fieldErrs = append(fieldErrs, apperror.FieldError{
-			Field:   "statement",
-			Message: "Statement must not exceed 150,000 characters",
-		})
-	}
-
 	var validOverrides []problem.LanguageOverride
 	if input.LangOverrides != nil {
 		seenLangs := make(map[string]struct{}, len(input.LangOverrides))
@@ -186,9 +179,17 @@ func (uc *UpdateProblemUseCase) Execute(ctx context.Context, input UpdateProblem
 		return nil, apperror.NewValidation(fieldErrs)
 	}
 
-	var statementPtr **string
+	var statementPtr *problem.Statement
 	if input.Statement != nil {
-		statementPtr = &input.Statement
+		stmt, err := problem.NewStatement(input.Statement)
+		if err != nil {
+			var valErr *apperror.AppError
+			if errors.As(err, &valErr) {
+				return nil, apperror.NewValidation(valErr.Details)
+			}
+			return nil, apperror.NewInternal()
+		}
+		statementPtr = &stmt
 	}
 	p.UpdateMetadata(title, statementPtr, timeLimit, memoryLimit, validOverrides, tags)
 

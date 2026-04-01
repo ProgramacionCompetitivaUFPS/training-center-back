@@ -535,7 +535,7 @@ User does not have permission.
 - **FR-014**: The system MUST extract problem metadata from `problem.yaml`.
 - **FR-015**: The system MUST extract the problem statement from LaTeX files in `problem_statement/`.
 - **FR-016**: The system MUST import test cases from the `data/` directory structure.
-- **FR-017**: The system MUST import solutions from `submissions/accepted/` if present.
+- **FR-017**: The system MUST import solutions from `solutions/` if present.
 - **FR-018**: The system MUST import validators from appropriate directories if present.
 - **FR-019**: The system MUST return detailed logs of what was imported or what failed.
 - **FR-020**: The system MUST enforce a maximum ZIP size of 200 MB.

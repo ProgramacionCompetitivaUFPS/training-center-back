@@ -11,7 +11,7 @@ type Problem struct {
 	ID               string
 	Slug             Slug
 	Title            Title
-	Statement        *string
+	Statement        Statement
 	TimeLimit        *TimeLimit
 	MemoryLimit      *MemoryLimit
 	LangOverrides    []LanguageOverride
@@ -33,7 +33,7 @@ func NewProblem(
 	id string,
 	slug Slug,
 	title Title,
-	statement *string,
+	statement Statement,
 	timeLimit *TimeLimit,
 	memoryLimit *MemoryLimit,
 	langOverrides []LanguageOverride,
@@ -62,7 +62,7 @@ func NewProblem(
 
 func (p *Problem) UpdateMetadata(
 	title *Title,
-	statement **string,
+	statement *Statement,
 	timeLimit **TimeLimit,
 	memoryLimit **MemoryLimit,
 	langOverrides []LanguageOverride,
@@ -220,19 +220,14 @@ func RestoreProblem(
 ) *Problem {
 	var tl *TimeLimit
 	if timeLimit != nil {
-		tl = &TimeLimit{value: *timeLimit}
+		restored := RestoreTimeLimit(*timeLimit)
+		tl = &restored
 	}
 
 	var ml *MemoryLimit
 	if memoryLimit != nil {
-		ml = &MemoryLimit{value: *memoryLimit}
-	}
-
-	var tagsVO Tags
-	if tags != nil {
-		tagsVO = Tags{values: tags}
-	} else {
-		tagsVO = Tags{values: []string{}}
+		restored := RestoreMemoryLimit(*memoryLimit)
+		ml = &restored
 	}
 
 	if modifierIDs == nil {
@@ -249,15 +244,15 @@ func RestoreProblem(
 
 	return &Problem{
 		ID:               id,
-		Slug:             Slug{value: slug},
-		Title:            Title{value: title},
-		Statement:        statement,
+		Slug:             RestoreSlug(slug),
+		Title:            RestoreTitle(title),
+		Statement:        RestoreStatement(statement),
 		TimeLimit:        tl,
 		MemoryLimit:      ml,
 		LangOverrides:    langOverrides,
-		Tags:             tagsVO,
-		Status:           Status{value: status},
-		Accessibility:    Accessibility{value: accessibility},
+		Tags:             RestoreTags(tags),
+		Status:           RestoreStatus(status),
+		Accessibility:    RestoreAccessibility(accessibility),
 		AuthorID:         authorID,
 		ModifierIDs:      modifierIDs,
 		TestCasesKey:     testCasesKey,

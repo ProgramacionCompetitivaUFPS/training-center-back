@@ -37,3 +37,7 @@ func NewSlug(value string) (Slug, error) {
 func (s Slug) String() string {
 	return s.value
 }
+
+func RestoreSlug(value string) Slug {
+	return Slug{value: value}
+}

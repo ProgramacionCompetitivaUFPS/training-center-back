@@ -52,3 +52,10 @@ func NewTags(values []string, allowedTags map[string]struct{}) (Tags, error) {
 func (t Tags) Values() []string {
 	return t.values
 }
+
+func RestoreTags(values []string) Tags {
+	if values == nil {
+		return Tags{values: []string{}}
+	}
+	return Tags{values: values}
+}

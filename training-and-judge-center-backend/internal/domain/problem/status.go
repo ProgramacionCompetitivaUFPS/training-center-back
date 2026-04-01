@@ -32,3 +32,7 @@ func (s Status) String() string {
 func (s Status) IsPublished() bool {
 	return s.value == "PUBLISHED"
 }
+
+func RestoreStatus(value string) Status {
+	return Status{value: value}
+}

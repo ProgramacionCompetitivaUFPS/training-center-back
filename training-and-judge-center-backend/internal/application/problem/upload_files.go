@@ -177,7 +177,7 @@ func (uc *UploadProblemFilesUseCase) handleTestCases(ctx context.Context, p *pro
 	}
 
 	if err := g.Wait(); err != nil {
-		return fileAction{toDeleteOnFailure: allNewKeys}, fmt.Errorf("failed to upload sample test cases concurrently: %w", err)
+		return fileAction{toDeleteOnFailure: allNewKeys}, apperror.NewInternal()
 	}
 
 	action := fileAction{toDeleteOnFailure: allNewKeys}

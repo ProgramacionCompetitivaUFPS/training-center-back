@@ -28,3 +28,7 @@ func NewAccessibilityPublic() Accessibility {
 func (a Accessibility) String() string {
 	return a.value
 }
+
+func RestoreAccessibility(value string) Accessibility {
+	return Accessibility{value: value}
+}

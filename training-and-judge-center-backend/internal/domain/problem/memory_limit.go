@@ -25,3 +25,7 @@ func NewMemoryLimit(value int, maxGlobal int) (MemoryLimit, error) {
 func (m MemoryLimit) Value() int {
 	return m.value
 }
+
+func RestoreMemoryLimit(value int) MemoryLimit {
+	return MemoryLimit{value: value}
+}
