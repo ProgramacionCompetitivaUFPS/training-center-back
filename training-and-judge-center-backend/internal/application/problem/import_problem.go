@@ -178,8 +178,7 @@ func (uc *ImportProblemUseCase) Execute(ctx context.Context, input ImportProblem
 	}
 
 	for _, sol := range pkg.Solutions {
-		filename := filepath.Base(sol.Path)
-		cleanName := strings.ReplaceAll(filename, "/", "_")
+		cleanName := filepath.Base(sol.Path)
 		lang, ok := uc.platformSettings.GetLanguageByExtension(strings.ToLower(filepath.Ext(cleanName)))
 		if !ok {
 			continue
@@ -239,8 +238,7 @@ func (uc *ImportProblemUseCase) uploadVerifier(
 	uploadedKeys *[]string,
 	cleanup func(),
 ) error {
-	filename := filepath.Base(f.Path)
-	cleanName := strings.ReplaceAll(filename, "/", "_")
+	cleanName := filepath.Base(f.Path)
 	ext := strings.ToLower(filepath.Ext(cleanName))
 	lang, ok := uc.platformSettings.GetLanguageByExtension(ext)
 	if !ok {

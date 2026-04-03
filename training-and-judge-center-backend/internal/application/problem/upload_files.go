@@ -196,7 +196,7 @@ func (uc *UploadProblemFilesUseCase) handleSolution(ctx context.Context, p *prob
 		})
 	}
 
-	cleanName := strings.ReplaceAll(input.FileName, "/", "_")
+	cleanName := filepath.Base(input.FileName)
 	lang, err := uc.getLanguageForFile(cleanName, FileTypeSolution)
 	if err != nil {
 		return fileAction{}, err
@@ -240,7 +240,7 @@ func (uc *UploadProblemFilesUseCase) handleChecker(ctx context.Context, p *probl
 		})
 	}
 
-	cleanName := strings.ReplaceAll(input.FileName, "/", "_")
+	cleanName := filepath.Base(input.FileName)
 	lang, err := uc.getLanguageForFile(cleanName, FileTypeChecker)
 	if err != nil {
 		return fileAction{}, err
@@ -276,7 +276,7 @@ func (uc *UploadProblemFilesUseCase) handleValidator(ctx context.Context, p *pro
 		})
 	}
 
-	cleanName := strings.ReplaceAll(input.FileName, "/", "_")
+	cleanName := filepath.Base(input.FileName)
 	lang, err := uc.getLanguageForFile(cleanName, FileTypeValidator)
 	if err != nil {
 		return fileAction{}, err
