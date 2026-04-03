@@ -6,18 +6,20 @@ import (
 )
 
 type Handler struct {
-	createUC         *appProblem.CreateProblemUseCase
-	importUC         *appProblem.ImportProblemUseCase
-	updateUC         *appProblem.UpdateProblemUseCase
-	uploadUC         *appProblem.UploadProblemFilesUseCase
-	deleteFileUC     *appProblem.DeleteProblemFileUseCase
-	addModifierUC    *appProblem.AddModifierUseCase
-	removeModifierUC *appProblem.RemoveModifierUseCase
-	listModifiersUC  *appProblem.ListModifiersUseCase
-	getProblemUC     *appProblem.GetProblemUseCase
-	listProblemsUC   *appProblem.ListProblemsUseCase
-	userProvider     appProblem.UserProvider
-	settings         domainProblem.PlatformSettingsService
+	createUC              *appProblem.CreateProblemUseCase
+	importUC              *appProblem.ImportProblemUseCase
+	updateUC              *appProblem.UpdateProblemUseCase
+	uploadUC              *appProblem.UploadProblemFilesUseCase
+	deleteFileUC          *appProblem.DeleteProblemFileUseCase
+	addModifierUC         *appProblem.AddModifierUseCase
+	removeModifierUC      *appProblem.RemoveModifierUseCase
+	listModifiersUC       *appProblem.ListModifiersUseCase
+	getProblemUC          *appProblem.GetProblemUseCase
+	listProblemsUC        *appProblem.ListProblemsUseCase
+	unpublishUC           *appProblem.UnpublishProblemUseCase
+	changeAccessibilityUC *appProblem.ChangeAccessibilityUseCase
+	userProvider          appProblem.UserProvider
+	settings              domainProblem.PlatformSettingsService
 }
 
 func NewHandler(
@@ -31,21 +33,25 @@ func NewHandler(
 	listModifiersUC *appProblem.ListModifiersUseCase,
 	getProblemUC *appProblem.GetProblemUseCase,
 	listProblemsUC *appProblem.ListProblemsUseCase,
+	unpublishUC *appProblem.UnpublishProblemUseCase,
+	changeAccessibilityUC *appProblem.ChangeAccessibilityUseCase,
 	userProvider appProblem.UserProvider,
 	settings domainProblem.PlatformSettingsService,
 ) *Handler {
 	return &Handler{
-		createUC:         createUC,
-		importUC:         importUC,
-		updateUC:         updateUC,
-		uploadUC:         uploadUC,
-		deleteFileUC:     deleteFileUC,
-		addModifierUC:    addModifierUC,
-		removeModifierUC: removeModifierUC,
-		listModifiersUC:  listModifiersUC,
-		getProblemUC:     getProblemUC,
-		listProblemsUC:   listProblemsUC,
-		userProvider:     userProvider,
-		settings:         settings,
+		createUC:              createUC,
+		importUC:              importUC,
+		updateUC:              updateUC,
+		uploadUC:              uploadUC,
+		deleteFileUC:          deleteFileUC,
+		addModifierUC:         addModifierUC,
+		removeModifierUC:      removeModifierUC,
+		listModifiersUC:       listModifiersUC,
+		getProblemUC:          getProblemUC,
+		listProblemsUC:        listProblemsUC,
+		unpublishUC:           unpublishUC,
+		changeAccessibilityUC: changeAccessibilityUC,
+		userProvider:          userProvider,
+		settings:              settings,
 	}
 }

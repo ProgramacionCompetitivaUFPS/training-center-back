@@ -100,6 +100,15 @@ func (p *Problem) CanBeEditedBy(userID UserID, isAdmin bool) bool {
 	return false
 }
 
+func (p *Problem) Unpublish() error {
+	if !p.Status.IsPublished() {
+		return apperror.NewConflict(ErrCodeAlreadyDraft, "Problem is already unpublished")
+	}
+	p.Status = NewStatusDraft()
+	p.UpdatedAt = time.Now().UTC()
+	return nil
+}
+
 func (p *Problem) UpdateAccessibility(acc Accessibility) {
 	p.Accessibility = acc
 	p.UpdatedAt = time.Now().UTC()
