@@ -1,6 +1,7 @@
 package problem
 
 import (
+	appProblem "github.com/training-judge-center/backend/internal/application/problem"
 	domainProblem "github.com/training-judge-center/backend/internal/domain/problem"
 	"github.com/training-judge-center/backend/internal/domain/user"
 )
@@ -30,24 +31,6 @@ type updateProblemRequest struct {
 	Tags          []string              `json:"tags"`
 	Accessibility *string               `json:"accessibility"`
 }
-
-type problemResponse struct {
-	Slug          string             `json:"slug"`
-	Title         string             `json:"title"`
-	Statement     *string            `json:"statement"`
-	TimeLimit     *int               `json:"timeLimit"`
-	MemoryLimit   *int               `json:"memoryLimit"`
-	LangOverrides []langOverrideResp `json:"languageOverrides"`
-	Tags          []string           `json:"tags"`
-	Status        string             `json:"status"`
-	Accessibility string             `json:"accessibility"`
-	Author        authorResp         `json:"author"`
-	Modifiers     []interface{}      `json:"modifiers"`
-	Files         filesResp          `json:"files"`
-	CreatedAt     string             `json:"createdAt"`
-	UpdatedAt     string             `json:"updatedAt"`
-}
-
 
 
 type langOverrideResp struct {
@@ -119,7 +102,19 @@ type listProblemsResponse struct {
 	Pagination paginationResp        `json:"pagination"`
 }
 
-func buildResponse(p *domainProblem.Problem, display *user.Display) problemResponse {
+func convertLangOverrides(overrides []langOverrideRequest) []appProblem.LanguageOverrideInput {
+	result := make([]appProblem.LanguageOverrideInput, 0, len(overrides))
+	for _, lo := range overrides {
+		result = append(result, appProblem.LanguageOverrideInput{
+			Language:    lo.Language,
+			TimeLimit:   lo.TimeLimit,
+			MemoryLimit: lo.MemoryLimit,
+		})
+	}
+	return result
+}
+
+func buildResponse(p *domainProblem.Problem, display *user.Display) getProblemResponse {
 	author := authorResp{Nickname: "unknown", Name: ""}
 	if display != nil {
 		author = authorResp{Nickname: display.Nickname, Name: display.Name}
@@ -146,7 +141,11 @@ func buildResponse(p *domainProblem.Problem, display *user.Display) problemRespo
 		ml = &v
 	}
 
-	tags := p.Tags.Values()
+	var judgingUpdatedAt *string
+	if p.JudgingUpdatedAt != nil {
+		s := p.JudgingUpdatedAt.Format("2006-01-02T15:04:05Z")
+		judgingUpdatedAt = &s
+	}
 
 	solutions := make([]solutionResp, 0, len(p.Solutions))
 	for _, sol := range p.Solutions {
@@ -156,25 +155,25 @@ func buildResponse(p *domainProblem.Problem, display *user.Display) problemRespo
 		})
 	}
 
-	return problemResponse{
+	return getProblemResponse{
 		Slug:          p.Slug.String(),
 		Title:         p.Title.String(),
 		Statement:     p.Statement.Value(),
 		TimeLimit:     tl,
 		MemoryLimit:   ml,
 		LangOverrides: overrides,
-		Tags:          tags,
+		Tags:          p.Tags.Values(),
 		Status:        p.Status.String(),
 		Accessibility: p.Accessibility.String(),
 		Author:        author,
-		Modifiers:     []interface{}{},
-		Files: filesResp{
+		Files: &filesResp{
 			TestCases: p.TestCasesKey != nil,
 			Solutions: solutions,
 			Checker:   p.Checker != nil,
 			Validator: p.Validator != nil,
 		},
-		CreatedAt: p.CreatedAt.Format("2006-01-02T15:04:05Z"),
-		UpdatedAt: p.UpdatedAt.Format("2006-01-02T15:04:05Z"),
+		ProblemJudgingUpdatedAt: judgingUpdatedAt,
+		CreatedAt:               p.CreatedAt.Format("2006-01-02T15:04:05Z"),
+		UpdatedAt:               p.UpdatedAt.Format("2006-01-02T15:04:05Z"),
 	}
 }

@@ -337,10 +337,13 @@ func judgingFileFromDB(data []byte) (*problem.JudgingFile, error) {
 }
 
 func (r *ProblemRepository) Delete(ctx context.Context, id string) error {
-	_, err := r.db.Exec(ctx, `DELETE FROM problems WHERE id = $1`, id)
+	tag, err := r.db.Exec(ctx, `DELETE FROM problems WHERE id = $1`, id)
 	if err != nil {
 		slog.ErrorContext(ctx, "Database error in Delete", "error", err, "problem_id", id)
 		return apperror.NewInternal()
+	}
+	if tag.RowsAffected() == 0 {
+		return apperror.NewNotFound(apperror.ErrCodeNotFound, "problem not found")
 	}
 	return nil
 }
@@ -357,7 +360,9 @@ func (r *ProblemRepository) List(ctx context.Context, filters problem.ListFilter
 		return s
 	}
 
-	conds = append(conds, fmt.Sprintf("status = ANY(%s)", nextArg(filters.Statuses)))
+	if len(filters.Statuses) > 0 {
+		conds = append(conds, fmt.Sprintf("status = ANY(%s)", nextArg(filters.Statuses)))
+	}
 
 	if filters.ViewerModifierID != nil {
 		p := nextArg(*filters.ViewerModifierID)

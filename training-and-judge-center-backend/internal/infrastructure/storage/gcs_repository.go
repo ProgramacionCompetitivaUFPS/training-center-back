@@ -3,6 +3,7 @@ package storage
 import (
 	"context"
 	"fmt"
+	"log/slog"
 
 	"cloud.google.com/go/storage"
 	appProblem "github.com/training-judge-center/backend/internal/application/problem"
@@ -29,7 +30,9 @@ func (r *GCSProblemFileRepository) UploadFile(ctx context.Context, path string, 
 	writer := obj.NewWriter(ctx)
 
 	if _, err := writer.Write(content); err != nil {
-		_ = writer.Close()
+		if closeErr := writer.Close(); closeErr != nil {
+			slog.ErrorContext(ctx, "GCS writer close failed after write error", "close_error", closeErr, "path", path)
+		}
 		return fmt.Errorf("failed to write data to GCS object %s: %w", path, err)
 	}
 

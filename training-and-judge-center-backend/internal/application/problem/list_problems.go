@@ -54,7 +54,6 @@ func (uc *ListProblemsUseCase) Execute(ctx context.Context, in ListProblemsInput
 	}
 
 	filters := problem.ListFilters{
-		Statuses:      []string{"PUBLISHED", "DRAFT"},
 		Tags:          in.Tags,
 		Accessibility: in.Accessibility,
 		Page:          in.Page,

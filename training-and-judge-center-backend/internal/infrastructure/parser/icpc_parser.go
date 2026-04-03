@@ -7,6 +7,7 @@ import (
 	"io"
 	"log/slog"
 	"math"
+	"os"
 	"path/filepath"
 	"strings"
 
@@ -303,6 +304,7 @@ func (p *ICPCParser) extractFileContent(file *zip.File) ([]byte, error) {
 		return nil, err
 	}
 	defer rc.Close()
+	// +1024 buffer to avoid truncating at the boundary due to minor metadata overhead in the ZIP entry
 	lr := io.LimitReader(rc, int64(file.UncompressedSize64)+1024)
 	return io.ReadAll(lr)
 }
@@ -415,6 +417,9 @@ func (p *ICPCParser) prepareZip(zipData []byte) (*ParsedZip, error) {
 		}
 		if strings.Contains(cleanPath, "__MACOSX") || strings.HasSuffix(cleanPath, ".DS_Store") {
 			continue
+		}
+		if f.FileInfo().Mode()&os.ModeSymlink != 0 {
+			return nil, apperror.NewValidation([]apperror.FieldError{{Field: "file", Message: "ZIP contains symlinks which are not allowed"}})
 		}
 
 		isDir := f.FileInfo().IsDir()

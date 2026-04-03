@@ -2,7 +2,6 @@ package problem
 
 import (
 	"encoding/json"
-	"errors"
 	"io"
 	"log/slog"
 	"net/http"
@@ -32,14 +31,7 @@ func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	langOverrides := make([]appProblem.LanguageOverrideInput, 0, len(body.LangOverrides))
-	for _, lo := range body.LangOverrides {
-		langOverrides = append(langOverrides, appProblem.LanguageOverrideInput{
-			Language:    lo.Language,
-			TimeLimit:   lo.TimeLimit,
-			MemoryLimit: lo.MemoryLimit,
-		})
-	}
+	langOverrides := convertLangOverrides(body.LangOverrides)
 
 	result, ucErr := h.createUC.Execute(r.Context(), appProblem.CreateProblemInput{
 		Slug:          body.Slug,
@@ -58,7 +50,10 @@ func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
 	}
 
 	p := result.Problem
-	authorDisplay, _ := h.userProvider.GetDisplay(r.Context(), p.AuthorID.Value())
+	authorDisplay, err := h.userProvider.GetDisplay(r.Context(), p.AuthorID.Value())
+	if err != nil {
+		slog.DebugContext(r.Context(), "failed to fetch author display", "error", err, "user_id", p.AuthorID.Value())
+	}
 
 	handler.WriteJSON(w, http.StatusCreated, buildResponse(p, authorDisplay))
 }
@@ -84,14 +79,7 @@ func (h *Handler) Update(w http.ResponseWriter, r *http.Request) {
 
 	var langOverrides []appProblem.LanguageOverrideInput
 	if body.LangOverrides != nil {
-		langOverrides = make([]appProblem.LanguageOverrideInput, 0, len(body.LangOverrides))
-		for _, lo := range body.LangOverrides {
-			langOverrides = append(langOverrides, appProblem.LanguageOverrideInput{
-				Language:    lo.Language,
-				TimeLimit:   lo.TimeLimit,
-				MemoryLimit: lo.MemoryLimit,
-			})
-		}
+		langOverrides = convertLangOverrides(body.LangOverrides)
 	}
 
 	result, ucErr := h.updateUC.Execute(r.Context(), appProblem.UpdateProblemInput{
@@ -107,18 +95,15 @@ func (h *Handler) Update(w http.ResponseWriter, r *http.Request) {
 	})
 
 	if ucErr != nil {
-		var appErr *apperror.AppError
-		if errors.As(ucErr, &appErr) {
-			handler.WriteError(w, appErr)
-		} else {
-			slog.Error("Unexpected error in UpdateProblem", "error", ucErr, "slug", slug)
-			handler.WriteError(w, apperror.NewInternal())
-		}
+		handler.WriteError(w, ucErr)
 		return
 	}
 
 	p := result.Problem
-	authorDisplay, _ := h.userProvider.GetDisplay(r.Context(), p.AuthorID.Value())
+	authorDisplay, err := h.userProvider.GetDisplay(r.Context(), p.AuthorID.Value())
+	if err != nil {
+		slog.DebugContext(r.Context(), "failed to fetch author display", "error", err, "user_id", p.AuthorID.Value())
+	}
 	handler.WriteJSON(w, http.StatusOK, buildResponse(p, authorDisplay))
 }
 
@@ -185,6 +170,9 @@ func (h *Handler) Import(w http.ResponseWriter, r *http.Request) {
 	}
 
 	p := result.Problem
-	authorDisplay, _ := h.userProvider.GetDisplay(r.Context(), p.AuthorID.Value())
+	authorDisplay, err := h.userProvider.GetDisplay(r.Context(), p.AuthorID.Value())
+	if err != nil {
+		slog.DebugContext(r.Context(), "failed to fetch author display", "error", err, "user_id", p.AuthorID.Value())
+	}
 	handler.WriteJSON(w, http.StatusCreated, buildResponse(p, authorDisplay))
 }
