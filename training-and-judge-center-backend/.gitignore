@@ -32,3 +32,7 @@ Thumbs.db
 
 # Local storage
 .local_storage
+
+# E2E test temp files
+tmp_e2e_*
+tmp_dummy_*
