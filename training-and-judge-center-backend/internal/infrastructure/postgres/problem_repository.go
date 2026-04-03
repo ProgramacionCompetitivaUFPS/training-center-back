@@ -336,6 +336,15 @@ func judgingFileFromDB(data []byte) (*problem.JudgingFile, error) {
 	return &j, nil
 }
 
+func (r *ProblemRepository) Delete(ctx context.Context, id string) error {
+	_, err := r.db.Exec(ctx, `DELETE FROM problems WHERE id = $1`, id)
+	if err != nil {
+		slog.ErrorContext(ctx, "Database error in Delete", "error", err, "problem_id", id)
+		return apperror.NewInternal()
+	}
+	return nil
+}
+
 func (r *ProblemRepository) List(ctx context.Context, filters problem.ListFilters) ([]*problem.Problem, int, error) {
 	var conds []string
 	var args []any

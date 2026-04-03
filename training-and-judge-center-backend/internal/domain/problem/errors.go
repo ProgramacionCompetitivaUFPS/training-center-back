@@ -8,4 +8,5 @@ const (
 	ErrCodeModifierNotFound      = "MODIFIER_NOT_FOUND"
 	ErrCodeAlreadyDraft          = "ALREADY_DRAFT"
 	ErrCodeAlreadyPublished      = "ALREADY_PUBLISHED"
+	ErrCodeSlugMismatch          = "SLUG_MISMATCH"
 )

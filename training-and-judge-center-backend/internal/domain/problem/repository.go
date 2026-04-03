@@ -25,4 +25,5 @@ type Repository interface {
 	FindBySlug(ctx context.Context, slug Slug) (*Problem, error)
 	ExistsBySlug(ctx context.Context, slug Slug) (bool, error)
 	List(ctx context.Context, filters ListFilters) ([]*Problem, int, error)
+	Delete(ctx context.Context, id string) error
 }

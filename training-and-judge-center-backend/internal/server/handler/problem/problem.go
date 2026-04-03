@@ -18,6 +18,7 @@ type Handler struct {
 	listProblemsUC        *appProblem.ListProblemsUseCase
 	unpublishUC           *appProblem.UnpublishProblemUseCase
 	changeAccessibilityUC *appProblem.ChangeAccessibilityUseCase
+	deleteProblemUC       *appProblem.DeleteProblemUseCase
 	userProvider          appProblem.UserProvider
 	settings              domainProblem.PlatformSettingsService
 }
@@ -35,6 +36,7 @@ func NewHandler(
 	listProblemsUC *appProblem.ListProblemsUseCase,
 	unpublishUC *appProblem.UnpublishProblemUseCase,
 	changeAccessibilityUC *appProblem.ChangeAccessibilityUseCase,
+	deleteProblemUC *appProblem.DeleteProblemUseCase,
 	userProvider appProblem.UserProvider,
 	settings domainProblem.PlatformSettingsService,
 ) *Handler {
@@ -51,6 +53,7 @@ func NewHandler(
 		listProblemsUC:        listProblemsUC,
 		unpublishUC:           unpublishUC,
 		changeAccessibilityUC: changeAccessibilityUC,
+		deleteProblemUC:       deleteProblemUC,
 		userProvider:          userProvider,
 		settings:              settings,
 	}

@@ -96,6 +96,7 @@ func main() {
 	listProblemsUseCase := appProblem.NewListProblemsUseCase(problemRepo, userProvider)
 	unpublishProblemUseCase := appProblem.NewUnpublishProblemUseCase(problemRepo)
 	changeAccessibilityUseCase := appProblem.NewChangeAccessibilityUseCase(problemRepo)
+	deleteProblemUseCase := appProblem.NewDeleteProblemUseCase(problemRepo, fileStorage)
 
 	problemHandler := problem.NewHandler(
 		createProblemUseCase,
@@ -110,6 +111,7 @@ func main() {
 		listProblemsUseCase,
 		unpublishProblemUseCase,
 		changeAccessibilityUseCase,
+		deleteProblemUseCase,
 		userProvider,
 		settingsProvider,
 	)
