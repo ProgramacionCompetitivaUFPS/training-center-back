@@ -202,7 +202,10 @@ Problem details retrieved successfully.
   ],
   "files": {
     "testCases": true,
-    "solutions": ["solution.cpp", "solution.py"],
+    "solutions": [
+      {"filename": "solution.cpp", "language": "cpp20"},
+      {"filename": "solution.py", "language": "python310"}
+    ],
     "checker": false,
     "validator": true
   },
