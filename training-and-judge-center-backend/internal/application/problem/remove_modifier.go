@@ -34,14 +34,14 @@ func (uc *RemoveModifierUseCase) Execute(ctx context.Context, input RemoveModifi
 		return apperror.NewNotFound(apperror.ErrCodeNotFound, "Problem not found")
 	}
 
-	isAuthor := p.AuthorID == input.CurrentUser.ID
+	isAuthor := p.AuthorID == problem.RestoreUserID(input.CurrentUser.ID)
 	isAdmin := input.CurrentUser.Role == user.RoleAdmin
 
 	if !isAuthor && !isAdmin {
 		return apperror.NewForbidden(apperror.ErrCodeForbidden, "Only the author or Admin can remove modifiers")
 	}
 
-	if err := p.RemoveModifier(input.UserID); err != nil {
+	if err := p.RemoveModifier(problem.RestoreUserID(input.UserID)); err != nil {
 		return err
 	}
 

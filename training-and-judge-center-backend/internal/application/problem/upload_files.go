@@ -79,7 +79,7 @@ func (uc *UploadProblemFilesUseCase) Execute(ctx context.Context, input UploadPr
 		return nil, apperror.NewBadRequest(ErrCodeProblemIsPublished, "Cannot upload files to a published problem. Unpublish first.")
 	}
 
-	if !p.CanBeEditedBy(input.CurrentUser.ID, input.CurrentUser.Role) {
+	if !p.CanBeEditedBy(problem.RestoreUserID(input.CurrentUser.ID), input.CurrentUser.Role == user.RoleAdmin) {
 		return nil, apperror.NewForbidden(apperror.ErrCodeForbidden, "Only the problem author, Admin, or assigned modifiers can update this problem")
 	}
 

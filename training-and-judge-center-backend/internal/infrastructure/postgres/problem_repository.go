@@ -91,6 +91,11 @@ func (r *ProblemRepository) Save(ctx context.Context, p *problem.Problem) error 
 		ml = &v
 	}
 
+	modifierStrings := make([]string, len(p.ModifierIDs))
+	for i, id := range p.ModifierIDs {
+		modifierStrings[i] = id.Value()
+	}
+
 	_, err = r.db.Exec(ctx, query,
 		p.ID,
 		slug,
@@ -101,8 +106,8 @@ func (r *ProblemRepository) Save(ctx context.Context, p *problem.Problem) error 
 		p.Tags.Values(),
 		status,
 		accessibility,
-		p.AuthorID,
-		p.ModifierIDs,
+		p.AuthorID.Value(),
+		modifierStrings,
 		langOverridesJSON,
 		p.TestCasesKey,
 		solutionsJSON,
@@ -197,6 +202,11 @@ func scanProblem(row pgx.Row) (*problem.Problem, error) {
 		return nil, apperror.NewInternal()
 	}
 
+	modifierIDs := make([]problem.UserID, len(pModifiers))
+	for i, id := range pModifiers {
+		modifierIDs[i] = problem.RestoreUserID(id)
+	}
+
 	return problem.RestoreProblem(
 		pId,
 		pSlug,
@@ -207,8 +217,8 @@ func scanProblem(row pgx.Row) (*problem.Problem, error) {
 		pTags,
 		pStatus,
 		pAccessibility,
-		pAuthorId,
-		pModifiers,
+		problem.RestoreUserID(pAuthorId),
+		modifierIDs,
 		langOverrides,
 		pTestCasesKey,
 		solutions,

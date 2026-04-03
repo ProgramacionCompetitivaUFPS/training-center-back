@@ -3,7 +3,6 @@ package problem
 import (
 	"time"
 
-	"github.com/training-judge-center/backend/internal/domain/user"
 	"github.com/training-judge-center/backend/pkg/apperror"
 )
 
@@ -18,8 +17,8 @@ type Problem struct {
 	Tags             Tags
 	Status           Status
 	Accessibility    Accessibility
-	AuthorID         string
-	ModifierIDs      []string
+	AuthorID         UserID
+	ModifierIDs      []UserID
 	TestCasesKey     *string
 	Solutions        []JudgingFile
 	Checker          *JudgingFile
@@ -38,7 +37,7 @@ func NewProblem(
 	memoryLimit *MemoryLimit,
 	langOverrides []LanguageOverride,
 	tags Tags,
-	authorID string,
+	authorID UserID,
 ) *Problem {
 	now := time.Now().UTC()
 	return &Problem{
@@ -53,7 +52,7 @@ func NewProblem(
 		Status:        NewStatusDraft(),
 		Accessibility: NewAccessibilityPrivate(),
 		AuthorID:      authorID,
-		ModifierIDs:   []string{},
+		ModifierIDs:   []UserID{},
 		Solutions:     []JudgingFile{},
 		CreatedAt:     now,
 		UpdatedAt:     now,
@@ -89,8 +88,8 @@ func (p *Problem) UpdateMetadata(
 	p.UpdatedAt = time.Now().UTC()
 }
 
-func (p *Problem) CanBeEditedBy(userID string, role user.Role) bool {
-	if p.AuthorID == userID || role == user.RoleAdmin {
+func (p *Problem) CanBeEditedBy(userID UserID, isAdmin bool) bool {
+	if p.AuthorID == userID || isAdmin {
 		return true
 	}
 	for _, id := range p.ModifierIDs {
@@ -106,7 +105,7 @@ func (p *Problem) UpdateAccessibility(acc Accessibility) {
 	p.UpdatedAt = time.Now().UTC()
 }
 
-func (p *Problem) AddModifier(userID string) error {
+func (p *Problem) AddModifier(userID UserID) error {
 	for _, id := range p.ModifierIDs {
 		if id == userID {
 			return apperror.NewConflict(ErrCodeModifierAlreadyExists, "User is already a modifier of this problem")
@@ -117,9 +116,9 @@ func (p *Problem) AddModifier(userID string) error {
 	return nil
 }
 
-func (p *Problem) RemoveModifier(userID string) error {
+func (p *Problem) RemoveModifier(userID UserID) error {
 	found := false
-	var newModifiers []string
+	var newModifiers []UserID
 	for _, id := range p.ModifierIDs {
 		if id == userID {
 			found = true
@@ -149,9 +148,6 @@ func (p *Problem) RemoveTestCases() {
 	p.touchJudgingUpdatedAt(time.Now().UTC())
 }
 
-// AddSolution adds a new solution or replaces one with the same filename.
-// Returns the replaced JudgingFile if one existed, nil otherwise.
-// The caller should use this to clean up the old storage key when keys differ.
 func (p *Problem) AddSolution(solution JudgingFile) *JudgingFile {
 	for i, sol := range p.Solutions {
 		if sol.Filename() == solution.Filename() {
@@ -207,8 +203,8 @@ func RestoreProblem(
 	tags []string,
 	status string,
 	accessibility string,
-	authorID string,
-	modifierIDs []string,
+	authorID UserID,
+	modifierIDs []UserID,
 	langOverrides []LanguageOverride,
 	testCasesKey *string,
 	solutions []JudgingFile,
@@ -231,7 +227,7 @@ func RestoreProblem(
 	}
 
 	if modifierIDs == nil {
-		modifierIDs = []string{}
+		modifierIDs = []UserID{}
 	}
 
 	if langOverrides == nil {

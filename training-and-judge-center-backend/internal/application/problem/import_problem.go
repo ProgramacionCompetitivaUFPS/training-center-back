@@ -139,7 +139,7 @@ func (uc *ImportProblemUseCase) Execute(ctx context.Context, input ImportProblem
 		memoryLimit,
 		nil,
 		problem.Tags{},
-		input.CurrentUser.ID,
+		problem.RestoreUserID(input.CurrentUser.ID),
 	)
 
 	if pkg.ZipData != nil {

@@ -1,3 +1,4 @@
 # Agent skills (local / no compartir)
 .agent/
 .cursor/
+.claude/

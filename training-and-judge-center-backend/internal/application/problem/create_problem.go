@@ -174,7 +174,7 @@ func (usecase *CreateProblemUseCase) Execute(ctx context.Context, input CreatePr
 		memoryLimit,
 		validOverrides,
 		tags,
-		input.CurrentUser.ID,
+		problem.RestoreUserID(input.CurrentUser.ID),
 	)
 
 	if err := usecase.repo.Save(ctx, newProblem); err != nil {

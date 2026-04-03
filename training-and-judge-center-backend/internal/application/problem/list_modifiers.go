@@ -27,9 +27,13 @@ func (uc *ListModifiersUseCase) Execute(ctx context.Context, slugStr string, cur
 		return nil, apperror.NewNotFound(apperror.ErrCodeNotFound, "Problem not found")
 	}
 
-	if !p.CanBeEditedBy(currentUser.ID, currentUser.Role) {
+	if !p.CanBeEditedBy(problem.RestoreUserID(currentUser.ID), currentUser.Role == user.RoleAdmin) {
 		return nil, apperror.NewForbidden(apperror.ErrCodeForbidden, "Only the problem author, Admin, or assigned modifiers can view modifiers")
 	}
 
-	return p.ModifierIDs, nil
+	modifiers := make([]string, len(p.ModifierIDs))
+	for i, id := range p.ModifierIDs {
+		modifiers[i] = id.Value()
+	}
+	return modifiers, nil
 }

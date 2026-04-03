@@ -38,7 +38,7 @@ func (uc *AddModifierUseCase) Execute(ctx context.Context, input AddModifierInpu
 		return apperror.NewNotFound(apperror.ErrCodeNotFound, "Problem not found")
 	}
 
-	isAuthor := p.AuthorID == input.CurrentUser.ID
+	isAuthor := p.AuthorID == problem.RestoreUserID(input.CurrentUser.ID)
 	isAdmin := input.CurrentUser.Role == user.RoleAdmin
 
 	if !isAuthor && !isAdmin {
@@ -54,7 +54,7 @@ func (uc *AddModifierUseCase) Execute(ctx context.Context, input AddModifierInpu
 		return apperror.NewNotFound(apperror.ErrCodeNotFound, "user not found")
 	}
 
-	if err := p.AddModifier(input.UserID); err != nil {
+	if err := p.AddModifier(problem.RestoreUserID(input.UserID)); err != nil {
 		return err
 	}
 

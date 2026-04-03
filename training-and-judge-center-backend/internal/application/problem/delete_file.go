@@ -47,7 +47,7 @@ func (usecase *DeleteProblemFileUseCase) Execute(ctx context.Context, input Dele
 		return apperror.NewBadRequest(ErrCodeProblemIsPublished, "Cannot delete files from a published problem. Unpublish first.")
 	}
 
-	if !foundProblem.CanBeEditedBy(input.CurrentUser.ID, input.CurrentUser.Role) {
+	if !foundProblem.CanBeEditedBy(problem.RestoreUserID(input.CurrentUser.ID), input.CurrentUser.Role == user.RoleAdmin) {
 		return apperror.NewForbidden(apperror.ErrCodeForbidden, "Only the problem author, Admin, or assigned modifiers can update this problem")
 	}
 
