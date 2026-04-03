@@ -45,3 +45,12 @@ func (m *MockDisplayProvider) ExistsByID(_ context.Context, userID string) (bool
 	_, exists := m.users[userID]
 	return exists, nil
 }
+
+func (m *MockDisplayProvider) GetIDByNickname(_ context.Context, nickname string) (string, bool, error) {
+	for id, d := range m.users {
+		if d.Nickname == nickname {
+			return id, true, nil
+		}
+	}
+	return "", false, nil
+}

@@ -1,0 +1,24 @@
+meta {
+  name: List Problems
+  type: http
+  seq: 4
+}
+
+get {
+  url: {{baseUrl}}/problems
+  body: none
+  auth: none
+}
+
+params:query {
+  ~page: 1
+  ~limit: 20
+  ~status: PUBLISHED
+  ~accessibility: PUBLIC
+  ~tags: graphs
+  ~author: coach_john
+}
+
+headers {
+  X-Mock-User: {{mockUser}}
+}

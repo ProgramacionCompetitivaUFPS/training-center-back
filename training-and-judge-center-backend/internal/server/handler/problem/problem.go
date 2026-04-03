@@ -14,6 +14,8 @@ type Handler struct {
 	addModifierUC    *appProblem.AddModifierUseCase
 	removeModifierUC *appProblem.RemoveModifierUseCase
 	listModifiersUC  *appProblem.ListModifiersUseCase
+	getProblemUC     *appProblem.GetProblemUseCase
+	listProblemsUC   *appProblem.ListProblemsUseCase
 	userProvider     appProblem.UserProvider
 	settings         domainProblem.PlatformSettingsService
 }
@@ -27,6 +29,8 @@ func NewHandler(
 	addModifierUC *appProblem.AddModifierUseCase,
 	removeModifierUC *appProblem.RemoveModifierUseCase,
 	listModifiersUC *appProblem.ListModifiersUseCase,
+	getProblemUC *appProblem.GetProblemUseCase,
+	listProblemsUC *appProblem.ListProblemsUseCase,
 	userProvider appProblem.UserProvider,
 	settings domainProblem.PlatformSettingsService,
 ) *Handler {
@@ -39,6 +43,8 @@ func NewHandler(
 		addModifierUC:    addModifierUC,
 		removeModifierUC: removeModifierUC,
 		listModifiersUC:  listModifiersUC,
+		getProblemUC:     getProblemUC,
+		listProblemsUC:   listProblemsUC,
 		userProvider:     userProvider,
 		settings:         settings,
 	}

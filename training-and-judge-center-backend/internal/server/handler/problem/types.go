@@ -73,6 +73,52 @@ type filesResp struct {
 	Validator bool          `json:"validator"`
 }
 
+type modifierResp struct {
+	Nickname string `json:"nickname"`
+	Name     string `json:"name"`
+}
+
+type getProblemResponse struct {
+	Slug                    string            `json:"slug"`
+	Title                   string            `json:"title"`
+	Statement               *string           `json:"statement"`
+	TimeLimit               *int              `json:"timeLimit"`
+	MemoryLimit             *int              `json:"memoryLimit"`
+	LangOverrides           []langOverrideResp `json:"languageOverrides"`
+	Tags                    []string          `json:"tags"`
+	Status                  string            `json:"status"`
+	Accessibility           string            `json:"accessibility"`
+	Author                  authorResp        `json:"author"`
+	Modifiers               []modifierResp    `json:"modifiers,omitempty"`
+	Files                   *filesResp        `json:"files,omitempty"`
+	CreatedAt               string            `json:"createdAt"`
+	UpdatedAt               string            `json:"updatedAt"`
+	ProblemJudgingUpdatedAt *string           `json:"problemJudgingUpdatedAt"`
+}
+
+type problemListItemResp struct {
+	Slug          string     `json:"slug"`
+	Title         string     `json:"title"`
+	Tags          []string   `json:"tags"`
+	Status        string     `json:"status"`
+	Accessibility string     `json:"accessibility"`
+	Author        authorResp `json:"author"`
+	CreatedAt     string     `json:"createdAt"`
+	UpdatedAt     string     `json:"updatedAt"`
+}
+
+type paginationResp struct {
+	TotalCount  int `json:"totalCount"`
+	CurrentPage int `json:"currentPage"`
+	TotalPages  int `json:"totalPages"`
+	ItemsPerPage int `json:"itemsPerPage"`
+}
+
+type listProblemsResponse struct {
+	Problems   []problemListItemResp `json:"problems"`
+	Pagination paginationResp        `json:"pagination"`
+}
+
 func buildResponse(p *domainProblem.Problem, display *user.Display) problemResponse {
 	author := authorResp{Nickname: "unknown", Name: ""}
 	if display != nil {

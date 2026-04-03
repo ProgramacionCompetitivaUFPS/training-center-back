@@ -92,6 +92,8 @@ func main() {
 	addModifierUseCase := appProblem.NewAddModifierUseCase(problemRepo, userProvider)
 	removeModifierUseCase := appProblem.NewRemoveModifierUseCase(problemRepo)
 	listModifiersUseCase := appProblem.NewListModifiersUseCase(problemRepo)
+	getProblemUseCase := appProblem.NewGetProblemUseCase(problemRepo, userProvider)
+	listProblemsUseCase := appProblem.NewListProblemsUseCase(problemRepo, userProvider)
 
 	problemHandler := problem.NewHandler(
 		createProblemUseCase,
@@ -102,6 +104,8 @@ func main() {
 		addModifierUseCase,
 		removeModifierUseCase,
 		listModifiersUseCase,
+		getProblemUseCase,
+		listProblemsUseCase,
 		userProvider,
 		settingsProvider,
 	)

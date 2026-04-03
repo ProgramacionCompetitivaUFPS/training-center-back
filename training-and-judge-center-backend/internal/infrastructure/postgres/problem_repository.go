@@ -4,12 +4,16 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"log/slog"
+	"strings"
 	"time"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
+	"golang.org/x/sync/errgroup"
+
 	"github.com/training-judge-center/backend/internal/domain/problem"
 	"github.com/training-judge-center/backend/pkg/apperror"
 )
@@ -330,4 +334,99 @@ func judgingFileFromDB(data []byte) (*problem.JudgingFile, error) {
 	}
 	j := problem.RestoreJudgingFile(dbFile.Filename, dbFile.FileKey, dbFile.Language)
 	return &j, nil
+}
+
+func (r *ProblemRepository) List(ctx context.Context, filters problem.ListFilters) ([]*problem.Problem, int, error) {
+	var conds []string
+	var args []any
+	idx := 1
+
+	nextArg := func(v any) string {
+		args = append(args, v)
+		s := fmt.Sprintf("$%d", idx)
+		idx++
+		return s
+	}
+
+	conds = append(conds, fmt.Sprintf("status = ANY(%s)", nextArg(filters.Statuses)))
+
+	if filters.ViewerModifierID != nil {
+		p := nextArg(*filters.ViewerModifierID)
+		conds = append(conds, fmt.Sprintf(
+			"(status = 'PUBLISHED' OR author_id = %s OR %s = ANY(modifiers_ids))",
+			p, p,
+		))
+	}
+
+	if filters.AuthorID != nil {
+		conds = append(conds, fmt.Sprintf("author_id = %s", nextArg(*filters.AuthorID)))
+	}
+
+	if len(filters.Tags) > 0 {
+		conds = append(conds, fmt.Sprintf("tags @> %s", nextArg(filters.Tags)))
+	}
+
+	if filters.Accessibility != nil {
+		conds = append(conds, fmt.Sprintf("accessibility = %s", nextArg(*filters.Accessibility)))
+	}
+
+	where := "WHERE " + strings.Join(conds, " AND ")
+
+	countArgs := make([]any, len(args))
+	copy(countArgs, args)
+
+	offset := (filters.Page - 1) * filters.Limit
+	limitArg := nextArg(filters.Limit)
+	offsetArg := nextArg(offset)
+
+	selectQuery := fmt.Sprintf(`
+		SELECT id, slug, title, statement, time_limit, memory_limit,
+			tags, status, accessibility, author_id, modifiers_ids, lang_overrides,
+			test_cases_key, solutions, checker, validator, judging_updated_at,
+			created_at, updated_at
+		FROM problems
+		%s
+		ORDER BY created_at DESC
+		LIMIT %s OFFSET %s
+	`, where, limitArg, offsetArg)
+
+	countQuery := fmt.Sprintf("SELECT COUNT(*) FROM problems %s", where)
+
+	g, gCtx := errgroup.WithContext(ctx)
+
+	var result []*problem.Problem
+	var total int
+
+	g.Go(func() error {
+		rows, queryErr := r.db.Query(gCtx, selectQuery, args...)
+		if queryErr != nil {
+			return queryErr
+		}
+		defer rows.Close()
+		for rows.Next() {
+			p, err := scanProblem(rows)
+			if err != nil {
+				return err
+			}
+			result = append(result, p)
+		}
+		return rows.Err()
+	})
+
+	g.Go(func() error {
+		var countErr error
+		countErr = r.db.QueryRow(gCtx, countQuery, countArgs...).Scan(&total)
+		return countErr
+	})
+
+	if err := g.Wait(); err != nil {
+		slog.ErrorContext(ctx, "Database error in List", "error", err)
+		return nil, 0, apperror.NewInternal()
+	}
+
+	if result == nil {
+		result = []*problem.Problem{}
+	}
+
+	return result, total, nil
 }
