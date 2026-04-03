@@ -1,0 +1,24 @@
+meta {
+  name: Delete File
+  type: http
+  seq: 2
+}
+
+delete {
+  url: {{baseUrl}}/problems/p/two-sum/files/testcases
+  body: none
+  auth: none
+}
+
+headers {
+  X-Mock-User: {{mockUser}}
+}
+
+docs {
+  Para eliminar una solución específica, cambia la URL a:
+  
+  {{baseUrl}}/problems/p/two-sum/files/solution?fileName=solution.cpp
+  
+  fileType válidos: testcases, solution, checker, validator
+  
+}

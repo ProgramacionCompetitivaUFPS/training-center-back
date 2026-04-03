@@ -227,3 +227,199 @@ curl -X POST http://localhost:8080/problems \
   "message": "A problem with that slug already exists"
 }
 ```
+
+---
+
+### Actualizar Problema
+
+```
+PUT /problems/p/{slug}
+```
+
+Todos los campos son opcionales (solo se actualiza lo que se envía). El problema debe estar en estado `DRAFT`.
+
+```bash
+curl -X PUT http://localhost:8080/problems/p/two-sum \
+  -H "Content-Type: application/json" \
+  -H "X-Mock-User: coach_john" \
+  -d '{
+    "title": "Two Sum (Updated)",
+    "statement": "Given an array of integers, return indices of the two numbers that add up to target.",
+    "timeLimit": 3000,
+    "memoryLimit": 512,
+    "tags": ["math", "dp"],
+    "accessibility": "PUBLIC",
+    "languageOverrides": [
+      {
+        "language": "python310",
+        "timeLimit": 6000
+      }
+    ]
+  }'
+```
+
+**Respuestas esperadas:**
+
+- `200 OK` — problema actualizado (mismo schema que Create)
+- `403 Forbidden` — no es autor, admin ni modifier
+- `404 Not Found` — slug no existe
+- `400 Bad Request` — problema publicado (debe despublicarse primero)
+
+---
+
+### Importar Problema (paquete ICPC)
+
+```
+POST /problems/import
+```
+
+Acepta `multipart/form-data` con un `.zip` en formato ICPC (con `problem.xml` y archivos de test).
+
+```bash
+curl -X POST http://localhost:8080/problems/import \
+  -H "X-Mock-User: coach_john" \
+  -F "slug=icpc-problem-a" \
+  -F "file=@/path/to/package.zip"
+```
+
+**Respuestas esperadas:**
+
+- `201 Created` — problema creado (mismo schema que Create)
+- `400 Bad Request` — slug o archivo faltante, ZIP inválido
+- `413 Payload Too Large` — ZIP excede el límite
+
+---
+
+### Subir Archivos
+
+```
+POST /problems/p/{slug}/files
+```
+
+Acepta `multipart/form-data`. El campo `fileType` determina qué tipo de archivo se sube:
+
+| `fileType`  | Descripción                        |
+|-------------|------------------------------------|
+| `testcases` | ZIP con casos de prueba            |
+| `solution`  | Archivo de solución (C++, Java, Python) |
+| `checker`   | Checker personalizado              |
+| `validator` | Validador de entrada               |
+
+```bash
+# Subir casos de prueba
+curl -X POST http://localhost:8080/problems/p/two-sum/files \
+  -H "X-Mock-User: coach_john" \
+  -F "fileType=testcases" \
+  -F "file=@/path/to/tests.zip"
+
+# Subir solución
+curl -X POST http://localhost:8080/problems/p/two-sum/files \
+  -H "X-Mock-User: coach_john" \
+  -F "fileType=solution" \
+  -F "file=@/path/to/solution.cpp"
+```
+
+**Respuesta `200 OK`:**
+
+```json
+{
+  "message": "File uploaded successfully",
+  "problem": { "...": "mismo schema que Create" }
+}
+```
+
+---
+
+### Eliminar Archivo
+
+```
+DELETE /problems/p/{slug}/files/{fileType}
+```
+
+Para `solution`, el filename es requerido via query param `?fileName=`.
+
+```bash
+# Eliminar casos de prueba
+curl -X DELETE http://localhost:8080/problems/p/two-sum/files/testcases \
+  -H "X-Mock-User: coach_john"
+
+# Eliminar una solución específica
+curl -X DELETE "http://localhost:8080/problems/p/two-sum/files/solution?fileName=solution.cpp" \
+  -H "X-Mock-User: coach_john"
+
+# Eliminar checker
+curl -X DELETE http://localhost:8080/problems/p/two-sum/files/checker \
+  -H "X-Mock-User: coach_john"
+```
+
+**Respuestas esperadas:**
+
+- `204 No Content` — archivo eliminado
+- `403 Forbidden` — sin permisos
+- `404 Not Found` — problema no existe
+
+---
+
+### Agregar Modifier
+
+```
+POST /problems/p/{slug}/modifiers
+```
+
+Solo el autor o un admin puede agregar modifiers.
+
+```bash
+curl -X POST http://localhost:8080/problems/p/two-sum/modifiers \
+  -H "Content-Type: application/json" \
+  -H "X-Mock-User: coach_john" \
+  -d '{
+    "userId": "coach_mary"
+  }'
+```
+
+**Respuestas esperadas:**
+
+- `200 OK` — modifier agregado (body vacío)
+- `403 Forbidden` — no es autor ni admin
+- `404 Not Found` — usuario o problema no existe
+- `409 Conflict` — el usuario ya es modifier
+
+---
+
+### Listar Modifiers
+
+```
+GET /problems/p/{slug}/modifiers
+```
+
+```bash
+curl http://localhost:8080/problems/p/two-sum/modifiers \
+  -H "X-Mock-User: coach_john"
+```
+
+**Respuesta `200 OK`:**
+
+```json
+{
+  "modifiers": ["coach_mary"]
+}
+```
+
+---
+
+### Eliminar Modifier
+
+```
+DELETE /problems/p/{slug}/modifiers/{userId}
+```
+
+```bash
+curl -X DELETE http://localhost:8080/problems/p/two-sum/modifiers/coach_mary \
+  -H "X-Mock-User: coach_john"
+```
+
+**Respuestas esperadas:**
+
+- `200 OK` — modifier eliminado (body vacío)
+- `403 Forbidden` — no es autor ni admin
+- `404 Not Found` — modifier no estaba asignado

@@ -1,0 +1,32 @@
+meta {
+  name: Create Problem
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{baseUrl}}/problems
+  body: json
+  auth: none
+}
+
+headers {
+  X-Mock-User: {{mockUser}}
+}
+
+body:json {
+  {
+    "slug": "two-sum",
+    "title": "Two Sum",
+    "statement": "Given an array of integers, return indices of the two numbers that add up to target.",
+    "timeLimit": 2000,
+    "memoryLimit": 256,
+    "tags": ["math", "dp"],
+    "languageOverrides": [
+      {
+        "language": "python310",
+        "timeLimit": 4000
+      }
+    ]
+  }
+}
