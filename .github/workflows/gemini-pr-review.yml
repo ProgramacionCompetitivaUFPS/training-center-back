@@ -1,0 +1,50 @@
+name: Gemini AI Code Reviewer
+
+on:
+  issue_comment:
+    types: [created]
+
+# Permisos necesarios para leer el código, comentar en el PR y usar la API de GitHub
+permissions: write-all
+
+jobs:
+  gemini-code-review:
+    runs-on: ubuntu-latest
+    # Solo se activa si es un comentario en un Pull Request y contiene el comando /gemini-review
+    if: |
+      github.event.issue.pull_request &&
+      contains(github.event.comment.body, '/gemini-review')
+    
+    steps:
+      - name: PR Info
+        run: |
+          echo "Comment: ${{ github.event.comment.body }}"
+          echo "Issue Number: ${{ github.event.issue.number }}"
+          echo "Repository: ${{ github.repository }}"
+
+      - name: Checkout Repo
+        uses: actions/checkout@v4
+        with:
+          # fetch-depth: 0 permite ver todo el historial para comparar ramas correctamente
+          fetch-depth: 0
+
+      - name: Get PR Details
+        id: pr
+        run: |
+          PR_JSON=$(gh api repos/${{ github.repository }}/pulls/${{ github.event.issue.number }})
+          echo "head_sha=$(echo $PR_JSON | jq -r .head.sha)" >> $GITHUB_OUTPUT
+          echo "base_sha=$(echo $PR_JSON | jq -r .base.sha)" >> $GITHUB_OUTPUT
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Run Gemini PR Review
+        uses: truongnh1992/gemini-ai-code-reviewer@main
+        with:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          
+          # Usamos gemini-2.5-flash para asegurar disponibilidad en el nivel gratuito
+          GEMINI_MODEL: gemini-2.5-flash
+          
+          # Excluimos archivos autogenerados, binarios y otros archivos ruidosos
+          EXCLUDE: "**/go.sum, .agent/**, **/*.exe, **/.env*, *.md, *.txt, package-lock.json, *.yml, *.yaml"
