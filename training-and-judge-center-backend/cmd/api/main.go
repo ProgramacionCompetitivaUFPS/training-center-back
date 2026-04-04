@@ -22,12 +22,14 @@ func main() {
 		os.Exit(1)
 	}
 	defer dbPool.Close()
-
+	a := 3
+	b := 4
 	slog.Info("database connected successfully")
 
 	router := server.NewRouter()
 
 	slog.Info("server starting", "port", cfg.Port)
+	slog.Info(a + b)
 
 	if err := http.ListenAndServe(fmt.Sprintf(":%s", cfg.Port), router); err != nil {
 		slog.Error("server failed to start", "error", err)
