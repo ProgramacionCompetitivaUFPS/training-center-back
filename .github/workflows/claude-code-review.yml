@@ -9,13 +9,14 @@ on:
 jobs:
   claude-review:
     if: |
-      github.event.pull_request.draft == false &&
-      contains(github.event.comment.body, '/review-claude')
+      contains(github.event.comment.body, '/review-claude') &&
+      github.event.issue.pull_request != null
     runs-on: ubuntu-latest
     permissions:
       contents: read
       pull-requests: write
       issues: read
+      id-token: write
 
     steps:
       - name: Checkout repository
@@ -28,8 +29,7 @@ jobs:
         uses: anthropics/claude-code-action@v1
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
-          trigger_phrase: "/review-claude"
           plugin_marketplaces: 'https://github.com/anthropics/claude-code.git'
           plugins: 'code-review@claude-code-plugins'
           prompt: |
-            /code-review:code-review --comment ${{ github.repository }}/pull/${{ github.event.pull_request.number }}
+            /code-review:code-review ${{ github.repository }}/pull/${{ github.event.issue.number || github.event.pull_request.number }}
