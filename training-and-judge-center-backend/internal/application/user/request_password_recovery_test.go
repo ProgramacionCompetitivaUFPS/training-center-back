@@ -135,3 +135,38 @@ func TestRequestPasswordRecovery_InvalidEmail(t *testing.T) {
 		t.Errorf("expected VALIDATION_ERROR, got %v", err)
 	}
 }
+
+func TestRequestPasswordRecovery_EmailSendFailNoError(t *testing.T) {
+	userRepo := newNoConflictRepo()
+	activeUser := newUserWithRole("user-1", domain.RoleContestant, domain.StatusActive)
+	userRepo.findByEmailFn = func(_ context.Context, email domain.Email) (*domain.User, error) {
+		if email.String() == "user@example.com" {
+			activeUser.Email = &email
+			return activeUser, nil
+		}
+		return nil, nil
+	}
+
+	recoveryRepo := &mockPasswordRecoveryRepo{
+		invalidatePendingByUserIDFn: func(ctx context.Context, userID string, now time.Time) error {
+			return nil
+		},
+		saveFn: func(ctx context.Context, req *domain.PasswordRecoveryRequest) error {
+			return nil
+		},
+	}
+
+	mockEmail := &mockEmailSender{
+		sendFn: func(ctx context.Context, msg notification.EmailMessage) error {
+			return apperror.NewInternal() // Simulate email sending failure
+		},
+	}
+
+	uc := NewRequestPasswordRecoveryUseCase(userRepo, recoveryRepo, mockEmail)
+	err := uc.Execute(context.Background(), RequestPasswordRecoveryInput{Email: "user@example.com"})
+	
+	// Should return nil even if email sending fails
+	if err != nil {
+		t.Fatalf("expected nil, got %v", err)
+	}
+}

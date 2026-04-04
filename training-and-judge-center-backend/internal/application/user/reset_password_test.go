@@ -94,8 +94,8 @@ func TestResetPassword_InvalidCode(t *testing.T) {
 		t.Fatal("expected error, got nil")
 	}
 	appErr, ok := err.(*apperror.AppError)
-	if !ok || appErr.Code != "INVALID_CODE" {
-		t.Errorf("expected INVALID_CODE, got %v", err)
+	if !ok || appErr.Code != "INVALID_RECOVERY_ATTEMPT" {
+		t.Errorf("expected INVALID_RECOVERY_ATTEMPT, got %v", err)
 	}
 }
 
@@ -124,7 +124,7 @@ func TestResetPassword_NoPendingRequest(t *testing.T) {
 		t.Fatal("expected error, got nil")
 	}
 	appErr, ok := err.(*apperror.AppError)
-	if !ok || appErr.Code != "NOT_FOUND" {
-		t.Errorf("expected NOT_FOUND, got %v", err)
+	if !ok || appErr.Code != "INVALID_RECOVERY_ATTEMPT" {
+		t.Errorf("expected INVALID_RECOVERY_ATTEMPT, got %v", err)
 	}
 }

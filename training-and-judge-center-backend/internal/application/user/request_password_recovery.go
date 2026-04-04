@@ -3,6 +3,7 @@ package user
 import (
 	"context"
 	"fmt"
+	"log"
 	"time"
 
 	"github.com/google/uuid"
@@ -82,7 +83,7 @@ func (uc *RequestPasswordRecoveryUseCase) Execute(ctx context.Context, input Req
 		Subject: "Password Recovery Code",
 		Body:    fmt.Sprintf("Your password recovery code is: %s\nThis code will expire in 15 minutes.", code),
 	}); err != nil {
-		return apperror.NewServiceUnavailable("INTERNAL_SERVER_ERROR", "Failed to send email to the provided address")
+		log.Printf("ERROR: Failed to send password recovery email to %s: %v\n", foundUser.Email.String(), err)
 	}
 
 	return nil

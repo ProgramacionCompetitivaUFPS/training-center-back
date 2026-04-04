@@ -8,6 +8,8 @@ import (
 	"github.com/training-judge-center/backend/pkg/apperror"
 )
 
+var errInvalidRecoveryAttempt = apperror.NewBadRequest("INVALID_RECOVERY_ATTEMPT", "Invalid email or recovery code")
+
 type ResetPasswordInput struct {
 	Email       string
 	Code        string
@@ -45,7 +47,7 @@ func (uc *ResetPasswordUseCase) Execute(ctx context.Context, input ResetPassword
 		return apperror.NewInternal()
 	}
 	if foundUser == nil || foundUser.Status == user.StatusDeactivated {
-		return apperror.NewNotFound("NOT_FOUND", "No pending password recovery request found")
+		return errInvalidRecoveryAttempt
 	}
 
 	req, err := uc.recoveryRepo.FindPendingByUserID(ctx, foundUser.ID)
@@ -53,12 +55,12 @@ func (uc *ResetPasswordUseCase) Execute(ctx context.Context, input ResetPassword
 		return apperror.NewInternal()
 	}
 	if req == nil {
-		return apperror.NewNotFound("NOT_FOUND", "No pending password recovery request found")
+		return errInvalidRecoveryAttempt
 	}
 
 	now := time.Now()
 	if req.IsExpired(now) || req.Code != input.Code {
-		return apperror.NewBadRequest("INVALID_CODE", "The recovery code is invalid or has expired")
+		return errInvalidRecoveryAttempt
 	}
 
 	newPassword, err := user.NewPassword(input.NewPassword)
