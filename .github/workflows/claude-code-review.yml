@@ -8,9 +8,8 @@ on:
 
 jobs:
   claude-review:
-    if: |
-      github.event.pull_request.draft == false &&
-      contains(github.event.comment.body, '/review-claude')
+    # issue_comment solo existe en PRs (no issues puros), pull_request_review_comment siempre es en PRs
+    if: github.event.issue.pull_request != null || github.event.pull_request != null
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -22,15 +21,28 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
-          fetch-depth: 1
+          fetch-depth: 0
 
-      - name: Run Claude Code Review
-        id: claude-review
+      - name: Select Claude token by commenter
+        id: select-token
+        env:
+          COMMENTER: ${{ github.event.comment.user.login }}
+          TOKEN_CARLOSSALAZAR84: ${{ secrets.CLAUDE_TOKEN_CARLOSSALAZAR84 }}
+          TOKEN_ALEXAVJ: ${{ secrets.CLAUDE_TOKEN_ALEXAVJ }}
+          FALLBACK_TOKEN: ${{ secrets.CLAUDE_TOKEN_CARLOSSALAZAR84 }}
+        run: |
+          case "$COMMENTER" in
+            "CarlosSalazar84") echo "token=$TOKEN_CARLOSSALAZAR84" >> $GITHUB_OUTPUT ;;
+            # "OtroUsuario")    echo "token=$TOKEN_OTROUSUARIO"    >> $GITHUB_OUTPUT ;;
+            *)                 echo "token=$FALLBACK_TOKEN"        >> $GITHUB_OUTPUT ;;
+          esac
+
+      - name: Run Claude PR Review Toolkit
         uses: anthropics/claude-code-action@v1
         with:
-          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
-          trigger_phrase: "/review-claude"
+          claude_code_oauth_token: ${{ steps.select-token.outputs.token }}
+          trigger_phrase: '/review-claude'
           plugin_marketplaces: 'https://github.com/anthropics/claude-code.git'
-          plugins: 'code-review@claude-code-plugins'
+          plugins: 'pr-review-toolkit@claude-code-plugins'
           prompt: |
-            /code-review:code-review --comment ${{ github.repository }}/pull/${{ github.event.pull_request.number }}
+            /pr-review-toolkit:review-pr all
