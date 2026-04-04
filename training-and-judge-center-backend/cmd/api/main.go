@@ -24,6 +24,9 @@ func main() {
 	defer dbPool.Close()
 	slog.Info("database connected successfully")
 
+	// ESTE COMENTARIO y LOG DEBEN SER BORRADOS, SI SE DEJA SERIA UN PROBLEMA MUY GRANDE, GENERANDO UN ERROR CRITICO
+	slog.Info("CARLOS ES UN MUY BUEN CSM")
+
 	router := server.NewRouter()
 
 	slog.Info("server starting", "port", cfg.Port)
