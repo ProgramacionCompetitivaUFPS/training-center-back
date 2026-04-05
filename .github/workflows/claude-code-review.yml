@@ -8,8 +8,9 @@ on:
 
 jobs:
   claude-review:
-    # issue_comment solo existe en PRs (no issues puros), pull_request_review_comment siempre es en PRs
-    if: github.event.issue.pull_request != null || github.event.pull_request != null
+    if: |
+      contains(github.event.comment.body, '/review-claude') &&
+      (github.event.issue.pull_request != null || github.event.pull_request != null)
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -33,7 +34,7 @@ jobs:
         run: |
           case "$COMMENTER" in
             "CarlosSalazar84") echo "token=$TOKEN_CARLOSSALAZAR84" >> $GITHUB_OUTPUT ;;
-            # "OtroUsuario")    echo "token=$TOKEN_OTROUSUARIO"    >> $GITHUB_OUTPUT ;;
+            "AlexaVJ")         echo "token=$TOKEN_ALEXAVJ"         >> $GITHUB_OUTPUT ;;
             *)                 echo "token=$FALLBACK_TOKEN"        >> $GITHUB_OUTPUT ;;
           esac
 
@@ -44,5 +45,10 @@ jobs:
           trigger_phrase: '/review-claude'
           plugin_marketplaces: 'https://github.com/anthropics/claude-code.git'
           plugins: 'pr-review-toolkit@claude-code-plugins'
+          claude_args: >-
+            --allowedTools "mcp__github_inline_comment__create_inline_comment,Bash(gh pr comment:*),Bash(gh pr diff:*),Bash(gh pr view:*),Bash(gh api:*)"
           prompt: |
+            REPO: ${{ github.repository }}
+            PR NUMBER: ${{ github.event.issue.number || github.event.pull_request.number }}
+
             /pr-review-toolkit:review-pr all
