@@ -69,7 +69,7 @@ func RequireRole(required user.Role) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			claims := GetClaims(r.Context())
-			if claims == nil || user.Role(claims.Role) != required {
+			if claims == nil || claims.Role != required {
 				w.Header().Set("Content-Type", "application/json")
 				w.WriteHeader(http.StatusForbidden)
 				w.Write([]byte(`{"error":"FORBIDDEN","message":"Admin privileges required"}`))

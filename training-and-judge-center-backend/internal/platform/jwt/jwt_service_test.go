@@ -87,11 +87,11 @@ func TestValidateToken_ValidToken(t *testing.T) {
 	if claims.UserID != u.ID() {
 		t.Errorf("UserID: got %q, want %q", claims.UserID, u.ID())
 	}
-	if claims.Email != u.Email().String() {
-		t.Errorf("Email: got %q, want %q", claims.Email, u.Email().String())
+	if claims.Email != *u.Email() {
+		t.Errorf("Email: got %v, want %v", claims.Email, *u.Email())
 	}
-	if claims.Role != u.Role().String() {
-		t.Errorf("Role: got %q, want %q", claims.Role, u.Role().String())
+	if claims.Role != u.Role() {
+		t.Errorf("Role: got %q, want %q", claims.Role, u.Role())
 	}
 	if claims.IssuedAt.IsZero() {
 		t.Error("IssuedAt is zero")

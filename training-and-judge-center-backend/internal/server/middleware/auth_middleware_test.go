@@ -18,10 +18,11 @@ func okHandler() http.Handler {
 }
 
 func validClaims() *user.TokenClaims {
+	email, _ := user.NewEmail("test@example.com")
 	return &user.TokenClaims{
 		UserID:   "user-123",
-		Email:    "test@example.com",
-		Role:     user.RoleContestant.String(),
+		Email:    email,
+		Role:     user.RoleContestant,
 		IssuedAt: time.Now(),
 	}
 }
@@ -159,7 +160,7 @@ func TestAuth_ValidToken_ClaimsInContext(t *testing.T) {
 		t.Errorf("expected Role %q, got %q", expected.Role, capturedClaims.Role)
 	}
 	if capturedClaims.Email != expected.Email {
-		t.Errorf("expected Email %q, got %q", expected.Email, capturedClaims.Email)
+		t.Errorf("expected Email %v, got %v", expected.Email, capturedClaims.Email)
 	}
 	_ = rr
 }
@@ -170,7 +171,7 @@ func TestRequireRole_CorrectRole(t *testing.T) {
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
 	ctx := context.WithValue(req.Context(), claimsKey, &user.TokenClaims{
 		UserID: "admin-123",
-		Role:   user.RoleAdmin.String(),
+		Role:   user.RoleAdmin,
 	})
 	rr := httptest.NewRecorder()
 
@@ -189,7 +190,7 @@ func TestRequireRole_WrongRole(t *testing.T) {
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
 	ctx := context.WithValue(req.Context(), claimsKey, &user.TokenClaims{
 		UserID: "coach-123",
-		Role:   user.RoleCoach.String(),
+		Role:   user.RoleCoach,
 	})
 	rr := httptest.NewRecorder()
 

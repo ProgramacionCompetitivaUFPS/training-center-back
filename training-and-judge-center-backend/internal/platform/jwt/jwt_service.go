@@ -57,10 +57,20 @@ func (s *Service) ValidateToken(tokenString string) (*user.TokenClaims, error) {
 		return nil, fmt.Errorf("invalid token claims")
 	}
 
+	parsedEmail, err := user.NewEmail(claims.Email)
+	if err != nil {
+		return nil, fmt.Errorf("invalid email in token: %w", err)
+	}
+
+	parsedRole, err := user.NewRole(claims.Role)
+	if err != nil {
+		return nil, fmt.Errorf("invalid role in token: %w", err)
+	}
+
 	return &user.TokenClaims{
 		UserID:   claims.Subject,
-		Email:    claims.Email,
-		Role:     claims.Role,
+		Email:    parsedEmail,
+		Role:     parsedRole,
 		IssuedAt: claims.IssuedAt.Time,
 	}, nil
 }

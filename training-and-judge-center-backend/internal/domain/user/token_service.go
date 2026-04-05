@@ -4,8 +4,8 @@ import "time"
 
 type TokenClaims struct {
 	UserID   string
-	Email    string
-	Role     string
+	Email    Email
+	Role     Role
 	IssuedAt time.Time
 }
 
