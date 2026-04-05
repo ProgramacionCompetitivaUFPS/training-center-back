@@ -74,6 +74,10 @@ func (r *DeactivationRequest) IsBlocked() bool {
 	return r.status == DeactivationStatusBlocked
 }
 
+func (r *DeactivationRequest) IsExpired(now time.Time) bool {
+	return now.After(r.expiresAt) || r.status == DeactivationStatusExpired
+}
+
 func (r *DeactivationRequest) Confirm() {
 	r.status = DeactivationStatusConfirmed
 	r.updatedAt = time.Now()

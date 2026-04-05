@@ -76,7 +76,7 @@ func (uc *ConfirmDeactivationUseCase) Execute(ctx context.Context, input Confirm
 	}
 
 	// Code expiration validation
-	if now.After(req.ExpiresAt()) {
+	if req.IsExpired(now) {
 		req.MarkAsExpired()
 		if err := uc.deactRepo.Update(ctx, req); err != nil {
 			return apperror.NewInternal()
