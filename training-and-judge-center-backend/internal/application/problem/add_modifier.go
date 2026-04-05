@@ -51,7 +51,7 @@ func (uc *AddModifierUseCase) Execute(ctx context.Context, input AddModifierInpu
 		return struct{}{}, apperror.NewInternal()
 	}
 	if !exists {
-		// Replace bare string per "Backend Domain Errors" task
+		// TODO: Replace bare string per "Backend Domain Errors" task
 		return struct{}{}, apperror.NewNotFound("USER_NOT_FOUND", "User not found")
 	}
 

@@ -31,13 +31,14 @@ func loadVirtualObject() *VirtualObject {
 
 	data, err := os.ReadFile(path)
 	if err != nil {
-		return nil
+		slog.Error("failed to read virtual object config", "path", path, "error", err)
+		os.Exit(1)
 	}
 
 	var vo VirtualObject
 	if err := json.Unmarshal(data, &vo); err != nil {
 		slog.Error("failed to parse virtual object config", "path", path, "error", err)
-		return nil
+		os.Exit(1)
 	}
 
 	return &vo
