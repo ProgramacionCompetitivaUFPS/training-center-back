@@ -147,6 +147,37 @@ func TestAdminDeactivateUser_RepositoryFindError(t *testing.T) {
 	}
 }
 
+func TestAdminDeactivateUser_SessionInvalidationError_DoesNotPersist(t *testing.T) {
+	repo := newNoConflictRepo()
+	target := newUserWithRole("target-1", domain.RoleContestant, domain.StatusActive)
+	repo.findByIDFn = func(_ context.Context, _ string) (*domain.User, error) {
+		return target, nil
+	}
+	updateCalled := false
+	repo.updateFn = func(_ context.Context, _ *domain.User) error {
+		updateCalled = true
+		return nil
+	}
+	invalidator := &mockSessionInvalidator{
+		invalidateAllUserSessionsFn: func(_ context.Context, _ string, _ time.Time) error {
+			return errors.New("redis unavailable")
+		},
+	}
+	uc := NewAdminDeactivateUserUseCase(repo, invalidator)
+
+	err := uc.Execute(context.Background(), AdminDeactivateUserInput{RequesterID: "admin-1", TargetID: "target-1"})
+	if err == nil {
+		t.Fatal("expected error when session invalidation fails, got nil")
+	}
+	appErr := err.(*apperror.AppError)
+	if appErr.Code != "INTERNAL_ERROR" {
+		t.Errorf("expected code INTERNAL_ERROR, got %q", appErr.Code)
+	}
+	if updateCalled {
+		t.Error("repo.Update must NOT be called when session invalidation fails (DB write never happens)")
+	}
+}
+
 func TestAdminDeactivateUser_RepositoryUpdateError(t *testing.T) {
 	repo := newNoConflictRepo()
 	target := newUserWithRole("target-1", domain.RoleContestant, domain.StatusActive)
