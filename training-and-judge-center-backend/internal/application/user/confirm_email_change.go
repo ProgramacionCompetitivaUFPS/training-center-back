@@ -72,9 +72,7 @@ func (uc *ConfirmEmailChangeUseCase) Execute(ctx context.Context, input ConfirmE
 	}
 
 	newEmailVal := req.NewEmail()
-	if err := u.Update(nil, nil, nil, &newEmailVal, nil); err != nil {
-		return nil, apperror.NewInternal()
-	}
+	u.UpdateEmail(newEmailVal)
 	if err := uc.userRepo.Update(ctx, u); err != nil {
 		return nil, apperror.NewInternal()
 	}

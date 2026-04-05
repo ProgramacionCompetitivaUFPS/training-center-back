@@ -96,7 +96,7 @@ func (uc *AdminUpdateUserUseCase) Execute(ctx context.Context, input AdminUpdate
 		return nil, apperror.NewValidation(fieldErrors)
 	}
 
-	if err := foundUser.Update(nameToUpdate, nicknameToUpdate, institutionToUpdate, emailToUpdate, roleToUpdate); err != nil {
+	if err := foundUser.AdminUpdate(nameToUpdate, nicknameToUpdate, institutionToUpdate, emailToUpdate, roleToUpdate); err != nil {
 		return nil, apperror.NewInternal()
 	}
 

@@ -68,7 +68,7 @@ func NewUser(email Email, password Password, name string, nickname Nickname, cou
 	}, nil
 }
 
-func (u *User) Update(name *string, nickname *Nickname, institution *string, email *Email, role *Role) error {
+func (u *User) Update(name *string, nickname *Nickname, institution *string) error {
 	if name != nil {
 		if strings.TrimSpace(*name) == "" {
 			return fmt.Errorf("name cannot be empty")
@@ -84,13 +84,28 @@ func (u *User) Update(name *string, nickname *Nickname, institution *string, ema
 		}
 		u.institution = *institution
 	}
+
+	now := time.Now()
+	u.updatedAt = &now
+	return nil
+}
+
+func (u *User) AdminUpdate(name *string, nickname *Nickname, institution *string, email *Email, role *Role) error {
+	if role != nil && *role == RoleAdmin {
+		return fmt.Errorf("role ADMIN cannot be assigned through standard update")
+	}
+
+	if err := u.Update(name, nickname, institution); err != nil {
+		return err
+	}
+
 	if email != nil {
 		u.email = email
 	}
 	if role != nil {
 		u.role = *role
 	}
-	
+
 	now := time.Now()
 	u.updatedAt = &now
 	return nil
@@ -98,6 +113,12 @@ func (u *User) Update(name *string, nickname *Nickname, institution *string, ema
 
 func (u *User) UpdatePassword(newPassword Password) {
 	u.password = newPassword
+	now := time.Now()
+	u.updatedAt = &now
+}
+
+func (u *User) UpdateEmail(newEmail Email) {
+	u.email = &newEmail
 	now := time.Now()
 	u.updatedAt = &now
 }

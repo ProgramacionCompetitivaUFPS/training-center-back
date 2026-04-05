@@ -72,7 +72,7 @@ func (uc *UpdateUserUseCase) Execute(ctx context.Context, input UpdateUserInput)
 		return nil, apperror.NewValidation(fieldErrors)
 	}
 
-	if err := foundUser.Update(nameToUpdate, nicknameToUpdate, institutionToUpdate, nil, nil); err != nil {
+	if err := foundUser.Update(nameToUpdate, nicknameToUpdate, institutionToUpdate); err != nil {
 		return nil, apperror.NewInternal()
 	}
 
