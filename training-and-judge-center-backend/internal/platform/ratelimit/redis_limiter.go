@@ -8,6 +8,14 @@ import (
 	"github.com/redis/go-redis/v9"
 )
 
+var rateLimitScript = redis.NewScript(`
+	local count = redis.call('INCR', KEYS[1])
+	if count == 1 then
+		redis.call('EXPIRE', KEYS[1], ARGV[1])
+	end
+	return count
+`)
+
 type RedisRateLimiter struct {
 	client *redis.Client
 }
@@ -17,20 +25,11 @@ func NewRedisRateLimiter(client *redis.Client) *RedisRateLimiter {
 }
 
 func (r *RedisRateLimiter) Allow(ctx context.Context, key string, maxAttempts int, window time.Duration) (bool, error) {
-	count, err := r.client.Incr(ctx, key).Result()
+	count, err := rateLimitScript.Run(ctx, r.client, []string{key}, int64(window.Seconds())).Int64()
 	if err != nil {
-		return false, fmt.Errorf("failed to increment rate limit: %w", err)
+		return false, fmt.Errorf("rate limit script failed: %w", err)
 	}
-
-	if count == 1 {
-		r.client.Expire(ctx, key, window)
-	}
-
-	if count > int64(maxAttempts) {
-		return false, nil
-	}
-
-	return true, nil
+	return count <= int64(maxAttempts), nil
 }
 
 func (r *RedisRateLimiter) Reset(ctx context.Context, key string) error {
