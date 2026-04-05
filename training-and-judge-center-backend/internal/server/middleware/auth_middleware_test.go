@@ -108,7 +108,7 @@ func TestAuth_RevokedSession(t *testing.T) {
 }
 
 func TestAuth_SessionInvalidatorError(t *testing.T) {
-	// Arrange — IsSessionRevoked returns an error: must fail closed (fail-closed → 401)
+	// Arrange — IsSessionRevoked returns an error: Redis unavailable → 503
 	sessionInv := &mockSessionInvalidator{
 		isSessionRevokedFn: func(_ context.Context, _ string, _ time.Time) (bool, error) {
 			return false, errors.New("redis timeout")
@@ -123,8 +123,8 @@ func TestAuth_SessionInvalidatorError(t *testing.T) {
 	handler.ServeHTTP(rr, req)
 
 	// Assert
-	if rr.Code != http.StatusUnauthorized {
-		t.Errorf("expected 401, got %d", rr.Code)
+	if rr.Code != http.StatusServiceUnavailable {
+		t.Errorf("expected 503, got %d", rr.Code)
 	}
 }
 

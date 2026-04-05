@@ -2,6 +2,7 @@ package middleware
 
 import (
 	"context"
+	"log/slog"
 	"net/http"
 	"strings"
 
@@ -35,7 +36,14 @@ func Auth(tokenService user.TokenService, sessionInvalidator user.SessionInvalid
 
 			if sessionInvalidator != nil {
 				revoked, err := sessionInvalidator.IsSessionRevoked(r.Context(), claims.UserID, claims.IssuedAt)
-				if err != nil || revoked {
+				if err != nil {
+					slog.Error("session revocation check failed", "user_id", claims.UserID, "error", err)
+					w.Header().Set("Content-Type", "application/json")
+					w.WriteHeader(http.StatusServiceUnavailable)
+					w.Write([]byte(`{"error":"SERVICE_UNAVAILABLE","message":"Service temporarily unavailable"}`))
+					return
+				}
+				if revoked {
 					w.Header().Set("Content-Type", "application/json")
 					w.WriteHeader(http.StatusUnauthorized)
 					w.Write([]byte(`{"error":"UNAUTHORIZED","message":"Invalid or missing authentication token"}`))
