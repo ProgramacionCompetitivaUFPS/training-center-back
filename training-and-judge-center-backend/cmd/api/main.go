@@ -85,8 +85,8 @@ func main() {
 		slog.Info("running in MOCK_AUTH mode")
 		userProvider = platformUser.NewMockDisplayProvider()
 	} else {
-		// TODO: userProvider = postgres.NewUserRepository(db)
-		userProvider = platformUser.NewMockDisplayProvider()
+		slog.Error("real UserProvider is not implemented yet; set MOCK_AUTH=1 for local development")
+		os.Exit(1)
 	}
 
 	// Use Cases

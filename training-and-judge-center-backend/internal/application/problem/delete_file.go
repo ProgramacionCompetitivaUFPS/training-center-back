@@ -117,10 +117,12 @@ func (usecase *DeleteProblemFileUseCase) Execute(ctx context.Context, input Dele
 	if deleteByPrefix {
 		if err := usecase.fileStorage.DeleteFilesWithPrefix(ctx, storageKeyToDelete); err != nil {
 			slog.ErrorContext(ctx, "file reference removed from DB but storage prefix deletion failed (orphaned files)", "prefix", storageKeyToDelete, "error", err)
+			return struct{}{}, apperror.NewInternal()
 		}
 	} else {
 		if err := usecase.fileStorage.DeleteFile(ctx, storageKeyToDelete); err != nil {
 			slog.ErrorContext(ctx, "file reference removed from DB but storage deletion failed (orphaned file)", "key", storageKeyToDelete, "error", err)
+			return struct{}{}, apperror.NewInternal()
 		}
 	}
 

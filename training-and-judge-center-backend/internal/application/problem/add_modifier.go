@@ -35,7 +35,7 @@ func (uc *AddModifierUseCase) Execute(ctx context.Context, input AddModifierInpu
 
 	p, err := uc.repo.FindBySlug(ctx, slug)
 	if err != nil {
-		return struct{}{}, apperror.NewNotFound(apperror.ErrCodeNotFound, "Problem not found")
+		return struct{}{}, err
 	}
 
 	isAuthor := p.AuthorID == problem.RestoreUserID(input.CurrentUser.ID)
