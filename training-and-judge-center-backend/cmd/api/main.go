@@ -24,6 +24,12 @@ import (
 
 func main() {
 	cfg := config.Load()
+
+	if cfg.VirtualObject == nil {
+		slog.Error("virtual object config cannot be nil")
+		os.Exit(1)
+	}
+
 	ctx := context.Background()
 
 	dbPool, err := platformPostgres.NewConnectionPool(ctx, cfg)

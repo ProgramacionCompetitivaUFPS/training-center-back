@@ -46,26 +46,26 @@ As a Coach or Admin who has created a problem, I want to update the problem's me
    - **When** they update the statement
    - **Then** the system accepts the update
 
-9. **Scenario**: Update accessibility from PRIVATE to PUBLIC
+6. **Scenario**: Update accessibility from PRIVATE to PUBLIC
    - **Given** a problem exists with status `DRAFT` and accessibility `PRIVATE`
    - **And** the authenticated user is the author, Admin, or a modifier
    - **When** they update accessibility to `PUBLIC`
    - **Then** the system updates the accessibility
    - **And** returns the updated problem data
 
-6. **Scenario**: Invalid time/memory limit
+7. **Scenario**: Invalid time/memory limit
    - **Given** a Coach or Admin is authenticated
    - **And** timeLimit or memoryLimit is zero, negative, or exceeds maximum allowed value
    - **When** they submit the update request
    - **Then** the system rejects with 400 Bad Request indicating invalid limits
 
-7. **Scenario**: Invalid tags provided
+8. **Scenario**: Invalid tags provided
    - **Given** a Coach or Admin is authenticated
    - **And** the request includes tags that are not in the system's predefined tag list
    - **When** they submit the update request
    - **Then** the system rejects with 400 Bad Request indicating invalid tags
 
-8. **Scenario**: Unauthenticated request
+9. **Scenario**: Unauthenticated request
    - **Given** the request does not include valid authentication credentials
    - **When** an update request is submitted
    - **Then** the system rejects with 401 Unauthorized
@@ -278,6 +278,8 @@ Update problem metadata.
 | tags | string[] | No | Array of tags from system's predefined list |
 | accessibility | string | No | Problem accessibility: `PUBLIC` or `PRIVATE` |
 
+> **Note**: Modifying `accessibility` via this Update endpoint acts as a convenient alias for the `Change problem visibility` endpoint. Both endpoints follow the exact same rules.
+
 > **Note**: See the Platform README for Virtual Object configuration including `maxTimeLimitGlobal`, `maxMemoryLimitGlobal`, and language-specific maximums.
 
 **Responses**:
@@ -311,7 +313,7 @@ Problem updated successfully.
   ],
   "files": {
     "testCases": true,
-    "solutions": ["solution.cpp"],
+    "solutions": [{"filename": "solution.cpp", "language": "cpp20"}],
     "checker": false,
     "validator": false
   },
@@ -438,7 +440,7 @@ File uploaded successfully.
   "fileName": "testcases.zip",
   "files": {
     "testCases": true,
-    "solutions": ["solution.cpp"],
+    "solutions": [{"filename": "solution.cpp", "language": "cpp20"}],
     "checker": false,
     "validator": false
   }
@@ -514,7 +516,7 @@ File deleted successfully.
   "fileType": "checker",
   "files": {
     "testCases": true,
-    "solutions": ["solution.cpp"],
+    "solutions": [{"filename": "solution.cpp", "language": "cpp20"}],
     "checker": false,
     "validator": false
   }
@@ -762,43 +764,9 @@ Problem not found.
 
 ### Key Entities
 
-Referenced from Create Problem spec:
+📝 **Please Refer to `README.md`**
 
-- **Problem**: Represents a programming problem.  
-  Key attributes:
-  - `slug` (string, unique, user-provided, lowercase alphanumeric with hyphens, 3-70 chars, immutable)
-  - `title` (string, required)
-  - `statement` (string, LaTeX format, nullable)
-  - `timeLimit` (integer, milliseconds, nullable, default for all languages, max from Virtual Object)
-  - `memoryLimit` (integer, MiB, nullable, default for all languages, max from Virtual Object)
-  - `languageOverrides` (array, nullable, language-specific limit overrides)
-  - `tags` (array of strings, always optional, from predefined list)
-  - `status` (enum: `DRAFT` | `PUBLISHED`)
-  - `accessibility` (enum: `PUBLIC` | `PRIVATE`, default: `PRIVATE`)
-  - `authorId` (string, UUID, FK to User)
-  - `modifierIds` (array of UUIDs, FK to User, users with edit permissions)
-  - `testCasesFileKey` (string, nullable, reference to test cases ZIP)
-  - `solutionFileKeys` (array of strings, references to solution files)
-  - `checkerFileKey` (string, nullable, reference to checker file)
-  - `validatorFileKey` (string, nullable, reference to validator file)
-  - `problemJudgingUpdatedAt` (timestamp, nullable, updated when judging components are uploaded)
-  - `createdAt` (timestamp)
-  - `updatedAt` (timestamp)
-
-> **problemJudgingUpdatedAt**: This timestamp is automatically updated whenever any judging component is uploaded:
-> - Test cases (`fileType=testCases`)
-> - Checker (`fileType=checker`)
-> - Validator (`fileType=validator`)
->
-> This timestamp is used by the Rejudge system to determine which submissions need rejudging. See Rejudge Submissions spec for details.
-
-> **Problem Status** (publication state):
-> - `DRAFT`: Problem is being built. Can have partial data. Can be updated.
-> - `PUBLISHED`: Problem is complete and published. Cannot be modified (must unpublish first via Publish Problem spec).
-
-> **Problem Accessibility** (who can add it to contests):
-> - `PRIVATE`: Only the problem's modifiers (author + assigned modifiers) can add this problem to a contest. Default for all new problems.
-> - `PUBLIC`: Any contest creator can add this problem to their contest.
+For the canonical documentation of the `Problem` entity and its properties (including Status, Accessibility, etc.), please refer to the `README.md` at the root of the Problem management directory.
 
 ### Supported File Types
 

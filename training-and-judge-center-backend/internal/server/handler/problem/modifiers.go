@@ -26,7 +26,7 @@ func (h *Handler) AddModifier(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	err := h.addModifierUC.Execute(r.Context(), appProblem.AddModifierInput{
+	_, err := h.addModifierUC.Execute(r.Context(), appProblem.AddModifierInput{
 		Slug:        slug,
 		UserID:      body.UserID,
 		CurrentUser: *currentUser,
@@ -54,7 +54,7 @@ func (h *Handler) RemoveModifier(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	err := h.removeModifierUC.Execute(r.Context(), appProblem.RemoveModifierInput{
+	_, err := h.removeModifierUC.Execute(r.Context(), appProblem.RemoveModifierInput{
 		Slug:        slug,
 		UserID:      userID,
 		CurrentUser: *currentUser,

@@ -175,22 +175,26 @@ func (uc *UpdateProblemUseCase) Execute(ctx context.Context, input UpdateProblem
 		}
 	}
 
-	if len(fieldErrs) > 0 {
-		return nil, apperror.NewValidation(fieldErrs)
-	}
-
 	var statementPtr *problem.Statement
 	if input.Statement != nil {
 		stmt, err := problem.NewStatement(input.Statement)
 		if err != nil {
 			var valErr *apperror.AppError
 			if errors.As(err, &valErr) {
-				return nil, apperror.NewValidation(valErr.Details)
+				fieldErrs = append(fieldErrs, valErr.Details...)
+			} else {
+				slog.ErrorContext(ctx, "failed to validate statement", "error", err)
+				return nil, apperror.NewInternal()
 			}
-			return nil, apperror.NewInternal()
+		} else {
+			statementPtr = &stmt
 		}
-		statementPtr = &stmt
 	}
+
+	if len(fieldErrs) > 0 {
+		return nil, apperror.NewValidation(fieldErrs)
+	}
+
 	p.UpdateMetadata(title, statementPtr, timeLimit, memoryLimit, validOverrides, tags)
 
 	if accessibility != nil {

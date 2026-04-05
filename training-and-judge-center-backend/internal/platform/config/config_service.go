@@ -5,6 +5,8 @@ import (
 	"github.com/training-judge-center/backend/internal/domain/problem"
 )
 
+var _ = func() { _ = config.LanguageLimit(problem.LanguageLimit{}) }
+
 type VirtualObjectProvider struct {
 	languageExtensions    map[string]string
 	uploadMaxConcurrency  int
@@ -12,12 +14,12 @@ type VirtualObjectProvider struct {
 	maxFileSizeTestCaseMB int
 	maxFileCountTestCase  int
 	maxFileSizeDefaultMB  int
-	globalMaxTimeLimit   int
-	globalMaxMemoryLimit int
-	languages            map[string]problem.LanguageLimit
-	supportedLanguages   map[string]struct{}
-	allowedTags          map[string]struct{}
-	tagsList             []string
+	globalMaxTimeLimit    int
+	globalMaxMemoryLimit  int
+	languages             map[string]problem.LanguageLimit
+	supportedLanguages    map[string]struct{}
+	allowedTags           map[string]struct{}
+	tagsList              []string
 }
 
 func NewVirtualObjectProvider(cfg *config.VirtualObject) *VirtualObjectProvider {
@@ -56,12 +58,12 @@ func NewVirtualObjectProvider(cfg *config.VirtualObject) *VirtualObjectProvider 
 		maxFileSizeTestCaseMB: cfg.MaxFileSizeTestCaseMB,
 		maxFileCountTestCase:  cfg.MaxFileCountTestCase,
 		maxFileSizeDefaultMB:  cfg.MaxFileSizeDefaultMB,
-		globalMaxTimeLimit:   cfg.MaxTimeLimitGlobal,
-		globalMaxMemoryLimit: cfg.MaxMemoryLimitGlobal,
-		languages:            langs,
-		supportedLanguages:   supportedMap,
-		allowedTags:          tagsMap,
-		tagsList:             cfg.Tags,
+		globalMaxTimeLimit:    cfg.MaxTimeLimitGlobal,
+		globalMaxMemoryLimit:  cfg.MaxMemoryLimitGlobal,
+		languages:             langs,
+		supportedLanguages:    supportedMap,
+		allowedTags:           tagsMap,
+		tagsList:              cfg.Tags,
 	}
 }
 

@@ -14,7 +14,7 @@ As a Coach or Admin with a complete problem, I want to publish it so that it bec
 
 **Why this priority**: Publishing is the final step that makes problems available to contestants. The validation ensures problem quality before publication.
 
-**Independent Test**: This user story can be tested independently by consuming the `POST /problems/{slug}/publish` endpoint for a complete problem, validating that status changes to `PUBLISHED` after successful validation.
+**Independent Test**: This user story can be tested independently by consuming the `POST /problems/p/{slug}/publish` endpoint for a complete problem, validating that status changes to `PUBLISHED` after successful validation.
 
 **Acceptance Scenarios**:
 
@@ -94,7 +94,7 @@ As a Coach or Admin, I want to unpublish a problem so that I can make changes to
 
 **Why this priority**: Allows corrections and updates to published problems. Lower priority as it's not part of the initial creation flow.
 
-**Independent Test**: This user story can be tested independently by consuming the `POST /problems/{slug}/unpublish` endpoint, validating that status changes from `PUBLISHED` to `DRAFT`.
+**Independent Test**: This user story can be tested independently by consuming the `POST /problems/p/{slug}/unpublish` endpoint, validating that status changes from `PUBLISHED` to `DRAFT`.
 
 **Acceptance Scenarios**:
 
@@ -126,6 +126,13 @@ As a Coach or Admin, I want to unpublish a problem so that I can make changes to
    - **When** unpublish is attempted
    - **Then** the system rejects with 404 Not Found
 
+6. **Scenario**: Unpublish problem in active contest
+   - **Given** a problem exists with status `PUBLISHED`
+   - **And** the problem is part of an ongoing/active contest
+   - **When** unpublish is attempted
+   - **Then** the system rejects with 409 Conflict (PROBLEM_IN_ACTIVE_CONTEST)
+   - **And** returns an error message indicating the problem is currently used in an active contest
+
 ---
 
 ### User Story 3 – Change problem accessibility (Priority: P2)
@@ -134,7 +141,7 @@ As a Coach or Admin, I want to change a problem's accessibility between `PRIVATE
 
 **Why this priority**: Allows flexible control over problem distribution. Can be done independently of the publish/unpublish flow.
 
-**Independent Test**: This user story can be tested independently by consuming the `PATCH /problems/{slug}/accessibility` endpoint, validating that accessibility changes without affecting the problem's status.
+**Independent Test**: This user story can be tested independently by consuming the `PATCH /problems/p/{slug}/accessibility` endpoint, validating that accessibility changes without affecting the problem's status.
 
 **Acceptance Scenarios**:
 
@@ -239,7 +246,7 @@ As a Coach or Admin, I want to change a problem's accessibility between `PRIVATE
 
 ## API Contract
 
-### POST /problems/{slug}/publish
+### POST /problems/p/{slug}/publish
 
 Validate and publish a problem, changing status from `DRAFT` to `PUBLISHED`.
 
@@ -482,7 +489,7 @@ Problem is already PUBLISHED.
 
 ---
 
-### POST /problems/{slug}/unpublish
+### POST /problems/p/{slug}/unpublish
 
 Unpublish a problem, changing status from `PUBLISHED` to `DRAFT`.
 
@@ -544,7 +551,7 @@ Problem not found.
 ```
 
 #### 409 Conflict
-Problem is already DRAFT.
+Problem is already DRAFT or used in an active contest.
 
 ```json
 {
@@ -553,9 +560,16 @@ Problem is already DRAFT.
 }
 ```
 
+```json
+{
+  "error": "PROBLEM_IN_ACTIVE_CONTEST",
+  "message": "Cannot unpublish a problem that is currently being used in an active contest"
+}
+```
+
 ---
 
-### PATCH /problems/{slug}/accessibility
+### PATCH /problems/p/{slug}/accessibility
 
 Change a problem's accessibility between `PRIVATE` and `PUBLIC`.
 
@@ -703,34 +717,9 @@ Problem not found.
 
 ### Key Entities
 
-Referenced from Create Problem spec:
+📝 **Please Refer to `README.md`**
 
-- **Problem**: Represents a programming problem.  
-  Key attributes for publication:
-  - `slug` (string, unique, user-provided, 3-70 chars, immutable)
-  - `title` (string, required)
-  - `statement` (string, LaTeX format, required for publication)
-  - `timeLimit` (integer, milliseconds, required for publication)
-  - `memoryLimit` (integer, MiB, required for publication)
-  - `tags` (array of strings, always optional)
-  - `status` (enum: `DRAFT` | `PUBLISHED`)
-  - `accessibility` (enum: `PUBLIC` | `PRIVATE`, default: `PRIVATE`)
-  - `authorId` (string, UUID, FK to User)
-  - `modifierIds` (array of UUIDs, FK to User)
-  - `testCasesFileKey` (string, required for publication)
-  - `solutionFileKeys` (array of strings, at least 1 required for publication)
-  - `checkerFileKey` (string, optional)
-  - `validatorFileKey` (string, optional)
-  - `problemJudgingUpdatedAt` (timestamp, nullable, updated when judging components are uploaded)
-  - `updatedAt` (timestamp)
-
-> **Problem Status** (publication state):
-> - `DRAFT`: Problem is being built. Can be modified. Not available for contests/practice.
-> - `PUBLISHED`: Problem is complete and published. Cannot be modified (must unpublish first). Available for contests/practice.
-
-> **Problem Accessibility** (who can add it to contests):
-> - `PRIVATE`: Only the problem's modifiers (author + assigned modifiers) can add this problem to a contest. Default for all new problems.
-> - `PUBLIC`: Any contest creator can add this problem to their contest.
+For the canonical documentation of the `Problem` entity and its properties (including verification steps, accessibility meaning, etc), please refer to the `README.md` at the root of the Problem management directory.
 
 ### Validation Process
 
@@ -785,7 +774,7 @@ The publish endpoint triggers a comprehensive validation pipeline:
 ### Measurable Outcomes
 
 **Publication:**
-- **SC-001**: Complete problems can be published via `POST /problems/{slug}/publish` with HTTP 200.
+- **SC-001**: Complete problems can be published via `POST /problems/p/{slug}/publish` with HTTP 200.
 - **SC-002**: Publication validates all required fields.
 - **SC-003**: Publication validates test cases ZIP structure (ICPC format).
 - **SC-004**: Publication compiles and runs checker/validator if provided.
@@ -794,12 +783,13 @@ The publish endpoint triggers a comprehensive validation pipeline:
 - **SC-007**: Failed validation returns detailed logs with specific failures.
 - **SC-008**: Successful publication changes status to `PUBLISHED`.
 - **SC-009**: Already PUBLISHED problems return 409 Conflict on publish attempt.
-- **SC-010**: Problems can be unpublished via `POST /problems/{slug}/unpublish` with HTTP 200.
+- **SC-010**: Problems can be unpublished via `POST /problems/p/{slug}/unpublish` with HTTP 200.
 - **SC-011**: Unpublishing changes status to `DRAFT`.
 - **SC-012**: Already DRAFT problems return 409 Conflict on unpublish attempt.
+- **SC-013**: Unpublishing active contest problems returns 409 Conflict on unpublish attempt.
 
 **Accessibility:**
-- **SC-013**: Problem accessibility can be changed via `PATCH /problems/{slug}/accessibility` with HTTP 200.
+- **SC-014**: Problem accessibility can be changed via `PATCH /problems/p/{slug}/accessibility` with HTTP 200.
 - **SC-014**: Accessibility can be changed for both `DRAFT` and `PUBLISHED` problems.
 - **SC-015**: Changing accessibility does NOT affect problem status.
 - **SC-016**: Invalid accessibility values return HTTP 400.

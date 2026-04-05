@@ -42,8 +42,8 @@ func TestDeleteProblem_InvalidBody_Returns400(t *testing.T) {
 
 func TestDeleteProblem_NotFound_Returns404(t *testing.T) {
 	uc := &mockDeleteProblemUC{
-		fn: func(_ context.Context, _ appProblem.DeleteProblemInput) error {
-			return apperror.NewNotFound(apperror.ErrCodeNotFound, "problem not found")
+		fn: func(_ context.Context, _ appProblem.DeleteProblemInput) (struct{}, error) {
+			return struct{}{}, apperror.NewNotFound(apperror.ErrCodeNotFound, "problem not found")
 		},
 	}
 	h := newTestHandler(nil, nil, nil, nil, nil, uc, nil, nil)
@@ -62,8 +62,8 @@ func TestDeleteProblem_NotFound_Returns404(t *testing.T) {
 
 func TestDeleteProblem_HappyPath_Returns204(t *testing.T) {
 	uc := &mockDeleteProblemUC{
-		fn: func(_ context.Context, _ appProblem.DeleteProblemInput) error {
-			return nil
+		fn: func(_ context.Context, _ appProblem.DeleteProblemInput) (struct{}, error) {
+			return struct{}{}, nil
 		},
 	}
 	h := newTestHandler(nil, nil, nil, nil, nil, uc, nil, nil)

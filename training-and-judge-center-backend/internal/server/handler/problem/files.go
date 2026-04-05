@@ -114,7 +114,7 @@ func (h *Handler) DeleteFile(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), 30*time.Second)
 	defer cancel()
 
-	ucErr := h.deleteFileUC.Execute(ctx, appProblem.DeleteProblemFileInput{
+	_, ucErr := h.deleteFileUC.Execute(ctx, appProblem.DeleteProblemFileInput{
 		Slug:        slug,
 		FileType:    fileType,
 		FileName:    fileName,

@@ -25,15 +25,15 @@ type uploadFilesUC interface {
 }
 
 type deleteFileUC interface {
-	Execute(ctx context.Context, input appProblem.DeleteProblemFileInput) error
+	Execute(ctx context.Context, input appProblem.DeleteProblemFileInput) (struct{}, error)
 }
 
 type addModifierUC interface {
-	Execute(ctx context.Context, input appProblem.AddModifierInput) error
+	Execute(ctx context.Context, input appProblem.AddModifierInput) (struct{}, error)
 }
 
 type removeModifierUC interface {
-	Execute(ctx context.Context, input appProblem.RemoveModifierInput) error
+	Execute(ctx context.Context, input appProblem.RemoveModifierInput) (struct{}, error)
 }
 
 type listModifiersUC interface {
@@ -57,7 +57,7 @@ type changeAccessibilityProblemUC interface {
 }
 
 type deleteProblemUC interface {
-	Execute(ctx context.Context, in appProblem.DeleteProblemInput) error
+	Execute(ctx context.Context, in appProblem.DeleteProblemInput) (struct{}, error)
 }
 
 type Handler struct {

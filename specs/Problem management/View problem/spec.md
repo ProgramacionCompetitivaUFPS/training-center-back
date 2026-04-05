@@ -431,36 +431,9 @@ Authentication failed.
 
 ### Key Entities
 
-- **Problem**: Represents a programming problem.  
-  Key attributes:
-  - `id` (string, UUID, internal only, never exposed in API responses)
-  - `slug` (string, unique, user-provided, 3-70 chars, lowercase alphanumeric with hyphens)
-  - `title` (string, normalized NFKC)
-  - `statement` (string, LaTeX format, nullable)
-  - `timeLimit` (integer, milliseconds, nullable)
-  - `memoryLimit` (integer, MiB, nullable)
-  - `languageOverrides` (array, language-specific limit overrides)
-  - `tags` (array of strings, from predefined list)
-  - `status` (enum: DRAFT | PUBLISHED)
-  - `accessibility` (enum: PRIVATE | PUBLIC)
-  - `authorId` (string, UUID, FK to User) - JOIN with User table required to retrieve author.nickname and author.name for API response
-  - `modifierIds` (array of UUIDs, FK to User) - JOIN with User table required to retrieve modifiers[].nickname and modifiers[].name for API response
-  - `testCasesFileKey` (string, nullable)
-  - `solutionFileKeys` (array of strings)
-  - `checkerFileKey` (string, nullable)
-  - `validatorFileKey` (string, nullable)
-  - `problemJudgingUpdatedAt` (timestamp, nullable)
-  - `createdAt` (timestamp)
-  - `updatedAt` (timestamp)
+📝 **Please Refer to `README.md`**
 
-- **User**: Represents a user (author or modifier).  
-  Key attributes:
-  - `id` (string, UUID, internal only, never exposed in API responses)
-  - `nickname` (string, unique, lowercase)
-  - `name` (string)
-  - `role` (enum: ADMIN | COACH | CONTESTANT)
-
-> **Note on Data Retrieval**: To return author and modifiers information in API responses, the system must JOIN the Problem table with the User table using `authorId` and each UUID in `modifierIds` array. The authenticated user's `userId` (from JWT token) is used for authorization checks without requiring additional JOINs.
+For the canonical documentation of the `Problem` and `User` entities and their properties, please refer to the `README.md` at the root of the Problem management directory.
 
 ## Success Criteria *(mandatory)*
 

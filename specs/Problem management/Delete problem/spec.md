@@ -43,10 +43,9 @@ As a problem author or Admin, I want to permanently delete a problem from the sy
    - **Given** a problem exists and is included in an ACTIVE contest
    - **And** the authenticated user is the author or Admin
    - **When** they delete the problem with correct confirmation
-   - **Then** the system deletes the problem and Contest_Problem association
-   - **And** the problem disappears from the contest immediately
-   - **And** contest standings are recalculated if necessary
-   - **And** existing submissions remain visible in standings with preserved problem title
+   - **Then** the system rejects with HTTP 409 Conflict
+   - **And** returns error code PROBLEM_IN_ACTIVE_CONTEST
+   - **And** indicates the problem must be removed from the active contest first
 
 5. **Scenario**: Delete problem in scheduled contest
    - **Given** a problem exists and is included in a SCHEDULED (future) contest
@@ -124,7 +123,7 @@ As a problem author or Admin, I want to permanently delete a problem from the sy
 - Delete problem immediately after creation (no submissions, no contests)
 - Attempt to delete same problem twice (idempotency)
 - Delete problem with special characters in slug
-- Standing recalculation when problem deleted from active contest
+- Standing recalculation when problem deleted from active contest (Currently blocked by validation)
 - Contest with only one problem, and that problem is deleted
 
 ## API Contract
@@ -244,10 +243,9 @@ Problem with the specified slug does not exist.
 - **FR-013**: The system MUST preserve the problem title in submission records for historical reference.
 
 **Contest Impact**
-- **FR-014**: The system MUST allow deletion of problems that are in ACTIVE contests.
+- **FR-014**: The system MUST NOT allow deletion of problems that are currently in ACTIVE contests (must return PROBLEM_IN_ACTIVE_CONTEST).
 - **FR-015**: The system MUST allow deletion of problems that are in SCHEDULED contests.
 - **FR-016**: The system MUST allow deletion of problems that are in FINISHED contests.
-- **FR-017**: When a problem is deleted from an ACTIVE contest, the system MUST recalculate standings if necessary.
 - **FR-018**: When a problem is deleted from a SCHEDULED contest, the system MUST remove it without notification.
 - **FR-019**: When a problem is deleted from a FINISHED contest, the system MUST preserve historical standings.
 
@@ -272,36 +270,9 @@ Problem with the specified slug does not exist.
 
 ### Key Entities
 
-- **Problem**: Represents a programming problem.  
-  Relevant attributes:
-  - `id` (string, UUID, internal only)
-  - `slug` (string, unique, 3-70 chars)
-  - `title` (string, preserved in submissions)
-  - `status` (enum: DRAFT | PUBLISHED)
-  - `authorId` (string, UUID, FK to User)
-  - `testCasesFileKey` (string, nullable)
-  - `solutionFileKeys` (array of strings)
-  - `checkerFileKey` (string, nullable)
-  - `validatorFileKey` (string, nullable)
+📝 **Please Refer to `README.md`**
 
-- **Contest_Problem**: Association between contest and problem.  
-  Relevant attributes:
-  - `id` (string, UUID, internal only)
-  - `contestId` (string, UUID, FK to Contest)
-  - `problemId` (string, UUID, FK to Problem)
-  - `position` (integer)
-
-- **Submission**: Code submission for a problem.  
-  Relevant attributes:
-  - `id` (string, UUID, internal only)
-  - `problemId` (string, UUID, FK to Problem - preserved after deletion)
-  - `problemTitle` (string, preserved for display)
-  - `contestId` (string, UUID, FK to Contest, nullable)
-
-- **User**: Represents a user.  
-  Relevant attributes:
-  - `id` (string, UUID, internal only)
-  - `role` (enum: ADMIN | COACH | CONTESTANT)
+For the canonical documentation of the `Problem`, `Contest_Problem`, `Submission`, and `User` entities, please refer to the `README.md` at the root of the Problem management directory.
 
 > **Note on Deletion**: Problem deletion is a hard delete operation. The Problem record and all associated files are permanently removed. Contest_Problem associations are deleted to remove the problem from all contests. Submissions are preserved with problem_id and problemTitle intact for historical reference.
 
@@ -319,7 +290,7 @@ Problem with the specified slug does not exist.
 - **SC-008**: All Contest_Problem associations are deleted (problem removed from all contests).
 - **SC-009**: All Submission records are preserved with problem_id intact.
 - **SC-010**: Submissions display preserved problem title after deletion.
-- **SC-011**: Problems can be deleted from ACTIVE contests with standings recalculation.
+- **SC-011**: Problems CANNOT be deleted from ACTIVE contests (rejected with 409 Conflict).
 - **SC-012**: Problems can be deleted from SCHEDULED contests without notification.
 - **SC-013**: Problems can be deleted from FINISHED contests with preserved standings.
 - **SC-014**: Deleted problems return HTTP 404 Not Found on subsequent access attempts.

@@ -56,38 +56,38 @@ As a Coach or Admin, I want to create a new problem by providing a slug and titl
    - **When** they submit the problem creation request
    - **Then** the system rejects with 400 Bad Request indicating invalid tags
 
-12. **Scenario**: Unsupported language in languageOverrides
+8. **Scenario**: Unsupported language in languageOverrides
     - **Given** a Coach or Admin is authenticated
     - **When** they submit a problem with a language in `languageOverrides` that is not supported by the platform (not in Virtual Object `supportedLanguages` list)
     - **Then** the system rejects with 400 Bad Request and field `languageOverrides.language` indicating the unsupported language
 
-13. **Scenario**: Duplicate language in languageOverrides
+9. **Scenario**: Duplicate language in languageOverrides
     - **Given** a Coach or Admin is authenticated
     - **When** they submit a problem with the same language appearing more than once in `languageOverrides`
     - **Then** the system rejects with 400 Bad Request and field `languageOverrides.language` indicating the duplicate language
 
-14. **Scenario**: Statement exceeds maximum length
+10. **Scenario**: Statement exceeds maximum length
     - **Given** a Coach or Admin is authenticated
     - **When** they submit a problem with a `statement` field exceeding 150,000 characters
     - **Then** the system rejects with 400 Bad Request and field `statement`
 
-8. **Scenario**: Slug already exists
+11. **Scenario**: Slug already exists
    - **Given** a problem with slug "sum-two-numbers" already exists
    - **When** a Coach creates a new problem with slug "sum-two-numbers"
    - **Then** the system rejects with 409 Conflict (SLUG_ALREADY_EXISTS)
    - **And** returns a message indicating the slug is already in use
 
-9. **Scenario**: Slug too short
+12. **Scenario**: Slug too short
    - **Given** a Coach or Admin is authenticated
    - **When** they submit a problem with slug "ab" (less than 3 characters)
    - **Then** the system rejects with 400 Bad Request (SLUG_TOO_SHORT)
 
-10. **Scenario**: Slug too long
+13. **Scenario**: Slug too long
     - **Given** a Coach or Admin is authenticated
     - **When** they submit a problem with slug exceeding 70 characters
     - **Then** the system rejects with 400 Bad Request (SLUG_TOO_LONG)
 
-11. **Scenario**: Slug with invalid format
+14. **Scenario**: Slug with invalid format
     - **Given** a Coach or Admin is authenticated
     - **When** they submit a problem with slug containing invalid characters (uppercase, spaces, special chars)
     - **Then** the system rejects with 400 Bad Request (INVALID_SLUG_FORMAT)
@@ -429,7 +429,7 @@ Problem imported successfully.
   "modifiers": [],
   "files": {
     "testCases": true,
-    "solutions": ["solution.cpp"],
+    "solutions": [{"filename": "solution.cpp", "language": "cpp20"}],
     "checker": false,
     "validator": true
   },
@@ -548,62 +548,15 @@ User does not have permission.
 
 ### Key Entities
 
-- **Problem**: Represents a programming problem.  
-  Key attributes:
-  - `slug` (string, unique, user-provided, lowercase alphanumeric with hyphens, 3-70 chars)
-  - `title` (string, required, normalized NFKC)
-  - `statement` (string, LaTeX format, nullable)
-  - `timeLimit` (integer, milliseconds, nullable, default for all languages, max from Virtual Object)
-  - `memoryLimit` (integer, MiB, nullable, default for all languages, max from Virtual Object)
-  - `languageOverrides` (array, nullable, language-specific limit overrides)
-  - `tags` (array of strings, always optional, from predefined list)
-  - `status` (enum: `DRAFT` | `PUBLISHED`, default: `DRAFT`)
-  - `accessibility` (enum: `PUBLIC` | `PRIVATE`, default: `PRIVATE`)
-  - `authorId` (string, UUID, FK to User)
-  - `modifierIds` (array of UUIDs, FK to User, empty on creation)
-  - `testCasesFileKey` (string, nullable, reference to test cases ZIP)
-  - `solutionFileKeys` (array of strings, references to solution files)
-  - `checkerFileKey` (string, nullable, reference to checker file)
-  - `validatorFileKey` (string, nullable, reference to validator file)
-  - `problemJudgingUpdatedAt` (timestamp, nullable, updated when judging components are uploaded)
-  - `createdAt` (timestamp)
-  - `updatedAt` (timestamp)
+📝 **Please Refer to `README.md`**
 
-> **problemJudgingUpdatedAt**: This timestamp is automatically updated whenever any judging component is uploaded (test cases, checker, or validator). Used by the Rejudge system to determine which submissions need rejudging. See Rejudge Submissions spec for details.
-
-> **Problem Status** (publication state):
-> - `DRAFT`: Problem is being built. Can have partial data. Can be modified. Not available for contests/practice.
-> - `PUBLISHED`: Problem is complete and published. Cannot be modified (must unpublish first). Available for contests/practice.
-
-> **Problem Accessibility** (who can add it to contests):
-> - `PRIVATE`: Only the problem's modifiers (author + assigned modifiers) can add this problem to a contest. Default for all new problems.
-> - `PUBLIC`: Any contest creator can add this problem to their contest.
+For the canonical documentation of the `Problem` entity and its properties, please refer to the `README.md` at the root of the Problem management directory.
 
 ### Slug Validation Rules
 
-The slug is provided by the user and must follow these rules:
+📝 **Please Refer to `README.md`**
 
-| Rule | Description |
-|------|-------------|
-| Length | 3-70 characters |
-| Characters | Only lowercase letters (a-z), numbers (0-9), and hyphens (-) |
-| Format | Cannot start or end with hyphen |
-| Format | Cannot contain consecutive hyphens (--) |
-| Uniqueness | Must be unique across all problems |
-
-**Valid examples**:
-- `sum-two-numbers` ✅
-- `prob-001` ✅
-- `dp-knapsack` ✅
-- `a1b` ✅
-
-**Invalid examples**:
-- `ab` ❌ (too short, < 3 chars)
-- `Sum-Two-Numbers` ❌ (uppercase not allowed)
-- `-sum-two-` ❌ (cannot start/end with hyphen)
-- `sum--two` ❌ (consecutive hyphens not allowed)
-- `sum two` ❌ (spaces not allowed)
-- `probléma` ❌ (special characters not allowed)
+For the canonical rules governing slug validation, length, and format, please refer to the `README.md` at the root of the Problem management directory.
 
 ### Tags
 

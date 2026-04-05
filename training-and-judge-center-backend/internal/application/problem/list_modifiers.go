@@ -24,7 +24,7 @@ func (uc *ListModifiersUseCase) Execute(ctx context.Context, slugStr string, cur
 
 	p, err := uc.repo.FindBySlug(ctx, slug)
 	if err != nil {
-		return nil, apperror.NewNotFound(apperror.ErrCodeNotFound, "Problem not found")
+		return nil, err
 	}
 
 	if !p.CanBeEditedBy(problem.RestoreUserID(currentUser.ID), currentUser.Role == user.RoleAdmin) {

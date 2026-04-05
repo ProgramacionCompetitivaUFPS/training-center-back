@@ -47,10 +47,10 @@ func (m *mockImportUC) Execute(ctx context.Context, in appProblem.ImportProblemI
 }
 
 type mockDeleteProblemUC struct {
-	fn func(context.Context, appProblem.DeleteProblemInput) error
+	fn func(context.Context, appProblem.DeleteProblemInput) (struct{}, error)
 }
 
-func (m *mockDeleteProblemUC) Execute(ctx context.Context, in appProblem.DeleteProblemInput) error {
+func (m *mockDeleteProblemUC) Execute(ctx context.Context, in appProblem.DeleteProblemInput) (struct{}, error) {
 	if m.fn == nil {
 		panic("mockDeleteProblemUC.Execute called unexpectedly")
 	}
@@ -110,19 +110,19 @@ func (n *noopUploadUC) Execute(ctx context.Context, in appProblem.UploadProblemF
 
 type noopDeleteFileUC struct{}
 
-func (n *noopDeleteFileUC) Execute(ctx context.Context, in appProblem.DeleteProblemFileInput) error {
+func (n *noopDeleteFileUC) Execute(ctx context.Context, in appProblem.DeleteProblemFileInput) (struct{}, error) {
 	panic("noopDeleteFileUC.Execute called unexpectedly")
 }
 
 type noopAddModifierUC struct{}
 
-func (n *noopAddModifierUC) Execute(ctx context.Context, in appProblem.AddModifierInput) error {
+func (n *noopAddModifierUC) Execute(ctx context.Context, in appProblem.AddModifierInput) (struct{}, error) {
 	panic("noopAddModifierUC.Execute called unexpectedly")
 }
 
 type noopRemoveModifierUC struct{}
 
-func (n *noopRemoveModifierUC) Execute(ctx context.Context, in appProblem.RemoveModifierInput) error {
+func (n *noopRemoveModifierUC) Execute(ctx context.Context, in appProblem.RemoveModifierInput) (struct{}, error) {
 	panic("noopRemoveModifierUC.Execute called unexpectedly")
 }
 

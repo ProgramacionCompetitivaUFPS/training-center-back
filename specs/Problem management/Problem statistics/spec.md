@@ -54,12 +54,12 @@ As an authenticated user with access to a problem, I want to view comprehensive 
    - **Then** the system returns HTTP 404 Not Found
 
 6. **Scenario**: Statistics with multiple languages
-   - **Given** a problem has submissions in CPP, PYTHON, and JAVA
-   - **And** CPP has 50 users attempted, 30 solved (60% rate)
-   - **And** PYTHON has 40 users attempted, 20 solved (50% rate)
-   - **And** JAVA has 30 users attempted, 21 solved (70% rate)
+   - **Given** a problem has submissions in cpp20, python310, and java17
+   - **And** cpp20 has 50 users attempted, 30 solved (60% rate)
+   - **And** python310 has 40 users attempted, 20 solved (50% rate)
+   - **And** java17 has 30 users attempted, 21 solved (70% rate)
    - **When** statistics are requested
-   - **Then** languages are ordered: JAVA (70%), CPP (60%), PYTHON (50%)
+   - **Then** languages are ordered: java17 (70%), cpp20 (60%), python310 (50%)
 
 7. **Scenario**: Statistics include all verdict types
    - **Given** a problem has submissions with verdicts: ACCEPTED, WRONG_ANSWER, TIME_LIMIT_EXCEEDED, COMPILATION_ERROR
@@ -98,7 +98,9 @@ As an authenticated user with access to a problem, I want to view comprehensive 
 
 Retrieve comprehensive statistics for a specific problem including submission counts, user metrics, acceptance rates by language, and verdict distribution.
 
-> **Important**: Statistics are only available for PUBLISHED problems. DRAFT problems return 403 Forbidden regardless of user role. Statistics include all submissions from both active and deactivated users.
+> **Important**: Statistics are only available for PUBLISHED problems. DRAFT problems return 403 Forbidden regardless of user role. Statistics include all submissions from both active and deactivated users. 
+> 
+> **Note on DRAFT restriction for Admin/Modifiers**: Even if the authenticated user is an Admin or assigned modifier who can normally view and edit the DRAFT problem, they are **explicitly blocked** from viewing statistics because DRAFT problems are not organically open to submissions.
 
 **Headers**:
 
@@ -127,17 +129,17 @@ Statistics retrieved successfully.
   },
   "acceptanceRateByLanguage": [
     {
-      "language": "JAVA",
+      "language": "java17",
       "usersAccepted": 35,
       "usersAttempted": 50
     },
     {
-      "language": "CPP",
+      "language": "cpp20",
       "usersAccepted": 30,
       "usersAttempted": 110
     },
     {
-      "language": "PYTHON",
+      "language": "python310",
       "usersAccepted": 24,
       "usersAttempted": 74
     }
@@ -160,7 +162,7 @@ Statistics retrieved successfully.
       "count": 65
     },
     {
-      "verdict": "RUNTIME_ERROR",
+      "verdict": "RUNTIME_EXCEPTION",
       "count": 35
     }
   ]
@@ -184,7 +186,7 @@ Statistics retrieved successfully.
 | uniqueUsers.attempted | integer | Number of unique users who made at least one submission |
 | uniqueUsers.solved | integer | Number of unique users who have at least one ACCEPTED submission |
 | acceptanceRateByLanguage | array | Acceptance rate breakdown by programming language |
-| acceptanceRateByLanguage[].language | string | Programming language (CPP, JAVA, PYTHON, etc.) |
+| acceptanceRateByLanguage[].language | string | Programming language (cpp20, java17, python310, etc.) |
 | acceptanceRateByLanguage[].usersAccepted | integer | Number of users who solved using this language |
 | acceptanceRateByLanguage[].usersAttempted | integer | Number of users who attempted using this language |
 | verdictDistribution | array | Distribution of submission verdicts |
@@ -271,7 +273,7 @@ Problem with the specified slug does not exist.
 - **FR-023**: The system MUST include all verdict types that have at least one submission.
 - **FR-024**: The system MUST NOT include verdict types with zero submissions.
 - **FR-025**: The system MUST count all submissions regardless of user status (active or deactivated).
-- **FR-026**: Verdict types include but are not limited to: ACCEPTED, WRONG_ANSWER, TIME_LIMIT_EXCEEDED, MEMORY_LIMIT_EXCEEDED, RUNTIME_ERROR, COMPILATION_ERROR, SYSTEM_ERROR.
+- **FR-026**: Verdict types include but are not limited to: ACCEPTED, WRONG_ANSWER, TIME_LIMIT_EXCEEDED, MEMORY_LIMIT_EXCEEDED, RUNTIME_EXCEPTION, COMPILATION_ERROR, SYSTEM_ERROR.
 
 **No Submissions Case**
 - **FR-027**: When a problem has zero submissions, the system MUST return HTTP 200 with a message indicating no statistics are available.
@@ -292,28 +294,9 @@ Problem with the specified slug does not exist.
 
 ### Key Entities
 
-- **Problem**: Represents a programming problem.  
-  Relevant attributes:
-  - `id` (string, UUID, internal only)
-  - `slug` (string, unique, 3-70 chars)
-  - `status` (enum: DRAFT | PUBLISHED)
-  - `authorId` (string, UUID, FK to User)
-  - `modifierIds` (array of UUIDs, FK to User)
+📝 **Please Refer to `README.md`**
 
-- **Submission**: Code submission for a problem.  
-  Relevant attributes:
-  - `id` (string, UUID, internal only)
-  - `problemId` (string, UUID, FK to Problem)
-  - `userId` (string, UUID, FK to User)
-  - `language` (enum: CPP, JAVA, PYTHON, etc.)
-  - `verdict` (enum: ACCEPTED, WRONG_ANSWER, TIME_LIMIT_EXCEEDED, etc.)
-  - `submittedAt` (timestamp)
-
-- **User**: Represents a user.  
-  Relevant attributes:
-  - `id` (string, UUID, internal only)
-  - `status` (enum: ACTIVE | DEACTIVATED)
-  - `role` (enum: ADMIN | COACH | CONTESTANT)
+For the canonical documentation of the `Problem`, `Submission`, and `User` entities, please refer to the `README.md` at the root of the Problem management directory.
 
 > **Note on Statistics Calculation**: Statistics must be calculated by aggregating data from the Submission table, joining with Problem table for access control, and potentially joining with User table for role-based access checks. Deactivated users' submissions are included in all calculations.
 

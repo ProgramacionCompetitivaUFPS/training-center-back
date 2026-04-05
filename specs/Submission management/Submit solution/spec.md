@@ -503,6 +503,7 @@ Contest, group, or problem not found.
 * **Submission**: Represents a user's solution attempt for a problem.
   * `id` (string, UUID, PK)
   * `problem_id` (string, UUID, FK to Problem)
+  * `problemTitle` (string, preserved title of the problem)
   * `contest_id` (string, UUID, FK to Contest, nullable)
   * `submittedBy` (string, UUID, FK to User) - **primary link to user who submitted**
   * `standingId` (string, UUID, nullable) - userId OR teamId, determines which standing document to update

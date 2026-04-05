@@ -99,9 +99,11 @@ When changing from `PUBLIC` to `PRIVATE`:
 
 ---
 
-## 🔹 Problem Attributes
+## 🔹 Key Entities
 
-### Basic Attributes
+### Problem
+
+**Basic Attributes**
 
 | Attribute | Type | Required | Description |
 |-----------|------|----------|-------------|
@@ -136,6 +138,38 @@ Problems can define different time/memory limits for specific languages:
 ```
 
 Limits are validated against the Virtual Object maximums.
+
+### User
+
+Represents a user in the system.
+**Key attributes**:
+- `id` (string, UUID, internal only, never exposed in API responses)
+- `nickname` (string, unique, lowercase)
+- `name` (string)
+- `status` (enum: ACTIVE | DEACTIVATED)
+- `role` (enum: ADMIN | COACH | CONTESTANT)
+
+### Submission
+
+Code submission for a problem.
+**Key attributes**:
+- `id` (string, UUID, internal only)
+- `problemId` (string, UUID, FK to Problem - preserved after deletion)
+- `problemTitle` (string, preserved for display)
+- `userId` (string, UUID, FK to User)
+- `contestId` (string, UUID, FK to Contest, nullable)
+- `language` (enum: cpp20, java17, python310, etc.)
+- `verdict` (enum: ACCEPTED, WRONG_ANSWER, TIME_LIMIT_EXCEEDED, MEMORY_LIMIT_EXCEEDED, RUNTIME_EXCEPTION, COMPILATION_ERROR, SYSTEM_ERROR)
+- `submittedAt` (timestamp)
+
+### Contest_Problem
+
+Association between contest and problem.
+**Key attributes**:
+- `id` (string, UUID, internal only)
+- `contestId` (string, UUID, FK to Contest)
+- `problemId` (string, UUID, FK to Problem)
+- `position` (integer)
 
 ---
 
@@ -316,7 +350,7 @@ problem-package.zip/
 ├── data/
 │   ├── sample/               # Sample test cases
 │   └── secret/               # Secret test cases
-├── submissions/              # Optional solutions
+├── solutions/                # Optional solutions
 │   └── accepted/
 ├── output_validators/        # Optional custom checker
 └── input_validators/         # Optional input validator

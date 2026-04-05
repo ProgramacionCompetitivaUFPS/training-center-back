@@ -2,6 +2,7 @@ package problem
 
 import (
 	"context"
+	"log/slog"
 
 	"github.com/training-judge-center/backend/internal/domain/problem"
 	"github.com/training-judge-center/backend/internal/domain/user"
@@ -67,6 +68,7 @@ func (uc *GetProblemUseCase) Execute(ctx context.Context, in GetProblemInput) (*
 
 	authorDisplay, err := uc.userProvider.GetDisplay(ctx, p.AuthorID.Value())
 	if err != nil {
+		slog.ErrorContext(ctx, "failed to fetch author display", "error", err, "author_id", p.AuthorID.Value())
 		return nil, apperror.NewInternal()
 	}
 
@@ -82,6 +84,7 @@ func (uc *GetProblemUseCase) Execute(ctx context.Context, in GetProblemInput) (*
 		}
 		displays, err := uc.userProvider.GetDisplays(ctx, modifierIDs)
 		if err != nil {
+			slog.ErrorContext(ctx, "failed to fetch modifier displays", "error", err)
 			return nil, apperror.NewInternal()
 		}
 		modifiers := make([]ModifierDisplay, 0, len(p.ModifierIDs))
