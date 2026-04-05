@@ -6,16 +6,15 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/training-judge-center/backend/internal/domain/user"
 )
 
 type PasswordRecoveryRepository struct {
-	pool *pgxpool.Pool
+	querier Querier
 }
 
-func NewPasswordRecoveryRepository(pool *pgxpool.Pool) *PasswordRecoveryRepository {
-	return &PasswordRecoveryRepository{pool: pool}
+func NewPasswordRecoveryRepository(querier Querier) *PasswordRecoveryRepository {
+	return &PasswordRecoveryRepository{querier: querier}
 }
 
 func (r *PasswordRecoveryRepository) Save(ctx context.Context, req *user.PasswordRecoveryRequest) error {
@@ -23,7 +22,8 @@ func (r *PasswordRecoveryRepository) Save(ctx context.Context, req *user.Passwor
 		INSERT INTO password_recovery_requests (id, user_id, code, status, expires_at, created_at, updated_at)
 		VALUES ($1, $2, $3, $4, $5, $6, $7)`
 
-	_, err := r.pool.Exec(ctx, query,
+	querier := getQuerier(ctx, r.querier)
+	_, err := querier.Exec(ctx, query,
 		req.ID(),
 		req.UserID(),
 		req.Code(),
@@ -49,7 +49,7 @@ func (r *PasswordRecoveryRepository) FindByID(ctx context.Context, id string) (*
 	var updatedAt *time.Time
 	var statusStr string
 
-	err := r.pool.QueryRow(ctx, query, id).Scan(
+	err := r.querier.QueryRow(ctx, query, id).Scan(
 		&returnedID,
 		&userID,
 		&code,
@@ -76,7 +76,8 @@ func (r *PasswordRecoveryRepository) Update(ctx context.Context, req *user.Passw
 		SET status = $1, updated_at = $2
 		WHERE id = $3`
 
-	_, err := r.pool.Exec(ctx, query,
+	querier := getQuerier(ctx, r.querier)
+	_, err := querier.Exec(ctx, query,
 		string(req.Status()),
 		req.UpdatedAt(),
 		req.ID(),
@@ -98,7 +99,7 @@ func (r *PasswordRecoveryRepository) FindPendingByUserID(ctx context.Context, us
 	var updatedAt *time.Time
 	var statusStr string
 
-	err := r.pool.QueryRow(ctx, query, userID, string(user.StatusPending)).Scan(
+	err := r.querier.QueryRow(ctx, query, userID, string(user.StatusPending)).Scan(
 		&id,
 		&returnedUserID,
 		&code,
@@ -125,7 +126,7 @@ func (r *PasswordRecoveryRepository) InvalidatePendingByUserID(ctx context.Conte
 		SET status = $1, updated_at = $2
 		WHERE user_id = $3 AND status = $4`
 
-	_, err := r.pool.Exec(ctx, query, string(user.StatusExpired), now, userID, string(user.StatusPending))
+	_, err := r.querier.Exec(ctx, query, string(user.StatusExpired), now, userID, string(user.StatusPending))
 	if err != nil {
 		return fmt.Errorf("failed to invalidate pending password recovery requests: %w", err)
 	}

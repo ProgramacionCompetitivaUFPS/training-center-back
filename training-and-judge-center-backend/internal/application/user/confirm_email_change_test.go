@@ -55,7 +55,7 @@ func TestConfirmEmailChange_Success(t *testing.T) {
 		},
 	}
 
-	uc := NewConfirmEmailChangeUseCase(userRepo, emailChangeRepo, mockEmailSender)
+	uc := NewConfirmEmailChangeUseCase(userRepo, emailChangeRepo, mockEmailSender, &mockTransactionManager{})
 
 	newEmail, err := uc.Execute(context.Background(), ConfirmEmailChangeInput{
 		UserID: "user-1",
@@ -91,7 +91,7 @@ func TestConfirmEmailChange_InvalidCode(t *testing.T) {
 
 	mockEmailSender := &mockEmailSender{}
 
-	uc := NewConfirmEmailChangeUseCase(userRepo, emailChangeRepo, mockEmailSender)
+	uc := NewConfirmEmailChangeUseCase(userRepo, emailChangeRepo, mockEmailSender, &mockTransactionManager{})
 
 	_, err := uc.Execute(context.Background(), ConfirmEmailChangeInput{
 		UserID: "user-1",
@@ -129,7 +129,7 @@ func TestConfirmEmailChange_ExpiredCode(t *testing.T) {
 	
 	mockEmailSender := &mockEmailSender{}
 
-	uc := NewConfirmEmailChangeUseCase(userRepo, emailChangeRepo, mockEmailSender)
+	uc := NewConfirmEmailChangeUseCase(userRepo, emailChangeRepo, mockEmailSender, &mockTransactionManager{})
 
 	_, err := uc.Execute(context.Background(), ConfirmEmailChangeInput{
 		UserID: "user-1",
@@ -169,7 +169,7 @@ func TestConfirmEmailChange_DuplicateEmailAtConfirmation(t *testing.T) {
 	
 	mockEmailSender := &mockEmailSender{}
 
-	uc := NewConfirmEmailChangeUseCase(userRepo, emailChangeRepo, mockEmailSender)
+	uc := NewConfirmEmailChangeUseCase(userRepo, emailChangeRepo, mockEmailSender, &mockTransactionManager{})
 
 	_, err := uc.Execute(context.Background(), ConfirmEmailChangeInput{
 		UserID: "user-1",

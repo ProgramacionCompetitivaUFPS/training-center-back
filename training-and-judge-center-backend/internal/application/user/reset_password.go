@@ -20,17 +20,20 @@ type ResetPasswordUseCase struct {
 	userRepo           user.UserRepository
 	recoveryRepo       user.PasswordRecoveryRepository
 	sessionInvalidator user.SessionInvalidator
+	txManager          user.TransactionManager
 }
 
 func NewResetPasswordUseCase(
 	userRepo user.UserRepository,
 	recoveryRepo user.PasswordRecoveryRepository,
 	sessionInvalidator user.SessionInvalidator,
+	txManager user.TransactionManager,
 ) *ResetPasswordUseCase {
 	return &ResetPasswordUseCase{
 		userRepo:           userRepo,
 		recoveryRepo:       recoveryRepo,
 		sessionInvalidator: sessionInvalidator,
+		txManager:          txManager,
 	}
 }
 
@@ -70,17 +73,22 @@ func (uc *ResetPasswordUseCase) Execute(ctx context.Context, input ResetPassword
 		})
 	}
 
-	if err := uc.sessionInvalidator.InvalidateAllUserSessions(ctx, foundUser.ID(), now); err != nil {
-		return apperror.NewInternal()
-	}
-
-	req.MarkAsUsed(now)
-	if err := uc.recoveryRepo.Update(ctx, req); err != nil {
-		return apperror.NewInternal()
-	}
-
 	foundUser.UpdatePassword(newPassword)
-	if err := uc.userRepo.Update(ctx, foundUser); err != nil {
+	req.MarkAsUsed(now)
+
+	if err := uc.txManager.WithTx(ctx, func(txCtx context.Context) error {
+		if err := uc.userRepo.Update(txCtx, foundUser); err != nil {
+			return err
+		}
+		if err := uc.recoveryRepo.Update(txCtx, req); err != nil {
+			return err
+		}
+		return nil
+	}); err != nil {
+		return apperror.NewInternal()
+	}
+
+	if err := uc.sessionInvalidator.InvalidateAllUserSessions(ctx, foundUser.ID(), now); err != nil {
 		return apperror.NewInternal()
 	}
 

@@ -4,25 +4,24 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/training-judge-center/backend/internal/domain/user"
 )
 
 type DeactivationAuditLogRepository struct {
-	pool *pgxpool.Pool
+	querier Querier
 }
 
-func NewDeactivationAuditLogRepository(pool *pgxpool.Pool) *DeactivationAuditLogRepository {
-	return &DeactivationAuditLogRepository{pool: pool}
+func NewDeactivationAuditLogRepository(querier Querier) *DeactivationAuditLogRepository {
+	return &DeactivationAuditLogRepository{querier: querier}
 }
 
 func (r *DeactivationAuditLogRepository) Save(ctx context.Context, log *user.DeactivationAuditLog) error {
 	query := `
-		INSERT INTO deactivation_audit_logs 
+		INSERT INTO deactivation_audit_logs
 		(id, user_id, original_email, original_nickname, occurred_at, ip, user_agent)
 		VALUES ($1, $2, $3, $4, $5, $6, $7)`
 
-	_, err := r.pool.Exec(ctx, query,
+	_, err := r.querier.Exec(ctx, query,
 		log.ID,
 		log.UserID,
 		log.OriginalEmail,

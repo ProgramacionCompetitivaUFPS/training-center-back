@@ -6,16 +6,15 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/training-judge-center/backend/internal/domain/user"
 )
 
 type EmailChangeRepository struct {
-	pool *pgxpool.Pool
+	querier Querier
 }
 
-func NewEmailChangeRepository(pool *pgxpool.Pool) *EmailChangeRepository {
-	return &EmailChangeRepository{pool: pool}
+func NewEmailChangeRepository(querier Querier) *EmailChangeRepository {
+	return &EmailChangeRepository{querier: querier}
 }
 
 func (r *EmailChangeRepository) Save(ctx context.Context, req *user.EmailChangeRequest) error {
@@ -23,7 +22,8 @@ func (r *EmailChangeRepository) Save(ctx context.Context, req *user.EmailChangeR
 		INSERT INTO email_change_requests (id, user_id, new_email, code, status, expires_at, created_at, updated_at)
 		VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`
 
-	_, err := r.pool.Exec(ctx, query,
+	querier := getQuerier(ctx, r.querier)
+	_, err := querier.Exec(ctx, query,
 		req.ID(),
 		req.UserID(),
 		req.NewEmail().String(),
@@ -50,7 +50,7 @@ func (r *EmailChangeRepository) FindByID(ctx context.Context, id string) (*user.
 	var updatedAt *time.Time
 	var statusStr, emailStr string
 
-	err := r.pool.QueryRow(ctx, query, id).Scan(
+	err := r.querier.QueryRow(ctx, query, id).Scan(
 		&returnedID,
 		&userID,
 		&emailStr,
@@ -80,7 +80,8 @@ func (r *EmailChangeRepository) Update(ctx context.Context, req *user.EmailChang
 		SET status = $1, updated_at = $2
 		WHERE id = $3`
 
-	_, err := r.pool.Exec(ctx, query,
+	querier := getQuerier(ctx, r.querier)
+	_, err := querier.Exec(ctx, query,
 		string(req.Status()),
 		req.UpdatedAt(),
 		req.ID(),
@@ -102,7 +103,7 @@ func (r *EmailChangeRepository) FindByCodeAndUserID(ctx context.Context, code st
 	var updatedAt *time.Time
 	var statusStr, emailStr string
 
-	err := r.pool.QueryRow(ctx, query, code, userID).Scan(
+	err := r.querier.QueryRow(ctx, query, code, userID).Scan(
 		&id,
 		&returnedUserID,
 		&emailStr,
@@ -132,7 +133,7 @@ func (r *EmailChangeRepository) InvalidatePendingByUserID(ctx context.Context, u
 		SET status = $1, updated_at = $2
 		WHERE user_id = $3 AND status = $4`
 
-	_, err := r.pool.Exec(ctx, query,
+	_, err := r.querier.Exec(ctx, query,
 		string(user.StatusExpired),
 		time.Now(),
 		userID,

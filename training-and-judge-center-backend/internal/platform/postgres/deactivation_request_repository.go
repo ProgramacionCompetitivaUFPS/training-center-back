@@ -6,25 +6,25 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/training-judge-center/backend/internal/domain/user"
 )
 
 type DeactivationRequestRepository struct {
-	pool *pgxpool.Pool
+	querier Querier
 }
 
-func NewDeactivationRequestRepository(pool *pgxpool.Pool) *DeactivationRequestRepository {
-	return &DeactivationRequestRepository{pool: pool}
+func NewDeactivationRequestRepository(querier Querier) *DeactivationRequestRepository {
+	return &DeactivationRequestRepository{querier: querier}
 }
 
 func (r *DeactivationRequestRepository) Save(ctx context.Context, req *user.DeactivationRequest) error {
 	query := `
-		INSERT INTO deactivation_requests 
+		INSERT INTO deactivation_requests
 		(id, user_id, verification_code, expires_at, attempts, blocked_until, status, created_at, updated_at)
 		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`
 
-	_, err := r.pool.Exec(ctx, query,
+	querier := getQuerier(ctx, r.querier)
+	_, err := querier.Exec(ctx, query,
 		req.ID(),
 		req.UserID(),
 		req.VerificationCode(),
@@ -55,7 +55,7 @@ func (r *DeactivationRequestRepository) FindPendingByUserID(ctx context.Context,
 	var blockedUntil *time.Time
 	var status string
 
-	err := r.pool.QueryRow(ctx, query, userID, string(user.DeactivationStatusPending), string(user.DeactivationStatusBlocked)).Scan(
+	err := r.querier.QueryRow(ctx, query, userID, string(user.DeactivationStatusPending), string(user.DeactivationStatusBlocked)).Scan(
 		&id,
 		&returnedUserID,
 		&verificationCode,
@@ -90,7 +90,7 @@ func (r *DeactivationRequestRepository) FindByID(ctx context.Context, id string)
 	var blockedUntil *time.Time
 	var status string
 
-	err := r.pool.QueryRow(ctx, query, id).Scan(
+	err := r.querier.QueryRow(ctx, query, id).Scan(
 		&returnedID,
 		&returnedUserID,
 		&verificationCode,
@@ -119,7 +119,8 @@ func (r *DeactivationRequestRepository) Update(ctx context.Context, req *user.De
 		SET verification_code = $1, expires_at = $2, attempts = $3, blocked_until = $4, status = $5, updated_at = $6
 		WHERE id = $7`
 
-	_, err := r.pool.Exec(ctx, query,
+	querier := getQuerier(ctx, r.querier)
+	_, err := querier.Exec(ctx, query,
 		req.VerificationCode(),
 		req.ExpiresAt(),
 		req.Attempts(),
@@ -141,7 +142,7 @@ func (r *DeactivationRequestRepository) InvalidatePendingByUserID(ctx context.Co
 		SET status = $1, updated_at = $2
 		WHERE user_id = $3 AND status IN ($4, $5)`
 
-	_, err := r.pool.Exec(ctx, query, 
+	_, err := r.querier.Exec(ctx, query, 
 		string(user.DeactivationStatusExpired), now, userID, string(user.DeactivationStatusPending), string(user.DeactivationStatusBlocked))
 	
 	if err != nil {

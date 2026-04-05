@@ -24,6 +24,7 @@ type ConfirmDeactivationUseCase struct {
 	auditRepo          user.DeactivationAuditLogRepository
 	emailSender        notification.EmailSender
 	sessionInvalidator user.SessionInvalidator
+	txManager          user.TransactionManager
 }
 
 func NewConfirmDeactivationUseCase(
@@ -32,6 +33,7 @@ func NewConfirmDeactivationUseCase(
 	auditRepo user.DeactivationAuditLogRepository,
 	emailSender notification.EmailSender,
 	sessionInvalidator user.SessionInvalidator,
+	txManager user.TransactionManager,
 ) *ConfirmDeactivationUseCase {
 	return &ConfirmDeactivationUseCase{
 		userRepo:           userRepo,
@@ -39,6 +41,7 @@ func NewConfirmDeactivationUseCase(
 		auditRepo:          auditRepo,
 		emailSender:        emailSender,
 		sessionInvalidator: sessionInvalidator,
+		txManager:          txManager,
 	}
 }
 
@@ -98,7 +101,6 @@ func (uc *ConfirmDeactivationUseCase) Execute(ctx context.Context, input Confirm
 		return apperror.NewBadRequest("INVALID_CODE", "The confirmation code is invalid")
 	}
 
-	// Execution: Deactivate
 	originalEmailStr := ""
 	if foundUser.Email() != nil {
 		originalEmailStr = foundUser.Email().String()
@@ -107,24 +109,26 @@ func (uc *ConfirmDeactivationUseCase) Execute(ctx context.Context, input Confirm
 
 	if err := foundUser.Deactivate(); err != nil {
 		return apperror.NewInternal()
-	} // Applies StatusDeactivated, Email=nil, Anon Nickname, timestamps
-
-	if err := uc.userRepo.Update(ctx, foundUser); err != nil {
-		return apperror.NewInternal()
 	}
 
-	// Close request
 	req.Confirm()
-	if err := uc.deactRepo.Update(ctx, req); err != nil {
+
+	if err := uc.txManager.WithTx(ctx, func(txCtx context.Context) error {
+		if err := uc.userRepo.Update(txCtx, foundUser); err != nil {
+			return err
+		}
+		if err := uc.deactRepo.Update(txCtx, req); err != nil {
+			return err
+		}
+		return nil
+	}); err != nil {
 		return apperror.NewInternal()
 	}
 
-	// Invalidate Sessions
 	if err := uc.sessionInvalidator.InvalidateAllUserSessions(ctx, foundUser.ID(), now); err != nil {
 		slog.Error("failed to invalidate sessions after self-deactivation", "user_id", foundUser.ID(), "error", err)
 	}
 
-	// Audit Log
 	auditLog := user.RestoreDeactivationAuditLog(uuid.NewString(), foundUser.ID(), originalEmailStr, originalNicknameStr, now, input.IP, input.UserAgent)
 	if err := uc.auditRepo.Save(ctx, auditLog); err != nil {
 		slog.Error("failed to save deactivation audit log", "user_id", foundUser.ID(), "error", err)

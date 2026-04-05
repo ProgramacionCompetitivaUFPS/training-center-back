@@ -9,16 +9,15 @@ import (
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
-	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/training-judge-center/backend/internal/domain/user"
 )
 
 type UserRepository struct {
-	pool *pgxpool.Pool
+	querier Querier
 }
 
-func NewUserRepository(pool *pgxpool.Pool) *UserRepository {
-	return &UserRepository{pool: pool}
+func NewUserRepository(querier Querier) *UserRepository {
+	return &UserRepository{querier: querier}
 }
 
 func (r *UserRepository) Save(ctx context.Context, u *user.User) error {
@@ -26,7 +25,8 @@ func (r *UserRepository) Save(ctx context.Context, u *user.User) error {
 		INSERT INTO users (id, email, password, name, nickname, country, city, institution, role, status, created_at)
 		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`
 
-	_, err := r.pool.Exec(ctx, query,
+	querier := getQuerier(ctx, r.querier)
+	_, err := querier.Exec(ctx, query,
 		u.ID(),
 		u.Email().String(),
 		u.Password().Hash(),
@@ -58,7 +58,8 @@ func (r *UserRepository) Update(ctx context.Context, u *user.User) error {
 		emailVal = u.Email().String()
 	}
 
-	_, err := r.pool.Exec(ctx, query,
+	querier := getQuerier(ctx, r.querier)
+	_, err := querier.Exec(ctx, query,
 		u.Name(),
 		u.Nickname().String(),
 		u.Institution(),
@@ -90,7 +91,7 @@ func (r *UserRepository) ExistsByEmail(ctx context.Context, email user.Email) (b
 	query := `SELECT EXISTS(SELECT 1 FROM users WHERE email = $1)`
 
 	var exists bool
-	err := r.pool.QueryRow(ctx, query, email.String()).Scan(&exists)
+	err := r.querier.QueryRow(ctx, query, email.String()).Scan(&exists)
 	if err != nil {
 		return false, fmt.Errorf("failed to check email: %w", err)
 	}
@@ -102,7 +103,7 @@ func (r *UserRepository) ExistsByNickname(ctx context.Context, nickname user.Nic
 	query := `SELECT EXISTS(SELECT 1 FROM users WHERE nickname = $1)`
 
 	var exists bool
-	err := r.pool.QueryRow(ctx, query, nickname.String()).Scan(&exists)
+	err := r.querier.QueryRow(ctx, query, nickname.String()).Scan(&exists)
 	if err != nil {
 		return false, fmt.Errorf("failed to check nickname: %w", err)
 	}
@@ -166,7 +167,7 @@ func scanUser(row pgx.Row) (*user.User, error) {
 func (r *UserRepository) FindByEmail(ctx context.Context, email user.Email) (*user.User, error) {
 	query := `SELECT ` + userColumns + ` FROM users WHERE email = $1`
 
-	u, err := scanUser(r.pool.QueryRow(ctx, query, email.String()))
+	u, err := scanUser(r.querier.QueryRow(ctx, query, email.String()))
 	if err != nil {
 		return nil, fmt.Errorf("failed to find user by email: %w", err)
 	}
@@ -176,7 +177,7 @@ func (r *UserRepository) FindByEmail(ctx context.Context, email user.Email) (*us
 func (r *UserRepository) FindByID(ctx context.Context, id string) (*user.User, error) {
 	query := `SELECT ` + userColumns + ` FROM users WHERE id = $1`
 
-	u, err := scanUser(r.pool.QueryRow(ctx, query, id))
+	u, err := scanUser(r.querier.QueryRow(ctx, query, id))
 	if err != nil {
 		return nil, fmt.Errorf("failed to find user by id: %w", err)
 	}
@@ -186,7 +187,7 @@ func (r *UserRepository) FindByID(ctx context.Context, id string) (*user.User, e
 func (r *UserRepository) FindByNickname(ctx context.Context, nickname user.Nickname) (*user.User, error) {
 	query := `SELECT ` + userColumns + ` FROM users WHERE LOWER(nickname) = LOWER($1)`
 
-	u, err := scanUser(r.pool.QueryRow(ctx, query, nickname.String()))
+	u, err := scanUser(r.querier.QueryRow(ctx, query, nickname.String()))
 	if err != nil {
 		return nil, fmt.Errorf("failed to find user by nickname: %w", err)
 	}
@@ -294,7 +295,7 @@ func (r *UserRepository) FindAll(ctx context.Context, filter user.UserFilter) ([
 	// COUNT query for pagination metadata
 	countQuery := fmt.Sprintf(`SELECT COUNT(*) FROM users %s`, whereClause)
 	var totalCount int
-	if err := r.pool.QueryRow(ctx, countQuery, args...).Scan(&totalCount); err != nil {
+	if err := r.querier.QueryRow(ctx, countQuery, args...).Scan(&totalCount); err != nil {
 		return nil, 0, fmt.Errorf("failed to count users: %w", err)
 	}
 
@@ -306,7 +307,7 @@ func (r *UserRepository) FindAll(ctx context.Context, filter user.UserFilter) ([
 	)
 	args = append(args, filter.Limit, offset)
 
-	rows, err := r.pool.Query(ctx, dataQuery, args...)
+	rows, err := r.querier.Query(ctx, dataQuery, args...)
 	if err != nil {
 		return nil, 0, fmt.Errorf("failed to list users: %w", err)
 	}

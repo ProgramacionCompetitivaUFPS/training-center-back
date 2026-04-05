@@ -39,7 +39,7 @@ func TestResetPassword_Success(t *testing.T) {
 		},
 	}
 
-	uc := NewResetPasswordUseCase(userRepo, recoveryRepo, invalidator)
+	uc := NewResetPasswordUseCase(userRepo, recoveryRepo, invalidator, &mockTransactionManager{})
 
 	err := uc.Execute(context.Background(), ResetPasswordInput{
 		Email:       "user-1@example.com",
@@ -68,7 +68,7 @@ func TestResetPassword_InvalidCode(t *testing.T) {
 		},
 	}
 
-	uc := NewResetPasswordUseCase(userRepo, recoveryRepo, &mockSessionInvalidator{})
+	uc := NewResetPasswordUseCase(userRepo, recoveryRepo, &mockSessionInvalidator{}, &mockTransactionManager{})
 
 	err := uc.Execute(context.Background(), ResetPasswordInput{
 		Email:       "user-1@example.com",
@@ -98,7 +98,7 @@ func TestResetPassword_NoPendingRequest(t *testing.T) {
 		},
 	}
 
-	uc := NewResetPasswordUseCase(userRepo, recoveryRepo, &mockSessionInvalidator{})
+	uc := NewResetPasswordUseCase(userRepo, recoveryRepo, &mockSessionInvalidator{}, &mockTransactionManager{})
 	err := uc.Execute(context.Background(), ResetPasswordInput{
 		Email:       "user-1@example.com",
 		Code:        "123456",

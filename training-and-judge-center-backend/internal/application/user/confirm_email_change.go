@@ -20,17 +20,20 @@ type ConfirmEmailChangeUseCase struct {
 	userRepo        user.UserRepository
 	emailChangeRepo user.EmailChangeRepository
 	emailSender     notification.EmailSender
+	txManager       user.TransactionManager
 }
 
 func NewConfirmEmailChangeUseCase(
 	userRepo user.UserRepository,
 	emailChangeRepo user.EmailChangeRepository,
 	emailSender notification.EmailSender,
+	txManager user.TransactionManager,
 ) *ConfirmEmailChangeUseCase {
 	return &ConfirmEmailChangeUseCase{
 		userRepo:        userRepo,
 		emailChangeRepo: emailChangeRepo,
 		emailSender:     emailSender,
+		txManager:       txManager,
 	}
 }
 
@@ -65,15 +68,19 @@ func (uc *ConfirmEmailChangeUseCase) Execute(ctx context.Context, input ConfirmE
 	}
 
 	oldEmail := u.Email().String()
-
-	req.MarkAsUsed(time.Now())
-	if err := uc.emailChangeRepo.Update(ctx, req); err != nil {
-		return nil, apperror.NewInternal()
-	}
-
 	newEmailVal := req.NewEmail()
 	u.UpdateEmail(newEmailVal)
-	if err := uc.userRepo.Update(ctx, u); err != nil {
+	req.MarkAsUsed(time.Now())
+
+	if err := uc.txManager.WithTx(ctx, func(txCtx context.Context) error {
+		if err := uc.userRepo.Update(txCtx, u); err != nil {
+			return err
+		}
+		if err := uc.emailChangeRepo.Update(txCtx, req); err != nil {
+			return err
+		}
+		return nil
+	}); err != nil {
 		return nil, apperror.NewInternal()
 	}
 
