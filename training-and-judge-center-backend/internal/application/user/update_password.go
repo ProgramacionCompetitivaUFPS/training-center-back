@@ -2,6 +2,7 @@ package user
 
 import (
 	"context"
+	"errors"
 	"log/slog"
 	"time"
 
@@ -9,6 +10,11 @@ import (
 	"github.com/training-judge-center/backend/internal/domain/user"
 	"github.com/training-judge-center/backend/pkg/apperror"
 )
+
+// ErrSessionsNotInvalidated is returned when the password was changed successfully
+// but the active sessions could not be revoked. The caller should inform the user
+// that changing their password again will close the remaining sessions.
+var ErrSessionsNotInvalidated = errors.New("password changed but sessions could not be invalidated")
 
 type UpdatePasswordInput struct {
 	UserID          string
@@ -58,16 +64,16 @@ func (uc *UpdatePasswordUseCase) Execute(ctx context.Context, input UpdatePasswo
 		})
 	}
 
-	now := time.Now()
+	foundUser.UpdatePassword(newPassword)
 
-	if err := uc.sessionInvalidator.InvalidateAllUserSessions(ctx, foundUser.ID(), now); err != nil {
-		slog.Error("failed to invalidate sessions before password update", "user_id", foundUser.ID(), "error", err)
+	if err := uc.repo.Update(ctx, foundUser); err != nil {
 		return apperror.NewInternal()
 	}
 
-	foundUser.UpdatePassword(newPassword)
-	if err := uc.repo.Update(ctx, foundUser); err != nil {
-		return apperror.NewInternal()
+	now := time.Now()
+	if err := uc.sessionInvalidator.InvalidateAllUserSessions(ctx, foundUser.ID(), now); err != nil {
+		slog.Error("failed to invalidate sessions after password update", "user_id", foundUser.ID(), "error", err)
+		return ErrSessionsNotInvalidated
 	}
 
 	if err := uc.emailSender.Send(ctx, notification.EmailMessage{

@@ -5,6 +5,7 @@ import (
 	"errors"
 	"net/http"
 	"testing"
+	"time"
 
 	domain "github.com/training-judge-center/backend/internal/domain/user"
 	"github.com/training-judge-center/backend/pkg/apperror"
@@ -19,9 +20,7 @@ func TestUpdatePassword_Success(t *testing.T) {
 		}
 		return nil, nil
 	}
-	mockEmail := &mockEmailSender{}
-	mockInv := &mockSessionInvalidator{}
-	uc := NewUpdatePasswordUseCase(repo, mockEmail, mockInv)
+	uc := NewUpdatePasswordUseCase(repo, &mockEmailSender{}, &mockSessionInvalidator{})
 
 	err := uc.Execute(context.Background(), UpdatePasswordInput{
 		UserID:          "user-1",
@@ -44,9 +43,7 @@ func TestUpdatePassword_Success(t *testing.T) {
 
 func TestUpdatePassword_UserNotFound(t *testing.T) {
 	repo := newNoConflictRepo()
-	mockEmail := &mockEmailSender{}
-	mockInv := &mockSessionInvalidator{}
-	uc := NewUpdatePasswordUseCase(repo, mockEmail, mockInv)
+	uc := NewUpdatePasswordUseCase(repo, &mockEmailSender{}, &mockSessionInvalidator{})
 
 	err := uc.Execute(context.Background(), UpdatePasswordInput{
 		UserID:          "nonexistent",
@@ -75,9 +72,7 @@ func TestUpdatePassword_WrongCurrentPassword(t *testing.T) {
 	repo.findByIDFn = func(_ context.Context, _ string) (*domain.User, error) {
 		return activeUser, nil
 	}
-	mockEmail := &mockEmailSender{}
-	mockInv := &mockSessionInvalidator{}
-	uc := NewUpdatePasswordUseCase(repo, mockEmail, mockInv)
+	uc := NewUpdatePasswordUseCase(repo, &mockEmailSender{}, &mockSessionInvalidator{})
 
 	err := uc.Execute(context.Background(), UpdatePasswordInput{
 		UserID:          "user-1",
@@ -109,9 +104,7 @@ func TestUpdatePassword_WeakNewPassword(t *testing.T) {
 	repo.findByIDFn = func(_ context.Context, _ string) (*domain.User, error) {
 		return activeUser, nil
 	}
-	mockEmail := &mockEmailSender{}
-	mockInv := &mockSessionInvalidator{}
-	uc := NewUpdatePasswordUseCase(repo, mockEmail, mockInv)
+	uc := NewUpdatePasswordUseCase(repo, &mockEmailSender{}, &mockSessionInvalidator{})
 
 	err := uc.Execute(context.Background(), UpdatePasswordInput{
 		UserID:          "user-1",
@@ -140,9 +133,7 @@ func TestUpdatePassword_SamePassword(t *testing.T) {
 	repo.findByIDFn = func(_ context.Context, _ string) (*domain.User, error) {
 		return activeUser, nil
 	}
-	mockEmail := &mockEmailSender{}
-	mockInv := &mockSessionInvalidator{}
-	uc := NewUpdatePasswordUseCase(repo, mockEmail, mockInv)
+	uc := NewUpdatePasswordUseCase(repo, &mockEmailSender{}, &mockSessionInvalidator{})
 
 	err := uc.Execute(context.Background(), UpdatePasswordInput{
 		UserID:          "user-1",
@@ -170,9 +161,7 @@ func TestUpdatePassword_RepositoryFindError(t *testing.T) {
 	repo.findByIDFn = func(_ context.Context, _ string) (*domain.User, error) {
 		return nil, errors.New("db connection lost")
 	}
-	mockEmail := &mockEmailSender{}
-	mockInv := &mockSessionInvalidator{}
-	uc := NewUpdatePasswordUseCase(repo, mockEmail, mockInv)
+	uc := NewUpdatePasswordUseCase(repo, &mockEmailSender{}, &mockSessionInvalidator{})
 
 	err := uc.Execute(context.Background(), UpdatePasswordInput{
 		UserID:          "user-1",
@@ -201,9 +190,7 @@ func TestUpdatePassword_RepositoryUpdateError(t *testing.T) {
 	repo.updateFn = func(_ context.Context, _ *domain.User) error {
 		return errors.New("db update failed")
 	}
-	mockEmail := &mockEmailSender{}
-	mockInv := &mockSessionInvalidator{}
-	uc := NewUpdatePasswordUseCase(repo, mockEmail, mockInv)
+	uc := NewUpdatePasswordUseCase(repo, &mockEmailSender{}, &mockSessionInvalidator{})
 
 	err := uc.Execute(context.Background(), UpdatePasswordInput{
 		UserID:          "user-1",
@@ -220,5 +207,34 @@ func TestUpdatePassword_RepositoryUpdateError(t *testing.T) {
 	}
 	if appErr.Code != "INTERNAL_ERROR" {
 		t.Errorf("expected code INTERNAL_ERROR, got %q", appErr.Code)
+	}
+}
+
+func TestUpdatePassword_SessionInvalidationFails_PasswordAlreadyChanged(t *testing.T) {
+	repo := newNoConflictRepo()
+	activeUser := newUserWithRole("user-1", domain.RoleContestant, domain.StatusActive)
+	repo.findByIDFn = func(_ context.Context, _ string) (*domain.User, error) {
+		return activeUser, nil
+	}
+	inv := &mockSessionInvalidator{
+		invalidateAllUserSessionsFn: func(_ context.Context, _ string, _ time.Time) error {
+			return errors.New("redis unavailable")
+		},
+	}
+	uc := NewUpdatePasswordUseCase(repo, &mockEmailSender{}, inv)
+
+	err := uc.Execute(context.Background(), UpdatePasswordInput{
+		UserID:          "user-1",
+		CurrentPassword: "Secret1!",
+		NewPassword:     "NewSecret2@",
+	})
+
+	if !errors.Is(err, ErrSessionsNotInvalidated) {
+		t.Fatalf("expected ErrSessionsNotInvalidated, got %v", err)
+	}
+
+	// Password must have been persisted despite the session invalidation failure.
+	if !activeUser.Password().Compare("NewSecret2@") {
+		t.Error("expected new password to be valid: repo.Update must run before session invalidation")
 	}
 }

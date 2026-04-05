@@ -54,17 +54,26 @@ func (h *UserHandler) UpdatePassword(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := h.updatePassword.Execute(r.Context(), appuser.UpdatePasswordInput{
+	err = h.updatePassword.Execute(r.Context(), appuser.UpdatePasswordInput{
 		UserID:          claims.UserID,
 		CurrentPassword: req.CurrentPassword,
 		NewPassword:     req.NewPassword,
-	}); err != nil {
+	})
+	if err != nil && err != appuser.ErrSessionsNotInvalidated {
 		respondError(w, err)
 		return
 	}
 
 	// Reset rate limit on success
 	_ = h.rateLimiter.Reset(r.Context(), rateKey)
+
+	if err == appuser.ErrSessionsNotInvalidated {
+		respondJSON(w, http.StatusOK, map[string]string{
+			"code":    "SESSIONS_NOT_INVALIDATED",
+			"message": "Your password was changed successfully. We couldn't close your other active sessions — to close them, please change your password again.",
+		})
+		return
+	}
 
 	w.WriteHeader(http.StatusNoContent)
 }
