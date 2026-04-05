@@ -96,7 +96,9 @@ func (uc *AdminUpdateUserUseCase) Execute(ctx context.Context, input AdminUpdate
 		return nil, apperror.NewValidation(fieldErrors)
 	}
 
-	foundUser.Update(nameToUpdate, nicknameToUpdate, institutionToUpdate, emailToUpdate, roleToUpdate)
+	if err := foundUser.Update(nameToUpdate, nicknameToUpdate, institutionToUpdate, emailToUpdate, roleToUpdate); err != nil {
+		return nil, apperror.NewInternal()
+	}
 
 	if err := uc.repo.Update(ctx, foundUser); err != nil {
 		if errors.Is(err, user.ErrNicknameConflict) {

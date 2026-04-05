@@ -76,7 +76,10 @@ func (uc *CreateUserUseCase) Execute(ctx context.Context, input CreateUserInput)
 		return nil, apperror.NewConflict("NICKNAME_ALREADY_EXISTS", "The nickname is already in use")
 	}
 
-	newUser := user.NewUser(email, password, input.Name, nickname, input.Country, input.City, input.Institution)
+	newUser, err := user.NewUser(email, password, input.Name, nickname, input.Country, input.City, input.Institution)
+	if err != nil {
+		return nil, apperror.NewInternal()
+	}
 
 	if err := uc.repo.Save(ctx, newUser); err != nil {
 		return nil, apperror.NewInternal()

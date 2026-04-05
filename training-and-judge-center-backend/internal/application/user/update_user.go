@@ -72,7 +72,9 @@ func (uc *UpdateUserUseCase) Execute(ctx context.Context, input UpdateUserInput)
 		return nil, apperror.NewValidation(fieldErrors)
 	}
 
-	foundUser.Update(nameToUpdate, nicknameToUpdate, institutionToUpdate, nil, nil)
+	if err := foundUser.Update(nameToUpdate, nicknameToUpdate, institutionToUpdate, nil, nil); err != nil {
+		return nil, apperror.NewInternal()
+	}
 
 	if err := uc.repo.Update(ctx, foundUser); err != nil {
 		if errors.Is(err, user.ErrNicknameConflict) {

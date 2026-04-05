@@ -1,6 +1,8 @@
 package user
 
 import (
+	"fmt"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -37,7 +39,20 @@ func (u *User) CreatedAt() time.Time         { return u.createdAt }
 func (u *User) UpdatedAt() *time.Time        { return u.updatedAt }
 func (u *User) DeactivatedAt() *time.Time    { return u.deactivatedAt }
 
-func NewUser(email Email, password Password, name string, nickname Nickname, country, city, institution string) *User {
+func NewUser(email Email, password Password, name string, nickname Nickname, country, city, institution string) (*User, error) {
+	if strings.TrimSpace(name) == "" {
+		return nil, fmt.Errorf("name is required")
+	}
+	if strings.TrimSpace(country) == "" {
+		return nil, fmt.Errorf("country is required")
+	}
+	if strings.TrimSpace(city) == "" {
+		return nil, fmt.Errorf("city is required")
+	}
+	if strings.TrimSpace(institution) == "" {
+		return nil, fmt.Errorf("institution is required")
+	}
+
 	return &User{
 		id:          uuid.New().String(),
 		email:       &email,
@@ -50,17 +65,23 @@ func NewUser(email Email, password Password, name string, nickname Nickname, cou
 		role:        RoleContestant,
 		status:      StatusActive,
 		createdAt:   time.Now(),
-	}
+	}, nil
 }
 
-func (u *User) Update(name *string, nickname *Nickname, institution *string, email *Email, role *Role) {
+func (u *User) Update(name *string, nickname *Nickname, institution *string, email *Email, role *Role) error {
 	if name != nil {
+		if strings.TrimSpace(*name) == "" {
+			return fmt.Errorf("name cannot be empty")
+		}
 		u.name = *name
 	}
 	if nickname != nil {
 		u.nickname = *nickname
 	}
 	if institution != nil {
+		if strings.TrimSpace(*institution) == "" {
+			return fmt.Errorf("institution cannot be empty")
+		}
 		u.institution = *institution
 	}
 	if email != nil {
@@ -72,6 +93,7 @@ func (u *User) Update(name *string, nickname *Nickname, institution *string, ema
 	
 	now := time.Now()
 	u.updatedAt = &now
+	return nil
 }
 
 func (u *User) UpdatePassword(newPassword Password) {
