@@ -141,7 +141,7 @@ func scanUser(row pgx.Row) (*user.User, error) {
 		return nil, err
 	}
 
-	u := user.RestoreUser(
+	u, err := user.RestoreUser(
 		id,
 		emailStr,
 		passwordHash,
@@ -156,6 +156,9 @@ func scanUser(row pgx.Row) (*user.User, error) {
 		updatedAt,
 		deactivatedAt,
 	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to restore user from db row: %w", err)
+	}
 
 	return u, nil
 }

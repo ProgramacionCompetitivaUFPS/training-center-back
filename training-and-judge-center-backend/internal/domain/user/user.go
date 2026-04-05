@@ -151,7 +151,7 @@ func RestoreUser(
 	createdAt time.Time,
 	updatedAt *time.Time,
 	deactivatedAt *time.Time,
-) *User {
+) (*User, error) {
 	u := &User{
 		id:            id,
 		name:          name,
@@ -164,20 +164,32 @@ func RestoreUser(
 	}
 
 	if emailStr != nil {
-		parsedEmail, _ := NewEmail(*emailStr)
+		parsedEmail, err := NewEmail(*emailStr)
+		if err != nil {
+			return nil, fmt.Errorf("restoring user %s: invalid email: %w", id, err)
+		}
 		u.email = &parsedEmail
 	}
 
 	u.password = NewPasswordFromHash(passwordHash)
 
-	parsedNickname, _ := NewNickname(nicknameStr)
+	parsedNickname, err := NewNickname(nicknameStr)
+	if err != nil {
+		return nil, fmt.Errorf("restoring user %s: invalid nickname: %w", id, err)
+	}
 	u.nickname = parsedNickname
 
-	parsedRole, _ := NewRole(roleStr)
+	parsedRole, err := NewRole(roleStr)
+	if err != nil {
+		return nil, fmt.Errorf("restoring user %s: invalid role: %w", id, err)
+	}
 	u.role = parsedRole
 
-	parsedStatus, _ := NewStatus(statusStr)
+	parsedStatus, err := NewStatus(statusStr)
+	if err != nil {
+		return nil, fmt.Errorf("restoring user %s: invalid status: %w", id, err)
+	}
 	u.status = parsedStatus
 
-	return u
+	return u, nil
 }

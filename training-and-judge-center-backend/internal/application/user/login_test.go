@@ -28,7 +28,7 @@ func newActiveUser() *domain.User {
 	password, _ := domain.NewPassword("Secret1!")
 	emailStr := "test@example.com"
 
-	return domain.RestoreUser(
+	u, err := domain.RestoreUser(
 		"user-uuid-123",
 		&emailStr,
 		password.Hash(),
@@ -43,6 +43,10 @@ func newActiveUser() *domain.User {
 		nil,
 		nil,
 	)
+	if err != nil {
+		panic("newActiveUser: " + err.Error())
+	}
+	return u
 }
 
 func newLoginDeps() (*mockUserRepository, *mockTokenService) {
