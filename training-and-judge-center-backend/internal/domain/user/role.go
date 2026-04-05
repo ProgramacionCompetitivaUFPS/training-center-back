@@ -19,6 +19,14 @@ func NewRole(value string) (Role, error) {
 	}
 }
 
+func (r Role) IsValid() bool {
+	switch r {
+	case RoleAdmin, RoleCoach, RoleContestant:
+		return true
+	}
+	return false
+}
+
 func (r Role) String() string {
 	return string(r)
 }

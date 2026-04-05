@@ -18,6 +18,14 @@ func NewStatus(value string) (Status, error) {
 	}
 }
 
+func (s Status) IsValid() bool {
+	switch s {
+	case StatusActive, StatusDeactivated:
+		return true
+	}
+	return false
+}
+
 func (s Status) String() string {
 	return string(s)
 }

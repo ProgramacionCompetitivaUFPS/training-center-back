@@ -91,6 +91,9 @@ func (u *User) Update(name *string, nickname *Nickname, institution *string) err
 }
 
 func (u *User) AdminUpdate(name *string, nickname *Nickname, institution *string, email *Email, role *Role) error {
+	if role != nil && !role.IsValid() {
+		return fmt.Errorf("invalid role: %s", *role)
+	}
 	if role != nil && *role == RoleAdmin {
 		return fmt.Errorf("role ADMIN cannot be assigned through standard update")
 	}
