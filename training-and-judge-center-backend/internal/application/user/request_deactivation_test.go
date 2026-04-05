@@ -52,9 +52,6 @@ func (m *mockDeactivationRepo) InvalidatePendingByUserID(ctx context.Context, us
 func TestRequestDeactivation_Success(t *testing.T) {
 	userRepo := newNoConflictRepo()
 	activeUser := newUserWithRole("user-1", domain.RoleContestant, domain.StatusActive)
-	emailStr := "user@example.com"
-	em, _ := domain.NewEmail(emailStr)
-	activeUser.Email = &em
 
 	userRepo.findByIDFn = func(_ context.Context, id string) (*domain.User, error) {
 		if id == "user-1" {
@@ -68,11 +65,11 @@ func TestRequestDeactivation_Success(t *testing.T) {
 			return nil
 		},
 		saveFn: func(ctx context.Context, req *domain.DeactivationRequest) error {
-			if req.UserID != "user-1" {
-				t.Errorf("expected user-1, got %s", req.UserID)
+			if req.UserID() != "user-1" {
+				t.Errorf("expected user-1, got %s", req.UserID())
 			}
-			if len(req.VerificationCode) != 6 {
-				t.Errorf("expected 6-digit code, got %s", req.VerificationCode)
+			if len(req.VerificationCode()) != 6 {
+				t.Errorf("expected 6-digit code, got %s", req.VerificationCode())
 			}
 			return nil
 		},
@@ -82,7 +79,7 @@ func TestRequestDeactivation_Success(t *testing.T) {
 	mockEmail := &mockEmailSender{
 		sendFn: func(ctx context.Context, msg notification.EmailMessage) error {
 			emailSent = true
-			if msg.To != "user@example.com" {
+			if msg.To != "user-1@example.com" {
 				t.Errorf("expected user@example.com, got %s", msg.To)
 			}
 			return nil

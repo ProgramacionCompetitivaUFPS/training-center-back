@@ -28,11 +28,11 @@ func TestGetMyProfile_Success(t *testing.T) {
 	if !result.IsFullProfile {
 		t.Error("expected IsFullProfile to be true for own profile")
 	}
-	if result.User.ID != "user-1" {
-		t.Errorf("expected user ID %q, got %q", "user-1", result.User.ID)
+	if result.User.ID() != "user-1" {
+		t.Errorf("expected user ID %q, got %q", "user-1", result.User.ID())
 	}
-	if result.User.Email.String() != "user-1@example.com" {
-		t.Errorf("expected email %q, got %q", "user-1@example.com", result.User.Email.String())
+	if result.User.Email().String() != "user-1@example.com" {
+		t.Errorf("expected email %q, got %q", "user-1@example.com", result.User.Email().String())
 	}
 }
 
@@ -93,8 +93,8 @@ func TestGetByNickname_PublicProfile(t *testing.T) {
 	if result.IsFullProfile {
 		t.Error("expected IsFullProfile to be false for non-admin viewing other user")
 	}
-	if result.User.Name != "User target" {
-		t.Errorf("expected name %q, got %q", "User target", result.User.Name)
+	if result.User.Name() != "User target" {
+		t.Errorf("expected name %q, got %q", "User target", result.User.Name())
 	}
 }
 

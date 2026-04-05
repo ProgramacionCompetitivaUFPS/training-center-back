@@ -25,23 +25,24 @@ func (m *mockTokenService) ValidateToken(tokenString string) (*domain.TokenClaim
 }
 
 func newActiveUser() *domain.User {
-	email, _ := domain.NewEmail("test@example.com")
 	password, _ := domain.NewPassword("Secret1!")
-	nickname, _ := domain.NewNickname("testuser")
+	emailStr := "test@example.com"
 
-	return &domain.User{
-		ID:          "user-uuid-123",
-		Email:       &email,
-		Password:    password,
-		Name:        "Test User",
-		Nickname:    nickname,
-		Country:     "Colombia",
-		City:        "Cúcuta",
-		Institution: "UFPS",
-		Role:        domain.RoleContestant,
-		Status:      domain.StatusActive,
-		CreatedAt:   time.Now(),
-	}
+	return domain.RestoreUser(
+		"user-uuid-123",
+		&emailStr,
+		password.Hash(),
+		"Test User",
+		"testuser",
+		"Colombia",
+		"Cúcuta",
+		"UFPS",
+		domain.RoleContestant.String(),
+		domain.StatusActive.String(),
+		time.Now(),
+		nil,
+		nil,
+	)
 }
 
 func newLoginDeps() (*mockUserRepository, *mockTokenService) {
@@ -71,8 +72,8 @@ func TestLogin_Success(t *testing.T) {
 	if result.Token != "mock-jwt-token" {
 		t.Errorf("expected token %q, got %q", "mock-jwt-token", result.Token)
 	}
-	if result.User.ID != "user-uuid-123" {
-		t.Errorf("expected user ID %q, got %q", "user-uuid-123", result.User.ID)
+	if result.User.ID() != "user-uuid-123" {
+		t.Errorf("expected user ID %q, got %q", "user-uuid-123", result.User.ID())
 	}
 }
 
@@ -151,7 +152,7 @@ func TestLogin_UserNotFound(t *testing.T) {
 func TestLogin_DeactivatedAccount(t *testing.T) {
 	repo, tokenSvc := newLoginDeps()
 	deactivatedUser := newActiveUser()
-	deactivatedUser.Status = domain.StatusDeactivated
+	deactivatedUser.Deactivate()
 	repo.findByEmailFn = func(_ context.Context, _ domain.Email) (*domain.User, error) {
 		return deactivatedUser, nil
 	}

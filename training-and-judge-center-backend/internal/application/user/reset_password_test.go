@@ -13,22 +13,15 @@ func TestResetPassword_Success(t *testing.T) {
 	userRepo := newNoConflictRepo()
 	activeUser := newUserWithRole("user-1", domain.RoleContestant, domain.StatusActive)
 	userRepo.findByEmailFn = func(_ context.Context, email domain.Email) (*domain.User, error) {
-		activeUser.Email = &email
 		return activeUser, nil
 	}
 
 	recoveryRepo := &mockPasswordRecoveryRepo{
 		findPendingByUserIDFn: func(ctx context.Context, userID string) (*domain.PasswordRecoveryRequest, error) {
-			return &domain.PasswordRecoveryRequest{
-				ID:        "req-1",
-				UserID:    "user-1",
-				Code:      "123456",
-				Status:    domain.StatusPending,
-				ExpiresAt: time.Now().Add(10 * time.Minute),
-			}, nil
+			return domain.RestorePasswordRecoveryRequest("req-1", "user-1", "123456", domain.StatusPending, time.Now().Add(10 * time.Minute), time.Time{}, nil), nil
 		},
 		updateFn: func(ctx context.Context, req *domain.PasswordRecoveryRequest) error {
-			if req.Status != domain.StatusUsed {
+			if req.Status() != domain.StatusUsed {
 				t.Errorf("expected status to be USED")
 			}
 			return nil
@@ -49,7 +42,7 @@ func TestResetPassword_Success(t *testing.T) {
 	uc := NewResetPasswordUseCase(userRepo, recoveryRepo, invalidator)
 
 	err := uc.Execute(context.Background(), ResetPasswordInput{
-		Email:       "user@example.com",
+		Email:       "user-1@example.com",
 		Code:        "123456",
 		NewPassword: "NewSecret123!",
 	})
@@ -66,26 +59,19 @@ func TestResetPassword_InvalidCode(t *testing.T) {
 	userRepo := newNoConflictRepo()
 	activeUser := newUserWithRole("user-1", domain.RoleContestant, domain.StatusActive)
 	userRepo.findByEmailFn = func(_ context.Context, email domain.Email) (*domain.User, error) {
-		activeUser.Email = &email
 		return activeUser, nil
 	}
 
 	recoveryRepo := &mockPasswordRecoveryRepo{
 		findPendingByUserIDFn: func(ctx context.Context, userID string) (*domain.PasswordRecoveryRequest, error) {
-			return &domain.PasswordRecoveryRequest{
-				ID:        "req-1",
-				UserID:    "user-1",
-				Code:      "654321", // Different code
-				Status:    domain.StatusPending,
-				ExpiresAt: time.Now().Add(10 * time.Minute),
-			}, nil
+			return domain.RestorePasswordRecoveryRequest("req-1", "user-1", "654321", domain.StatusPending, time.Now().Add(10*time.Minute), time.Time{}, nil), nil
 		},
 	}
 
 	uc := NewResetPasswordUseCase(userRepo, recoveryRepo, &mockSessionInvalidator{})
 
 	err := uc.Execute(context.Background(), ResetPasswordInput{
-		Email:       "user@example.com",
+		Email:       "user-1@example.com",
 		Code:        "123456",
 		NewPassword: "NewSecret123!",
 	})
@@ -103,7 +89,6 @@ func TestResetPassword_NoPendingRequest(t *testing.T) {
 	userRepo := newNoConflictRepo()
 	activeUser := newUserWithRole("user-1", domain.RoleContestant, domain.StatusActive)
 	userRepo.findByEmailFn = func(_ context.Context, email domain.Email) (*domain.User, error) {
-		activeUser.Email = &email
 		return activeUser, nil
 	}
 
@@ -115,7 +100,7 @@ func TestResetPassword_NoPendingRequest(t *testing.T) {
 
 	uc := NewResetPasswordUseCase(userRepo, recoveryRepo, &mockSessionInvalidator{})
 	err := uc.Execute(context.Background(), ResetPasswordInput{
-		Email:       "user@example.com",
+		Email:       "user-1@example.com",
 		Code:        "123456",
 		NewPassword: "NewSecret123!",
 	})

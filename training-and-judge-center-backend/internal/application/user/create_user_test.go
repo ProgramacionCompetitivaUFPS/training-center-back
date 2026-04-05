@@ -32,19 +32,19 @@ func TestCreateUser_Success(t *testing.T) {
 	if result == nil {
 		t.Fatal("expected user, got nil")
 	}
-	if result.Email.String() != "test@example.com" {
-		t.Errorf("expected email %q, got %q", "test@example.com", result.Email.String())
+	if result.Email().String() != "test@example.com" {
+		t.Errorf("expected email %q, got %q", "test@example.com", result.Email().String())
 	}
-	if result.Nickname.String() != "testuser" {
-		t.Errorf("expected nickname %q, got %q", "testuser", result.Nickname.String())
+	if result.Nickname().String() != "testuser" {
+		t.Errorf("expected nickname %q, got %q", "testuser", result.Nickname().String())
 	}
-	if result.Role.String() != "CONTESTANT" {
-		t.Errorf("expected role CONTESTANT, got %q", result.Role.String())
+	if result.Role().String() != "CONTESTANT" {
+		t.Errorf("expected role CONTESTANT, got %q", result.Role().String())
 	}
-	if result.Status.String() != "ACTIVE" {
-		t.Errorf("expected status ACTIVE, got %q", result.Status.String())
+	if result.Status().String() != "ACTIVE" {
+		t.Errorf("expected status ACTIVE, got %q", result.Status().String())
 	}
-	if result.ID == "" {
+	if result.ID() == "" {
 		t.Error("expected non-empty ID")
 	}
 }

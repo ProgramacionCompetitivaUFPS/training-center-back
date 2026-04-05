@@ -59,7 +59,7 @@ func (uc *AdminUpdateUserUseCase) Execute(ctx context.Context, input AdminUpdate
 		newNickname, err := user.NewNickname(*input.Nickname)
 		if err != nil {
 			fieldErrors = append(fieldErrors, apperror.FieldError{Field: "nickname", Message: err.Error()})
-		} else if newNickname.String() != foundUser.Nickname.String() {
+		} else if newNickname.String() != foundUser.Nickname().String() {
 			nicknameToUpdate = &newNickname
 		}
 	}
@@ -76,7 +76,7 @@ func (uc *AdminUpdateUserUseCase) Execute(ctx context.Context, input AdminUpdate
 		newEmail, err := user.NewEmail(*input.Email)
 		if err != nil {
 			fieldErrors = append(fieldErrors, apperror.FieldError{Field: "email", Message: err.Error()})
-		} else if foundUser.Email == nil || newEmail.String() != foundUser.Email.String() {
+		} else if foundUser.Email() == nil || newEmail.String() != foundUser.Email().String() {
 			emailToUpdate = &newEmail
 		}
 	}

@@ -39,16 +39,16 @@ func TestAdminDeactivateUser_Success(t *testing.T) {
 	if !invCalled {
 		t.Error("expected session invalidator to be called")
 	}
-	if target.Status != domain.StatusDeactivated {
-		t.Errorf("expected status DEACTIVATED, got %s", target.Status)
+	if target.Status() != domain.StatusDeactivated {
+		t.Errorf("expected status DEACTIVATED, got %s", target.Status())
 	}
-	if target.Email != nil {
-		t.Errorf("expected email to be nil after deactivation, got %v", target.Email)
+	if target.Email() != nil {
+		t.Errorf("expected email to be nil after deactivation, got %v", target.Email())
 	}
-	if target.DeactivatedAt == nil {
+	if target.DeactivatedAt() == nil {
 		t.Error("expected deactivatedAt to be set")
 	}
-	if target.UpdatedAt == nil {
+	if target.UpdatedAt() == nil {
 		t.Error("expected updatedAt to be set")
 	}
 }

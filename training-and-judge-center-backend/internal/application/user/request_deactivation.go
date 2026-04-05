@@ -38,18 +38,18 @@ func (uc *RequestDeactivationUseCase) Execute(ctx context.Context, input Request
 	if err != nil {
 		return apperror.NewInternal()
 	}
-	if foundUser == nil || foundUser.Status == user.StatusDeactivated {
+	if foundUser == nil || foundUser.Status() == user.StatusDeactivated {
 		return apperror.NewNotFound("NOT_FOUND", "User not found")
 	}
 
-	if foundUser.Role == user.RoleAdmin {
+	if foundUser.Role() == user.RoleAdmin {
 		return apperror.NewForbidden("FORBIDDEN", "Administrators cannot deactivate their own account")
 	}
 
 	now := time.Now()
 
 	// Invalidate previous requests to ensure only one code is active
-	if err := uc.deactRepo.InvalidatePendingByUserID(ctx, foundUser.ID, now); err != nil {
+	if err := uc.deactRepo.InvalidatePendingByUserID(ctx, foundUser.ID(), now); err != nil {
 		return apperror.NewInternal()
 	}
 
@@ -58,23 +58,14 @@ func (uc *RequestDeactivationUseCase) Execute(ctx context.Context, input Request
 		return apperror.NewInternal()
 	}
 
-	req := &user.DeactivationRequest{
-		ID:               uuid.NewString(),
-		UserID:           foundUser.ID,
-		VerificationCode: code,
-		Attempts:         0,
-		Status:           user.DeactivationStatusPending,
-		ExpiresAt:        now.Add(15 * time.Minute),
-		CreatedAt:        now,
-		UpdatedAt:        now,
-	}
+	req := user.RestoreDeactivationRequest(uuid.NewString(), foundUser.ID(), code, now.Add(15 * time.Minute), 0, nil, user.DeactivationStatusPending, now, now)
 
 	if err := uc.deactRepo.Save(ctx, req); err != nil {
 		return apperror.NewInternal()
 	}
 
 	if err := uc.emailSender.Send(ctx, notification.EmailMessage{
-		To:      foundUser.Email.String(),
+		To:      foundUser.Email().String(),
 		Subject: "Account Deactivation Code",
 		Body:    fmt.Sprintf("You requested to deactivate your account.\n\nYour confirmation code is: %s\n\nThis code will expire in 15 minutes. Note: Confirming this code will completely anonymize your account and log you out immediately.", code),
 	}); err != nil {

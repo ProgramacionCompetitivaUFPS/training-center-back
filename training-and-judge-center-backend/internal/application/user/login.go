@@ -52,11 +52,11 @@ func (uc *LoginUseCase) Execute(ctx context.Context, input LoginInput) (*LoginOu
 		return nil, apperror.NewUnauthorized("INVALID_CREDENTIALS", "Invalid email or password")
 	}
 
-	if foundUser.Status != user.StatusActive {
+	if foundUser.Status() != user.StatusActive {
 		return nil, apperror.NewForbidden("ACCOUNT_DEACTIVATED", "This account has been deactivated")
 	}
 
-	if !foundUser.Password.Compare(input.Password) {
+	if !foundUser.Password().Compare(input.Password) {
 		return nil, apperror.NewUnauthorized("INVALID_CREDENTIALS", "Invalid email or password")
 	}
 

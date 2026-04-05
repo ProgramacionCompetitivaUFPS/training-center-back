@@ -25,15 +25,15 @@ func (r *DeactivationRequestRepository) Save(ctx context.Context, req *user.Deac
 		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`
 
 	_, err := r.pool.Exec(ctx, query,
-		req.ID,
-		req.UserID,
-		req.VerificationCode,
-		req.ExpiresAt,
-		req.Attempts,
-		req.BlockedUntil,
-		string(req.Status),
-		req.CreatedAt,
-		req.UpdatedAt,
+		req.ID(),
+		req.UserID(),
+		req.VerificationCode(),
+		req.ExpiresAt(),
+		req.Attempts(),
+		req.BlockedUntil(),
+		string(req.Status()),
+		req.CreatedAt(),
+		req.UpdatedAt(),
 	)
 	if err != nil {
 		return fmt.Errorf("failed to save deactivation request: %w", err)
@@ -49,19 +49,22 @@ func (r *DeactivationRequestRepository) FindPendingByUserID(ctx context.Context,
 		WHERE user_id = $1 AND status IN ($2, $3)
 		ORDER BY created_at DESC LIMIT 1`
 
-	var req user.DeactivationRequest
+	var id, returnedUserID, verificationCode string
+	var expiresAt, createdAt, updatedAt time.Time
+	var attempts int
+	var blockedUntil *time.Time
 	var status string
 
 	err := r.pool.QueryRow(ctx, query, userID, string(user.DeactivationStatusPending), string(user.DeactivationStatusBlocked)).Scan(
-		&req.ID,
-		&req.UserID,
-		&req.VerificationCode,
-		&req.ExpiresAt,
-		&req.Attempts,
-		&req.BlockedUntil,
+		&id,
+		&returnedUserID,
+		&verificationCode,
+		&expiresAt,
+		&attempts,
+		&blockedUntil,
 		&status,
-		&req.CreatedAt,
-		&req.UpdatedAt,
+		&createdAt,
+		&updatedAt,
 	)
 
 	if err != nil {
@@ -71,8 +74,8 @@ func (r *DeactivationRequestRepository) FindPendingByUserID(ctx context.Context,
 		return nil, fmt.Errorf("failed to find pending deactivation request: %w", err)
 	}
 
-	req.Status = user.DeactivationStatus(status)
-	return &req, nil
+	req := user.RestoreDeactivationRequest(id, returnedUserID, verificationCode, expiresAt, attempts, blockedUntil, user.DeactivationStatus(status), createdAt, updatedAt)
+	return req, nil
 }
 
 func (r *DeactivationRequestRepository) FindByID(ctx context.Context, id string) (*user.DeactivationRequest, error) {
@@ -81,19 +84,22 @@ func (r *DeactivationRequestRepository) FindByID(ctx context.Context, id string)
 		FROM deactivation_requests
 		WHERE id = $1`
 
-	var req user.DeactivationRequest
+	var returnedID, returnedUserID, verificationCode string
+	var expiresAt, createdAt, updatedAt time.Time
+	var attempts int
+	var blockedUntil *time.Time
 	var status string
 
 	err := r.pool.QueryRow(ctx, query, id).Scan(
-		&req.ID,
-		&req.UserID,
-		&req.VerificationCode,
-		&req.ExpiresAt,
-		&req.Attempts,
-		&req.BlockedUntil,
+		&returnedID,
+		&returnedUserID,
+		&verificationCode,
+		&expiresAt,
+		&attempts,
+		&blockedUntil,
 		&status,
-		&req.CreatedAt,
-		&req.UpdatedAt,
+		&createdAt,
+		&updatedAt,
 	)
 
 	if err != nil {
@@ -103,8 +109,8 @@ func (r *DeactivationRequestRepository) FindByID(ctx context.Context, id string)
 		return nil, fmt.Errorf("failed to find deactivation request by id: %w", err)
 	}
 
-	req.Status = user.DeactivationStatus(status)
-	return &req, nil
+	req := user.RestoreDeactivationRequest(returnedID, returnedUserID, verificationCode, expiresAt, attempts, blockedUntil, user.DeactivationStatus(status), createdAt, updatedAt)
+	return req, nil
 }
 
 func (r *DeactivationRequestRepository) Update(ctx context.Context, req *user.DeactivationRequest) error {
@@ -114,13 +120,13 @@ func (r *DeactivationRequestRepository) Update(ctx context.Context, req *user.De
 		WHERE id = $7`
 
 	_, err := r.pool.Exec(ctx, query,
-		req.VerificationCode,
-		req.ExpiresAt,
-		req.Attempts,
-		req.BlockedUntil,
-		string(req.Status),
-		req.UpdatedAt,
-		req.ID,
+		req.VerificationCode(),
+		req.ExpiresAt(),
+		req.Attempts(),
+		req.BlockedUntil(),
+		string(req.Status()),
+		req.UpdatedAt(),
+		req.ID(),
 	)
 	if err != nil {
 		return fmt.Errorf("failed to update deactivation request: %w", err)

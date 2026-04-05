@@ -55,7 +55,7 @@ func (uc *UpdateUserUseCase) Execute(ctx context.Context, input UpdateUserInput)
 		newNickname, err := user.NewNickname(*input.Nickname)
 		if err != nil {
 			fieldErrors = append(fieldErrors, apperror.FieldError{Field: "nickname", Message: err.Error()})
-		} else if newNickname.String() != foundUser.Nickname.String() {
+		} else if newNickname.String() != foundUser.Nickname().String() {
 			nicknameToUpdate = &newNickname
 		}
 	}

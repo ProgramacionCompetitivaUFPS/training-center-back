@@ -58,14 +58,14 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 	respondJSON(w, http.StatusOK, loginResponse{
 		Token: result.Token,
 		User: userResponse{
-			Email:       result.User.Email.String(),
-			Name:        result.User.Name,
-			Nickname:    result.User.Nickname.String(),
-			Country:     result.User.Country,
-			City:        result.User.City,
-			Institution: result.User.Institution,
-			Role:        result.User.Role.String(),
-			CreatedAt:   result.User.CreatedAt.Format("2006-01-02T15:04:05Z"),
+			Email:       result.User.Email().String(),
+			Name:        result.User.Name(),
+			Nickname:    result.User.Nickname().String(),
+			Country:     result.User.Country(),
+			City:        result.User.City(),
+			Institution: result.User.Institution(),
+			Role:        result.User.Role().String(),
+			CreatedAt:   result.User.CreatedAt().Format("2006-01-02T15:04:05Z"),
 		},
 	})
 }

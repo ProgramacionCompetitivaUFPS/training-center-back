@@ -52,11 +52,11 @@ func (uc *ConfirmEmailChangeUseCase) Execute(ctx context.Context, input ConfirmE
 		return nil, apperror.NewBadRequest("INVALID_CODE", "The verification code is invalid or has expired")
 	}
 
-	if req.Status != user.StatusPending || req.IsExpired(time.Now()) {
+	if req.Status() != user.StatusPending || req.IsExpired(time.Now()) {
 		return nil, apperror.NewBadRequest("INVALID_CODE", "The verification code is invalid or has expired")
 	}
 
-	emailExists, err := uc.userRepo.ExistsByEmail(ctx, req.NewEmail)
+	emailExists, err := uc.userRepo.ExistsByEmail(ctx, req.NewEmail())
 	if err != nil {
 		return nil, apperror.NewInternal()
 	}
@@ -64,14 +64,15 @@ func (uc *ConfirmEmailChangeUseCase) Execute(ctx context.Context, input ConfirmE
 		return nil, apperror.NewConflict("EMAIL_ALREADY_EXISTS", "The email address is already in use")
 	}
 
-	oldEmail := u.Email.String()
+	oldEmail := u.Email().String()
 
 	req.MarkAsUsed(time.Now())
 	if err := uc.emailChangeRepo.Update(ctx, req); err != nil {
 		return nil, apperror.NewInternal()
 	}
 
-	u.Update(nil, nil, nil, &req.NewEmail, nil)
+	newEmailVal := req.NewEmail()
+	u.Update(nil, nil, nil, &newEmailVal, nil)
 	if err := uc.userRepo.Update(ctx, u); err != nil {
 		return nil, apperror.NewInternal()
 	}
@@ -85,12 +86,12 @@ func (uc *ConfirmEmailChangeUseCase) Execute(ctx context.Context, input ConfirmE
 	}
 	
 	if err := uc.emailSender.Send(ctx, notification.EmailMessage{
-		To:      req.NewEmail.String(),
+		To:      req.NewEmail().String(),
 		Subject: "Email successfully updated",
-		Body:    fmt.Sprintf("Hello %s, your email address has been successfully verified and updated on our platform.", u.Name),
+		Body:    fmt.Sprintf("Hello %s, your email address has been successfully verified and updated on our platform.", u.Name()),
 	}); err != nil {
-		slog.Error("failed to send confirmation to new email", "email", req.NewEmail.String(), "error", err)
+		slog.Error("failed to send confirmation to new email", "email", req.NewEmail().String(), "error", err)
 	}
 
-	return &req.NewEmail, nil
+	return &newEmailVal, nil
 }

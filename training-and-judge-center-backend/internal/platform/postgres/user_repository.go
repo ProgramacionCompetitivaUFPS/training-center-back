@@ -27,17 +27,17 @@ func (r *UserRepository) Save(ctx context.Context, u *user.User) error {
 		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`
 
 	_, err := r.pool.Exec(ctx, query,
-		u.ID,
-		u.Email.String(),
-		u.Password.Hash(),
-		u.Name,
-		u.Nickname.String(),
-		u.Country,
-		u.City,
-		u.Institution,
-		u.Role.String(),
-		u.Status.String(),
-		u.CreatedAt,
+		u.ID(),
+		u.Email().String(),
+		u.Password().Hash(),
+		u.Name(),
+		u.Nickname().String(),
+		u.Country(),
+		u.City(),
+		u.Institution(),
+		u.Role().String(),
+		u.Status().String(),
+		u.CreatedAt(),
 	)
 	if err != nil {
 		return fmt.Errorf("failed to save user: %w", err)
@@ -54,21 +54,21 @@ func (r *UserRepository) Update(ctx context.Context, u *user.User) error {
 		WHERE id = $10`
 
 	var emailVal interface{}
-	if u.Email != nil {
-		emailVal = u.Email.String()
+	if u.Email() != nil {
+		emailVal = u.Email().String()
 	}
 
 	_, err := r.pool.Exec(ctx, query,
-		u.Name,
-		u.Nickname.String(),
-		u.Institution,
+		u.Name(),
+		u.Nickname().String(),
+		u.Institution(),
 		emailVal,
-		u.Password.Hash(),
-		u.Role.String(),
-		u.Status.String(),
-		u.UpdatedAt,
-		u.DeactivatedAt,
-		u.ID,
+		u.Password().Hash(),
+		u.Role().String(),
+		u.Status().String(),
+		u.UpdatedAt(),
+		u.DeactivatedAt(),
+		u.ID(),
 	)
 	if err != nil {
 		var pgErr *pgconn.PgError

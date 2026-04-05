@@ -53,8 +53,7 @@ func TestRequestPasswordRecovery_Success(t *testing.T) {
 	userRepo := newNoConflictRepo()
 	activeUser := newUserWithRole("user-1", domain.RoleContestant, domain.StatusActive)
 	userRepo.findByEmailFn = func(_ context.Context, email domain.Email) (*domain.User, error) {
-		if email.String() == "user@example.com" {
-			activeUser.Email = &email
+		if email.String() == "user-1@example.com" {
 			return activeUser, nil
 		}
 		return nil, nil
@@ -65,11 +64,11 @@ func TestRequestPasswordRecovery_Success(t *testing.T) {
 			return nil
 		},
 		saveFn: func(ctx context.Context, req *domain.PasswordRecoveryRequest) error {
-			if req.UserID != "user-1" {
-				t.Errorf("expected user-1, got %s", req.UserID)
+			if req.UserID() != "user-1" {
+				t.Errorf("expected user-1, got %s", req.UserID())
 			}
-			if len(req.Code) != 6 {
-				t.Errorf("expected 6-digit code, got %s", req.Code)
+			if len(req.Code()) != 6 {
+				t.Errorf("expected 6-digit code, got %s", req.Code())
 			}
 			return nil
 		},
@@ -79,7 +78,7 @@ func TestRequestPasswordRecovery_Success(t *testing.T) {
 	mockEmail := &mockEmailSender{
 		sendFn: func(ctx context.Context, msg notification.EmailMessage) error {
 			emailSent = true
-			if msg.To != "user@example.com" {
+			if msg.To != "user-1@example.com" {
 				t.Errorf("expected user@example.com, got %s", msg.To)
 			}
 			return nil
@@ -87,7 +86,7 @@ func TestRequestPasswordRecovery_Success(t *testing.T) {
 	}
 
 	uc := NewRequestPasswordRecoveryUseCase(userRepo, recoveryRepo, mockEmail)
-	err := uc.Execute(context.Background(), RequestPasswordRecoveryInput{Email: "user@example.com"})
+	err := uc.Execute(context.Background(), RequestPasswordRecoveryInput{Email: "user-1@example.com"})
 	
 	if err != nil {
 		t.Fatalf("expected nil, got %v", err)
@@ -140,8 +139,7 @@ func TestRequestPasswordRecovery_EmailSendFailNoError(t *testing.T) {
 	userRepo := newNoConflictRepo()
 	activeUser := newUserWithRole("user-1", domain.RoleContestant, domain.StatusActive)
 	userRepo.findByEmailFn = func(_ context.Context, email domain.Email) (*domain.User, error) {
-		if email.String() == "user@example.com" {
-			activeUser.Email = &email
+		if email.String() == "user-1@example.com" {
 			return activeUser, nil
 		}
 		return nil, nil
@@ -163,7 +161,7 @@ func TestRequestPasswordRecovery_EmailSendFailNoError(t *testing.T) {
 	}
 
 	uc := NewRequestPasswordRecoveryUseCase(userRepo, recoveryRepo, mockEmail)
-	err := uc.Execute(context.Background(), RequestPasswordRecoveryInput{Email: "user@example.com"})
+	err := uc.Execute(context.Background(), RequestPasswordRecoveryInput{Email: "user-1@example.com"})
 	
 	// Should return nil even if email sending fails
 	if err != nil {

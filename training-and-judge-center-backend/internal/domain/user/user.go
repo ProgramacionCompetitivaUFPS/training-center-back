@@ -7,72 +7,87 @@ import (
 )
 
 type User struct {
-	ID            string
-	Email         *Email
-	Password      Password
-	Name          string
-	Nickname      Nickname
-	Country       string
-	City          string
-	Institution   string
-	Role          Role
-	Status        Status
-	CreatedAt     time.Time
-	UpdatedAt     *time.Time
-	DeactivatedAt *time.Time
+	id            string
+	email         *Email
+	password      Password
+	name          string
+	nickname      Nickname
+	country       string
+	city          string
+	institution   string
+	role          Role
+	status        Status
+	createdAt     time.Time
+	updatedAt     *time.Time
+	deactivatedAt *time.Time
 }
+
+// Accessors
+func (u *User) ID() string                   { return u.id }
+func (u *User) Email() *Email                { return u.email }
+func (u *User) Password() Password           { return u.password }
+func (u *User) Name() string                 { return u.name }
+func (u *User) Nickname() Nickname           { return u.nickname }
+func (u *User) Country() string              { return u.country }
+func (u *User) City() string                 { return u.city }
+func (u *User) Institution() string          { return u.institution }
+func (u *User) Role() Role                   { return u.role }
+func (u *User) Status() Status               { return u.status }
+func (u *User) CreatedAt() time.Time         { return u.createdAt }
+func (u *User) UpdatedAt() *time.Time        { return u.updatedAt }
+func (u *User) DeactivatedAt() *time.Time    { return u.deactivatedAt }
 
 func NewUser(email Email, password Password, name string, nickname Nickname, country, city, institution string) *User {
 	return &User{
-		ID:          uuid.New().String(),
-		Email:       &email,
-		Password:    password,
-		Name:        name,
-		Nickname:    nickname,
-		Country:     country,
-		City:        city,
-		Institution: institution,
-		Role:        RoleContestant,
-		Status:      StatusActive,
-		CreatedAt:   time.Now(),
+		id:          uuid.New().String(),
+		email:       &email,
+		password:    password,
+		name:        name,
+		nickname:    nickname,
+		country:     country,
+		city:        city,
+		institution: institution,
+		role:        RoleContestant,
+		status:      StatusActive,
+		createdAt:   time.Now(),
 	}
 }
 
 func (u *User) Update(name *string, nickname *Nickname, institution *string, email *Email, role *Role) {
 	if name != nil {
-		u.Name = *name
+		u.name = *name
 	}
 	if nickname != nil {
-		u.Nickname = *nickname
+		u.nickname = *nickname
 	}
 	if institution != nil {
-		u.Institution = *institution
+		u.institution = *institution
 	}
 	if email != nil {
-		u.Email = email
+		u.email = email
 	}
 	if role != nil {
-		u.Role = *role
+		u.role = *role
 	}
 	
 	now := time.Now()
-	u.UpdatedAt = &now
+	u.updatedAt = &now
 }
 
 func (u *User) UpdatePassword(newPassword Password) {
-	u.Password = newPassword
+	u.password = newPassword
 	now := time.Now()
-	u.UpdatedAt = &now
+	u.updatedAt = &now
 }
 
 func (u *User) Deactivate() {
 	anonymousNickname, _ := NewNickname("user_anonimo_" + uuid.New().String()[:10])
 	now := time.Now()
-	u.Nickname = anonymousNickname
-	u.Email = nil
-	u.Status = StatusDeactivated
-	u.DeactivatedAt = &now
-	u.UpdatedAt = &now
+	u.nickname = anonymousNickname
+	u.email = nil
+	u.status = StatusDeactivated
+	u.deactivatedAt = &now
+	u.updatedAt = &now
 }
 
 func RestoreUser(
@@ -91,31 +106,31 @@ func RestoreUser(
 	deactivatedAt *time.Time,
 ) *User {
 	u := &User{
-		ID:            id,
-		Name:          name,
-		Country:       country,
-		City:          city,
-		Institution:   institution,
-		CreatedAt:     createdAt,
-		UpdatedAt:     updatedAt,
-		DeactivatedAt: deactivatedAt,
+		id:            id,
+		name:          name,
+		country:       country,
+		city:          city,
+		institution:   institution,
+		createdAt:     createdAt,
+		updatedAt:     updatedAt,
+		deactivatedAt: deactivatedAt,
 	}
 
 	if emailStr != nil {
 		parsedEmail, _ := NewEmail(*emailStr)
-		u.Email = &parsedEmail
+		u.email = &parsedEmail
 	}
 
-	u.Password = NewPasswordFromHash(passwordHash)
+	u.password = NewPasswordFromHash(passwordHash)
 
 	parsedNickname, _ := NewNickname(nicknameStr)
-	u.Nickname = parsedNickname
+	u.nickname = parsedNickname
 
 	parsedRole, _ := NewRole(roleStr)
-	u.Role = parsedRole
+	u.role = parsedRole
 
 	parsedStatus, _ := NewStatus(statusStr)
-	u.Status = parsedStatus
+	u.status = parsedStatus
 
 	return u
 }

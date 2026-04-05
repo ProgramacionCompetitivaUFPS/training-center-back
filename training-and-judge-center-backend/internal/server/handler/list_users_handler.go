@@ -73,26 +73,26 @@ func (h *UserHandler) ListUsers(w http.ResponseWriter, r *http.Request) {
 	items := make([]listUserItem, 0, len(result.Users))
 	for _, u := range result.Users {
 		item := listUserItem{
-			ID:          u.ID,
-			Name:        u.Name,
-			Nickname:    u.Nickname.String(),
-			Country:     u.Country,
-			City:        u.City,
-			Institution: u.Institution,
-			Role:        u.Role.String(),
-			Status:      u.Status.String(),
-			CreatedAt:   u.CreatedAt.Format("2006-01-02T15:04:05Z"),
+			ID:          u.ID(),
+			Name:        u.Name(),
+			Nickname:    u.Nickname().String(),
+			Country:     u.Country(),
+			City:        u.City(),
+			Institution: u.Institution(),
+			Role:        u.Role().String(),
+			Status:      u.Status().String(),
+			CreatedAt:   u.CreatedAt().Format("2006-01-02T15:04:05Z"),
 		}
-		if u.Email != nil {
-			s := u.Email.String()
+		if u.Email() != nil {
+			s := u.Email().String()
 			item.Email = &s
 		}
-		if u.UpdatedAt != nil {
-			s := u.UpdatedAt.Format("2006-01-02T15:04:05Z")
+		if u.UpdatedAt() != nil {
+			s := u.UpdatedAt().Format("2006-01-02T15:04:05Z")
 			item.UpdatedAt = &s
 		}
-		if u.DeactivatedAt != nil {
-			s := u.DeactivatedAt.Format("2006-01-02T15:04:05Z")
+		if u.DeactivatedAt() != nil {
+			s := u.DeactivatedAt().Format("2006-01-02T15:04:05Z")
 			item.DeactivatedAt = &s
 		}
 		items = append(items, item)

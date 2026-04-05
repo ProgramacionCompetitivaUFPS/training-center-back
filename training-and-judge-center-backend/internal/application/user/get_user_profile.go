@@ -48,18 +48,18 @@ func (uc *GetUserProfileUseCase) GetUserByNickname(ctx context.Context, requeste
 		return nil, apperror.NewNotFound("NOT_FOUND", "User not found")
 	}
 
-	if targetUser.Status == user.StatusDeactivated {
+	if targetUser.Status() == user.StatusDeactivated {
 		return nil, apperror.NewNotFound("NOT_FOUND", "User not found")
 	}
 
-	isSelf := targetUser.ID == requesterID
+	isSelf := targetUser.ID() == requesterID
 	if isSelf {
 		return &UserProfileOutput{User: targetUser, IsFullProfile: true}, nil
 	}
 
 	isRequesterAdmin := requesterRole == user.RoleAdmin.String()
 
-	if !isRequesterAdmin && targetUser.Role == user.RoleAdmin {
+	if !isRequesterAdmin && targetUser.Role() == user.RoleAdmin {
 		return nil, apperror.NewForbidden("ADMIN_PROFILE_RESTRICTED", "Admin profiles are not accessible to non-admin users")
 	}
 

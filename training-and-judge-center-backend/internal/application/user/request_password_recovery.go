@@ -49,14 +49,14 @@ func (uc *RequestPasswordRecoveryUseCase) Execute(ctx context.Context, input Req
 
 	// Ambiguous response: If user doesn't exist, we just return nil natively 
 	// The HTTP handler will always return 200 OK.
-	if foundUser == nil || foundUser.Status == user.StatusDeactivated {
+	if foundUser == nil || foundUser.Status() == user.StatusDeactivated {
 		return nil
 	}
 
 	now := time.Now()
 
 	// Invalidate previous requests
-	if err := uc.recoveryRepo.InvalidatePendingByUserID(ctx, foundUser.ID, now); err != nil {
+	if err := uc.recoveryRepo.InvalidatePendingByUserID(ctx, foundUser.ID(), now); err != nil {
 		return apperror.NewInternal()
 	}
 
@@ -65,25 +65,18 @@ func (uc *RequestPasswordRecoveryUseCase) Execute(ctx context.Context, input Req
 		return apperror.NewInternal()
 	}
 
-	req := &user.PasswordRecoveryRequest{
-		ID:        uuid.NewString(),
-		UserID:    foundUser.ID,
-		Code:      code,
-		Status:    user.StatusPending,
-		ExpiresAt: now.Add(15 * time.Minute),
-		CreatedAt: now,
-	}
+	req := user.RestorePasswordRecoveryRequest(uuid.NewString(), foundUser.ID(), code, user.StatusPending, now.Add(15 * time.Minute), now, nil)
 
 	if err := uc.recoveryRepo.Save(ctx, req); err != nil {
 		return apperror.NewInternal()
 	}
 
 	if err := uc.emailSender.Send(ctx, notification.EmailMessage{
-		To:      foundUser.Email.String(),
+		To:      foundUser.Email().String(),
 		Subject: "Password Recovery Code",
 		Body:    fmt.Sprintf("Your password recovery code is: %s\nThis code will expire in 15 minutes.", code),
 	}); err != nil {
-		log.Printf("ERROR: Failed to send password recovery email to %s: %v\n", foundUser.Email.String(), err)
+		log.Printf("ERROR: Failed to send password recovery email to %s: %v\n", foundUser.Email().String(), err)
 	}
 
 	return nil

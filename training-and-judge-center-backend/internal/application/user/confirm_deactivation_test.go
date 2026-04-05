@@ -24,9 +24,6 @@ func (m *mockAuditRepo) Save(ctx context.Context, log *domain.DeactivationAuditL
 func TestConfirmDeactivation_Success(t *testing.T) {
 	userRepo := newNoConflictRepo()
 	activeUser := newUserWithRole("user-1", domain.RoleContestant, domain.StatusActive)
-	emailStr := "user@example.com"
-	em, _ := domain.NewEmail(emailStr)
-	activeUser.Email = &em
 
 	userRepo.findByIDFn = func(_ context.Context, id string) (*domain.User, error) {
 		if id == "user-1" {
@@ -35,28 +32,22 @@ func TestConfirmDeactivation_Success(t *testing.T) {
 		return nil, nil
 	}
 	userRepo.updateFn = func(ctx context.Context, u *domain.User) error {
-		if u.Status != domain.StatusDeactivated {
-			t.Errorf("expected DEACTIVATED status, got %s", u.Status)
+		if u.Status() != domain.StatusDeactivated {
+			t.Errorf("expected DEACTIVATED status, got %s", u.Status())
 		}
-		if u.Email != nil {
-			t.Errorf("expected Email to be nil, got %v", u.Email)
+		if u.Email() != nil {
+			t.Errorf("expected Email to be nil, got %v", u.Email())
 		}
 		return nil
 	}
 
 	deactRepo := &mockDeactivationRepo{
 		findPendingByUserIDFn: func(ctx context.Context, userID string) (*domain.DeactivationRequest, error) {
-			return &domain.DeactivationRequest{
-				ID:               "req-1",
-				UserID:           "user-1",
-				VerificationCode: "123456",
-				Status:           domain.DeactivationStatusPending,
-				ExpiresAt:        time.Now().Add(10 * time.Minute),
-			}, nil
+			return domain.RestoreDeactivationRequest("req-1", "user-1", "123456", time.Now().Add(10*time.Minute), 0, nil, domain.DeactivationStatusPending, time.Time{}, time.Time{}), nil
 		},
 		updateFn: func(ctx context.Context, req *domain.DeactivationRequest) error {
-			if req.Status != domain.DeactivationStatusConfirmed {
-				t.Errorf("expected expected CONFIRMED, got %s", req.Status)
+			if req.Status() != domain.DeactivationStatusConfirmed {
+				t.Errorf("expected expected CONFIRMED, got %s", req.Status())
 			}
 			return nil
 		},
@@ -66,8 +57,8 @@ func TestConfirmDeactivation_Success(t *testing.T) {
 	auditRepo := &mockAuditRepo{
 		saveFn: func(ctx context.Context, log *domain.DeactivationAuditLog) error {
 			auditCalled = true
-			if log.OriginalEmail != "user@example.com" {
-				t.Errorf("expected audit email to be user@example.com, got %s", log.OriginalEmail)
+			if log.OriginalEmail() != "user-1@example.com" {
+				t.Errorf("expected audit email to be user@example.com, got %s", log.OriginalEmail())
 			}
 			return nil
 		},
@@ -119,18 +110,11 @@ func TestConfirmDeactivation_InvalidCode(t *testing.T) {
 
 	deactRepo := &mockDeactivationRepo{
 		findPendingByUserIDFn: func(ctx context.Context, userID string) (*domain.DeactivationRequest, error) {
-			return &domain.DeactivationRequest{
-				ID:               "req-1",
-				UserID:           "user-1",
-				VerificationCode: "123456",
-				Status:           domain.DeactivationStatusPending,
-				ExpiresAt:        time.Now().Add(10 * time.Minute),
-				Attempts:         0,
-			}, nil
+			return domain.RestoreDeactivationRequest("req-1", "user-1", "123456", time.Now().Add(10*time.Minute), 0, nil, domain.DeactivationStatusPending, time.Time{}, time.Time{}), nil
 		},
 		updateFn: func(ctx context.Context, req *domain.DeactivationRequest) error {
-			if req.Attempts != 1 {
-				t.Errorf("expected attempts to be incremented to 1, got %d", req.Attempts)
+			if req.Attempts() != 1 {
+				t.Errorf("expected attempts to be incremented to 1, got %d", req.Attempts())
 			}
 			return nil
 		},
@@ -161,20 +145,13 @@ func TestConfirmDeactivation_ExceedAttemptsAndBlock(t *testing.T) {
 
 	deactRepo := &mockDeactivationRepo{
 		findPendingByUserIDFn: func(ctx context.Context, userID string) (*domain.DeactivationRequest, error) {
-			return &domain.DeactivationRequest{
-				ID:               "req-1",
-				UserID:           "user-1",
-				VerificationCode: "123456",
-				Status:           domain.DeactivationStatusPending,
-				ExpiresAt:        time.Now().Add(10 * time.Minute),
-				Attempts:         4, // Next failure will hit 5 and block
-			}, nil
+			return domain.RestoreDeactivationRequest("req-1", "user-1", "123456", time.Now().Add(10*time.Minute), 4, nil, domain.DeactivationStatusPending, time.Time{}, time.Time{}), nil
 		},
 		updateFn: func(ctx context.Context, req *domain.DeactivationRequest) error {
-			if req.Status != domain.DeactivationStatusBlocked {
-				t.Errorf("expected status to change to BLOCKED, got %s", req.Status)
+			if req.Status() != domain.DeactivationStatusBlocked {
+				t.Errorf("expected status to change to BLOCKED, got %s", req.Status())
 			}
-			if req.BlockedUntil == nil {
+			if req.BlockedUntil() == nil {
 				t.Error("expected blockedUntil to be set")
 			}
 			return nil

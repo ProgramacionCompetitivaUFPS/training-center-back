@@ -24,14 +24,14 @@ func (r *EmailChangeRepository) Save(ctx context.Context, req *user.EmailChangeR
 		VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`
 
 	_, err := r.pool.Exec(ctx, query,
-		req.ID,
-		req.UserID,
-		req.NewEmail.String(),
-		req.Code,
-		string(req.Status),
-		req.ExpiresAt,
-		req.CreatedAt,
-		req.UpdatedAt,
+		req.ID(),
+		req.UserID(),
+		req.NewEmail().String(),
+		req.Code(),
+		string(req.Status()),
+		req.ExpiresAt(),
+		req.CreatedAt(),
+		req.UpdatedAt(),
 	)
 	if err != nil {
 		return fmt.Errorf("failed to save email change request: %w", err)
@@ -45,17 +45,20 @@ func (r *EmailChangeRepository) FindByID(ctx context.Context, id string) (*user.
 		FROM email_change_requests
 		WHERE id = $1`
 
-	var req user.EmailChangeRequest
+	var returnedID, userID, code string
+	var expiresAt, createdAt time.Time
+	var updatedAt *time.Time
 	var statusStr, emailStr string
+
 	err := r.pool.QueryRow(ctx, query, id).Scan(
-		&req.ID,
-		&req.UserID,
+		&returnedID,
+		&userID,
 		&emailStr,
-		&req.Code,
+		&code,
 		&statusStr,
-		&req.ExpiresAt,
-		&req.CreatedAt,
-		&req.UpdatedAt,
+		&expiresAt,
+		&createdAt,
+		&updatedAt,
 	)
 
 	if err != nil {
@@ -65,11 +68,10 @@ func (r *EmailChangeRepository) FindByID(ctx context.Context, id string) (*user.
 		return nil, fmt.Errorf("failed to find email change request: %w", err)
 	}
 
-	req.Status = user.RequestStatus(statusStr)
 	parsedEmail, _ := user.NewEmail(emailStr)
-	req.NewEmail = parsedEmail
+	req := user.RestoreEmailChangeRequest(returnedID, userID, parsedEmail, code, user.RequestStatus(statusStr), expiresAt, createdAt, updatedAt)
 
-	return &req, nil
+	return req, nil
 }
 
 func (r *EmailChangeRepository) Update(ctx context.Context, req *user.EmailChangeRequest) error {
@@ -79,9 +81,9 @@ func (r *EmailChangeRepository) Update(ctx context.Context, req *user.EmailChang
 		WHERE id = $3`
 
 	_, err := r.pool.Exec(ctx, query,
-		string(req.Status),
-		req.UpdatedAt,
-		req.ID,
+		string(req.Status()),
+		req.UpdatedAt(),
+		req.ID(),
 	)
 	if err != nil {
 		return fmt.Errorf("failed to update email change request: %w", err)
@@ -95,17 +97,20 @@ func (r *EmailChangeRepository) FindByCodeAndUserID(ctx context.Context, code st
 		FROM email_change_requests
 		WHERE code = $1 AND user_id = $2`
 
-	var req user.EmailChangeRequest
+	var id, returnedUserID, codeStr string
+	var expiresAt, createdAt time.Time
+	var updatedAt *time.Time
 	var statusStr, emailStr string
+
 	err := r.pool.QueryRow(ctx, query, code, userID).Scan(
-		&req.ID,
-		&req.UserID,
+		&id,
+		&returnedUserID,
 		&emailStr,
-		&req.Code,
+		&codeStr,
 		&statusStr,
-		&req.ExpiresAt,
-		&req.CreatedAt,
-		&req.UpdatedAt,
+		&expiresAt,
+		&createdAt,
+		&updatedAt,
 	)
 
 	if err != nil {
@@ -115,11 +120,10 @@ func (r *EmailChangeRepository) FindByCodeAndUserID(ctx context.Context, code st
 		return nil, fmt.Errorf("failed to find email change request by code: %w", err)
 	}
 
-	req.Status = user.RequestStatus(statusStr)
 	parsedEmail, _ := user.NewEmail(emailStr)
-	req.NewEmail = parsedEmail
+	req := user.RestoreEmailChangeRequest(id, returnedUserID, parsedEmail, codeStr, user.RequestStatus(statusStr), expiresAt, createdAt, updatedAt)
 
-	return &req, nil
+	return req, nil
 }
 
 func (r *EmailChangeRepository) InvalidatePendingByUserID(ctx context.Context, userID string) error {

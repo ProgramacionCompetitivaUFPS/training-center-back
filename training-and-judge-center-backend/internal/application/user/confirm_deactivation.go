@@ -47,7 +47,7 @@ func (uc *ConfirmDeactivationUseCase) Execute(ctx context.Context, input Confirm
 	if err != nil {
 		return apperror.NewInternal()
 	}
-	if foundUser == nil || foundUser.Status == user.StatusDeactivated {
+	if foundUser == nil || foundUser.Status() == user.StatusDeactivated {
 		return apperror.NewConflict("ALREADY_DEACTIVATED", "User account is already deactivated or doesn't exist")
 	}
 
@@ -62,9 +62,9 @@ func (uc *ConfirmDeactivationUseCase) Execute(ctx context.Context, input Confirm
 	now := time.Now()
 
 	// Handle Blocked State
-	if req.IsBlocked() && req.BlockedUntil != nil {
-		if now.Before(*req.BlockedUntil) {
-			retryAfter := int(req.BlockedUntil.Sub(now).Seconds())
+	if req.IsBlocked() && req.BlockedUntil() != nil {
+		if now.Before(*req.BlockedUntil()) {
+			retryAfter := int(req.BlockedUntil().Sub(now).Seconds())
 			if retryAfter < 0 {
 				retryAfter = 0
 			}
@@ -73,14 +73,14 @@ func (uc *ConfirmDeactivationUseCase) Execute(ctx context.Context, input Confirm
 	}
 
 	// Code expiration validation
-	if now.After(req.ExpiresAt) {
+	if now.After(req.ExpiresAt()) {
 		req.MarkAsExpired()
 		_ = uc.deactRepo.Update(ctx, req)
 		return apperror.NewBadRequest("EXPIRED_CODE", "The confirmation code has expired. Please request a new one")
 	}
 
 	// Code match validation
-	if req.VerificationCode != input.Code {
+	if req.VerificationCode() != input.Code {
 		req.RegisterFailure()
 
 		if req.IsBlocked() {
@@ -94,10 +94,10 @@ func (uc *ConfirmDeactivationUseCase) Execute(ctx context.Context, input Confirm
 
 	// Execution: Deactivate
 	originalEmailStr := ""
-	if foundUser.Email != nil {
-		originalEmailStr = foundUser.Email.String()
+	if foundUser.Email() != nil {
+		originalEmailStr = foundUser.Email().String()
 	}
-	originalNicknameStr := foundUser.Nickname.String()
+	originalNicknameStr := foundUser.Nickname().String()
 
 	foundUser.Deactivate() // Applies StatusDeactivated, Email=nil, Anon Nickname, timestamps
 
@@ -112,20 +112,12 @@ func (uc *ConfirmDeactivationUseCase) Execute(ctx context.Context, input Confirm
 	}
 
 	// Invalidate Sessions
-	if err := uc.sessionInvalidator.InvalidateAllUserSessions(ctx, foundUser.ID, now); err != nil {
-		slog.Error("failed to invalidate sessions after self-deactivation", "user_id", foundUser.ID, "error", err)
+	if err := uc.sessionInvalidator.InvalidateAllUserSessions(ctx, foundUser.ID(), now); err != nil {
+		slog.Error("failed to invalidate sessions after self-deactivation", "user_id", foundUser.ID(), "error", err)
 	}
 
 	// Audit Log
-	auditLog := &user.DeactivationAuditLog{
-		ID:               uuid.NewString(),
-		UserID:           foundUser.ID,
-		OriginalEmail:    originalEmailStr,
-		OriginalNickname: originalNicknameStr,
-		OccurredAt:       now,
-		IP:               input.IP,
-		UserAgent:        input.UserAgent,
-	}
+	auditLog := user.RestoreDeactivationAuditLog(uuid.NewString(), foundUser.ID(), originalEmailStr, originalNicknameStr, now, input.IP, input.UserAgent)
 	_ = uc.auditRepo.Save(ctx, auditLog) // fail-safe (ignore error if it fails instead of reverting user)
 
 	// Send final email

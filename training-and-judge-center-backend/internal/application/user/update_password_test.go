@@ -31,13 +31,13 @@ func TestUpdatePassword_Success(t *testing.T) {
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
-	if activeUser.UpdatedAt == nil {
+	if activeUser.UpdatedAt() == nil {
 		t.Error("expected updatedAt to be set after password change")
 	}
-	if activeUser.Password.Compare("Secret1!") {
+	if activeUser.Password().Compare("Secret1!") {
 		t.Error("expected old password to be invalid after update")
 	}
-	if !activeUser.Password.Compare("NewSecret2@") {
+	if !activeUser.Password().Compare("NewSecret2@") {
 		t.Error("expected new password to be valid after update")
 	}
 }

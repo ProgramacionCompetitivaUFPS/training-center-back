@@ -39,12 +39,12 @@ func (uc *AdminDeactivateUserUseCase) Execute(ctx context.Context, input AdminDe
 		return apperror.NewNotFound(apperror.ErrCodeNotFound, "User not found")
 	}
 
-	if foundUser.Role == user.RoleAdmin {
+	if foundUser.Role() == user.RoleAdmin {
 		return apperror.NewForbidden(user.ErrCodeCannotDeactivateAdmin, "Cannot deactivate another administrator")
 	}
 
 	// Idempotent: already deactivated users return success immediately
-	if foundUser.Status == user.StatusDeactivated {
+	if foundUser.Status() == user.StatusDeactivated {
 		return nil
 	}
 
@@ -55,8 +55,8 @@ func (uc *AdminDeactivateUserUseCase) Execute(ctx context.Context, input AdminDe
 	}
 
 	now := time.Now()
-	if err := uc.sessionInvalidator.InvalidateAllUserSessions(ctx, foundUser.ID, now); err != nil {
-		slog.Error("failed to invalidate sessions after admin deactivation", "user_id", foundUser.ID, "error", err)
+	if err := uc.sessionInvalidator.InvalidateAllUserSessions(ctx, foundUser.ID(), now); err != nil {
+		slog.Error("failed to invalidate sessions after admin deactivation", "user_id", foundUser.ID(), "error", err)
 	}
 
 	return nil

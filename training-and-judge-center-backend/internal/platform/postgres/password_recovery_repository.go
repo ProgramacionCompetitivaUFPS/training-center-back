@@ -24,13 +24,13 @@ func (r *PasswordRecoveryRepository) Save(ctx context.Context, req *user.Passwor
 		VALUES ($1, $2, $3, $4, $5, $6, $7)`
 
 	_, err := r.pool.Exec(ctx, query,
-		req.ID,
-		req.UserID,
-		req.Code,
-		string(req.Status),
-		req.ExpiresAt,
-		req.CreatedAt,
-		req.UpdatedAt,
+		req.ID(),
+		req.UserID(),
+		req.Code(),
+		string(req.Status()),
+		req.ExpiresAt(),
+		req.CreatedAt(),
+		req.UpdatedAt(),
 	)
 	if err != nil {
 		return fmt.Errorf("failed to save password recovery request: %w", err)
@@ -44,16 +44,19 @@ func (r *PasswordRecoveryRepository) FindByID(ctx context.Context, id string) (*
 		FROM password_recovery_requests
 		WHERE id = $1`
 
-	var req user.PasswordRecoveryRequest
+	var returnedID, userID, code string
+	var expiresAt, createdAt time.Time
+	var updatedAt *time.Time
 	var statusStr string
+
 	err := r.pool.QueryRow(ctx, query, id).Scan(
-		&req.ID,
-		&req.UserID,
-		&req.Code,
+		&returnedID,
+		&userID,
+		&code,
 		&statusStr,
-		&req.ExpiresAt,
-		&req.CreatedAt,
-		&req.UpdatedAt,
+		&expiresAt,
+		&createdAt,
+		&updatedAt,
 	)
 
 	if err != nil {
@@ -63,8 +66,8 @@ func (r *PasswordRecoveryRepository) FindByID(ctx context.Context, id string) (*
 		return nil, fmt.Errorf("failed to find password recovery request: %w", err)
 	}
 
-	req.Status = user.RequestStatus(statusStr)
-	return &req, nil
+	req := user.RestorePasswordRecoveryRequest(returnedID, userID, code, user.RequestStatus(statusStr), expiresAt, createdAt, updatedAt)
+	return req, nil
 }
 
 func (r *PasswordRecoveryRepository) Update(ctx context.Context, req *user.PasswordRecoveryRequest) error {
@@ -74,9 +77,9 @@ func (r *PasswordRecoveryRepository) Update(ctx context.Context, req *user.Passw
 		WHERE id = $3`
 
 	_, err := r.pool.Exec(ctx, query,
-		string(req.Status),
-		req.UpdatedAt,
-		req.ID,
+		string(req.Status()),
+		req.UpdatedAt(),
+		req.ID(),
 	)
 	if err != nil {
 		return fmt.Errorf("failed to update password recovery request: %w", err)
@@ -90,16 +93,19 @@ func (r *PasswordRecoveryRepository) FindPendingByUserID(ctx context.Context, us
 		FROM password_recovery_requests
 		WHERE user_id = $1 AND status = $2`
 
-	var req user.PasswordRecoveryRequest
+	var id, returnedUserID, code string
+	var expiresAt, createdAt time.Time
+	var updatedAt *time.Time
 	var statusStr string
+
 	err := r.pool.QueryRow(ctx, query, userID, string(user.StatusPending)).Scan(
-		&req.ID,
-		&req.UserID,
-		&req.Code,
+		&id,
+		&returnedUserID,
+		&code,
 		&statusStr,
-		&req.ExpiresAt,
-		&req.CreatedAt,
-		&req.UpdatedAt,
+		&expiresAt,
+		&createdAt,
+		&updatedAt,
 	)
 
 	if err != nil {
@@ -109,8 +115,8 @@ func (r *PasswordRecoveryRepository) FindPendingByUserID(ctx context.Context, us
 		return nil, fmt.Errorf("failed to find pending password recovery request: %w", err)
 	}
 
-	req.Status = user.RequestStatus(statusStr)
-	return &req, nil
+	req := user.RestorePasswordRecoveryRequest(id, returnedUserID, code, user.RequestStatus(statusStr), expiresAt, createdAt, updatedAt)
+	return req, nil
 }
 
 func (r *PasswordRecoveryRepository) InvalidatePendingByUserID(ctx context.Context, userID string, now time.Time) error {

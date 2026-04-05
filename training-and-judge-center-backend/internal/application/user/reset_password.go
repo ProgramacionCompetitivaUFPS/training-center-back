@@ -46,11 +46,11 @@ func (uc *ResetPasswordUseCase) Execute(ctx context.Context, input ResetPassword
 	if err != nil {
 		return apperror.NewInternal()
 	}
-	if foundUser == nil || foundUser.Status == user.StatusDeactivated {
+	if foundUser == nil || foundUser.Status() == user.StatusDeactivated {
 		return errInvalidRecoveryAttempt
 	}
 
-	req, err := uc.recoveryRepo.FindPendingByUserID(ctx, foundUser.ID)
+	req, err := uc.recoveryRepo.FindPendingByUserID(ctx, foundUser.ID())
 	if err != nil {
 		return apperror.NewInternal()
 	}
@@ -59,7 +59,7 @@ func (uc *ResetPasswordUseCase) Execute(ctx context.Context, input ResetPassword
 	}
 
 	now := time.Now()
-	if req.IsExpired(now) || req.Code != input.Code {
+	if req.IsExpired(now) || req.Code() != input.Code {
 		return errInvalidRecoveryAttempt
 	}
 
@@ -70,7 +70,7 @@ func (uc *ResetPasswordUseCase) Execute(ctx context.Context, input ResetPassword
 		})
 	}
 
-	if err := uc.sessionInvalidator.InvalidateAllUserSessions(ctx, foundUser.ID, now); err != nil {
+	if err := uc.sessionInvalidator.InvalidateAllUserSessions(ctx, foundUser.ID(), now); err != nil {
 		return apperror.NewInternal()
 	}
 

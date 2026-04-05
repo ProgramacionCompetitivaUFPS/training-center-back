@@ -47,7 +47,7 @@ func (uc *RequestEmailChangeUseCase) Execute(ctx context.Context, input RequestE
 		return apperror.NewUnauthorized("INVALID_CREDENTIALS", "Invalid credentials")
 	}
 
-	if !u.Password.Compare(input.Password) {
+	if !u.Password().Compare(input.Password) {
 		return apperror.NewUnauthorized("INVALID_CREDENTIALS", "Invalid credentials")
 	}
 
@@ -78,15 +78,7 @@ func (uc *RequestEmailChangeUseCase) Execute(ctx context.Context, input RequestE
 	now := time.Now()
 	expiresAt := now.Add(15 * time.Minute)
 
-	req := &user.EmailChangeRequest{
-		ID:        uuid.New().String(),
-		UserID:    input.UserID,
-		NewEmail:  parsedNewEmail,
-		Code:      code,
-		Status:    user.StatusPending,
-		ExpiresAt: expiresAt,
-		CreatedAt: now,
-	}
+	req := user.RestoreEmailChangeRequest(uuid.New().String(), input.UserID, parsedNewEmail, code, user.StatusPending, expiresAt, now, nil)
 
 	if err := uc.emailChangeRepo.Save(ctx, req); err != nil {
 		return apperror.NewInternal()

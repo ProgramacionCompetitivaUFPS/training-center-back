@@ -39,7 +39,7 @@ func (uc *UpdatePasswordUseCase) Execute(ctx context.Context, input UpdatePasswo
 		return apperror.NewNotFound("NOT_FOUND", "User not found")
 	}
 
-	if !foundUser.Password.Compare(input.CurrentPassword) {
+	if !foundUser.Password().Compare(input.CurrentPassword) {
 		return apperror.NewValidation([]apperror.FieldError{
 			{Field: "currentPassword", Message: "Current password is incorrect"},
 		})
@@ -52,7 +52,7 @@ func (uc *UpdatePasswordUseCase) Execute(ctx context.Context, input UpdatePasswo
 		})
 	}
 
-	if foundUser.Password.Compare(input.NewPassword) {
+	if foundUser.Password().Compare(input.NewPassword) {
 		return apperror.NewValidation([]apperror.FieldError{
 			{Field: "newPassword", Message: "New password must be different from current password"},
 		})
@@ -60,8 +60,8 @@ func (uc *UpdatePasswordUseCase) Execute(ctx context.Context, input UpdatePasswo
 
 	now := time.Now()
 
-	if err := uc.sessionInvalidator.InvalidateAllUserSessions(ctx, foundUser.ID, now); err != nil {
-		slog.Error("failed to invalidate sessions before password update", "user_id", foundUser.ID, "error", err)
+	if err := uc.sessionInvalidator.InvalidateAllUserSessions(ctx, foundUser.ID(), now); err != nil {
+		slog.Error("failed to invalidate sessions before password update", "user_id", foundUser.ID(), "error", err)
 		return apperror.NewInternal()
 	}
 
@@ -71,11 +71,11 @@ func (uc *UpdatePasswordUseCase) Execute(ctx context.Context, input UpdatePasswo
 	}
 
 	if err := uc.emailSender.Send(ctx, notification.EmailMessage{
-		To:      foundUser.Email.String(),
+		To:      foundUser.Email().String(),
 		Subject: "Security Alert: Password Changed",
 		Body:    "Your password has been changed successfully. If you did not make this change, please contact support immediately.",
 	}); err != nil {
-		slog.Error("failed to send password changed email", "user_id", foundUser.ID, "email", foundUser.Email.String(), "error", err)
+		slog.Error("failed to send password changed email", "user_id", foundUser.ID(), "email", foundUser.Email().String(), "error", err)
 	}
 
 	return nil

@@ -28,10 +28,10 @@ func NewService(secret string, expirationHours int) *Service {
 
 func (s *Service) GenerateToken(u *user.User) (string, error) {
 	claims := customClaims{
-		Email: u.Email.String(),
-		Role:  u.Role.String(),
+		Email: u.Email().String(),
+		Role:  u.Role().String(),
 		RegisteredClaims: jwt.RegisteredClaims{
-			Subject:   u.ID,
+			Subject:   u.ID(),
 			IssuedAt:  jwt.NewNumericDate(time.Now()),
 			ExpiresAt: jwt.NewNumericDate(time.Now().Add(s.expiration)),
 		},

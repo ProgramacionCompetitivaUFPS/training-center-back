@@ -14,22 +14,42 @@ const (
 )
 
 type PasswordRecoveryRequest struct {
-	ID        string
-	UserID    string
-	Code      string
-	Status    RequestStatus
-	ExpiresAt time.Time
-	CreatedAt time.Time
-	UpdatedAt *time.Time
+	id        string
+	userID    string
+	code      string
+	status    RequestStatus
+	expiresAt time.Time
+	createdAt time.Time
+	updatedAt *time.Time
 }
 
+func RestorePasswordRecoveryRequest(id, userID, code string, status RequestStatus, expiresAt, createdAt time.Time, updatedAt *time.Time) *PasswordRecoveryRequest {
+	return &PasswordRecoveryRequest{
+		id:        id,
+		userID:    userID,
+		code:      code,
+		status:    status,
+		expiresAt: expiresAt,
+		createdAt: createdAt,
+		updatedAt: updatedAt,
+	}
+}
+
+func (r *PasswordRecoveryRequest) ID() string            { return r.id }
+func (r *PasswordRecoveryRequest) UserID() string        { return r.userID }
+func (r *PasswordRecoveryRequest) Code() string          { return r.code }
+func (r *PasswordRecoveryRequest) Status() RequestStatus { return r.status }
+func (r *PasswordRecoveryRequest) ExpiresAt() time.Time  { return r.expiresAt }
+func (r *PasswordRecoveryRequest) CreatedAt() time.Time  { return r.createdAt }
+func (r *PasswordRecoveryRequest) UpdatedAt() *time.Time { return r.updatedAt }
+
 func (r *PasswordRecoveryRequest) IsExpired(now time.Time) bool {
-	return now.After(r.ExpiresAt) || r.Status == StatusExpired
+	return now.After(r.expiresAt) || r.status == StatusExpired
 }
 
 func (r *PasswordRecoveryRequest) MarkAsUsed(now time.Time) {
-	r.Status = StatusUsed
-	r.UpdatedAt = &now
+	r.status = StatusUsed
+	r.updatedAt = &now
 }
 
 type PasswordRecoveryRepository interface {

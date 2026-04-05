@@ -103,20 +103,25 @@ func newNoConflictRepo() *mockUserRepository {
 }
 
 func newUserWithRole(id string, role domain.Role, status domain.Status) *domain.User {
-	email, _ := domain.NewEmail(id + "@example.com")
-	nickname, _ := domain.NewNickname(id)
-	u := &domain.User{
-		ID:        id,
-		Email:     &email,
-		Nickname:  nickname,
-		Name:      "User " + id,
-		Role:      role,
-		Status:    status,
-		CreatedAt: time.Now(),
-	}
 	p, _ := domain.NewPassword("Secret1!")
-	u.Password = p
-	return u
+	emailStr := id + "@example.com"
+	nicknameStr := id
+
+	return domain.RestoreUser(
+		id,
+		&emailStr,
+		p.Hash(),
+		"User "+id,
+		nicknameStr,
+		"",
+		"",
+		"",
+		role.String(),
+		status.String(),
+		time.Now(),
+		nil,
+		nil,
+	)
 }
 
 type mockEmailChangeRepo struct {

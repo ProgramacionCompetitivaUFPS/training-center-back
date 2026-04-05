@@ -38,19 +38,19 @@ func TestAdminUpdateUser_Success_AllFields(t *testing.T) {
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
-	if result.Name != "Updated Name" {
-		t.Errorf("expected name %q, got %q", "Updated Name", result.Name)
+	if result.Name() != "Updated Name" {
+		t.Errorf("expected name %q, got %q", "Updated Name", result.Name())
 	}
-	if result.Nickname.String() != "updatednick" {
-		t.Errorf("expected nickname %q, got %q", "updatednick", result.Nickname.String())
+	if result.Nickname().String() != "updatednick" {
+		t.Errorf("expected nickname %q, got %q", "updatednick", result.Nickname().String())
 	}
-	if result.Email.String() != "updated@example.com" {
-		t.Errorf("expected email %q, got %q", "updated@example.com", result.Email.String())
+	if result.Email().String() != "updated@example.com" {
+		t.Errorf("expected email %q, got %q", "updated@example.com", result.Email().String())
 	}
-	if result.Role.String() != "COACH" {
-		t.Errorf("expected role %q, got %q", "COACH", result.Role.String())
+	if result.Role().String() != "COACH" {
+		t.Errorf("expected role %q, got %q", "COACH", result.Role().String())
 	}
-	if result.UpdatedAt == nil {
+	if result.UpdatedAt() == nil {
 		t.Error("expected updatedAt to be set")
 	}
 }
@@ -71,11 +71,11 @@ func TestAdminUpdateUser_Success_PartialUpdate(t *testing.T) {
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
-	if result.Name != "Only Name" {
-		t.Errorf("expected name %q, got %q", "Only Name", result.Name)
+	if result.Name() != "Only Name" {
+		t.Errorf("expected name %q, got %q", "Only Name", result.Name())
 	}
-	if result.Role.String() != "CONTESTANT" {
-		t.Errorf("expected role unchanged, got %q", result.Role.String())
+	if result.Role().String() != "CONTESTANT" {
+		t.Errorf("expected role unchanged, got %q", result.Role().String())
 	}
 }
 

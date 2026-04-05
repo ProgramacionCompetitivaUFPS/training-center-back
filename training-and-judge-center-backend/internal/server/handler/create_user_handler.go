@@ -53,17 +53,17 @@ func (h *UserHandler) Create(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var emailStr string
-	if result.Email != nil {
-		emailStr = result.Email.String()
+	if result.Email() != nil {
+		emailStr = result.Email().String()
 	}
 	respondJSON(w, http.StatusCreated, createUserResponse{
 		Email:       emailStr,
-		Name:        result.Name,
-		Nickname:    result.Nickname.String(),
-		Country:     result.Country,
-		City:        result.City,
-		Institution: result.Institution,
-		Role:        result.Role.String(),
-		CreatedAt:   result.CreatedAt.Format("2006-01-02T15:04:05Z"),
+		Name:        result.Name(),
+		Nickname:    result.Nickname().String(),
+		Country:     result.Country(),
+		City:        result.City(),
+		Institution: result.Institution(),
+		Role:        result.Role().String(),
+		CreatedAt:   result.CreatedAt().Format("2006-01-02T15:04:05Z"),
 	})
 }
