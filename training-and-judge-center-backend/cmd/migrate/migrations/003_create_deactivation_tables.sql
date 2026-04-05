@@ -1,3 +1,4 @@
+-- +goose Up
 CREATE TABLE IF NOT EXISTS deactivation_requests (
     id UUID PRIMARY KEY,
     user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -19,3 +20,7 @@ CREATE TABLE IF NOT EXISTS deactivation_audit_logs (
     ip VARCHAR(45),
     user_agent TEXT
 );
+
+-- +goose Down
+DROP TABLE IF EXISTS deactivation_audit_logs;
+DROP TABLE IF EXISTS deactivation_requests;
