@@ -17,6 +17,7 @@ func TestNewNickname_Valid(t *testing.T) {
 		{"with underscore", "john_doe", "john_doe"},
 		{"alphanumeric mix", "user42", "user42"},
 		{"hyphen and underscore combined", "j_o-h_n", "j_o-h_n"},
+		{"numeric only", "123", "123"},
 	}
 
 	for _, tt := range tests {
@@ -49,6 +50,7 @@ func TestNewNickname_Invalid(t *testing.T) {
 		{"unicode symbol", "niño"},
 		{"at sign", "nick@name"},
 		{"dot", "nick.name"},
+		{"with slash", "ab/cd"},
 	}
 
 	for _, tt := range tests {
