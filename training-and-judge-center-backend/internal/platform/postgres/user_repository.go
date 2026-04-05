@@ -194,6 +194,13 @@ func (r *UserRepository) FindByNickname(ctx context.Context, nickname user.Nickn
 	return u, nil
 }
 
+func escapeILIKE(s string) string {
+	s = strings.ReplaceAll(s, `\`, `\\`)
+	s = strings.ReplaceAll(s, `%`, `\%`)
+	s = strings.ReplaceAll(s, `_`, `\_`)
+	return s
+}
+
 var sortColumnMap = map[user.SortField]string{
 	user.SortByCreatedAt:     "created_at",
 	user.SortByName:          "name",
@@ -248,7 +255,7 @@ func (r *UserRepository) FindAll(ctx context.Context, filter user.UserFilter) ([
 
 	// Text search
 	if filter.SearchTerm != "" {
-		searchPattern := "%" + filter.SearchTerm + "%"
+		searchPattern := "%" + escapeILIKE(filter.SearchTerm) + "%"
 		switch filter.SearchField {
 		case user.SearchByName:
 			conditions = append(conditions, fmt.Sprintf("name ILIKE $%d", n))
