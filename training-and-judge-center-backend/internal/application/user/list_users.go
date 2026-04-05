@@ -41,7 +41,6 @@ func (uc *ListUsersUseCase) Execute(ctx context.Context, input ListUsersInput) (
 	var filter user.UserFilter
 	var fieldErrors []apperror.FieldError
 
-	// Validate and parse roles
 	for _, r := range input.Roles {
 		role, err := user.NewRole(strings.TrimSpace(r))
 		if err != nil {
@@ -54,7 +53,6 @@ func (uc *ListUsersUseCase) Execute(ctx context.Context, input ListUsersInput) (
 		filter.Roles = append(filter.Roles, role)
 	}
 
-	// Validate status
 	if input.Status != "" {
 		s, err := user.NewStatus(input.Status)
 		if err != nil {
@@ -67,36 +65,36 @@ func (uc *ListUsersUseCase) Execute(ctx context.Context, input ListUsersInput) (
 		}
 	}
 
-	// Validate sort
-	sort := input.Sort
-	if sort == "" {
-		sort = "createdAt"
+	sortRaw := input.Sort
+	if sortRaw == "" {
+		sortRaw = string(user.SortByCreatedAt)
 	}
-	if !user.ValidSortFields[sort] {
+	sortField, err := user.NewSortField(sortRaw)
+	if err != nil {
 		fieldErrors = append(fieldErrors, apperror.FieldError{
 			Field:   "sort",
 			Message: "Sort field must be one of: createdAt, name, nickname, email, deactivatedAt",
 		})
 	}
 
-	// Validate order
-	order := strings.ToLower(input.Order)
-	if order == "" {
-		order = "desc"
+	orderRaw := input.Order
+	if orderRaw == "" {
+		orderRaw = string(user.SortOrderDesc)
 	}
-	if order != "asc" && order != "desc" {
+	sortOrder, err := user.NewSortOrder(orderRaw)
+	if err != nil {
 		fieldErrors = append(fieldErrors, apperror.FieldError{
 			Field:   "order",
 			Message: "Sort order must be: asc or desc",
 		})
 	}
 
-	// Validate searchField
-	searchField := input.SearchField
-	if searchField == "" {
-		searchField = "all"
+	searchFieldRaw := input.SearchField
+	if searchFieldRaw == "" {
+		searchFieldRaw = string(user.SearchByAll)
 	}
-	if !user.ValidSearchFields[searchField] {
+	searchField, err := user.NewSearchField(searchFieldRaw)
+	if err != nil {
 		fieldErrors = append(fieldErrors, apperror.FieldError{
 			Field:   "searchField",
 			Message: "Search field must be one of: name, nickname, email, institution, all",
@@ -107,7 +105,6 @@ func (uc *ListUsersUseCase) Execute(ctx context.Context, input ListUsersInput) (
 		return nil, apperror.NewValidation(fieldErrors)
 	}
 
-	// Apply defaults and caps
 	page := input.Page
 	if page < 1 {
 		page = 1
@@ -125,8 +122,8 @@ func (uc *ListUsersUseCase) Execute(ctx context.Context, input ListUsersInput) (
 	filter.Institution = input.Institution
 	filter.SearchField = searchField
 	filter.SearchTerm = input.SearchTerm
-	filter.Sort = sort
-	filter.Order = order
+	filter.Sort = sortField
+	filter.Order = sortOrder
 	filter.Page = page
 	filter.Limit = limit
 

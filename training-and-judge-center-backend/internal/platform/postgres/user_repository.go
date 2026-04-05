@@ -193,14 +193,12 @@ func (r *UserRepository) FindByNickname(ctx context.Context, nickname user.Nickn
 	return u, nil
 }
 
-// sortColumnMap maps domain sort field names to safe SQL column names.
-// This whitelist is the protection against SQL injection in ORDER BY.
-var sortColumnMap = map[string]string{
-	"createdAt":     "created_at",
-	"name":          "name",
-	"nickname":      "nickname",
-	"email":         "email",
-	"deactivatedAt": "deactivated_at",
+var sortColumnMap = map[user.SortField]string{
+	user.SortByCreatedAt:     "created_at",
+	user.SortByName:          "name",
+	user.SortByNickname:      "nickname",
+	user.SortByEmail:         "email",
+	user.SortByDeactivatedAt: "deactivated_at",
 }
 
 func (r *UserRepository) FindAll(ctx context.Context, filter user.UserFilter) ([]*user.User, int, error) {
@@ -251,23 +249,23 @@ func (r *UserRepository) FindAll(ctx context.Context, filter user.UserFilter) ([
 	if filter.SearchTerm != "" {
 		searchPattern := "%" + filter.SearchTerm + "%"
 		switch filter.SearchField {
-		case "name":
+		case user.SearchByName:
 			conditions = append(conditions, fmt.Sprintf("name ILIKE $%d", n))
 			args = append(args, searchPattern)
 			n++
-		case "nickname":
+		case user.SearchByNickname:
 			conditions = append(conditions, fmt.Sprintf("nickname ILIKE $%d", n))
 			args = append(args, searchPattern)
 			n++
-		case "email":
+		case user.SearchByEmail:
 			conditions = append(conditions, fmt.Sprintf("email ILIKE $%d", n))
 			args = append(args, searchPattern)
 			n++
-		case "institution":
+		case user.SearchByInstitution:
 			conditions = append(conditions, fmt.Sprintf("institution ILIKE $%d", n))
 			args = append(args, searchPattern)
 			n++
-		default: // "all"
+		default: // SearchByAll
 			conditions = append(conditions, fmt.Sprintf(
 				"(name ILIKE $%d OR nickname ILIKE $%d OR email ILIKE $%d OR institution ILIKE $%d)",
 				n, n, n, n,
@@ -288,7 +286,7 @@ func (r *UserRepository) FindAll(ctx context.Context, filter user.UserFilter) ([
 		colName = "created_at"
 	}
 	order := "DESC"
-	if filter.Order == "asc" {
+	if filter.Order == user.SortOrderAsc {
 		order = "ASC"
 	}
 	orderClause := fmt.Sprintf("ORDER BY %s %s NULLS LAST", colName, order)
