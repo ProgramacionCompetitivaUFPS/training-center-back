@@ -2,6 +2,7 @@ package problem
 
 import (
 	"context"
+	"log/slog"
 
 	"github.com/training-judge-center/backend/internal/domain/problem"
 	"github.com/training-judge-center/backend/internal/domain/user"
@@ -13,12 +14,6 @@ type UnpublishProblemInput struct {
 	CurrentUser user.CurrentUser
 }
 
-type UnpublishProblemOutput struct {
-	Slug    string
-	Status  string
-	Message string
-}
-
 type UnpublishProblemUseCase struct {
 	repo problem.Repository
 }
@@ -27,7 +22,7 @@ func NewUnpublishProblemUseCase(repo problem.Repository) *UnpublishProblemUseCas
 	return &UnpublishProblemUseCase{repo: repo}
 }
 
-func (uc *UnpublishProblemUseCase) Execute(ctx context.Context, in UnpublishProblemInput) (*UnpublishProblemOutput, error) {
+func (uc *UnpublishProblemUseCase) Execute(ctx context.Context, in UnpublishProblemInput) (*problem.Problem, error) {
 	slug, err := problem.NewSlug(in.Slug)
 	if err != nil {
 		return nil, err
@@ -49,12 +44,9 @@ func (uc *UnpublishProblemUseCase) Execute(ctx context.Context, in UnpublishProb
 	}
 
 	if err := uc.repo.Save(ctx, p); err != nil {
-		return nil, err
+		slog.ErrorContext(ctx, "failed to save problem after unpublish", "error", err, "slug", p.Slug.String())
+		return nil, apperror.NewInternal()
 	}
 
-	return &UnpublishProblemOutput{
-		Slug:    p.Slug.String(),
-		Status:  p.Status.String(),
-		Message: "Problem unpublished successfully. You can now make changes.",
-	}, nil
+	return p, nil
 }

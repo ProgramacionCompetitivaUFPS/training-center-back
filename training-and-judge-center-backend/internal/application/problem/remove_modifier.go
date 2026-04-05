@@ -41,7 +41,12 @@ func (uc *RemoveModifierUseCase) Execute(ctx context.Context, input RemoveModifi
 		return struct{}{}, apperror.NewForbidden(apperror.ErrCodeForbidden, "Only the author or Admin can remove modifiers")
 	}
 
-	if err := p.RemoveModifier(problem.RestoreUserID(input.UserID)); err != nil {
+	modifierID, err := problem.NewUserID(input.UserID)
+	if err != nil {
+		return struct{}{}, err
+	}
+
+	if err := p.RemoveModifier(modifierID); err != nil {
 		return struct{}{}, err
 	}
 

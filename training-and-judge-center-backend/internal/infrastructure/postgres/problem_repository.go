@@ -367,7 +367,7 @@ func (r *ProblemRepository) List(ctx context.Context, filters problem.ListFilter
 	if filters.ViewerModifierID != nil {
 		p := nextArg(*filters.ViewerModifierID)
 		conds = append(conds, fmt.Sprintf(
-			"(status = 'PUBLISHED' OR author_id = %s OR %s = ANY(modifiers_ids))",
+			"((status = 'PUBLISHED' AND accessibility = 'PUBLIC') OR author_id = %s OR %s = ANY(modifiers_ids))",
 			p, p,
 		))
 	}
@@ -384,7 +384,10 @@ func (r *ProblemRepository) List(ctx context.Context, filters problem.ListFilter
 		conds = append(conds, fmt.Sprintf("accessibility = %s", nextArg(*filters.Accessibility)))
 	}
 
-	where := "WHERE " + strings.Join(conds, " AND ")
+	var where string
+	if len(conds) > 0 {
+		where = "WHERE " + strings.Join(conds, " AND ")
+	}
 
 	countArgs := make([]any, len(args))
 	copy(countArgs, args)

@@ -2,6 +2,7 @@ package config
 
 import (
 	"encoding/json"
+	"log/slog"
 	"os"
 )
 
@@ -35,6 +36,7 @@ func loadVirtualObject() *VirtualObject {
 
 	var vo VirtualObject
 	if err := json.Unmarshal(data, &vo); err != nil {
+		slog.Error("failed to parse virtual object config", "path", path, "error", err)
 		return nil
 	}
 

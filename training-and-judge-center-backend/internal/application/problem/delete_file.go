@@ -109,21 +109,21 @@ func (usecase *DeleteProblemFileUseCase) Execute(ctx context.Context, input Dele
 		return struct{}{}, apperror.NewBadRequest(ErrCodeProblemInvalidFileType, "Invalid file type. Allowed: testCases, solution, checker, validator")
 	}
 
-	if err := usecase.repo.Save(ctx, foundProblem); err != nil {
-		slog.ErrorContext(ctx, "failed to save problem after file deletion", "error", err, "slug", foundProblem.Slug.String())
-		return struct{}{}, apperror.NewInternal()
-	}
-
 	if deleteByPrefix {
 		if err := usecase.fileStorage.DeleteFilesWithPrefix(ctx, storageKeyToDelete); err != nil {
-			slog.ErrorContext(ctx, "file reference removed from DB but storage prefix deletion failed (orphaned files)", "prefix", storageKeyToDelete, "error", err)
+			slog.ErrorContext(ctx, "failed to delete files from storage", "prefix", storageKeyToDelete, "error", err)
 			return struct{}{}, apperror.NewInternal()
 		}
 	} else {
 		if err := usecase.fileStorage.DeleteFile(ctx, storageKeyToDelete); err != nil {
-			slog.ErrorContext(ctx, "file reference removed from DB but storage deletion failed (orphaned file)", "key", storageKeyToDelete, "error", err)
+			slog.ErrorContext(ctx, "failed to delete file from storage", "key", storageKeyToDelete, "error", err)
 			return struct{}{}, apperror.NewInternal()
 		}
+	}
+
+	if err := usecase.repo.Save(ctx, foundProblem); err != nil {
+		slog.ErrorContext(ctx, "failed to save problem after file deletion", "error", err, "slug", foundProblem.Slug.String())
+		return struct{}{}, apperror.NewInternal()
 	}
 
 	return struct{}{}, nil

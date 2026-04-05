@@ -37,7 +37,7 @@ func (h *Handler) AddModifier(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	w.WriteHeader(http.StatusOK)
+	w.WriteHeader(http.StatusNoContent)
 }
 
 func (h *Handler) RemoveModifier(w http.ResponseWriter, r *http.Request) {
@@ -65,7 +65,7 @@ func (h *Handler) RemoveModifier(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	w.WriteHeader(http.StatusOK)
+	w.WriteHeader(http.StatusNoContent)
 }
 
 func (h *Handler) ListModifiers(w http.ResponseWriter, r *http.Request) {
@@ -81,7 +81,10 @@ func (h *Handler) ListModifiers(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	modifiers, err := h.listModifiersUC.Execute(r.Context(), slug, *currentUser)
+	modifiers, err := h.listModifiersUC.Execute(r.Context(), appProblem.ListModifiersInput{
+		Slug:        slug,
+		CurrentUser: *currentUser,
+	})
 	if err != nil {
 		handler.WriteError(w, err)
 		return

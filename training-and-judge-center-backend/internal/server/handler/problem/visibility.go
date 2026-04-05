@@ -2,6 +2,7 @@ package problem
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 
 	appProblem "github.com/training-judge-center/backend/internal/application/problem"
@@ -36,7 +37,7 @@ func (h *Handler) Unpublish(w http.ResponseWriter, r *http.Request) {
 
 	slug := r.PathValue("slug")
 
-	out, err := h.unpublishUC.Execute(r.Context(), appProblem.UnpublishProblemInput{
+	p, err := h.unpublishUC.Execute(r.Context(), appProblem.UnpublishProblemInput{
 		Slug:        slug,
 		CurrentUser: *currentUser,
 	})
@@ -46,9 +47,9 @@ func (h *Handler) Unpublish(w http.ResponseWriter, r *http.Request) {
 	}
 
 	handler.WriteJSON(w, http.StatusOK, unpublishResponse{
-		Slug:    out.Slug,
-		Status:  out.Status,
-		Message: out.Message,
+		Slug:    p.Slug.String(),
+		Status:  p.Status.String(),
+		Message: "Problem unpublished successfully. You can now make changes.",
 	})
 }
 
@@ -67,7 +68,7 @@ func (h *Handler) ChangeAccessibility(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	out, err := h.changeAccessibilityUC.Execute(r.Context(), appProblem.ChangeAccessibilityInput{
+	p, err := h.changeAccessibilityUC.Execute(r.Context(), appProblem.ChangeAccessibilityInput{
 		Slug:          slug,
 		Accessibility: req.Accessibility,
 		CurrentUser:   *currentUser,
@@ -78,9 +79,9 @@ func (h *Handler) ChangeAccessibility(w http.ResponseWriter, r *http.Request) {
 	}
 
 	handler.WriteJSON(w, http.StatusOK, changeAccessibilityResponse{
-		Slug:          out.Slug,
-		Accessibility: out.Accessibility,
-		Status:        out.Status,
-		Message:       out.Message,
+		Slug:          p.Slug.String(),
+		Accessibility: p.Accessibility.String(),
+		Status:        p.Status.String(),
+		Message:       fmt.Sprintf("Problem accessibility changed to %s", p.Accessibility.String()),
 	})
 }

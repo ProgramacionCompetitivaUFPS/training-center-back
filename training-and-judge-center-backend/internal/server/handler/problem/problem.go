@@ -5,7 +5,6 @@ import (
 
 	appProblem "github.com/training-judge-center/backend/internal/application/problem"
 	domainProblem "github.com/training-judge-center/backend/internal/domain/problem"
-	"github.com/training-judge-center/backend/internal/domain/user"
 )
 
 type createProblemUC interface {
@@ -37,7 +36,7 @@ type removeModifierUC interface {
 }
 
 type listModifiersUC interface {
-	Execute(ctx context.Context, slugStr string, currentUser user.CurrentUser) ([]string, error)
+	Execute(ctx context.Context, input appProblem.ListModifiersInput) ([]string, error)
 }
 
 type getProblemUC interface {
@@ -49,11 +48,11 @@ type listProblemsUC interface {
 }
 
 type unpublishProblemUC interface {
-	Execute(ctx context.Context, in appProblem.UnpublishProblemInput) (*appProblem.UnpublishProblemOutput, error)
+	Execute(ctx context.Context, in appProblem.UnpublishProblemInput) (*domainProblem.Problem, error)
 }
 
 type changeAccessibilityProblemUC interface {
-	Execute(ctx context.Context, in appProblem.ChangeAccessibilityInput) (*appProblem.ChangeAccessibilityOutput, error)
+	Execute(ctx context.Context, in appProblem.ChangeAccessibilityInput) (*domainProblem.Problem, error)
 }
 
 type deleteProblemUC interface {

@@ -55,7 +55,12 @@ func (uc *AddModifierUseCase) Execute(ctx context.Context, input AddModifierInpu
 		return struct{}{}, apperror.NewNotFound("USER_NOT_FOUND", "User not found")
 	}
 
-	if err := p.AddModifier(problem.RestoreUserID(input.UserID)); err != nil {
+	modifierID, err := problem.NewUserID(input.UserID)
+	if err != nil {
+		return struct{}{}, err
+	}
+
+	if err := p.AddModifier(modifierID); err != nil {
 		return struct{}{}, err
 	}
 

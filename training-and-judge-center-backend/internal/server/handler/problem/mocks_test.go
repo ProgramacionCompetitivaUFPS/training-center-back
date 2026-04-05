@@ -80,10 +80,10 @@ func (m *mockListProblemsUC) Execute(ctx context.Context, in appProblem.ListProb
 }
 
 type mockUnpublishUC struct {
-	fn func(context.Context, appProblem.UnpublishProblemInput) (*appProblem.UnpublishProblemOutput, error)
+	fn func(context.Context, appProblem.UnpublishProblemInput) (*domainProblem.Problem, error)
 }
 
-func (m *mockUnpublishUC) Execute(ctx context.Context, in appProblem.UnpublishProblemInput) (*appProblem.UnpublishProblemOutput, error) {
+func (m *mockUnpublishUC) Execute(ctx context.Context, in appProblem.UnpublishProblemInput) (*domainProblem.Problem, error) {
 	if m.fn == nil {
 		panic("mockUnpublishUC.Execute called unexpectedly")
 	}
@@ -91,10 +91,10 @@ func (m *mockUnpublishUC) Execute(ctx context.Context, in appProblem.UnpublishPr
 }
 
 type mockChangeAccessibilityUC struct {
-	fn func(context.Context, appProblem.ChangeAccessibilityInput) (*appProblem.ChangeAccessibilityOutput, error)
+	fn func(context.Context, appProblem.ChangeAccessibilityInput) (*domainProblem.Problem, error)
 }
 
-func (m *mockChangeAccessibilityUC) Execute(ctx context.Context, in appProblem.ChangeAccessibilityInput) (*appProblem.ChangeAccessibilityOutput, error) {
+func (m *mockChangeAccessibilityUC) Execute(ctx context.Context, in appProblem.ChangeAccessibilityInput) (*domainProblem.Problem, error) {
 	if m.fn == nil {
 		panic("mockChangeAccessibilityUC.Execute called unexpectedly")
 	}
@@ -128,7 +128,7 @@ func (n *noopRemoveModifierUC) Execute(ctx context.Context, in appProblem.Remove
 
 type noopListModifiersUC struct{}
 
-func (n *noopListModifiersUC) Execute(ctx context.Context, slugStr string, cu user.CurrentUser) ([]string, error) {
+func (n *noopListModifiersUC) Execute(ctx context.Context, input appProblem.ListModifiersInput) ([]string, error) {
 	panic("noopListModifiersUC.Execute called unexpectedly")
 }
 

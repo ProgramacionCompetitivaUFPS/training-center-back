@@ -2,7 +2,7 @@ package problem
 
 import (
 	"context"
-	"fmt"
+	"log/slog"
 
 	"github.com/training-judge-center/backend/internal/domain/problem"
 	"github.com/training-judge-center/backend/internal/domain/user"
@@ -15,13 +15,6 @@ type ChangeAccessibilityInput struct {
 	CurrentUser   user.CurrentUser
 }
 
-type ChangeAccessibilityOutput struct {
-	Slug          string
-	Accessibility string
-	Status        string
-	Message       string
-}
-
 type ChangeAccessibilityUseCase struct {
 	repo problem.Repository
 }
@@ -30,7 +23,7 @@ func NewChangeAccessibilityUseCase(repo problem.Repository) *ChangeAccessibility
 	return &ChangeAccessibilityUseCase{repo: repo}
 }
 
-func (uc *ChangeAccessibilityUseCase) Execute(ctx context.Context, in ChangeAccessibilityInput) (*ChangeAccessibilityOutput, error) {
+func (uc *ChangeAccessibilityUseCase) Execute(ctx context.Context, in ChangeAccessibilityInput) (*problem.Problem, error) {
 	newAcc, err := problem.NewAccessibility(in.Accessibility)
 	if err != nil {
 		return nil, err
@@ -55,13 +48,9 @@ func (uc *ChangeAccessibilityUseCase) Execute(ctx context.Context, in ChangeAcce
 	p.UpdateAccessibility(newAcc)
 
 	if err := uc.repo.Save(ctx, p); err != nil {
-		return nil, err
+		slog.ErrorContext(ctx, "failed to save problem after accessibility change", "error", err, "slug", p.Slug.String())
+		return nil, apperror.NewInternal()
 	}
 
-	return &ChangeAccessibilityOutput{
-		Slug:          p.Slug.String(),
-		Accessibility: p.Accessibility.String(),
-		Status:        p.Status.String(),
-		Message:       fmt.Sprintf("Problem accessibility changed to %s", p.Accessibility.String()),
-	}, nil
+	return p, nil
 }

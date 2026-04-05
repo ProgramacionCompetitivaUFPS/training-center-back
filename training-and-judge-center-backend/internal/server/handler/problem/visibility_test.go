@@ -6,8 +6,10 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 
 	appProblem "github.com/training-judge-center/backend/internal/application/problem"
+	domainProblem "github.com/training-judge-center/backend/internal/domain/problem"
 	"github.com/training-judge-center/backend/pkg/apperror"
 )
 
@@ -27,7 +29,7 @@ func TestUnpublish_NoUser_Returns401(t *testing.T) {
 
 func TestUnpublish_NotFound_Returns404(t *testing.T) {
 	uc := &mockUnpublishUC{
-		fn: func(_ context.Context, _ appProblem.UnpublishProblemInput) (*appProblem.UnpublishProblemOutput, error) {
+		fn: func(_ context.Context, _ appProblem.UnpublishProblemInput) (*domainProblem.Problem, error) {
 			return nil, apperror.NewNotFound(apperror.ErrCodeNotFound, "problem not found")
 		},
 	}
@@ -46,13 +48,16 @@ func TestUnpublish_NotFound_Returns404(t *testing.T) {
 }
 
 func TestUnpublish_HappyPath_Returns200(t *testing.T) {
+	now := time.Now()
 	uc := &mockUnpublishUC{
-		fn: func(_ context.Context, _ appProblem.UnpublishProblemInput) (*appProblem.UnpublishProblemOutput, error) {
-			return &appProblem.UnpublishProblemOutput{
-				Slug:    "my-problem",
-				Status:  "DRAFT",
-				Message: "Problem unpublished successfully",
-			}, nil
+		fn: func(_ context.Context, _ appProblem.UnpublishProblemInput) (*domainProblem.Problem, error) {
+			return domainProblem.RestoreProblem(
+				"test-id", "my-problem", "My Problem",
+				nil, nil, nil, []string{}, "DRAFT", "PRIVATE",
+				domainProblem.RestoreUserID("author-id"),
+				nil, nil, nil, nil, nil, nil, nil,
+				now, now,
+			), nil
 		},
 	}
 	h := newTestHandler(nil, nil, nil, nil, nil, nil, uc, nil)
@@ -102,14 +107,16 @@ func TestChangeAccessibility_InvalidBody_Returns400(t *testing.T) {
 }
 
 func TestChangeAccessibility_HappyPath_Returns200(t *testing.T) {
+	now := time.Now()
 	uc := &mockChangeAccessibilityUC{
-		fn: func(_ context.Context, _ appProblem.ChangeAccessibilityInput) (*appProblem.ChangeAccessibilityOutput, error) {
-			return &appProblem.ChangeAccessibilityOutput{
-				Slug:          "my-problem",
-				Accessibility: "PUBLIC",
-				Status:        "DRAFT",
-				Message:       "Accessibility updated",
-			}, nil
+		fn: func(_ context.Context, _ appProblem.ChangeAccessibilityInput) (*domainProblem.Problem, error) {
+			return domainProblem.RestoreProblem(
+				"test-id", "my-problem", "My Problem",
+				nil, nil, nil, []string{}, "DRAFT", "PUBLIC",
+				domainProblem.RestoreUserID("author-id"),
+				nil, nil, nil, nil, nil, nil, nil,
+				now, now,
+			), nil
 		},
 	}
 	h := newTestHandler(nil, nil, nil, nil, nil, nil, nil, uc)
