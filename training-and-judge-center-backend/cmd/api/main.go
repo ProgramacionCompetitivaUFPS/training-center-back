@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"net/http"
 	"os"
+	"time"
 
 	appuser "github.com/training-judge-center/backend/internal/application/user"
 	"github.com/training-judge-center/backend/internal/config"
@@ -58,7 +59,7 @@ func main() {
 	jwtService := jwtplatform.NewService(cfg.JWTSecret, cfg.JWTExpirationHours)
 	emailSender := email.NewSMTPSender(cfg.SMTPHost, cfg.SMTPPort, cfg.SMTPUser, cfg.SMTPPassword, cfg.SMTPFrom)
 	redisRateLimiter := ratelimit.NewRedisRateLimiter(redisClient)
-	sessionInvalidator := redisplatform.NewSessionInvalidator(redisClient)
+	sessionInvalidator := redisplatform.NewSessionInvalidator(redisClient, time.Duration(cfg.JWTExpirationHours)*time.Hour)
 
 	// Use Cases
 	createUserUC := appuser.NewCreateUserUseCase(userRepo)
