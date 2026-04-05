@@ -126,7 +126,9 @@ func (uc *ConfirmDeactivationUseCase) Execute(ctx context.Context, input Confirm
 
 	// Audit Log
 	auditLog := user.RestoreDeactivationAuditLog(uuid.NewString(), foundUser.ID(), originalEmailStr, originalNicknameStr, now, input.IP, input.UserAgent)
-	_ = uc.auditRepo.Save(ctx, auditLog) // fail-safe (ignore error if it fails instead of reverting user)
+	if err := uc.auditRepo.Save(ctx, auditLog); err != nil {
+		slog.Error("failed to save deactivation audit log", "user_id", foundUser.ID(), "error", err)
+	}
 
 	// Send final email
 	if originalEmailStr != "" {
