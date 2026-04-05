@@ -99,7 +99,9 @@ func (uc *ConfirmDeactivationUseCase) Execute(ctx context.Context, input Confirm
 	}
 	originalNicknameStr := foundUser.Nickname().String()
 
-	foundUser.Deactivate() // Applies StatusDeactivated, Email=nil, Anon Nickname, timestamps
+	if err := foundUser.Deactivate(); err != nil {
+		return apperror.NewInternal()
+	} // Applies StatusDeactivated, Email=nil, Anon Nickname, timestamps
 
 	if err := uc.userRepo.Update(ctx, foundUser); err != nil {
 		return apperror.NewInternal()

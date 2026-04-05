@@ -123,7 +123,10 @@ func (u *User) UpdateEmail(newEmail Email) {
 	u.updatedAt = &now
 }
 
-func (u *User) Deactivate() {
+func (u *User) Deactivate() error {
+	if u.status == StatusDeactivated {
+		return fmt.Errorf("user is already deactivated")
+	}
 	anonymousNickname, _ := NewNickname("user_anonimo_" + uuid.New().String()[:10])
 	now := time.Now()
 	u.nickname = anonymousNickname
@@ -131,6 +134,7 @@ func (u *User) Deactivate() {
 	u.status = StatusDeactivated
 	u.deactivatedAt = &now
 	u.updatedAt = &now
+	return nil
 }
 
 func RestoreUser(

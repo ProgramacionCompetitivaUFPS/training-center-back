@@ -48,7 +48,9 @@ func (uc *AdminDeactivateUserUseCase) Execute(ctx context.Context, input AdminDe
 		return nil
 	}
 
-	foundUser.Deactivate()
+	if err := foundUser.Deactivate(); err != nil {
+		return apperror.NewInternal()
+	}
 
 	if err := uc.repo.Update(ctx, foundUser); err != nil {
 		return apperror.NewInternal()
