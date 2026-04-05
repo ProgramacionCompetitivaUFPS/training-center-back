@@ -13,6 +13,10 @@ func TestNewNickname_Valid(t *testing.T) {
 		{"with spaces trimmed", "  john  ", "john"},
 		{"min length 3", "abc", "abc"},
 		{"max length 30", "abcdefghijklmnopqrstuvwxyzabcd", "abcdefghijklmnopqrstuvwxyzabcd"},
+		{"with hyphen", "john-doe", "john-doe"},
+		{"with underscore", "john_doe", "john_doe"},
+		{"alphanumeric mix", "user42", "user42"},
+		{"hyphen and underscore combined", "j_o-h_n", "j_o-h_n"},
 	}
 
 	for _, tt := range tests {
@@ -37,6 +41,14 @@ func TestNewNickname_Invalid(t *testing.T) {
 		{"only spaces", "   "},
 		{"too short (2 chars)", "ab"},
 		{"too long (31 chars)", "abcdefghijklmnopqrstuvwxyzabcde"},
+		{"internal space", "john doe"},
+		{"special char less-than", "nick<name"},
+		{"special char greater-than", "nick>name"},
+		{"special char double-quote", `nick"name`},
+		{"special char single-quote", "nick'name"},
+		{"unicode symbol", "niño"},
+		{"at sign", "nick@name"},
+		{"dot", "nick.name"},
 	}
 
 	for _, tt := range tests {
