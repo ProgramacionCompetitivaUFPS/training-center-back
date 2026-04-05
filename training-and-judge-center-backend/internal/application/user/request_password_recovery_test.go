@@ -156,15 +156,49 @@ func TestRequestPasswordRecovery_EmailSendFailNoError(t *testing.T) {
 
 	mockEmail := &mockEmailSender{
 		sendFn: func(ctx context.Context, msg notification.EmailMessage) error {
-			return apperror.NewInternal() // Simulate email sending failure
+			return apperror.NewInternal()
 		},
 	}
 
 	uc := NewRequestPasswordRecoveryUseCase(userRepo, recoveryRepo, mockEmail)
 	err := uc.Execute(context.Background(), RequestPasswordRecoveryInput{Email: "user-1@example.com"})
-	
-	// Should return nil even if email sending fails
+
 	if err != nil {
 		t.Fatalf("expected nil, got %v", err)
+	}
+}
+
+func TestRequestPasswordRecovery_EmailSendFail_InvalidatesOrphanedCode(t *testing.T) {
+	userRepo := newNoConflictRepo()
+	activeUser := newUserWithRole("user-1", domain.RoleContestant, domain.StatusActive)
+	userRepo.findByEmailFn = func(_ context.Context, email domain.Email) (*domain.User, error) {
+		return activeUser, nil
+	}
+
+	invalidateCalls := 0
+	recoveryRepo := &mockPasswordRecoveryRepo{
+		invalidatePendingByUserIDFn: func(ctx context.Context, userID string, now time.Time) error {
+			invalidateCalls++
+			return nil
+		},
+		saveFn: func(ctx context.Context, req *domain.PasswordRecoveryRequest) error {
+			return nil
+		},
+	}
+
+	mockEmail := &mockEmailSender{
+		sendFn: func(ctx context.Context, msg notification.EmailMessage) error {
+			return apperror.NewInternal()
+		},
+	}
+
+	uc := NewRequestPasswordRecoveryUseCase(userRepo, recoveryRepo, mockEmail)
+	err := uc.Execute(context.Background(), RequestPasswordRecoveryInput{Email: "user-1@example.com"})
+
+	if err != nil {
+		t.Fatalf("expected nil, got %v", err)
+	}
+	if invalidateCalls != 2 {
+		t.Errorf("expected InvalidatePendingByUserID to be called twice (pre-save + email-fail), got %d", invalidateCalls)
 	}
 }

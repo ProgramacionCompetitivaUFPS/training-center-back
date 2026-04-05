@@ -3,7 +3,7 @@ package user
 import (
 	"context"
 	"fmt"
-	"log"
+	"log/slog"
 	"time"
 
 	"github.com/google/uuid"
@@ -76,7 +76,10 @@ func (uc *RequestPasswordRecoveryUseCase) Execute(ctx context.Context, input Req
 		Subject: "Password Recovery Code",
 		Body:    fmt.Sprintf("Your password recovery code is: %s\nThis code will expire in 15 minutes.", code),
 	}); err != nil {
-		log.Printf("ERROR: Failed to send password recovery email to %s: %v\n", foundUser.Email().String(), err)
+		slog.Error("failed to send password recovery email", "user_id", foundUser.ID(), "error", err)
+		if invalidateErr := uc.recoveryRepo.InvalidatePendingByUserID(ctx, foundUser.ID(), time.Now()); invalidateErr != nil {
+			slog.Error("failed to invalidate undelivered recovery code", "user_id", foundUser.ID(), "error", invalidateErr)
+		}
 	}
 
 	return nil
