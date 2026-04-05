@@ -14,6 +14,11 @@ const (
 	DeactivationStatusBlocked   DeactivationStatus = "BLOCKED"
 )
 
+const (
+	MaxDeactivationAttempts   = 5
+	DeactivationBlockDuration = time.Hour
+)
+
 type DeactivationRequest struct {
 	id               string
 	userID           string
@@ -58,9 +63,9 @@ func (r *DeactivationRequest) MarkAsExpired() {
 func (r *DeactivationRequest) RegisterFailure() {
 	r.attempts++
 	r.updatedAt = time.Now()
-	if r.attempts >= 5 {
+	if r.attempts >= MaxDeactivationAttempts {
 		r.status = DeactivationStatusBlocked
-		blockedUntil := time.Now().Add(time.Hour)
+		blockedUntil := time.Now().Add(DeactivationBlockDuration)
 		r.blockedUntil = &blockedUntil
 	}
 }
