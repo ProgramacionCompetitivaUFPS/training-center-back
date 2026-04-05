@@ -5,14 +5,6 @@ import (
 	"time"
 )
 
-type RequestStatus string
-
-const (
-	StatusPending RequestStatus = "PENDING"
-	StatusUsed    RequestStatus = "USED"
-	StatusExpired RequestStatus = "EXPIRED"
-)
-
 type PasswordRecoveryRequest struct {
 	id        string
 	userID    string
