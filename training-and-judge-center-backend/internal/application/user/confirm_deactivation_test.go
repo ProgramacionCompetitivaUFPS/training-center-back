@@ -2,6 +2,7 @@ package user
 
 import (
 	"context"
+	"errors"
 	"testing"
 	"time"
 
@@ -133,6 +134,99 @@ func TestConfirmDeactivation_InvalidCode(t *testing.T) {
 	appErr, ok := err.(*apperror.AppError)
 	if !ok || appErr.Code != "INVALID_CODE" {
 		t.Errorf("expected INVALID_CODE, got %v", err)
+	}
+}
+
+func TestConfirmDeactivation_ExpiredCode_UpdateFails_ReturnsInternal(t *testing.T) {
+	userRepo := newNoConflictRepo()
+	userRepo.findByIDFn = func(_ context.Context, id string) (*domain.User, error) {
+		return newUserWithRole("user-1", domain.RoleContestant, domain.StatusActive), nil
+	}
+
+	dbErr := errors.New("connection refused")
+	deactRepo := &mockDeactivationRepo{
+		findPendingByUserIDFn: func(ctx context.Context, userID string) (*domain.DeactivationRequest, error) {
+			return domain.RestoreDeactivationRequest("req-1", "user-1", "123456", time.Now().Add(-1*time.Minute), 0, nil, domain.DeactivationStatusPending, time.Time{}, time.Time{}), nil
+		},
+		updateFn: func(ctx context.Context, req *domain.DeactivationRequest) error {
+			return dbErr
+		},
+	}
+
+	uc := NewConfirmDeactivationUseCase(userRepo, deactRepo, &mockAuditRepo{}, &mockEmailSender{}, &mockSessionInvalidator{})
+
+	// Act
+	err := uc.Execute(context.Background(), ConfirmDeactivationInput{UserID: "user-1", Code: "123456"})
+
+	// Assert
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+	appErr, ok := err.(*apperror.AppError)
+	if !ok || appErr.StatusCode != 500 {
+		t.Errorf("expected internal error (500), got %v", err)
+	}
+}
+
+func TestConfirmDeactivation_InvalidCode_UpdateFails_ReturnsInternal(t *testing.T) {
+	userRepo := newNoConflictRepo()
+	userRepo.findByIDFn = func(_ context.Context, id string) (*domain.User, error) {
+		return newUserWithRole("user-1", domain.RoleContestant, domain.StatusActive), nil
+	}
+
+	dbErr := errors.New("connection refused")
+	deactRepo := &mockDeactivationRepo{
+		findPendingByUserIDFn: func(ctx context.Context, userID string) (*domain.DeactivationRequest, error) {
+			return domain.RestoreDeactivationRequest("req-1", "user-1", "123456", time.Now().Add(10*time.Minute), 0, nil, domain.DeactivationStatusPending, time.Time{}, time.Time{}), nil
+		},
+		updateFn: func(ctx context.Context, req *domain.DeactivationRequest) error {
+			return dbErr
+		},
+	}
+
+	uc := NewConfirmDeactivationUseCase(userRepo, deactRepo, &mockAuditRepo{}, &mockEmailSender{}, &mockSessionInvalidator{})
+
+	// Act
+	err := uc.Execute(context.Background(), ConfirmDeactivationInput{UserID: "user-1", Code: "000000"})
+
+	// Assert
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+	appErr, ok := err.(*apperror.AppError)
+	if !ok || appErr.StatusCode != 500 {
+		t.Errorf("expected internal error (500), got %v", err)
+	}
+}
+
+func TestConfirmDeactivation_BlockedState_UpdateFails_ReturnsInternal(t *testing.T) {
+	userRepo := newNoConflictRepo()
+	userRepo.findByIDFn = func(_ context.Context, id string) (*domain.User, error) {
+		return newUserWithRole("user-1", domain.RoleContestant, domain.StatusActive), nil
+	}
+
+	dbErr := errors.New("connection refused")
+	deactRepo := &mockDeactivationRepo{
+		findPendingByUserIDFn: func(ctx context.Context, userID string) (*domain.DeactivationRequest, error) {
+			return domain.RestoreDeactivationRequest("req-1", "user-1", "123456", time.Now().Add(10*time.Minute), 4, nil, domain.DeactivationStatusPending, time.Time{}, time.Time{}), nil
+		},
+		updateFn: func(ctx context.Context, req *domain.DeactivationRequest) error {
+			return dbErr
+		},
+	}
+
+	uc := NewConfirmDeactivationUseCase(userRepo, deactRepo, &mockAuditRepo{}, &mockEmailSender{}, &mockSessionInvalidator{})
+
+	// Act
+	err := uc.Execute(context.Background(), ConfirmDeactivationInput{UserID: "user-1", Code: "000000"})
+
+	// Assert
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+	appErr, ok := err.(*apperror.AppError)
+	if !ok || appErr.StatusCode != 500 {
+		t.Errorf("expected internal error (500), got %v", err)
 	}
 }
 

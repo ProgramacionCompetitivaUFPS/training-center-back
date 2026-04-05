@@ -75,7 +75,9 @@ func (uc *ConfirmDeactivationUseCase) Execute(ctx context.Context, input Confirm
 	// Code expiration validation
 	if now.After(req.ExpiresAt()) {
 		req.MarkAsExpired()
-		_ = uc.deactRepo.Update(ctx, req)
+		if err := uc.deactRepo.Update(ctx, req); err != nil {
+			return apperror.NewInternal()
+		}
 		return apperror.NewBadRequest("EXPIRED_CODE", "The confirmation code has expired. Please request a new one")
 	}
 
@@ -84,11 +86,15 @@ func (uc *ConfirmDeactivationUseCase) Execute(ctx context.Context, input Confirm
 		req.RegisterFailure()
 
 		if req.IsBlocked() {
-			_ = uc.deactRepo.Update(ctx, req)
+			if err := uc.deactRepo.Update(ctx, req); err != nil {
+				return apperror.NewInternal()
+			}
 			return apperror.NewTooManyRequests("MAX_ATTEMPTS_EXCEEDED", "Maximum confirmation attempts exceeded. Please try again later", 3600)
 		}
 
-		_ = uc.deactRepo.Update(ctx, req)
+		if err := uc.deactRepo.Update(ctx, req); err != nil {
+			return apperror.NewInternal()
+		}
 		return apperror.NewBadRequest("INVALID_CODE", "The confirmation code is invalid")
 	}
 
