@@ -174,7 +174,11 @@ func RestoreUser(
 		u.email = &parsedEmail
 	}
 
-	u.password = NewPasswordFromHash(passwordHash)
+	parsedPassword, err := NewPasswordFromHash(passwordHash)
+	if err != nil {
+		return nil, fmt.Errorf("restoring user %s: invalid password hash: %w", id, err)
+	}
+	u.password = parsedPassword
 
 	parsedNickname, err := NewNickname(nicknameStr)
 	if err != nil {

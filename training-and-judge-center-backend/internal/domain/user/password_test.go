@@ -72,10 +72,20 @@ func TestNewPassword_MissingSpecialChar(t *testing.T) {
 	}
 }
 
-func TestNewPasswordFromHash(t *testing.T) {
+func TestNewPasswordFromHash_Valid(t *testing.T) {
 	hash := "$2a$10$somefakehashvalue"
-	pw := NewPasswordFromHash(hash)
+	pw, err := NewPasswordFromHash(hash)
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
 	if pw.Hash() != hash {
 		t.Errorf("expected hash %q, got %q", hash, pw.Hash())
+	}
+}
+
+func TestNewPasswordFromHash_InvalidFormat(t *testing.T) {
+	_, err := NewPasswordFromHash("Secret1!")
+	if err == nil {
+		t.Fatal("expected error for raw password passed as hash, got nil")
 	}
 }

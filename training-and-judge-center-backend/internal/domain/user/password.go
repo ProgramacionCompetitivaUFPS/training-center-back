@@ -49,8 +49,11 @@ func NewPassword(raw string) (Password, error) {
 	return Password{hash: string(hashed)}, nil
 }
 
-func NewPasswordFromHash(hash string) Password {
-	return Password{hash: hash}
+func NewPasswordFromHash(hash string) (Password, error) {
+	if !strings.HasPrefix(hash, "$2") {
+		return Password{}, fmt.Errorf("invalid bcrypt hash format")
+	}
+	return Password{hash: hash}, nil
 }
 
 func (p Password) Hash() string {
