@@ -28,6 +28,10 @@ func main() {
 	router := server.NewRouter()
 
 	slog.Info("server starting", "port", cfg.Port)
+	// CODIGO DE PRUEBA
+	a := 1
+	b := 2
+	slog.Info(a + b)
 
 	if err := http.ListenAndServe(fmt.Sprintf(":%s", cfg.Port), router); err != nil {
 		slog.Error("server failed to start", "error", err)
