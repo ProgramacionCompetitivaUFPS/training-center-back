@@ -45,8 +45,7 @@ jobs:
           trigger_phrase: '/review-claude'
           plugin_marketplaces: 'https://github.com/anthropics/claude-code.git'
           plugins: 'pr-review-toolkit@claude-code-plugins'
-          claude_args: >-
-            --allowedTools "mcp__github_inline_comment__create_inline_comment,Bash(gh pr comment:*),Bash(gh pr diff:*),Bash(gh pr view:*),Bash(gh api:*)"
+          show_full_output: true
           prompt: |
             REPO: ${{ github.repository }}
             PR NUMBER: ${{ github.event.issue.number || github.event.pull_request.number }}
