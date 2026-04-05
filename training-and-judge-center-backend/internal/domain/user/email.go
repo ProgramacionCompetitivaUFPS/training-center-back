@@ -16,11 +16,12 @@ func NewEmail(value string) (Email, error) {
 		return Email{}, fmt.Errorf("email is required")
 	}
 
-	if _, err := mail.ParseAddress(trimmed); err != nil {
+	parsed, err := mail.ParseAddress(trimmed)
+	if err != nil {
 		return Email{}, fmt.Errorf("invalid email format")
 	}
 
-	return Email{value: trimmed}, nil
+	return Email{value: parsed.Address}, nil
 }
 
 func (e Email) String() string {
