@@ -260,6 +260,36 @@ func TestConfirmDeactivation_AuditLogSaveFails_ReturnsNil(t *testing.T) {
 	}
 }
 
+func TestConfirmDeactivation_EmailSendFails_ReturnsNil(t *testing.T) {
+	userRepo := newNoConflictRepo()
+	activeUser := newUserWithRole("user-1", domain.RoleContestant, domain.StatusActive)
+	userRepo.findByIDFn = func(_ context.Context, id string) (*domain.User, error) {
+		return activeUser, nil
+	}
+	userRepo.updateFn = func(ctx context.Context, u *domain.User) error { return nil }
+
+	deactRepo := &mockDeactivationRepo{
+		findPendingByUserIDFn: func(ctx context.Context, userID string) (*domain.DeactivationRequest, error) {
+			return domain.RestoreDeactivationRequest("req-1", "user-1", "123456", time.Now().Add(10*time.Minute), 0, nil, domain.DeactivationStatusPending, time.Time{}, time.Time{}), nil
+		},
+		updateFn: func(ctx context.Context, req *domain.DeactivationRequest) error { return nil },
+	}
+
+	emailSender := &mockEmailSender{
+		sendFn: func(ctx context.Context, msg notification.EmailMessage) error {
+			return errors.New("smtp timeout")
+		},
+	}
+
+	uc := NewConfirmDeactivationUseCase(userRepo, deactRepo, &mockAuditRepo{}, emailSender, &mockSessionInvalidator{})
+
+	err := uc.Execute(context.Background(), ConfirmDeactivationInput{UserID: "user-1", Code: "123456"})
+
+	if err != nil {
+		t.Fatalf("expected nil (fail-safe), got %v", err)
+	}
+}
+
 func TestConfirmDeactivation_ExceedAttemptsAndBlock(t *testing.T) {
 	userRepo := newNoConflictRepo()
 	activeUser := newUserWithRole("user-1", domain.RoleContestant, domain.StatusActive)
