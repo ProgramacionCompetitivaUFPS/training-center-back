@@ -18,10 +18,11 @@ func okHandler() http.Handler {
 }
 
 func validClaims() *user.TokenClaims {
+	email, _ := user.NewEmail("test@example.com")
 	return &user.TokenClaims{
 		UserID:   "user-123",
-		Email:    "test@example.com",
-		Role:     user.RoleContestant.String(),
+		Email:    email,
+		Role:     user.RoleContestant,
 		IssuedAt: time.Now(),
 	}
 }
@@ -108,7 +109,7 @@ func TestAuth_RevokedSession(t *testing.T) {
 }
 
 func TestAuth_SessionInvalidatorError(t *testing.T) {
-	// Arrange — IsSessionRevoked returns an error: must fail closed (fail-closed → 401)
+	// Arrange — IsSessionRevoked returns an error: Redis unavailable → 503
 	sessionInv := &mockSessionInvalidator{
 		isSessionRevokedFn: func(_ context.Context, _ string, _ time.Time) (bool, error) {
 			return false, errors.New("redis timeout")
@@ -123,8 +124,8 @@ func TestAuth_SessionInvalidatorError(t *testing.T) {
 	handler.ServeHTTP(rr, req)
 
 	// Assert
-	if rr.Code != http.StatusUnauthorized {
-		t.Errorf("expected 401, got %d", rr.Code)
+	if rr.Code != http.StatusServiceUnavailable {
+		t.Errorf("expected 503, got %d", rr.Code)
 	}
 }
 
@@ -159,7 +160,7 @@ func TestAuth_ValidToken_ClaimsInContext(t *testing.T) {
 		t.Errorf("expected Role %q, got %q", expected.Role, capturedClaims.Role)
 	}
 	if capturedClaims.Email != expected.Email {
-		t.Errorf("expected Email %q, got %q", expected.Email, capturedClaims.Email)
+		t.Errorf("expected Email %v, got %v", expected.Email, capturedClaims.Email)
 	}
 	_ = rr
 }
@@ -170,7 +171,7 @@ func TestRequireRole_CorrectRole(t *testing.T) {
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
 	ctx := context.WithValue(req.Context(), claimsKey, &user.TokenClaims{
 		UserID: "admin-123",
-		Role:   user.RoleAdmin.String(),
+		Role:   user.RoleAdmin,
 	})
 	rr := httptest.NewRecorder()
 
@@ -189,7 +190,7 @@ func TestRequireRole_WrongRole(t *testing.T) {
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
 	ctx := context.WithValue(req.Context(), claimsKey, &user.TokenClaims{
 		UserID: "coach-123",
-		Role:   user.RoleCoach.String(),
+		Role:   user.RoleCoach,
 	})
 	rr := httptest.NewRecorder()
 

@@ -32,7 +32,7 @@ func (uc *GetUserProfileUseCase) GetMyProfile(ctx context.Context, userID string
 	return &UserProfileOutput{User: foundUser, IsFullProfile: true}, nil
 }
 
-func (uc *GetUserProfileUseCase) GetUserByNickname(ctx context.Context, requesterID, requesterRole, nickname string) (*UserProfileOutput, error) {
+func (uc *GetUserProfileUseCase) GetUserByNickname(ctx context.Context, requesterID string, requesterRole user.Role, nickname string) (*UserProfileOutput, error) {
 	parsedNickname, err := user.NewNickname(nickname)
 	if err != nil {
 		return nil, apperror.NewValidation([]apperror.FieldError{
@@ -57,7 +57,7 @@ func (uc *GetUserProfileUseCase) GetUserByNickname(ctx context.Context, requeste
 		return &UserProfileOutput{User: targetUser, IsFullProfile: true}, nil
 	}
 
-	isRequesterAdmin := requesterRole == user.RoleAdmin.String()
+	isRequesterAdmin := requesterRole == user.RoleAdmin
 
 	if !isRequesterAdmin && targetUser.Role() == user.RoleAdmin {
 		return nil, apperror.NewForbidden("ADMIN_PROFILE_RESTRICTED", "Admin profiles are not accessible to non-admin users")

@@ -13,6 +13,7 @@ func TestNewEmail_Valid(t *testing.T) {
 		{"with spaces trimmed", "  user@example.com  ", "user@example.com"},
 		{"display name stripped", "john doe <john@example.com>", "john@example.com"},
 		{"display name normalized", "jane doe <Jane@EXAMPLE.COM>", "jane@example.com"},
+		{"unicode local part accepted", "ñoño@example.com", "ñoño@example.com"},
 	}
 
 	for _, tt := range tests {

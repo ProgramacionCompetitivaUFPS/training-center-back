@@ -86,7 +86,7 @@ func TestGetByNickname_PublicProfile(t *testing.T) {
 	}
 	uc := NewGetUserProfileUseCase(repo)
 
-	result, err := uc.GetUserByNickname(context.Background(), "requester-1", "CONTESTANT", "target")
+	result, err := uc.GetUserByNickname(context.Background(), "requester-1", domain.RoleContestant, "target")
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
@@ -106,7 +106,7 @@ func TestGetByNickname_AdminViewsAll(t *testing.T) {
 	}
 	uc := NewGetUserProfileUseCase(repo)
 
-	result, err := uc.GetUserByNickname(context.Background(), "admin-1", "ADMIN", "target")
+	result, err := uc.GetUserByNickname(context.Background(), "admin-1", domain.RoleAdmin, "target")
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
@@ -123,7 +123,7 @@ func TestGetByNickname_SelfViaNickname(t *testing.T) {
 	}
 	uc := NewGetUserProfileUseCase(repo)
 
-	result, err := uc.GetUserByNickname(context.Background(), "self-user", "CONTESTANT", "self-user")
+	result, err := uc.GetUserByNickname(context.Background(), "self-user", domain.RoleContestant, "self-user")
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
@@ -140,7 +140,7 @@ func TestGetByNickname_NonAdminViewsAdmin(t *testing.T) {
 	}
 	uc := NewGetUserProfileUseCase(repo)
 
-	_, err := uc.GetUserByNickname(context.Background(), "requester-1", "CONTESTANT", "admin-target")
+	_, err := uc.GetUserByNickname(context.Background(), "requester-1", domain.RoleContestant, "admin-target")
 	if err == nil {
 		t.Fatal("expected error, got nil")
 	}
@@ -165,7 +165,7 @@ func TestGetByNickname_DeactivatedUser(t *testing.T) {
 	}
 	uc := NewGetUserProfileUseCase(repo)
 
-	_, err := uc.GetUserByNickname(context.Background(), "requester-1", "CONTESTANT", "deactivated")
+	_, err := uc.GetUserByNickname(context.Background(), "requester-1", domain.RoleContestant, "deactivated")
 	if err == nil {
 		t.Fatal("expected error, got nil")
 	}
@@ -183,7 +183,7 @@ func TestGetByNickname_UserNotFound(t *testing.T) {
 	repo := newNoConflictRepo()
 	uc := NewGetUserProfileUseCase(repo)
 
-	_, err := uc.GetUserByNickname(context.Background(), "requester-1", "CONTESTANT", "nonexistent")
+	_, err := uc.GetUserByNickname(context.Background(), "requester-1", domain.RoleContestant, "nonexistent")
 	if err == nil {
 		t.Fatal("expected error, got nil")
 	}
@@ -201,7 +201,7 @@ func TestGetByNickname_InvalidNickname(t *testing.T) {
 	repo := newNoConflictRepo()
 	uc := NewGetUserProfileUseCase(repo)
 
-	_, err := uc.GetUserByNickname(context.Background(), "requester-1", "CONTESTANT", "")
+	_, err := uc.GetUserByNickname(context.Background(), "requester-1", domain.RoleContestant, "")
 	if err == nil {
 		t.Fatal("expected error, got nil")
 	}
@@ -226,7 +226,7 @@ func TestGetByNickname_AdminViewsDeactivated(t *testing.T) {
 	}
 	uc := NewGetUserProfileUseCase(repo)
 
-	_, err := uc.GetUserByNickname(context.Background(), "admin-1", "ADMIN", "deactivated")
+	_, err := uc.GetUserByNickname(context.Background(), "admin-1", domain.RoleAdmin, "deactivated")
 	if err == nil {
 		t.Fatal("expected error, got nil")
 	}

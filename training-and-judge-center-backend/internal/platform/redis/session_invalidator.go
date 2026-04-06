@@ -9,17 +9,18 @@ import (
 )
 
 type SessionInvalidator struct {
-	client *redis.Client
+	client   *redis.Client
+	tokenTTL time.Duration
 }
 
-func NewSessionInvalidator(client *redis.Client) *SessionInvalidator {
-	return &SessionInvalidator{client: client}
+func NewSessionInvalidator(client *redis.Client, tokenTTL time.Duration) *SessionInvalidator {
+	return &SessionInvalidator{client: client, tokenTTL: tokenTTL}
 }
 
 func (s *SessionInvalidator) InvalidateAllUserSessions(ctx context.Context, userID string, timestamp time.Time) error {
 	key := fmt.Sprintf("revoked_sessions:%s", userID)
-	// Guaranteed 24-h expiration (or matching max token lifecycle)
-	err := s.client.Set(ctx, key, timestamp.Unix(), 24*time.Hour).Err()
+	// TTL matches the JWT expiration so the revocation key outlives any token it covers.
+	err := s.client.Set(ctx, key, timestamp.Unix(), s.tokenTTL).Err()
 	if err != nil {
 		return fmt.Errorf("failed to save session revocation timestamp: %w", err)
 	}

@@ -52,13 +52,18 @@ func (uc *AdminDeactivateUserUseCase) Execute(ctx context.Context, input AdminDe
 		return apperror.NewInternal()
 	}
 
-	if err := uc.repo.Update(ctx, foundUser); err != nil {
+	// Invalidate sessions BEFORE persisting to DB: if Redis fails, the DB
+	// write never happens and the caller receives an error with clean state.
+	// If DB write fails after this point, the user loses their active session
+	// but is not officially deactivated — a minor inconsistency, not a security risk.
+	now := time.Now()
+	if err := uc.sessionInvalidator.InvalidateAllUserSessions(ctx, foundUser.ID(), now); err != nil {
+		slog.Error("failed to invalidate sessions during admin deactivation", "user_id", foundUser.ID(), "error", err)
 		return apperror.NewInternal()
 	}
 
-	now := time.Now()
-	if err := uc.sessionInvalidator.InvalidateAllUserSessions(ctx, foundUser.ID(), now); err != nil {
-		slog.Error("failed to invalidate sessions after admin deactivation", "user_id", foundUser.ID(), "error", err)
+	if err := uc.repo.Update(ctx, foundUser); err != nil {
+		return apperror.NewInternal()
 	}
 
 	return nil

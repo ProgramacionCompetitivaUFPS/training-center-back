@@ -1,6 +1,9 @@
 package user
 
-import "testing"
+import (
+	"strings"
+	"testing"
+)
 
 func TestNewPassword_Valid(t *testing.T) {
 	pw, err := NewPassword("Secret1!")
@@ -87,5 +90,43 @@ func TestNewPasswordFromHash_InvalidFormat(t *testing.T) {
 	_, err := NewPasswordFromHash("Secret1!")
 	if err == nil {
 		t.Fatal("expected error for raw password passed as hash, got nil")
+	}
+}
+
+func TestNewPassword_ExactlyAtBcryptLimit(t *testing.T) {
+	raw := "A1!" + strings.Repeat("a", 69)
+	pw, err := NewPassword(raw)
+	if err != nil {
+		t.Fatalf("expected no error at 72 bytes, got %v", err)
+	}
+	if !pw.Compare(raw) {
+		t.Error("Compare should return true at 72-byte boundary")
+	}
+}
+
+func TestNewPasswordFromHash_RoundTrip(t *testing.T) {
+	pw, err := NewPassword("Secret1!")
+	if err != nil {
+		t.Fatalf("unexpected error creating password: %v", err)
+	}
+	restored, err := NewPasswordFromHash(pw.Hash())
+	if err != nil {
+		t.Fatalf("unexpected error restoring from hash: %v", err)
+	}
+	if !restored.Compare("Secret1!") {
+		t.Error("restored password should compare correctly against original")
+	}
+	if restored.Compare("Wrong1!") {
+		t.Error("restored password should not match a different input")
+	}
+}
+
+func TestPassword_CompareEmpty(t *testing.T) {
+	pw, err := NewPassword("Secret1!")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if pw.Compare("") {
+		t.Error("Compare should return false for empty string")
 	}
 }
