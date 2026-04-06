@@ -73,6 +73,12 @@ func (uc *ConfirmDeactivationUseCase) Execute(ctx context.Context, input Confirm
 			}
 			return apperror.NewTooManyRequests("MAX_ATTEMPTS_EXCEEDED", "Maximum confirmation attempts exceeded. Please try again later", retryAfter)
 		}
+		// Block period has expired — invalidate the request entirely; user must start a new one
+		req.MarkAsExpired()
+		if err := uc.deactRepo.Update(ctx, req); err != nil {
+			return apperror.NewInternal()
+		}
+		return apperror.NewBadRequest("EXPIRED_CODE", "The confirmation code has expired. Please request a new one")
 	}
 
 	// Code expiration validation

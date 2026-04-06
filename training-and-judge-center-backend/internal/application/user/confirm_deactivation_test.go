@@ -290,6 +290,67 @@ func TestConfirmDeactivation_EmailSendFails_ReturnsNil(t *testing.T) {
 	}
 }
 
+func TestConfirmDeactivation_BlockExpired_MarksExpiredAndReturnsError(t *testing.T) {
+	userRepo := newNoConflictRepo()
+	userRepo.findByIDFn = func(_ context.Context, id string) (*domain.User, error) {
+		return newUserWithRole("user-1", domain.RoleContestant, domain.StatusActive), nil
+	}
+
+	expiredBlockedUntil := time.Now().Add(-1 * time.Minute)
+	deactRepo := &mockDeactivationRepo{
+		findPendingByUserIDFn: func(ctx context.Context, userID string) (*domain.DeactivationRequest, error) {
+			return domain.RestoreDeactivationRequest("req-1", "user-1", "123456", time.Now().Add(10*time.Minute), 5, &expiredBlockedUntil, domain.DeactivationStatusBlocked, time.Time{}, time.Time{}), nil
+		},
+		updateFn: func(ctx context.Context, req *domain.DeactivationRequest) error {
+			if req.Status() != domain.DeactivationStatusExpired {
+				t.Errorf("expected EXPIRED status after block expiry, got %s", req.Status())
+			}
+			return nil
+		},
+	}
+
+	uc := NewConfirmDeactivationUseCase(userRepo, deactRepo, &mockAuditRepo{}, &mockEmailSender{}, &mockSessionInvalidator{}, &mockTransactionManager{})
+
+	err := uc.Execute(context.Background(), ConfirmDeactivationInput{UserID: "user-1", Code: "123456"})
+
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+	appErr, ok := err.(*apperror.AppError)
+	if !ok || appErr.Code != "EXPIRED_CODE" {
+		t.Errorf("expected EXPIRED_CODE after block expiry, got %v", err)
+	}
+}
+
+func TestConfirmDeactivation_BlockExpired_UpdateFails_ReturnsInternal(t *testing.T) {
+	userRepo := newNoConflictRepo()
+	userRepo.findByIDFn = func(_ context.Context, id string) (*domain.User, error) {
+		return newUserWithRole("user-1", domain.RoleContestant, domain.StatusActive), nil
+	}
+
+	expiredBlockedUntil := time.Now().Add(-1 * time.Minute)
+	deactRepo := &mockDeactivationRepo{
+		findPendingByUserIDFn: func(ctx context.Context, userID string) (*domain.DeactivationRequest, error) {
+			return domain.RestoreDeactivationRequest("req-1", "user-1", "123456", time.Now().Add(10*time.Minute), 5, &expiredBlockedUntil, domain.DeactivationStatusBlocked, time.Time{}, time.Time{}), nil
+		},
+		updateFn: func(ctx context.Context, req *domain.DeactivationRequest) error {
+			return errors.New("db unavailable")
+		},
+	}
+
+	uc := NewConfirmDeactivationUseCase(userRepo, deactRepo, &mockAuditRepo{}, &mockEmailSender{}, &mockSessionInvalidator{}, &mockTransactionManager{})
+
+	err := uc.Execute(context.Background(), ConfirmDeactivationInput{UserID: "user-1", Code: "123456"})
+
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+	appErr, ok := err.(*apperror.AppError)
+	if !ok || appErr.StatusCode != 500 {
+		t.Errorf("expected internal error (500), got %v", err)
+	}
+}
+
 func TestConfirmDeactivation_ExceedAttemptsAndBlock(t *testing.T) {
 	userRepo := newNoConflictRepo()
 	activeUser := newUserWithRole("user-1", domain.RoleContestant, domain.StatusActive)
