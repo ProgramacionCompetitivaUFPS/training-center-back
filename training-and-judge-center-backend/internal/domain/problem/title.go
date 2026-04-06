@@ -30,7 +30,7 @@ func NewTitle(value string) (Title, error) {
 		})
 	}
 
-	if len(trimmed) > 200 {
+	if len([]rune(trimmed)) > 200 {
 		return Title{}, apperror.NewValidation([]apperror.FieldError{
 			{Field: "title", Message: "Title must not exceed 200 characters"},
 		})

@@ -111,7 +111,14 @@ func (usecase *CreateProblemUseCase) Execute(ctx context.Context, input CreatePr
 	seenLangs := make(map[string]struct{}, len(input.LangOverrides))
 	var validOverrides []problem.LanguageOverride
 	for _, override := range input.LangOverrides {
-		if override.Language != "" && !usecase.platformSettings.IsLanguageSupported(override.Language) {
+		if override.Language == "" {
+			fieldErrs = append(fieldErrs, apperror.FieldError{
+				Field:   "languageOverrides",
+				Message: "Language must not be empty",
+			})
+			continue
+		}
+		if !usecase.platformSettings.IsLanguageSupported(override.Language) {
 			fieldErrs = append(fieldErrs, apperror.FieldError{
 				Field:   "languageOverrides.language",
 				Message: "Unsupported language: " + override.Language,

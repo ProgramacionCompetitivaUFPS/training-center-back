@@ -111,7 +111,14 @@ func (uc *UpdateProblemUseCase) Execute(ctx context.Context, input UpdateProblem
 	if input.LangOverrides != nil {
 		seenLangs := make(map[string]struct{}, len(input.LangOverrides))
 		for _, override := range input.LangOverrides {
-			if override.Language != "" && !uc.platformSettings.IsLanguageSupported(override.Language) {
+			if override.Language == "" {
+				fieldErrs = append(fieldErrs, apperror.FieldError{
+					Field:   "languageOverrides",
+					Message: "Language must not be empty",
+				})
+				continue
+			}
+			if !uc.platformSettings.IsLanguageSupported(override.Language) {
 				fieldErrs = append(fieldErrs, apperror.FieldError{
 					Field:   "languageOverrides.language",
 					Message: "Unsupported language: " + override.Language,

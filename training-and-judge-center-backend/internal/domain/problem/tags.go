@@ -50,7 +50,9 @@ func NewTags(values []string, allowedTags map[string]struct{}) (Tags, error) {
 }
 
 func (t Tags) Values() []string {
-	return t.values
+	cp := make([]string, len(t.values))
+	copy(cp, t.values)
+	return cp
 }
 
 func RestoreTags(values []string) Tags {

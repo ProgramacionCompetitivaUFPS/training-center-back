@@ -20,5 +20,9 @@ func RestoreStatement(value *string) Statement {
 }
 
 func (s Statement) Value() *string {
-	return s.value
+	if s.value == nil {
+		return nil
+	}
+	v := *s.value
+	return &v
 }
