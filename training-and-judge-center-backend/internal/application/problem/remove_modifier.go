@@ -34,7 +34,7 @@ func (uc *RemoveModifierUseCase) Execute(ctx context.Context, input RemoveModifi
 		return struct{}{}, err
 	}
 
-	isAuthor := p.AuthorID == problem.RestoreUserID(input.CurrentUser.ID)
+	isAuthor := p.AuthorID() == problem.RestoreUserID(input.CurrentUser.ID)
 	isAdmin := input.CurrentUser.Role == user.RoleAdmin
 
 	if !isAuthor && !isAdmin {
@@ -51,7 +51,7 @@ func (uc *RemoveModifierUseCase) Execute(ctx context.Context, input RemoveModifi
 	}
 
 	if err := uc.repo.Save(ctx, p); err != nil {
-		slog.ErrorContext(ctx, "failed to save problem after removing modifier", "error", err, "slug", p.Slug.String())
+		slog.ErrorContext(ctx, "failed to save problem after removing modifier", "error", err, "slug", p.Slug().String())
 		return struct{}{}, apperror.NewInternal()
 	}
 

@@ -96,7 +96,7 @@ func (uc *ListProblemsUseCase) Execute(ctx context.Context, in ListProblemsInput
 	authorIDs := make([]string, 0, len(problems))
 	seen := make(map[string]bool)
 	for _, p := range problems {
-		id := p.AuthorID.Value()
+		id := p.AuthorID().Value()
 		if !seen[id] {
 			authorIDs = append(authorIDs, id)
 			seen[id] = true
@@ -111,7 +111,7 @@ func (uc *ListProblemsUseCase) Execute(ctx context.Context, in ListProblemsInput
 
 	summaries := make([]ProblemSummary, 0, len(problems))
 	for _, p := range problems {
-		d := displays[p.AuthorID.Value()]
+		d := displays[p.AuthorID().Value()]
 		var author ModifierDisplay
 		if d != nil {
 			author = ModifierDisplay{Nickname: d.Nickname, Name: d.Name}

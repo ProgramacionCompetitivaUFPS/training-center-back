@@ -48,7 +48,7 @@ func (uc *ChangeAccessibilityUseCase) Execute(ctx context.Context, in ChangeAcce
 	p.UpdateAccessibility(newAcc)
 
 	if err := uc.repo.Save(ctx, p); err != nil {
-		slog.ErrorContext(ctx, "failed to save problem after accessibility change", "error", err, "slug", p.Slug.String())
+		slog.ErrorContext(ctx, "failed to save problem after accessibility change", "error", err, "slug", p.Slug().String())
 		return nil, apperror.NewInternal()
 	}
 

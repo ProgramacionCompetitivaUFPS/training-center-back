@@ -120,8 +120,8 @@ func buildResponse(p *domainProblem.Problem, display *user.Display) getProblemRe
 		author = authorResp{Nickname: display.Nickname, Name: display.Name}
 	}
 
-	overrides := make([]langOverrideResp, 0, len(p.LangOverrides))
-	for _, lo := range p.LangOverrides {
+	overrides := make([]langOverrideResp, 0, len(p.LangOverrides()))
+	for _, lo := range p.LangOverrides() {
 		overrides = append(overrides, langOverrideResp{
 			Language:    lo.Language(),
 			TimeLimit:   lo.TimeLimit(),
@@ -130,25 +130,25 @@ func buildResponse(p *domainProblem.Problem, display *user.Display) getProblemRe
 	}
 
 	var tl *int
-	if p.TimeLimit != nil {
-		v := p.TimeLimit.Milliseconds()
+	if p.TimeLimit() != nil {
+		v := p.TimeLimit().Milliseconds()
 		tl = &v
 	}
 
 	var ml *int
-	if p.MemoryLimit != nil {
-		v := p.MemoryLimit.Megabytes()
+	if p.MemoryLimit() != nil {
+		v := p.MemoryLimit().Megabytes()
 		ml = &v
 	}
 
 	var judgingUpdatedAt *string
-	if p.JudgingUpdatedAt != nil {
-		s := p.JudgingUpdatedAt.Format("2006-01-02T15:04:05Z")
+	if p.JudgingUpdatedAt() != nil {
+		s := p.JudgingUpdatedAt().Format("2006-01-02T15:04:05Z")
 		judgingUpdatedAt = &s
 	}
 
-	solutions := make([]solutionResp, 0, len(p.Solutions))
-	for _, sol := range p.Solutions {
+	solutions := make([]solutionResp, 0, len(p.Solutions()))
+	for _, sol := range p.Solutions() {
 		solutions = append(solutions, solutionResp{
 			Filename: sol.Filename(),
 			Language: sol.Language(),
@@ -156,24 +156,24 @@ func buildResponse(p *domainProblem.Problem, display *user.Display) getProblemRe
 	}
 
 	return getProblemResponse{
-		Slug:          p.Slug.String(),
-		Title:         p.Title.String(),
-		Statement:     p.Statement.Value(),
+		Slug:          p.Slug().String(),
+		Title:         p.Title().String(),
+		Statement:     p.Statement().Value(),
 		TimeLimit:     tl,
 		MemoryLimit:   ml,
 		LangOverrides: overrides,
-		Tags:          p.Tags.Values(),
-		Status:        p.Status.String(),
-		Accessibility: p.Accessibility.String(),
+		Tags:          p.Tags().Values(),
+		Status:        p.Status().String(),
+		Accessibility: p.Accessibility().String(),
 		Author:        author,
 		Files: &filesResp{
-			TestCases: p.TestCasesKey != nil,
+			TestCases: p.TestCasesKey() != nil,
 			Solutions: solutions,
-			Checker:   p.Checker != nil,
-			Validator: p.Validator != nil,
+			Checker:   p.Checker() != nil,
+			Validator: p.Validator() != nil,
 		},
 		ProblemJudgingUpdatedAt: judgingUpdatedAt,
-		CreatedAt:               p.CreatedAt.Format("2006-01-02T15:04:05Z"),
-		UpdatedAt:               p.UpdatedAt.Format("2006-01-02T15:04:05Z"),
+		CreatedAt:               p.CreatedAt().Format("2006-01-02T15:04:05Z"),
+		UpdatedAt:               p.UpdatedAt().Format("2006-01-02T15:04:05Z"),
 	}
 }

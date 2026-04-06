@@ -44,7 +44,7 @@ func (uc *UnpublishProblemUseCase) Execute(ctx context.Context, in UnpublishProb
 	}
 
 	if err := uc.repo.Save(ctx, p); err != nil {
-		slog.ErrorContext(ctx, "failed to save problem after unpublish", "error", err, "slug", p.Slug.String())
+		slog.ErrorContext(ctx, "failed to save problem after unpublish", "error", err, "slug", p.Slug().String())
 		return nil, apperror.NewInternal()
 	}
 

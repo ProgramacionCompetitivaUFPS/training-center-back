@@ -75,7 +75,7 @@ func (uc *UploadProblemFilesUseCase) Execute(ctx context.Context, input UploadPr
 		return nil, err
 	}
 
-	if p.Status.IsPublished() {
+	if p.Status().IsPublished() {
 		return nil, apperror.NewBadRequest(ErrCodeProblemIsPublished, "Cannot upload files to a published problem. Unpublish first.")
 	}
 
@@ -97,7 +97,7 @@ func (uc *UploadProblemFilesUseCase) Execute(ctx context.Context, input UploadPr
 	case FileTypeValidator:
 		action, handleErr = uc.handleValidator(ctx, p, input)
 	default:
-		slog.WarnContext(ctx, "invalid file type provided", "file_type", input.FileType, "slug", p.Slug.String())
+		slog.WarnContext(ctx, "invalid file type provided", "file_type", input.FileType, "slug", p.Slug().String())
 		return nil, apperror.NewBadRequest(ErrCodeProblemInvalidFileType, "Invalid file type. Allowed: testCases, solution, checker, validator")
 	}
 
@@ -108,7 +108,7 @@ func (uc *UploadProblemFilesUseCase) Execute(ctx context.Context, input UploadPr
 
 	if err := uc.repo.Save(ctx, p); err != nil {
 		uc.cleanupFiles(ctx, action.toDeleteOnFailure)
-		slog.ErrorContext(ctx, "failed to save problem after file upload", "error", err, "slug", p.Slug.String())
+		slog.ErrorContext(ctx, "failed to save problem after file upload", "error", err, "slug", p.Slug().String())
 		return nil, apperror.NewInternal()
 	}
 
@@ -147,7 +147,7 @@ func (uc *UploadProblemFilesUseCase) handleTestCases(ctx context.Context, p *pro
 	}
 
 	uploadInstanceID := uuid.New().String()
-	basePath := fmt.Sprintf("problems/%s/%s/%s", p.Slug.String(), FileTypeTestCases, uploadInstanceID)
+	basePath := fmt.Sprintf("problems/%s/%s/%s", p.Slug().String(), FileTypeTestCases, uploadInstanceID)
 	zipKey := fmt.Sprintf("%s/testcases.zip", basePath)
 
 	allNewKeys := make([]string, 0, len(sampleFiles)+1)
@@ -157,7 +157,7 @@ func (uc *UploadProblemFilesUseCase) handleTestCases(ctx context.Context, p *pro
 	}
 
 	if err := uc.storage.UploadFile(ctx, zipKey, input.FileData); err != nil {
-		slog.ErrorContext(ctx, "failed to upload testcases zip", "error", err, "slug", p.Slug.String())
+		slog.ErrorContext(ctx, "failed to upload testcases zip", "error", err, "slug", p.Slug().String())
 		return fileAction{toDeleteOnFailure: allNewKeys}, apperror.NewInternal()
 	}
 
@@ -181,8 +181,8 @@ func (uc *UploadProblemFilesUseCase) handleTestCases(ctx context.Context, p *pro
 	}
 
 	action := fileAction{toDeleteOnFailure: allNewKeys}
-	if p.TestCasesKey != nil {
-		action.prefixToDeleteOnSuccess = *p.TestCasesKey
+	if p.TestCasesKey() != nil {
+		action.prefixToDeleteOnSuccess = *p.TestCasesKey()
 	}
 
 	p.SetTestCases(basePath)
@@ -202,14 +202,14 @@ func (uc *UploadProblemFilesUseCase) handleSolution(ctx context.Context, p *prob
 		return fileAction{}, err
 	}
 
-	fileKey := fmt.Sprintf("problems/%s/%s/%s", p.Slug.String(), FileTypeSolution, cleanName)
+	fileKey := fmt.Sprintf("problems/%s/%s/%s", p.Slug().String(), FileTypeSolution, cleanName)
 	solutionObj, err := problem.NewSolutionFile(cleanName, fileKey, lang)
 	if err != nil {
 		return fileAction{}, err
 	}
 
 	if err := uc.storage.UploadFile(ctx, fileKey, input.FileData); err != nil {
-		slog.ErrorContext(ctx, "failed to upload solution file", "error", err, "slug", p.Slug.String(), "filename", cleanName)
+		slog.ErrorContext(ctx, "failed to upload solution file", "error", err, "slug", p.Slug().String(), "filename", cleanName)
 		return fileAction{}, apperror.NewInternal()
 	}
 
@@ -235,22 +235,22 @@ func (uc *UploadProblemFilesUseCase) handleChecker(ctx context.Context, p *probl
 		return fileAction{}, err
 	}
 
-	fileKey := fmt.Sprintf("problems/%s/%s/%s", p.Slug.String(), FileTypeChecker, cleanName)
+	fileKey := fmt.Sprintf("problems/%s/%s/%s", p.Slug().String(), FileTypeChecker, cleanName)
 	verifierObj, err := problem.NewVerifierFile(cleanName, fileKey, lang)
 	if err != nil {
 		return fileAction{}, err
 	}
 
 	action := fileAction{}
-	if p.Checker == nil || p.Checker.FileKey() != fileKey {
+	if p.Checker() == nil || p.Checker().FileKey() != fileKey {
 		action.toDeleteOnFailure = []string{fileKey}
 	}
-	if p.Checker != nil && p.Checker.FileKey() != fileKey {
-		action.toDeleteOnSuccess = []string{p.Checker.FileKey()}
+	if p.Checker() != nil && p.Checker().FileKey() != fileKey {
+		action.toDeleteOnSuccess = []string{p.Checker().FileKey()}
 	}
 
 	if err := uc.storage.UploadFile(ctx, fileKey, input.FileData); err != nil {
-		slog.ErrorContext(ctx, "failed to upload checker file", "error", err, "slug", p.Slug.String(), "filename", cleanName)
+		slog.ErrorContext(ctx, "failed to upload checker file", "error", err, "slug", p.Slug().String(), "filename", cleanName)
 		return fileAction{toDeleteOnFailure: action.toDeleteOnFailure}, apperror.NewInternal()
 	}
 
@@ -271,22 +271,22 @@ func (uc *UploadProblemFilesUseCase) handleValidator(ctx context.Context, p *pro
 		return fileAction{}, err
 	}
 
-	fileKey := fmt.Sprintf("problems/%s/%s/%s", p.Slug.String(), FileTypeValidator, cleanName)
+	fileKey := fmt.Sprintf("problems/%s/%s/%s", p.Slug().String(), FileTypeValidator, cleanName)
 	verifierObj, err := problem.NewVerifierFile(cleanName, fileKey, lang)
 	if err != nil {
 		return fileAction{}, err
 	}
 
 	action := fileAction{}
-	if p.Validator == nil || p.Validator.FileKey() != fileKey {
+	if p.Validator() == nil || p.Validator().FileKey() != fileKey {
 		action.toDeleteOnFailure = []string{fileKey}
 	}
-	if p.Validator != nil && p.Validator.FileKey() != fileKey {
-		action.toDeleteOnSuccess = []string{p.Validator.FileKey()}
+	if p.Validator() != nil && p.Validator().FileKey() != fileKey {
+		action.toDeleteOnSuccess = []string{p.Validator().FileKey()}
 	}
 
 	if err := uc.storage.UploadFile(ctx, fileKey, input.FileData); err != nil {
-		slog.ErrorContext(ctx, "failed to upload validator file", "error", err, "slug", p.Slug.String(), "filename", cleanName)
+		slog.ErrorContext(ctx, "failed to upload validator file", "error", err, "slug", p.Slug().String(), "filename", cleanName)
 		return fileAction{toDeleteOnFailure: action.toDeleteOnFailure}, apperror.NewInternal()
 	}
 

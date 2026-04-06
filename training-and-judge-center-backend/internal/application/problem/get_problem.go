@@ -62,13 +62,13 @@ func (uc *GetProblemUseCase) Execute(ctx context.Context, in GetProblemInput) (*
 	isAdmin := in.CurrentUser.Role == user.RoleAdmin
 	isModifier := p.CanBeEditedBy(viewerID, isAdmin)
 
-	if p.Status.String() == "DRAFT" && !isModifier {
+	if p.Status().String() == "DRAFT" && !isModifier {
 		return nil, apperror.NewForbidden(apperror.ErrCodeForbidden, "Only the problem author, Admin, or assigned modifiers can view this DRAFT problem")
 	}
 
-	authorDisplay, err := uc.userProvider.GetDisplay(ctx, p.AuthorID.Value())
+	authorDisplay, err := uc.userProvider.GetDisplay(ctx, p.AuthorID().Value())
 	if err != nil {
-		slog.ErrorContext(ctx, "failed to fetch author display", "error", err, "author_id", p.AuthorID.Value())
+		slog.ErrorContext(ctx, "failed to fetch author display", "error", err, "author_id", p.AuthorID().Value())
 		return nil, apperror.NewInternal()
 	}
 
@@ -78,8 +78,8 @@ func (uc *GetProblemUseCase) Execute(ctx context.Context, in GetProblemInput) (*
 	}
 
 	if isModifier {
-		modifierIDs := make([]string, len(p.ModifierIDs))
-		for i, id := range p.ModifierIDs {
+		modifierIDs := make([]string, len(p.ModifierIDs()))
+		for i, id := range p.ModifierIDs() {
 			modifierIDs[i] = id.Value()
 		}
 		displays, err := uc.userProvider.GetDisplays(ctx, modifierIDs)
@@ -87,7 +87,7 @@ func (uc *GetProblemUseCase) Execute(ctx context.Context, in GetProblemInput) (*
 			slog.ErrorContext(ctx, "failed to fetch modifier displays", "error", err)
 			return nil, apperror.NewInternal()
 		}
-		modifiers := make([]ModifierDisplay, 0, len(p.ModifierIDs))
+		modifiers := make([]ModifierDisplay, 0, len(p.ModifierIDs()))
 		for _, id := range modifierIDs {
 			if d, ok := displays[id]; ok {
 				modifiers = append(modifiers, ModifierDisplay{Nickname: d.Nickname, Name: d.Name})
@@ -95,15 +95,15 @@ func (uc *GetProblemUseCase) Execute(ctx context.Context, in GetProblemInput) (*
 		}
 		out.Modifiers = modifiers
 
-		solutions := make([]SolutionInfo, 0, len(p.Solutions))
-		for _, sol := range p.Solutions {
+		solutions := make([]SolutionInfo, 0, len(p.Solutions()))
+		for _, sol := range p.Solutions() {
 			solutions = append(solutions, SolutionInfo{Filename: sol.Filename(), Language: sol.Language()})
 		}
 		out.Files = &FilesAvailability{
-			TestCases: p.TestCasesKey != nil,
+			TestCases: p.TestCasesKey() != nil,
 			Solutions: solutions,
-			Checker:   p.Checker != nil,
-			Validator: p.Validator != nil,
+			Checker:   p.Checker() != nil,
+			Validator: p.Validator() != nil,
 		}
 	}
 

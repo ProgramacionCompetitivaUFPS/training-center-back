@@ -50,9 +50,9 @@ func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
 	}
 
 	p := result.Problem
-	authorDisplay, err := h.userProvider.GetDisplay(r.Context(), p.AuthorID.Value())
+	authorDisplay, err := h.userProvider.GetDisplay(r.Context(), p.AuthorID().Value())
 	if err != nil {
-		slog.DebugContext(r.Context(), "failed to fetch author display", "error", err, "user_id", p.AuthorID.Value())
+		slog.DebugContext(r.Context(), "failed to fetch author display", "error", err, "user_id", p.AuthorID().Value())
 	}
 
 	handler.WriteJSON(w, http.StatusCreated, buildResponse(p, authorDisplay))
@@ -100,9 +100,9 @@ func (h *Handler) Update(w http.ResponseWriter, r *http.Request) {
 	}
 
 	p := result.Problem
-	authorDisplay, err := h.userProvider.GetDisplay(r.Context(), p.AuthorID.Value())
+	authorDisplay, err := h.userProvider.GetDisplay(r.Context(), p.AuthorID().Value())
 	if err != nil {
-		slog.DebugContext(r.Context(), "failed to fetch author display", "error", err, "user_id", p.AuthorID.Value())
+		slog.DebugContext(r.Context(), "failed to fetch author display", "error", err, "user_id", p.AuthorID().Value())
 	}
 	handler.WriteJSON(w, http.StatusOK, buildResponse(p, authorDisplay))
 }
@@ -170,9 +170,9 @@ func (h *Handler) Import(w http.ResponseWriter, r *http.Request) {
 	}
 
 	p := result.Problem
-	authorDisplay, err := h.userProvider.GetDisplay(r.Context(), p.AuthorID.Value())
+	authorDisplay, err := h.userProvider.GetDisplay(r.Context(), p.AuthorID().Value())
 	if err != nil {
-		slog.DebugContext(r.Context(), "failed to fetch author display", "error", err, "user_id", p.AuthorID.Value())
+		slog.DebugContext(r.Context(), "failed to fetch author display", "error", err, "user_id", p.AuthorID().Value())
 	}
 	handler.WriteJSON(w, http.StatusCreated, buildResponse(p, authorDisplay))
 }

@@ -54,72 +54,72 @@ func (r *ProblemRepository) Save(ctx context.Context, p *problem.Problem) error 
 			updated_at = EXCLUDED.updated_at
 	`
 
-	slug := p.Slug.String()
-	title := p.Title.String()
-	status := p.Status.String()
-	accessibility := p.Accessibility.String()
+	slug := p.Slug().String()
+	title := p.Title().String()
+	status := p.Status().String()
+	accessibility := p.Accessibility().String()
 
-	langOverridesJSON, err := mapLangOverridesToDB(p.LangOverrides)
+	langOverridesJSON, err := mapLangOverridesToDB(p.LangOverrides())
 	if err != nil {
-		slog.ErrorContext(ctx, "error mapping lang overrides to DB", "error", err, "problem_id", p.ID)
+		slog.ErrorContext(ctx, "error mapping lang overrides to DB", "error", err, "problem_id", p.ID())
 		return apperror.NewInternal()
 	}
 
-	solutionsJSON, err := mapSolutionsToDB(p.Solutions)
+	solutionsJSON, err := mapSolutionsToDB(p.Solutions())
 	if err != nil {
-		slog.ErrorContext(ctx, "error mapping solutions to DB", "error", err, "problem_id", p.ID)
+		slog.ErrorContext(ctx, "error mapping solutions to DB", "error", err, "problem_id", p.ID())
 		return apperror.NewInternal()
 	}
 
-	checkerJSON, err := mapJudgingFileToDB(p.Checker)
+	checkerJSON, err := mapJudgingFileToDB(p.Checker())
 	if err != nil {
-		slog.ErrorContext(ctx, "error mapping checker to DB", "error", err, "problem_id", p.ID)
+		slog.ErrorContext(ctx, "error mapping checker to DB", "error", err, "problem_id", p.ID())
 		return apperror.NewInternal()
 	}
 
-	validatorJSON, err := mapJudgingFileToDB(p.Validator)
+	validatorJSON, err := mapJudgingFileToDB(p.Validator())
 	if err != nil {
-		slog.ErrorContext(ctx, "error mapping validator to DB", "error", err, "problem_id", p.ID)
+		slog.ErrorContext(ctx, "error mapping validator to DB", "error", err, "problem_id", p.ID())
 		return apperror.NewInternal()
 	}
 
 	var tl *int
-	if p.TimeLimit != nil {
-		v := p.TimeLimit.Milliseconds()
+	if p.TimeLimit() != nil {
+		v := p.TimeLimit().Milliseconds()
 		tl = &v
 	}
 
 	var ml *int
-	if p.MemoryLimit != nil {
-		v := p.MemoryLimit.Megabytes()
+	if p.MemoryLimit() != nil {
+		v := p.MemoryLimit().Megabytes()
 		ml = &v
 	}
 
-	modifierStrings := make([]string, len(p.ModifierIDs))
-	for i, id := range p.ModifierIDs {
+	modifierStrings := make([]string, len(p.ModifierIDs()))
+	for i, id := range p.ModifierIDs() {
 		modifierStrings[i] = id.Value()
 	}
 
 	_, err = r.db.Exec(ctx, query,
-		p.ID,
+		p.ID(),
 		slug,
 		title,
-		p.Statement.Value(),
+		p.Statement().Value(),
 		tl,
 		ml,
-		p.Tags.Values(),
+		p.Tags().Values(),
 		status,
 		accessibility,
-		p.AuthorID.Value(),
+		p.AuthorID().Value(),
 		modifierStrings,
 		langOverridesJSON,
-		p.TestCasesKey,
+		p.TestCasesKey(),
 		solutionsJSON,
 		checkerJSON,
 		validatorJSON,
-		p.JudgingUpdatedAt,
-		p.CreatedAt,
-		p.UpdatedAt,
+		p.JudgingUpdatedAt(),
+		p.CreatedAt(),
+		p.UpdatedAt(),
 	)
 
 	if err != nil {
@@ -127,7 +127,7 @@ func (r *ProblemRepository) Save(ctx context.Context, p *problem.Problem) error 
 		if errors.As(err, &pgErr) && pgErr.Code == "23505" && pgErr.ConstraintName == "problems_slug_key" {
 			return &problem.ErrSlugAlreadyExists{Slug: slug}
 		}
-		slog.ErrorContext(ctx, "Database error in Save", "error", err, "problem_id", p.ID, "slug", slug)
+		slog.ErrorContext(ctx, "Database error in Save", "error", err, "problem_id", p.ID(), "slug", slug)
 		return apperror.NewInternal()
 	}
 

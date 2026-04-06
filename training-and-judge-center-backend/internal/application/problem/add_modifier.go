@@ -38,7 +38,7 @@ func (uc *AddModifierUseCase) Execute(ctx context.Context, input AddModifierInpu
 		return struct{}{}, err
 	}
 
-	isAuthor := p.AuthorID == problem.RestoreUserID(input.CurrentUser.ID)
+	isAuthor := p.AuthorID() == problem.RestoreUserID(input.CurrentUser.ID)
 	isAdmin := input.CurrentUser.Role == user.RoleAdmin
 
 	if !isAuthor && !isAdmin {
@@ -65,7 +65,7 @@ func (uc *AddModifierUseCase) Execute(ctx context.Context, input AddModifierInpu
 	}
 
 	if err := uc.repo.Save(ctx, p); err != nil {
-		slog.ErrorContext(ctx, "failed to save problem with new modifier", "error", err, "slug", p.Slug.String())
+		slog.ErrorContext(ctx, "failed to save problem with new modifier", "error", err, "slug", p.Slug().String())
 		return struct{}{}, apperror.NewInternal()
 	}
 

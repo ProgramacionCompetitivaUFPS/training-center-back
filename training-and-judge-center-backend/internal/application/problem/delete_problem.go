@@ -43,37 +43,37 @@ func (uc *DeleteProblemUseCase) Execute(ctx context.Context, in DeleteProblemInp
 		return struct{}{}, err
 	}
 
-	if in.ConfirmSlug != p.Slug.String() {
+	if in.ConfirmSlug != p.Slug().String() {
 		return struct{}{}, apperror.NewBadRequest(problem.ErrCodeSlugMismatch, "Confirmation slug does not match the problem slug")
 	}
 
 	viewerID := problem.RestoreUserID(in.CurrentUser.ID)
 	isAdmin := in.CurrentUser.Role == user.RoleAdmin
-	if p.AuthorID != viewerID && !isAdmin {
+	if p.AuthorID() != viewerID && !isAdmin {
 		return struct{}{}, apperror.NewForbidden(apperror.ErrCodeForbidden, "Only the problem author or Admin can delete this problem")
 	}
 
-	if err := uc.repo.Delete(ctx, p.ID); err != nil {
+	if err := uc.repo.Delete(ctx, p.ID()); err != nil {
 		return struct{}{}, err
 	}
 
 	var cleanupFailed bool
 
-	if p.TestCasesKey != nil {
+	if p.TestCasesKey() != nil {
 		var err error
 		for i := 0; i < maxRetries; i++ {
-			err = uc.fileStorage.DeleteFilesWithPrefix(ctx, *p.TestCasesKey)
+			err = uc.fileStorage.DeleteFilesWithPrefix(ctx, *p.TestCasesKey())
 			if err == nil {
 				break
 			}
 		}
 		if err != nil {
-			slog.ErrorContext(ctx, "problem deleted from DB but test cases storage cleanup failed", "prefix", *p.TestCasesKey, "error", err)
+			slog.ErrorContext(ctx, "problem deleted from DB but test cases storage cleanup failed", "prefix", *p.TestCasesKey(), "error", err)
 			cleanupFailed = true
 		}
 	}
 
-	for _, sol := range p.Solutions {
+	for _, sol := range p.Solutions() {
 		var err error
 		for i := 0; i < maxRetries; i++ {
 			err = uc.fileStorage.DeleteFile(ctx, sol.FileKey())
@@ -87,30 +87,30 @@ func (uc *DeleteProblemUseCase) Execute(ctx context.Context, in DeleteProblemInp
 		}
 	}
 
-	if p.Checker != nil {
+	if p.Checker() != nil {
 		var err error
 		for i := 0; i < maxRetries; i++ {
-			err = uc.fileStorage.DeleteFile(ctx, p.Checker.FileKey())
+			err = uc.fileStorage.DeleteFile(ctx, p.Checker().FileKey())
 			if err == nil {
 				break
 			}
 		}
 		if err != nil {
-			slog.ErrorContext(ctx, "problem deleted from DB but checker storage cleanup failed", "key", p.Checker.FileKey(), "error", err)
+			slog.ErrorContext(ctx, "problem deleted from DB but checker storage cleanup failed", "key", p.Checker().FileKey(), "error", err)
 			cleanupFailed = true
 		}
 	}
 
-	if p.Validator != nil {
+	if p.Validator() != nil {
 		var err error
 		for i := 0; i < maxRetries; i++ {
-			err = uc.fileStorage.DeleteFile(ctx, p.Validator.FileKey())
+			err = uc.fileStorage.DeleteFile(ctx, p.Validator().FileKey())
 			if err == nil {
 				break
 			}
 		}
 		if err != nil {
-			slog.ErrorContext(ctx, "problem deleted from DB but validator storage cleanup failed", "key", p.Validator.FileKey(), "error", err)
+			slog.ErrorContext(ctx, "problem deleted from DB but validator storage cleanup failed", "key", p.Validator().FileKey(), "error", err)
 			cleanupFailed = true
 		}
 	}

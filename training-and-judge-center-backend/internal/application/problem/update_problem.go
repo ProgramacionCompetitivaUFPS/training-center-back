@@ -49,7 +49,7 @@ func (uc *UpdateProblemUseCase) Execute(ctx context.Context, input UpdateProblem
 		return nil, err
 	}
 
-	if p.Status.IsPublished() {
+	if p.Status().IsPublished() {
 		return nil, apperror.NewBadRequest(ErrCodeProblemIsPublished, "Cannot update a published problem. Unpublish first to make changes.")
 	}
 

@@ -36,8 +36,8 @@ func (uc *ListModifiersUseCase) Execute(ctx context.Context, input ListModifiers
 		return nil, apperror.NewForbidden(apperror.ErrCodeForbidden, "Only the problem author, Admin, or assigned modifiers can view modifiers")
 	}
 
-	modifiers := make([]string, len(p.ModifierIDs))
-	for i, id := range p.ModifierIDs {
+	modifiers := make([]string, len(p.ModifierIDs()))
+	for i, id := range p.ModifierIDs() {
 		modifiers[i] = id.Value()
 	}
 	return modifiers, nil

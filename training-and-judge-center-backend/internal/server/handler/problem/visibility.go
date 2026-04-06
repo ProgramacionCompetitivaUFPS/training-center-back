@@ -47,8 +47,8 @@ func (h *Handler) Unpublish(w http.ResponseWriter, r *http.Request) {
 	}
 
 	handler.WriteJSON(w, http.StatusOK, unpublishResponse{
-		Slug:    p.Slug.String(),
-		Status:  p.Status.String(),
+		Slug:    p.Slug().String(),
+		Status:  p.Status().String(),
 		Message: "Problem unpublished successfully. You can now make changes.",
 	})
 }
@@ -79,9 +79,9 @@ func (h *Handler) ChangeAccessibility(w http.ResponseWriter, r *http.Request) {
 	}
 
 	handler.WriteJSON(w, http.StatusOK, changeAccessibilityResponse{
-		Slug:          p.Slug.String(),
-		Accessibility: p.Accessibility.String(),
-		Status:        p.Status.String(),
-		Message:       fmt.Sprintf("Problem accessibility changed to %s", p.Accessibility.String()),
+		Slug:          p.Slug().String(),
+		Accessibility: p.Accessibility().String(),
+		Status:        p.Status().String(),
+		Message:       fmt.Sprintf("Problem accessibility changed to %s", p.Accessibility().String()),
 	})
 }

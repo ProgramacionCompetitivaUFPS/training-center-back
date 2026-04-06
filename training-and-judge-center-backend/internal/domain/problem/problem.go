@@ -7,26 +7,46 @@ import (
 )
 
 type Problem struct {
-	ID               string
-	Slug             Slug
-	Title            Title
-	Statement        Statement
-	TimeLimit        *TimeLimit
-	MemoryLimit      *MemoryLimit
-	LangOverrides    []LanguageOverride
-	Tags             Tags
-	Status           Status
-	Accessibility    Accessibility
-	AuthorID         UserID
-	ModifierIDs      []UserID
-	TestCasesKey     *string
-	Solutions        []JudgingFile
-	Checker          *JudgingFile
-	Validator        *JudgingFile
-	JudgingUpdatedAt *time.Time
-	CreatedAt        time.Time
-	UpdatedAt        time.Time
+	id               string
+	slug             Slug
+	title            Title
+	statement        Statement
+	timeLimit        *TimeLimit
+	memoryLimit      *MemoryLimit
+	langOverrides    []LanguageOverride
+	tags             Tags
+	status           Status
+	accessibility    Accessibility
+	authorID         UserID
+	modifierIDs      []UserID
+	testCasesKey     *string
+	solutions        []JudgingFile
+	checker          *JudgingFile
+	validator        *JudgingFile
+	judgingUpdatedAt *time.Time
+	createdAt        time.Time
+	updatedAt        time.Time
 }
+
+func (p *Problem) ID() string                    { return p.id }
+func (p *Problem) Slug() Slug                    { return p.slug }
+func (p *Problem) Title() Title                  { return p.title }
+func (p *Problem) Statement() Statement          { return p.statement }
+func (p *Problem) TimeLimit() *TimeLimit         { return p.timeLimit }
+func (p *Problem) MemoryLimit() *MemoryLimit     { return p.memoryLimit }
+func (p *Problem) LangOverrides() []LanguageOverride { return p.langOverrides }
+func (p *Problem) Tags() Tags                    { return p.tags }
+func (p *Problem) Status() Status                { return p.status }
+func (p *Problem) Accessibility() Accessibility  { return p.accessibility }
+func (p *Problem) AuthorID() UserID              { return p.authorID }
+func (p *Problem) ModifierIDs() []UserID         { return p.modifierIDs }
+func (p *Problem) TestCasesKey() *string         { return p.testCasesKey }
+func (p *Problem) Solutions() []JudgingFile      { return p.solutions }
+func (p *Problem) Checker() *JudgingFile         { return p.checker }
+func (p *Problem) Validator() *JudgingFile       { return p.validator }
+func (p *Problem) JudgingUpdatedAt() *time.Time  { return p.judgingUpdatedAt }
+func (p *Problem) CreatedAt() time.Time          { return p.createdAt }
+func (p *Problem) UpdatedAt() time.Time          { return p.updatedAt }
 
 func NewProblem(
 	id string,
@@ -41,21 +61,21 @@ func NewProblem(
 ) *Problem {
 	now := time.Now().UTC()
 	return &Problem{
-		ID:            id,
-		Slug:          slug,
-		Title:         title,
-		Statement:     statement,
-		TimeLimit:     timeLimit,
-		MemoryLimit:   memoryLimit,
-		LangOverrides: langOverrides,
-		Tags:          tags,
-		Status:        NewStatusDraft(),
-		Accessibility: NewAccessibilityPrivate(),
-		AuthorID:      authorID,
-		ModifierIDs:   []UserID{},
-		Solutions:     []JudgingFile{},
-		CreatedAt:     now,
-		UpdatedAt:     now,
+		id:            id,
+		slug:          slug,
+		title:         title,
+		statement:     statement,
+		timeLimit:     timeLimit,
+		memoryLimit:   memoryLimit,
+		langOverrides: langOverrides,
+		tags:          tags,
+		status:        NewStatusDraft(),
+		accessibility: NewAccessibilityPrivate(),
+		authorID:      authorID,
+		modifierIDs:   []UserID{},
+		solutions:     []JudgingFile{},
+		createdAt:     now,
+		updatedAt:     now,
 	}
 }
 
@@ -68,31 +88,31 @@ func (p *Problem) UpdateMetadata(
 	tags *Tags,
 ) {
 	if title != nil {
-		p.Title = *title
+		p.title = *title
 	}
 	if statement != nil {
-		p.Statement = *statement
+		p.statement = *statement
 	}
 	if timeLimit != nil {
-		p.TimeLimit = *timeLimit
+		p.timeLimit = *timeLimit
 	}
 	if memoryLimit != nil {
-		p.MemoryLimit = *memoryLimit
+		p.memoryLimit = *memoryLimit
 	}
 	if langOverrides != nil {
-		p.LangOverrides = langOverrides
+		p.langOverrides = langOverrides
 	}
 	if tags != nil {
-		p.Tags = *tags
+		p.tags = *tags
 	}
-	p.UpdatedAt = time.Now().UTC()
+	p.updatedAt = time.Now().UTC()
 }
 
 func (p *Problem) CanBeEditedBy(userID UserID, isAdmin bool) bool {
-	if p.AuthorID == userID || isAdmin {
+	if p.authorID == userID || isAdmin {
 		return true
 	}
-	for _, id := range p.ModifierIDs {
+	for _, id := range p.modifierIDs {
 		if id == userID {
 			return true
 		}
@@ -101,34 +121,34 @@ func (p *Problem) CanBeEditedBy(userID UserID, isAdmin bool) bool {
 }
 
 func (p *Problem) Unpublish() error {
-	if !p.Status.IsPublished() {
+	if !p.status.IsPublished() {
 		return apperror.NewConflict(ErrCodeAlreadyDraft, "Problem is already unpublished")
 	}
-	p.Status = NewStatusDraft()
-	p.UpdatedAt = time.Now().UTC()
+	p.status = NewStatusDraft()
+	p.updatedAt = time.Now().UTC()
 	return nil
 }
 
 func (p *Problem) UpdateAccessibility(acc Accessibility) {
-	p.Accessibility = acc
-	p.UpdatedAt = time.Now().UTC()
+	p.accessibility = acc
+	p.updatedAt = time.Now().UTC()
 }
 
 func (p *Problem) AddModifier(userID UserID) error {
-	for _, id := range p.ModifierIDs {
+	for _, id := range p.modifierIDs {
 		if id == userID {
 			return apperror.NewConflict(ErrCodeModifierAlreadyExists, "User is already a modifier of this problem")
 		}
 	}
-	p.ModifierIDs = append(p.ModifierIDs, userID)
-	p.UpdatedAt = time.Now().UTC()
+	p.modifierIDs = append(p.modifierIDs, userID)
+	p.updatedAt = time.Now().UTC()
 	return nil
 }
 
 func (p *Problem) RemoveModifier(userID UserID) error {
 	found := false
-	newModifiers := make([]UserID, 0, len(p.ModifierIDs))
-	for _, id := range p.ModifierIDs {
+	newModifiers := make([]UserID, 0, len(p.modifierIDs))
+	for _, id := range p.modifierIDs {
 		if id == userID {
 			found = true
 			continue
@@ -138,67 +158,67 @@ func (p *Problem) RemoveModifier(userID UserID) error {
 	if !found {
 		return apperror.NewNotFound(ErrCodeModifierNotFound, "User is not a modifier of this problem")
 	}
-	p.ModifierIDs = newModifiers
-	p.UpdatedAt = time.Now().UTC()
+	p.modifierIDs = newModifiers
+	p.updatedAt = time.Now().UTC()
 	return nil
 }
 
 func (p *Problem) touchJudgingUpdatedAt(now time.Time) {
-	p.JudgingUpdatedAt = &now
-	p.UpdatedAt = now
+	p.judgingUpdatedAt = &now
+	p.updatedAt = now
 }
 
 func (p *Problem) SetTestCases(fileKey string) {
-	p.TestCasesKey = &fileKey
+	p.testCasesKey = &fileKey
 	p.touchJudgingUpdatedAt(time.Now().UTC())
 }
 func (p *Problem) RemoveTestCases() {
-	p.TestCasesKey = nil
+	p.testCasesKey = nil
 	p.touchJudgingUpdatedAt(time.Now().UTC())
 }
 
 func (p *Problem) AddSolution(solution JudgingFile) *JudgingFile {
-	for i, sol := range p.Solutions {
+	for i, sol := range p.solutions {
 		if sol.Filename() == solution.Filename() {
 			old := sol
-			p.Solutions[i] = solution
-			p.UpdatedAt = time.Now().UTC()
+			p.solutions[i] = solution
+			p.updatedAt = time.Now().UTC()
 			return &old
 		}
 	}
-	p.Solutions = append(p.Solutions, solution)
-	p.UpdatedAt = time.Now().UTC()
+	p.solutions = append(p.solutions, solution)
+	p.updatedAt = time.Now().UTC()
 	return nil
 }
 
 func (p *Problem) RemoveSolution(filename string) {
-	newSolutions := make([]JudgingFile, 0, len(p.Solutions))
-	for _, sol := range p.Solutions {
+	newSolutions := make([]JudgingFile, 0, len(p.solutions))
+	for _, sol := range p.solutions {
 		if sol.Filename() != filename {
 			newSolutions = append(newSolutions, sol)
 		}
 	}
-	p.Solutions = newSolutions
-	p.UpdatedAt = time.Now().UTC()
+	p.solutions = newSolutions
+	p.updatedAt = time.Now().UTC()
 }
 
 func (p *Problem) SetChecker(checker JudgingFile) {
-	p.Checker = &checker
+	p.checker = &checker
 	p.touchJudgingUpdatedAt(time.Now().UTC())
 }
 
 func (p *Problem) RemoveChecker() {
-	p.Checker = nil
+	p.checker = nil
 	p.touchJudgingUpdatedAt(time.Now().UTC())
 }
 
 func (p *Problem) SetValidator(validator JudgingFile) {
-	p.Validator = &validator
+	p.validator = &validator
 	p.touchJudgingUpdatedAt(time.Now().UTC())
 }
 
 func (p *Problem) RemoveValidator() {
-	p.Validator = nil
+	p.validator = nil
 	p.touchJudgingUpdatedAt(time.Now().UTC())
 }
 
@@ -248,24 +268,24 @@ func RestoreProblem(
 	}
 
 	return &Problem{
-		ID:               id,
-		Slug:             RestoreSlug(slug),
-		Title:            RestoreTitle(title),
-		Statement:        RestoreStatement(statement),
-		TimeLimit:        tl,
-		MemoryLimit:      ml,
-		LangOverrides:    langOverrides,
-		Tags:             RestoreTags(tags),
-		Status:           RestoreStatus(status),
-		Accessibility:    RestoreAccessibility(accessibility),
-		AuthorID:         authorID,
-		ModifierIDs:      modifierIDs,
-		TestCasesKey:     testCasesKey,
-		Solutions:        solutions,
-		Checker:          checker,
-		Validator:        validator,
-		JudgingUpdatedAt: judgingUpdatedAt,
-		CreatedAt:        createdAt,
-		UpdatedAt:        updatedAt,
+		id:               id,
+		slug:             RestoreSlug(slug),
+		title:            RestoreTitle(title),
+		statement:        RestoreStatement(statement),
+		timeLimit:        tl,
+		memoryLimit:      ml,
+		langOverrides:    langOverrides,
+		tags:             RestoreTags(tags),
+		status:           RestoreStatus(status),
+		accessibility:    RestoreAccessibility(accessibility),
+		authorID:         authorID,
+		modifierIDs:      modifierIDs,
+		testCasesKey:     testCasesKey,
+		solutions:        solutions,
+		checker:          checker,
+		validator:        validator,
+		judgingUpdatedAt: judgingUpdatedAt,
+		createdAt:        createdAt,
+		updatedAt:        updatedAt,
 	}
 }

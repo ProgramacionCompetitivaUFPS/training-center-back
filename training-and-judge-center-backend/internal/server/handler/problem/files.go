@@ -92,7 +92,7 @@ func (h *Handler) UploadFiles(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	authorDisplay, _ := h.userProvider.GetDisplay(r.Context(), res.Problem.AuthorID.Value())
+	authorDisplay, _ := h.userProvider.GetDisplay(r.Context(), res.Problem.AuthorID().Value())
 	handler.WriteJSON(w, http.StatusOK, map[string]interface{}{
 		"message": res.Message,
 		"problem": buildResponse(res.Problem, authorDisplay),

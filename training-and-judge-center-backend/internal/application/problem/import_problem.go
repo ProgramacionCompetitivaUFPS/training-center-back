@@ -216,16 +216,16 @@ func (uc *ImportProblemUseCase) Execute(ctx context.Context, input ImportProblem
 		return nil, apperror.NewInternal()
 	}
 
-	solutionsLoaded := make([]string, 0, len(newProblem.Solutions))
-	for _, sol := range newProblem.Solutions {
+	solutionsLoaded := make([]string, 0, len(newProblem.Solutions()))
+	for _, sol := range newProblem.Solutions() {
 		solutionsLoaded = append(solutionsLoaded, sol.Filename())
 	}
 
 	return &ImportProblemResult{
 		Problem:         newProblem,
-		TestCasesLoaded: newProblem.TestCasesKey != nil,
-		CheckerLoaded:   newProblem.Checker != nil,
-		ValidatorLoaded: newProblem.Validator != nil,
+		TestCasesLoaded: newProblem.TestCasesKey() != nil,
+		CheckerLoaded:   newProblem.Checker() != nil,
+		ValidatorLoaded: newProblem.Validator() != nil,
 		SolutionsLoaded: solutionsLoaded,
 	}, nil
 }
