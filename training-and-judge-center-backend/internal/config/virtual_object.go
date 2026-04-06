@@ -15,15 +15,15 @@ type LanguageLimit struct {
 type VirtualObject struct {
 	SupportedLanguages    []string          `json:"supportedLanguages"`
 	LanguageExtensions    map[string]string `json:"languageExtensions"`
-	UploadMaxConcurrency  int             `json:"uploadMaxConcurrency"`
-	MaxFileCountSample    int             `json:"maxFileCountSample"`
-	MaxFileSizeTestCaseMB int             `json:"maxFileSizeTestCaseMB"`
-	MaxFileCountTestCase  int             `json:"maxFileCountTestCase"`
-	MaxFileSizeDefaultMB  int             `json:"maxFileSizeDefaultMB"`
-	MaxTimeLimitGlobal   int             `json:"maxTimeLimitGlobal"`
-	MaxMemoryLimitGlobal int             `json:"maxMemoryLimitGlobal"`
-	LanguageOverrides    []LanguageLimit `json:"languageOverrides"`
-	Tags                 []string        `json:"tags"`
+	UploadMaxConcurrency  int               `json:"uploadMaxConcurrency"`
+	MaxFileCountSample    int               `json:"maxFileCountSample"`
+	MaxFileSizeTestCaseMB int               `json:"maxFileSizeTestCaseMB"`
+	MaxFileCountTestCase  int               `json:"maxFileCountTestCase"`
+	MaxFileSizeDefaultMB  int               `json:"maxFileSizeDefaultMB"`
+	MaxTimeLimitGlobal    int               `json:"maxTimeLimitGlobal"`
+	MaxMemoryLimitGlobal  int               `json:"maxMemoryLimitGlobal"`
+	LanguageOverrides     []LanguageLimit   `json:"languageOverrides"`
+	Tags                  []string          `json:"tags"`
 }
 
 func loadVirtualObject() *VirtualObject {
@@ -32,13 +32,13 @@ func loadVirtualObject() *VirtualObject {
 	data, err := os.ReadFile(path)
 	if err != nil {
 		slog.Error("failed to read virtual object config", "path", path, "error", err)
-		return nil
+		os.Exit(1)
 	}
 
 	var vo VirtualObject
 	if err := json.Unmarshal(data, &vo); err != nil {
 		slog.Error("failed to parse virtual object config", "path", path, "error", err)
-		return nil
+		os.Exit(1)
 	}
 
 	return &vo
