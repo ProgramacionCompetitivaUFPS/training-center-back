@@ -22,7 +22,7 @@ func NewTimeLimit(value int, maxGlobal int) (TimeLimit, error) {
 	return TimeLimit{value: value}, nil
 }
 
-func (t TimeLimit) Value() int {
+func (t TimeLimit) Milliseconds() int {
 	return t.value
 }
 

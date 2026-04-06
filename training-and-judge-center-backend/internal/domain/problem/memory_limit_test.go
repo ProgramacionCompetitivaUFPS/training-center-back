@@ -61,8 +61,8 @@ func TestNewMemoryLimit(t *testing.T) {
 					return
 				}
 
-				if ml.Value() != tt.value {
-					t.Errorf("expected value %d, got %d", tt.value, ml.Value())
+				if ml.Megabytes() != tt.value {
+					t.Errorf("expected value %d, got %d", tt.value, ml.Megabytes())
 				}
 			}
 		})

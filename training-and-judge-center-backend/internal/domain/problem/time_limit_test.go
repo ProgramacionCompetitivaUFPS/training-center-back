@@ -61,8 +61,8 @@ func TestNewTimeLimit(t *testing.T) {
 					return
 				}
 
-				if tl.Value() != tt.value {
-					t.Errorf("expected value %d, got %d", tt.value, tl.Value())
+				if tl.Milliseconds() != tt.value {
+					t.Errorf("expected value %d, got %d", tt.value, tl.Milliseconds())
 				}
 			}
 		})

@@ -22,7 +22,7 @@ func NewMemoryLimit(value int, maxGlobal int) (MemoryLimit, error) {
 	return MemoryLimit{value: value}, nil
 }
 
-func (m MemoryLimit) Value() int {
+func (m MemoryLimit) Megabytes() int {
 	return m.value
 }
 

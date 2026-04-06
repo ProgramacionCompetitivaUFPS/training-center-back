@@ -85,13 +85,13 @@ func (r *ProblemRepository) Save(ctx context.Context, p *problem.Problem) error 
 
 	var tl *int
 	if p.TimeLimit != nil {
-		v := p.TimeLimit.Value()
+		v := p.TimeLimit.Milliseconds()
 		tl = &v
 	}
 
 	var ml *int
 	if p.MemoryLimit != nil {
-		v := p.MemoryLimit.Value()
+		v := p.MemoryLimit.Megabytes()
 		ml = &v
 	}
 
