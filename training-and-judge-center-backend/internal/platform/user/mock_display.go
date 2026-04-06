@@ -32,10 +32,13 @@ func (m *MockDisplayProvider) GetDisplay(_ context.Context, userID string) (*use
 	return &user.Display{Nickname: nick, Name: "Mock User"}, nil
 }
 
-func (m *MockDisplayProvider) GetDisplays(_ context.Context, userIDs []string) (map[string]*user.Display, error) {
+func (m *MockDisplayProvider) GetDisplays(ctx context.Context, userIDs []string) (map[string]*user.Display, error) {
 	out := make(map[string]*user.Display, len(userIDs))
 	for _, id := range userIDs {
-		d, _ := m.GetDisplay(nil, id)
+		d, err := m.GetDisplay(ctx, id)
+		if err != nil {
+			return nil, err
+		}
 		out[id] = d
 	}
 	return out, nil

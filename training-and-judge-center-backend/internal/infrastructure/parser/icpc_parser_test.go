@@ -10,23 +10,29 @@ import (
 	"github.com/training-judge-center/backend/pkg/apperror"
 )
 
-func createZipBuffer(files map[string][]byte) []byte {
+func createZipBuffer(t *testing.T, files map[string][]byte) []byte {
+	t.Helper()
 	buf := new(bytes.Buffer)
 	w := zip.NewWriter(buf)
-
 	for name, content := range files {
-		f, _ := w.Create(name)
-		f.Write(content)
+		f, err := w.Create(name)
+		if err != nil {
+			t.Fatalf("createZipBuffer: failed to create entry %q: %v", name, err)
+		}
+		if _, err := f.Write(content); err != nil {
+			t.Fatalf("createZipBuffer: failed to write entry %q: %v", name, err)
+		}
 	}
-
-	w.Close()
+	if err := w.Close(); err != nil {
+		t.Fatalf("createZipBuffer: failed to close zip writer: %v", err)
+	}
 	return buf.Bytes()
 }
 
 func TestICPCParser_ValidArchive(t *testing.T) {
 	p := parser.NewICPCParser(200, 2, 10000, 10, nil)
 
-	zipData := createZipBuffer(map[string][]byte{
+	zipData := createZipBuffer(t, map[string][]byte{
 		"data/sample/1.in":  []byte("1 2"),
 		"data/sample/1.ans": []byte("3"),
 		"data/secret/2.in":  []byte("10 20"),
@@ -49,7 +55,7 @@ func TestICPCParser_ValidArchive(t *testing.T) {
 func TestICPCParser_InvalidExtension(t *testing.T) {
 	p := parser.NewICPCParser(200, 2, 10000, 10, nil)
 
-	zipData := createZipBuffer(map[string][]byte{
+	zipData := createZipBuffer(t, map[string][]byte{
 		"data/sample/1.in":  []byte("1 2"),
 		"data/sample/1.txt": []byte("3"),
 	})
@@ -72,7 +78,7 @@ func TestICPCParser_InvalidExtension(t *testing.T) {
 func TestICPCParser_PathTraversal(t *testing.T) {
 	p := parser.NewICPCParser(200, 2, 10000, 10, nil)
 
-	zipData := createZipBuffer(map[string][]byte{
+	zipData := createZipBuffer(t, map[string][]byte{
 		"data/sample/1.in":            []byte("1 2"),
 		"data/sample/../../etc/hosts": []byte("malicious"),
 	})
@@ -86,7 +92,7 @@ func TestICPCParser_PathTraversal(t *testing.T) {
 func TestICPCParser_MissingContentDir(t *testing.T) {
 	p := parser.NewICPCParser(200, 2, 10000, 10, nil)
 
-	zipData := createZipBuffer(map[string][]byte{
+	zipData := createZipBuffer(t, map[string][]byte{
 		"some_other_dir/1.in": []byte("1 2"),
 	})
 
@@ -99,7 +105,7 @@ func TestICPCParser_MissingContentDir(t *testing.T) {
 func TestICPCParser_TooManySamples(t *testing.T) {
 	p := parser.NewICPCParser(200, 2, 10000, 1, nil)
 
-	zipData := createZipBuffer(map[string][]byte{
+	zipData := createZipBuffer(t, map[string][]byte{
 		"data/sample/1.in": []byte("1 2"),
 		"data/sample/2.in": []byte("3"),
 	})

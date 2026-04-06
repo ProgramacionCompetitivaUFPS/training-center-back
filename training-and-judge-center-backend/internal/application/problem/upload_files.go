@@ -208,23 +208,12 @@ func (uc *UploadProblemFilesUseCase) handleSolution(ctx context.Context, p *prob
 		return fileAction{}, err
 	}
 
-	isNewKey := true
-	for _, existing := range p.Solutions {
-		if existing.Filename() == cleanName {
-			isNewKey = false
-			break
-		}
-	}
-
 	if err := uc.storage.UploadFile(ctx, fileKey, input.FileData); err != nil {
 		slog.ErrorContext(ctx, "failed to upload solution file", "error", err, "slug", p.Slug.String(), "filename", cleanName)
 		return fileAction{}, apperror.NewInternal()
 	}
 
-	action := fileAction{}
-	if isNewKey {
-		action.toDeleteOnFailure = []string{fileKey}
-	}
+	action := fileAction{toDeleteOnFailure: []string{fileKey}}
 
 	if old := p.AddSolution(solutionObj); old != nil && old.FileKey() != fileKey {
 		action.toDeleteOnSuccess = []string{old.FileKey()}
