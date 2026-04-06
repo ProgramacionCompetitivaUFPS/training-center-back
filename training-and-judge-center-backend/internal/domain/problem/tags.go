@@ -46,13 +46,15 @@ func NewTags(values []string, allowedTags map[string]struct{}) (Tags, error) {
 		return Tags{}, apperror.NewValidation(fieldErrs)
 	}
 
-	return Tags{values: values}, nil
+	copied := make([]string, len(values))
+	copy(copied, values)
+	return Tags{values: copied}, nil
 }
 
 func (t Tags) Values() []string {
-	cp := make([]string, len(t.values))
-	copy(cp, t.values)
-	return cp
+	cop := make([]string, len(t.values))
+	copy(cop, t.values)
+	return cop
 }
 
 func RestoreTags(values []string) Tags {

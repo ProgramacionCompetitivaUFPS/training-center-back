@@ -361,7 +361,11 @@ func (r *ProblemRepository) List(ctx context.Context, filters problem.ListFilter
 	}
 
 	if len(filters.Statuses) > 0 {
-		conds = append(conds, fmt.Sprintf("status = ANY(%s)", nextArg(filters.Statuses)))
+		statusStrings := make([]string, len(filters.Statuses))
+		for i, s := range filters.Statuses {
+			statusStrings[i] = s.String()
+		}
+		conds = append(conds, fmt.Sprintf("status = ANY(%s)", nextArg(statusStrings)))
 	}
 
 	if filters.ViewerModifierID != nil {
@@ -381,7 +385,7 @@ func (r *ProblemRepository) List(ctx context.Context, filters problem.ListFilter
 	}
 
 	if filters.Accessibility != nil {
-		conds = append(conds, fmt.Sprintf("accessibility = %s", nextArg(*filters.Accessibility)))
+		conds = append(conds, fmt.Sprintf("accessibility = %s", nextArg(filters.Accessibility.String())))
 	}
 
 	var where string

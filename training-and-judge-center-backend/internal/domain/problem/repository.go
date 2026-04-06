@@ -11,11 +11,11 @@ func (e *ErrSlugAlreadyExists) Error() string {
 }
 
 type ListFilters struct {
-	Statuses         []string
+	Statuses         []Status
 	ViewerModifierID *string
 	AuthorID         *string
 	Tags             []string
-	Accessibility    *string
+	Accessibility    *Accessibility
 	Page             int
 	Limit            int
 }

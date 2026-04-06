@@ -55,14 +55,29 @@ func (uc *ListProblemsUseCase) Execute(ctx context.Context, in ListProblemsInput
 	}
 
 	filters := problem.ListFilters{
-		Tags:          in.Tags,
-		Accessibility: in.Accessibility,
-		Page:          in.Page,
-		Limit:         in.Limit,
+		Tags:  in.Tags,
+		Page:  in.Page,
+		Limit: in.Limit,
 	}
 
 	if in.Status != nil {
-		filters.Statuses = []string{*in.Status}
+		s, err := problem.NewStatus(*in.Status)
+		if err != nil {
+			return nil, apperror.NewValidation([]apperror.FieldError{
+				{Field: "status", Message: "Invalid status. Must be DRAFT or PUBLISHED"},
+			})
+		}
+		filters.Statuses = []problem.Status{s}
+	}
+
+	if in.Accessibility != nil {
+		acc, err := problem.NewAccessibility(*in.Accessibility)
+		if err != nil {
+			return nil, apperror.NewValidation([]apperror.FieldError{
+				{Field: "accessibility", Message: "Invalid accessibility. Must be PUBLIC or PRIVATE"},
+			})
+		}
+		filters.Accessibility = &acc
 	}
 
 	isAdmin := in.CurrentUser.Role == user.RoleAdmin
