@@ -12,6 +12,8 @@ type updateUserRequest struct {
 	Name        *string `json:"name"`
 	Nickname    *string `json:"nickname"`
 	Institution *string `json:"institution"`
+	City        *string `json:"city"`
+	Country     *string `json:"country"`
 }
 
 func (h *UserHandler) UpdateProfile(w http.ResponseWriter, r *http.Request) {
@@ -38,6 +40,8 @@ func (h *UserHandler) UpdateProfile(w http.ResponseWriter, r *http.Request) {
 		Name:        req.Name,
 		Nickname:    req.Nickname,
 		Institution: req.Institution,
+		City:        req.City,
+		Country:     req.Country,
 	})
 	if err != nil {
 		respondError(w, err)
