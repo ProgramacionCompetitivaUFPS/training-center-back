@@ -2,6 +2,7 @@ package user
 
 import (
 	"context"
+	"errors"
 
 	"github.com/training-judge-center/backend/internal/domain/user"
 	"github.com/training-judge-center/backend/pkg/apperror"
@@ -60,28 +61,18 @@ func (uc *CreateUserUseCase) Execute(ctx context.Context, input CreateUserInput)
 		return nil, apperror.NewValidation(fieldErrors)
 	}
 
-	emailExists, err := uc.repo.ExistsByEmail(ctx, email)
-	if err != nil {
-		return nil, apperror.NewInternal()
-	}
-	if emailExists {
-		return nil, apperror.NewConflict("EMAIL_ALREADY_EXISTS", "The email address is already in use")
-	}
-
-	nicknameExists, err := uc.repo.ExistsByNickname(ctx, nickname)
-	if err != nil {
-		return nil, apperror.NewInternal()
-	}
-	if nicknameExists {
-		return nil, apperror.NewConflict("NICKNAME_ALREADY_EXISTS", "The nickname is already in use")
-	}
-
 	newUser, err := user.NewUser(email, password, input.Name, nickname, input.Country, input.City, input.Institution)
 	if err != nil {
 		return nil, apperror.NewInternal()
 	}
 
 	if err := uc.repo.Save(ctx, newUser); err != nil {
+		if errors.Is(err, user.ErrEmailConflict) {
+			return nil, apperror.NewConflict("EMAIL_ALREADY_EXISTS", "The email address is already in use")
+		}
+		if errors.Is(err, user.ErrNicknameConflict) {
+			return nil, apperror.NewConflict("NICKNAME_ALREADY_EXISTS", "The nickname is already in use")
+		}
 		return nil, apperror.NewInternal()
 	}
 

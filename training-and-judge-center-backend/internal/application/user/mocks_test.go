@@ -39,14 +39,12 @@ func (m *mockSessionInvalidator) IsSessionRevoked(ctx context.Context, userID st
 }
 
 type mockUserRepository struct {
-	saveFn            func(ctx context.Context, u *domain.User) error
-	findByIDFn        func(ctx context.Context, id string) (*domain.User, error)
-	findByEmailFn     func(ctx context.Context, email domain.Email) (*domain.User, error)
-	findByNicknameFn  func(ctx context.Context, nickname domain.Nickname) (*domain.User, error)
-	existsByEmailFn   func(ctx context.Context, email domain.Email) (bool, error)
-	existsByNicknameFn func(ctx context.Context, nickname domain.Nickname) (bool, error)
-	updateFn          func(ctx context.Context, u *domain.User) error
-	findAllFn         func(ctx context.Context, filter domain.UserFilter) ([]*domain.User, int, error)
+	saveFn           func(ctx context.Context, u *domain.User) error
+	findByIDFn       func(ctx context.Context, id string) (*domain.User, error)
+	findByEmailFn    func(ctx context.Context, email domain.Email) (*domain.User, error)
+	findByNicknameFn func(ctx context.Context, nickname domain.Nickname) (*domain.User, error)
+	updateFn         func(ctx context.Context, u *domain.User) error
+	findAllFn        func(ctx context.Context, filter domain.UserFilter) ([]*domain.User, int, error)
 }
 
 func (m *mockUserRepository) Save(ctx context.Context, u *domain.User) error {
@@ -72,18 +70,6 @@ func (m *mockUserRepository) FindByNickname(ctx context.Context, nickname domain
 		return m.findByNicknameFn(ctx, nickname)
 	}
 	return nil, nil
-}
-func (m *mockUserRepository) ExistsByEmail(ctx context.Context, email domain.Email) (bool, error) {
-	if m.existsByEmailFn != nil {
-		return m.existsByEmailFn(ctx, email)
-	}
-	return false, nil
-}
-func (m *mockUserRepository) ExistsByNickname(ctx context.Context, nickname domain.Nickname) (bool, error) {
-	if m.existsByNicknameFn != nil {
-		return m.existsByNicknameFn(ctx, nickname)
-	}
-	return false, nil
 }
 func (m *mockUserRepository) Update(ctx context.Context, u *domain.User) error {
 	if m.updateFn != nil {

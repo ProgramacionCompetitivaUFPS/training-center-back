@@ -40,6 +40,15 @@ func (r *UserRepository) Save(ctx context.Context, u *user.User) error {
 		u.CreatedAt(),
 	)
 	if err != nil {
+		var pgErr *pgconn.PgError
+		if errors.As(err, &pgErr) && pgErr.Code == "23505" {
+			switch pgErr.ConstraintName {
+			case "users_email_key":
+				return user.ErrEmailConflict
+			case "users_nickname_key":
+				return user.ErrNicknameConflict
+			}
+		}
 		return fmt.Errorf("failed to save user: %w", err)
 	}
 
@@ -85,30 +94,6 @@ func (r *UserRepository) Update(ctx context.Context, u *user.User) error {
 	}
 
 	return nil
-}
-
-func (r *UserRepository) ExistsByEmail(ctx context.Context, email user.Email) (bool, error) {
-	query := `SELECT EXISTS(SELECT 1 FROM users WHERE email = $1)`
-
-	var exists bool
-	err := r.querier.QueryRow(ctx, query, email.String()).Scan(&exists)
-	if err != nil {
-		return false, fmt.Errorf("failed to check email: %w", err)
-	}
-
-	return exists, nil
-}
-
-func (r *UserRepository) ExistsByNickname(ctx context.Context, nickname user.Nickname) (bool, error) {
-	query := `SELECT EXISTS(SELECT 1 FROM users WHERE nickname = $1)`
-
-	var exists bool
-	err := r.querier.QueryRow(ctx, query, nickname.String()).Scan(&exists)
-	if err != nil {
-		return false, fmt.Errorf("failed to check nickname: %w", err)
-	}
-
-	return exists, nil
 }
 
 const userColumns = `id, email, password, name, nickname, country, city, institution, role, status, created_at, updated_at, deactivated_at`

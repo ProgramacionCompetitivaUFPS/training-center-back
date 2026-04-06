@@ -82,8 +82,8 @@ func TestCreateUser_ValidationErrors(t *testing.T) {
 
 func TestCreateUser_EmailAlreadyExists(t *testing.T) {
 	repo := newNoConflictRepo()
-	repo.existsByEmailFn = func(_ context.Context, _ domain.Email) (bool, error) {
-		return true, nil
+	repo.saveFn = func(_ context.Context, _ *domain.User) error {
+		return domain.ErrEmailConflict
 	}
 	uc := NewCreateUserUseCase(repo)
 
@@ -103,8 +103,8 @@ func TestCreateUser_EmailAlreadyExists(t *testing.T) {
 
 func TestCreateUser_NicknameAlreadyExists(t *testing.T) {
 	repo := newNoConflictRepo()
-	repo.existsByNicknameFn = func(_ context.Context, _ domain.Nickname) (bool, error) {
-		return true, nil
+	repo.saveFn = func(_ context.Context, _ *domain.User) error {
+		return domain.ErrNicknameConflict
 	}
 	uc := NewCreateUserUseCase(repo)
 
@@ -143,23 +143,3 @@ func TestCreateUser_RepositorySaveError(t *testing.T) {
 	}
 }
 
-func TestCreateUser_RepositoryExistsByEmailError(t *testing.T) {
-	repo := newNoConflictRepo()
-	repo.existsByEmailFn = func(_ context.Context, _ domain.Email) (bool, error) {
-		return false, errors.New("db error")
-	}
-	uc := NewCreateUserUseCase(repo)
-
-	_, err := uc.Execute(context.Background(), validInput())
-	if err == nil {
-		t.Fatal("expected error, got nil")
-	}
-
-	appErr, ok := err.(*apperror.AppError)
-	if !ok {
-		t.Fatalf("expected *apperror.AppError, got %T", err)
-	}
-	if appErr.Code != "INTERNAL_ERROR" {
-		t.Errorf("expected code INTERNAL_ERROR, got %q", appErr.Code)
-	}
-}

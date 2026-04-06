@@ -2,6 +2,7 @@ package user
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"time"
@@ -59,14 +60,6 @@ func (uc *ConfirmEmailChangeUseCase) Execute(ctx context.Context, input ConfirmE
 		return nil, apperror.NewBadRequest("INVALID_CODE", "The verification code is invalid or has expired")
 	}
 
-	emailExists, err := uc.userRepo.ExistsByEmail(ctx, req.NewEmail())
-	if err != nil {
-		return nil, apperror.NewInternal()
-	}
-	if emailExists {
-		return nil, apperror.NewConflict("EMAIL_ALREADY_EXISTS", "The email address is already in use")
-	}
-
 	oldEmail := u.Email().String()
 	newEmailVal := req.NewEmail()
 	u.UpdateEmail(newEmailVal)
@@ -81,6 +74,9 @@ func (uc *ConfirmEmailChangeUseCase) Execute(ctx context.Context, input ConfirmE
 		}
 		return nil
 	}); err != nil {
+		if errors.Is(err, user.ErrEmailConflict) {
+			return nil, apperror.NewConflict("EMAIL_ALREADY_EXISTS", "The email address is already in use")
+		}
 		return nil, apperror.NewInternal()
 	}
 

@@ -58,14 +58,6 @@ func (uc *RequestEmailChangeUseCase) Execute(ctx context.Context, input RequestE
 		})
 	}
 
-	emailExists, err := uc.userRepo.ExistsByEmail(ctx, parsedNewEmail)
-	if err != nil {
-		return apperror.NewInternal()
-	}
-	if emailExists {
-		return apperror.NewConflict("EMAIL_ALREADY_EXISTS", "The email address is already in use")
-	}
-
 	if err := uc.emailChangeRepo.InvalidatePendingByUserID(ctx, input.UserID); err != nil {
 		return apperror.NewInternal()
 	}

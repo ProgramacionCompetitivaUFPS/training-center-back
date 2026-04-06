@@ -20,10 +20,6 @@ func TestRequestEmailChange_Success(t *testing.T) {
 		}
 		return nil, nil
 	}
-	userRepo.existsByEmailFn = func(_ context.Context, _ domain.Email) (bool, error) {
-		return false, nil // Email is unique
-	}
-
 	emailChangeRepo := &mockEmailChangeRepo{}
 	
 	emailSent := false
@@ -83,39 +79,6 @@ func TestRequestEmailChange_WrongPassword(t *testing.T) {
 	}
 }
 
-func TestRequestEmailChange_EmailAlreadyExists(t *testing.T) {
-	userRepo := newNoConflictRepo()
-	activeUser := newUserWithRole("user-1", domain.RoleContestant, domain.StatusActive)
-	userRepo.findByIDFn = func(_ context.Context, id string) (*domain.User, error) {
-		if id == "user-1" {
-			return activeUser, nil
-		}
-		return nil, nil
-	}
-	userRepo.existsByEmailFn = func(_ context.Context, _ domain.Email) (bool, error) {
-		return true, nil // Email is already in use
-	}
-
-	emailChangeRepo := &mockEmailChangeRepo{}
-	mockEmail := &mockEmailSender{}
-	uc := NewRequestEmailChangeUseCase(userRepo, emailChangeRepo, mockEmail)
-
-	err := uc.Execute(context.Background(), RequestEmailChangeInput{
-		UserID:   "user-1",
-		Password: "Secret1!",
-		NewEmail: "used@example.com",
-	})
-
-	if err == nil {
-		t.Fatal("expected error, got nil")
-	}
-
-	appErr, ok := err.(*apperror.AppError)
-	if !ok || appErr.Code != "EMAIL_ALREADY_EXISTS" {
-		t.Errorf("expected EMAIL_ALREADY_EXISTS error, got %v", err)
-	}
-}
-
 func TestRequestEmailChange_EmailDeliveryFails(t *testing.T) {
 	userRepo := newNoConflictRepo()
 	activeUser := newUserWithRole("user-1", domain.RoleContestant, domain.StatusActive)
@@ -125,10 +88,6 @@ func TestRequestEmailChange_EmailDeliveryFails(t *testing.T) {
 		}
 		return nil, nil
 	}
-	userRepo.existsByEmailFn = func(_ context.Context, _ domain.Email) (bool, error) {
-		return false, nil
-	}
-
 	emailChangeRepo := &mockEmailChangeRepo{}
 	
 	// Simulate SMTP failure

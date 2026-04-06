@@ -20,9 +20,6 @@ func TestConfirmEmailChange_Success(t *testing.T) {
 		}
 		return nil, nil
 	}
-	userRepo.existsByEmailFn = func(_ context.Context, _ domain.Email) (bool, error) {
-		return false, nil // New email is still unique
-	}
 	var updatedUser *domain.User
 	userRepo.updateFn = func(_ context.Context, u *domain.User) error {
 		updatedUser = u
@@ -152,24 +149,22 @@ func TestConfirmEmailChange_DuplicateEmailAtConfirmation(t *testing.T) {
 	userRepo.findByIDFn = func(_ context.Context, id string) (*domain.User, error) {
 		return activeUser, nil
 	}
-
-	// Wait! While it was pending, someone else registered the new email!
-	userRepo.existsByEmailFn = func(_ context.Context, _ domain.Email) (bool, error) {
-		return true, nil 
+	// While the request was pending, someone else registered the new email.
+	// The DB constraint fires on Update and returns ErrEmailConflict.
+	userRepo.updateFn = func(_ context.Context, _ *domain.User) error {
+		return domain.ErrEmailConflict
 	}
 
 	mockEmail, _ := domain.NewEmail("stolen@example.com")
-	req := domain.RestoreEmailChangeRequest("req-1", "user-1", mockEmail, "123456", domain.StatusPending, time.Now().Add(10 * time.Minute), time.Time{}, nil)
+	req := domain.RestoreEmailChangeRequest("req-1", "user-1", mockEmail, "123456", domain.StatusPending, time.Now().Add(10*time.Minute), time.Time{}, nil)
 
 	emailChangeRepo := &mockEmailChangeRepo{
 		findByCodeAndUserIDFn: func(ctx context.Context, code string, userID string) (*domain.EmailChangeRequest, error) {
 			return req, nil
 		},
 	}
-	
-	mockEmailSender := &mockEmailSender{}
 
-	uc := NewConfirmEmailChangeUseCase(userRepo, emailChangeRepo, mockEmailSender, &mockTransactionManager{})
+	uc := NewConfirmEmailChangeUseCase(userRepo, emailChangeRepo, &mockEmailSender{}, &mockTransactionManager{})
 
 	_, err := uc.Execute(context.Background(), ConfirmEmailChangeInput{
 		UserID: "user-1",
