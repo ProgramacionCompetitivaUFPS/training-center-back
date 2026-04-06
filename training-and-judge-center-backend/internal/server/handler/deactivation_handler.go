@@ -55,12 +55,12 @@ func (h *UserHandler) ConfirmDeactivation(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	if body.Code == "" || len(body.Code) != 6 {
+	if !digitCodeRegex.MatchString(body.Code) {
 		respondJSON(w, http.StatusBadRequest, map[string]interface{}{
 			"error":   "VALIDATION_ERROR",
 			"message": "Invalid request data",
 			"details": []map[string]string{
-				{"field": "code", "message": "Code must be 6 characters long"},
+				{"field": "code", "message": "Code must be exactly 6 digits"},
 			},
 		})
 		return

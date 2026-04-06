@@ -24,7 +24,7 @@ func (h *UserHandler) ResetPassword(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if body.Email == "" || body.Code == "" || body.NewPassword == "" {
+	if body.Email == "" || !digitCodeRegex.MatchString(body.Code) || body.NewPassword == "" {
 		respondJSON(w, http.StatusBadRequest, map[string]interface{}{
 			"error":   "VALIDATION_ERROR",
 			"message": "Invalid request data",
