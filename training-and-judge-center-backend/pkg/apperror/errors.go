@@ -3,7 +3,9 @@ package apperror
 import "net/http"
 
 const (
-	ErrCodeNotFound = "NOT_FOUND"
+	ErrCodeNotFound             = "NOT_FOUND"
+	ErrCodeCannotSelfDeactivate = "CANNOT_SELF_DEACTIVATE"
+	ErrCodeCannotDeactivateAdmin = "CANNOT_DEACTIVATE_ADMIN"
 )
 
 func NewValidation(details []FieldError) *AppError {

@@ -61,13 +61,10 @@ func TestAdminDeactivateUser_SelfDeactivation(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected error, got nil")
 	}
-	appErr, ok := err.(*apperror.AppError)
-	if !ok {
-		t.Fatalf("expected *apperror.AppError, got %T", err)
+	if !errors.Is(err, domain.ErrCannotSelfDeactivate) {
+		t.Errorf("expected ErrCannotSelfDeactivate, got %v", err)
 	}
-	if appErr.Code != domain.ErrCodeCannotSelfDeactivate {
-		t.Errorf("expected code %q, got %q", domain.ErrCodeCannotSelfDeactivate, appErr.Code)
-	}
+	appErr := err.(*apperror.AppError)
 	if appErr.StatusCode != http.StatusForbidden {
 		t.Errorf("expected status 403, got %d", appErr.StatusCode)
 	}
@@ -99,10 +96,10 @@ func TestAdminDeactivateUser_CannotDeactivateAdmin(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected error, got nil")
 	}
-	appErr := err.(*apperror.AppError)
-	if appErr.Code != domain.ErrCodeCannotDeactivateAdmin {
-		t.Errorf("expected code %q, got %q", domain.ErrCodeCannotDeactivateAdmin, appErr.Code)
+	if !errors.Is(err, domain.ErrCannotDeactivateAdmin) {
+		t.Errorf("expected ErrCannotDeactivateAdmin, got %v", err)
 	}
+	appErr := err.(*apperror.AppError)
 	if appErr.StatusCode != http.StatusForbidden {
 		t.Errorf("expected status 403, got %d", appErr.StatusCode)
 	}
