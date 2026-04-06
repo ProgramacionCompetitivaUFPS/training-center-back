@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"net/http"
+	"strings"
 	"testing"
 	"time"
 
@@ -288,5 +289,46 @@ func TestLogin_RepositoryFindByEmailError(t *testing.T) {
 	}
 	if appErr.Code != "INTERNAL_ERROR" {
 		t.Errorf("expected code INTERNAL_ERROR, got %q", appErr.Code)
+	}
+}
+
+func TestLogin_PasswordAtBcryptBoundary(t *testing.T) {
+	pass72 := "A1!" + strings.Repeat("a", 69)
+	password, err := domain.NewPassword(pass72)
+	if err != nil {
+		t.Fatalf("setup: %v", err)
+	}
+	emailStr := "boundary@example.com"
+	u, err := domain.RestoreUser(
+		"user-boundary",
+		&emailStr,
+		password.Hash(),
+		"Boundary User",
+		"boundaryuser",
+		"Colombia",
+		"Cúcuta",
+		"UFPS",
+		domain.RoleContestant.String(),
+		domain.StatusActive.String(),
+		time.Now(),
+		nil,
+		nil,
+	)
+	if err != nil {
+		t.Fatalf("setup: %v", err)
+	}
+
+	repo, tokenSvc := newLoginDeps()
+	repo.findByEmailFn = func(_ context.Context, _ domain.Email) (*domain.User, error) {
+		return u, nil
+	}
+	uc := NewLoginUseCase(repo, tokenSvc)
+
+	_, err = uc.Execute(context.Background(), LoginInput{
+		Email:    "boundary@example.com",
+		Password: pass72,
+	})
+	if err != nil {
+		t.Fatalf("login with 72-byte password must succeed, got: %v", err)
 	}
 }
