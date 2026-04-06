@@ -127,7 +127,7 @@ func (p *Problem) AddModifier(userID UserID) error {
 
 func (p *Problem) RemoveModifier(userID UserID) error {
 	found := false
-	var newModifiers []UserID
+	newModifiers := make([]UserID, 0, len(p.ModifierIDs))
 	for _, id := range p.ModifierIDs {
 		if id == userID {
 			found = true
@@ -172,7 +172,7 @@ func (p *Problem) AddSolution(solution JudgingFile) *JudgingFile {
 }
 
 func (p *Problem) RemoveSolution(filename string) {
-	var newSolutions []JudgingFile
+	newSolutions := make([]JudgingFile, 0, len(p.Solutions))
 	for _, sol := range p.Solutions {
 		if sol.Filename() != filename {
 			newSolutions = append(newSolutions, sol)

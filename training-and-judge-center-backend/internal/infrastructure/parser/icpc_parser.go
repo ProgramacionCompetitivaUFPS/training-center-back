@@ -429,12 +429,10 @@ func (p *ICPCParser) prepareZip(zipData []byte) (*ParsedZip, error) {
 			if fileCount > p.maxFiles {
 				return nil, apperror.NewValidation([]apperror.FieldError{{Field: "file", Message: "ZIP contains too many files"}})
 			}
-			if f.UncompressedSize64 > 0 {
-				if f.UncompressedSize64 > maxLimit-totalSize {
-					return nil, apperror.NewValidation([]apperror.FieldError{{Field: "file", Message: "Extracted ZIP size exceeds safe limit"}})
-				}
-				totalSize += f.UncompressedSize64
+			if f.UncompressedSize64 > maxLimit || totalSize > maxLimit-f.UncompressedSize64 {
+				return nil, apperror.NewValidation([]apperror.FieldError{{Field: "file", Message: "Extracted ZIP size exceeds safe limit"}})
 			}
+			totalSize += f.UncompressedSize64
 		}
 
 		czf := &CleanZipFile{

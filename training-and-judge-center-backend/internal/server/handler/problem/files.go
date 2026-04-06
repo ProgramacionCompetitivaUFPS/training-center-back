@@ -65,10 +65,14 @@ func (h *Handler) UploadFiles(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	fileData, err := io.ReadAll(file)
+	fileData, err := io.ReadAll(io.LimitReader(file, limitBytes+1))
 	if err != nil {
 		slog.Error("Failed to read uploaded file", "error", err, "slug", slug)
 		handler.WriteJSON(w, http.StatusInternalServerError, apperror.NewInternal())
+		return
+	}
+	if int64(len(fileData)) > limitBytes {
+		handler.WriteJSON(w, http.StatusRequestEntityTooLarge, apperror.AppError{Code: apperror.ErrCodePayloadTooLarge, Message: "File size exceeds allowed limit"})
 		return
 	}
 

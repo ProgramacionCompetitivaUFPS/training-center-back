@@ -31,6 +31,7 @@ func loadVirtualObject() *VirtualObject {
 
 	data, err := os.ReadFile(path)
 	if err != nil {
+		slog.Error("failed to read virtual object config", "path", path, "error", err)
 		return nil
 	}
 

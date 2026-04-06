@@ -2,6 +2,7 @@ package storage
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 
@@ -46,7 +47,7 @@ func (r *GCSProblemFileRepository) UploadFile(ctx context.Context, path string, 
 func (r *GCSProblemFileRepository) DeleteFile(ctx context.Context, path string) error {
 	obj := r.client.Bucket(r.bucket).Object(path)
 	if err := obj.Delete(ctx); err != nil {
-		if err == storage.ErrObjectNotExist {
+		if errors.Is(err, storage.ErrObjectNotExist) {
 			return nil
 		}
 		return fmt.Errorf("failed to delete GCS object %s: %w", path, err)
@@ -60,7 +61,7 @@ func (r *GCSProblemFileRepository) DeleteFilesWithPrefix(ctx context.Context, pr
 	var names []string
 	for {
 		attrs, err := it.Next()
-		if err == iterator.Done {
+		if errors.Is(err, iterator.Done) {
 			break
 		}
 		if err != nil {
@@ -80,7 +81,7 @@ func (r *GCSProblemFileRepository) DeleteFilesWithPrefix(ctx context.Context, pr
 		name := name
 		g.Go(func() error {
 			if err := r.client.Bucket(r.bucket).Object(name).Delete(gCtx); err != nil {
-				if err != storage.ErrObjectNotExist {
+				if !errors.Is(err, storage.ErrObjectNotExist) {
 					return fmt.Errorf("failed to delete GCS object %s: %w", name, err)
 				}
 			}

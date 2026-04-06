@@ -57,52 +57,66 @@ func (uc *DeleteProblemUseCase) Execute(ctx context.Context, in DeleteProblemInp
 		return struct{}{}, err
 	}
 
+	var cleanupFailed bool
+
 	if p.TestCasesKey != nil {
+		var err error
 		for i := 0; i < maxRetries; i++ {
-			err := uc.fileStorage.DeleteFilesWithPrefix(ctx, *p.TestCasesKey)
+			err = uc.fileStorage.DeleteFilesWithPrefix(ctx, *p.TestCasesKey)
 			if err == nil {
 				break
 			}
-			if i == maxRetries-1 {
-				slog.ErrorContext(ctx, "failed to delete test cases from storage after retries", "prefix", *p.TestCasesKey, "error", err)
-			}
+		}
+		if err != nil {
+			slog.ErrorContext(ctx, "problem deleted from DB but test cases storage cleanup failed", "prefix", *p.TestCasesKey, "error", err)
+			cleanupFailed = true
 		}
 	}
 
 	for _, sol := range p.Solutions {
+		var err error
 		for i := 0; i < maxRetries; i++ {
-			err := uc.fileStorage.DeleteFile(ctx, sol.FileKey())
+			err = uc.fileStorage.DeleteFile(ctx, sol.FileKey())
 			if err == nil {
 				break
 			}
-			if i == maxRetries-1 {
-				slog.ErrorContext(ctx, "failed to delete solution from storage after retries", "key", sol.FileKey(), "error", err)
-			}
+		}
+		if err != nil {
+			slog.ErrorContext(ctx, "problem deleted from DB but solution storage cleanup failed", "key", sol.FileKey(), "error", err)
+			cleanupFailed = true
 		}
 	}
 
 	if p.Checker != nil {
+		var err error
 		for i := 0; i < maxRetries; i++ {
-			err := uc.fileStorage.DeleteFile(ctx, p.Checker.FileKey())
+			err = uc.fileStorage.DeleteFile(ctx, p.Checker.FileKey())
 			if err == nil {
 				break
 			}
-			if i == maxRetries-1 {
-				slog.ErrorContext(ctx, "failed to delete checker from storage after retries", "key", p.Checker.FileKey(), "error", err)
-			}
+		}
+		if err != nil {
+			slog.ErrorContext(ctx, "problem deleted from DB but checker storage cleanup failed", "key", p.Checker.FileKey(), "error", err)
+			cleanupFailed = true
 		}
 	}
 
 	if p.Validator != nil {
+		var err error
 		for i := 0; i < maxRetries; i++ {
-			err := uc.fileStorage.DeleteFile(ctx, p.Validator.FileKey())
+			err = uc.fileStorage.DeleteFile(ctx, p.Validator.FileKey())
 			if err == nil {
 				break
 			}
-			if i == maxRetries-1 {
-				slog.ErrorContext(ctx, "failed to delete validator from storage after retries", "key", p.Validator.FileKey(), "error", err)
-			}
 		}
+		if err != nil {
+			slog.ErrorContext(ctx, "problem deleted from DB but validator storage cleanup failed", "key", p.Validator.FileKey(), "error", err)
+			cleanupFailed = true
+		}
+	}
+
+	if cleanupFailed {
+		return struct{}{}, apperror.NewInternal()
 	}
 
 	return struct{}{}, nil
