@@ -1,6 +1,10 @@
 package user
 
-import "testing"
+import (
+	"testing"
+
+	"github.com/google/uuid"
+)
 
 func TestNewNickname_Valid(t *testing.T) {
 	tests := []struct {
@@ -60,5 +64,13 @@ func TestNewNickname_Invalid(t *testing.T) {
 				t.Fatal("expected error, got nil")
 			}
 		})
+	}
+}
+
+func TestNewNickname_AnonymousFormat(t *testing.T) {
+	raw := "user_anonimo_" + uuid.New().String()[:10]
+	_, err := NewNickname(raw)
+	if err != nil {
+		t.Errorf("anonymous nickname format %q must be valid, got: %v", raw, err)
 	}
 }

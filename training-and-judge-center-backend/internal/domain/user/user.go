@@ -142,7 +142,10 @@ func (u *User) Deactivate() error {
 	if u.status == StatusDeactivated {
 		return fmt.Errorf("user is already deactivated")
 	}
-	anonymousNickname, _ := NewNickname("user_anonimo_" + uuid.New().String()[:10])
+	anonymousNickname, err := NewNickname("user_anonimo_" + uuid.New().String()[:10])
+	if err != nil {
+		return fmt.Errorf("generating anonymous nickname: %w", err)
+	}
 	now := time.Now()
 	u.nickname = anonymousNickname
 	u.email = nil
