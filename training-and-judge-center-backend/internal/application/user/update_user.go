@@ -13,6 +13,8 @@ type UpdateUserInput struct {
 	Name        *string
 	Nickname    *string
 	Institution *string
+	City        *string
+	Country     *string
 }
 
 type UpdateUserUseCase struct {
@@ -24,7 +26,7 @@ func NewUpdateUserUseCase(repo user.UserRepository) *UpdateUserUseCase {
 }
 
 func (uc *UpdateUserUseCase) Execute(ctx context.Context, input UpdateUserInput) (*user.User, error) {
-	if input.Name == nil && input.Nickname == nil && input.Institution == nil {
+	if input.Name == nil && input.Nickname == nil && input.Institution == nil && input.City == nil && input.Country == nil {
 		return nil, apperror.NewValidation([]apperror.FieldError{
 			{Field: "body", Message: "At least one updatable field must be provided"},
 		})
@@ -42,6 +44,8 @@ func (uc *UpdateUserUseCase) Execute(ctx context.Context, input UpdateUserInput)
 	var nameToUpdate *string
 	var nicknameToUpdate *user.Nickname
 	var institutionToUpdate *string
+	var cityToUpdate *string
+	var countryToUpdate *string
 
 	if input.Name != nil {
 		if *input.Name == "" {
@@ -68,11 +72,27 @@ func (uc *UpdateUserUseCase) Execute(ctx context.Context, input UpdateUserInput)
 		}
 	}
 
+	if input.City != nil {
+		if *input.City == "" {
+			fieldErrors = append(fieldErrors, apperror.FieldError{Field: "city", Message: "City cannot be empty"})
+		} else {
+			cityToUpdate = input.City
+		}
+	}
+
+	if input.Country != nil {
+		if *input.Country == "" {
+			fieldErrors = append(fieldErrors, apperror.FieldError{Field: "country", Message: "Country cannot be empty"})
+		} else {
+			countryToUpdate = input.Country
+		}
+	}
+
 	if len(fieldErrors) > 0 {
 		return nil, apperror.NewValidation(fieldErrors)
 	}
 
-	if err := foundUser.Update(nameToUpdate, nicknameToUpdate, institutionToUpdate); err != nil {
+	if err := foundUser.Update(nameToUpdate, nicknameToUpdate, institutionToUpdate, cityToUpdate, countryToUpdate); err != nil {
 		return nil, apperror.NewInternal()
 	}
 

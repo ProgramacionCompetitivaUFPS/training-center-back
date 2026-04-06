@@ -245,7 +245,7 @@ func TestAdminUpdateUser_InvalidRole(t *testing.T) {
 	badRole := "SUPERUSER"
 	_, err := uc.Execute(context.Background(), AdminUpdateUserInput{
 		TargetID: "target-1",
-		Role: &badRole,
+		Role:     &badRole,
 	})
 	if err == nil {
 		t.Fatal("expected error for invalid role, got nil")
@@ -260,5 +260,77 @@ func TestAdminUpdateUser_InvalidRole(t *testing.T) {
 	}
 	if len(appErr.Details) == 0 || appErr.Details[0].Field != "role" {
 		t.Errorf("expected field error on role, got %v", appErr.Details)
+	}
+}
+
+func TestAdminUpdateUser_Success_CityAndCountry(t *testing.T) {
+	repo := newNoConflictRepo()
+	targetUser := newUserWithRole("target-1", domain.RoleContestant, domain.StatusActive)
+	repo.findByIDFn = func(_ context.Context, _ string) (*domain.User, error) {
+		return targetUser, nil
+	}
+	uc := NewAdminUpdateUserUseCase(repo)
+
+	result, err := uc.Execute(context.Background(), AdminUpdateUserInput{
+		TargetID: "target-1",
+		City:     strPtr("Guayaquil"),
+		Country:  strPtr("Ecuador"),
+	})
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+	if result.City() != "Guayaquil" {
+		t.Errorf("expected city %q, got %q", "Guayaquil", result.City())
+	}
+	if result.Country() != "Ecuador" {
+		t.Errorf("expected country %q, got %q", "Ecuador", result.Country())
+	}
+}
+
+func TestAdminUpdateUser_EmptyCityValidation(t *testing.T) {
+	repo := newNoConflictRepo()
+	targetUser := newUserWithRole("target-1", domain.RoleContestant, domain.StatusActive)
+	repo.findByIDFn = func(_ context.Context, _ string) (*domain.User, error) {
+		return targetUser, nil
+	}
+	uc := NewAdminUpdateUserUseCase(repo)
+
+	_, err := uc.Execute(context.Background(), AdminUpdateUserInput{
+		TargetID: "target-1",
+		City:     strPtr(""),
+	})
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+	appErr, ok := err.(*apperror.AppError)
+	if !ok {
+		t.Fatalf("expected *apperror.AppError, got %T", err)
+	}
+	if appErr.Code != "VALIDATION_ERROR" {
+		t.Errorf("expected code VALIDATION_ERROR, got %q", appErr.Code)
+	}
+}
+
+func TestAdminUpdateUser_EmptyCountryValidation(t *testing.T) {
+	repo := newNoConflictRepo()
+	targetUser := newUserWithRole("target-1", domain.RoleContestant, domain.StatusActive)
+	repo.findByIDFn = func(_ context.Context, _ string) (*domain.User, error) {
+		return targetUser, nil
+	}
+	uc := NewAdminUpdateUserUseCase(repo)
+
+	_, err := uc.Execute(context.Background(), AdminUpdateUserInput{
+		TargetID: "target-1",
+		Country:  strPtr(""),
+	})
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+	appErr, ok := err.(*apperror.AppError)
+	if !ok {
+		t.Fatalf("expected *apperror.AppError, got %T", err)
+	}
+	if appErr.Code != "VALIDATION_ERROR" {
+		t.Errorf("expected code VALIDATION_ERROR, got %q", appErr.Code)
 	}
 }

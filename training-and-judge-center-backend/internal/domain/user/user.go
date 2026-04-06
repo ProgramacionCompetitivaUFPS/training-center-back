@@ -68,7 +68,7 @@ func NewUser(email Email, password Password, name string, nickname Nickname, cou
 	}, nil
 }
 
-func (u *User) Update(name *string, nickname *Nickname, institution *string) error {
+func (u *User) Update(name *string, nickname *Nickname, institution *string, city *string, country *string) error {
 	if name != nil {
 		if strings.TrimSpace(*name) == "" {
 			return fmt.Errorf("name cannot be empty")
@@ -84,13 +84,25 @@ func (u *User) Update(name *string, nickname *Nickname, institution *string) err
 		}
 		u.institution = *institution
 	}
+	if city != nil {
+		if strings.TrimSpace(*city) == "" {
+			return fmt.Errorf("city cannot be empty")
+		}
+		u.city = *city
+	}
+	if country != nil {
+		if strings.TrimSpace(*country) == "" {
+			return fmt.Errorf("country cannot be empty")
+		}
+		u.country = *country
+	}
 
 	now := time.Now()
 	u.updatedAt = &now
 	return nil
 }
 
-func (u *User) AdminUpdate(name *string, nickname *Nickname, institution *string, email *Email, role *Role) error {
+func (u *User) AdminUpdate(name *string, nickname *Nickname, institution *string, city *string, country *string, email *Email, role *Role) error {
 	if role != nil && !role.IsValid() {
 		return fmt.Errorf("invalid role: %s", *role)
 	}
@@ -98,7 +110,7 @@ func (u *User) AdminUpdate(name *string, nickname *Nickname, institution *string
 		return fmt.Errorf("role ADMIN cannot be assigned through standard update")
 	}
 
-	if err := u.Update(name, nickname, institution); err != nil {
+	if err := u.Update(name, nickname, institution, city, country); err != nil {
 		return err
 	}
 

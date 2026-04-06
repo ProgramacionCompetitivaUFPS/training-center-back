@@ -234,3 +234,75 @@ func TestUpdateUser_NicknameLowercased(t *testing.T) {
 		t.Errorf("expected nickname to be lowercased %q, got %q", "mynewnick", result.Nickname().String())
 	}
 }
+
+func TestUpdateUser_Success_CityAndCountry(t *testing.T) {
+	repo := newNoConflictRepo()
+	activeUser := newUserWithRole("user-1", domain.RoleContestant, domain.StatusActive)
+	repo.findByIDFn = func(_ context.Context, _ string) (*domain.User, error) {
+		return activeUser, nil
+	}
+	uc := NewUpdateUserUseCase(repo)
+
+	result, err := uc.Execute(context.Background(), UpdateUserInput{
+		UserID:  "user-1",
+		City:    strPtr("Quito"),
+		Country: strPtr("Ecuador"),
+	})
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+	if result.City() != "Quito" {
+		t.Errorf("expected city %q, got %q", "Quito", result.City())
+	}
+	if result.Country() != "Ecuador" {
+		t.Errorf("expected country %q, got %q", "Ecuador", result.Country())
+	}
+}
+
+func TestUpdateUser_EmptyCityValidation(t *testing.T) {
+	repo := newNoConflictRepo()
+	activeUser := newUserWithRole("user-1", domain.RoleContestant, domain.StatusActive)
+	repo.findByIDFn = func(_ context.Context, _ string) (*domain.User, error) {
+		return activeUser, nil
+	}
+	uc := NewUpdateUserUseCase(repo)
+
+	_, err := uc.Execute(context.Background(), UpdateUserInput{
+		UserID: "user-1",
+		City:   strPtr(""),
+	})
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+	appErr, ok := err.(*apperror.AppError)
+	if !ok {
+		t.Fatalf("expected *apperror.AppError, got %T", err)
+	}
+	if appErr.Code != "VALIDATION_ERROR" {
+		t.Errorf("expected code VALIDATION_ERROR, got %q", appErr.Code)
+	}
+}
+
+func TestUpdateUser_EmptyCountryValidation(t *testing.T) {
+	repo := newNoConflictRepo()
+	activeUser := newUserWithRole("user-1", domain.RoleContestant, domain.StatusActive)
+	repo.findByIDFn = func(_ context.Context, _ string) (*domain.User, error) {
+		return activeUser, nil
+	}
+	uc := NewUpdateUserUseCase(repo)
+
+	_, err := uc.Execute(context.Background(), UpdateUserInput{
+		UserID:  "user-1",
+		Country: strPtr(""),
+	})
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+	appErr, ok := err.(*apperror.AppError)
+	if !ok {
+		t.Fatalf("expected *apperror.AppError, got %T", err)
+	}
+	if appErr.Code != "VALIDATION_ERROR" {
+		t.Errorf("expected code VALIDATION_ERROR, got %q", appErr.Code)
+	}
+}

@@ -13,6 +13,8 @@ type AdminUpdateUserInput struct {
 	Name        *string
 	Nickname    *string
 	Institution *string
+	City        *string
+	Country     *string
 	Email       *string
 	Role        *string
 }
@@ -26,7 +28,7 @@ func NewAdminUpdateUserUseCase(repo user.UserRepository) *AdminUpdateUserUseCase
 }
 
 func (uc *AdminUpdateUserUseCase) Execute(ctx context.Context, input AdminUpdateUserInput) (*user.User, error) {
-	if input.Name == nil && input.Nickname == nil && input.Institution == nil && input.Email == nil && input.Role == nil {
+	if input.Name == nil && input.Nickname == nil && input.Institution == nil && input.City == nil && input.Country == nil && input.Email == nil && input.Role == nil {
 		return nil, apperror.NewValidation([]apperror.FieldError{
 			{Field: "body", Message: "At least one updatable field must be provided"},
 		})
@@ -44,6 +46,8 @@ func (uc *AdminUpdateUserUseCase) Execute(ctx context.Context, input AdminUpdate
 	var nameToUpdate *string
 	var nicknameToUpdate *user.Nickname
 	var institutionToUpdate *string
+	var cityToUpdate *string
+	var countryToUpdate *string
 	var emailToUpdate *user.Email
 	var roleToUpdate *user.Role
 
@@ -72,6 +76,22 @@ func (uc *AdminUpdateUserUseCase) Execute(ctx context.Context, input AdminUpdate
 		}
 	}
 
+	if input.City != nil {
+		if *input.City == "" {
+			fieldErrors = append(fieldErrors, apperror.FieldError{Field: "city", Message: "City cannot be empty"})
+		} else {
+			cityToUpdate = input.City
+		}
+	}
+
+	if input.Country != nil {
+		if *input.Country == "" {
+			fieldErrors = append(fieldErrors, apperror.FieldError{Field: "country", Message: "Country cannot be empty"})
+		} else {
+			countryToUpdate = input.Country
+		}
+	}
+
 	if input.Email != nil {
 		newEmail, err := user.NewEmail(*input.Email)
 		if err != nil {
@@ -96,7 +116,7 @@ func (uc *AdminUpdateUserUseCase) Execute(ctx context.Context, input AdminUpdate
 		return nil, apperror.NewValidation(fieldErrors)
 	}
 
-	if err := foundUser.AdminUpdate(nameToUpdate, nicknameToUpdate, institutionToUpdate, emailToUpdate, roleToUpdate); err != nil {
+	if err := foundUser.AdminUpdate(nameToUpdate, nicknameToUpdate, institutionToUpdate, cityToUpdate, countryToUpdate, emailToUpdate, roleToUpdate); err != nil {
 		return nil, apperror.NewInternal()
 	}
 
