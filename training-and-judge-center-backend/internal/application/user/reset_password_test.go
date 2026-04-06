@@ -113,3 +113,110 @@ func TestResetPassword_NoPendingRequest(t *testing.T) {
 		t.Errorf("expected INVALID_RECOVERY_ATTEMPT, got %v", err)
 	}
 }
+
+func TestResetPassword_ExpiredRequest(t *testing.T) {
+	userRepo := newNoConflictRepo()
+	activeUser := newUserWithRole("user-1", domain.RoleContestant, domain.StatusActive)
+	userRepo.findByEmailFn = func(_ context.Context, _ domain.Email) (*domain.User, error) {
+		return activeUser, nil
+	}
+
+	recoveryRepo := &mockPasswordRecoveryRepo{
+		findPendingByUserIDFn: func(_ context.Context, _ string) (*domain.PasswordRecoveryRequest, error) {
+			// Request exists in DB but its window has already elapsed
+			return domain.RestorePasswordRecoveryRequest("req-1", "user-1", "123456", domain.StatusPending, time.Now().Add(-1*time.Minute), time.Time{}, nil), nil
+		},
+	}
+
+	uc := NewResetPasswordUseCase(userRepo, recoveryRepo, &mockSessionInvalidator{}, &mockTransactionManager{})
+
+	err := uc.Execute(context.Background(), ResetPasswordInput{
+		Email:       "user-1@example.com",
+		Code:        "123456",
+		NewPassword: "NewSecret123!",
+	})
+
+	if err == nil {
+		t.Fatal("expected error for expired request, got nil")
+	}
+	appErr, ok := err.(*apperror.AppError)
+	if !ok || appErr.Code != "INVALID_RECOVERY_ATTEMPT" {
+		t.Errorf("expected INVALID_RECOVERY_ATTEMPT, got %v", err)
+	}
+}
+
+func TestResetPassword_WeakPassword(t *testing.T) {
+	userRepo := newNoConflictRepo()
+	activeUser := newUserWithRole("user-1", domain.RoleContestant, domain.StatusActive)
+	userRepo.findByEmailFn = func(_ context.Context, _ domain.Email) (*domain.User, error) {
+		return activeUser, nil
+	}
+
+	recoveryRepo := &mockPasswordRecoveryRepo{
+		findPendingByUserIDFn: func(_ context.Context, _ string) (*domain.PasswordRecoveryRequest, error) {
+			return domain.RestorePasswordRecoveryRequest("req-1", "user-1", "123456", domain.StatusPending, time.Now().Add(10*time.Minute), time.Time{}, nil), nil
+		},
+	}
+
+	txCalled := false
+	invCalled := false
+	uc := NewResetPasswordUseCase(
+		userRepo,
+		recoveryRepo,
+		&mockSessionInvalidator{
+			invalidateAllUserSessionsFn: func(_ context.Context, _ string, _ time.Time) error {
+				invCalled = true
+				return nil
+			},
+		},
+		&mockTransactionManager{
+			withTxFn: func(_ context.Context, _ func(context.Context) error) error {
+				txCalled = true
+				return nil
+			},
+		},
+	)
+
+	err := uc.Execute(context.Background(), ResetPasswordInput{
+		Email:       "user-1@example.com",
+		Code:        "123456",
+		NewPassword: "weak",
+	})
+
+	if err == nil {
+		t.Fatal("expected validation error for weak password, got nil")
+	}
+	appErr, ok := err.(*apperror.AppError)
+	if !ok || appErr.Code != "VALIDATION_ERROR" {
+		t.Errorf("expected VALIDATION_ERROR, got %v", err)
+	}
+	if txCalled {
+		t.Error("transaction must NOT be started when password validation fails")
+	}
+	if invCalled {
+		t.Error("session invalidator must NOT be called when password validation fails")
+	}
+}
+
+func TestResetPassword_UserNotFound(t *testing.T) {
+	userRepo := newNoConflictRepo()
+	userRepo.findByEmailFn = func(_ context.Context, _ domain.Email) (*domain.User, error) {
+		return nil, nil // email does not exist in DB
+	}
+
+	uc := NewResetPasswordUseCase(userRepo, &mockPasswordRecoveryRepo{}, &mockSessionInvalidator{}, &mockTransactionManager{})
+
+	err := uc.Execute(context.Background(), ResetPasswordInput{
+		Email:       "ghost@example.com",
+		Code:        "123456",
+		NewPassword: "NewSecret123!",
+	})
+
+	if err == nil {
+		t.Fatal("expected error when user not found, got nil")
+	}
+	appErr, ok := err.(*apperror.AppError)
+	if !ok || appErr.Code != "INVALID_RECOVERY_ATTEMPT" {
+		t.Errorf("expected INVALID_RECOVERY_ATTEMPT to avoid information leakage, got %v", err)
+	}
+}
