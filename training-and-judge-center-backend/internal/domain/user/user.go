@@ -126,16 +126,24 @@ func (u *User) AdminUpdate(name *string, nickname *Nickname, institution *string
 	return nil
 }
 
-func (u *User) UpdatePassword(newPassword Password) {
+func (u *User) UpdatePassword(newPassword Password) error {
+	if u.status == StatusDeactivated {
+		return fmt.Errorf("cannot update password of a deactivated user")
+	}
 	u.password = newPassword
 	now := time.Now()
 	u.updatedAt = &now
+	return nil
 }
 
-func (u *User) UpdateEmail(newEmail Email) {
+func (u *User) UpdateEmail(newEmail Email) error {
+	if u.status == StatusDeactivated {
+		return fmt.Errorf("cannot update email of a deactivated user")
+	}
 	u.email = &newEmail
 	now := time.Now()
 	u.updatedAt = &now
+	return nil
 }
 
 func (u *User) Deactivate() error {

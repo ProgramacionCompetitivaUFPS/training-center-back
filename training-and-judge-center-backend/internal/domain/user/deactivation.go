@@ -50,7 +50,13 @@ func (r *DeactivationRequest) UserID() string                 { return r.userID 
 func (r *DeactivationRequest) VerificationCode() string       { return r.verificationCode }
 func (r *DeactivationRequest) ExpiresAt() time.Time           { return r.expiresAt }
 func (r *DeactivationRequest) Attempts() int                  { return r.attempts }
-func (r *DeactivationRequest) BlockedUntil() *time.Time       { return r.blockedUntil }
+func (r *DeactivationRequest) BlockedUntil() *time.Time {
+	if r.blockedUntil == nil {
+		return nil
+	}
+	t := *r.blockedUntil
+	return &t
+}
 func (r *DeactivationRequest) Status() DeactivationStatus     { return r.status }
 func (r *DeactivationRequest) CreatedAt() time.Time           { return r.createdAt }
 func (r *DeactivationRequest) UpdatedAt() time.Time           { return r.updatedAt }
