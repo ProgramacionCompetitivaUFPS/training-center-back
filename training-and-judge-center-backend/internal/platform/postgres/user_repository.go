@@ -59,8 +59,9 @@ func (r *UserRepository) Update(ctx context.Context, u *user.User) error {
 	query := `
 		UPDATE users
 		SET name = $1, nickname = $2, institution = $3, email = $4, password = $5,
-		    role = $6, status = $7, updated_at = $8, deactivated_at = $9
-		WHERE id = $10`
+		    role = $6, status = $7, updated_at = $8, deactivated_at = $9,
+		    country = $10, city = $11
+		WHERE id = $12`
 
 	var emailVal interface{}
 	if u.Email() != nil {
@@ -78,6 +79,8 @@ func (r *UserRepository) Update(ctx context.Context, u *user.User) error {
 		u.Status().String(),
 		u.UpdatedAt(),
 		u.DeactivatedAt(),
+		u.Country(),
+		u.City(),
 		u.ID(),
 	)
 	if err != nil {
