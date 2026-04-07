@@ -77,8 +77,8 @@ func TestLogin_Success(t *testing.T) {
 	if result.Token != "mock-jwt-token" {
 		t.Errorf("expected token %q, got %q", "mock-jwt-token", result.Token)
 	}
-	if result.User.ID() != "user-uuid-123" {
-		t.Errorf("expected user ID %q, got %q", "user-uuid-123", result.User.ID())
+	if result.User.ID != "user-uuid-123" {
+		t.Errorf("expected user ID %q, got %q", "user-uuid-123", result.User.ID)
 	}
 }
 

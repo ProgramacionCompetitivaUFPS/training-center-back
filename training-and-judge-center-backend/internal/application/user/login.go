@@ -2,6 +2,7 @@ package user
 
 import (
 	"context"
+	"log/slog"
 
 	"github.com/training-judge-center/backend/internal/domain/user"
 	"github.com/training-judge-center/backend/pkg/apperror"
@@ -14,7 +15,7 @@ type LoginInput struct {
 
 type LoginOutput struct {
 	Token string
-	User  *user.User
+	User  UserDTO
 }
 
 type LoginUseCase struct {
@@ -46,6 +47,7 @@ func (uc *LoginUseCase) Execute(ctx context.Context, input LoginInput) (*LoginOu
 
 	foundUser, err := uc.repo.FindByEmail(ctx, email)
 	if err != nil {
+		slog.Error("failed to find user by email during login", "error", err)
 		return nil, apperror.NewInternal()
 	}
 	if foundUser == nil {
@@ -62,8 +64,9 @@ func (uc *LoginUseCase) Execute(ctx context.Context, input LoginInput) (*LoginOu
 
 	token, err := uc.tokenService.GenerateToken(foundUser)
 	if err != nil {
+		slog.Error("failed to generate token during login", "user_id", foundUser.ID(), "error", err)
 		return nil, apperror.NewInternal()
 	}
 
-	return &LoginOutput{Token: token, User: foundUser}, nil
+	return &LoginOutput{Token: token, User: userToDTO(foundUser)}, nil
 }

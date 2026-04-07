@@ -2,6 +2,7 @@ package user
 
 import (
 	"context"
+	"log/slog"
 	"strings"
 
 	"github.com/training-judge-center/backend/internal/domain/user"
@@ -23,7 +24,7 @@ type ListUsersInput struct {
 }
 
 type ListUsersOutput struct {
-	Users      []*user.User
+	Users      []UserDTO
 	TotalCount int
 	Page       int
 	Limit      int
@@ -129,11 +130,16 @@ func (uc *ListUsersUseCase) Execute(ctx context.Context, input ListUsersInput) (
 
 	users, total, err := uc.repo.FindAll(ctx, filter)
 	if err != nil {
+		slog.Error("failed to list users", "error", err)
 		return nil, apperror.NewInternal()
 	}
 
+	dtos := make([]UserDTO, len(users))
+	for i, u := range users {
+		dtos[i] = userToDTO(u)
+	}
 	return &ListUsersOutput{
-		Users:      users,
+		Users:      dtos,
 		TotalCount: total,
 		Page:       page,
 		Limit:      limit,
