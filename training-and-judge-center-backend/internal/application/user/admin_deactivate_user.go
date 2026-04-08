@@ -33,6 +33,7 @@ func (uc *AdminDeactivateUserUseCase) Execute(ctx context.Context, input AdminDe
 
 	foundUser, err := uc.repo.FindByID(ctx, input.TargetID)
 	if err != nil {
+		slog.Error("failed to find user by id during admin deactivation", "target_id", input.TargetID, "error", err)
 		return apperror.NewInternal()
 	}
 	if foundUser == nil {
@@ -49,6 +50,7 @@ func (uc *AdminDeactivateUserUseCase) Execute(ctx context.Context, input AdminDe
 	}
 
 	if err := foundUser.Deactivate(); err != nil {
+		slog.Error("failed to deactivate user domain object", "user_id", foundUser.ID(), "error", err)
 		return apperror.NewInternal()
 	}
 
@@ -63,6 +65,7 @@ func (uc *AdminDeactivateUserUseCase) Execute(ctx context.Context, input AdminDe
 	}
 
 	if err := uc.repo.Update(ctx, foundUser); err != nil {
+		slog.Error("failed to persist user deactivation", "user_id", foundUser.ID(), "error", err)
 		return apperror.NewInternal()
 	}
 

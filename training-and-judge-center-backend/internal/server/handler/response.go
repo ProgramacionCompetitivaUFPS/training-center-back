@@ -21,5 +21,6 @@ func respondError(w http.ResponseWriter, err error) {
 		respondJSON(w, appErr.StatusCode, appErr)
 		return
 	}
+	slog.Error("unhandled non-AppError reached respondError", "error", err)
 	respondJSON(w, http.StatusInternalServerError, apperror.NewInternal())
 }

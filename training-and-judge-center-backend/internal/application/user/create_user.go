@@ -3,6 +3,7 @@ package user
 import (
 	"context"
 	"errors"
+	"log/slog"
 
 	"github.com/training-judge-center/backend/internal/domain/user"
 	"github.com/training-judge-center/backend/pkg/apperror"
@@ -63,6 +64,7 @@ func (uc *CreateUserUseCase) Execute(ctx context.Context, input CreateUserInput)
 
 	newUser, err := user.NewUser(email, password, input.Name, nickname, input.Country, input.City, input.Institution)
 	if err != nil {
+		slog.Error("failed to build new user domain object", "error", err)
 		return nil, apperror.NewInternal()
 	}
 
@@ -73,6 +75,7 @@ func (uc *CreateUserUseCase) Execute(ctx context.Context, input CreateUserInput)
 		if errors.Is(err, user.ErrNicknameConflict) {
 			return nil, apperror.NewConflict("NICKNAME_ALREADY_EXISTS", "The nickname is already in use")
 		}
+		slog.Error("failed to save new user", "error", err)
 		return nil, apperror.NewInternal()
 	}
 

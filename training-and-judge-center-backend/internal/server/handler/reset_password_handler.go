@@ -2,6 +2,7 @@ package handler
 
 import (
 	"encoding/json"
+	"errors"
 	"net/http"
 
 	appuser "github.com/training-judge-center/backend/internal/application/user"
@@ -41,8 +42,17 @@ func (h *UserHandler) ResetPassword(w http.ResponseWriter, r *http.Request) {
 		NewPassword: body.NewPassword,
 	}
 
-	if err := h.resetPassword.Execute(ctx, input); err != nil {
+	err := h.resetPassword.Execute(ctx, input)
+	if err != nil && !errors.Is(err, appuser.ErrSessionsNotInvalidated) {
 		respondError(w, err)
+		return
+	}
+
+	if errors.Is(err, appuser.ErrSessionsNotInvalidated) {
+		respondJSON(w, http.StatusOK, map[string]string{
+			"code":    "SESSIONS_NOT_INVALIDATED",
+			"message": "Your password was reset successfully. We couldn't close your other active sessions — to close them, please change your password again.",
+		})
 		return
 	}
 

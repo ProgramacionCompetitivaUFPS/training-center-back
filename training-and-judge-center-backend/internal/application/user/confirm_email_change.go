@@ -41,6 +41,7 @@ func NewConfirmEmailChangeUseCase(
 func (uc *ConfirmEmailChangeUseCase) Execute(ctx context.Context, input ConfirmEmailChangeInput) (*user.Email, error) {
 	u, err := uc.userRepo.FindByID(ctx, input.UserID)
 	if err != nil {
+		slog.Error("failed to find user during email change confirmation", "user_id", input.UserID, "error", err)
 		return nil, apperror.NewInternal()
 	}
 	if u == nil {
@@ -49,6 +50,7 @@ func (uc *ConfirmEmailChangeUseCase) Execute(ctx context.Context, input ConfirmE
 
 	req, err := uc.emailChangeRepo.FindByCodeAndUserID(ctx, input.Code, input.UserID)
 	if err != nil {
+		slog.Error("failed to find email change request by code", "user_id", input.UserID, "error", err)
 		return nil, apperror.NewInternal()
 	}
 	
@@ -62,7 +64,10 @@ func (uc *ConfirmEmailChangeUseCase) Execute(ctx context.Context, input ConfirmE
 
 	oldEmail := u.Email().String()
 	newEmailVal := req.NewEmail()
-	u.UpdateEmail(newEmailVal)
+	if err := u.UpdateEmail(newEmailVal); err != nil {
+		slog.Error("failed to update email on user domain object", "user_id", input.UserID, "error", err)
+		return nil, apperror.NewInternal()
+	}
 	req.MarkAsUsed(time.Now())
 
 	if err := uc.txManager.WithTx(ctx, func(txCtx context.Context) error {
@@ -77,6 +82,7 @@ func (uc *ConfirmEmailChangeUseCase) Execute(ctx context.Context, input ConfirmE
 		if errors.Is(err, user.ErrEmailConflict) {
 			return nil, apperror.NewConflict("EMAIL_ALREADY_EXISTS", "The email address is already in use")
 		}
+		slog.Error("failed to commit email change transaction", "user_id", input.UserID, "error", err)
 		return nil, apperror.NewInternal()
 	}
 
