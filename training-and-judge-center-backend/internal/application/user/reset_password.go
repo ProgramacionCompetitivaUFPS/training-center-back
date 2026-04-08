@@ -81,7 +81,10 @@ func (uc *ResetPasswordUseCase) Execute(ctx context.Context, input ResetPassword
 		slog.Error("failed to update password on user domain object", "user_id", foundUser.ID(), "error", err)
 		return apperror.NewInternal()
 	}
-	req.MarkAsUsed(now)
+	if err := req.MarkAsUsed(now); err != nil {
+		slog.Error("failed to mark recovery request as used", "user_id", foundUser.ID(), "error", err)
+		return apperror.NewInternal()
+	}
 
 	if err := uc.txManager.WithTx(ctx, func(txCtx context.Context) error {
 		if err := uc.userRepo.Update(txCtx, foundUser); err != nil {

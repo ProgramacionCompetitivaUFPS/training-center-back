@@ -68,14 +68,14 @@ func (uc *ConfirmDeactivationUseCase) Execute(ctx context.Context, input Confirm
 	now := time.Now()
 
 	// Handle Blocked State
-	if req.IsBlocked() && req.BlockedUntil() != nil {
-		if now.Before(*req.BlockedUntil()) {
-			retryAfter := int(req.BlockedUntil().Sub(now).Seconds())
-			if retryAfter < 0 {
-				retryAfter = 0
-			}
-			return apperror.NewTooManyRequests("MAX_ATTEMPTS_EXCEEDED", "Maximum confirmation attempts exceeded. Please try again later", retryAfter)
+	if req.IsCurrentlyBlocked(now) {
+		retryAfter := int(req.BlockedUntil().Sub(now).Seconds())
+		if retryAfter < 0 {
+			retryAfter = 0
 		}
+		return apperror.NewTooManyRequests("MAX_ATTEMPTS_EXCEEDED", "Maximum confirmation attempts exceeded. Please try again later", retryAfter)
+	}
+	if req.IsBlocked() {
 		// Block period has expired — invalidate the request entirely; user must start a new one
 		req.MarkAsExpired()
 		if err := uc.deactRepo.Update(ctx, req); err != nil {

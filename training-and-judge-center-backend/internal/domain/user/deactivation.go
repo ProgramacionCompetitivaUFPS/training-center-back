@@ -32,6 +32,9 @@ type DeactivationRequest struct {
 }
 
 func RestoreDeactivationRequest(id, userID, verificationCode string, expiresAt time.Time, attempts int, blockedUntil *time.Time, status DeactivationStatus, createdAt, updatedAt time.Time) *DeactivationRequest {
+	if status == DeactivationStatusBlocked && blockedUntil == nil {
+		status = DeactivationStatusExpired
+	}
 	return &DeactivationRequest{
 		id:               id,
 		userID:           userID,
@@ -78,6 +81,12 @@ func (r *DeactivationRequest) RegisterFailure() {
 
 func (r *DeactivationRequest) IsBlocked() bool {
 	return r.status == DeactivationStatusBlocked
+}
+
+func (r *DeactivationRequest) IsCurrentlyBlocked(now time.Time) bool {
+	return r.status == DeactivationStatusBlocked &&
+		r.blockedUntil != nil &&
+		now.Before(*r.blockedUntil)
 }
 
 func (r *DeactivationRequest) IsExpired(now time.Time) bool {

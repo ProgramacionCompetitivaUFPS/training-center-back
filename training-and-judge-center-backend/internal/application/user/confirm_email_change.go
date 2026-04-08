@@ -68,7 +68,10 @@ func (uc *ConfirmEmailChangeUseCase) Execute(ctx context.Context, input ConfirmE
 		slog.Error("failed to update email on user domain object", "user_id", input.UserID, "error", err)
 		return nil, apperror.NewInternal()
 	}
-	req.MarkAsUsed(time.Now())
+	if err := req.MarkAsUsed(time.Now()); err != nil {
+		slog.Error("failed to mark email change request as used", "user_id", input.UserID, "error", err)
+		return nil, apperror.NewInternal()
+	}
 
 	if err := uc.txManager.WithTx(ctx, func(txCtx context.Context) error {
 		if err := uc.userRepo.Update(txCtx, u); err != nil {

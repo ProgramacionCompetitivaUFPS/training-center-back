@@ -2,6 +2,7 @@ package user
 
 import (
 	"context"
+	"fmt"
 	"time"
 )
 
@@ -39,9 +40,13 @@ func (r *PasswordRecoveryRequest) IsExpired(now time.Time) bool {
 	return now.After(r.expiresAt) || r.status == StatusExpired
 }
 
-func (r *PasswordRecoveryRequest) MarkAsUsed(now time.Time) {
+func (r *PasswordRecoveryRequest) MarkAsUsed(now time.Time) error {
+	if r.status != StatusPending {
+		return fmt.Errorf("cannot mark a %s request as used", r.status)
+	}
 	r.status = StatusUsed
 	r.updatedAt = &now
+	return nil
 }
 
 type PasswordRecoveryRepository interface {

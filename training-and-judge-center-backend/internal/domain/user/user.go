@@ -121,8 +121,6 @@ func (u *User) AdminUpdate(name *string, nickname *Nickname, institution *string
 		u.role = *role
 	}
 
-	now := time.Now()
-	u.updatedAt = &now
 	return nil
 }
 
