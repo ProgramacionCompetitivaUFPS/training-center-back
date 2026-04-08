@@ -5,6 +5,68 @@ import (
 	"time"
 )
 
+func TestRestoreDeactivationRequest_BlockedWithNilBlockedUntil(t *testing.T) {
+	req := RestoreDeactivationRequest(
+		"req-id", "user-id", "123456",
+		time.Now().Add(time.Hour),
+		5, nil,
+		DeactivationStatusBlocked,
+		time.Now(), time.Now(),
+	)
+
+	if req.Status() != DeactivationStatusExpired {
+		t.Errorf("expected status EXPIRED when restored as BLOCKED with nil blockedUntil, got %q", req.Status())
+	}
+}
+
+func TestIsCurrentlyBlocked(t *testing.T) {
+	now := time.Now()
+
+	tests := []struct {
+		name         string
+		status       DeactivationStatus
+		blockedUntil *time.Time
+		expected     bool
+	}{
+		{
+			name:         "blocked and within period",
+			status:       DeactivationStatusBlocked,
+			blockedUntil: ptr(now.Add(30 * time.Minute)),
+			expected:     true,
+		},
+		{
+			name:         "blocked but period expired",
+			status:       DeactivationStatusBlocked,
+			blockedUntil: ptr(now.Add(-1 * time.Minute)),
+			expected:     false,
+		},
+		{
+			name:         "not blocked",
+			status:       DeactivationStatusPending,
+			blockedUntil: nil,
+			expected:     false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			req := RestoreDeactivationRequest(
+				"req-id", "user-id", "123456",
+				now.Add(time.Hour),
+				0, tt.blockedUntil,
+				tt.status,
+				now, now,
+			)
+			got := req.IsCurrentlyBlocked(now)
+			if got != tt.expected {
+				t.Errorf("IsCurrentlyBlocked: got %v, want %v", got, tt.expected)
+			}
+		})
+	}
+}
+
+func ptr(t time.Time) *time.Time { return &t }
+
 func TestRegisterFailure(t *testing.T) {
 	newRequest := func(attempts int) *DeactivationRequest {
 		return RestoreDeactivationRequest(

@@ -2,6 +2,69 @@ package user
 
 import "testing"
 
+func TestNewUserFilter_ValidPageAndLimit(t *testing.T) {
+	tests := []struct {
+		name  string
+		page  int
+		limit int
+	}{
+		{"minimum valid", 1, 1},
+		{"typical values", 1, 20},
+		{"max limit", 1, 100},
+		{"page 2", 2, 50},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, err := NewUserFilter(nil, nil, "", "", "", SearchByAll, "", SortByCreatedAt, SortOrderDesc, tt.page, tt.limit)
+			if err != nil {
+				t.Errorf("expected no error for page=%d limit=%d, got %v", tt.page, tt.limit, err)
+			}
+		})
+	}
+}
+
+func TestNewUserFilter_InvalidPage(t *testing.T) {
+	tests := []struct {
+		name string
+		page int
+	}{
+		{"zero", 0},
+		{"negative", -1},
+		{"large negative", -100},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, err := NewUserFilter(nil, nil, "", "", "", SearchByAll, "", SortByCreatedAt, SortOrderDesc, tt.page, 20)
+			if err == nil {
+				t.Errorf("expected error for page=%d, got nil", tt.page)
+			}
+		})
+	}
+}
+
+func TestNewUserFilter_InvalidLimit(t *testing.T) {
+	tests := []struct {
+		name  string
+		limit int
+	}{
+		{"zero", 0},
+		{"negative", -1},
+		{"exceeds max", 101},
+		{"way over", 1000},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, err := NewUserFilter(nil, nil, "", "", "", SearchByAll, "", SortByCreatedAt, SortOrderDesc, 1, tt.limit)
+			if err == nil {
+				t.Errorf("expected error for limit=%d, got nil", tt.limit)
+			}
+		})
+	}
+}
+
 func TestNewSortField_Valid(t *testing.T) {
 	tests := []struct {
 		name     string
