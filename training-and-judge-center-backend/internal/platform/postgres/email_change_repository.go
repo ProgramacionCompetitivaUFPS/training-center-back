@@ -72,7 +72,11 @@ func (r *EmailChangeRepository) FindByID(ctx context.Context, id string) (*user.
 	if err != nil {
 		return nil, fmt.Errorf("invalid email stored in db for request %s: %w", returnedID, err)
 	}
-	req := user.RestoreEmailChangeRequest(returnedID, userID, parsedEmail, code, user.RequestStatus(statusStr), expiresAt, createdAt, updatedAt)
+	status, err := user.NewRequestStatus(statusStr)
+	if err != nil {
+		return nil, fmt.Errorf("invalid status in email change request %s: %w", returnedID, err)
+	}
+	req := user.RestoreEmailChangeRequest(returnedID, userID, parsedEmail, code, status, expiresAt, createdAt, updatedAt)
 
 	return req, nil
 }
@@ -128,7 +132,11 @@ func (r *EmailChangeRepository) FindByCodeAndUserID(ctx context.Context, code st
 	if err != nil {
 		return nil, fmt.Errorf("invalid email stored in db for request %s: %w", id, err)
 	}
-	req := user.RestoreEmailChangeRequest(id, returnedUserID, parsedEmail, codeStr, user.RequestStatus(statusStr), expiresAt, createdAt, updatedAt)
+	status, err := user.NewRequestStatus(statusStr)
+	if err != nil {
+		return nil, fmt.Errorf("invalid status in email change request %s: %w", id, err)
+	}
+	req := user.RestoreEmailChangeRequest(id, returnedUserID, parsedEmail, codeStr, status, expiresAt, createdAt, updatedAt)
 
 	return req, nil
 }

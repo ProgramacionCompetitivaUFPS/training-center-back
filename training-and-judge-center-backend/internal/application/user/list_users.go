@@ -39,7 +39,8 @@ func NewListUsersUseCase(repo user.UserRepository) *ListUsersUseCase {
 }
 
 func (uc *ListUsersUseCase) Execute(ctx context.Context, input ListUsersInput) (*ListUsersOutput, error) {
-	var filter user.UserFilter
+	var roles []user.Role
+	var status *user.Status
 	var fieldErrors []apperror.FieldError
 
 	for _, r := range input.Roles {
@@ -51,7 +52,7 @@ func (uc *ListUsersUseCase) Execute(ctx context.Context, input ListUsersInput) (
 			})
 			break
 		}
-		filter.Roles = append(filter.Roles, role)
+		roles = append(roles, role)
 	}
 
 	if input.Status != "" {
@@ -62,7 +63,7 @@ func (uc *ListUsersUseCase) Execute(ctx context.Context, input ListUsersInput) (
 				Message: "Status must be ACTIVE or DEACTIVATED",
 			})
 		} else {
-			filter.Status = &s
+			status = &s
 		}
 	}
 
@@ -118,17 +119,19 @@ func (uc *ListUsersUseCase) Execute(ctx context.Context, input ListUsersInput) (
 		limit = 100
 	}
 
-	filter.Country = input.Country
-	filter.City = input.City
-	filter.Institution = input.Institution
-	filter.SearchField = searchField
-	filter.SearchTerm = input.SearchTerm
-	filter.Sort = sortField
-	filter.Order = sortOrder
-	filter.Page = page
-	filter.Limit = limit
+	builtFilter, err := user.NewUserFilter(
+		roles, status,
+		input.Country, input.City, input.Institution,
+		searchField, input.SearchTerm,
+		sortField, sortOrder,
+		page, limit,
+	)
+	if err != nil {
+		slog.Error("failed to build user filter", "error", err)
+		return nil, apperror.NewInternal()
+	}
 
-	users, total, err := uc.repo.FindAll(ctx, filter)
+	users, total, err := uc.repo.FindAll(ctx, builtFilter)
 	if err != nil {
 		slog.Error("failed to list users", "error", err)
 		return nil, apperror.NewInternal()

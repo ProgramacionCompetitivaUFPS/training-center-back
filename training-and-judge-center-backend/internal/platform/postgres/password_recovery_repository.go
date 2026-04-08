@@ -66,7 +66,11 @@ func (r *PasswordRecoveryRepository) FindByID(ctx context.Context, id string) (*
 		return nil, fmt.Errorf("failed to find password recovery request: %w", err)
 	}
 
-	req := user.RestorePasswordRecoveryRequest(returnedID, userID, code, user.RequestStatus(statusStr), expiresAt, createdAt, updatedAt)
+	status, err := user.NewRequestStatus(statusStr)
+	if err != nil {
+		return nil, fmt.Errorf("invalid status in password recovery request: %w", err)
+	}
+	req := user.RestorePasswordRecoveryRequest(returnedID, userID, code, status, expiresAt, createdAt, updatedAt)
 	return req, nil
 }
 
@@ -116,7 +120,11 @@ func (r *PasswordRecoveryRepository) FindPendingByUserID(ctx context.Context, us
 		return nil, fmt.Errorf("failed to find pending password recovery request: %w", err)
 	}
 
-	req := user.RestorePasswordRecoveryRequest(id, returnedUserID, code, user.RequestStatus(statusStr), expiresAt, createdAt, updatedAt)
+	status, err := user.NewRequestStatus(statusStr)
+	if err != nil {
+		return nil, fmt.Errorf("invalid status in pending password recovery request: %w", err)
+	}
+	req := user.RestorePasswordRecoveryRequest(id, returnedUserID, code, status, expiresAt, createdAt, updatedAt)
 	return req, nil
 }
 

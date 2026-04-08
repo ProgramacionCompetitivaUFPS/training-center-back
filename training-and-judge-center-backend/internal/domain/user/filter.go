@@ -69,3 +69,25 @@ type UserFilter struct {
 	Page        int
 	Limit       int
 }
+
+func NewUserFilter(roles []Role, status *Status, country, city, institution string, searchField SearchField, searchTerm string, sort SortField, order SortOrder, page, limit int) (UserFilter, error) {
+	if page < 1 {
+		return UserFilter{}, fmt.Errorf("page must be >= 1, got %d", page)
+	}
+	if limit < 1 || limit > 100 {
+		return UserFilter{}, fmt.Errorf("limit must be between 1 and 100, got %d", limit)
+	}
+	return UserFilter{
+		Roles:       roles,
+		Status:      status,
+		Country:     country,
+		City:        city,
+		Institution: institution,
+		SearchField: searchField,
+		SearchTerm:  searchTerm,
+		Sort:        sort,
+		Order:       order,
+		Page:        page,
+		Limit:       limit,
+	}, nil
+}
