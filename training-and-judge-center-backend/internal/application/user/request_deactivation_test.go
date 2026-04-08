@@ -2,6 +2,7 @@ package user
 
 import (
 	"context"
+	"errors"
 	"testing"
 	"time"
 
@@ -124,12 +125,99 @@ func TestRequestDeactivation_UserNotFound(t *testing.T) {
 
 	uc := NewRequestDeactivationUseCase(userRepo, &mockDeactivationRepo{}, &mockEmailSender{})
 	err := uc.Execute(context.Background(), RequestDeactivationInput{UserID: "non-existent"})
-	
+
 	if err == nil {
 		t.Fatal("expected error, got nil")
 	}
 	appErr, ok := err.(*apperror.AppError)
 	if !ok || appErr.Code != "NOT_FOUND" {
 		t.Errorf("expected NOT_FOUND error, got %v", err)
+	}
+}
+
+func TestRequestDeactivation_UserRepoError(t *testing.T) {
+	userRepo := newNoConflictRepo()
+	userRepo.findByIDFn = func(_ context.Context, _ string) (*domain.User, error) {
+		return nil, errors.New("db down")
+	}
+
+	uc := NewRequestDeactivationUseCase(userRepo, &mockDeactivationRepo{}, &mockEmailSender{})
+	err := uc.Execute(context.Background(), RequestDeactivationInput{UserID: "user-1"})
+
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+	appErr, ok := err.(*apperror.AppError)
+	if !ok || appErr.Code != "INTERNAL_ERROR" {
+		t.Errorf("expected INTERNAL_ERROR, got %v", err)
+	}
+}
+
+func TestRequestDeactivation_InvalidatePendingError(t *testing.T) {
+	userRepo := newNoConflictRepo()
+	activeUser := newUserWithRole("user-1", domain.RoleContestant, domain.StatusActive)
+	userRepo.findByIDFn = func(_ context.Context, _ string) (*domain.User, error) { return activeUser, nil }
+
+	deactRepo := &mockDeactivationRepo{
+		invalidatePendingByUserIDFn: func(_ context.Context, _ string, _ time.Time) error {
+			return errors.New("db error")
+		},
+	}
+
+	uc := NewRequestDeactivationUseCase(userRepo, deactRepo, &mockEmailSender{})
+	err := uc.Execute(context.Background(), RequestDeactivationInput{UserID: "user-1"})
+
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+	appErr, ok := err.(*apperror.AppError)
+	if !ok || appErr.Code != "INTERNAL_ERROR" {
+		t.Errorf("expected INTERNAL_ERROR, got %v", err)
+	}
+}
+
+func TestRequestDeactivation_SaveError(t *testing.T) {
+	userRepo := newNoConflictRepo()
+	activeUser := newUserWithRole("user-1", domain.RoleContestant, domain.StatusActive)
+	userRepo.findByIDFn = func(_ context.Context, _ string) (*domain.User, error) { return activeUser, nil }
+
+	deactRepo := &mockDeactivationRepo{
+		saveFn: func(_ context.Context, _ *domain.DeactivationRequest) error {
+			return errors.New("insert failed")
+		},
+	}
+
+	uc := NewRequestDeactivationUseCase(userRepo, deactRepo, &mockEmailSender{})
+	err := uc.Execute(context.Background(), RequestDeactivationInput{UserID: "user-1"})
+
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+	appErr, ok := err.(*apperror.AppError)
+	if !ok || appErr.Code != "INTERNAL_ERROR" {
+		t.Errorf("expected INTERNAL_ERROR, got %v", err)
+	}
+}
+
+func TestRequestDeactivation_EmailDeliveryFailure(t *testing.T) {
+	userRepo := newNoConflictRepo()
+	activeUser := newUserWithRole("user-1", domain.RoleContestant, domain.StatusActive)
+	userRepo.findByIDFn = func(_ context.Context, _ string) (*domain.User, error) { return activeUser, nil }
+
+	emailSender := &mockEmailSender{
+		sendFn: func(_ context.Context, _ notification.EmailMessage) error {
+			return errors.New("smtp error")
+		},
+	}
+
+	uc := NewRequestDeactivationUseCase(userRepo, &mockDeactivationRepo{}, emailSender)
+	err := uc.Execute(context.Background(), RequestDeactivationInput{UserID: "user-1"})
+
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+	appErr, ok := err.(*apperror.AppError)
+	if !ok || appErr.Code != "EMAIL_DELIVERY_FAILED" {
+		t.Errorf("expected EMAIL_DELIVERY_FAILED, got %v", err)
 	}
 }

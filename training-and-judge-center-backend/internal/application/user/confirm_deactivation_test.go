@@ -351,6 +351,31 @@ func TestConfirmDeactivation_BlockExpired_UpdateFails_ReturnsInternal(t *testing
 	}
 }
 
+func TestConfirmDeactivation_ActiveBlock(t *testing.T) {
+	userRepo := newNoConflictRepo()
+	userRepo.findByIDFn = func(_ context.Context, _ string) (*domain.User, error) {
+		return newUserWithRole("user-1", domain.RoleContestant, domain.StatusActive), nil
+	}
+
+	blockedUntil := time.Now().Add(30 * time.Minute)
+	deactRepo := &mockDeactivationRepo{
+		findPendingByUserIDFn: func(_ context.Context, _ string) (*domain.DeactivationRequest, error) {
+			return domain.RestoreDeactivationRequest("req-1", "user-1", "123456", time.Now().Add(time.Hour), 5, &blockedUntil, domain.DeactivationStatusBlocked, time.Time{}, time.Time{}), nil
+		},
+	}
+
+	uc := NewConfirmDeactivationUseCase(userRepo, deactRepo, &mockAuditRepo{}, &mockEmailSender{}, &mockSessionInvalidator{}, &mockTransactionManager{})
+	err := uc.Execute(context.Background(), ConfirmDeactivationInput{UserID: "user-1", Code: "123456"})
+
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+	appErr, ok := err.(*apperror.AppError)
+	if !ok || appErr.Code != "MAX_ATTEMPTS_EXCEEDED" {
+		t.Errorf("expected MAX_ATTEMPTS_EXCEEDED, got %v", err)
+	}
+}
+
 func TestConfirmDeactivation_ExceedAttemptsAndBlock(t *testing.T) {
 	userRepo := newNoConflictRepo()
 	activeUser := newUserWithRole("user-1", domain.RoleContestant, domain.StatusActive)

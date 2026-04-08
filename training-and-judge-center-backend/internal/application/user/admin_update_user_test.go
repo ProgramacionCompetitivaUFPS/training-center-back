@@ -311,6 +311,35 @@ func TestAdminUpdateUser_EmptyCityValidation(t *testing.T) {
 	}
 }
 
+func TestAdminUpdateUser_NicknameConflict(t *testing.T) {
+	repo := newNoConflictRepo()
+	targetUser := newUserWithRole("target-1", domain.RoleContestant, domain.StatusActive)
+	repo.findByIDFn = func(_ context.Context, _ string) (*domain.User, error) {
+		return targetUser, nil
+	}
+	repo.updateFn = func(_ context.Context, _ *domain.User) error {
+		return domain.ErrNicknameConflict
+	}
+	uc := NewAdminUpdateUserUseCase(repo)
+
+	nick := "takenick"
+	_, err := uc.Execute(context.Background(), AdminUpdateUserInput{
+		TargetID: "target-1",
+		Nickname: &nick,
+	})
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+
+	appErr, ok := err.(*apperror.AppError)
+	if !ok {
+		t.Fatalf("expected *apperror.AppError, got %T", err)
+	}
+	if appErr.Code != "NICKNAME_ALREADY_EXISTS" {
+		t.Errorf("expected NICKNAME_ALREADY_EXISTS, got %q", appErr.Code)
+	}
+}
+
 func TestAdminUpdateUser_EmptyCountryValidation(t *testing.T) {
 	repo := newNoConflictRepo()
 	targetUser := newUserWithRole("target-1", domain.RoleContestant, domain.StatusActive)

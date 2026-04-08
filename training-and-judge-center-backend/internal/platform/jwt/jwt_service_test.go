@@ -181,6 +181,16 @@ func TestValidateToken_AlgorithmNone(t *testing.T) {
 	}
 }
 
+func TestValidateToken_MalformedToken(t *testing.T) {
+	svc := NewService("test-secret", 1)
+
+	_, err := svc.ValidateToken("not.a.token")
+
+	if err == nil {
+		t.Error("expected error for malformed token, got nil")
+	}
+}
+
 func TestValidateToken_TamperedPayload(t *testing.T) {
 	// Arrange — generate a valid token then replace the payload with forged claims
 	svc := NewService("test-secret", 1)

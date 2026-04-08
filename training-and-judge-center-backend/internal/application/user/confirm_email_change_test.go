@@ -2,6 +2,7 @@ package user
 
 import (
 	"context"
+	"errors"
 	"net/http"
 	"testing"
 	"time"
@@ -37,7 +38,7 @@ func TestConfirmEmailChange_Success(t *testing.T) {
 			return nil, nil
 		},
 		updateFn: func(ctx context.Context, r *domain.EmailChangeRequest) error {
-			if r.Status() != domain.StatusExpired && r.Status() != domain.StatusUsed {
+			if r.Status() != domain.StatusUsed {
 				t.Errorf("expected request status to be set to USED, got %s", r.Status())
 			}
 			return nil
@@ -178,5 +179,95 @@ func TestConfirmEmailChange_DuplicateEmailAtConfirmation(t *testing.T) {
 	appErr, ok := err.(*apperror.AppError)
 	if !ok || appErr.Code != "EMAIL_ALREADY_EXISTS" {
 		t.Errorf("expected EMAIL_ALREADY_EXISTS error, got %v", err)
+	}
+}
+
+func TestConfirmEmailChange_UserNotFound(t *testing.T) {
+	userRepo := newNoConflictRepo()
+	userRepo.findByIDFn = func(_ context.Context, _ string) (*domain.User, error) {
+		return nil, nil
+	}
+
+	uc := NewConfirmEmailChangeUseCase(userRepo, &mockEmailChangeRepo{}, &mockEmailSender{}, &mockTransactionManager{})
+	_, err := uc.Execute(context.Background(), ConfirmEmailChangeInput{UserID: "user-1", Code: "123456"})
+
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+	appErr, ok := err.(*apperror.AppError)
+	if !ok || appErr.Code != "INVALID_CREDENTIALS" {
+		t.Errorf("expected INVALID_CREDENTIALS, got %v", err)
+	}
+}
+
+func TestConfirmEmailChange_UserRepoError(t *testing.T) {
+	userRepo := newNoConflictRepo()
+	userRepo.findByIDFn = func(_ context.Context, _ string) (*domain.User, error) {
+		return nil, errors.New("db error")
+	}
+
+	uc := NewConfirmEmailChangeUseCase(userRepo, &mockEmailChangeRepo{}, &mockEmailSender{}, &mockTransactionManager{})
+	_, err := uc.Execute(context.Background(), ConfirmEmailChangeInput{UserID: "user-1", Code: "123456"})
+
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+	appErr, ok := err.(*apperror.AppError)
+	if !ok || appErr.Code != "INTERNAL_ERROR" {
+		t.Errorf("expected INTERNAL_ERROR, got %v", err)
+	}
+}
+
+func TestConfirmEmailChange_EmailChangeRepoError(t *testing.T) {
+	userRepo := newNoConflictRepo()
+	activeUser := newUserWithRole("user-1", domain.RoleContestant, domain.StatusActive)
+	userRepo.findByIDFn = func(_ context.Context, _ string) (*domain.User, error) { return activeUser, nil }
+
+	emailChangeRepo := &mockEmailChangeRepo{
+		findByCodeAndUserIDFn: func(_ context.Context, _ string, _ string) (*domain.EmailChangeRequest, error) {
+			return nil, errors.New("db error")
+		},
+	}
+
+	uc := NewConfirmEmailChangeUseCase(userRepo, emailChangeRepo, &mockEmailSender{}, &mockTransactionManager{})
+	_, err := uc.Execute(context.Background(), ConfirmEmailChangeInput{UserID: "user-1", Code: "123456"})
+
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+	appErr, ok := err.(*apperror.AppError)
+	if !ok || appErr.Code != "INTERNAL_ERROR" {
+		t.Errorf("expected INTERNAL_ERROR, got %v", err)
+	}
+}
+
+func TestConfirmEmailChange_TxFailure(t *testing.T) {
+	userRepo := newNoConflictRepo()
+	activeUser := newUserWithRole("user-1", domain.RoleContestant, domain.StatusActive)
+	userRepo.findByIDFn = func(_ context.Context, _ string) (*domain.User, error) { return activeUser, nil }
+
+	mockEmail, _ := domain.NewEmail("new@example.com")
+	req := domain.RestoreEmailChangeRequest("req-1", "user-1", mockEmail, "123456", domain.StatusPending, time.Now().Add(10*time.Minute), time.Time{}, nil)
+	emailChangeRepo := &mockEmailChangeRepo{
+		findByCodeAndUserIDFn: func(_ context.Context, _ string, _ string) (*domain.EmailChangeRequest, error) {
+			return req, nil
+		},
+	}
+
+	tx := &mockTransactionManager{
+		withTxFn: func(_ context.Context, _ func(context.Context) error) error {
+			return errors.New("tx error")
+		},
+	}
+
+	uc := NewConfirmEmailChangeUseCase(userRepo, emailChangeRepo, &mockEmailSender{}, tx)
+	_, err := uc.Execute(context.Background(), ConfirmEmailChangeInput{UserID: "user-1", Code: "123456"})
+
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+	appErr, ok := err.(*apperror.AppError)
+	if !ok || appErr.Code != "INTERNAL_ERROR" {
+		t.Errorf("expected INTERNAL_ERROR, got %v", err)
 	}
 }

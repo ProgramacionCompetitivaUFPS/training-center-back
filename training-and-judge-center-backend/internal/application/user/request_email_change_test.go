@@ -79,6 +79,52 @@ func TestRequestEmailChange_WrongPassword(t *testing.T) {
 	}
 }
 
+func TestRequestEmailChange_UserNotFound(t *testing.T) {
+	userRepo := newNoConflictRepo()
+	userRepo.findByIDFn = func(_ context.Context, _ string) (*domain.User, error) {
+		return nil, nil
+	}
+
+	uc := NewRequestEmailChangeUseCase(userRepo, &mockEmailChangeRepo{}, &mockEmailSender{}, &mockRateLimiter{})
+	err := uc.Execute(context.Background(), RequestEmailChangeInput{
+		UserID:   "ghost",
+		Password: "Secret1!",
+		NewEmail: "new@example.com",
+	})
+
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+	appErr, ok := err.(*apperror.AppError)
+	if !ok || appErr.Code != "INVALID_CREDENTIALS" {
+		t.Errorf("expected INVALID_CREDENTIALS, got %v", err)
+	}
+}
+
+func TestRequestEmailChange_InvalidNewEmail(t *testing.T) {
+	userRepo := newNoConflictRepo()
+	activeUser := newUserWithRole("user-1", domain.RoleContestant, domain.StatusActive)
+	userRepo.findByIDFn = func(_ context.Context, _ string) (*domain.User, error) { return activeUser, nil }
+
+	uc := NewRequestEmailChangeUseCase(userRepo, &mockEmailChangeRepo{}, &mockEmailSender{}, &mockRateLimiter{})
+	err := uc.Execute(context.Background(), RequestEmailChangeInput{
+		UserID:   "user-1",
+		Password: "Secret1!",
+		NewEmail: "not-an-email",
+	})
+
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+	appErr, ok := err.(*apperror.AppError)
+	if !ok || appErr.Code != "VALIDATION_ERROR" {
+		t.Errorf("expected VALIDATION_ERROR, got %v", err)
+	}
+	if len(appErr.Details) == 0 || appErr.Details[0].Field != "newEmail" {
+		t.Errorf("expected field error on newEmail, got %v", appErr.Details)
+	}
+}
+
 func TestRequestEmailChange_EmailDeliveryFails(t *testing.T) {
 	userRepo := newNoConflictRepo()
 	activeUser := newUserWithRole("user-1", domain.RoleContestant, domain.StatusActive)
