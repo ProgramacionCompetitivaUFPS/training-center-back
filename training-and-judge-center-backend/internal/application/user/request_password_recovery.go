@@ -8,6 +8,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/training-judge-center/backend/internal/domain/notification"
+	"github.com/training-judge-center/backend/internal/domain/ratelimit"
 	"github.com/training-judge-center/backend/internal/domain/user"
 	"github.com/training-judge-center/backend/pkg/apperror"
 )
@@ -20,21 +21,33 @@ type RequestPasswordRecoveryUseCase struct {
 	userRepo     user.UserRepository
 	recoveryRepo user.PasswordRecoveryRepository
 	emailSender  notification.EmailSender
+	rateLimiter  ratelimit.RateLimiter
 }
 
 func NewRequestPasswordRecoveryUseCase(
 	userRepo user.UserRepository,
 	recoveryRepo user.PasswordRecoveryRepository,
 	emailSender notification.EmailSender,
+	rateLimiter ratelimit.RateLimiter,
 ) *RequestPasswordRecoveryUseCase {
 	return &RequestPasswordRecoveryUseCase{
 		userRepo:     userRepo,
 		recoveryRepo: recoveryRepo,
 		emailSender:  emailSender,
+		rateLimiter:  rateLimiter,
 	}
 }
 
 func (uc *RequestPasswordRecoveryUseCase) Execute(ctx context.Context, input RequestPasswordRecoveryInput) error {
+	allowed, err := uc.rateLimiter.Allow(ctx, "password-recovery:"+input.Email, 5, time.Hour)
+	if err != nil {
+		slog.Error("failed to check rate limit for password recovery request", "email", input.Email, "error", err)
+		return apperror.NewInternal()
+	}
+	if !allowed {
+		return apperror.NewTooManyRequests("RATE_LIMIT_EXCEEDED", "Too many recovery requests. Please try again later.", 3600)
+	}
+
 	emailVO, err := user.NewEmail(input.Email)
 	if err != nil {
 		return apperror.NewValidation([]apperror.FieldError{
@@ -44,6 +57,7 @@ func (uc *RequestPasswordRecoveryUseCase) Execute(ctx context.Context, input Req
 
 	foundUser, err := uc.userRepo.FindByEmail(ctx, emailVO)
 	if err != nil {
+		slog.Error("failed to find user by email during password recovery request", "error", err)
 		return apperror.NewInternal()
 	}
 
@@ -57,17 +71,20 @@ func (uc *RequestPasswordRecoveryUseCase) Execute(ctx context.Context, input Req
 
 	// Invalidate previous requests
 	if err := uc.recoveryRepo.InvalidatePendingByUserID(ctx, foundUser.ID(), now); err != nil {
+		slog.Error("failed to invalidate pending recovery requests", "user_id", foundUser.ID(), "error", err)
 		return apperror.NewInternal()
 	}
 
 	code, err := generateSixDigitCode()
 	if err != nil {
+		slog.Error("failed to generate recovery code", "user_id", foundUser.ID(), "error", err)
 		return apperror.NewInternal()
 	}
 
-	req := user.RestorePasswordRecoveryRequest(uuid.NewString(), foundUser.ID(), code, user.StatusPending, now.Add(15 * time.Minute), now, nil)
+	req := user.RestorePasswordRecoveryRequest(uuid.NewString(), foundUser.ID(), code, user.StatusPending, now.Add(15*time.Minute), now, nil)
 
 	if err := uc.recoveryRepo.Save(ctx, req); err != nil {
+		slog.Error("failed to save password recovery request", "user_id", foundUser.ID(), "error", err)
 		return apperror.NewInternal()
 	}
 

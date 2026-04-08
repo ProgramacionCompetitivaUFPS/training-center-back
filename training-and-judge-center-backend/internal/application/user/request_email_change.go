@@ -10,6 +10,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/training-judge-center/backend/internal/domain/notification"
+	"github.com/training-judge-center/backend/internal/domain/ratelimit"
 	"github.com/training-judge-center/backend/internal/domain/user"
 	"github.com/training-judge-center/backend/pkg/apperror"
 )
@@ -24,23 +25,36 @@ type RequestEmailChangeUseCase struct {
 	userRepo        user.UserRepository
 	emailChangeRepo user.EmailChangeRepository
 	emailSender     notification.EmailSender
+	rateLimiter     ratelimit.RateLimiter
 }
 
 func NewRequestEmailChangeUseCase(
 	userRepo user.UserRepository,
 	emailChangeRepo user.EmailChangeRepository,
 	emailSender notification.EmailSender,
+	rateLimiter ratelimit.RateLimiter,
 ) *RequestEmailChangeUseCase {
 	return &RequestEmailChangeUseCase{
 		userRepo:        userRepo,
 		emailChangeRepo: emailChangeRepo,
 		emailSender:     emailSender,
+		rateLimiter:     rateLimiter,
 	}
 }
 
 func (uc *RequestEmailChangeUseCase) Execute(ctx context.Context, input RequestEmailChangeInput) error {
+	allowed, err := uc.rateLimiter.Allow(ctx, "email-change-request:"+input.UserID, 5, time.Hour)
+	if err != nil {
+		slog.Error("failed to check rate limit for email change request", "user_id", input.UserID, "error", err)
+		return apperror.NewInternal()
+	}
+	if !allowed {
+		return apperror.NewTooManyRequests("RATE_LIMIT_EXCEEDED", "Too many requests. Please try again later.", 3600)
+	}
+
 	u, err := uc.userRepo.FindByID(ctx, input.UserID)
 	if err != nil {
+		slog.Error("failed to find user during email change request", "user_id", input.UserID, "error", err)
 		return apperror.NewInternal()
 	}
 	if u == nil {
@@ -59,11 +73,13 @@ func (uc *RequestEmailChangeUseCase) Execute(ctx context.Context, input RequestE
 	}
 
 	if err := uc.emailChangeRepo.InvalidatePendingByUserID(ctx, input.UserID); err != nil {
+		slog.Error("failed to invalidate pending email change requests", "user_id", input.UserID, "error", err)
 		return apperror.NewInternal()
 	}
 
 	code, err := generateSixDigitCode()
 	if err != nil {
+		slog.Error("failed to generate email change code", "user_id", input.UserID, "error", err)
 		return apperror.NewInternal()
 	}
 
@@ -73,6 +89,7 @@ func (uc *RequestEmailChangeUseCase) Execute(ctx context.Context, input RequestE
 	req := user.RestoreEmailChangeRequest(uuid.New().String(), input.UserID, parsedNewEmail, code, user.StatusPending, expiresAt, now, nil)
 
 	if err := uc.emailChangeRepo.Save(ctx, req); err != nil {
+		slog.Error("failed to save email change request", "user_id", input.UserID, "error", err)
 		return apperror.NewInternal()
 	}
 

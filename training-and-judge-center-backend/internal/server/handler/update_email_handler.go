@@ -7,7 +7,6 @@ import (
 
 	appuser "github.com/training-judge-center/backend/internal/application/user"
 	"github.com/training-judge-center/backend/internal/server/middleware"
-	"github.com/training-judge-center/backend/pkg/apperror"
 )
 
 type requestEmailChangeBody struct {
@@ -26,21 +25,6 @@ func (h *UserHandler) RequestEmailChange(w http.ResponseWriter, r *http.Request)
 	}
 	userID := claims.UserID
 	ctx := r.Context()
-
-	// Rate Limiting: max 5 requests per hour for this user
-	key := "email-change-request:" + userID
-	allowed, err := h.rateLimiter.Allow(ctx, key, 5, time.Hour)
-	if err != nil {
-		respondError(w, apperror.NewInternal())
-		return
-	}
-	if !allowed {
-		respondJSON(w, http.StatusTooManyRequests, map[string]string{
-			"error":   "RATE_LIMIT_EXCEEDED",
-			"message": "Too many requests. Please try again later.",
-		})
-		return
-	}
 
 	var body requestEmailChangeBody
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {

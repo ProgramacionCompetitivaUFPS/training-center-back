@@ -3,10 +3,8 @@ package handler
 import (
 	"encoding/json"
 	"net/http"
-	"time"
 
 	appuser "github.com/training-judge-center/backend/internal/application/user"
-	"github.com/training-judge-center/backend/pkg/apperror"
 )
 
 type requestPasswordRecoveryBody struct {
@@ -31,22 +29,6 @@ func (h *UserHandler) RequestPasswordRecovery(w http.ResponseWriter, r *http.Req
 			"details": []map[string]string{
 				{"field": "email", "message": "Email is required"},
 			},
-		})
-		return
-	}
-
-	// Rate Limiting
-	key := "password-recovery:" + body.Email
-	allowed, err := h.rateLimiter.Allow(ctx, key, 5, time.Hour)
-	if err != nil {
-		respondError(w, apperror.NewInternal())
-		return
-	}
-	if !allowed {
-		respondJSON(w, http.StatusTooManyRequests, map[string]interface{}{
-			"error":      "RATE_LIMIT_EXCEEDED",
-			"message":    "Too many recovery requests. Please try again later",
-			"retryAfter": 3600,
 		})
 		return
 	}

@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/training-judge-center/backend/internal/domain/notification"
+	"github.com/training-judge-center/backend/internal/domain/ratelimit"
 	"github.com/training-judge-center/backend/internal/domain/user"
 	"github.com/training-judge-center/backend/pkg/apperror"
 )
@@ -26,19 +27,32 @@ type UpdatePasswordUseCase struct {
 	repo               user.UserRepository
 	emailSender        notification.EmailSender
 	sessionInvalidator user.SessionInvalidator
+	rateLimiter        ratelimit.RateLimiter
 }
 
-func NewUpdatePasswordUseCase(repo user.UserRepository, email notification.EmailSender, sessionInvalidator user.SessionInvalidator) *UpdatePasswordUseCase {
+func NewUpdatePasswordUseCase(repo user.UserRepository, email notification.EmailSender, sessionInvalidator user.SessionInvalidator, rateLimiter ratelimit.RateLimiter) *UpdatePasswordUseCase {
 	return &UpdatePasswordUseCase{
 		repo:               repo,
 		emailSender:        email,
 		sessionInvalidator: sessionInvalidator,
+		rateLimiter:        rateLimiter,
 	}
 }
 
 func (uc *UpdatePasswordUseCase) Execute(ctx context.Context, input UpdatePasswordInput) error {
+	rateKey := "rate_limit:update_password:" + input.UserID
+	allowed, err := uc.rateLimiter.Allow(ctx, rateKey, 5, time.Hour)
+	if err != nil {
+		slog.Error("failed to check rate limit for password update", "user_id", input.UserID, "error", err)
+		return apperror.NewInternal()
+	}
+	if !allowed {
+		return apperror.NewTooManyRequests("TOO_MANY_REQUESTS", "Too many password update attempts. Please try again in an hour.", 3600)
+	}
+
 	foundUser, err := uc.repo.FindByID(ctx, input.UserID)
 	if err != nil {
+		slog.Error("failed to find user during password update", "user_id", input.UserID, "error", err)
 		return apperror.NewInternal()
 	}
 	if foundUser == nil {
@@ -64,10 +78,20 @@ func (uc *UpdatePasswordUseCase) Execute(ctx context.Context, input UpdatePasswo
 		})
 	}
 
-	foundUser.UpdatePassword(newPassword)
+	if err := foundUser.UpdatePassword(newPassword); err != nil {
+		slog.Error("failed to update password on user domain object", "user_id", foundUser.ID(), "error", err)
+		return apperror.NewInternal()
+	}
 
 	if err := uc.repo.Update(ctx, foundUser); err != nil {
+		slog.Error("failed to persist password update", "user_id", foundUser.ID(), "error", err)
 		return apperror.NewInternal()
+	}
+
+	// Password changed successfully — reset rate limit so the user can make fresh attempts later.
+	if err := uc.rateLimiter.Reset(ctx, rateKey); err != nil {
+		slog.Error("failed to reset rate limit after successful password update", "user_id", foundUser.ID(), "error", err)
+		// Don't fail the operation; the password was already saved.
 	}
 
 	now := time.Now()

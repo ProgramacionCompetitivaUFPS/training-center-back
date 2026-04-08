@@ -85,7 +85,7 @@ func TestRequestPasswordRecovery_Success(t *testing.T) {
 		},
 	}
 
-	uc := NewRequestPasswordRecoveryUseCase(userRepo, recoveryRepo, mockEmail)
+	uc := NewRequestPasswordRecoveryUseCase(userRepo, recoveryRepo, mockEmail, &mockRateLimiter{})
 	err := uc.Execute(context.Background(), RequestPasswordRecoveryInput{Email: "user-1@example.com"})
 	
 	if err != nil {
@@ -111,7 +111,7 @@ func TestRequestPasswordRecovery_AmbiguousResponseWhenNotFound(t *testing.T) {
 		},
 	}
 
-	uc := NewRequestPasswordRecoveryUseCase(userRepo, recoveryRepo, mockEmail)
+	uc := NewRequestPasswordRecoveryUseCase(userRepo, recoveryRepo, mockEmail, &mockRateLimiter{})
 	err := uc.Execute(context.Background(), RequestPasswordRecoveryInput{Email: "unknown@example.com"})
 	
 	if err != nil {
@@ -123,7 +123,7 @@ func TestRequestPasswordRecovery_AmbiguousResponseWhenNotFound(t *testing.T) {
 }
 
 func TestRequestPasswordRecovery_InvalidEmail(t *testing.T) {
-	uc := NewRequestPasswordRecoveryUseCase(newNoConflictRepo(), &mockPasswordRecoveryRepo{}, &mockEmailSender{})
+	uc := NewRequestPasswordRecoveryUseCase(newNoConflictRepo(), &mockPasswordRecoveryRepo{}, &mockEmailSender{}, &mockRateLimiter{})
 	err := uc.Execute(context.Background(), RequestPasswordRecoveryInput{Email: "not-an-email"})
 	
 	if err == nil {
@@ -160,7 +160,7 @@ func TestRequestPasswordRecovery_EmailSendFailNoError(t *testing.T) {
 		},
 	}
 
-	uc := NewRequestPasswordRecoveryUseCase(userRepo, recoveryRepo, mockEmail)
+	uc := NewRequestPasswordRecoveryUseCase(userRepo, recoveryRepo, mockEmail, &mockRateLimiter{})
 	err := uc.Execute(context.Background(), RequestPasswordRecoveryInput{Email: "user-1@example.com"})
 
 	if err != nil {
@@ -192,7 +192,7 @@ func TestRequestPasswordRecovery_EmailSendFail_InvalidatesOrphanedCode(t *testin
 		},
 	}
 
-	uc := NewRequestPasswordRecoveryUseCase(userRepo, recoveryRepo, mockEmail)
+	uc := NewRequestPasswordRecoveryUseCase(userRepo, recoveryRepo, mockEmail, &mockRateLimiter{})
 	err := uc.Execute(context.Background(), RequestPasswordRecoveryInput{Email: "user-1@example.com"})
 
 	if err != nil {

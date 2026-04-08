@@ -8,6 +8,27 @@ import (
 	domain "github.com/training-judge-center/backend/internal/domain/user"
 )
 
+// mockRateLimiter implementa ratelimit.RateLimiter para tests.
+// Por defecto permite todas las solicitudes y no falla.
+type mockRateLimiter struct {
+	allowFn func(ctx context.Context, key string, maxAttempts int, window time.Duration) (bool, error)
+	resetFn func(ctx context.Context, key string) error
+}
+
+func (m *mockRateLimiter) Allow(ctx context.Context, key string, maxAttempts int, window time.Duration) (bool, error) {
+	if m.allowFn != nil {
+		return m.allowFn(ctx, key, maxAttempts, window)
+	}
+	return true, nil
+}
+
+func (m *mockRateLimiter) Reset(ctx context.Context, key string) error {
+	if m.resetFn != nil {
+		return m.resetFn(ctx, key)
+	}
+	return nil
+}
+
 type mockEmailSender struct {
 	sendFn func(ctx context.Context, msg notification.EmailMessage) error
 }

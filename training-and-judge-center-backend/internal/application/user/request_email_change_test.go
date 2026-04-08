@@ -33,7 +33,7 @@ func TestRequestEmailChange_Success(t *testing.T) {
 		},
 	}
 
-	uc := NewRequestEmailChangeUseCase(userRepo, emailChangeRepo, mockEmail)
+	uc := NewRequestEmailChangeUseCase(userRepo, emailChangeRepo, mockEmail, &mockRateLimiter{})
 
 	err := uc.Execute(context.Background(), RequestEmailChangeInput{
 		UserID:   "user-1",
@@ -61,7 +61,7 @@ func TestRequestEmailChange_WrongPassword(t *testing.T) {
 
 	emailChangeRepo := &mockEmailChangeRepo{}
 	mockEmail := &mockEmailSender{}
-	uc := NewRequestEmailChangeUseCase(userRepo, emailChangeRepo, mockEmail)
+	uc := NewRequestEmailChangeUseCase(userRepo, emailChangeRepo, mockEmail, &mockRateLimiter{})
 
 	err := uc.Execute(context.Background(), RequestEmailChangeInput{
 		UserID:   "user-1",
@@ -97,7 +97,7 @@ func TestRequestEmailChange_EmailDeliveryFails(t *testing.T) {
 		},
 	}
 
-	uc := NewRequestEmailChangeUseCase(userRepo, emailChangeRepo, mockEmail)
+	uc := NewRequestEmailChangeUseCase(userRepo, emailChangeRepo, mockEmail, &mockRateLimiter{})
 
 	err := uc.Execute(context.Background(), RequestEmailChangeInput{
 		UserID:   "user-1",
