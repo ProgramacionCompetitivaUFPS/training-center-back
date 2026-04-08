@@ -27,7 +27,7 @@ func NewCreateUserUseCase(repo user.UserRepository) *CreateUserUseCase {
 	return &CreateUserUseCase{repo: repo}
 }
 
-func (uc *CreateUserUseCase) Execute(ctx context.Context, input CreateUserInput) (*user.User, error) {
+func (uc *CreateUserUseCase) Execute(ctx context.Context, input CreateUserInput) (UserDTO, error) {
 	var fieldErrors []apperror.FieldError
 
 	email, err := user.NewEmail(input.Email)
@@ -59,25 +59,25 @@ func (uc *CreateUserUseCase) Execute(ctx context.Context, input CreateUserInput)
 	}
 
 	if len(fieldErrors) > 0 {
-		return nil, apperror.NewValidation(fieldErrors)
+		return UserDTO{}, apperror.NewValidation(fieldErrors)
 	}
 
 	newUser, err := user.NewUser(email, password, input.Name, nickname, input.Country, input.City, input.Institution)
 	if err != nil {
 		slog.Error("failed to build new user domain object", "error", err)
-		return nil, apperror.NewInternal()
+		return UserDTO{}, apperror.NewInternal()
 	}
 
 	if err := uc.repo.Save(ctx, newUser); err != nil {
 		if errors.Is(err, user.ErrEmailConflict) {
-			return nil, apperror.NewConflict("EMAIL_ALREADY_EXISTS", "The email address is already in use")
+			return UserDTO{}, apperror.NewConflict("EMAIL_ALREADY_EXISTS", "The email address is already in use")
 		}
 		if errors.Is(err, user.ErrNicknameConflict) {
-			return nil, apperror.NewConflict("NICKNAME_ALREADY_EXISTS", "The nickname is already in use")
+			return UserDTO{}, apperror.NewConflict("NICKNAME_ALREADY_EXISTS", "The nickname is already in use")
 		}
 		slog.Error("failed to save new user", "error", err)
-		return nil, apperror.NewInternal()
+		return UserDTO{}, apperror.NewInternal()
 	}
 
-	return newUser, nil
+	return userToDTO(newUser), nil
 }
