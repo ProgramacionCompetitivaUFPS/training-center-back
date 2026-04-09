@@ -2,6 +2,12 @@ package apperror
 
 import "net/http"
 
+const (
+	ErrCodeNotFound             = "NOT_FOUND"
+	ErrCodeCannotSelfDeactivate = "CANNOT_SELF_DEACTIVATE"
+	ErrCodeCannotDeactivateAdmin = "CANNOT_DEACTIVATE_ADMIN"
+)
+
 func NewValidation(details []FieldError) *AppError {
 	return &AppError{
 		Code:       "VALIDATION_ERROR",
@@ -16,6 +22,14 @@ func NewConflict(code, message string) *AppError {
 		Code:       code,
 		Message:    message,
 		StatusCode: http.StatusConflict,
+	}
+}
+
+func NewBadRequest(code, message string) *AppError {
+	return &AppError{
+		Code:       code,
+		Message:    message,
+		StatusCode: http.StatusBadRequest,
 	}
 }
 
@@ -48,5 +62,28 @@ func NewInternal() *AppError {
 		Code:       "INTERNAL_ERROR",
 		Message:    "An unexpected error occurred",
 		StatusCode: http.StatusInternalServerError,
+	}
+}
+
+func NewServiceUnavailable(code, message string) *AppError {
+	return &AppError{
+		Code:       code,
+		Message:    message,
+		StatusCode: http.StatusServiceUnavailable,
+	}
+}
+
+func NewTooManyRequests(code, message string, retryAfter int) *AppError {
+	if code == "" {
+		code = "RATE_LIMIT_EXCEEDED"
+	}
+	if message == "" {
+		message = "Too many requests. Please try again later"
+	}
+	return &AppError{
+		Code:       code,
+		Message:    message,
+		StatusCode: http.StatusTooManyRequests,
+		RetryAfter: retryAfter,
 	}
 }

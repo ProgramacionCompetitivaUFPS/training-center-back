@@ -31,7 +31,7 @@ Users Management handles all user-related operations in the platform, including 
 | `email` | string | Yes | Unique email address |
 | `password` | string | Yes | Hashed password, never returned in responses |
 | `name` | string | Yes | User's full name |
-| `nickname` | string | No | Display name/alias, stored in lowercase, unique |
+| `nickname` | string | Yes | Display name/alias, stored in lowercase, unique |
 | `country` | string | Yes | User's country |
 | `city` | string | Yes | User's city |
 | `institution` | string | Yes | User's institution or organization |
@@ -97,6 +97,7 @@ Several features use 6-digit numeric verification codes sent via email:
 | Spec | Endpoint | Description |
 |------|----------|-------------|
 | [Create user](Create%20user/spec.md) | `POST /users` | Self-registration (CONTESTANT role only) |
+| [Login](Login/spec.md) | `POST /auth/login` | Authentication with email and password (JWT) |
 | [Get user information](Get%20user%20information/spec.md) | `GET /users/me`, `GET /users/{nickname}` | View own or others' profiles |
 | [Update data user](Update%20data%20user/spec.md) | `PUT /users` | Update own profile (name, nickname, institution) |
 | [Update email user](Update%20email%20user/spec.md) | `POST /users/email-change/*` | Change email with verification |
