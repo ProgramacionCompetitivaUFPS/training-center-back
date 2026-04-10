@@ -9,6 +9,7 @@ import (
 	"github.com/training-judge-center/backend/pkg/apperror"
 )
 
+// WriteJSON and WriteError are exported for use by handler/problem subpackage.
 func WriteJSON(w http.ResponseWriter, status int, v any) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
@@ -30,4 +31,12 @@ func WriteError(w http.ResponseWriter, err error) {
 	}
 
 	WriteJSON(w, status, appErr)
+}
+
+func respondJSON(w http.ResponseWriter, status int, data any) {
+	WriteJSON(w, status, data)
+}
+
+func respondError(w http.ResponseWriter, err error) {
+	WriteError(w, err)
 }

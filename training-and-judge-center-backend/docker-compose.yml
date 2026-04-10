@@ -53,6 +53,19 @@ services:
       migrate:
         condition: service_completed_successfully
 
+  mailhog:
+    image: mailhog/mailhog
+    container_name: training-center-mailhog
+    ports:
+      - "1025:1025" # SMTP server
+      - "8025:8025" # Web UI
+
+  redis:
+    image: redis:7-alpine
+    container_name: training-center-redis
+    ports:
+      - "6379:6379"
+
 volumes:
   postgres_data:
   problem_uploads:

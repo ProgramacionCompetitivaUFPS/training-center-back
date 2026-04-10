@@ -117,6 +117,8 @@ Update a user's information as an administrator.
   "name": "string",
   "nickname": "string",
   "institution": "string",
+  "city": "string",
+  "country": "string",
   "role": "string"
 }
 ```
@@ -127,6 +129,8 @@ Update a user's information as an administrator.
 | name | string | No* | User's full name |
 | nickname | string | No* | User's display name or alias |
 | institution | string | No* | User's institution or organization |
+| city | string | No* | User's city |
+| country | string | No* | User's country |
 | role | string | No* | User's role (CONTESTANT, COACH). Cannot be set to ADMIN. |
 
 > *At least one field must be provided in the request.
@@ -142,6 +146,8 @@ User updated successfully by admin.
   "name": "Juan Pérez Updated",
   "nickname": "juan_updated",
   "institution": "Updated University",
+  "city": "Quito",
+  "country": "Ecuador",
   "role": "COACH",
   "createdAt": "2025-12-13T10:00:00Z",
   "updatedAt": "2025-12-14T09:30:00Z"
@@ -237,14 +243,16 @@ Target user not found.
   - `email` (string, unique, **mutable by admin**)
   - `password` (string, hashed, immutable via this endpoint)
   - `name` (string, **mutable**)
-  - `nickname` (string, optional, **mutable**, stored in lowercase)
+  - `nickname` (string, required, **mutable**, stored in lowercase)
   - `institution` (string, optional, **mutable**)
+  - `city` (string, optional, **mutable**)
+  - `country` (string, optional, **mutable**)
   - `role` (enum: ADMIN | COACH | CONTESTANT, **mutable by admin**, except ADMIN)
   - `status` (enum: ACTIVE | DEACTIVATED, immutable via this endpoint - see [Admin Deactivate User](../Admin%20deactivate%20user/spec.md))
   - `createdAt` (timestamp, immutable)
   - `updatedAt` (timestamp, nullable, updated on modification)
 
-> **Note**: Through this feature, administrators can update mutable fields (`name`, `nickname`, `institution`) and privileged fields (`email`, `role`), except assigning the ADMIN role. To deactivate a user, see [Admin Deactivate User](../Admin%20deactivate%20user/spec.md).
+> **Note**: Through this feature, administrators can update mutable fields (`name`, `nickname`, `institution`, `city`, `country`) and privileged fields (`email`, `role`), except assigning the ADMIN role. To deactivate a user, see [Admin Deactivate User](../Admin%20deactivate%20user/spec.md).
 
 ### Supported Roles
 
@@ -267,4 +275,3 @@ Target user not found.
 - **SC-007**: Validation and authorization errors include clear messages and a consistent structure.
 - **SC-008**: The `createdAt` value remains unchanged after admin updates.
 - **SC-009**: The `updatedAt` value is updated on every successful modification.
-

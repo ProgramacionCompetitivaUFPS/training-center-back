@@ -8,8 +8,6 @@ import (
 	"github.com/training-judge-center/backend/internal/domain/user"
 )
 
-type contextKey string
-
 const currentUserKey contextKey = "currentUser"
 
 type MockUser struct {

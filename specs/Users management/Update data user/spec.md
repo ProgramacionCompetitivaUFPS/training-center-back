@@ -73,7 +73,9 @@ Update the authenticated user's profile information.
 {
   "name": "string",
   "nickname": "string",
-  "institution": "string"
+  "institution": "string",
+  "city": "string",
+  "country": "string"
 }
 ```
 
@@ -82,6 +84,8 @@ Update the authenticated user's profile information.
 | name | string | No* | User's full name |
 | nickname | string | No* | User's display name or alias |
 | institution | string | No* | User's institution or organization |
+| city | string | No* | User's city |
+| country | string | No* | User's country |
 
 > *At least one field must be provided in the request.
 
@@ -96,6 +100,8 @@ User profile updated successfully.
   "name": "Juan Pérez Updated",
   "nickname": "juan_updated",
   "institution": "Updated University",
+  "city": "Quito",
+  "country": "Ecuador",
   "role": "CONTESTANT",
   "createdAt": "2025-12-13T10:00:00Z",
   "updatedAt": "2025-12-14T09:30:00Z"
@@ -160,14 +166,16 @@ User not found for the authenticated token.
   - `email` (string, unique, immutable via this endpoint)
   - `password` (string, hashed, immutable via this endpoint)
   - `name` (string, **mutable**)
-  - `nickname` (string, optional, **mutable**, stored in lowercase)
+  - `nickname` (string, required, **mutable**, stored in lowercase)
   - `institution` (string, optional, **mutable**)
+  - `city` (string, optional, **mutable**)
+  - `country` (string, optional, **mutable**)
   - `role` (enum: ADMIN | COACH | CONTESTANT, immutable via this endpoint)
   - `status` (enum: ACTIVE | DEACTIVATED, immutable via this endpoint)
   - `createdAt` (timestamp, immutable)
   - `updatedAt` (timestamp, nullable, updated on modification)
 
-> **Note**: Only mutable fields (`name`, `nickname`, `institution`) can be updated through this feature.
+> **Note**: Only mutable fields (`name`, `nickname`, `institution`, `city`, `country`) can be updated through this feature.
 
 ## Success Criteria *(mandatory)*
 

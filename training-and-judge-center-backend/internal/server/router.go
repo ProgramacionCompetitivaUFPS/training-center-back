@@ -4,6 +4,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	chimw "github.com/go-chi/chi/v5/middleware"
 	"github.com/training-judge-center/backend/internal/config"
+	"github.com/training-judge-center/backend/internal/domain/user"
 	"github.com/training-judge-center/backend/internal/server/handler"
 	"github.com/training-judge-center/backend/internal/server/handler/problem"
 	"github.com/training-judge-center/backend/internal/server/middleware"
@@ -11,9 +12,16 @@ import (
 
 type Handlers struct {
 	Problem *problem.Handler
+	User    *handler.UserHandler
+	Auth    *handler.AuthHandler
 }
 
-func NewRouter(cfg *config.Config, h *Handlers) *chi.Mux {
+type Services struct {
+	TokenService       user.TokenService
+	SessionInvalidator user.SessionInvalidator
+}
+
+func NewRouter(cfg *config.Config, h *Handlers, s *Services) *chi.Mux {
 	r := chi.NewRouter()
 
 	r.Use(chimw.Logger)
@@ -23,6 +31,7 @@ func NewRouter(cfg *config.Config, h *Handlers) *chi.Mux {
 	healthHandler := handler.NewHealthHandler()
 	r.Get("/ping", healthHandler.Ping)
 
+	// Problem routes
 	r.Route("/problems", func(r chi.Router) {
 		if cfg.MockAuth {
 			r.Use(middleware.MockAuth)
@@ -49,6 +58,39 @@ func NewRouter(cfg *config.Config, h *Handlers) *chi.Mux {
 				r.Delete("/{userId}", h.Problem.RemoveModifier)
 			})
 		})
+	})
+
+	// Public user routes
+	r.Post("/users", h.User.Create)
+	r.Post("/password/forgot", h.User.RequestPasswordRecovery)
+	r.Post("/password/reset", h.User.ResetPassword)
+
+	r.Route("/auth", func(r chi.Router) {
+		r.Post("/login", h.Auth.Login)
+	})
+
+	// Protected routes — authenticated users
+	r.Group(func(r chi.Router) {
+		r.Use(middleware.Auth(s.TokenService, s.SessionInvalidator))
+
+		r.Get("/users/me", h.User.GetMyProfile)
+		r.Get("/users/{nickname}", h.User.GetByNickname)
+		r.Put("/users", h.User.UpdateProfile)
+		r.Put("/users/password", h.User.UpdatePassword)
+		r.Post("/users/email-change/request", h.User.RequestEmailChange)
+		r.Post("/users/email-change/confirm", h.User.ConfirmEmailChange)
+		r.Post("/users/deactivation", h.User.RequestDeactivation)
+		r.Post("/users/deactivation/confirm", h.User.ConfirmDeactivation)
+	})
+
+	// Protected routes — admin only
+	r.Route("/admin", func(r chi.Router) {
+		r.Use(middleware.Auth(s.TokenService, s.SessionInvalidator))
+		r.Use(middleware.RequireRole(user.RoleAdmin))
+
+		r.Get("/users", h.User.ListUsers)
+		r.Put("/users/{id}", h.User.AdminUpdateUser)
+		r.Post("/users/{id}/deactivate", h.User.AdminDeactivateUser)
 	})
 
 	return r
