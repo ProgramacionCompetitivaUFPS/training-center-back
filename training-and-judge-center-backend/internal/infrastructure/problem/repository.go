@@ -1,4 +1,4 @@
-package postgres
+package problem
 
 import (
 	"context"
@@ -14,7 +14,8 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	"golang.org/x/sync/errgroup"
 
-	"github.com/training-judge-center/backend/internal/domain/problem"
+	domainProblem "github.com/training-judge-center/backend/internal/domain/problem"
+	"github.com/training-judge-center/backend/internal/domain/shared"
 	"github.com/training-judge-center/backend/pkg/apperror"
 )
 
@@ -26,7 +27,7 @@ func NewProblemRepository(db *pgxpool.Pool) *ProblemRepository {
 	return &ProblemRepository{db: db}
 }
 
-func (r *ProblemRepository) Save(ctx context.Context, p *problem.Problem) error {
+func (r *ProblemRepository) Save(ctx context.Context, p *domainProblem.Problem) error {
 	query := `
 		INSERT INTO problems (
 			id, slug, title, statement, time_limit, memory_limit,
@@ -125,7 +126,7 @@ func (r *ProblemRepository) Save(ctx context.Context, p *problem.Problem) error 
 	if err != nil {
 		var pgErr *pgconn.PgError
 		if errors.As(err, &pgErr) && pgErr.Code == "23505" && pgErr.ConstraintName == "problems_slug_key" {
-			return &problem.ErrSlugAlreadyExists{Slug: slug}
+			return &domainProblem.ErrSlugAlreadyExists{Slug: slug}
 		}
 		slog.ErrorContext(ctx, "Database error in Save", "error", err, "problem_id", p.ID(), "slug", slug)
 		return apperror.NewInternal()
@@ -134,7 +135,7 @@ func (r *ProblemRepository) Save(ctx context.Context, p *problem.Problem) error 
 	return nil
 }
 
-func (r *ProblemRepository) FindBySlug(ctx context.Context, slug problem.Slug) (*problem.Problem, error) {
+func (r *ProblemRepository) FindBySlug(ctx context.Context, slug domainProblem.Slug) (*domainProblem.Problem, error) {
 	query := `
 		SELECT id, slug, title, statement, time_limit, memory_limit,
 			tags, status, accessibility, author_id, modifiers_ids, lang_overrides,
@@ -147,7 +148,7 @@ func (r *ProblemRepository) FindBySlug(ctx context.Context, slug problem.Slug) (
 	return scanProblem(row)
 }
 
-func scanProblem(row pgx.Row) (*problem.Problem, error) {
+func scanProblem(row pgx.Row) (*domainProblem.Problem, error) {
 	var pId, pSlug, pTitle, pStatus, pAccessibility, pAuthorId string
 	var pStatement, pTestCasesKey *string
 	var pTl, pMl *int
@@ -206,12 +207,12 @@ func scanProblem(row pgx.Row) (*problem.Problem, error) {
 		return nil, apperror.NewInternal()
 	}
 
-	modifierIDs := make([]problem.UserID, len(pModifiers))
+	modifierIDs := make([]shared.UserID, len(pModifiers))
 	for i, id := range pModifiers {
-		modifierIDs[i] = problem.RestoreUserID(id)
+		modifierIDs[i] = shared.RestoreUserID(id)
 	}
 
-	return problem.RestoreProblem(
+	return domainProblem.RestoreProblem(
 		pId,
 		pSlug,
 		pTitle,
@@ -221,7 +222,7 @@ func scanProblem(row pgx.Row) (*problem.Problem, error) {
 		pTags,
 		pStatus,
 		pAccessibility,
-		problem.RestoreUserID(pAuthorId),
+		shared.RestoreUserID(pAuthorId),
 		modifierIDs,
 		langOverrides,
 		pTestCasesKey,
@@ -234,7 +235,7 @@ func scanProblem(row pgx.Row) (*problem.Problem, error) {
 	), nil
 }
 
-func (r *ProblemRepository) ExistsBySlug(ctx context.Context, slug problem.Slug) (bool, error) {
+func (r *ProblemRepository) ExistsBySlug(ctx context.Context, slug domainProblem.Slug) (bool, error) {
 	query := `SELECT EXISTS(SELECT 1 FROM problems WHERE slug = $1)`
 
 	var exists bool
@@ -259,7 +260,7 @@ type dbLangOverride struct {
 	MemoryLimit *int   `json:"memoryLimit,omitempty"`
 }
 
-func mapLangOverridesToDB(overrides []problem.LanguageOverride) ([]byte, error) {
+func mapLangOverridesToDB(overrides []domainProblem.LanguageOverride) ([]byte, error) {
 	dbOverrides := make([]dbLangOverride, 0, len(overrides))
 	for _, lo := range overrides {
 		dbOverrides = append(dbOverrides, dbLangOverride{
@@ -271,7 +272,7 @@ func mapLangOverridesToDB(overrides []problem.LanguageOverride) ([]byte, error) 
 	return json.Marshal(dbOverrides)
 }
 
-func mapSolutionsToDB(solutions []problem.JudgingFile) ([]byte, error) {
+func mapSolutionsToDB(solutions []domainProblem.JudgingFile) ([]byte, error) {
 	dbSolutions := make([]dbJudgingFile, 0, len(solutions))
 	for _, sol := range solutions {
 		dbSolutions = append(dbSolutions, dbJudgingFile{
@@ -283,7 +284,7 @@ func mapSolutionsToDB(solutions []problem.JudgingFile) ([]byte, error) {
 	return json.Marshal(dbSolutions)
 }
 
-func mapJudgingFileToDB(file *problem.JudgingFile) ([]byte, error) {
+func mapJudgingFileToDB(file *domainProblem.JudgingFile) ([]byte, error) {
 	if file == nil {
 		return nil, nil // SQL NULL
 	}
@@ -294,7 +295,7 @@ func mapJudgingFileToDB(file *problem.JudgingFile) ([]byte, error) {
 	})
 }
 
-func langOverridesFromDB(data []byte) ([]problem.LanguageOverride, error) {
+func langOverridesFromDB(data []byte) ([]domainProblem.LanguageOverride, error) {
 	if len(data) == 0 {
 		return nil, nil
 	}
@@ -302,14 +303,14 @@ func langOverridesFromDB(data []byte) ([]problem.LanguageOverride, error) {
 	if err := json.Unmarshal(data, &dbOverrides); err != nil {
 		return nil, err
 	}
-	overrides := make([]problem.LanguageOverride, len(dbOverrides))
+	overrides := make([]domainProblem.LanguageOverride, len(dbOverrides))
 	for i, lo := range dbOverrides {
-		overrides[i] = problem.RestoreLanguageOverride(lo.Language, lo.TimeLimit, lo.MemoryLimit)
+		overrides[i] = domainProblem.RestoreLanguageOverride(lo.Language, lo.TimeLimit, lo.MemoryLimit)
 	}
 	return overrides, nil
 }
 
-func solutionsFromDB(data []byte) ([]problem.JudgingFile, error) {
+func solutionsFromDB(data []byte) ([]domainProblem.JudgingFile, error) {
 	if len(data) == 0 {
 		return nil, nil
 	}
@@ -317,14 +318,14 @@ func solutionsFromDB(data []byte) ([]problem.JudgingFile, error) {
 	if err := json.Unmarshal(data, &dbSolutions); err != nil {
 		return nil, err
 	}
-	solutions := make([]problem.JudgingFile, len(dbSolutions))
+	solutions := make([]domainProblem.JudgingFile, len(dbSolutions))
 	for i, sol := range dbSolutions {
-		solutions[i] = problem.RestoreJudgingFile(sol.Filename, sol.FileKey, sol.Language)
+		solutions[i] = domainProblem.RestoreJudgingFile(sol.Filename, sol.FileKey, sol.Language)
 	}
 	return solutions, nil
 }
 
-func judgingFileFromDB(data []byte) (*problem.JudgingFile, error) {
+func judgingFileFromDB(data []byte) (*domainProblem.JudgingFile, error) {
 	if len(data) == 0 {
 		return nil, nil
 	}
@@ -332,7 +333,7 @@ func judgingFileFromDB(data []byte) (*problem.JudgingFile, error) {
 	if err := json.Unmarshal(data, &dbFile); err != nil {
 		return nil, err
 	}
-	j := problem.RestoreJudgingFile(dbFile.Filename, dbFile.FileKey, dbFile.Language)
+	j := domainProblem.RestoreJudgingFile(dbFile.Filename, dbFile.FileKey, dbFile.Language)
 	return &j, nil
 }
 
@@ -348,7 +349,7 @@ func (r *ProblemRepository) Delete(ctx context.Context, id string) error {
 	return nil
 }
 
-func (r *ProblemRepository) List(ctx context.Context, filters problem.ListFilters) ([]*problem.Problem, int, error) {
+func (r *ProblemRepository) List(ctx context.Context, filters domainProblem.ListFilters) ([]*domainProblem.Problem, int, error) {
 	var conds []string
 	var args []any
 	idx := 1
@@ -415,7 +416,7 @@ func (r *ProblemRepository) List(ctx context.Context, filters problem.ListFilter
 
 	g, gCtx := errgroup.WithContext(ctx)
 
-	var result []*problem.Problem
+	var result []*domainProblem.Problem
 	var total int
 
 	g.Go(func() error {
@@ -446,7 +447,7 @@ func (r *ProblemRepository) List(ctx context.Context, filters problem.ListFilter
 	}
 
 	if result == nil {
-		result = []*problem.Problem{}
+		result = []*domainProblem.Problem{}
 	}
 
 	return result, total, nil

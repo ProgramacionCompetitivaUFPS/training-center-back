@@ -14,17 +14,13 @@ import (
 	appProblem "github.com/training-judge-center/backend/internal/application/problem"
 	appuser "github.com/training-judge-center/backend/internal/application/user"
 	"github.com/training-judge-center/backend/internal/config"
-	"github.com/training-judge-center/backend/internal/infrastructure/parser"
-	infraPostgres "github.com/training-judge-center/backend/internal/infrastructure/postgres"
-	infraSt "github.com/training-judge-center/backend/internal/infrastructure/storage"
 	"github.com/training-judge-center/backend/internal/platform/email"
 	jwtplatform "github.com/training-judge-center/backend/internal/platform/jwt"
 	platformConfig "github.com/training-judge-center/backend/internal/platform/config"
-	platformParser "github.com/training-judge-center/backend/internal/platform/parser"
 	platformPostgres "github.com/training-judge-center/backend/internal/platform/postgres"
 	"github.com/training-judge-center/backend/internal/platform/ratelimit"
 	redisplatform "github.com/training-judge-center/backend/internal/platform/redis"
-	platformUser "github.com/training-judge-center/backend/internal/platform/user"
+	infraProblem "github.com/training-judge-center/backend/internal/infrastructure/problem"
 	"github.com/training-judge-center/backend/internal/server"
 	"github.com/training-judge-center/backend/internal/server/handler"
 	"github.com/training-judge-center/backend/internal/server/handler/problem"
@@ -64,7 +60,7 @@ func main() {
 	slog.Info("redis connected successfully")
 
 	// Problem repositories & settings
-	problemRepo := infraPostgres.NewProblemRepository(dbPool)
+	problemRepo := infraProblem.NewProblemRepository(dbPool)
 	settingsProvider := platformConfig.NewVirtualObjectProvider(cfg.VirtualObject)
 
 	// File Storage
@@ -81,10 +77,10 @@ func main() {
 			os.Exit(1)
 		}
 		slog.Info("using GCS storage backend", "bucket", cfg.GCSBucket)
-		fileStorage = infraSt.NewGCSProblemFileRepository(gcsClient, cfg.GCSBucket)
+		fileStorage = infraProblem.NewGCSProblemFileRepository(gcsClient, cfg.GCSBucket)
 	default:
 		localDir := cfg.StorageLocalDir
-		localRepo, err := infraSt.NewLocalStorageRepository(localDir)
+		localRepo, err := infraProblem.NewLocalStorageRepository(localDir)
 		if err != nil {
 			slog.Error("failed to create local file storage", "error", err)
 			os.Exit(1)
@@ -93,24 +89,17 @@ func main() {
 		fileStorage = localRepo
 	}
 
-	icpcParser := parser.NewICPCParser(
+	icpcParser := infraProblem.NewICPCParser(
 		settingsProvider.GetMaxFileSizeTestCaseMB(),
 		settingsProvider.GetMaxFileSizeDefaultMB(),
 		settingsProvider.GetMaxFileCountTestCase(),
 		settingsProvider.GetMaxFileCountSample(),
 		cfg.VirtualObject.LanguageExtensions,
 	)
-	zipParserAdapter := platformParser.NewICPCParserAdapter(icpcParser)
-	packageParserAdapter := platformParser.NewICPCPackageParserAdapter(icpcParser)
+	zipParserAdapter := infraProblem.NewICPCParserAdapter(icpcParser)
+	packageParserAdapter := infraProblem.NewICPCPackageParserAdapter(icpcParser)
 
-	var userProvider appProblem.UserProvider
-	if cfg.MockAuth {
-		slog.Info("running in MOCK_AUTH mode")
-		userProvider = platformUser.NewMockDisplayProvider()
-	} else {
-		slog.Error("real UserProvider is not implemented yet; set MOCK_AUTH=1 for local development")
-		os.Exit(1)
-	}
+	userProvider := infraProblem.NewProblemUserProvider(dbPool)
 
 	// Problem use cases
 	createProblemUseCase := appProblem.NewCreateProblemUseCase(problemRepo, settingsProvider)
