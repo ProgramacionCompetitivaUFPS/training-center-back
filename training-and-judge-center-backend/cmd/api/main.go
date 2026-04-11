@@ -177,7 +177,7 @@ func main() {
 	userHandler := handler.NewUserHandler(createUserUC, getUserProfileUC, updateUserUC, updatePasswordUC, adminUpdateUserUC, adminDeactivateUserUC, listUsersUC, requestEmailChangeUC, confirmEmailChangeUC, requestPasswordRecoveryUC, resetPasswordUC, requestDeactUC, confirmDeactUC)
 	authHandler := handler.NewAuthHandler(loginUC)
 
-	router := server.NewRouter(cfg, &server.Handlers{
+	router := server.NewRouter(&server.Handlers{
 		Problem: problemHandler,
 		User:    userHandler,
 		Auth:    authHandler,

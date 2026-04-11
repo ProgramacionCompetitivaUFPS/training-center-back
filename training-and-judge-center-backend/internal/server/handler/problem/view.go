@@ -6,23 +6,25 @@ import (
 	"strings"
 
 	appProblem "github.com/training-judge-center/backend/internal/application/problem"
+	"github.com/training-judge-center/backend/internal/domain/user"
 	"github.com/training-judge-center/backend/internal/server/handler"
 	"github.com/training-judge-center/backend/internal/server/middleware"
 	"github.com/training-judge-center/backend/pkg/apperror"
 )
 
 func (h *Handler) GetProblem(w http.ResponseWriter, r *http.Request) {
-	currentUser := middleware.GetCurrentUser(r.Context())
-	if currentUser == nil {
+	claims := middleware.GetClaims(r.Context())
+	if claims == nil {
 		handler.WriteJSON(w, http.StatusUnauthorized, apperror.AppError{Code: apperror.ErrCodeUnauthorized, Message: "Invalid or missing authentication token"})
 		return
 	}
 
 	slug := r.PathValue("slug")
+	currentUser := user.CurrentUser{ID: claims.UserID, Role: claims.Role}
 
 	out, err := h.getProblemUC.Execute(r.Context(), appProblem.GetProblemInput{
 		Slug:        slug,
-		CurrentUser: *currentUser,
+		CurrentUser: currentUser,
 	})
 	if err != nil {
 		handler.WriteError(w, err)
@@ -97,8 +99,8 @@ func (h *Handler) GetProblem(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) ListProblems(w http.ResponseWriter, r *http.Request) {
-	currentUser := middleware.GetCurrentUser(r.Context())
-	if currentUser == nil {
+	claims := middleware.GetClaims(r.Context())
+	if claims == nil {
 		handler.WriteJSON(w, http.StatusUnauthorized, apperror.AppError{Code: apperror.ErrCodeUnauthorized, Message: "Invalid or missing authentication token"})
 		return
 	}
@@ -128,14 +130,16 @@ func (h *Handler) ListProblems(w http.ResponseWriter, r *http.Request) {
 		tags = strings.Split(raw, ",")
 	}
 
+	currentUser := user.CurrentUser{ID: claims.UserID, Role: claims.Role}
+
 	in := appProblem.ListProblemsInput{
-		CurrentUser:   *currentUser,
-		Tags:          tags,
-		Accessibility: queryStringPtr(r.URL.Query().Get("accessibility")),
-		Status:        queryStringPtr(r.URL.Query().Get("status")),
+		CurrentUser:    currentUser,
+		Tags:           tags,
+		Accessibility:  queryStringPtr(r.URL.Query().Get("accessibility")),
+		Status:         queryStringPtr(r.URL.Query().Get("status")),
 		AuthorNickname: queryStringPtr(r.URL.Query().Get("author")),
-		Page:          page,
-		Limit:         limit,
+		Page:           page,
+		Limit:          limit,
 	}
 
 	out, ucErr := h.listProblemsUC.Execute(r.Context(), in)

@@ -5,14 +5,15 @@ import (
 	"net/http"
 
 	appProblem "github.com/training-judge-center/backend/internal/application/problem"
+	"github.com/training-judge-center/backend/internal/domain/user"
 	"github.com/training-judge-center/backend/internal/server/handler"
 	"github.com/training-judge-center/backend/internal/server/middleware"
 	"github.com/training-judge-center/backend/pkg/apperror"
 )
 
 func (h *Handler) AddModifier(w http.ResponseWriter, r *http.Request) {
-	currentUser := middleware.GetCurrentUser(r.Context())
-	if currentUser == nil {
+	claims := middleware.GetClaims(r.Context())
+	if claims == nil {
 		handler.WriteJSON(w, http.StatusUnauthorized, apperror.AppError{Code: apperror.ErrCodeUnauthorized, Message: "Invalid token"})
 		return
 	}
@@ -26,10 +27,12 @@ func (h *Handler) AddModifier(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	currentUser := user.CurrentUser{ID: claims.UserID, Role: claims.Role}
+
 	_, err := h.addModifierUC.Execute(r.Context(), appProblem.AddModifierInput{
 		Slug:        slug,
 		UserID:      body.UserID,
-		CurrentUser: *currentUser,
+		CurrentUser: currentUser,
 	})
 
 	if err != nil {
@@ -41,8 +44,8 @@ func (h *Handler) AddModifier(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) RemoveModifier(w http.ResponseWriter, r *http.Request) {
-	currentUser := middleware.GetCurrentUser(r.Context())
-	if currentUser == nil {
+	claims := middleware.GetClaims(r.Context())
+	if claims == nil {
 		handler.WriteJSON(w, http.StatusUnauthorized, apperror.AppError{Code: apperror.ErrCodeUnauthorized, Message: "Invalid token"})
 		return
 	}
@@ -54,10 +57,12 @@ func (h *Handler) RemoveModifier(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	currentUser := user.CurrentUser{ID: claims.UserID, Role: claims.Role}
+
 	_, err := h.removeModifierUC.Execute(r.Context(), appProblem.RemoveModifierInput{
 		Slug:        slug,
 		UserID:      userID,
-		CurrentUser: *currentUser,
+		CurrentUser: currentUser,
 	})
 
 	if err != nil {
@@ -69,8 +74,8 @@ func (h *Handler) RemoveModifier(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) ListModifiers(w http.ResponseWriter, r *http.Request) {
-	currentUser := middleware.GetCurrentUser(r.Context())
-	if currentUser == nil {
+	claims := middleware.GetClaims(r.Context())
+	if claims == nil {
 		handler.WriteJSON(w, http.StatusUnauthorized, apperror.AppError{Code: apperror.ErrCodeUnauthorized, Message: "Invalid token"})
 		return
 	}
@@ -81,9 +86,11 @@ func (h *Handler) ListModifiers(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	currentUser := user.CurrentUser{ID: claims.UserID, Role: claims.Role}
+
 	modifiers, err := h.listModifiersUC.Execute(r.Context(), appProblem.ListModifiersInput{
 		Slug:        slug,
-		CurrentUser: *currentUser,
+		CurrentUser: currentUser,
 	})
 	if err != nil {
 		handler.WriteError(w, err)

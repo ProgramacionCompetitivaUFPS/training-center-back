@@ -10,6 +10,7 @@ import (
 	"time"
 
 	appProblem "github.com/training-judge-center/backend/internal/application/problem"
+	"github.com/training-judge-center/backend/internal/domain/user"
 	"github.com/training-judge-center/backend/internal/server/handler"
 	"github.com/training-judge-center/backend/internal/server/middleware"
 	"github.com/training-judge-center/backend/pkg/apperror"
@@ -21,8 +22,8 @@ const (
 )
 
 func (h *Handler) UploadFiles(w http.ResponseWriter, r *http.Request) {
-	currentUser := middleware.GetCurrentUser(r.Context())
-	if currentUser == nil {
+	claims := middleware.GetClaims(r.Context())
+	if claims == nil {
 		handler.WriteJSON(w, http.StatusUnauthorized, apperror.AppError{Code: apperror.ErrCodeUnauthorized, Message: "Invalid or missing token"})
 		return
 	}
@@ -79,12 +80,14 @@ func (h *Handler) UploadFiles(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), uploadContextTimeout)
 	defer cancel()
 
+	currentUser := user.CurrentUser{ID: claims.UserID, Role: claims.Role}
+
 	res, ucErr := h.uploadUC.Execute(ctx, appProblem.UploadProblemFilesInput{
 		Slug:        slug,
 		FileType:    fileType,
 		FileName:    fileHeader.Filename,
 		FileData:    fileData,
-		CurrentUser: *currentUser,
+		CurrentUser: currentUser,
 	})
 
 	if ucErr != nil {
@@ -100,8 +103,8 @@ func (h *Handler) UploadFiles(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) DeleteFile(w http.ResponseWriter, r *http.Request) {
-	currentUser := middleware.GetCurrentUser(r.Context())
-	if currentUser == nil {
+	claims := middleware.GetClaims(r.Context())
+	if claims == nil {
 		handler.WriteJSON(w, http.StatusUnauthorized, apperror.AppError{Code: apperror.ErrCodeUnauthorized, Message: "Invalid or missing token"})
 		return
 	}
@@ -118,11 +121,13 @@ func (h *Handler) DeleteFile(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), 30*time.Second)
 	defer cancel()
 
+	currentUser := user.CurrentUser{ID: claims.UserID, Role: claims.Role}
+
 	_, ucErr := h.deleteFileUC.Execute(ctx, appProblem.DeleteProblemFileInput{
 		Slug:        slug,
 		FileType:    fileType,
 		FileName:    fileName,
-		CurrentUser: *currentUser,
+		CurrentUser: currentUser,
 	})
 
 	if ucErr != nil {

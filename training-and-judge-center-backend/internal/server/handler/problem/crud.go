@@ -7,14 +7,15 @@ import (
 	"net/http"
 
 	appProblem "github.com/training-judge-center/backend/internal/application/problem"
+	"github.com/training-judge-center/backend/internal/domain/user"
 	"github.com/training-judge-center/backend/internal/server/handler"
 	"github.com/training-judge-center/backend/internal/server/middleware"
 	"github.com/training-judge-center/backend/pkg/apperror"
 )
 
 func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
-	currentUser := middleware.GetCurrentUser(r.Context())
-	if currentUser == nil {
+	claims := middleware.GetClaims(r.Context())
+	if claims == nil {
 		handler.WriteJSON(w, http.StatusUnauthorized, apperror.AppError{
 			Code:    apperror.ErrCodeUnauthorized,
 			Message: "Invalid or missing authentication token",
@@ -32,6 +33,7 @@ func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
 	}
 
 	langOverrides := convertLangOverrides(body.LangOverrides)
+	currentUser := user.CurrentUser{ID: claims.UserID, Role: claims.Role}
 
 	result, ucErr := h.createUC.Execute(r.Context(), appProblem.CreateProblemInput{
 		Slug:          body.Slug,
@@ -41,7 +43,7 @@ func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
 		MemoryLimit:   body.MemoryLimit,
 		LangOverrides: langOverrides,
 		Tags:          body.Tags,
-		CurrentUser:   *currentUser,
+		CurrentUser:   currentUser,
 	})
 
 	if ucErr != nil {
@@ -59,8 +61,8 @@ func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) Update(w http.ResponseWriter, r *http.Request) {
-	currentUser := middleware.GetCurrentUser(r.Context())
-	if currentUser == nil {
+	claims := middleware.GetClaims(r.Context())
+	if claims == nil {
 		handler.WriteJSON(w, http.StatusUnauthorized, apperror.AppError{Code: apperror.ErrCodeUnauthorized, Message: "Invalid or missing token"})
 		return
 	}
@@ -82,6 +84,8 @@ func (h *Handler) Update(w http.ResponseWriter, r *http.Request) {
 		langOverrides = convertLangOverrides(body.LangOverrides)
 	}
 
+	currentUser := user.CurrentUser{ID: claims.UserID, Role: claims.Role}
+
 	result, ucErr := h.updateUC.Execute(r.Context(), appProblem.UpdateProblemInput{
 		Slug:          slug,
 		Title:         body.Title,
@@ -91,7 +95,7 @@ func (h *Handler) Update(w http.ResponseWriter, r *http.Request) {
 		LangOverrides: langOverrides,
 		Tags:          body.Tags,
 		Accessibility: body.Accessibility,
-		CurrentUser:   *currentUser,
+		CurrentUser:   currentUser,
 	})
 
 	if ucErr != nil {
@@ -108,8 +112,8 @@ func (h *Handler) Update(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) Import(w http.ResponseWriter, r *http.Request) {
-	currentUser := middleware.GetCurrentUser(r.Context())
-	if currentUser == nil {
+	claims := middleware.GetClaims(r.Context())
+	if claims == nil {
 		handler.WriteJSON(w, http.StatusUnauthorized, apperror.AppError{
 			Code:    apperror.ErrCodeUnauthorized,
 			Message: "Invalid or missing authentication token",
@@ -159,10 +163,12 @@ func (h *Handler) Import(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	currentUser := user.CurrentUser{ID: claims.UserID, Role: claims.Role}
+
 	result, ucErr := h.importUC.Execute(r.Context(), appProblem.ImportProblemInput{
 		Slug:        slug,
 		ZipData:     zipData,
-		CurrentUser: *currentUser,
+		CurrentUser: currentUser,
 	})
 	if ucErr != nil {
 		handler.WriteError(w, ucErr)
