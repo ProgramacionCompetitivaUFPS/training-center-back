@@ -5,13 +5,13 @@ import (
 	"log/slog"
 
 	"github.com/training-judge-center/backend/internal/domain/problem"
-	"github.com/training-judge-center/backend/internal/domain/user"
+	"github.com/training-judge-center/backend/internal/domain/shared"
 	"github.com/training-judge-center/backend/pkg/apperror"
 )
 
 type UnpublishProblemInput struct {
 	Slug        string
-	CurrentUser user.CurrentUser
+	CurrentUser shared.CurrentUser
 }
 
 type UnpublishProblemUseCase struct {
@@ -33,8 +33,8 @@ func (uc *UnpublishProblemUseCase) Execute(ctx context.Context, in UnpublishProb
 		return nil, err
 	}
 
-	viewerID := problem.RestoreUserID(in.CurrentUser.ID)
-	isAdmin := in.CurrentUser.Role == user.RoleAdmin
+	viewerID := shared.RestoreUserID(in.CurrentUser.ID)
+	isAdmin := in.CurrentUser.IsAdmin()
 	if !p.CanBeEditedBy(viewerID, isAdmin) {
 		return nil, apperror.NewForbidden(apperror.ErrCodeForbidden, "Only the problem author, Admin, or assigned modifiers can unpublish this problem")
 	}

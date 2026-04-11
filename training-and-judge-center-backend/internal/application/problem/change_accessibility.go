@@ -5,14 +5,14 @@ import (
 	"log/slog"
 
 	"github.com/training-judge-center/backend/internal/domain/problem"
-	"github.com/training-judge-center/backend/internal/domain/user"
+	"github.com/training-judge-center/backend/internal/domain/shared"
 	"github.com/training-judge-center/backend/pkg/apperror"
 )
 
 type ChangeAccessibilityInput struct {
 	Slug          string
 	Accessibility string
-	CurrentUser   user.CurrentUser
+	CurrentUser   shared.CurrentUser
 }
 
 type ChangeAccessibilityUseCase struct {
@@ -39,8 +39,8 @@ func (uc *ChangeAccessibilityUseCase) Execute(ctx context.Context, in ChangeAcce
 		return nil, err
 	}
 
-	viewerID := problem.RestoreUserID(in.CurrentUser.ID)
-	isAdmin := in.CurrentUser.Role == user.RoleAdmin
+	viewerID := shared.RestoreUserID(in.CurrentUser.ID)
+	isAdmin := in.CurrentUser.IsAdmin()
 	if !p.CanBeEditedBy(viewerID, isAdmin) {
 		return nil, apperror.NewForbidden(apperror.ErrCodeForbidden, "Only the problem author, Admin, or assigned modifiers can change this problem's accessibility")
 	}

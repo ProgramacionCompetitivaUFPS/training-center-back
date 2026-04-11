@@ -4,13 +4,13 @@ import (
 	"context"
 
 	"github.com/training-judge-center/backend/internal/domain/problem"
-	"github.com/training-judge-center/backend/internal/domain/user"
+	"github.com/training-judge-center/backend/internal/domain/shared"
 	"github.com/training-judge-center/backend/pkg/apperror"
 )
 
 type ListModifiersInput struct {
 	Slug        string
-	CurrentUser user.CurrentUser
+	CurrentUser shared.CurrentUser
 }
 
 type ListModifiersUseCase struct {
@@ -32,7 +32,7 @@ func (uc *ListModifiersUseCase) Execute(ctx context.Context, input ListModifiers
 		return nil, err
 	}
 
-	if !p.CanBeEditedBy(problem.RestoreUserID(input.CurrentUser.ID), input.CurrentUser.Role == user.RoleAdmin) {
+	if !p.CanBeEditedBy(shared.RestoreUserID(input.CurrentUser.ID), input.CurrentUser.IsAdmin()) {
 		return nil, apperror.NewForbidden(apperror.ErrCodeForbidden, "Only the problem author, Admin, or assigned modifiers can view modifiers")
 	}
 

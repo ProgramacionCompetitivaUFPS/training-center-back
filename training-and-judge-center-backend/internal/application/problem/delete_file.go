@@ -6,7 +6,7 @@ import (
 	"strings"
 
 	"github.com/training-judge-center/backend/internal/domain/problem"
-	"github.com/training-judge-center/backend/internal/domain/user"
+	"github.com/training-judge-center/backend/internal/domain/shared"
 	"github.com/training-judge-center/backend/pkg/apperror"
 )
 
@@ -14,7 +14,7 @@ type DeleteProblemFileInput struct {
 	Slug        string
 	FileType    string
 	FileName    string
-	CurrentUser user.CurrentUser
+	CurrentUser shared.CurrentUser
 }
 
 type DeleteProblemFileUseCase struct {
@@ -47,7 +47,7 @@ func (usecase *DeleteProblemFileUseCase) Execute(ctx context.Context, input Dele
 		return struct{}{}, apperror.NewBadRequest(ErrCodeProblemIsPublished, "Cannot delete files from a published problem. Unpublish first.")
 	}
 
-	if !foundProblem.CanBeEditedBy(problem.RestoreUserID(input.CurrentUser.ID), input.CurrentUser.Role == user.RoleAdmin) {
+	if !foundProblem.CanBeEditedBy(shared.RestoreUserID(input.CurrentUser.ID), input.CurrentUser.IsAdmin()) {
 		return struct{}{}, apperror.NewForbidden(apperror.ErrCodeForbidden, "Only the problem author, Admin, or assigned modifiers can update this problem")
 	}
 

@@ -6,7 +6,7 @@ import (
 	"strings"
 
 	appProblem "github.com/training-judge-center/backend/internal/application/problem"
-	"github.com/training-judge-center/backend/internal/domain/user"
+	"github.com/training-judge-center/backend/internal/domain/shared"
 	"github.com/training-judge-center/backend/internal/server/handler"
 	"github.com/training-judge-center/backend/internal/server/middleware"
 	"github.com/training-judge-center/backend/pkg/apperror"
@@ -20,7 +20,7 @@ func (h *Handler) GetProblem(w http.ResponseWriter, r *http.Request) {
 	}
 
 	slug := r.PathValue("slug")
-	currentUser := user.CurrentUser{ID: claims.UserID, Role: claims.Role}
+	currentUser := shared.CurrentUser{ID: claims.UserID, Role: claims.Role.String()}
 
 	out, err := h.getProblemUC.Execute(r.Context(), appProblem.GetProblemInput{
 		Slug:        slug,
@@ -130,7 +130,7 @@ func (h *Handler) ListProblems(w http.ResponseWriter, r *http.Request) {
 		tags = strings.Split(raw, ",")
 	}
 
-	currentUser := user.CurrentUser{ID: claims.UserID, Role: claims.Role}
+	currentUser := shared.CurrentUser{ID: claims.UserID, Role: claims.Role.String()}
 
 	in := appProblem.ListProblemsInput{
 		CurrentUser:    currentUser,

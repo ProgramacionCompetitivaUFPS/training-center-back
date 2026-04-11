@@ -10,7 +10,7 @@ import (
 	"time"
 
 	appProblem "github.com/training-judge-center/backend/internal/application/problem"
-	"github.com/training-judge-center/backend/internal/domain/user"
+	"github.com/training-judge-center/backend/internal/domain/shared"
 	"github.com/training-judge-center/backend/internal/server/handler"
 	"github.com/training-judge-center/backend/internal/server/middleware"
 	"github.com/training-judge-center/backend/pkg/apperror"
@@ -80,7 +80,7 @@ func (h *Handler) UploadFiles(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), uploadContextTimeout)
 	defer cancel()
 
-	currentUser := user.CurrentUser{ID: claims.UserID, Role: claims.Role}
+	currentUser := shared.CurrentUser{ID: claims.UserID, Role: claims.Role.String()}
 
 	res, ucErr := h.uploadUC.Execute(ctx, appProblem.UploadProblemFilesInput{
 		Slug:        slug,
@@ -121,7 +121,7 @@ func (h *Handler) DeleteFile(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), 30*time.Second)
 	defer cancel()
 
-	currentUser := user.CurrentUser{ID: claims.UserID, Role: claims.Role}
+	currentUser := shared.CurrentUser{ID: claims.UserID, Role: claims.Role.String()}
 
 	_, ucErr := h.deleteFileUC.Execute(ctx, appProblem.DeleteProblemFileInput{
 		Slug:        slug,

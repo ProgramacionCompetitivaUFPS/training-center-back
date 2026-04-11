@@ -5,7 +5,7 @@ import (
 	"net/http"
 
 	appProblem "github.com/training-judge-center/backend/internal/application/problem"
-	"github.com/training-judge-center/backend/internal/domain/user"
+	"github.com/training-judge-center/backend/internal/domain/shared"
 	"github.com/training-judge-center/backend/internal/server/handler"
 	"github.com/training-judge-center/backend/internal/server/middleware"
 	"github.com/training-judge-center/backend/pkg/apperror"
@@ -27,7 +27,7 @@ func (h *Handler) AddModifier(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	currentUser := user.CurrentUser{ID: claims.UserID, Role: claims.Role}
+	currentUser := shared.CurrentUser{ID: claims.UserID, Role: claims.Role.String()}
 
 	_, err := h.addModifierUC.Execute(r.Context(), appProblem.AddModifierInput{
 		Slug:        slug,
@@ -57,7 +57,7 @@ func (h *Handler) RemoveModifier(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	currentUser := user.CurrentUser{ID: claims.UserID, Role: claims.Role}
+	currentUser := shared.CurrentUser{ID: claims.UserID, Role: claims.Role.String()}
 
 	_, err := h.removeModifierUC.Execute(r.Context(), appProblem.RemoveModifierInput{
 		Slug:        slug,
@@ -86,7 +86,7 @@ func (h *Handler) ListModifiers(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	currentUser := user.CurrentUser{ID: claims.UserID, Role: claims.Role}
+	currentUser := shared.CurrentUser{ID: claims.UserID, Role: claims.Role.String()}
 
 	modifiers, err := h.listModifiersUC.Execute(r.Context(), appProblem.ListModifiersInput{
 		Slug:        slug,

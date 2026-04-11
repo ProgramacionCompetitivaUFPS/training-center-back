@@ -6,7 +6,7 @@ import (
 	"log/slog"
 
 	"github.com/training-judge-center/backend/internal/domain/problem"
-	"github.com/training-judge-center/backend/internal/domain/user"
+	"github.com/training-judge-center/backend/internal/domain/shared"
 	"github.com/training-judge-center/backend/pkg/apperror"
 )
 
@@ -19,7 +19,7 @@ type UpdateProblemInput struct {
 	LangOverrides []LanguageOverrideInput
 	Tags          []string
 	Accessibility *string
-	CurrentUser   user.CurrentUser
+	CurrentUser   shared.CurrentUser
 }
 
 type UpdateProblemResult struct {
@@ -53,7 +53,7 @@ func (uc *UpdateProblemUseCase) Execute(ctx context.Context, input UpdateProblem
 		return nil, apperror.NewBadRequest(ErrCodeProblemIsPublished, "Cannot update a published problem. Unpublish first to make changes.")
 	}
 
-	if !p.CanBeEditedBy(problem.RestoreUserID(input.CurrentUser.ID), input.CurrentUser.Role == user.RoleAdmin) {
+	if !p.CanBeEditedBy(shared.RestoreUserID(input.CurrentUser.ID), input.CurrentUser.IsAdmin()) {
 		return nil, apperror.NewForbidden(apperror.ErrCodeForbidden, "Only the problem author, Admin, or assigned modifiers can update this problem")
 	}
 

@@ -3,7 +3,6 @@ package problem
 import (
 	appProblem "github.com/training-judge-center/backend/internal/application/problem"
 	domainProblem "github.com/training-judge-center/backend/internal/domain/problem"
-	"github.com/training-judge-center/backend/internal/domain/user"
 )
 
 type createProblemRequest struct {
@@ -114,7 +113,7 @@ func convertLangOverrides(overrides []langOverrideRequest) []appProblem.Language
 	return result
 }
 
-func buildResponse(p *domainProblem.Problem, display *user.Display) getProblemResponse {
+func buildResponse(p *domainProblem.Problem, display *appProblem.UserDisplay) getProblemResponse {
 	author := authorResp{Nickname: "unknown", Name: ""}
 	if display != nil {
 		author = authorResp{Nickname: display.Nickname, Name: display.Name}

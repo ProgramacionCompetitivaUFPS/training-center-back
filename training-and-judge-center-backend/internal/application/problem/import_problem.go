@@ -10,7 +10,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/training-judge-center/backend/internal/domain/problem"
-	"github.com/training-judge-center/backend/internal/domain/user"
+	"github.com/training-judge-center/backend/internal/domain/shared"
 	"github.com/training-judge-center/backend/pkg/apperror"
 	"golang.org/x/sync/errgroup"
 )
@@ -18,7 +18,7 @@ import (
 type ImportProblemInput struct {
 	Slug        string
 	ZipData     []byte
-	CurrentUser user.CurrentUser
+	CurrentUser shared.CurrentUser
 }
 
 type ImportProblemResult struct {
@@ -51,7 +51,7 @@ func NewImportProblemUseCase(
 }
 
 func (uc *ImportProblemUseCase) Execute(ctx context.Context, input ImportProblemInput) (*ImportProblemResult, error) {
-	if input.CurrentUser.Role != user.RoleCoach && input.CurrentUser.Role != user.RoleAdmin {
+	if input.CurrentUser.Role != shared.RoleCoach && !input.CurrentUser.IsAdmin() {
 		return nil, apperror.NewForbidden(apperror.ErrCodeForbidden, "Only Coach and Admin users can import problems")
 	}
 
@@ -139,7 +139,7 @@ func (uc *ImportProblemUseCase) Execute(ctx context.Context, input ImportProblem
 		memoryLimit,
 		nil,
 		problem.Tags{},
-		problem.RestoreUserID(input.CurrentUser.ID),
+		shared.RestoreUserID(input.CurrentUser.ID),
 	)
 
 	if pkg.ZipData != nil {

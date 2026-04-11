@@ -3,6 +3,7 @@ package problem
 import (
 	"time"
 
+	"github.com/training-judge-center/backend/internal/domain/shared"
 	"github.com/training-judge-center/backend/pkg/apperror"
 )
 
@@ -17,8 +18,8 @@ type Problem struct {
 	tags             Tags
 	status           Status
 	accessibility    Accessibility
-	authorID         UserID
-	modifierIDs      []UserID
+	authorID         shared.UserID
+	modifierIDs      []shared.UserID
 	testCasesKey     *string
 	solutions        []JudgingFile
 	checker          *JudgingFile
@@ -28,25 +29,25 @@ type Problem struct {
 	updatedAt        time.Time
 }
 
-func (p *Problem) ID() string                    { return p.id }
-func (p *Problem) Slug() Slug                    { return p.slug }
-func (p *Problem) Title() Title                  { return p.title }
-func (p *Problem) Statement() Statement          { return p.statement }
-func (p *Problem) TimeLimit() *TimeLimit         { return p.timeLimit }
-func (p *Problem) MemoryLimit() *MemoryLimit     { return p.memoryLimit }
+func (p *Problem) ID() string                        { return p.id }
+func (p *Problem) Slug() Slug                        { return p.slug }
+func (p *Problem) Title() Title                      { return p.title }
+func (p *Problem) Statement() Statement              { return p.statement }
+func (p *Problem) TimeLimit() *TimeLimit             { return p.timeLimit }
+func (p *Problem) MemoryLimit() *MemoryLimit         { return p.memoryLimit }
 func (p *Problem) LangOverrides() []LanguageOverride { return p.langOverrides }
-func (p *Problem) Tags() Tags                    { return p.tags }
-func (p *Problem) Status() Status                { return p.status }
-func (p *Problem) Accessibility() Accessibility  { return p.accessibility }
-func (p *Problem) AuthorID() UserID              { return p.authorID }
-func (p *Problem) ModifierIDs() []UserID         { return p.modifierIDs }
-func (p *Problem) TestCasesKey() *string         { return p.testCasesKey }
-func (p *Problem) Solutions() []JudgingFile      { return p.solutions }
-func (p *Problem) Checker() *JudgingFile         { return p.checker }
-func (p *Problem) Validator() *JudgingFile       { return p.validator }
-func (p *Problem) JudgingUpdatedAt() *time.Time  { return p.judgingUpdatedAt }
-func (p *Problem) CreatedAt() time.Time          { return p.createdAt }
-func (p *Problem) UpdatedAt() time.Time          { return p.updatedAt }
+func (p *Problem) Tags() Tags                        { return p.tags }
+func (p *Problem) Status() Status                    { return p.status }
+func (p *Problem) Accessibility() Accessibility      { return p.accessibility }
+func (p *Problem) AuthorID() shared.UserID           { return p.authorID }
+func (p *Problem) ModifierIDs() []shared.UserID      { return p.modifierIDs }
+func (p *Problem) TestCasesKey() *string             { return p.testCasesKey }
+func (p *Problem) Solutions() []JudgingFile          { return p.solutions }
+func (p *Problem) Checker() *JudgingFile             { return p.checker }
+func (p *Problem) Validator() *JudgingFile           { return p.validator }
+func (p *Problem) JudgingUpdatedAt() *time.Time      { return p.judgingUpdatedAt }
+func (p *Problem) CreatedAt() time.Time              { return p.createdAt }
+func (p *Problem) UpdatedAt() time.Time              { return p.updatedAt }
 
 func NewProblem(
 	id string,
@@ -57,7 +58,7 @@ func NewProblem(
 	memoryLimit *MemoryLimit,
 	langOverrides []LanguageOverride,
 	tags Tags,
-	authorID UserID,
+	authorID shared.UserID,
 ) *Problem {
 	now := time.Now().UTC()
 	return &Problem{
@@ -72,7 +73,7 @@ func NewProblem(
 		status:        NewStatusDraft(),
 		accessibility: NewAccessibilityPrivate(),
 		authorID:      authorID,
-		modifierIDs:   []UserID{},
+		modifierIDs:   []shared.UserID{},
 		solutions:     []JudgingFile{},
 		createdAt:     now,
 		updatedAt:     now,
@@ -108,7 +109,7 @@ func (p *Problem) UpdateMetadata(
 	p.updatedAt = time.Now().UTC()
 }
 
-func (p *Problem) CanBeEditedBy(userID UserID, isAdmin bool) bool {
+func (p *Problem) CanBeEditedBy(userID shared.UserID, isAdmin bool) bool {
 	if p.authorID == userID || isAdmin {
 		return true
 	}
@@ -134,7 +135,7 @@ func (p *Problem) UpdateAccessibility(acc Accessibility) {
 	p.updatedAt = time.Now().UTC()
 }
 
-func (p *Problem) AddModifier(userID UserID) error {
+func (p *Problem) AddModifier(userID shared.UserID) error {
 	for _, id := range p.modifierIDs {
 		if id == userID {
 			return apperror.NewConflict(ErrCodeModifierAlreadyExists, "User is already a modifier of this problem")
@@ -145,9 +146,9 @@ func (p *Problem) AddModifier(userID UserID) error {
 	return nil
 }
 
-func (p *Problem) RemoveModifier(userID UserID) error {
+func (p *Problem) RemoveModifier(userID shared.UserID) error {
 	found := false
-	newModifiers := make([]UserID, 0, len(p.modifierIDs))
+	newModifiers := make([]shared.UserID, 0, len(p.modifierIDs))
 	for _, id := range p.modifierIDs {
 		if id == userID {
 			found = true
@@ -172,6 +173,7 @@ func (p *Problem) SetTestCases(fileKey string) {
 	p.testCasesKey = &fileKey
 	p.touchJudgingUpdatedAt(time.Now().UTC())
 }
+
 func (p *Problem) RemoveTestCases() {
 	p.testCasesKey = nil
 	p.touchJudgingUpdatedAt(time.Now().UTC())
@@ -232,8 +234,8 @@ func RestoreProblem(
 	tags []string,
 	status string,
 	accessibility string,
-	authorID UserID,
-	modifierIDs []UserID,
+	authorID shared.UserID,
+	modifierIDs []shared.UserID,
 	langOverrides []LanguageOverride,
 	testCasesKey *string,
 	solutions []JudgingFile,
@@ -256,13 +258,11 @@ func RestoreProblem(
 	}
 
 	if modifierIDs == nil {
-		modifierIDs = []UserID{}
+		modifierIDs = []shared.UserID{}
 	}
-
 	if langOverrides == nil {
 		langOverrides = []LanguageOverride{}
 	}
-
 	if solutions == nil {
 		solutions = []JudgingFile{}
 	}

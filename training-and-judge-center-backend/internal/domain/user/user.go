@@ -222,15 +222,3 @@ func RestoreUser(
 	return u, nil
 }
 
-// CurrentUser holds the authenticated user identity extracted from request context.
-// Used by the problem domain until a proper cross-domain identity is established.
-type CurrentUser struct {
-	ID   string
-	Role Role
-}
-
-// Display holds the public display info of a user for cross-domain use.
-type Display struct {
-	Nickname string
-	Name     string
-}

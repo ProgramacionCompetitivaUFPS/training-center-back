@@ -7,7 +7,7 @@ import (
 	"net/http"
 
 	appProblem "github.com/training-judge-center/backend/internal/application/problem"
-	"github.com/training-judge-center/backend/internal/domain/user"
+	"github.com/training-judge-center/backend/internal/domain/shared"
 	"github.com/training-judge-center/backend/internal/server/handler"
 	"github.com/training-judge-center/backend/internal/server/middleware"
 	"github.com/training-judge-center/backend/pkg/apperror"
@@ -33,7 +33,7 @@ func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
 	}
 
 	langOverrides := convertLangOverrides(body.LangOverrides)
-	currentUser := user.CurrentUser{ID: claims.UserID, Role: claims.Role}
+	currentUser := shared.CurrentUser{ID: claims.UserID, Role: claims.Role.String()}
 
 	result, ucErr := h.createUC.Execute(r.Context(), appProblem.CreateProblemInput{
 		Slug:          body.Slug,
@@ -84,7 +84,7 @@ func (h *Handler) Update(w http.ResponseWriter, r *http.Request) {
 		langOverrides = convertLangOverrides(body.LangOverrides)
 	}
 
-	currentUser := user.CurrentUser{ID: claims.UserID, Role: claims.Role}
+	currentUser := shared.CurrentUser{ID: claims.UserID, Role: claims.Role.String()}
 
 	result, ucErr := h.updateUC.Execute(r.Context(), appProblem.UpdateProblemInput{
 		Slug:          slug,
@@ -163,7 +163,7 @@ func (h *Handler) Import(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	currentUser := user.CurrentUser{ID: claims.UserID, Role: claims.Role}
+	currentUser := shared.CurrentUser{ID: claims.UserID, Role: claims.Role.String()}
 
 	result, ucErr := h.importUC.Execute(r.Context(), appProblem.ImportProblemInput{
 		Slug:        slug,

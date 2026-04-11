@@ -7,7 +7,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/training-judge-center/backend/internal/domain/problem"
-	"github.com/training-judge-center/backend/internal/domain/user"
+	"github.com/training-judge-center/backend/internal/domain/shared"
 	"github.com/training-judge-center/backend/pkg/apperror"
 )
 
@@ -25,7 +25,7 @@ type CreateProblemInput struct {
 	MemoryLimit   *int
 	LangOverrides []LanguageOverrideInput
 	Tags          []string
-	CurrentUser   user.CurrentUser
+	CurrentUser   shared.CurrentUser
 }
 
 type CreateProblemResult struct {
@@ -45,7 +45,7 @@ func NewCreateProblemUseCase(repo problem.Repository, platformSettings problem.P
 }
 
 func (usecase *CreateProblemUseCase) Execute(ctx context.Context, input CreateProblemInput) (*CreateProblemResult, error) {
-	if input.CurrentUser.Role != user.RoleCoach && input.CurrentUser.Role != user.RoleAdmin {
+	if input.CurrentUser.Role != shared.RoleCoach && !input.CurrentUser.IsAdmin() {
 		return nil, apperror.NewForbidden(apperror.ErrCodeForbidden, "Only Coach and Admin users can create problems")
 	}
 
@@ -181,7 +181,7 @@ func (usecase *CreateProblemUseCase) Execute(ctx context.Context, input CreatePr
 		memoryLimit,
 		validOverrides,
 		tags,
-		problem.RestoreUserID(input.CurrentUser.ID),
+		shared.RestoreUserID(input.CurrentUser.ID),
 	)
 
 	if err := usecase.repo.Save(ctx, newProblem); err != nil {

@@ -5,14 +5,14 @@ import (
 	"log/slog"
 
 	"github.com/training-judge-center/backend/internal/domain/problem"
-	"github.com/training-judge-center/backend/internal/domain/user"
+	"github.com/training-judge-center/backend/internal/domain/shared"
 	"github.com/training-judge-center/backend/pkg/apperror"
 )
 
 type AddModifierInput struct {
 	Slug        string
 	UserID      string
-	CurrentUser user.CurrentUser
+	CurrentUser shared.CurrentUser
 }
 
 type AddModifierUseCase struct {
@@ -38,8 +38,8 @@ func (uc *AddModifierUseCase) Execute(ctx context.Context, input AddModifierInpu
 		return struct{}{}, err
 	}
 
-	isAuthor := p.AuthorID() == problem.RestoreUserID(input.CurrentUser.ID)
-	isAdmin := input.CurrentUser.Role == user.RoleAdmin
+	isAuthor := p.AuthorID() == shared.RestoreUserID(input.CurrentUser.ID)
+	isAdmin := input.CurrentUser.IsAdmin()
 
 	if !isAuthor && !isAdmin {
 		return struct{}{}, apperror.NewForbidden(apperror.ErrCodeForbidden, "Only the author or Admin can add modifiers")
@@ -55,7 +55,7 @@ func (uc *AddModifierUseCase) Execute(ctx context.Context, input AddModifierInpu
 		return struct{}{}, apperror.NewNotFound("USER_NOT_FOUND", "User not found")
 	}
 
-	modifierID, err := problem.NewUserID(input.UserID)
+	modifierID, err := shared.NewUserID(input.UserID)
 	if err != nil {
 		return struct{}{}, err
 	}

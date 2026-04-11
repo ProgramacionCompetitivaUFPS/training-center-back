@@ -5,14 +5,14 @@ import (
 	"log/slog"
 
 	"github.com/training-judge-center/backend/internal/domain/problem"
-	"github.com/training-judge-center/backend/internal/domain/user"
+	"github.com/training-judge-center/backend/internal/domain/shared"
 	"github.com/training-judge-center/backend/pkg/apperror"
 )
 
 type DeleteProblemInput struct {
 	Slug        string
 	ConfirmSlug string
-	CurrentUser user.CurrentUser
+	CurrentUser shared.CurrentUser
 }
 
 type DeleteProblemUseCase struct {
@@ -47,8 +47,8 @@ func (uc *DeleteProblemUseCase) Execute(ctx context.Context, in DeleteProblemInp
 		return struct{}{}, apperror.NewBadRequest(problem.ErrCodeSlugMismatch, "Confirmation slug does not match the problem slug")
 	}
 
-	viewerID := problem.RestoreUserID(in.CurrentUser.ID)
-	isAdmin := in.CurrentUser.Role == user.RoleAdmin
+	viewerID := shared.RestoreUserID(in.CurrentUser.ID)
+	isAdmin := in.CurrentUser.IsAdmin()
 	if p.AuthorID() != viewerID && !isAdmin {
 		return struct{}{}, apperror.NewForbidden(apperror.ErrCodeForbidden, "Only the problem author or Admin can delete this problem")
 	}

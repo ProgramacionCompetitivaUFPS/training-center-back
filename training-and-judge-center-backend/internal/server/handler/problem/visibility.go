@@ -6,7 +6,7 @@ import (
 	"net/http"
 
 	appProblem "github.com/training-judge-center/backend/internal/application/problem"
-	"github.com/training-judge-center/backend/internal/domain/user"
+	"github.com/training-judge-center/backend/internal/domain/shared"
 	"github.com/training-judge-center/backend/internal/server/handler"
 	"github.com/training-judge-center/backend/internal/server/middleware"
 	"github.com/training-judge-center/backend/pkg/apperror"
@@ -37,7 +37,7 @@ func (h *Handler) Unpublish(w http.ResponseWriter, r *http.Request) {
 	}
 
 	slug := r.PathValue("slug")
-	currentUser := user.CurrentUser{ID: claims.UserID, Role: claims.Role}
+	currentUser := shared.CurrentUser{ID: claims.UserID, Role: claims.Role.String()}
 
 	p, err := h.unpublishUC.Execute(r.Context(), appProblem.UnpublishProblemInput{
 		Slug:        slug,
@@ -70,7 +70,7 @@ func (h *Handler) ChangeAccessibility(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	currentUser := user.CurrentUser{ID: claims.UserID, Role: claims.Role}
+	currentUser := shared.CurrentUser{ID: claims.UserID, Role: claims.Role.String()}
 
 	p, err := h.changeAccessibilityUC.Execute(r.Context(), appProblem.ChangeAccessibilityInput{
 		Slug:          slug,

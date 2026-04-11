@@ -6,12 +6,12 @@ import (
 	"math"
 
 	"github.com/training-judge-center/backend/internal/domain/problem"
-	"github.com/training-judge-center/backend/internal/domain/user"
+	"github.com/training-judge-center/backend/internal/domain/shared"
 	"github.com/training-judge-center/backend/pkg/apperror"
 )
 
 type ListProblemsInput struct {
-	CurrentUser    user.CurrentUser
+	CurrentUser    shared.CurrentUser
 	Status         *string
 	Accessibility  *string
 	Tags           []string
@@ -80,7 +80,7 @@ func (uc *ListProblemsUseCase) Execute(ctx context.Context, in ListProblemsInput
 		filters.Accessibility = &acc
 	}
 
-	isAdmin := in.CurrentUser.Role == user.RoleAdmin
+	isAdmin := in.CurrentUser.IsAdmin()
 	if !isAdmin {
 		filters.ViewerModifierID = &in.CurrentUser.ID
 	}

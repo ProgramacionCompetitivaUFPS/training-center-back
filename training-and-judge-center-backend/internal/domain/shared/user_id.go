@@ -1,4 +1,4 @@
-package problem
+package shared
 
 import "github.com/training-judge-center/backend/pkg/apperror"
 

@@ -5,13 +5,13 @@ import (
 	"log/slog"
 
 	"github.com/training-judge-center/backend/internal/domain/problem"
-	"github.com/training-judge-center/backend/internal/domain/user"
+	"github.com/training-judge-center/backend/internal/domain/shared"
 	"github.com/training-judge-center/backend/pkg/apperror"
 )
 
 type GetProblemInput struct {
 	Slug        string
-	CurrentUser user.CurrentUser
+	CurrentUser shared.CurrentUser
 }
 
 type ModifierDisplay struct {
@@ -58,8 +58,8 @@ func (uc *GetProblemUseCase) Execute(ctx context.Context, in GetProblemInput) (*
 		return nil, err
 	}
 
-	viewerID := problem.RestoreUserID(in.CurrentUser.ID)
-	isAdmin := in.CurrentUser.Role == user.RoleAdmin
+	viewerID := shared.RestoreUserID(in.CurrentUser.ID)
+	isAdmin := in.CurrentUser.IsAdmin()
 	isModifier := p.CanBeEditedBy(viewerID, isAdmin)
 
 	if p.Status().String() == "DRAFT" && !isModifier {
