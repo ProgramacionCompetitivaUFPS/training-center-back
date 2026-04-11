@@ -83,8 +83,8 @@ func NewProblem(
 func (p *Problem) UpdateMetadata(
 	title *Title,
 	statement *Statement,
-	timeLimit **TimeLimit,
-	memoryLimit **MemoryLimit,
+	timeLimit *TimeLimit,
+	memoryLimit *MemoryLimit,
 	langOverrides []LanguageOverride,
 	tags *Tags,
 ) {
@@ -95,10 +95,12 @@ func (p *Problem) UpdateMetadata(
 		p.statement = *statement
 	}
 	if timeLimit != nil {
-		p.timeLimit = *timeLimit
+		tl := *timeLimit
+		p.timeLimit = &tl
 	}
 	if memoryLimit != nil {
-		p.memoryLimit = *memoryLimit
+		ml := *memoryLimit
+		p.memoryLimit = &ml
 	}
 	if langOverrides != nil {
 		p.langOverrides = langOverrides

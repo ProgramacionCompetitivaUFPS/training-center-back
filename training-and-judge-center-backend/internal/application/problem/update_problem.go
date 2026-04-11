@@ -77,33 +77,29 @@ func (uc *UpdateProblemUseCase) Execute(ctx context.Context, input UpdateProblem
 
 	globalMaxTime, globalMaxMemory := uc.platformSettings.GetGlobalLimits()
 
-	var timeLimit **problem.TimeLimit
+	var timeLimit *problem.TimeLimit
 	if input.TimeLimit != nil {
-		var tl problem.TimeLimit
-		tl, err = problem.NewTimeLimit(*input.TimeLimit, globalMaxTime)
-		if err != nil {
+		tl, tlErr := problem.NewTimeLimit(*input.TimeLimit, globalMaxTime)
+		if tlErr != nil {
 			var valErr *apperror.AppError
-			if errors.As(err, &valErr) {
+			if errors.As(tlErr, &valErr) {
 				fieldErrs = append(fieldErrs, valErr.Details...)
 			}
 		} else {
-			timeLimit = new(*problem.TimeLimit)
-			*timeLimit = &tl
+			timeLimit = &tl
 		}
 	}
 
-	var memoryLimit **problem.MemoryLimit
+	var memoryLimit *problem.MemoryLimit
 	if input.MemoryLimit != nil {
-		var ml problem.MemoryLimit
-		ml, err = problem.NewMemoryLimit(*input.MemoryLimit, globalMaxMemory)
-		if err != nil {
+		ml, mlErr := problem.NewMemoryLimit(*input.MemoryLimit, globalMaxMemory)
+		if mlErr != nil {
 			var valErr *apperror.AppError
-			if errors.As(err, &valErr) {
+			if errors.As(mlErr, &valErr) {
 				fieldErrs = append(fieldErrs, valErr.Details...)
 			}
 		} else {
-			memoryLimit = new(*problem.MemoryLimit)
-			*memoryLimit = &ml
+			memoryLimit = &ml
 		}
 	}
 
