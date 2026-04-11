@@ -7,6 +7,7 @@ go run cmd/api/main.go                  # run server
 go run cmd/migrate/main.go up|down|status
 go test ./...
 go test -v ./internal/domain/problem/...
+go test -v ./internal/application/problem/...
 docker-compose --env-file .env up --build -d
 bash tests/test_e2e.sh                  # requires running server
 ```
@@ -32,4 +33,6 @@ Go backend (DDD + Hexagonal). Layers: `domain` → `application` → `infrastruc
 
 **HTTP responses:** `getProblemResponse` is the single problem response type. Use `buildResponse(p, display)` in `types.go` for mutation endpoints (Create/Update/Import/UploadFiles). If an endpoint needs a different shape, build it directly in the handler — don't add parameters to `buildResponse`.
 
-**Cross-domain UserID:** `UserID` lives temporarily in `domain/problem/user_id.go`. Move to `domain/shared/` when the User domain branch merges. `domain/user/user.go` is a stub (only `CurrentUser` and `Display`) — not the real User domain.
+**Cross-domain primitives:** `UserID` and `CurrentUser` live in `domain/shared/`. Each domain defines its own local types for display/enrichment (e.g., `application/problem/ports.go` defines `UserDisplay` locally). Infrastructure adapters per domain implement the local port (e.g., `infrastructure/problem/user_provider.go` queries the `users` table). Don't import `domain/user` from other domains.
+
+**`domain/user/user.go`** is a stub — not the real User domain yet. Ignore it.

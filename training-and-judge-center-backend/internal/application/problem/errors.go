@@ -9,4 +9,5 @@ const (
 	ErrCodeProblemUnsupportedFileExt  = "PROBLEM_UNSUPPORTED_FILE_EXT"
 	ErrCodeProblemDuplicateLanguage   = "PROBLEM_DUPLICATE_LANGUAGE"
 	ErrCodeProblemUnsupportedLanguage = "PROBLEM_UNSUPPORTED_LANGUAGE"
+	ErrCodeUserNotFound               = "USER_NOT_FOUND"
 )

@@ -20,6 +20,9 @@ type DeleteProblemUseCase struct {
 	fileStorage ProblemFileRepository
 }
 
+// maxRetries is the number of retry attempts for storage cleanup operations after
+// a problem is deleted from the database. Chosen to tolerate transient failures
+// without blocking the response indefinitely.
 const maxRetries = 3
 
 func NewDeleteProblemUseCase(repo problem.Repository, fileStorage ProblemFileRepository) *DeleteProblemUseCase {

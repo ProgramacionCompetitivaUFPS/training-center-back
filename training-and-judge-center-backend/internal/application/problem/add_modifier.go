@@ -51,8 +51,7 @@ func (uc *AddModifierUseCase) Execute(ctx context.Context, input AddModifierInpu
 		return struct{}{}, apperror.NewInternal()
 	}
 	if !exists {
-		// TODO: Replace bare string per "Backend Domain Errors" task
-		return struct{}{}, apperror.NewNotFound("USER_NOT_FOUND", "User not found")
+		return struct{}{}, apperror.NewNotFound(ErrCodeUserNotFound, "User not found")
 	}
 
 	modifierID, err := shared.NewUserID(input.UserID)
