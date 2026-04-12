@@ -1,0 +1,692 @@
+opencollection: 1.0.0
+info:
+  name: Training & Judge Center API
+config:
+  environments:
+    - name: Local
+      variables:
+        - name: baseUrl
+          value: http://localhost:8080
+        - name: token
+          secret: true
+        - name: token_admin
+          secret: true
+items:
+  - info:
+      name: Admin
+      type: folder
+      seq: 1
+    items:
+      - info:
+          name: Deactivate User
+          type: http
+          seq: 16
+        http:
+          method: POST
+          url: '{{baseUrl}}/admin/users/:id/deactivate'
+          params:
+            - name: id
+              value: 0f57b245-fa8e-4ef2-afb1-df054f85df54
+              type: path
+          auth:
+            type: bearer
+            token: '{{token_admin}}'
+        settings:
+          encodeUrl: true
+          timeout: 0
+          followRedirects: true
+          maxRedirects: 5
+      - info:
+          name: List Users
+          type: http
+          seq: 14
+        http:
+          method: GET
+          url: '{{baseUrl}}/admin/users'
+          auth:
+            type: bearer
+            token: '{{token_admin}}'
+        runtime:
+          variables:
+            - name: token_admin
+              value: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJlbWFpbCI6ImFkbWluQGdtYWlsLmNvbSIsInJvbGUiOiJBRE1JTiIsInN1YiI6IjNjODRhMjZlLWE4MzQtNGM5YS1iYzVkLTFkYTkxNjFlMDQxYyIsImV4cCI6MTc3NjA0NTU5MywiaWF0IjoxNzc1OTU5MTkzfQ.a1CF2LP_KlTIfmjoXLUGtvIO9ZvJ6RbeuS-QTaGomgQ
+        settings:
+          encodeUrl: true
+          timeout: 0
+          followRedirects: true
+          maxRedirects: 5
+      - info:
+          name: Update User
+          type: http
+          seq: 15
+        http:
+          method: PUT
+          url: '{{baseUrl}}/admin/users/:id'
+          params:
+            - name: id
+              value: 0d26426d-0616-4e6e-946d-772eb961cd16
+              type: path
+          body:
+            type: json
+            data: |-
+              {
+                "institution": "med",
+                "country": "medellin"
+              }
+          auth:
+            type: bearer
+            token: '{{token_admin}}'
+        settings:
+          encodeUrl: true
+          timeout: 0
+          followRedirects: true
+          maxRedirects: 5
+  - info:
+      name: problems
+      type: folder
+      seq: 3
+    items:
+      - info:
+          name: Change Problem Accessibility
+          type: http
+          seq: 6
+        http:
+          method: PATCH
+          url: '{{baseUrl}}/problems/p/two-sum/accessibility'
+          headers:
+            - name: X-Mock-User
+              value: '{{mockUser}}'
+          body:
+            type: json
+            data: |-
+              {
+                "accessibility": "PUBLIC"
+              }
+        settings:
+          encodeUrl: true
+          timeout: 0
+          followRedirects: true
+          maxRedirects: 5
+      - info:
+          name: Create Problem
+          type: http
+          seq: 1
+        http:
+          method: POST
+          url: '{{baseUrl}}/problems'
+          headers:
+            - name: authorization
+              value: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJlbWFpbCI6ImFkbWluQGdtYWlsLmNvbSIsInJvbGUiOiJBRE1JTiIsInN1YiI6IjNjODRhMjZlLWE4MzQtNGM5YS1iYzVkLTFkYTkxNjFlMDQxYyIsImV4cCI6MTc3NjA0NTU5MywiaWF0IjoxNzc1OTU5MTkzfQ.a1CF2LP_KlTIfmjoXLUGtvIO9ZvJ6RbeuS-QTaGomgQ
+            - name: content-type
+              value: application/json
+          body:
+            type: json
+            data: |-
+              {
+                "slug": "two-sum-mmm",
+                "title": "Two Sum",
+                "statement": "Given an array of integers, return indices of the two numbers that add up to target.",
+                "timeLimit": 2000,
+                "memoryLimit": 256,
+                "tags": [
+                  "math",
+                  "dp"
+                ],
+                "languageOverrides": [
+                  {
+                    "language": "python310",
+                    "timeLimit": 4000
+                  }
+                ]
+              }
+          auth:
+            type: bearer
+            token: '{{token_admin}}'
+        settings:
+          encodeUrl: true
+          timeout: 0
+          followRedirects: true
+          maxRedirects: 5
+      - info:
+          name: Delete Problem
+          type: http
+          seq: 7
+        http:
+          method: DELETE
+          url: '{{baseUrl}}/problems/p/two-sum'
+          headers:
+            - name: X-Mock-User
+              value: '{{mockUser}}'
+          body:
+            type: json
+            data: |-
+              {
+                "confirmSlug": "two-sum"
+              }
+        settings:
+          encodeUrl: true
+          timeout: 0
+          followRedirects: true
+          maxRedirects: 5
+      - info:
+          name: Get Problem
+          type: http
+          seq: 3
+        http:
+          method: GET
+          url: '{{baseUrl}}/problems/p/two-sum-mmm'
+          headers:
+            - name: X-Mock-User
+              value: '{{mockUser}}'
+          auth:
+            type: bearer
+            token: '{{token_admin}}'
+        settings:
+          encodeUrl: true
+          timeout: 0
+          followRedirects: true
+          maxRedirects: 5
+      - info:
+          name: Import Problem (ICPC Package)
+          type: http
+          seq: 3
+        http:
+          method: POST
+          url: '{{baseUrl}}/problems/import'
+          headers:
+            - name: X-Mock-User
+              value: '{{mockUser}}'
+          body:
+            type: multipart-form
+            data:
+              - name: slug
+                type: text
+                value: icpc-problem-abcd
+              - name: file
+                type: file
+                value:
+                  - C:\Users\alexa\Documents\tesis\archivos_pruebas\package.zip
+          auth:
+            type: bearer
+            token: '{{token_admin}}'
+        settings:
+          encodeUrl: true
+          timeout: 0
+          followRedirects: true
+          maxRedirects: 5
+      - info:
+          name: List Problems
+          type: http
+          seq: 4
+        http:
+          method: GET
+          url: '{{baseUrl}}/problems'
+          headers:
+            - name: X-Mock-User
+              value: '{{mockUser}}'
+          params:
+            - name: page
+              value: '1'
+              type: query
+              disabled: true
+            - name: limit
+              value: '20'
+              type: query
+              disabled: true
+            - name: status
+              value: PUBLISHED
+              type: query
+              disabled: true
+            - name: accessibility
+              value: PUBLIC
+              type: query
+              disabled: true
+            - name: tags
+              value: graphs
+              type: query
+              disabled: true
+            - name: author
+              value: coach_john
+              type: query
+              disabled: true
+          auth:
+            type: bearer
+            token: '{{token_admin}}'
+        settings:
+          encodeUrl: true
+          timeout: 0
+          followRedirects: true
+          maxRedirects: 5
+      - info:
+          name: Unpublish Problem
+          type: http
+          seq: 5
+        http:
+          method: POST
+          url: '{{baseUrl}}/problems/p/two-sum/unpublish'
+          headers:
+            - name: X-Mock-User
+              value: '{{mockUser}}'
+        settings:
+          encodeUrl: true
+          timeout: 0
+          followRedirects: true
+          maxRedirects: 5
+      - info:
+          name: Update Problem
+          type: http
+          seq: 2
+        http:
+          method: PUT
+          url: '{{baseUrl}}/problems/p/two-sum-mmm'
+          headers:
+            - name: X-Mock-User
+              value: '{{mockUser}}'
+          body:
+            type: json
+            data: |-
+              {
+                "title": "Two Sum (Updated)",
+                "statement": "Given an array of integers, return indices of the two numbers that add up to target.",
+                "timeLimit": 3000,
+                "memoryLimit": 512,
+                "tags": ["math", "dp"],
+                "accessibility": "PUBLIC",
+                "languageOverrides": [
+                  {
+                    "language": "python310",
+                    "timeLimit": 6000
+                  }
+                ]
+              }
+          auth:
+            type: bearer
+            token: '{{token_admin}}'
+        settings:
+          encodeUrl: true
+          timeout: 0
+          followRedirects: true
+          maxRedirects: 5
+      - info:
+          name: files
+          type: folder
+        items:
+          - info:
+              name: Delete File
+              type: http
+              seq: 2
+            http:
+              method: DELETE
+              url: '{{baseUrl}}/problems/p/two-sum/files/testcases'
+              headers:
+                - name: X-Mock-User
+                  value: '{{mockUser}}'
+            settings:
+              encodeUrl: true
+              timeout: 0
+              followRedirects: true
+              maxRedirects: 5
+            docs: |
+              Para eliminar una solución específica, cambia la URL a:
+
+              {{baseUrl}}/problems/p/two-sum/files/solution?fileName=solution.cpp
+
+              fileType válidos: testcases, solution, checker, validator
+          - info:
+              name: Upload File
+              type: http
+              seq: 1
+            http:
+              method: POST
+              url: '{{baseUrl}}/problems/p/two-sum/files'
+              headers:
+                - name: X-Mock-User
+                  value: '{{mockUser}}'
+              body:
+                type: multipart-form
+                data:
+                  - name: fileType
+                    type: text
+                    value: testcases
+                  - name: file
+                    type: text
+                    value: ''
+            settings:
+              encodeUrl: true
+              timeout: 0
+              followRedirects: true
+              maxRedirects: 5
+      - info:
+          name: modifiers
+          type: folder
+        items:
+          - info:
+              name: Add Modifier
+              type: http
+              seq: 1
+            http:
+              method: POST
+              url: '{{baseUrl}}/problems/p/two-sum/modifiers'
+              headers:
+                - name: X-Mock-User
+                  value: '{{mockUser}}'
+              body:
+                type: json
+                data: |-
+                  {
+                    "userId": "coach_mary"
+                  }
+            runtime:
+              variables:
+                - name: baseUrl
+                  value: http://localhost:8080
+            settings:
+              encodeUrl: true
+              timeout: 0
+              followRedirects: true
+              maxRedirects: 5
+          - info:
+              name: List Modifiers
+              type: http
+              seq: 2
+            http:
+              method: GET
+              url: '{{baseUrl}}/problems/p/two-sum/modifiers'
+              headers:
+                - name: X-Mock-User
+                  value: '{{mockUser}}'
+            settings:
+              encodeUrl: true
+              timeout: 0
+              followRedirects: true
+              maxRedirects: 5
+          - info:
+              name: Remove Modifier
+              type: http
+              seq: 3
+            http:
+              method: DELETE
+              url: '{{baseUrl}}/problems/p/two-sum/modifiers/coach_mary'
+              headers:
+                - name: X-Mock-User
+                  value: '{{mockUser}}'
+            settings:
+              encodeUrl: true
+              timeout: 0
+              followRedirects: true
+              maxRedirects: 5
+  - info:
+      name: Protected
+      type: folder
+      seq: 2
+    items:
+      - info:
+          name: Confirm Deactivation
+          type: http
+          seq: 13
+        http:
+          method: POST
+          url: '{{baseUrl}}/users/deactivation/confirm'
+          body:
+            type: json
+            data: |-
+              {
+                "code": "588502"
+              }
+          auth:
+            type: bearer
+            token: '{{token}}'
+        settings:
+          encodeUrl: true
+          timeout: 0
+          followRedirects: true
+          maxRedirects: 5
+      - info:
+          name: Confirm Email Change
+          type: http
+          seq: 11
+        http:
+          method: POST
+          url: '{{baseUrl}}/users/email-change/confirm'
+          body:
+            type: json
+            data: |-
+              {
+                "code": "534861"
+              }
+          auth:
+            type: bearer
+            token: '{{token}}'
+        settings:
+          encodeUrl: true
+          timeout: 0
+          followRedirects: true
+          maxRedirects: 5
+      - info:
+          name: Get My Profile
+          type: http
+          seq: 6
+        http:
+          method: GET
+          url: '{{baseUrl}}/users/me'
+          auth:
+            type: bearer
+            token: '{{token_admin}}'
+        settings:
+          encodeUrl: true
+          timeout: 0
+          followRedirects: true
+          maxRedirects: 5
+      - info:
+          name: Get User By Nickname
+          type: http
+          seq: 7
+        http:
+          method: GET
+          url: '{{baseUrl}}/users/:nickname'
+          params:
+            - name: nickname
+              value: tester
+              type: path
+          auth:
+            type: bearer
+            token: '{{token_admin}}'
+        settings:
+          encodeUrl: true
+          timeout: 0
+          followRedirects: true
+          maxRedirects: 5
+      - info:
+          name: Request Deactivation
+          type: http
+          seq: 12
+        http:
+          method: POST
+          url: '{{baseUrl}}/users/deactivation'
+          auth:
+            type: bearer
+            token: '{{token}}'
+        settings:
+          encodeUrl: true
+          timeout: 0
+          followRedirects: true
+          maxRedirects: 5
+      - info:
+          name: Request Email Change
+          type: http
+          seq: 10
+        http:
+          method: POST
+          url: '{{baseUrl}}/users/email-change/request'
+          body:
+            type: json
+            data: |-
+              {
+                "newEmail": "tanuki.404.rng@gmail.com",
+                "password": "12345A67!8"
+              }
+          auth:
+            type: bearer
+            token: '{{token}}'
+        settings:
+          encodeUrl: true
+          timeout: 0
+          followRedirects: true
+          maxRedirects: 5
+      - info:
+          name: Update Password
+          type: http
+          seq: 9
+        http:
+          method: PUT
+          url: '{{baseUrl}}/users/password'
+          body:
+            type: json
+            data: |-
+              {
+                "newPassword": "12345A67!8",
+                "currentPassword": "NewPassword123!"
+              }
+          auth:
+            type: bearer
+            token: '{{token}}'
+        settings:
+          encodeUrl: true
+          timeout: 0
+          followRedirects: true
+          maxRedirects: 5
+      - info:
+          name: Update Profile
+          type: http
+          seq: 8
+        http:
+          method: PUT
+          url: '{{baseUrl}}/users'
+          body:
+            type: json
+            data: |-
+              {
+                "name": "Alexandra",
+                "city": "",
+                "institution": "UFPS"
+              }
+          auth:
+            type: bearer
+            token: '{{token}}'
+        settings:
+          encodeUrl: true
+          timeout: 0
+          followRedirects: true
+          maxRedirects: 5
+  - info:
+      name: Publics
+      type: folder
+      seq: 4
+    items:
+      - info:
+          name: Create User
+          type: http
+          seq: 2
+        http:
+          method: POST
+          url: '{{baseUrl}}/users'
+          body:
+            type: json
+            data: |-
+              {
+                "email": "admin@gmail.com",
+                "password": "12345A67!8",
+                "nickname": "admin",
+                "name": "admin",
+                "lastName": "admin",
+                "country": "admin",
+                "city": "admin",
+                "institution": "admin"
+              }
+        settings:
+          encodeUrl: true
+          timeout: 0
+          followRedirects: true
+          maxRedirects: 5
+      - info:
+          name: Forgot Password
+          type: http
+          seq: 3
+        http:
+          method: POST
+          url: '{{baseUrl}}/password/forgot'
+          body:
+            type: json
+            data: |-
+              {
+                "email": "test@example.com"
+              }
+        settings:
+          encodeUrl: true
+          timeout: 0
+          followRedirects: true
+          maxRedirects: 5
+      - info:
+          name: Login
+          type: http
+          seq: 5
+        http:
+          method: POST
+          url: '{{baseUrl}}/auth/login'
+          body:
+            type: json
+            data: |-
+              {
+                "email": "admin@gmail.com",
+                "password": "12345A67!8"
+              }
+        runtime:
+          variables:
+            - name: baseUrl
+              value: http://localhost:8080
+        settings:
+          encodeUrl: true
+          timeout: 0
+          followRedirects: true
+          maxRedirects: 5
+      - info:
+          name: Ping
+          type: http
+          seq: 1
+        http:
+          method: GET
+          url: '{{baseUrl}}/ping'
+        settings:
+          encodeUrl: true
+          timeout: 0
+          followRedirects: true
+          maxRedirects: 5
+      - info:
+          name: Reset Password
+          type: http
+          seq: 4
+        http:
+          method: POST
+          url: '{{baseUrl}}/password/reset'
+          body:
+            type: json
+            data: |-
+              {
+                "token": "reset-token",
+                "newPassword": "NewPassword123!"
+              }
+        settings:
+          encodeUrl: true
+          timeout: 0
+          followRedirects: true
+          maxRedirects: 5
+bundled: true
+extensions:
+  bruno:
+    ignore:
+      - node_modules
+      - .git
+    presets:
+      requestType: http
+    exportedAt: '2026-04-12T02:40:58.908Z'
+    exportedUsing: Bruno
