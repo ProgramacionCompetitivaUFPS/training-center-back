@@ -2,6 +2,7 @@ package problem
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
 	"math"
 
@@ -9,6 +10,8 @@ import (
 	"github.com/training-judge-center/backend/internal/domain/shared"
 	"github.com/training-judge-center/backend/pkg/apperror"
 )
+
+const MaxPageLimit = 100
 
 type ListProblemsInput struct {
 	CurrentUser    shared.CurrentUser
@@ -48,9 +51,9 @@ func (uc *ListProblemsUseCase) Execute(ctx context.Context, in ListProblemsInput
 			{Field: "page", Message: "Page must be a positive integer"},
 		})
 	}
-	if in.Limit < 1 || in.Limit > 100 {
+	if in.Limit < 1 || in.Limit > MaxPageLimit {
 		return nil, apperror.NewValidation([]apperror.FieldError{
-			{Field: "limit", Message: "Limit must be between 1 and 100"},
+			{Field: "limit", Message: fmt.Sprintf("Limit must be between 1 and %d", MaxPageLimit)},
 		})
 	}
 
