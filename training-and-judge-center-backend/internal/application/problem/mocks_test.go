@@ -8,6 +8,10 @@ import (
 	"github.com/training-judge-center/backend/internal/domain/shared"
 )
 
+var testNow = time.Date(2024, 1, 15, 10, 0, 0, 0, time.UTC)
+
+func fixedClock() time.Time { return testNow }
+
 // ── Repository mock ──────────────────────────────────────────────────────────
 
 type mockProblemRepository struct {
@@ -114,34 +118,21 @@ func (m *mockFileStorage) DeleteFilesWithPrefix(ctx context.Context, prefix stri
 	return nil
 }
 
-// ── PlatformSettingsService mock ─────────────────────────────────────────────
+// ── PlatformSettings default ─────────────────────────────────────────────────
 
-type mockSettings struct{}
-
-func newDefaultSettings() *mockSettings { return &mockSettings{} }
-
-func (s *mockSettings) IsLanguageSupported(language string) bool        { return language == "cpp" }
-func (s *mockSettings) GetLanguageByExtension(ext string) (string, bool) {
-	if ext == ".cpp" {
-		return "cpp", true
-	}
-	return "", false
-}
-func (s *mockSettings) GetUploadMaxConcurrency() int  { return 4 }
-func (s *mockSettings) GetMaxFileCountSample() int    { return 10 }
-func (s *mockSettings) GetMaxFileSizeDefaultMB() int  { return 10 }
-func (s *mockSettings) GetMaxFileSizeTestCaseMB() int { return 50 }
-func (s *mockSettings) GetMaxFileCountTestCase() int  { return 100 }
-func (s *mockSettings) GetGlobalLimits() (int, int)   { return 10000, 512 }
-func (s *mockSettings) GetLanguageLimit(language string) *domainProblem.LanguageLimit {
-	return nil
-}
-func (s *mockSettings) IsValidTag(tag string) bool { return true }
-func (s *mockSettings) GetAllowedTags() map[string]struct{} {
-	return map[string]struct{}{
-		"dp":             {},
-		"graphs":         {},
-		"implementation": {},
+func newDefaultSettings() *domainProblem.PlatformSettings {
+	return &domainProblem.PlatformSettings{
+		GlobalMaxTimeLimit:    10000,
+		GlobalMaxMemoryLimit:  512,
+		SupportedLanguages:    map[string]struct{}{"cpp": {}},
+		LanguageExtensions:    map[string]string{".cpp": "cpp"},
+		AllowedTags:           map[string]struct{}{"dp": {}, "graphs": {}, "implementation": {}},
+		UploadMaxConcurrency:  4,
+		MaxFileCountSample:    10,
+		MaxFileSizeDefaultMB:  10,
+		MaxFileSizeTestCaseMB: 50,
+		MaxFileCountTestCase:  100,
+		LanguageLimits:        map[string]*domainProblem.LanguageLimit{},
 	}
 }
 
@@ -163,82 +154,58 @@ const (
 
 func newDraftProblem() *domainProblem.Problem {
 	return domainProblem.RestoreProblem(
-		testProbID,
-		testSlug,
-		"Test Problem",
-		nil, nil, nil,
-		[]string{},
-		"DRAFT",
-		"PRIVATE",
+		testProbID, testSlug, "Test Problem",
+		nil, nil, nil, []string{},
+		"DRAFT", "PRIVATE",
 		shared.RestoreUserID(authorID),
 		[]shared.UserID{},
 		[]domainProblem.LanguageOverride{},
-		nil,
-		[]domainProblem.JudgingFile{},
+		nil, []domainProblem.JudgingFile{},
 		nil, nil, nil,
-		time.Now().UTC(),
-		time.Now().UTC(),
-	)
+		testNow, testNow,
+	).WithClock(fixedClock)
 }
 
 func newPublishedProblem() *domainProblem.Problem {
 	return domainProblem.RestoreProblem(
-		testProbID,
-		testSlug,
-		"Test Problem",
-		nil, nil, nil,
-		[]string{},
-		"PUBLISHED",
-		"PUBLIC",
+		testProbID, testSlug, "Test Problem",
+		nil, nil, nil, []string{},
+		"PUBLISHED", "PUBLIC",
 		shared.RestoreUserID(authorID),
 		[]shared.UserID{},
 		[]domainProblem.LanguageOverride{},
-		nil,
-		[]domainProblem.JudgingFile{},
+		nil, []domainProblem.JudgingFile{},
 		nil, nil, nil,
-		time.Now().UTC(),
-		time.Now().UTC(),
-	)
+		testNow, testNow,
+	).WithClock(fixedClock)
 }
 
 func newDraftProblemWithModifier() *domainProblem.Problem {
 	return domainProblem.RestoreProblem(
-		testProbID,
-		testSlug,
-		"Test Problem",
-		nil, nil, nil,
-		[]string{},
-		"DRAFT",
-		"PRIVATE",
+		testProbID, testSlug, "Test Problem",
+		nil, nil, nil, []string{},
+		"DRAFT", "PRIVATE",
 		shared.RestoreUserID(authorID),
 		[]shared.UserID{shared.RestoreUserID(modifierID)},
 		[]domainProblem.LanguageOverride{},
-		nil,
-		[]domainProblem.JudgingFile{},
+		nil, []domainProblem.JudgingFile{},
 		nil, nil, nil,
-		time.Now().UTC(),
-		time.Now().UTC(),
-	)
+		testNow, testNow,
+	).WithClock(fixedClock)
 }
 
 func newPublishedProblemWithModifier() *domainProblem.Problem {
 	return domainProblem.RestoreProblem(
-		testProbID,
-		testSlug,
-		"Test Problem",
-		nil, nil, nil,
-		[]string{},
-		"PUBLISHED",
-		"PUBLIC",
+		testProbID, testSlug, "Test Problem",
+		nil, nil, nil, []string{},
+		"PUBLISHED", "PUBLIC",
 		shared.RestoreUserID(authorID),
 		[]shared.UserID{shared.RestoreUserID(modifierID)},
 		[]domainProblem.LanguageOverride{},
-		nil,
-		[]domainProblem.JudgingFile{},
+		nil, []domainProblem.JudgingFile{},
 		nil, nil, nil,
-		time.Now().UTC(),
-		time.Now().UTC(),
-	)
+		testNow, testNow,
+	).WithClock(fixedClock)
 }
 
 func repoWith(p *domainProblem.Problem) *mockProblemRepository {
