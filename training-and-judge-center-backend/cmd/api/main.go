@@ -61,7 +61,7 @@ func main() {
 
 	// Problem repositories & settings
 	problemRepo := infraProblem.NewProblemRepository(dbPool)
-	settingsProvider := platformConfig.NewVirtualObjectProvider(cfg.VirtualObject)
+	settingsProvider := platformConfig.NewPlatformSettings(cfg.VirtualObject)
 
 	// File Storage
 	var fileStorage appProblem.ProblemFileRepository

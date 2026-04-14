@@ -38,23 +38,23 @@ type UploadProblemFilesResult struct {
 }
 
 type fileAction struct {
-	toDeleteOnFailure       []string
-	toDeleteOnSuccess       []string
-	prefixToDeleteOnSuccess string
+	rollbackFiles []string
+	cleanupFiles  []string
+	cleanupPrefix string
 }
 
 type UploadProblemFilesUseCase struct {
 	repo      problem.Repository
 	storage   ProblemFileRepository
 	zipParser ZipParser
-	settings  problem.PlatformSettingsService
+	settings  *problem.PlatformSettings
 }
 
 func NewUploadProblemFilesUseCase(
 	repo problem.Repository,
 	storage ProblemFileRepository,
 	zipParser ZipParser,
-	settings problem.PlatformSettingsService,
+	settings *problem.PlatformSettings,
 ) *UploadProblemFilesUseCase {
 	return &UploadProblemFilesUseCase{
 		repo:      repo,
@@ -102,18 +102,18 @@ func (uc *UploadProblemFilesUseCase) Execute(ctx context.Context, input UploadPr
 	}
 
 	if handleErr != nil {
-		uc.cleanupFiles(ctx, action.toDeleteOnFailure)
+		uc.cleanupFiles(ctx, action.rollbackFiles)
 		return nil, handleErr
 	}
 
 	if err := uc.repo.Save(ctx, p); err != nil {
-		uc.cleanupFiles(ctx, action.toDeleteOnFailure)
+		uc.cleanupFiles(ctx, action.rollbackFiles)
 		slog.ErrorContext(ctx, "failed to save problem after file upload", "error", err, "slug", p.Slug().String())
 		return nil, apperror.NewInternal()
 	}
 
-	uc.cleanupFiles(ctx, action.toDeleteOnSuccess)
-	uc.cleanupPrefix(ctx, action.prefixToDeleteOnSuccess)
+	uc.cleanupFiles(ctx, action.cleanupFiles)
+	uc.cleanupPrefix(ctx, action.cleanupPrefix)
 
 	return &UploadProblemFilesResult{
 		Message:  "File uploaded successfully",
@@ -158,7 +158,7 @@ func (uc *UploadProblemFilesUseCase) handleTestCases(ctx context.Context, p *pro
 
 	if err := uc.storage.UploadFile(ctx, zipKey, input.FileData); err != nil {
 		slog.ErrorContext(ctx, "failed to upload testcases zip", "error", err, "slug", p.Slug().String())
-		return fileAction{toDeleteOnFailure: allNewKeys}, apperror.NewInternal()
+		return fileAction{rollbackFiles: allNewKeys}, apperror.NewInternal()
 	}
 
 	g, gCtx := errgroup.WithContext(ctx)
@@ -177,12 +177,12 @@ func (uc *UploadProblemFilesUseCase) handleTestCases(ctx context.Context, p *pro
 	}
 
 	if err := g.Wait(); err != nil {
-		return fileAction{toDeleteOnFailure: allNewKeys}, apperror.NewInternal()
+		return fileAction{rollbackFiles: allNewKeys}, apperror.NewInternal()
 	}
 
-	action := fileAction{toDeleteOnFailure: allNewKeys}
+	action := fileAction{rollbackFiles: allNewKeys}
 	if p.TestCasesKey() != nil {
-		action.prefixToDeleteOnSuccess = *p.TestCasesKey()
+		action.cleanupPrefix = *p.TestCasesKey()
 	}
 
 	p.SetTestCases(basePath)
@@ -213,52 +213,31 @@ func (uc *UploadProblemFilesUseCase) handleSolution(ctx context.Context, p *prob
 		return fileAction{}, apperror.NewInternal()
 	}
 
-	action := fileAction{toDeleteOnFailure: []string{fileKey}}
+	action := fileAction{rollbackFiles: []string{fileKey}}
 
 	if old := p.AddSolution(solutionObj); old != nil && old.FileKey() != fileKey {
-		action.toDeleteOnSuccess = []string{old.FileKey()}
+		action.cleanupFiles = []string{old.FileKey()}
 	}
 
 	return action, nil
 }
 
 func (uc *UploadProblemFilesUseCase) handleChecker(ctx context.Context, p *problem.Problem, input UploadProblemFilesInput) (fileAction, error) {
-	if input.FileName == "" {
-		return fileAction{}, apperror.NewValidation([]apperror.FieldError{
-			{Field: "fileName", Message: "Filename is required"},
-		})
-	}
-
-	cleanName := filepath.Base(input.FileName)
-	lang, err := uc.getLanguageForFile(cleanName, FileTypeChecker)
-	if err != nil {
-		return fileAction{}, err
-	}
-
-	fileKey := fmt.Sprintf("problems/%s/%s/%s", p.Slug().String(), FileTypeChecker, cleanName)
-	verifierObj, err := problem.NewVerifierFile(cleanName, fileKey, lang)
-	if err != nil {
-		return fileAction{}, err
-	}
-
-	action := fileAction{}
-	if p.Checker() == nil || p.Checker().FileKey() != fileKey {
-		action.toDeleteOnFailure = []string{fileKey}
-	}
-	if p.Checker() != nil && p.Checker().FileKey() != fileKey {
-		action.toDeleteOnSuccess = []string{p.Checker().FileKey()}
-	}
-
-	if err := uc.storage.UploadFile(ctx, fileKey, input.FileData); err != nil {
-		slog.ErrorContext(ctx, "failed to upload checker file", "error", err, "slug", p.Slug().String(), "filename", cleanName)
-		return fileAction{toDeleteOnFailure: action.toDeleteOnFailure}, apperror.NewInternal()
-	}
-
-	p.SetChecker(verifierObj)
-	return action, nil
+	return uc.handleVerifier(ctx, p, input, FileTypeChecker, p.Checker, p.SetChecker)
 }
 
 func (uc *UploadProblemFilesUseCase) handleValidator(ctx context.Context, p *problem.Problem, input UploadProblemFilesInput) (fileAction, error) {
+	return uc.handleVerifier(ctx, p, input, FileTypeValidator, p.Validator, p.SetValidator)
+}
+
+func (uc *UploadProblemFilesUseCase) handleVerifier(
+	ctx context.Context,
+	p *problem.Problem,
+	input UploadProblemFilesInput,
+	fileType string,
+	getVerifier func() *problem.JudgingFile,
+	setVerifier func(problem.JudgingFile),
+) (fileAction, error) {
 	if input.FileName == "" {
 		return fileAction{}, apperror.NewValidation([]apperror.FieldError{
 			{Field: "fileName", Message: "Filename is required"},
@@ -266,31 +245,32 @@ func (uc *UploadProblemFilesUseCase) handleValidator(ctx context.Context, p *pro
 	}
 
 	cleanName := filepath.Base(input.FileName)
-	lang, err := uc.getLanguageForFile(cleanName, FileTypeValidator)
+	lang, err := uc.getLanguageForFile(cleanName, fileType)
 	if err != nil {
 		return fileAction{}, err
 	}
 
-	fileKey := fmt.Sprintf("problems/%s/%s/%s", p.Slug().String(), FileTypeValidator, cleanName)
+	fileKey := fmt.Sprintf("problems/%s/%s/%s", p.Slug().String(), fileType, cleanName)
 	verifierObj, err := problem.NewVerifierFile(cleanName, fileKey, lang)
 	if err != nil {
 		return fileAction{}, err
 	}
 
+	current := getVerifier()
 	action := fileAction{}
-	if p.Validator() == nil || p.Validator().FileKey() != fileKey {
-		action.toDeleteOnFailure = []string{fileKey}
+	if current == nil || current.FileKey() != fileKey {
+		action.rollbackFiles = []string{fileKey}
 	}
-	if p.Validator() != nil && p.Validator().FileKey() != fileKey {
-		action.toDeleteOnSuccess = []string{p.Validator().FileKey()}
+	if current != nil && current.FileKey() != fileKey {
+		action.cleanupFiles = []string{current.FileKey()}
 	}
 
 	if err := uc.storage.UploadFile(ctx, fileKey, input.FileData); err != nil {
-		slog.ErrorContext(ctx, "failed to upload validator file", "error", err, "slug", p.Slug().String(), "filename", cleanName)
-		return fileAction{toDeleteOnFailure: action.toDeleteOnFailure}, apperror.NewInternal()
+		slog.ErrorContext(ctx, "failed to upload "+fileType+" file", "error", err, "slug", p.Slug().String(), "filename", cleanName)
+		return fileAction{rollbackFiles: action.rollbackFiles}, apperror.NewInternal()
 	}
 
-	p.SetValidator(verifierObj)
+	setVerifier(verifierObj)
 	return action, nil
 }
 

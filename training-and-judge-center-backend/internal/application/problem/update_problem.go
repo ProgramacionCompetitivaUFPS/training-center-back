@@ -2,7 +2,6 @@ package problem
 
 import (
 	"context"
-	"errors"
 	"log/slog"
 
 	"github.com/training-judge-center/backend/internal/domain/problem"
@@ -28,10 +27,10 @@ type UpdateProblemResult struct {
 
 type UpdateProblemUseCase struct {
 	repo             problem.Repository
-	platformSettings problem.PlatformSettingsService
+	platformSettings *problem.PlatformSettings
 }
 
-func NewUpdateProblemUseCase(repo problem.Repository, platformSettings problem.PlatformSettingsService) *UpdateProblemUseCase {
+func NewUpdateProblemUseCase(repo problem.Repository, platformSettings *problem.PlatformSettings) *UpdateProblemUseCase {
 	return &UpdateProblemUseCase{
 		repo:             repo,
 		platformSettings: platformSettings,
@@ -61,16 +60,11 @@ func (uc *UpdateProblemUseCase) Execute(ctx context.Context, input UpdateProblem
 
 	var title *problem.Title
 	if input.Title != nil {
-		t, err := problem.NewTitle(*input.Title)
-		if err != nil {
-			var valErr *apperror.AppError
-			if errors.As(err, &valErr) {
-				fieldErrs = append(fieldErrs, valErr.Details...)
-			} else {
-				slog.ErrorContext(ctx, "failed to create title during update", "error", err, "slug", slug.String())
-				return nil, apperror.NewInternal()
-			}
-		} else {
+		t, tErr := problem.NewTitle(*input.Title)
+		if err := apperror.AccumulateFieldErrors(tErr, &fieldErrs); err != nil {
+			return nil, err
+		}
+		if tErr == nil {
 			title = &t
 		}
 	}
@@ -80,12 +74,10 @@ func (uc *UpdateProblemUseCase) Execute(ctx context.Context, input UpdateProblem
 	var timeLimit *problem.TimeLimit
 	if input.TimeLimit != nil {
 		tl, tlErr := problem.NewTimeLimit(*input.TimeLimit, globalMaxTime)
-		if tlErr != nil {
-			var valErr *apperror.AppError
-			if errors.As(tlErr, &valErr) {
-				fieldErrs = append(fieldErrs, valErr.Details...)
-			}
-		} else {
+		if err := apperror.AccumulateFieldErrors(tlErr, &fieldErrs); err != nil {
+			return nil, err
+		}
+		if tlErr == nil {
 			timeLimit = &tl
 		}
 	}
@@ -93,12 +85,10 @@ func (uc *UpdateProblemUseCase) Execute(ctx context.Context, input UpdateProblem
 	var memoryLimit *problem.MemoryLimit
 	if input.MemoryLimit != nil {
 		ml, mlErr := problem.NewMemoryLimit(*input.MemoryLimit, globalMaxMemory)
-		if mlErr != nil {
-			var valErr *apperror.AppError
-			if errors.As(mlErr, &valErr) {
-				fieldErrs = append(fieldErrs, valErr.Details...)
-			}
-		} else {
+		if err := apperror.AccumulateFieldErrors(mlErr, &fieldErrs); err != nil {
+			return nil, err
+		}
+		if mlErr == nil {
 			memoryLimit = &ml
 		}
 	}
@@ -132,7 +122,7 @@ func (uc *UpdateProblemUseCase) Execute(ctx context.Context, input UpdateProblem
 			seenLangs[override.Language] = struct{}{}
 
 			langLimit := uc.platformSettings.GetLanguageLimit(override.Language)
-			langOverride, err := problem.NewLanguageOverride(
+			langOverride, loErr := problem.NewLanguageOverride(
 				override.Language,
 				override.TimeLimit,
 				override.MemoryLimit,
@@ -140,10 +130,9 @@ func (uc *UpdateProblemUseCase) Execute(ctx context.Context, input UpdateProblem
 				globalMaxTime,
 				globalMaxMemory,
 			)
-			if err != nil {
-				var valErr *apperror.AppError
-				if errors.As(err, &valErr) {
-					fieldErrs = append(fieldErrs, valErr.Details...)
+			if loErr != nil {
+				if err := apperror.AccumulateFieldErrors(loErr, &fieldErrs); err != nil {
+					return nil, err
 				}
 				continue
 			}
@@ -154,42 +143,33 @@ func (uc *UpdateProblemUseCase) Execute(ctx context.Context, input UpdateProblem
 	var tags *problem.Tags
 	if input.Tags != nil {
 		allowedTags := uc.platformSettings.GetAllowedTags()
-		t, err := problem.NewTags(input.Tags, allowedTags)
-		if err != nil {
-			var valErr *apperror.AppError
-			if errors.As(err, &valErr) {
-				fieldErrs = append(fieldErrs, valErr.Details...)
-			}
-		} else {
+		t, tagsErr := problem.NewTags(input.Tags, allowedTags)
+		if err := apperror.AccumulateFieldErrors(tagsErr, &fieldErrs); err != nil {
+			return nil, err
+		}
+		if tagsErr == nil {
 			tags = &t
 		}
 	}
 
 	var accessibility *problem.Accessibility
 	if input.Accessibility != nil {
-		acc, err := problem.NewAccessibility(*input.Accessibility)
-		if err != nil {
-			var valErr *apperror.AppError
-			if errors.As(err, &valErr) {
-				fieldErrs = append(fieldErrs, valErr.Details...)
-			}
-		} else {
+		acc, accErr := problem.NewAccessibility(*input.Accessibility)
+		if err := apperror.AccumulateFieldErrors(accErr, &fieldErrs); err != nil {
+			return nil, err
+		}
+		if accErr == nil {
 			accessibility = &acc
 		}
 	}
 
 	var statementPtr *problem.Statement
 	if input.Statement != nil {
-		stmt, err := problem.NewStatement(input.Statement)
-		if err != nil {
-			var valErr *apperror.AppError
-			if errors.As(err, &valErr) {
-				fieldErrs = append(fieldErrs, valErr.Details...)
-			} else {
-				slog.ErrorContext(ctx, "failed to validate statement", "error", err)
-				return nil, apperror.NewInternal()
-			}
-		} else {
+		stmt, stmtErr := problem.NewStatement(input.Statement)
+		if err := apperror.AccumulateFieldErrors(stmtErr, &fieldErrs); err != nil {
+			return nil, err
+		}
+		if stmtErr == nil {
 			statementPtr = &stmt
 		}
 	}

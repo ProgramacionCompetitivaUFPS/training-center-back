@@ -33,14 +33,14 @@ type ImportProblemUseCase struct {
 	repo             problem.Repository
 	storage          ProblemFileRepository
 	packageParser    ICPCPackageParser
-	platformSettings problem.PlatformSettingsService
+	platformSettings *problem.PlatformSettings
 }
 
 func NewImportProblemUseCase(
 	repo problem.Repository,
 	storage ProblemFileRepository,
 	packageParser ICPCPackageParser,
-	platformSettings problem.PlatformSettingsService,
+	platformSettings *problem.PlatformSettings,
 ) *ImportProblemUseCase {
 	return &ImportProblemUseCase{
 		repo:             repo,

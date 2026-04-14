@@ -74,7 +74,7 @@ type Handler struct {
 	changeAccessibilityUC changeAccessibilityProblemUC
 	deleteProblemUC       deleteProblemUC
 	userProvider          appProblem.UserProvider
-	settings              domainProblem.PlatformSettingsService
+	settings              *domainProblem.PlatformSettings
 }
 
 func NewHandler(
@@ -92,7 +92,7 @@ func NewHandler(
 	changeAccessibilityUC changeAccessibilityProblemUC,
 	deleteProblemUC deleteProblemUC,
 	userProvider appProblem.UserProvider,
-	settings domainProblem.PlatformSettingsService,
+	settings *domainProblem.PlatformSettings,
 ) *Handler {
 	return &Handler{
 		createUC:              createUC,

@@ -34,10 +34,10 @@ type CreateProblemResult struct {
 
 type CreateProblemUseCase struct {
 	repo             problem.Repository
-	platformSettings problem.PlatformSettingsService
+	platformSettings *problem.PlatformSettings
 }
 
-func NewCreateProblemUseCase(repo problem.Repository, platformSettings problem.PlatformSettingsService) *CreateProblemUseCase {
+func NewCreateProblemUseCase(repo problem.Repository, platformSettings *problem.PlatformSettings) *CreateProblemUseCase {
 	return &CreateProblemUseCase{
 		repo:             repo,
 		platformSettings: platformSettings,
@@ -57,53 +57,35 @@ func (usecase *CreateProblemUseCase) Execute(ctx context.Context, input CreatePr
 	var fieldErrs []apperror.FieldError
 
 	title, err := problem.NewTitle(input.Title)
-	if err != nil {
-		var valErr *apperror.AppError
-		if errors.As(err, &valErr) {
-			fieldErrs = append(fieldErrs, valErr.Details...)
-		} else {
-			return nil, apperror.NewInternal()
-		}
+	if err := apperror.AccumulateFieldErrors(err, &fieldErrs); err != nil {
+		return nil, err
 	}
 
 	stmt, err := problem.NewStatement(input.Statement)
-	if err != nil {
-		var valErr *apperror.AppError
-		if errors.As(err, &valErr) {
-			fieldErrs = append(fieldErrs, valErr.Details...)
-		} else {
-			return nil, apperror.NewInternal()
-		}
+	if err := apperror.AccumulateFieldErrors(err, &fieldErrs); err != nil {
+		return nil, err
 	}
 
 	globalMaxTime, globalMaxMemory := usecase.platformSettings.GetGlobalLimits()
 
 	var timeLimit *problem.TimeLimit
 	if input.TimeLimit != nil {
-		tl, err := problem.NewTimeLimit(*input.TimeLimit, globalMaxTime)
-		if err != nil {
-			var valErr *apperror.AppError
-			if errors.As(err, &valErr) {
-				fieldErrs = append(fieldErrs, valErr.Details...)
-			} else {
-				return nil, apperror.NewInternal()
-			}
-		} else {
+		tl, tlErr := problem.NewTimeLimit(*input.TimeLimit, globalMaxTime)
+		if err := apperror.AccumulateFieldErrors(tlErr, &fieldErrs); err != nil {
+			return nil, err
+		}
+		if tlErr == nil {
 			timeLimit = &tl
 		}
 	}
 
 	var memoryLimit *problem.MemoryLimit
 	if input.MemoryLimit != nil {
-		ml, err := problem.NewMemoryLimit(*input.MemoryLimit, globalMaxMemory)
-		if err != nil {
-			var valErr *apperror.AppError
-			if errors.As(err, &valErr) {
-				fieldErrs = append(fieldErrs, valErr.Details...)
-			} else {
-				return nil, apperror.NewInternal()
-			}
-		} else {
+		ml, mlErr := problem.NewMemoryLimit(*input.MemoryLimit, globalMaxMemory)
+		if err := apperror.AccumulateFieldErrors(mlErr, &fieldErrs); err != nil {
+			return nil, err
+		}
+		if mlErr == nil {
 			memoryLimit = &ml
 		}
 	}
@@ -136,7 +118,7 @@ func (usecase *CreateProblemUseCase) Execute(ctx context.Context, input CreatePr
 		seenLangs[override.Language] = struct{}{}
 
 		langLimit := usecase.platformSettings.GetLanguageLimit(override.Language)
-		langOverride, err := problem.NewLanguageOverride(
+		langOverride, loErr := problem.NewLanguageOverride(
 			override.Language,
 			override.TimeLimit,
 			override.MemoryLimit,
@@ -144,12 +126,9 @@ func (usecase *CreateProblemUseCase) Execute(ctx context.Context, input CreatePr
 			globalMaxTime,
 			globalMaxMemory,
 		)
-		if err != nil {
-			var valErr *apperror.AppError
-			if errors.As(err, &valErr) {
-				fieldErrs = append(fieldErrs, valErr.Details...)
-			} else {
-				return nil, apperror.NewInternal()
+		if loErr != nil {
+			if err := apperror.AccumulateFieldErrors(loErr, &fieldErrs); err != nil {
+				return nil, err
 			}
 			continue
 		}
@@ -158,13 +137,8 @@ func (usecase *CreateProblemUseCase) Execute(ctx context.Context, input CreatePr
 
 	allowedTags := usecase.platformSettings.GetAllowedTags()
 	tags, err := problem.NewTags(input.Tags, allowedTags)
-	if err != nil {
-		var valErr *apperror.AppError
-		if errors.As(err, &valErr) {
-			fieldErrs = append(fieldErrs, valErr.Details...)
-		} else {
-			return nil, apperror.NewInternal()
-		}
+	if err := apperror.AccumulateFieldErrors(err, &fieldErrs); err != nil {
+		return nil, err
 	}
 
 	if len(fieldErrs) > 0 {
