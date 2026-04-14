@@ -5,36 +5,20 @@ import (
 	"github.com/training-judge-center/backend/internal/domain/problem"
 )
 
-var _ = func() { _ = config.LanguageLimit(problem.LanguageLimit{}) }
-
-type VirtualObjectProvider struct {
-	languageExtensions    map[string]string
-	uploadMaxConcurrency  int
-	maxFileCountSample    int
-	maxFileSizeTestCaseMB int
-	maxFileCountTestCase  int
-	maxFileSizeDefaultMB  int
-	globalMaxTimeLimit    int
-	globalMaxMemoryLimit  int
-	languages             map[string]problem.LanguageLimit
-	supportedLanguages    map[string]struct{}
-	allowedTags           map[string]struct{}
-	tagsList              []string
-}
-
-func NewVirtualObjectProvider(cfg *config.VirtualObject) *VirtualObjectProvider {
+func NewPlatformSettings(cfg *config.VirtualObject) *problem.PlatformSettings {
 	if cfg == nil {
-		return &VirtualObjectProvider{
-			languages:          make(map[string]problem.LanguageLimit),
-			supportedLanguages: make(map[string]struct{}),
-			allowedTags:        make(map[string]struct{}),
-			tagsList:           []string{},
+		return &problem.PlatformSettings{
+			LanguageLimits:     make(map[string]*problem.LanguageLimit),
+			SupportedLanguages: make(map[string]struct{}),
+			LanguageExtensions: make(map[string]string),
+			AllowedTags:        make(map[string]struct{}),
 		}
 	}
 
-	langs := make(map[string]problem.LanguageLimit, len(cfg.LanguageOverrides))
+	langs := make(map[string]*problem.LanguageLimit, len(cfg.LanguageOverrides))
 	for _, l := range cfg.LanguageOverrides {
-		langs[l.Language] = problem.LanguageLimit{
+		l := l
+		langs[l.Language] = &problem.LanguageLimit{
 			Language:       l.Language,
 			MaxTimeLimit:   l.MaxTimeLimit,
 			MaxMemoryLimit: l.MaxMemoryLimit,
@@ -51,83 +35,24 @@ func NewVirtualObjectProvider(cfg *config.VirtualObject) *VirtualObjectProvider 
 		supportedMap[l] = struct{}{}
 	}
 
-	return &VirtualObjectProvider{
-		languageExtensions:    cfg.LanguageExtensions,
-		uploadMaxConcurrency:  cfg.UploadMaxConcurrency,
-		maxFileCountSample:    cfg.MaxFileCountSample,
-		maxFileSizeTestCaseMB: cfg.MaxFileSizeTestCaseMB,
-		maxFileCountTestCase:  cfg.MaxFileCountTestCase,
-		maxFileSizeDefaultMB:  cfg.MaxFileSizeDefaultMB,
-		globalMaxTimeLimit:    cfg.MaxTimeLimitGlobal,
-		globalMaxMemoryLimit:  cfg.MaxMemoryLimitGlobal,
-		languages:             langs,
-		supportedLanguages:    supportedMap,
-		allowedTags:           tagsMap,
-		tagsList:              cfg.Tags,
+	return &problem.PlatformSettings{
+		GlobalMaxTimeLimit:    cfg.MaxTimeLimitGlobal,
+		GlobalMaxMemoryLimit:  cfg.MaxMemoryLimitGlobal,
+		LanguageLimits:        langs,
+		SupportedLanguages:    supportedMap,
+		LanguageExtensions:    cfg.LanguageExtensions,
+		AllowedTags:           tagsMap,
+		UploadMaxConcurrency:  defaultIfZero(cfg.UploadMaxConcurrency, 10),
+		MaxFileCountSample:    defaultIfZero(cfg.MaxFileCountSample, 10),
+		MaxFileSizeTestCaseMB: defaultIfZero(cfg.MaxFileSizeTestCaseMB, 200),
+		MaxFileCountTestCase:  defaultIfZero(cfg.MaxFileCountTestCase, 10000),
+		MaxFileSizeDefaultMB:  defaultIfZero(cfg.MaxFileSizeDefaultMB, 10),
 	}
 }
 
-func (p *VirtualObjectProvider) IsLanguageSupported(language string) bool {
-	_, ok := p.supportedLanguages[language]
-	return ok
-}
-
-func (p *VirtualObjectProvider) GetLanguageByExtension(ext string) (string, bool) {
-	lang, ok := p.languageExtensions[ext]
-	return lang, ok
-}
-
-func (p *VirtualObjectProvider) GetUploadMaxConcurrency() int {
-	if p.uploadMaxConcurrency <= 0 {
-		return 10 // Default fallback
+func defaultIfZero(v, d int) int {
+	if v <= 0 {
+		return d
 	}
-	return p.uploadMaxConcurrency
-}
-
-func (p *VirtualObjectProvider) GetMaxFileCountSample() int {
-	if p.maxFileCountSample <= 0 {
-		return 10 // Default fallback
-	}
-	return p.maxFileCountSample
-}
-
-func (p *VirtualObjectProvider) GetMaxFileSizeDefaultMB() int {
-	if p.maxFileSizeDefaultMB <= 0 {
-		return 10 // Default fallback
-	}
-	return p.maxFileSizeDefaultMB
-}
-
-func (p *VirtualObjectProvider) GetMaxFileSizeTestCaseMB() int {
-	if p.maxFileSizeTestCaseMB <= 0 {
-		return 200 // Default fallback
-	}
-	return p.maxFileSizeTestCaseMB
-}
-
-func (p *VirtualObjectProvider) GetMaxFileCountTestCase() int {
-	if p.maxFileCountTestCase <= 0 {
-		return 10000 // Default fallback
-	}
-	return p.maxFileCountTestCase
-}
-
-func (p *VirtualObjectProvider) GetGlobalLimits() (int, int) {
-	return p.globalMaxTimeLimit, p.globalMaxMemoryLimit
-}
-
-func (p *VirtualObjectProvider) GetLanguageLimit(language string) *problem.LanguageLimit {
-	if limit, ok := p.languages[language]; ok {
-		return &limit
-	}
-	return nil
-}
-
-func (p *VirtualObjectProvider) IsValidTag(tag string) bool {
-	_, ok := p.allowedTags[tag]
-	return ok
-}
-
-func (p *VirtualObjectProvider) GetAllowedTags() map[string]struct{} {
-	return p.allowedTags
+	return v
 }
