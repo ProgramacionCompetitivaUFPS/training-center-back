@@ -1,6 +1,21 @@
 package apperror
 
-import "net/http"
+import (
+	"errors"
+	"net/http"
+)
+
+func AccumulateFieldErrors(err error, fieldErrs *[]FieldError) error {
+	if err == nil {
+		return nil
+	}
+	var appErr *AppError
+	if errors.As(err, &appErr) {
+		*fieldErrs = append(*fieldErrs, appErr.Details...)
+		return nil
+	}
+	return NewInternal()
+}
 
 const (
 	ErrCodeCannotSelfDeactivate  = "CANNOT_SELF_DEACTIVATE"
