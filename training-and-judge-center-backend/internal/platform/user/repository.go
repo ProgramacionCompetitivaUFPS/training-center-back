@@ -1,4 +1,4 @@
-package postgres
+package user
 
 import (
 	"context"
@@ -9,23 +9,24 @@ import (
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
-	"github.com/training-judge-center/backend/internal/domain/user"
+	domainUser "github.com/training-judge-center/backend/internal/domain/user"
+	infraPostgres "github.com/training-judge-center/backend/internal/infrastructure/postgres"
 )
 
 type UserRepository struct {
-	querier Querier
+	querier infraPostgres.Querier
 }
 
-func NewUserRepository(querier Querier) *UserRepository {
+func NewUserRepository(querier infraPostgres.Querier) *UserRepository {
 	return &UserRepository{querier: querier}
 }
 
-func (r *UserRepository) Save(ctx context.Context, u *user.User) error {
+func (r *UserRepository) Save(ctx context.Context, u *domainUser.User) error {
 	query := `
 		INSERT INTO users (id, email, password, name, nickname, country, city, institution, role, status, created_at)
 		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`
 
-	querier := getQuerier(ctx, r.querier)
+	querier := infraPostgres.GetQuerier(ctx, r.querier)
 	_, err := querier.Exec(ctx, query,
 		u.ID(),
 		u.Email().String(),
@@ -44,9 +45,9 @@ func (r *UserRepository) Save(ctx context.Context, u *user.User) error {
 		if errors.As(err, &pgErr) && pgErr.Code == "23505" {
 			switch pgErr.ConstraintName {
 			case "users_email_key":
-				return user.ErrEmailConflict
+				return domainUser.ErrEmailConflict
 			case "users_nickname_key":
-				return user.ErrNicknameConflict
+				return domainUser.ErrNicknameConflict
 			}
 		}
 		return fmt.Errorf("failed to save user: %w", err)
@@ -55,7 +56,7 @@ func (r *UserRepository) Save(ctx context.Context, u *user.User) error {
 	return nil
 }
 
-func (r *UserRepository) Update(ctx context.Context, u *user.User) error {
+func (r *UserRepository) Update(ctx context.Context, u *domainUser.User) error {
 	query := `
 		UPDATE users
 		SET name = $1, nickname = $2, institution = $3, email = $4, password = $5,
@@ -68,7 +69,7 @@ func (r *UserRepository) Update(ctx context.Context, u *user.User) error {
 		emailVal = u.Email().String()
 	}
 
-	querier := getQuerier(ctx, r.querier)
+	querier := infraPostgres.GetQuerier(ctx, r.querier)
 	_, err := querier.Exec(ctx, query,
 		u.Name(),
 		u.Nickname().String(),
@@ -88,9 +89,9 @@ func (r *UserRepository) Update(ctx context.Context, u *user.User) error {
 		if errors.As(err, &pgErr) && pgErr.Code == "23505" {
 			switch pgErr.ConstraintName {
 			case "users_nickname_key":
-				return user.ErrNicknameConflict
+				return domainUser.ErrNicknameConflict
 			case "users_email_key":
-				return user.ErrEmailConflict
+				return domainUser.ErrEmailConflict
 			}
 		}
 		return fmt.Errorf("failed to update user: %w", err)
@@ -101,7 +102,7 @@ func (r *UserRepository) Update(ctx context.Context, u *user.User) error {
 
 const userColumns = `id, email, password, name, nickname, country, city, institution, role, status, created_at, updated_at, deactivated_at`
 
-func scanUser(row pgx.Row) (*user.User, error) {
+func scanUser(row pgx.Row) (*domainUser.User, error) {
 	var id, name, country, city, institution string
 	var emailStr *string
 	var passwordHash, nicknameStr, roleStr, statusStr string
@@ -130,7 +131,7 @@ func scanUser(row pgx.Row) (*user.User, error) {
 		return nil, err
 	}
 
-	u, err := user.RestoreUser(
+	u, err := domainUser.RestoreUser(
 		id,
 		emailStr,
 		passwordHash,
@@ -152,7 +153,7 @@ func scanUser(row pgx.Row) (*user.User, error) {
 	return u, nil
 }
 
-func (r *UserRepository) FindByEmail(ctx context.Context, email user.Email) (*user.User, error) {
+func (r *UserRepository) FindByEmail(ctx context.Context, email domainUser.Email) (*domainUser.User, error) {
 	query := `SELECT ` + userColumns + ` FROM users WHERE email = $1`
 
 	u, err := scanUser(r.querier.QueryRow(ctx, query, email.String()))
@@ -162,7 +163,7 @@ func (r *UserRepository) FindByEmail(ctx context.Context, email user.Email) (*us
 	return u, nil
 }
 
-func (r *UserRepository) FindByID(ctx context.Context, id string) (*user.User, error) {
+func (r *UserRepository) FindByID(ctx context.Context, id string) (*domainUser.User, error) {
 	query := `SELECT ` + userColumns + ` FROM users WHERE id = $1`
 
 	u, err := scanUser(r.querier.QueryRow(ctx, query, id))
@@ -172,7 +173,7 @@ func (r *UserRepository) FindByID(ctx context.Context, id string) (*user.User, e
 	return u, nil
 }
 
-func (r *UserRepository) FindByNickname(ctx context.Context, nickname user.Nickname) (*user.User, error) {
+func (r *UserRepository) FindByNickname(ctx context.Context, nickname domainUser.Nickname) (*domainUser.User, error) {
 	query := `SELECT ` + userColumns + ` FROM users WHERE LOWER(nickname) = LOWER($1)`
 
 	u, err := scanUser(r.querier.QueryRow(ctx, query, nickname.String()))
@@ -189,15 +190,15 @@ func escapeILIKE(s string) string {
 	return s
 }
 
-var sortColumnMap = map[user.SortField]string{
-	user.SortByCreatedAt:     "created_at",
-	user.SortByName:          "name",
-	user.SortByNickname:      "nickname",
-	user.SortByEmail:         "email",
-	user.SortByDeactivatedAt: "deactivated_at",
+var sortColumnMap = map[domainUser.SortField]string{
+	domainUser.SortByCreatedAt:     "created_at",
+	domainUser.SortByName:          "name",
+	domainUser.SortByNickname:      "nickname",
+	domainUser.SortByEmail:         "email",
+	domainUser.SortByDeactivatedAt: "deactivated_at",
 }
 
-func (r *UserRepository) FindAll(ctx context.Context, filter user.UserFilter) ([]*user.User, int, error) {
+func (r *UserRepository) FindAll(ctx context.Context, filter domainUser.UserFilter) ([]*domainUser.User, int, error) {
 	args := []interface{}{}
 	conditions := []string{}
 	n := 1
@@ -245,19 +246,19 @@ func (r *UserRepository) FindAll(ctx context.Context, filter user.UserFilter) ([
 	if filter.SearchTerm != "" {
 		searchPattern := "%" + escapeILIKE(filter.SearchTerm) + "%"
 		switch filter.SearchField {
-		case user.SearchByName:
+		case domainUser.SearchByName:
 			conditions = append(conditions, fmt.Sprintf("name ILIKE $%d", n))
 			args = append(args, searchPattern)
 			n++
-		case user.SearchByNickname:
+		case domainUser.SearchByNickname:
 			conditions = append(conditions, fmt.Sprintf("nickname ILIKE $%d", n))
 			args = append(args, searchPattern)
 			n++
-		case user.SearchByEmail:
+		case domainUser.SearchByEmail:
 			conditions = append(conditions, fmt.Sprintf("email ILIKE $%d", n))
 			args = append(args, searchPattern)
 			n++
-		case user.SearchByInstitution:
+		case domainUser.SearchByInstitution:
 			conditions = append(conditions, fmt.Sprintf("institution ILIKE $%d", n))
 			args = append(args, searchPattern)
 			n++
@@ -282,7 +283,7 @@ func (r *UserRepository) FindAll(ctx context.Context, filter user.UserFilter) ([
 		colName = "created_at"
 	}
 	order := "DESC"
-	if filter.Order == user.SortOrderAsc {
+	if filter.Order == domainUser.SortOrderAsc {
 		order = "ASC"
 	}
 	orderClause := fmt.Sprintf("ORDER BY %s %s NULLS LAST", colName, order)
@@ -308,7 +309,7 @@ func (r *UserRepository) FindAll(ctx context.Context, filter user.UserFilter) ([
 	}
 	defer rows.Close()
 
-	var users []*user.User
+	var users []*domainUser.User
 	for rows.Next() {
 		u, err := scanUser(rows)
 		if err != nil {
@@ -325,4 +326,3 @@ func (r *UserRepository) FindAll(ctx context.Context, filter user.UserFilter) ([
 
 	return users, totalCount, nil
 }
-

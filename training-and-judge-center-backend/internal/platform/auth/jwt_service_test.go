@@ -1,4 +1,4 @@
-package jwt
+package auth
 
 import (
 	"encoding/base64"
@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	gojwt "github.com/golang-jwt/jwt/v5"
+	"github.com/golang-jwt/jwt/v5"
 	"github.com/training-judge-center/backend/internal/domain/user"
 )
 
@@ -34,7 +34,7 @@ func testUser() *user.User {
 
 func TestGenerateToken_ClaimsPresent(t *testing.T) {
 	// Arrange
-	svc := NewService("test-secret", 1)
+	svc := NewJWTService("test-secret", 1)
 	u := testUser()
 
 	// Act
@@ -44,13 +44,13 @@ func TestGenerateToken_ClaimsPresent(t *testing.T) {
 	}
 
 	// Assert — parse manually to inspect raw claim names
-	token, err := gojwt.ParseWithClaims(tokenStr, &customClaims{}, func(token *gojwt.Token) (any, error) {
+	token, err := jwt.ParseWithClaims(tokenStr, &jwtCustomClaims{}, func(token *jwt.Token) (any, error) {
 		return []byte("test-secret"), nil
 	})
 	if err != nil {
 		t.Fatalf("could not parse generated token: %v", err)
 	}
-	claims := token.Claims.(*customClaims)
+	claims := token.Claims.(*jwtCustomClaims)
 	if claims.Subject != u.ID() {
 		t.Errorf("sub: got %q, want %q", claims.Subject, u.ID())
 	}
@@ -70,7 +70,7 @@ func TestGenerateToken_ClaimsPresent(t *testing.T) {
 
 func TestValidateToken_ValidToken(t *testing.T) {
 	// Arrange
-	svc := NewService("test-secret", 1)
+	svc := NewJWTService("test-secret", 1)
 	u := testUser()
 	tokenStr, err := svc.GenerateToken(u)
 	if err != nil {
@@ -100,7 +100,7 @@ func TestValidateToken_ValidToken(t *testing.T) {
 
 func TestGenerateToken_ExpirationHonored(t *testing.T) {
 	// Arrange
-	svc := NewService("test-secret", 2)
+	svc := NewJWTService("test-secret", 2)
 	u := testUser()
 
 	// Act
@@ -110,13 +110,13 @@ func TestGenerateToken_ExpirationHonored(t *testing.T) {
 	}
 
 	// Assert — verify exp - iat equals the configured 2-hour duration
-	token, err := gojwt.ParseWithClaims(tokenStr, &customClaims{}, func(token *gojwt.Token) (any, error) {
+	token, err := jwt.ParseWithClaims(tokenStr, &jwtCustomClaims{}, func(token *jwt.Token) (any, error) {
 		return []byte("test-secret"), nil
 	})
 	if err != nil {
 		t.Fatalf("could not parse generated token: %v", err)
 	}
-	claims := token.Claims.(*customClaims)
+	claims := token.Claims.(*jwtCustomClaims)
 	diff := claims.ExpiresAt.Time.Sub(claims.IssuedAt.Time)
 	if diff < 2*time.Hour-time.Second || diff > 2*time.Hour+time.Second {
 		t.Errorf("expiration duration: got %v, want ~2h", diff)
@@ -125,7 +125,7 @@ func TestGenerateToken_ExpirationHonored(t *testing.T) {
 
 func TestValidateToken_ExpiredToken(t *testing.T) {
 	// Arrange — negative expiration produces a token already expired
-	svc := NewService("test-secret", -1)
+	svc := NewJWTService("test-secret", -1)
 	u := testUser()
 	tokenStr, err := svc.GenerateToken(u)
 	if err != nil {
@@ -143,8 +143,8 @@ func TestValidateToken_ExpiredToken(t *testing.T) {
 
 func TestValidateToken_WrongSigningKey(t *testing.T) {
 	// Arrange
-	generator := NewService("original-secret", 1)
-	validator := NewService("different-secret", 1)
+	generator := NewJWTService("original-secret", 1)
+	validator := NewJWTService("different-secret", 1)
 	u := testUser()
 	tokenStr, _ := generator.GenerateToken(u)
 
@@ -159,15 +159,15 @@ func TestValidateToken_WrongSigningKey(t *testing.T) {
 
 func TestValidateToken_AlgorithmNone(t *testing.T) {
 	// Arrange — craft a token with alg:none (algorithm confusion attack)
-	svc := NewService("test-secret", 1)
-	noneToken := gojwt.NewWithClaims(gojwt.SigningMethodNone, gojwt.MapClaims{
+	svc := NewJWTService("test-secret", 1)
+	noneToken := jwt.NewWithClaims(jwt.SigningMethodNone, jwt.MapClaims{
 		"sub":   "attacker",
 		"email": "attacker@example.com",
 		"role":  "ADMIN",
 		"iat":   time.Now().Unix(),
 		"exp":   time.Now().Add(time.Hour).Unix(),
 	})
-	tokenStr, err := noneToken.SignedString(gojwt.UnsafeAllowNoneSignatureType)
+	tokenStr, err := noneToken.SignedString(jwt.UnsafeAllowNoneSignatureType)
 	if err != nil {
 		t.Fatalf("could not sign none token: %v", err)
 	}
@@ -182,7 +182,7 @@ func TestValidateToken_AlgorithmNone(t *testing.T) {
 }
 
 func TestValidateToken_MalformedToken(t *testing.T) {
-	svc := NewService("test-secret", 1)
+	svc := NewJWTService("test-secret", 1)
 
 	_, err := svc.ValidateToken("not.a.token")
 
@@ -193,7 +193,7 @@ func TestValidateToken_MalformedToken(t *testing.T) {
 
 func TestValidateToken_TamperedPayload(t *testing.T) {
 	// Arrange — generate a valid token then replace the payload with forged claims
-	svc := NewService("test-secret", 1)
+	svc := NewJWTService("test-secret", 1)
 	u := testUser()
 	tokenStr, _ := svc.GenerateToken(u)
 

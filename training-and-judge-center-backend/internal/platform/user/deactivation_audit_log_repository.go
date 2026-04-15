@@ -1,21 +1,22 @@
-package postgres
+package user
 
 import (
 	"context"
 	"fmt"
 
-	"github.com/training-judge-center/backend/internal/domain/user"
+	domainUser "github.com/training-judge-center/backend/internal/domain/user"
+	infraPostgres "github.com/training-judge-center/backend/internal/infrastructure/postgres"
 )
 
 type DeactivationAuditLogRepository struct {
-	querier Querier
+	querier infraPostgres.Querier
 }
 
-func NewDeactivationAuditLogRepository(querier Querier) *DeactivationAuditLogRepository {
+func NewDeactivationAuditLogRepository(querier infraPostgres.Querier) *DeactivationAuditLogRepository {
 	return &DeactivationAuditLogRepository{querier: querier}
 }
 
-func (r *DeactivationAuditLogRepository) Save(ctx context.Context, log *user.DeactivationAuditLog) error {
+func (r *DeactivationAuditLogRepository) Save(ctx context.Context, log *domainUser.DeactivationAuditLog) error {
 	query := `
 		INSERT INTO deactivation_audit_logs
 		(id, user_id, original_email, original_nickname, occurred_at, ip, user_agent)

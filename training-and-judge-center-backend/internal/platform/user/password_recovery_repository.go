@@ -1,4 +1,4 @@
-package postgres
+package user
 
 import (
 	"context"
@@ -6,23 +6,24 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5"
-	"github.com/training-judge-center/backend/internal/domain/user"
+	domainUser "github.com/training-judge-center/backend/internal/domain/user"
+	infraPostgres "github.com/training-judge-center/backend/internal/infrastructure/postgres"
 )
 
 type PasswordRecoveryRepository struct {
-	querier Querier
+	querier infraPostgres.Querier
 }
 
-func NewPasswordRecoveryRepository(querier Querier) *PasswordRecoveryRepository {
+func NewPasswordRecoveryRepository(querier infraPostgres.Querier) *PasswordRecoveryRepository {
 	return &PasswordRecoveryRepository{querier: querier}
 }
 
-func (r *PasswordRecoveryRepository) Save(ctx context.Context, req *user.PasswordRecoveryRequest) error {
+func (r *PasswordRecoveryRepository) Save(ctx context.Context, req *domainUser.PasswordRecoveryRequest) error {
 	query := `
 		INSERT INTO password_recovery_requests (id, user_id, code, status, expires_at, created_at, updated_at)
 		VALUES ($1, $2, $3, $4, $5, $6, $7)`
 
-	querier := getQuerier(ctx, r.querier)
+	querier := infraPostgres.GetQuerier(ctx, r.querier)
 	_, err := querier.Exec(ctx, query,
 		req.ID(),
 		req.UserID(),
@@ -38,7 +39,7 @@ func (r *PasswordRecoveryRepository) Save(ctx context.Context, req *user.Passwor
 	return nil
 }
 
-func (r *PasswordRecoveryRepository) FindByID(ctx context.Context, id string) (*user.PasswordRecoveryRequest, error) {
+func (r *PasswordRecoveryRepository) FindByID(ctx context.Context, id string) (*domainUser.PasswordRecoveryRequest, error) {
 	query := `
 		SELECT id, user_id, code, status, expires_at, created_at, updated_at
 		FROM password_recovery_requests
@@ -66,21 +67,21 @@ func (r *PasswordRecoveryRepository) FindByID(ctx context.Context, id string) (*
 		return nil, fmt.Errorf("failed to find password recovery request: %w", err)
 	}
 
-	status, err := user.NewRequestStatus(statusStr)
+	status, err := domainUser.NewRequestStatus(statusStr)
 	if err != nil {
 		return nil, fmt.Errorf("invalid status in password recovery request: %w", err)
 	}
-	req := user.RestorePasswordRecoveryRequest(returnedID, userID, code, status, expiresAt, createdAt, updatedAt)
+	req := domainUser.RestorePasswordRecoveryRequest(returnedID, userID, code, status, expiresAt, createdAt, updatedAt)
 	return req, nil
 }
 
-func (r *PasswordRecoveryRepository) Update(ctx context.Context, req *user.PasswordRecoveryRequest) error {
+func (r *PasswordRecoveryRepository) Update(ctx context.Context, req *domainUser.PasswordRecoveryRequest) error {
 	query := `
 		UPDATE password_recovery_requests
 		SET status = $1, updated_at = $2
 		WHERE id = $3`
 
-	querier := getQuerier(ctx, r.querier)
+	querier := infraPostgres.GetQuerier(ctx, r.querier)
 	_, err := querier.Exec(ctx, query,
 		string(req.Status()),
 		req.UpdatedAt(),
@@ -92,7 +93,7 @@ func (r *PasswordRecoveryRepository) Update(ctx context.Context, req *user.Passw
 	return nil
 }
 
-func (r *PasswordRecoveryRepository) FindPendingByUserID(ctx context.Context, userID string) (*user.PasswordRecoveryRequest, error) {
+func (r *PasswordRecoveryRepository) FindPendingByUserID(ctx context.Context, userID string) (*domainUser.PasswordRecoveryRequest, error) {
 	query := `
 		SELECT id, user_id, code, status, expires_at, created_at, updated_at
 		FROM password_recovery_requests
@@ -103,7 +104,7 @@ func (r *PasswordRecoveryRepository) FindPendingByUserID(ctx context.Context, us
 	var updatedAt *time.Time
 	var statusStr string
 
-	err := r.querier.QueryRow(ctx, query, userID, string(user.StatusPending)).Scan(
+	err := r.querier.QueryRow(ctx, query, userID, string(domainUser.StatusPending)).Scan(
 		&id,
 		&returnedUserID,
 		&code,
@@ -120,11 +121,11 @@ func (r *PasswordRecoveryRepository) FindPendingByUserID(ctx context.Context, us
 		return nil, fmt.Errorf("failed to find pending password recovery request: %w", err)
 	}
 
-	status, err := user.NewRequestStatus(statusStr)
+	status, err := domainUser.NewRequestStatus(statusStr)
 	if err != nil {
 		return nil, fmt.Errorf("invalid status in pending password recovery request: %w", err)
 	}
-	req := user.RestorePasswordRecoveryRequest(id, returnedUserID, code, status, expiresAt, createdAt, updatedAt)
+	req := domainUser.RestorePasswordRecoveryRequest(id, returnedUserID, code, status, expiresAt, createdAt, updatedAt)
 	return req, nil
 }
 
@@ -134,7 +135,7 @@ func (r *PasswordRecoveryRepository) InvalidatePendingByUserID(ctx context.Conte
 		SET status = $1, updated_at = $2
 		WHERE user_id = $3 AND status = $4`
 
-	_, err := r.querier.Exec(ctx, query, string(user.StatusExpired), now, userID, string(user.StatusPending))
+	_, err := r.querier.Exec(ctx, query, string(domainUser.StatusExpired), now, userID, string(domainUser.StatusPending))
 	if err != nil {
 		return fmt.Errorf("failed to invalidate pending password recovery requests: %w", err)
 	}

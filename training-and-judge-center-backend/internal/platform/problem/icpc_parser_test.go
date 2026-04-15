@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/training-judge-center/backend/internal/infrastructure/problem"
+	"github.com/training-judge-center/backend/internal/platform/problem"
 	"github.com/training-judge-center/backend/pkg/apperror"
 )
 

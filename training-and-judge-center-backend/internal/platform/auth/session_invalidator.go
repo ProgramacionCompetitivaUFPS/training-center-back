@@ -1,4 +1,4 @@
-package redis
+package auth
 
 import (
 	"context"
@@ -29,7 +29,7 @@ func (s *SessionInvalidator) InvalidateAllUserSessions(ctx context.Context, user
 
 func (s *SessionInvalidator) IsSessionRevoked(ctx context.Context, userID string, tokenIssuedAt time.Time) (bool, error) {
 	key := fmt.Sprintf("revoked_sessions:%s", userID)
-	
+
 	val, err := s.client.Get(ctx, key).Int64()
 	if err != nil {
 		if err == redis.Nil {

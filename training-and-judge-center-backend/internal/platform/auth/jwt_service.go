@@ -1,4 +1,4 @@
-package jwt
+package auth
 
 import (
 	"fmt"
@@ -8,26 +8,26 @@ import (
 	"github.com/training-judge-center/backend/internal/domain/user"
 )
 
-type customClaims struct {
+type jwtCustomClaims struct {
 	Email string `json:"email"`
 	Role  string `json:"role"`
 	jwt.RegisteredClaims
 }
 
-type Service struct {
+type JWTService struct {
 	secret     []byte
 	expiration time.Duration
 }
 
-func NewService(secret string, expirationHours int) *Service {
-	return &Service{
+func NewJWTService(secret string, expirationHours int) *JWTService {
+	return &JWTService{
 		secret:     []byte(secret),
 		expiration: time.Duration(expirationHours) * time.Hour,
 	}
 }
 
-func (s *Service) GenerateToken(u *user.User) (string, error) {
-	claims := customClaims{
+func (s *JWTService) GenerateToken(u *user.User) (string, error) {
+	claims := jwtCustomClaims{
 		Email: u.Email().String(),
 		Role:  u.Role().String(),
 		RegisteredClaims: jwt.RegisteredClaims{
@@ -41,8 +41,8 @@ func (s *Service) GenerateToken(u *user.User) (string, error) {
 	return token.SignedString(s.secret)
 }
 
-func (s *Service) ValidateToken(tokenString string) (*user.TokenClaims, error) {
-	token, err := jwt.ParseWithClaims(tokenString, &customClaims{}, func(token *jwt.Token) (any, error) {
+func (s *JWTService) ValidateToken(tokenString string) (*user.TokenClaims, error) {
+	token, err := jwt.ParseWithClaims(tokenString, &jwtCustomClaims{}, func(token *jwt.Token) (any, error) {
 		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
 			return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
 		}
@@ -52,7 +52,7 @@ func (s *Service) ValidateToken(tokenString string) (*user.TokenClaims, error) {
 		return nil, fmt.Errorf("invalid token: %w", err)
 	}
 
-	claims, ok := token.Claims.(*customClaims)
+	claims, ok := token.Claims.(*jwtCustomClaims)
 	if !ok || !token.Valid {
 		return nil, fmt.Errorf("invalid token claims")
 	}

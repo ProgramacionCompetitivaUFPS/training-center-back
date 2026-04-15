@@ -13,7 +13,7 @@ type Querier interface {
 	QueryRow(ctx context.Context, sql string, arguments ...interface{}) pgx.Row
 }
 
-func getQuerier(ctx context.Context, defaultQuerier Querier) Querier {
+func GetQuerier(ctx context.Context, defaultQuerier Querier) Querier {
 	if tx := txFromContext(ctx); tx != nil {
 		return tx
 	}
