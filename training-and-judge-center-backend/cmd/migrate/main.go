@@ -5,10 +5,11 @@ import (
 	"embed"
 	"log/slog"
 	"os"
+
 	_ "github.com/jackc/pgx/v5/stdlib"
 	"github.com/pressly/goose/v3"
 	"github.com/training-judge-center/backend/internal/config"
-	"github.com/training-judge-center/backend/internal/platform/postgres"
+	platformPostgres "github.com/training-judge-center/backend/internal/platform/postgres"
 )
 
 //go:embed migrations/*.sql
@@ -24,14 +25,14 @@ func main() {
 	cfg := config.Load()
 	ctx := context.Background()
 
-	pool, err := postgres.NewConnectionPool(ctx, cfg)
+	pool, err := platformPostgres.NewConnectionPool(ctx, cfg)
 	if err != nil {
 		slog.Error("failed to connect to database", "error", err)
 		os.Exit(1)
 	}
 	defer pool.Close()
 
-	gooseDB, err := goose.OpenDBWithDriver("postgres", pool.Config().ConnString())
+	gooseDB, err := goose.OpenDBWithDriver("pgx", pool.Config().ConnString())
 	if err != nil {
 		slog.Error("failed to open db for goose", "error", err)
 		os.Exit(1)

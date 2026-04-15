@@ -10,7 +10,7 @@ As a Coach or Admin who has created a problem, I want to update the problem's me
 
 **Why this priority**: Allows iterative refinement of problems. Essential for the incremental problem creation workflow.
 
-**Independent Test**: This user story can be tested independently by consuming the `PUT /problems/{slug}` endpoint with valid authentication and partial updates, validating that only provided fields are modified.
+**Independent Test**: This user story can be tested independently by consuming the `PUT /problems/p/{slug}` endpoint with valid authentication and partial updates, validating that only provided fields are modified.
 
 **Acceptance Scenarios**:
 
@@ -46,26 +46,26 @@ As a Coach or Admin who has created a problem, I want to update the problem's me
    - **When** they update the statement
    - **Then** the system accepts the update
 
-9. **Scenario**: Update accessibility from PRIVATE to PUBLIC
+6. **Scenario**: Update accessibility from PRIVATE to PUBLIC
    - **Given** a problem exists with status `DRAFT` and accessibility `PRIVATE`
    - **And** the authenticated user is the author, Admin, or a modifier
    - **When** they update accessibility to `PUBLIC`
    - **Then** the system updates the accessibility
    - **And** returns the updated problem data
 
-6. **Scenario**: Invalid time/memory limit
+7. **Scenario**: Invalid time/memory limit
    - **Given** a Coach or Admin is authenticated
    - **And** timeLimit or memoryLimit is zero, negative, or exceeds maximum allowed value
    - **When** they submit the update request
    - **Then** the system rejects with 400 Bad Request indicating invalid limits
 
-7. **Scenario**: Invalid tags provided
+8. **Scenario**: Invalid tags provided
    - **Given** a Coach or Admin is authenticated
    - **And** the request includes tags that are not in the system's predefined tag list
    - **When** they submit the update request
    - **Then** the system rejects with 400 Bad Request indicating invalid tags
 
-8. **Scenario**: Unauthenticated request
+9. **Scenario**: Unauthenticated request
    - **Given** the request does not include valid authentication credentials
    - **When** an update request is submitted
    - **Then** the system rejects with 401 Unauthorized
@@ -78,7 +78,7 @@ As a Coach or Admin who has created a problem, I want to upload test cases, solu
 
 **Why this priority**: Files are essential to complete problem setup. Direct upload to backend simplifies the flow and allows incremental file uploads.
 
-**Independent Test**: This user story can be tested independently by uploading files to `POST /problems/{slug}/files` endpoint, validating that files are stored and associated with the problem.
+**Independent Test**: This user story can be tested independently by uploading files to `POST /problems/p/{slug}/files` endpoint, validating that files are stored and associated with the problem.
 
 **Acceptance Scenarios**:
 
@@ -133,7 +133,7 @@ As a Coach or Admin, I want to delete a specific file from a problem so that I c
 
 **Why this priority**: Allows correction of file uploads without needing to replace. Secondary to upload functionality.
 
-**Independent Test**: This user story can be tested independently by consuming the `DELETE /problems/{slug}/files/{fileType}` endpoint, validating that the file is removed from the problem.
+**Independent Test**: This user story can be tested independently by consuming the `DELETE /problems/p/{slug}/files/{fileType}` endpoint, validating that the file is removed from the problem.
 
 **Acceptance Scenarios**:
 
@@ -232,7 +232,7 @@ As a problem author or Admin, I want to assign other users as modifiers so that 
 
 ## API Contract
 
-### PUT /problems/{slug}
+### PUT /problems/p/{slug}
 
 Update problem metadata.
 
@@ -278,6 +278,8 @@ Update problem metadata.
 | tags | string[] | No | Array of tags from system's predefined list |
 | accessibility | string | No | Problem accessibility: `PUBLIC` or `PRIVATE` |
 
+> **Note**: Modifying `accessibility` via this Update endpoint acts as a convenient alias for the `Change problem visibility` endpoint. Both endpoints follow the exact same rules.
+
 > **Note**: See the Platform README for Virtual Object configuration including `maxTimeLimitGlobal`, `maxMemoryLimitGlobal`, and language-specific maximums.
 
 **Responses**:
@@ -311,7 +313,7 @@ Problem updated successfully.
   ],
   "files": {
     "testCases": true,
-    "solutions": ["solution.cpp"],
+    "solutions": [{"filename": "solution.cpp", "language": "cpp20"}],
     "checker": false,
     "validator": false
   },
@@ -375,7 +377,7 @@ Problem not found.
 
 ---
 
-### POST /problems/{slug}/files
+### POST /problems/p/{slug}/files
 
 Upload files for a problem (test cases, solution, checker, validator).
 
@@ -438,7 +440,7 @@ File uploaded successfully.
   "fileName": "testcases.zip",
   "files": {
     "testCases": true,
-    "solutions": ["solution.cpp"],
+    "solutions": [{"filename": "solution.cpp", "language": "cpp20"}],
     "checker": false,
     "validator": false
   }
@@ -480,7 +482,7 @@ Problem not found.
 
 ---
 
-### DELETE /problems/{slug}/files/{fileType}
+### DELETE /problems/p/{slug}/files/{fileType}
 
 Delete a specific file from a problem.
 
@@ -514,7 +516,7 @@ File deleted successfully.
   "fileType": "checker",
   "files": {
     "testCases": true,
-    "solutions": ["solution.cpp"],
+    "solutions": [{"filename": "solution.cpp", "language": "cpp20"}],
     "checker": false,
     "validator": false
   }
@@ -542,7 +544,7 @@ Problem or file not found.
 
 ---
 
-### POST /problems/{slug}/modifiers
+### POST /problems/p/{slug}/modifiers
 
 Add a modifier to a problem.
 
@@ -625,7 +627,7 @@ Problem not found.
 
 ---
 
-### DELETE /problems/{slug}/modifiers/{nickname}
+### DELETE /problems/p/{slug}/modifiers/{nickname}
 
 Remove a modifier from a problem.
 
@@ -667,7 +669,7 @@ Problem or modifier not found.
 
 ---
 
-### GET /problems/{slug}/modifiers
+### GET /problems/p/{slug}/modifiers
 
 List all modifiers for a problem.
 
@@ -762,43 +764,9 @@ Problem not found.
 
 ### Key Entities
 
-Referenced from Create Problem spec:
+📝 **Please Refer to `README.md`**
 
-- **Problem**: Represents a programming problem.  
-  Key attributes:
-  - `slug` (string, unique, user-provided, lowercase alphanumeric with hyphens, 3-70 chars, immutable)
-  - `title` (string, required)
-  - `statement` (string, LaTeX format, nullable)
-  - `timeLimit` (integer, milliseconds, nullable, default for all languages, max from Virtual Object)
-  - `memoryLimit` (integer, MiB, nullable, default for all languages, max from Virtual Object)
-  - `languageOverrides` (array, nullable, language-specific limit overrides)
-  - `tags` (array of strings, always optional, from predefined list)
-  - `status` (enum: `DRAFT` | `PUBLISHED`)
-  - `accessibility` (enum: `PUBLIC` | `PRIVATE`, default: `PRIVATE`)
-  - `authorId` (string, UUID, FK to User)
-  - `modifierIds` (array of UUIDs, FK to User, users with edit permissions)
-  - `testCasesFileKey` (string, nullable, reference to test cases ZIP)
-  - `solutionFileKeys` (array of strings, references to solution files)
-  - `checkerFileKey` (string, nullable, reference to checker file)
-  - `validatorFileKey` (string, nullable, reference to validator file)
-  - `problemJudgingUpdatedAt` (timestamp, nullable, updated when judging components are uploaded)
-  - `createdAt` (timestamp)
-  - `updatedAt` (timestamp)
-
-> **problemJudgingUpdatedAt**: This timestamp is automatically updated whenever any judging component is uploaded:
-> - Test cases (`fileType=testCases`)
-> - Checker (`fileType=checker`)
-> - Validator (`fileType=validator`)
->
-> This timestamp is used by the Rejudge system to determine which submissions need rejudging. See Rejudge Submissions spec for details.
-
-> **Problem Status** (publication state):
-> - `DRAFT`: Problem is being built. Can have partial data. Can be updated.
-> - `PUBLISHED`: Problem is complete and published. Cannot be modified (must unpublish first via Publish Problem spec).
-
-> **Problem Accessibility** (who can add it to contests):
-> - `PRIVATE`: Only the problem's modifiers (author + assigned modifiers) can add this problem to a contest. Default for all new problems.
-> - `PUBLIC`: Any contest creator can add this problem to their contest.
+For the canonical documentation of the `Problem` entity and its properties (including Status, Accessibility, etc.), please refer to the `README.md` at the root of the Problem management directory.
 
 ### Supported File Types
 
@@ -828,11 +796,11 @@ Referenced from Create Problem spec:
 
 ### Measurable Outcomes
 
-- **SC-001**: Problem metadata can be updated via `PUT /problems/{slug}` with HTTP 200.
+- **SC-001**: Problem metadata can be updated via `PUT /problems/p/{slug}` with HTTP 200.
 - **SC-002**: Only provided fields are modified during update (partial updates work).
 - **SC-003**: Updates are blocked for problems with status `PUBLISHED` (HTTP 400).
-- **SC-004**: Files can be uploaded via `POST /problems/{slug}/files` with HTTP 200.
-- **SC-005**: Files can be deleted via `DELETE /problems/{slug}/files/{fileType}` with HTTP 200.
+- **SC-004**: Files can be uploaded via `POST /problems/p/{slug}/files` with HTTP 200.
+- **SC-005**: Files can be deleted via `DELETE /problems/p/{slug}/files/{fileType}` with HTTP 200.
 - **SC-006**: Test cases ZIP structure is validated against ICPC format on upload.
 - **SC-007**: Only problem author, Admin, or assigned modifiers can modify problems.
 - **SC-008**: Modifiers can be added/removed only by the author or Admin.

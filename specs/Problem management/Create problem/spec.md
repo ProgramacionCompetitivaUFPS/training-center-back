@@ -56,23 +56,38 @@ As a Coach or Admin, I want to create a new problem by providing a slug and titl
    - **When** they submit the problem creation request
    - **Then** the system rejects with 400 Bad Request indicating invalid tags
 
-8. **Scenario**: Slug already exists
+8. **Scenario**: Unsupported language in languageOverrides
+    - **Given** a Coach or Admin is authenticated
+    - **When** they submit a problem with a language in `languageOverrides` that is not supported by the platform (not in Virtual Object `supportedLanguages` list)
+    - **Then** the system rejects with 400 Bad Request and field `languageOverrides.language` indicating the unsupported language
+
+9. **Scenario**: Duplicate language in languageOverrides
+    - **Given** a Coach or Admin is authenticated
+    - **When** they submit a problem with the same language appearing more than once in `languageOverrides`
+    - **Then** the system rejects with 400 Bad Request and field `languageOverrides.language` indicating the duplicate language
+
+10. **Scenario**: Statement exceeds maximum length
+    - **Given** a Coach or Admin is authenticated
+    - **When** they submit a problem with a `statement` field exceeding 150,000 characters
+    - **Then** the system rejects with 400 Bad Request and field `statement`
+
+11. **Scenario**: Slug already exists
    - **Given** a problem with slug "sum-two-numbers" already exists
    - **When** a Coach creates a new problem with slug "sum-two-numbers"
    - **Then** the system rejects with 409 Conflict (SLUG_ALREADY_EXISTS)
    - **And** returns a message indicating the slug is already in use
 
-9. **Scenario**: Slug too short
+12. **Scenario**: Slug too short
    - **Given** a Coach or Admin is authenticated
    - **When** they submit a problem with slug "ab" (less than 3 characters)
    - **Then** the system rejects with 400 Bad Request (SLUG_TOO_SHORT)
 
-10. **Scenario**: Slug too long
+13. **Scenario**: Slug too long
     - **Given** a Coach or Admin is authenticated
     - **When** they submit a problem with slug exceeding 70 characters
     - **Then** the system rejects with 400 Bad Request (SLUG_TOO_LONG)
 
-11. **Scenario**: Slug with invalid format
+14. **Scenario**: Slug with invalid format
     - **Given** a Coach or Admin is authenticated
     - **When** they submit a problem with slug containing invalid characters (uppercase, spaces, special chars)
     - **Then** the system rejects with 400 Bad Request (INVALID_SLUG_FORMAT)
@@ -92,9 +107,9 @@ As a Coach or Admin, I want to create a new problem by uploading a complete ICPC
 1. **Scenario**: Successful import from valid ZIP
    - **Given** a Coach or Admin is authenticated
    - **And** has a valid ICPC-format ZIP with all required files
-   - **When** they upload the ZIP to import
+   - **When** they upload the ZIP to import and provide a valid unique 'slug'
    - **Then** the system extracts all data (title from problem.yaml, statement, test cases, etc.)
-   - **And** creates the problem with status `DRAFT` and accessibility `PRIVATE`
+   - **And** creates the problem with status `DRAFT` and accessibility `PRIVATE` under the provided slug
    - **And** returns the created problem data
 
 2. **Scenario**: Import ZIP with missing required files
@@ -121,6 +136,11 @@ As a Coach or Admin, I want to create a new problem by uploading a complete ICPC
    - **When** they attempt to upload
    - **Then** the system rejects with 400 Bad Request (FILE_TOO_LARGE)
 
+6. **Scenario**: Import ZIP with already existing slug
+   - **Given** a Coach or Admin is authenticated
+   - **When** they attempt to upload a ZIP with a 'slug' that already exists in the database
+   - **Then** the system rejects with 409 Conflict (SLUG_ALREADY_EXISTS) before unzipping
+   
 ---
 
 ### Edge Cases
@@ -142,7 +162,7 @@ As a Coach or Admin, I want to create a new problem by uploading a complete ICPC
 
 Create a new problem with metadata.
 
-> **Important**: Only users with Coach or Admin roles can create problems. The minimum required field is `title`. All other fields can be added later via the Update Problem spec (`PUT /problems/{slug}`).
+> **Important**: Only users with Coach or Admin roles can create problems. The minimum required field is `title`. All other fields can be added later via the Update Problem spec (`PUT /problems/p/{slug}`).
 
 **Headers**:
 
@@ -352,6 +372,7 @@ Create a new problem by importing an ICPC-format ZIP package.
 
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
+| slug | string | Yes | Unique problem identifier (3-70 chars, lowercase alphanumeric with hyphens only). Overrides any slug found in `problem.yaml` |
 | file | file | Yes | The ICPC-format ZIP file to import |
 
 **Expected ZIP Structure (ICPC Format)**:
@@ -369,18 +390,17 @@ problem-package.zip/
 │       ├── 01.in
 │       ├── 01.ans
 │       └── ...
-├── submissions/              # Optional solutions
-│   └── accepted/
-│       └── solution.cpp
-├── output_validators/        # Optional custom checker
-│   └── validator.cpp
-└── input_validators/         # Optional input validator
-    └── validator.cpp
+├── solutions/              # Optional solutions
+│   └── solution_1.cpp
+│   └── solution_2.py
+├── checker.cpp               # Optional custom checker
+└── validator.cpp             # Optional input validator
 ```
 
 **problem.yaml Example**:
 ```yaml
 name: Sum of Two Numbers
+slug: sum-two-numbers
 time_limit: 2.0
 memory_limit: 256
 author: coach_john
@@ -409,7 +429,7 @@ Problem imported successfully.
   "modifiers": [],
   "files": {
     "testCases": true,
-    "solutions": ["solution.cpp"],
+    "solutions": [{"filename": "solution.cpp", "language": "cpp20"}],
     "checker": false,
     "validator": true
   },
@@ -427,7 +447,20 @@ Problem imported successfully.
 ```
 
 #### 400 Bad Request
-Invalid ZIP file or missing required files.
+Validation errors (missing fields, invalid slug format) or invalid ZIP file.
+
+```json
+{
+  "error": "VALIDATION_ERROR",
+  "message": "Invalid request data",
+  "details": [
+    {
+      "field": "slug",
+      "message": "Slug is required"
+    }
+  ]
+}
+```
 
 ```json
 {
@@ -488,19 +521,21 @@ User does not have permission.
 - **FR-009**: The system MUST validate timeLimit as positive integer ≤ `maxTimeLimitGlobal` from Virtual Object if provided.
 - **FR-010**: The system MUST validate memoryLimit as positive integer ≤ `maxMemoryLimitGlobal` from Virtual Object if provided.
 - **FR-010.1**: The system MUST validate languageOverrides array if provided.
-- **FR-010.2**: The system MUST validate that each entry's `language` field is a valid language identifier supported by the platform.
+- **FR-010.2**: The system MUST validate that each entry's `language` field is a valid language identifier supported by the platform (present in Virtual Object `supportedLanguages`). If not supported, reject with VALIDATION_ERROR.
 - **FR-010.3**: The system MUST validate that each override's timeLimit (if provided) does not exceed the maximum from Virtual Object for that language.
 - **FR-010.4**: The system MUST validate that each override's memoryLimit (if provided) does not exceed the maximum from Virtual Object for that language.
 - **FR-010.5**: The system MUST validate that timeLimit and memoryLimit in languageOverrides are positive integers when provided.
+- **FR-010.6**: The system MUST reject with VALIDATION_ERROR if the same language appears more than once in `languageOverrides`.
 - **FR-011**: The system MUST validate tags against the system's predefined tag list if provided.
 - **FR-012**: Tags MUST always be optional (not required for creation or publication).
+- **FR-025**: The system MUST validate that `statement` does not exceed 150,000 characters when provided.
 
 **Problem Import (ZIP)**
 - **FR-013**: The system MUST accept ICPC-format ZIP packages for problem import.
 - **FR-014**: The system MUST extract problem metadata from `problem.yaml`.
 - **FR-015**: The system MUST extract the problem statement from LaTeX files in `problem_statement/`.
 - **FR-016**: The system MUST import test cases from the `data/` directory structure.
-- **FR-017**: The system MUST import solutions from `submissions/accepted/` if present.
+- **FR-017**: The system MUST import solutions from `solutions/` if present.
 - **FR-018**: The system MUST import validators from appropriate directories if present.
 - **FR-019**: The system MUST return detailed logs of what was imported or what failed.
 - **FR-020**: The system MUST enforce a maximum ZIP size of 200 MB.
@@ -513,62 +548,15 @@ User does not have permission.
 
 ### Key Entities
 
-- **Problem**: Represents a programming problem.  
-  Key attributes:
-  - `slug` (string, unique, user-provided, lowercase alphanumeric with hyphens, 3-70 chars)
-  - `title` (string, required, normalized NFKC)
-  - `statement` (string, LaTeX format, nullable)
-  - `timeLimit` (integer, milliseconds, nullable, default for all languages, max from Virtual Object)
-  - `memoryLimit` (integer, MiB, nullable, default for all languages, max from Virtual Object)
-  - `languageOverrides` (array, nullable, language-specific limit overrides)
-  - `tags` (array of strings, always optional, from predefined list)
-  - `status` (enum: `DRAFT` | `PUBLISHED`, default: `DRAFT`)
-  - `accessibility` (enum: `PUBLIC` | `PRIVATE`, default: `PRIVATE`)
-  - `authorId` (string, UUID, FK to User)
-  - `modifierIds` (array of UUIDs, FK to User, empty on creation)
-  - `testCasesFileKey` (string, nullable, reference to test cases ZIP)
-  - `solutionFileKeys` (array of strings, references to solution files)
-  - `checkerFileKey` (string, nullable, reference to checker file)
-  - `validatorFileKey` (string, nullable, reference to validator file)
-  - `problemJudgingUpdatedAt` (timestamp, nullable, updated when judging components are uploaded)
-  - `createdAt` (timestamp)
-  - `updatedAt` (timestamp)
+📝 **Please Refer to `README.md`**
 
-> **problemJudgingUpdatedAt**: This timestamp is automatically updated whenever any judging component is uploaded (test cases, checker, or validator). Used by the Rejudge system to determine which submissions need rejudging. See Rejudge Submissions spec for details.
-
-> **Problem Status** (publication state):
-> - `DRAFT`: Problem is being built. Can have partial data. Can be modified. Not available for contests/practice.
-> - `PUBLISHED`: Problem is complete and published. Cannot be modified (must unpublish first). Available for contests/practice.
-
-> **Problem Accessibility** (who can add it to contests):
-> - `PRIVATE`: Only the problem's modifiers (author + assigned modifiers) can add this problem to a contest. Default for all new problems.
-> - `PUBLIC`: Any contest creator can add this problem to their contest.
+For the canonical documentation of the `Problem` entity and its properties, please refer to the `README.md` at the root of the Problem management directory.
 
 ### Slug Validation Rules
 
-The slug is provided by the user and must follow these rules:
+📝 **Please Refer to `README.md`**
 
-| Rule | Description |
-|------|-------------|
-| Length | 3-70 characters |
-| Characters | Only lowercase letters (a-z), numbers (0-9), and hyphens (-) |
-| Format | Cannot start or end with hyphen |
-| Format | Cannot contain consecutive hyphens (--) |
-| Uniqueness | Must be unique across all problems |
-
-**Valid examples**:
-- `sum-two-numbers` ✅
-- `prob-001` ✅
-- `dp-knapsack` ✅
-- `a1b` ✅
-
-**Invalid examples**:
-- `ab` ❌ (too short, < 3 chars)
-- `Sum-Two-Numbers` ❌ (uppercase not allowed)
-- `-sum-two-` ❌ (cannot start/end with hyphen)
-- `sum--two` ❌ (consecutive hyphens not allowed)
-- `sum two` ❌ (spaces not allowed)
-- `probléma` ❌ (special characters not allowed)
+For the canonical rules governing slug validation, length, and format, please refer to the `README.md` at the root of the Problem management directory.
 
 ### Tags
 

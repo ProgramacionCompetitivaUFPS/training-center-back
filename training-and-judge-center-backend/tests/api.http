@@ -1,0 +1,30 @@
+# API Tests for Update Problem & Upload Files
+
+### 1. Update Problem Metadata (PUT /problems/:slug)
+PUT http://localhost:8080/problems/my-cool-problem
+Content-Type: application/json
+Authorization: Bearer mock-author-token
+
+{
+  "title": "My Super Cool Problem Updated",
+  "timeLimit": 5000,
+  "memoryLimit": 1024,
+  "tags": ["dp", "math"]
+}
+
+### 2. Add Modifier
+POST http://localhost:8080/problems/my-cool-problem/modifiers
+Content-Type: application/json
+Authorization: Bearer mock-author-token
+
+{
+  "userId": "modifier_user_123"
+}
+
+### 3. List Modifiers
+GET http://localhost:8080/problems/my-cool-problem/modifiers
+
+### 4. Remove Modifier
+DELETE http://localhost:8080/problems/my-cool-problem/modifiers/modifier_user_123
+Authorization: Bearer mock-author-token
+

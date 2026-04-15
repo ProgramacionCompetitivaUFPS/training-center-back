@@ -275,4 +275,3 @@ Target user not found.
 - **SC-007**: Validation and authorization errors include clear messages and a consistent structure.
 - **SC-008**: The `createdAt` value remains unchanged after admin updates.
 - **SC-009**: The `updatedAt` value is updated on every successful modification.
-

@@ -1,18 +1,40 @@
 package apperror
 
-import "net/http"
+import (
+	"errors"
+	"net/http"
+)
+
+func AccumulateFieldErrors(err error, fieldErrs *[]FieldError) error {
+	if err == nil {
+		return nil
+	}
+	var appErr *AppError
+	if errors.As(err, &appErr) {
+		*fieldErrs = append(*fieldErrs, appErr.Details...)
+		return nil
+	}
+	return NewInternal()
+}
 
 const (
-	ErrCodeNotFound             = "NOT_FOUND"
-	ErrCodeCannotSelfDeactivate = "CANNOT_SELF_DEACTIVATE"
+	ErrCodeCannotSelfDeactivate  = "CANNOT_SELF_DEACTIVATE"
 	ErrCodeCannotDeactivateAdmin = "CANNOT_DEACTIVATE_ADMIN"
 )
 
 func NewValidation(details []FieldError) *AppError {
 	return &AppError{
-		Code:       "VALIDATION_ERROR",
+		Code:       ErrCodeValidationError,
 		Message:    "Invalid request data",
 		Details:    details,
+		StatusCode: http.StatusBadRequest,
+	}
+}
+
+func NewBadRequest(code, message string) *AppError {
+	return &AppError{
+		Code:       code,
+		Message:    message,
 		StatusCode: http.StatusBadRequest,
 	}
 }
@@ -22,14 +44,6 @@ func NewConflict(code, message string) *AppError {
 		Code:       code,
 		Message:    message,
 		StatusCode: http.StatusConflict,
-	}
-}
-
-func NewBadRequest(code, message string) *AppError {
-	return &AppError{
-		Code:       code,
-		Message:    message,
-		StatusCode: http.StatusBadRequest,
 	}
 }
 
@@ -59,7 +73,7 @@ func NewForbidden(code, message string) *AppError {
 
 func NewInternal() *AppError {
 	return &AppError{
-		Code:       "INTERNAL_ERROR",
+		Code:       ErrCodeInternalError,
 		Message:    "An unexpected error occurred",
 		StatusCode: http.StatusInternalServerError,
 	}

@@ -8,29 +8,40 @@ import (
 	"os"
 	"time"
 
+	googleStorage "cloud.google.com/go/storage"
+	"github.com/redis/go-redis/v9"
+
+	appProblem "github.com/training-judge-center/backend/internal/application/problem"
 	appuser "github.com/training-judge-center/backend/internal/application/user"
 	"github.com/training-judge-center/backend/internal/config"
 	"github.com/training-judge-center/backend/internal/platform/email"
 	jwtplatform "github.com/training-judge-center/backend/internal/platform/jwt"
-	"github.com/training-judge-center/backend/internal/platform/postgres"
+	platformConfig "github.com/training-judge-center/backend/internal/platform/config"
+	platformPostgres "github.com/training-judge-center/backend/internal/platform/postgres"
 	"github.com/training-judge-center/backend/internal/platform/ratelimit"
 	redisplatform "github.com/training-judge-center/backend/internal/platform/redis"
+	infraProblem "github.com/training-judge-center/backend/internal/infrastructure/problem"
 	"github.com/training-judge-center/backend/internal/server"
-	"github.com/redis/go-redis/v9"
 	"github.com/training-judge-center/backend/internal/server/handler"
+	"github.com/training-judge-center/backend/internal/server/handler/problem"
 )
 
 func main() {
 	cfg := config.Load()
+
+	if cfg.VirtualObject == nil {
+		slog.Error("virtual object config cannot be nil")
+		os.Exit(1)
+	}
+
 	ctx := context.Background()
 
-	dbPool, err := postgres.NewConnectionPool(ctx, cfg)
+	dbPool, err := platformPostgres.NewConnectionPool(ctx, cfg)
 	if err != nil {
 		slog.Error("failed to connect to database", "error", err)
 		os.Exit(1)
 	}
 	defer dbPool.Close()
-
 	slog.Info("database connected successfully")
 
 	// Redis client
@@ -39,29 +50,103 @@ func main() {
 		slog.Error("invalid redis URL", "error", err)
 		os.Exit(1)
 	}
-	
+
 	redisClient := redis.NewClient(redisOpt)
 	if err := redisClient.Ping(ctx).Err(); err != nil {
 		slog.Error("failed to connect to redis", "error", err)
 		os.Exit(1)
 	}
-	defer redisClient.Close() // Ahora se cerrará cuando el servidor (main) se detenga
-	
+	defer redisClient.Close()
 	slog.Info("redis connected successfully")
 
-	// Platform adapters
-	userRepo := postgres.NewUserRepository(dbPool)
-	passwordRecoveryRepo := postgres.NewPasswordRecoveryRepository(dbPool)
-	emailChangeRepo := postgres.NewEmailChangeRepository(dbPool)
-	deactRepo := postgres.NewDeactivationRequestRepository(dbPool)
-	auditRepo := postgres.NewDeactivationAuditLogRepository(dbPool)
-	txManager := postgres.NewPostgresTransactionManager(dbPool)
+	// Problem repositories & settings
+	problemRepo := infraProblem.NewProblemRepository(dbPool)
+	settingsProvider := platformConfig.NewPlatformSettings(cfg.VirtualObject)
+
+	// File Storage
+	var fileStorage appProblem.ProblemFileRepository
+	switch cfg.StorageBackend {
+	case "gcs":
+		if cfg.GCSBucket == "" {
+			slog.Error("GCS_BUCKET env var is required when STORAGE_BACKEND=gcs")
+			os.Exit(1)
+		}
+		gcsClient, err := googleStorage.NewClient(ctx)
+		if err != nil {
+			slog.Error("failed to create GCS client", "error", err)
+			os.Exit(1)
+		}
+		slog.Info("using GCS storage backend", "bucket", cfg.GCSBucket)
+		fileStorage = infraProblem.NewGCSProblemFileRepository(gcsClient, cfg.GCSBucket)
+	default:
+		localDir := cfg.StorageLocalDir
+		localRepo, err := infraProblem.NewLocalStorageRepository(localDir)
+		if err != nil {
+			slog.Error("failed to create local file storage", "error", err)
+			os.Exit(1)
+		}
+		slog.Info("using local storage backend", "dir", localDir)
+		fileStorage = localRepo
+	}
+
+	icpcParser := infraProblem.NewICPCParser(
+		settingsProvider.GetMaxFileSizeTestCaseMB(),
+		settingsProvider.GetMaxFileSizeDefaultMB(),
+		settingsProvider.GetMaxFileCountTestCase(),
+		settingsProvider.GetMaxFileCountSample(),
+		cfg.VirtualObject.LanguageExtensions,
+	)
+	zipParserAdapter := infraProblem.NewICPCParserAdapter(icpcParser)
+	packageParserAdapter := infraProblem.NewICPCPackageParserAdapter(icpcParser)
+
+	userProvider := infraProblem.NewProblemUserProvider(dbPool)
+
+	// Problem use cases
+	createProblemUseCase := appProblem.NewCreateProblemUseCase(problemRepo, settingsProvider)
+	importProblemUseCase := appProblem.NewImportProblemUseCase(problemRepo, fileStorage, packageParserAdapter, settingsProvider)
+	updateProblemUseCase := appProblem.NewUpdateProblemUseCase(problemRepo, settingsProvider)
+	uploadProblemFilesUseCase := appProblem.NewUploadProblemFilesUseCase(problemRepo, fileStorage, zipParserAdapter, settingsProvider)
+	deleteProblemFileUseCase := appProblem.NewDeleteProblemFileUseCase(problemRepo, fileStorage)
+	addModifierUseCase := appProblem.NewAddModifierUseCase(problemRepo, userProvider)
+	removeModifierUseCase := appProblem.NewRemoveModifierUseCase(problemRepo)
+	listModifiersUseCase := appProblem.NewListModifiersUseCase(problemRepo)
+	getProblemUseCase := appProblem.NewGetProblemUseCase(problemRepo, userProvider)
+	listProblemsUseCase := appProblem.NewListProblemsUseCase(problemRepo, userProvider)
+	unpublishProblemUseCase := appProblem.NewUnpublishProblemUseCase(problemRepo)
+	changeAccessibilityUseCase := appProblem.NewChangeAccessibilityUseCase(problemRepo)
+	deleteProblemUseCase := appProblem.NewDeleteProblemUseCase(problemRepo, fileStorage)
+
+	problemHandler := problem.NewHandler(
+		createProblemUseCase,
+		importProblemUseCase,
+		updateProblemUseCase,
+		uploadProblemFilesUseCase,
+		deleteProblemFileUseCase,
+		addModifierUseCase,
+		removeModifierUseCase,
+		listModifiersUseCase,
+		getProblemUseCase,
+		listProblemsUseCase,
+		unpublishProblemUseCase,
+		changeAccessibilityUseCase,
+		deleteProblemUseCase,
+		userProvider,
+		settingsProvider,
+	)
+
+	// User platform adapters
+	userRepo := platformPostgres.NewUserRepository(dbPool)
+	passwordRecoveryRepo := platformPostgres.NewPasswordRecoveryRepository(dbPool)
+	emailChangeRepo := platformPostgres.NewEmailChangeRepository(dbPool)
+	deactRepo := platformPostgres.NewDeactivationRequestRepository(dbPool)
+	auditRepo := platformPostgres.NewDeactivationAuditLogRepository(dbPool)
+	txManager := platformPostgres.NewPostgresTransactionManager(dbPool)
 	jwtService := jwtplatform.NewService(cfg.JWTSecret, cfg.JWTExpirationHours)
 	emailSender := email.NewSMTPSender(cfg.SMTPHost, cfg.SMTPPort, cfg.SMTPUser, cfg.SMTPPassword, cfg.SMTPFrom)
 	redisRateLimiter := ratelimit.NewRedisRateLimiter(redisClient)
 	sessionInvalidator := redisplatform.NewSessionInvalidator(redisClient, time.Duration(cfg.JWTExpirationHours)*time.Hour)
 
-	// Use Cases
+	// User use cases
 	createUserUC := appuser.NewCreateUserUseCase(userRepo)
 	loginUC := appuser.NewLoginUseCase(userRepo, jwtService)
 	getUserProfileUC := appuser.NewGetUserProfileUseCase(userRepo)
@@ -81,22 +166,18 @@ func main() {
 	userHandler := handler.NewUserHandler(createUserUC, getUserProfileUC, updateUserUC, updatePasswordUC, adminUpdateUserUC, adminDeactivateUserUC, listUsersUC, requestEmailChangeUC, confirmEmailChangeUC, requestPasswordRecoveryUC, resetPasswordUC, requestDeactUC, confirmDeactUC)
 	authHandler := handler.NewAuthHandler(loginUC)
 
-	router := server.NewRouter(
-		&server.Handlers{
-			User: userHandler,
-			Auth: authHandler,
-		},
-		&server.Services{
-			TokenService:      jwtService,
-			SessionInvalidator: sessionInvalidator,
-		},
-	)
+	router := server.NewRouter(&server.Handlers{
+		Problem: problemHandler,
+		User:    userHandler,
+		Auth:    authHandler,
+	}, &server.Services{
+		TokenService:       jwtService,
+		SessionInvalidator: sessionInvalidator,
+	})
 
 	slog.Info("server starting", "port", cfg.Port)
-
 	if err := http.ListenAndServe(fmt.Sprintf(":%s", cfg.Port), router); err != nil {
 		slog.Error("server failed to start", "error", err)
 		os.Exit(1)
 	}
 }
-

@@ -209,4 +209,3 @@ Admin Deactivate User ✅
 - **Fairness**: Contest results and rankings are preserved
 - **Audit**: Platform can still track activity patterns without exposing PII
 
-
