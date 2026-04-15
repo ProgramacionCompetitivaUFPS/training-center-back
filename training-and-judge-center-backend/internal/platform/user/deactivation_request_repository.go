@@ -143,7 +143,8 @@ func (r *DeactivationRequestRepository) InvalidatePendingByUserID(ctx context.Co
 		SET status = $1, updated_at = $2
 		WHERE user_id = $3 AND status IN ($4, $5)`
 
-	_, err := r.querier.Exec(ctx, query,
+	querier := infraPostgres.GetQuerier(ctx, r.querier)
+	_, err := querier.Exec(ctx, query,
 		string(domainUser.DeactivationStatusExpired), now, userID, string(domainUser.DeactivationStatusPending), string(domainUser.DeactivationStatusBlocked))
 
 	if err != nil {

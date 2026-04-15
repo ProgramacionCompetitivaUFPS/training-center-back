@@ -135,7 +135,8 @@ func (r *PasswordRecoveryRepository) InvalidatePendingByUserID(ctx context.Conte
 		SET status = $1, updated_at = $2
 		WHERE user_id = $3 AND status = $4`
 
-	_, err := r.querier.Exec(ctx, query, string(domainUser.StatusExpired), now, userID, string(domainUser.StatusPending))
+	querier := infraPostgres.GetQuerier(ctx, r.querier)
+	_, err := querier.Exec(ctx, query, string(domainUser.StatusExpired), now, userID, string(domainUser.StatusPending))
 	if err != nil {
 		return fmt.Errorf("failed to invalidate pending password recovery requests: %w", err)
 	}

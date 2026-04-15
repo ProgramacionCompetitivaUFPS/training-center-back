@@ -140,6 +140,8 @@ func main() {
 	emailChangeRepo := platformUser.NewEmailChangeRepository(dbPool)
 	deactRepo := platformUser.NewDeactivationRequestRepository(dbPool)
 	auditRepo := platformUser.NewDeactivationAuditLogRepository(dbPool)
+
+	// Infrastructure and cross-cutting services
 	txManager := infraPostgres.NewPostgresTransactionManager(dbPool)
 	jwtService := platformAuth.NewJWTService(cfg.JWTSecret, cfg.JWTExpirationHours)
 	emailSender := email.NewSMTPSender(cfg.SMTPHost, cfg.SMTPPort, cfg.SMTPUser, cfg.SMTPPassword, cfg.SMTPFrom)

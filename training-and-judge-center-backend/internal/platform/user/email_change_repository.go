@@ -148,7 +148,8 @@ func (r *EmailChangeRepository) InvalidatePendingByUserID(ctx context.Context, u
 		SET status = $1, updated_at = $2
 		WHERE user_id = $3 AND status = $4`
 
-	_, err := r.querier.Exec(ctx, query,
+	querier := infraPostgres.GetQuerier(ctx, r.querier)
+	_, err := querier.Exec(ctx, query,
 		string(domainUser.StatusExpired),
 		time.Now(),
 		userID,
