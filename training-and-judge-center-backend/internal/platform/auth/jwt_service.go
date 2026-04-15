@@ -42,6 +42,14 @@ func (s *JWTService) GenerateToken(u *user.User) (string, error) {
 	return token.SignedString(s.secret)
 }
 
+func unauthorizedToken(msg string, cause error) error {
+	e := apperror.NewUnauthorized(apperror.ErrCodeUnauthorized, msg)
+	if cause != nil {
+		return e.WithCause(cause)
+	}
+	return e
+}
+
 func (s *JWTService) ValidateToken(tokenString string) (*user.TokenClaims, error) {
 	token, err := jwt.ParseWithClaims(tokenString, &jwtCustomClaims{}, func(token *jwt.Token) (any, error) {
 		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
@@ -50,22 +58,22 @@ func (s *JWTService) ValidateToken(tokenString string) (*user.TokenClaims, error
 		return s.secret, nil
 	})
 	if err != nil {
-		return nil, apperror.NewUnauthorized(apperror.ErrCodeUnauthorized, "invalid token").WithCause(err)
+		return nil, unauthorizedToken("invalid token", err)
 	}
 
 	claims, ok := token.Claims.(*jwtCustomClaims)
 	if !ok || !token.Valid {
-		return nil, apperror.NewUnauthorized(apperror.ErrCodeUnauthorized, "invalid token")
+		return nil, unauthorizedToken("invalid token", nil)
 	}
 
 	parsedEmail, err := user.NewEmail(claims.Email)
 	if err != nil {
-		return nil, apperror.NewUnauthorized(apperror.ErrCodeUnauthorized, "invalid token").WithCause(err)
+		return nil, unauthorizedToken("invalid token: bad email claim", err)
 	}
 
 	parsedRole, err := user.NewRole(claims.Role)
 	if err != nil {
-		return nil, apperror.NewUnauthorized(apperror.ErrCodeUnauthorized, "invalid token").WithCause(err)
+		return nil, unauthorizedToken("invalid token: bad role claim", err)
 	}
 
 	return &user.TokenClaims{

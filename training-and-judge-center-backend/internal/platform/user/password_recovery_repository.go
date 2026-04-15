@@ -67,7 +67,10 @@ func (r *PasswordRecoveryRepository) FindByID(ctx context.Context, id string) (*
 		return nil, fmt.Errorf("failed to find password recovery request: %w", err)
 	}
 
-	status := domainUser.RestoreRequestStatus(statusStr)
+	status, err := domainUser.NewRequestStatus(statusStr)
+	if err != nil {
+		return nil, fmt.Errorf("invalid status in password recovery request: %w", err)
+	}
 	req := domainUser.RestorePasswordRecoveryRequest(returnedID, userID, code, status, expiresAt, createdAt, updatedAt)
 	return req, nil
 }

@@ -70,7 +70,10 @@ func (r *EmailChangeRepository) FindByID(ctx context.Context, id string) (*domai
 	}
 
 	parsedEmail := domainUser.RestoreEmail(emailStr)
-	status := domainUser.RestoreRequestStatus(statusStr)
+	status, err := domainUser.NewRequestStatus(statusStr)
+	if err != nil {
+		return nil, fmt.Errorf("invalid status in email change request %s: %w", returnedID, err)
+	}
 	req := domainUser.RestoreEmailChangeRequest(returnedID, userID, parsedEmail, code, status, expiresAt, createdAt, updatedAt)
 
 	return req, nil
@@ -124,7 +127,10 @@ func (r *EmailChangeRepository) FindByCodeAndUserID(ctx context.Context, code st
 	}
 
 	parsedEmail := domainUser.RestoreEmail(emailStr)
-	status := domainUser.RestoreRequestStatus(statusStr)
+	status, err := domainUser.NewRequestStatus(statusStr)
+	if err != nil {
+		return nil, fmt.Errorf("invalid status in email change request %s: %w", id, err)
+	}
 	req := domainUser.RestoreEmailChangeRequest(id, returnedUserID, parsedEmail, codeStr, status, expiresAt, createdAt, updatedAt)
 
 	return req, nil
