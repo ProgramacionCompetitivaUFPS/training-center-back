@@ -18,7 +18,11 @@ bash tests/test_e2e.sh                  # requires running server
 
 ## Architecture
 
-Go backend (DDD + Hexagonal). Layers: `domain` → `application` → `infrastructure/server`.
+Go backend (DDD + Hexagonal). Layers: `domain` → `application` → `platform` / `infrastructure` → `server`.
+
+- **`infrastructure/`** — pure technology, zero domain imports. Wraps external libraries (postgres connection, querier, transactions).
+- **`platform/`** — domain-aware adapters, organized by domain (`problem/`, `user/`, `auth/`) or cross-cutting concern (`email/`, `ratelimit/`, `config/`). Implements ports defined in `domain/` and `application/`.
+- **Rule:** if a file imports from `domain/` or `application/`, it goes in `platform/`. If not, it goes in `infrastructure/`.
 
 **Key conventions:**
 - Use cases: `Execute(ctx, input) (output, error)`
@@ -33,6 +37,6 @@ Go backend (DDD + Hexagonal). Layers: `domain` → `application` → `infrastruc
 
 **HTTP responses:** `getProblemResponse` is the single problem response type. Use `buildResponse(p, display)` in `types.go` for mutation endpoints (Create/Update/Import/UploadFiles). If an endpoint needs a different shape, build it directly in the handler — don't add parameters to `buildResponse`.
 
-**Cross-domain primitives:** `UserID` and `CurrentUser` live in `domain/shared/`. Each domain defines its own local types for display/enrichment (e.g., `application/problem/ports.go` defines `UserDisplay` locally). Infrastructure adapters per domain implement the local port (e.g., `infrastructure/problem/user_provider.go` queries the `users` table). Don't import `domain/user` from other domains.
+**Cross-domain primitives:** `UserID` and `CurrentUser` live in `domain/shared/`. Each domain defines its own local types for display/enrichment (e.g., `application/problem/ports.go` defines `UserDisplay` locally). Platform adapters per domain implement the local port (e.g., `platform/problem/user_provider.go` queries the `users` table). Don't import `domain/user` from other domains.
 
 **`domain/user/user.go`** is a stub — not the real User domain yet. Ignore it.
