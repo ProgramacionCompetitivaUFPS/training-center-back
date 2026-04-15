@@ -6,6 +6,7 @@ import (
 
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/training-judge-center/backend/internal/domain/user"
+	"github.com/training-judge-center/backend/pkg/apperror"
 )
 
 type jwtCustomClaims struct {
@@ -49,22 +50,22 @@ func (s *JWTService) ValidateToken(tokenString string) (*user.TokenClaims, error
 		return s.secret, nil
 	})
 	if err != nil {
-		return nil, fmt.Errorf("invalid token: %w", err)
+		return nil, apperror.NewUnauthorized(apperror.ErrCodeUnauthorized, "invalid token").WithCause(err)
 	}
 
 	claims, ok := token.Claims.(*jwtCustomClaims)
 	if !ok || !token.Valid {
-		return nil, fmt.Errorf("invalid token claims")
+		return nil, apperror.NewUnauthorized(apperror.ErrCodeUnauthorized, "invalid token")
 	}
 
 	parsedEmail, err := user.NewEmail(claims.Email)
 	if err != nil {
-		return nil, fmt.Errorf("invalid email in token: %w", err)
+		return nil, apperror.NewUnauthorized(apperror.ErrCodeUnauthorized, "invalid token").WithCause(err)
 	}
 
 	parsedRole, err := user.NewRole(claims.Role)
 	if err != nil {
-		return nil, fmt.Errorf("invalid role in token: %w", err)
+		return nil, apperror.NewUnauthorized(apperror.ErrCodeUnauthorized, "invalid token").WithCause(err)
 	}
 
 	return &user.TokenClaims{
