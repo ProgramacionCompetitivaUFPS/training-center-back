@@ -69,14 +69,8 @@ func (r *EmailChangeRepository) FindByID(ctx context.Context, id string) (*domai
 		return nil, fmt.Errorf("failed to find email change request: %w", err)
 	}
 
-	parsedEmail, err := domainUser.NewEmail(emailStr)
-	if err != nil {
-		return nil, fmt.Errorf("invalid email stored in db for request %s: %w", returnedID, err)
-	}
-	status, err := domainUser.NewRequestStatus(statusStr)
-	if err != nil {
-		return nil, fmt.Errorf("invalid status in email change request %s: %w", returnedID, err)
-	}
+	parsedEmail := domainUser.RestoreEmail(emailStr)
+	status := domainUser.RestoreRequestStatus(statusStr)
 	req := domainUser.RestoreEmailChangeRequest(returnedID, userID, parsedEmail, code, status, expiresAt, createdAt, updatedAt)
 
 	return req, nil
@@ -129,14 +123,8 @@ func (r *EmailChangeRepository) FindByCodeAndUserID(ctx context.Context, code st
 		return nil, fmt.Errorf("failed to find email change request by code: %w", err)
 	}
 
-	parsedEmail, err := domainUser.NewEmail(emailStr)
-	if err != nil {
-		return nil, fmt.Errorf("invalid email stored in db for request %s: %w", id, err)
-	}
-	status, err := domainUser.NewRequestStatus(statusStr)
-	if err != nil {
-		return nil, fmt.Errorf("invalid status in email change request %s: %w", id, err)
-	}
+	parsedEmail := domainUser.RestoreEmail(emailStr)
+	status := domainUser.RestoreRequestStatus(statusStr)
 	req := domainUser.RestoreEmailChangeRequest(id, returnedUserID, parsedEmail, codeStr, status, expiresAt, createdAt, updatedAt)
 
 	return req, nil
