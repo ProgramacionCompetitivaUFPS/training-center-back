@@ -17,3 +17,4 @@ func NewRequestStatus(s string) (RequestStatus, error) {
 	}
 	return "", fmt.Errorf("invalid request status: %q", s)
 }
+

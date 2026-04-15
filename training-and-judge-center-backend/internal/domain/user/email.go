@@ -24,6 +24,10 @@ func NewEmail(value string) (Email, error) {
 	return Email{value: parsed.Address}, nil
 }
 
+func RestoreEmail(value string) Email {
+	return Email{value: value}
+}
+
 func (e Email) String() string {
 	return e.value
 }
