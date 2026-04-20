@@ -87,6 +87,9 @@ func (g *Group) CanBeDeleted() bool { return !g.isDefault }
 //   - Pass &nilPtr (where nilPtr is a nil *string) to clear the description.
 //   - Pass &ptr (where ptr points to a string) to set a new value.
 func (g *Group) UpdateMetadata(name *GroupName, description **string) {
+	if name == nil && description == nil {
+		return
+	}
 	if name != nil {
 		g.name = *name
 	}

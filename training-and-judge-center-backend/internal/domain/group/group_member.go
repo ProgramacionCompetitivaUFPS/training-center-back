@@ -58,7 +58,7 @@ func (m *GroupMember) IsLead() bool          { return m.role == MemberRoleLead }
 
 func (m *GroupMember) Promote() error {
 	if m.role == MemberRoleLead {
-		return apperror.NewConflict(ErrCodeAlreadyMember, "member is already a lead")
+		return apperror.NewConflict(ErrCodeRoleUnchanged, "member is already a lead")
 	}
 	m.role = MemberRoleLead
 	return nil
@@ -66,7 +66,7 @@ func (m *GroupMember) Promote() error {
 
 func (m *GroupMember) Demote() error {
 	if m.role == MemberRoleMember {
-		return apperror.NewConflict(ErrCodeAlreadyMember, "member is already a regular member")
+		return apperror.NewConflict(ErrCodeRoleUnchanged, "member is already a regular member")
 	}
 	m.role = MemberRoleMember
 	return nil

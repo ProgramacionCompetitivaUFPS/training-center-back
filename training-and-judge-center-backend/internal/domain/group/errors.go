@@ -18,4 +18,5 @@ const (
 	ErrCodeInvalidJoinPolicy        = "INVALID_JOIN_POLICY"
 	ErrCodeInvalidVisibility        = "INVALID_VISIBILITY"
 	ErrCodeInvalidMemberRole        = "INVALID_MEMBER_ROLE"
+	ErrCodeRoleUnchanged            = "ROLE_UNCHANGED"
 )

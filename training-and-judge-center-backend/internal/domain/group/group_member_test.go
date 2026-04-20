@@ -103,8 +103,8 @@ func TestGroupMember_Promote_AlreadyLead(t *testing.T) {
 	if !ok {
 		t.Fatalf("expected *apperror.AppError, got %T", err)
 	}
-	if appErr.Code != group.ErrCodeAlreadyMember {
-		t.Errorf("Code = %q, want %q", appErr.Code, group.ErrCodeAlreadyMember)
+	if appErr.Code != group.ErrCodeRoleUnchanged {
+		t.Errorf("Code = %q, want %q", appErr.Code, group.ErrCodeRoleUnchanged)
 	}
 }
 
@@ -128,8 +128,8 @@ func TestGroupMember_Demote_AlreadyMember(t *testing.T) {
 	if !ok {
 		t.Fatalf("expected *apperror.AppError, got %T", err)
 	}
-	if appErr.Code != group.ErrCodeAlreadyMember {
-		t.Errorf("Code = %q, want %q", appErr.Code, group.ErrCodeAlreadyMember)
+	if appErr.Code != group.ErrCodeRoleUnchanged {
+		t.Errorf("Code = %q, want %q", appErr.Code, group.ErrCodeRoleUnchanged)
 	}
 }
 

@@ -15,6 +15,7 @@ CREATE TABLE groups (
 );
 
 CREATE UNIQUE INDEX idx_groups_name ON groups (LOWER(name));
+CREATE UNIQUE INDEX idx_groups_single_default ON groups (is_default) WHERE is_default = TRUE;
 
 CREATE TABLE group_members (
     id          UUID        PRIMARY KEY,
