@@ -15,7 +15,7 @@ func NewJoinPolicy(s string) (JoinPolicy, error) {
 	case JoinPolicyInvite, JoinPolicyRequest, JoinPolicyOpen:
 		return JoinPolicy(s), nil
 	}
-	return "", apperror.NewBadRequest(apperror.ErrCodeBadRequest, "invalid join policy: "+s)
+	return "", apperror.NewBadRequest(ErrCodeInvalidJoinPolicy, "invalid join policy: "+s)
 }
 
 func RestoreJoinPolicy(s string) JoinPolicy { return JoinPolicy(s) }

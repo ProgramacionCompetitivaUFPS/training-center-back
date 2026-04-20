@@ -15,19 +15,27 @@ type GroupMember struct {
 	joinedAt time.Time
 }
 
-func NewGroupMember(id, groupID string, userID shared.UserID, role MemberRole) (*GroupMember, error) {
+// NewGroupMember constructs a validated GroupMember. Pass a non-nil clock for
+// deterministic joinedAt in tests; nil defaults to time.Now.
+func NewGroupMember(id, groupID string, userID shared.UserID, role MemberRole, clock func() time.Time) (*GroupMember, error) {
 	if id == "" {
 		return nil, apperror.NewBadRequest(apperror.ErrCodeBadRequest, "group member id cannot be empty")
 	}
 	if groupID == "" {
 		return nil, apperror.NewBadRequest(apperror.ErrCodeBadRequest, "group id cannot be empty")
 	}
+	if userID.Value() == "" {
+		return nil, apperror.NewBadRequest(apperror.ErrCodeBadRequest, "user id cannot be empty")
+	}
+	if clock == nil {
+		clock = time.Now
+	}
 	return &GroupMember{
 		id:       id,
 		groupID:  groupID,
 		userID:   userID,
 		role:     role,
-		joinedAt: time.Now().UTC(),
+		joinedAt: clock().UTC(),
 	}, nil
 }
 
@@ -48,5 +56,18 @@ func (m *GroupMember) Role() MemberRole      { return m.role }
 func (m *GroupMember) JoinedAt() time.Time   { return m.joinedAt }
 func (m *GroupMember) IsLead() bool          { return m.role == MemberRoleLead }
 
-func (m *GroupMember) Promote() { m.role = MemberRoleLead }
-func (m *GroupMember) Demote()  { m.role = MemberRoleMember }
+func (m *GroupMember) Promote() error {
+	if m.role == MemberRoleLead {
+		return apperror.NewConflict(ErrCodeAlreadyMember, "member is already a lead")
+	}
+	m.role = MemberRoleLead
+	return nil
+}
+
+func (m *GroupMember) Demote() error {
+	if m.role == MemberRoleMember {
+		return apperror.NewConflict(ErrCodeAlreadyMember, "member is already a regular member")
+	}
+	m.role = MemberRoleMember
+	return nil
+}

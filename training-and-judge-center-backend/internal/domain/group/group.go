@@ -22,11 +22,24 @@ type Group struct {
 
 func (g *Group) now() time.Time { return g.clock().UTC() }
 
-func NewGroup(id string, name GroupName, description *string, visibility Visibility, joinPolicy JoinPolicy, createdBy shared.UserID) (*Group, error) {
+func (g *Group) WithClock(fn func() time.Time) *Group {
+	g.clock = fn
+	return g
+}
+
+// NewGroup constructs a validated Group. Pass a non-nil clock for deterministic
+// timestamps in tests; nil defaults to time.Now.
+func NewGroup(id string, name GroupName, description *string, visibility Visibility, joinPolicy JoinPolicy, createdBy shared.UserID, clock func() time.Time) (*Group, error) {
+	if id == "" {
+		return nil, apperror.NewBadRequest(apperror.ErrCodeBadRequest, "group id cannot be empty")
+	}
 	if err := validatePolicyCombination(visibility, joinPolicy); err != nil {
 		return nil, err
 	}
-	now := time.Now().UTC()
+	if clock == nil {
+		clock = time.Now
+	}
+	now := clock().UTC()
 	return &Group{
 		id:          id,
 		name:        name,
@@ -37,7 +50,7 @@ func NewGroup(id string, name GroupName, description *string, visibility Visibil
 		createdBy:   createdBy,
 		createdAt:   now,
 		updatedAt:   now,
-		clock:       time.Now,
+		clock:       clock,
 	}, nil
 }
 
@@ -56,11 +69,6 @@ func RestoreGroup(id string, name GroupName, description *string, visibility Vis
 	}
 }
 
-func (g *Group) WithClock(fn func() time.Time) *Group {
-	g.clock = fn
-	return g
-}
-
 func (g *Group) ID() string               { return g.id }
 func (g *Group) Name() GroupName          { return g.name }
 func (g *Group) Description() *string     { return g.description }
@@ -73,17 +81,25 @@ func (g *Group) UpdatedAt() time.Time     { return g.updatedAt }
 
 func (g *Group) CanBeDeleted() bool { return !g.isDefault }
 
-func (g *Group) UpdateMetadata(name *GroupName, description *string) {
+// UpdateMetadata updates name and/or description.
+//   - Pass nil for name to leave it unchanged.
+//   - Pass nil for description to leave it unchanged.
+//   - Pass &nilPtr (where nilPtr is a nil *string) to clear the description.
+//   - Pass &ptr (where ptr points to a string) to set a new value.
+func (g *Group) UpdateMetadata(name *GroupName, description **string) {
 	if name != nil {
 		g.name = *name
 	}
 	if description != nil {
-		g.description = description
+		g.description = *description
 	}
 	g.updatedAt = g.now()
 }
 
 func (g *Group) UpdatePolicies(visibility *Visibility, joinPolicy *JoinPolicy) error {
+	if visibility == nil && joinPolicy == nil {
+		return nil
+	}
 	newV := g.visibility
 	newJP := g.joinPolicy
 	if visibility != nil {

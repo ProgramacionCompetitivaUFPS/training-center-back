@@ -14,7 +14,7 @@ func NewMemberRole(s string) (MemberRole, error) {
 	case MemberRoleLead, MemberRoleMember:
 		return MemberRole(s), nil
 	}
-	return "", apperror.NewBadRequest(apperror.ErrCodeBadRequest, "invalid member role: "+s)
+	return "", apperror.NewBadRequest(ErrCodeInvalidMemberRole, "invalid member role: "+s)
 }
 
 func RestoreMemberRole(s string) MemberRole { return MemberRole(s) }

@@ -14,7 +14,7 @@ func NewVisibility(s string) (Visibility, error) {
 	case VisibilityVisible, VisibilityNotVisible:
 		return Visibility(s), nil
 	}
-	return "", apperror.NewBadRequest(apperror.ErrCodeBadRequest, "invalid visibility: "+s)
+	return "", apperror.NewBadRequest(ErrCodeInvalidVisibility, "invalid visibility: "+s)
 }
 
 func RestoreVisibility(s string) Visibility { return Visibility(s) }

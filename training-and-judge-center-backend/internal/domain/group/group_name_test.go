@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/training-judge-center/backend/internal/domain/group"
+	"github.com/training-judge-center/backend/pkg/apperror"
 )
 
 func TestNewGroupName_Valid(t *testing.T) {
@@ -32,6 +33,14 @@ func TestNewGroupName_Empty(t *testing.T) {
 		_, err := group.NewGroupName(input)
 		if err == nil {
 			t.Errorf("NewGroupName(%q) expected error, got nil", input)
+			continue
+		}
+		appErr, ok := err.(*apperror.AppError)
+		if !ok {
+			t.Fatalf("NewGroupName(%q): expected *apperror.AppError, got %T", input, err)
+		}
+		if appErr.Code != group.ErrCodeInvalidName {
+			t.Errorf("NewGroupName(%q) Code = %q, want %q", input, appErr.Code, group.ErrCodeInvalidName)
 		}
 	}
 }
@@ -43,7 +52,14 @@ func TestNewGroupName_TooLong(t *testing.T) {
 	}
 	_, err := group.NewGroupName(long)
 	if err == nil {
-		t.Errorf("NewGroupName with %d chars expected error, got nil", group.MaxGroupNameLength+1)
+		t.Fatalf("NewGroupName with %d chars expected error, got nil", group.MaxGroupNameLength+1)
+	}
+	appErr, ok := err.(*apperror.AppError)
+	if !ok {
+		t.Fatalf("expected *apperror.AppError, got %T", err)
+	}
+	if appErr.Code != group.ErrCodeInvalidName {
+		t.Errorf("Code = %q, want %q", appErr.Code, group.ErrCodeInvalidName)
 	}
 }
 
@@ -52,6 +68,14 @@ func TestNewGroupName_ReservedName(t *testing.T) {
 		_, err := group.NewGroupName(reserved)
 		if err == nil {
 			t.Errorf("NewGroupName(%q) expected RESERVED_NAME error, got nil", reserved)
+			continue
+		}
+		appErr, ok := err.(*apperror.AppError)
+		if !ok {
+			t.Fatalf("NewGroupName(%q): expected *apperror.AppError, got %T", reserved, err)
+		}
+		if appErr.Code != group.ErrCodeReservedName {
+			t.Errorf("NewGroupName(%q) Code = %q, want %q", reserved, appErr.Code, group.ErrCodeReservedName)
 		}
 	}
 }
@@ -68,7 +92,6 @@ func TestNewGroupName_MaxLengthValid(t *testing.T) {
 }
 
 func TestNewGroupName_MultibyteValid(t *testing.T) {
-	// 10 CJK characters = 10 runes, 30 bytes — should be valid
 	name := "算法竞赛训练营算法竞"
 	n, err := group.NewGroupName(name)
 	if err != nil {

@@ -1,6 +1,10 @@
 package group
 
-import "context"
+import (
+	"context"
+
+	"github.com/training-judge-center/backend/internal/domain/shared"
+)
 
 type ListFilters struct {
 	Search     string
@@ -27,8 +31,8 @@ type Repository interface {
 type MemberRepository interface {
 	Save(ctx context.Context, m *GroupMember) error
 	SaveAll(ctx context.Context, members []*GroupMember) error
-	FindByGroupAndUser(ctx context.Context, groupID, userID string) (*GroupMember, error)
+	FindByGroupAndUser(ctx context.Context, groupID string, userID shared.UserID) (*GroupMember, error)
 	FindByGroup(ctx context.Context, groupID string, filters MemberFilters) ([]*GroupMember, int, error)
-	Delete(ctx context.Context, groupID, userID string) error
+	Delete(ctx context.Context, groupID string, userID shared.UserID) error
 	CountLeads(ctx context.Context, groupID string) (int, error)
 }

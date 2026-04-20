@@ -1,6 +1,7 @@
 package group
 
 import (
+	"fmt"
 	"strings"
 
 	"github.com/training-judge-center/backend/pkg/apperror"
@@ -18,7 +19,8 @@ func NewGroupName(s string) (GroupName, error) {
 		return GroupName{}, apperror.NewBadRequest(ErrCodeInvalidName, "group name cannot be empty")
 	}
 	if len([]rune(trimmed)) > MaxGroupNameLength {
-		return GroupName{}, apperror.NewBadRequest(ErrCodeInvalidName, "group name cannot exceed 100 characters")
+		return GroupName{}, apperror.NewBadRequest(ErrCodeInvalidName,
+			fmt.Sprintf("group name cannot exceed %d characters", MaxGroupNameLength))
 	}
 	if strings.EqualFold(trimmed, "global") {
 		return GroupName{}, apperror.NewBadRequest(ErrCodeReservedName, "the group name 'global' is reserved")
