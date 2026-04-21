@@ -5,6 +5,7 @@ import (
 	chimw "github.com/go-chi/chi/v5/middleware"
 	"github.com/training-judge-center/backend/internal/domain/user"
 	"github.com/training-judge-center/backend/internal/server/handler"
+	"github.com/training-judge-center/backend/internal/server/handler/group"
 	"github.com/training-judge-center/backend/internal/server/handler/problem"
 	"github.com/training-judge-center/backend/internal/server/middleware"
 )
@@ -13,6 +14,7 @@ type Handlers struct {
 	Problem *problem.Handler
 	User    *handler.UserHandler
 	Auth    *handler.AuthHandler
+	Group   *group.Handler
 }
 
 type Services struct {
@@ -60,6 +62,16 @@ func NewRouter(h *Handlers, s *Services) *chi.Mux {
 		})
 	})
 
+	// Group routes — require authentication
+	r.Group(func(r chi.Router) {
+		r.Use(middleware.Auth(s.TokenService, s.SessionInvalidator))
+
+		r.Route("/groups", func(r chi.Router) {
+			r.Get("/", h.Group.ListGroups)
+			r.Get("/{groupId}", h.Group.GetGroup)
+		})
+	})
+
 	// Public user routes
 	r.Post("/users", h.User.Create)
 	r.Post("/password/forgot", h.User.RequestPasswordRecovery)
@@ -74,6 +86,7 @@ func NewRouter(h *Handlers, s *Services) *chi.Mux {
 		r.Use(middleware.Auth(s.TokenService, s.SessionInvalidator))
 
 		r.Get("/users/me", h.User.GetMyProfile)
+		r.Get("/users/me/groups", h.Group.ListMyGroups)
 		r.Get("/users/{nickname}", h.User.GetByNickname)
 		r.Put("/users", h.User.UpdateProfile)
 		r.Put("/users/password", h.User.UpdatePassword)
