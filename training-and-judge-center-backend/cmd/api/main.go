@@ -11,6 +11,7 @@ import (
 	googleStorage "cloud.google.com/go/storage"
 	"github.com/redis/go-redis/v9"
 
+	appGroup "github.com/training-judge-center/backend/internal/application/group"
 	appProblem "github.com/training-judge-center/backend/internal/application/problem"
 	appuser "github.com/training-judge-center/backend/internal/application/user"
 	"github.com/training-judge-center/backend/internal/config"
@@ -18,11 +19,13 @@ import (
 	platformAuth "github.com/training-judge-center/backend/internal/platform/auth"
 	platformConfig "github.com/training-judge-center/backend/internal/platform/config"
 	"github.com/training-judge-center/backend/internal/platform/email"
+	platformGroup "github.com/training-judge-center/backend/internal/platform/group"
 	platformProblem "github.com/training-judge-center/backend/internal/platform/problem"
 	"github.com/training-judge-center/backend/internal/platform/ratelimit"
 	platformUser "github.com/training-judge-center/backend/internal/platform/user"
 	"github.com/training-judge-center/backend/internal/server"
 	"github.com/training-judge-center/backend/internal/server/handler"
+	"github.com/training-judge-center/backend/internal/server/handler/group"
 	"github.com/training-judge-center/backend/internal/server/handler/problem"
 )
 
@@ -168,10 +171,24 @@ func main() {
 	userHandler := handler.NewUserHandler(createUserUC, getUserProfileUC, updateUserUC, updatePasswordUC, adminUpdateUserUC, adminDeactivateUserUC, listUsersUC, requestEmailChangeUC, confirmEmailChangeUC, requestPasswordRecoveryUC, resetPasswordUC, requestDeactUC, confirmDeactUC)
 	authHandler := handler.NewAuthHandler(loginUC)
 
+	// Group repositories & platform adapters
+	groupRepo := platformGroup.NewGroupRepository(dbPool)
+	groupMemberRepo := platformGroup.NewMemberRepository(dbPool)
+	groupUserProvider := platformGroup.NewUserProvider(dbPool)
+	groupPrefsReader := platformGroup.NewPreferencesReader(dbPool)
+
+	// Group use cases
+	listGroupsUC := appGroup.NewListGroupsUseCase(groupRepo, groupMemberRepo)
+	getGroupUC := appGroup.NewGetGroupUseCase(groupRepo, groupMemberRepo, groupUserProvider)
+	listMyGroupsUC := appGroup.NewListMyGroupsUseCase(groupRepo, groupMemberRepo, groupPrefsReader)
+
+	groupHandler := group.NewHandler(listGroupsUC, getGroupUC, listMyGroupsUC)
+
 	router := server.NewRouter(&server.Handlers{
 		Problem: problemHandler,
 		User:    userHandler,
 		Auth:    authHandler,
+		Group:   groupHandler,
 	}, &server.Services{
 		TokenService:       jwtService,
 		SessionInvalidator: sessionInvalidator,
