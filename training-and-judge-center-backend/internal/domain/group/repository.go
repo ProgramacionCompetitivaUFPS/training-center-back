@@ -6,11 +6,48 @@ import (
 	"github.com/training-judge-center/backend/internal/domain/shared"
 )
 
+// SortField valores aceptados por ListFilters.SortBy.
+type SortField string
+
+const (
+	SortByName        SortField = "name"
+	SortByCreatedAt   SortField = "createdAt"
+	SortByMemberCount SortField = "memberCount"
+	SortByJoinedAt    SortField = "joinedAt"
+)
+
+// SortOrder valores aceptados por ListFilters.Order.
+type SortOrder string
+
+const (
+	OrderAsc  SortOrder = "asc"
+	OrderDesc SortOrder = "desc"
+)
+
 type ListFilters struct {
 	Search     string
 	Visibility *Visibility
+	JoinPolicy *JoinPolicy
+	SortBy     SortField
+	Order      SortOrder
 	Page       int
 	Limit      int
+
+	// ViewerID/ViewerIsAdmin controlan visibilidad de grupos NOT_VISIBLE.
+	// Si ViewerIsAdmin == true, se devuelven todos los grupos.
+	// Si no, se devuelven los VISIBLE + los NOT_VISIBLE donde ViewerID es miembro.
+	ViewerID      shared.UserID
+	ViewerIsAdmin bool
+
+	// OnlyMyGroups restringe el resultado a grupos donde ViewerID es miembro.
+	// Usado por GET /users/me/groups.
+	OnlyMyGroups bool
+
+	// RoleFilter filtra por rol del ViewerID (solo aplica cuando OnlyMyGroups).
+	RoleFilter *MemberRole
+
+	// ExcludeDefault omite el grupo global (usado por /me/groups cuando hideGlobalGroup=true).
+	ExcludeDefault bool
 }
 
 type MemberFilters struct {
@@ -35,4 +72,6 @@ type MemberRepository interface {
 	FindByGroup(ctx context.Context, groupID string, filters MemberFilters) ([]*GroupMember, int, error)
 	Delete(ctx context.Context, groupID string, userID shared.UserID) error
 	CountLeads(ctx context.Context, groupID string) (int, error)
+	CountMembers(ctx context.Context, groupID string) (int, error)
+	ListLeads(ctx context.Context, groupID string) ([]*GroupMember, error)
 }
