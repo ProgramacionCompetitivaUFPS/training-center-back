@@ -10,9 +10,8 @@ func fixedClock(t time.Time) func() time.Time {
 }
 
 func newTestMaterial() *Material {
-	m := NewMaterial("id-1", "group-1", "author-1", RestoreTitle("Test"), NewEmptyContent(), RestoreTags(nil))
-	m.WithClock(fixedClock(time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)))
-	return m
+	fixed := fixedClock(time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC))
+	return NewMaterial("id-1", "group-1", "author-1", RestoreTitle("Test"), NewEmptyContent(), RestoreTags(nil), fixed)
 }
 
 func TestPublish(t *testing.T) {

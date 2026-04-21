@@ -24,11 +24,6 @@ type Material struct {
 
 func (m *Material) now() time.Time { return m.clock().UTC() }
 
-func (m *Material) WithClock(fn func() time.Time) *Material {
-	m.clock = fn
-	return m
-}
-
 func (m *Material) ID() string           { return m.id }
 func (m *Material) Title() Title         { return m.title }
 func (m *Material) Content() Content     { return m.content }
@@ -42,10 +37,13 @@ func (m *Material) CreatedAt() time.Time { return m.createdAt }
 func (m *Material) UpdatedAt() time.Time { return m.updatedAt }
 func (m *Material) PublishedAt() *time.Time { return m.publishedAt }
 
-func NewMaterial(id, groupID, authorID string, title Title, content Content, tags Tags) *Material {
-	now := time.Now().UTC()
+func NewMaterial(id, groupID, authorID string, title Title, content Content, tags Tags, clock func() time.Time) *Material {
+	if clock == nil {
+		clock = time.Now
+	}
+	now := clock().UTC()
 	return &Material{
-		clock:     time.Now,
+		clock:     clock,
 		id:        id,
 		title:     title,
 		content:   content,
