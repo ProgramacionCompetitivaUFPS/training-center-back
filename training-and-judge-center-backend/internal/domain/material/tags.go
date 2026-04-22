@@ -7,7 +7,7 @@ import (
 	"github.com/training-judge-center/backend/pkg/apperror"
 )
 
-var tagRegex = regexp.MustCompile(`^[a-z0-9][a-z0-9_-]*[a-z0-9]$|^[a-z0-9]$`)
+var tagRegex = regexp.MustCompile(`^[a-z0-9][a-z0-9_-]*[a-z0-9]$`)
 
 type Tags struct {
 	values []string
@@ -46,9 +46,14 @@ func NewTags(values []string) (Tags, error) {
 	}
 
 	if len(invalid) > 0 {
-		return Tags{}, apperror.NewBadRequest(ErrCodeInvalidTagFormat,
-			"Tags must contain only lowercase letters, numbers, hyphens, and underscores (2-50 chars, cannot start/end with - or _)",
-		)
+		var fieldErrs []apperror.FieldError
+		for _, t := range invalid {
+			fieldErrs = append(fieldErrs, apperror.FieldError{
+				Field:   "tags",
+				Message: "invalid tag: " + t,
+			})
+		}
+		return Tags{}, apperror.NewValidation(fieldErrs)
 	}
 
 	return Tags{values: deduped}, nil
@@ -58,7 +63,9 @@ func RestoreTags(values []string) Tags {
 	if values == nil {
 		return Tags{values: []string{}}
 	}
-	return Tags{values: values}
+	cp := make([]string, len(values))
+	copy(cp, values)
+	return Tags{values: cp}
 }
 
 func (t Tags) Values() []string {

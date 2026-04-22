@@ -3,6 +3,7 @@ package material
 import (
 	"time"
 
+	"github.com/training-judge-center/backend/internal/domain/shared"
 	"github.com/training-judge-center/backend/pkg/apperror"
 )
 
@@ -15,7 +16,7 @@ type Material struct {
 	pinned      bool
 	pinnedAt    *time.Time
 	groupID     string
-	authorID    string
+	authorID    shared.UserID
 	createdAt   time.Time
 	updatedAt   time.Time
 	publishedAt *time.Time
@@ -24,27 +25,27 @@ type Material struct {
 
 func (m *Material) now() time.Time { return m.clock().UTC() }
 
-func (m *Material) ID() string           { return m.id }
-func (m *Material) Title() Title         { return m.title }
-func (m *Material) Content() Content     { return m.content }
-func (m *Material) Tags() Tags           { return m.tags }
-func (m *Material) Status() Status       { return m.status }
-func (m *Material) Pinned() bool         { return m.pinned }
-func (m *Material) PinnedAt() *time.Time { return m.pinnedAt }
-func (m *Material) GroupID() string      { return m.groupID }
-func (m *Material) AuthorID() string     { return m.authorID }
-func (m *Material) CreatedAt() time.Time { return m.createdAt }
-func (m *Material) UpdatedAt() time.Time { return m.updatedAt }
+func (m *Material) ID() string              { return m.id }
+func (m *Material) Title() Title            { return m.title }
+func (m *Material) Content() Content        { return m.content }
+func (m *Material) Tags() Tags              { return m.tags }
+func (m *Material) Status() Status          { return m.status }
+func (m *Material) Pinned() bool            { return m.pinned }
+func (m *Material) PinnedAt() *time.Time    { return m.pinnedAt }
+func (m *Material) GroupID() string         { return m.groupID }
+func (m *Material) AuthorID() shared.UserID { return m.authorID }
+func (m *Material) CreatedAt() time.Time    { return m.createdAt }
+func (m *Material) UpdatedAt() time.Time    { return m.updatedAt }
 func (m *Material) PublishedAt() *time.Time { return m.publishedAt }
 
-func NewMaterial(id, groupID, authorID string, title Title, content Content, tags Tags, clock func() time.Time) (*Material, error) {
+func NewMaterial(id, groupID string, authorID shared.UserID, title Title, content Content, tags Tags, clock func() time.Time) (*Material, error) {
 	if id == "" {
 		return nil, apperror.NewBadRequest("INVALID_MATERIAL_ID", "material id cannot be empty")
 	}
 	if groupID == "" {
 		return nil, apperror.NewBadRequest("INVALID_GROUP_ID", "group id cannot be empty")
 	}
-	if authorID == "" {
+	if authorID.Value() == "" {
 		return nil, apperror.NewBadRequest("INVALID_AUTHOR_ID", "material author id cannot be empty")
 	}
 	if clock == nil {
@@ -67,7 +68,8 @@ func NewMaterial(id, groupID, authorID string, title Title, content Content, tag
 }
 
 func RestoreMaterial(
-	id, groupID, authorID string,
+	id, groupID string,
+	authorID shared.UserID,
 	title, content string,
 	tags []string,
 	status string,
@@ -93,9 +95,9 @@ func RestoreMaterial(
 	}
 }
 
-func (m *Material) Publish() error {
+func (m *Material) Publish() {
 	if m.status.IsPublished() {
-		return nil
+		return
 	}
 	m.status = NewStatusPublished()
 	if m.publishedAt == nil {
@@ -103,22 +105,22 @@ func (m *Material) Publish() error {
 		m.publishedAt = &now
 	}
 	m.updatedAt = m.now()
-	return nil
 }
 
-func (m *Material) Unpublish() {
+func (m *Material) Unpublish() error {
 	if m.status.IsDraft() {
-		return
+		return apperror.NewConflict(ErrCodeAlreadyDraft, "material is already unpublished")
 	}
 	m.status = NewStatusDraft()
 	m.pinned = false
 	m.pinnedAt = nil
 	m.updatedAt = m.now()
+	return nil
 }
 
 func (m *Material) Pin() error {
 	if m.status.IsDraft() {
-		return apperror.NewBadRequest(ErrCodeCannotPinDraft, "Cannot pin a draft material. Publish it first.")
+		return apperror.NewBadRequest(ErrCodeCannotPinDraft, "cannot pin a draft material, publish it first")
 	}
 	if m.pinned {
 		return nil
@@ -139,7 +141,7 @@ func (m *Material) Unpin() {
 	m.updatedAt = m.now()
 }
 
-func (m *Material) UpdateContent(title *Title, content *Content, tags *Tags) {
+func (m *Material) UpdateMetadata(title *Title, content *Content, tags *Tags) {
 	if title != nil {
 		m.title = *title
 	}
@@ -152,10 +154,10 @@ func (m *Material) UpdateContent(title *Title, content *Content, tags *Tags) {
 	m.updatedAt = m.now()
 }
 
-func (m *Material) CanBeEditedBy(userID string, isAdmin bool) bool {
+func (m *Material) CanBeEditedBy(userID shared.UserID, isAdmin bool) bool {
 	return isAdmin || m.authorID == userID
 }
 
-func (m *Material) CanBePinnedBy(userID string, isAdmin, isGroupLead bool) bool {
+func (m *Material) CanBePinnedBy(userID shared.UserID, isAdmin, isGroupLead bool) bool {
 	return isAdmin || isGroupLead || m.authorID == userID
 }

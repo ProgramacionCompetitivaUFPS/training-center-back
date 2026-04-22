@@ -29,7 +29,7 @@ func TestNewTitle(t *testing.T) {
 	}
 }
 
-func TestTitle_NKFCNormalization(t *testing.T) {
+func TestTitle_NFKCNormalization(t *testing.T) {
 	// ﬁ is a ligature that normalizes to "fi" under NFKC
 	title, err := NewTitle("ﬁle")
 	if err != nil {

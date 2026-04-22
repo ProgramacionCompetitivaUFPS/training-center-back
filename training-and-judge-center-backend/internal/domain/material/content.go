@@ -1,13 +1,17 @@
 package material
 
-import "github.com/training-judge-center/backend/pkg/apperror"
+import (
+	"unicode/utf8"
+
+	"github.com/training-judge-center/backend/pkg/apperror"
+)
 
 type Content struct {
 	value string
 }
 
 func NewContent(value string) (Content, error) {
-	if len([]rune(value)) > 50000 {
+	if utf8.RuneCountInString(value) > 50000 {
 		return Content{}, apperror.NewValidation([]apperror.FieldError{
 			{Field: "content", Message: "Content must not exceed 50000 characters"},
 		})

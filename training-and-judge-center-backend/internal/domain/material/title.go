@@ -3,6 +3,7 @@ package material
 import (
 	"strings"
 	"unicode"
+	"unicode/utf8"
 
 	"github.com/training-judge-center/backend/pkg/apperror"
 	"golang.org/x/text/unicode/norm"
@@ -30,7 +31,7 @@ func NewTitle(value string) (Title, error) {
 		})
 	}
 
-	if len([]rune(trimmed)) > 200 {
+	if utf8.RuneCountInString(trimmed) > 200 {
 		return Title{}, apperror.NewValidation([]apperror.FieldError{
 			{Field: "title", Message: "Title must not exceed 200 characters"},
 		})

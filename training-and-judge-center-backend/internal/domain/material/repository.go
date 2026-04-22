@@ -2,6 +2,16 @@ package material
 
 import "context"
 
+type SortField string
+
+const (
+	SortByPublishedAt SortField = "publishedAt"
+	SortByTitle       SortField = "title"
+	SortByRelevance   SortField = "relevance"
+)
+
+// ListFilters defines the filtering, sorting and pagination options for listing materials.
+// Limit must be between 1 and 100; enforcement is the responsibility of the use case layer.
 type ListFilters struct {
 	GroupID       string
 	ViewerID      *string
@@ -11,7 +21,7 @@ type ListFilters struct {
 	Tags          []string
 	Pinned        *bool
 	SearchQuery   *string
-	SortBy        string
+	SortBy        SortField
 	Page          int
 	Limit         int
 }
