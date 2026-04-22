@@ -11,7 +11,11 @@ func fixedClock(t time.Time) func() time.Time {
 
 func newTestMaterial() *Material {
 	fixed := fixedClock(time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC))
-	return NewMaterial("id-1", "group-1", "author-1", RestoreTitle("Test"), NewEmptyContent(), RestoreTags(nil), fixed)
+	m, err := NewMaterial("id-1", "group-1", "author-1", RestoreTitle("Test"), NewEmptyContent(), RestoreTags(nil), fixed)
+	if err != nil {
+		panic(err)
+	}
+	return m
 }
 
 func TestPublish(t *testing.T) {

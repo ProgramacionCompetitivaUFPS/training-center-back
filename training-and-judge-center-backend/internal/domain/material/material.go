@@ -37,7 +37,16 @@ func (m *Material) CreatedAt() time.Time { return m.createdAt }
 func (m *Material) UpdatedAt() time.Time { return m.updatedAt }
 func (m *Material) PublishedAt() *time.Time { return m.publishedAt }
 
-func NewMaterial(id, groupID, authorID string, title Title, content Content, tags Tags, clock func() time.Time) *Material {
+func NewMaterial(id, groupID, authorID string, title Title, content Content, tags Tags, clock func() time.Time) (*Material, error) {
+	if id == "" {
+		return nil, apperror.NewBadRequest("INVALID_MATERIAL_ID", "material id cannot be empty")
+	}
+	if groupID == "" {
+		return nil, apperror.NewBadRequest("INVALID_GROUP_ID", "group id cannot be empty")
+	}
+	if authorID == "" {
+		return nil, apperror.NewBadRequest("INVALID_AUTHOR_ID", "material author id cannot be empty")
+	}
 	if clock == nil {
 		clock = time.Now
 	}
@@ -54,7 +63,7 @@ func NewMaterial(id, groupID, authorID string, title Title, content Content, tag
 		authorID:  authorID,
 		createdAt: now,
 		updatedAt: now,
-	}
+	}, nil
 }
 
 func RestoreMaterial(
