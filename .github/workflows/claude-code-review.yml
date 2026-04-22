@@ -30,11 +30,13 @@ jobs:
           COMMENTER: ${{ github.event.comment.user.login }}
           TOKEN_CARLOSSALAZAR84: ${{ secrets.CLAUDE_TOKEN_CARLOSSALAZAR84 }}
           TOKEN_ALEXAVJ: ${{ secrets.CLAUDE_TOKEN_ALEXAVJ }}
+          TOKEN_DALUCA21: ${{ secrets.CLAUDE_TOKEN_DALUCA21 }}
           FALLBACK_TOKEN: ${{ secrets.CLAUDE_TOKEN_CARLOSSALAZAR84 }}
         run: |
           case "$COMMENTER" in
             "CarlosSalazar84") echo "token=$TOKEN_CARLOSSALAZAR84" >> $GITHUB_OUTPUT ;;
             "AlexaVJ")         echo "token=$TOKEN_ALEXAVJ"         >> $GITHUB_OUTPUT ;;
+            "Daluca21")        echo "token=$TOKEN_DALUCA21"        >> $GITHUB_OUTPUT ;;
             *)                 echo "token=$FALLBACK_TOKEN"        >> $GITHUB_OUTPUT ;;
           esac
 
