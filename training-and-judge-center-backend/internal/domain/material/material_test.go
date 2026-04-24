@@ -170,7 +170,7 @@ func TestUnpin(t *testing.T) {
 		t.Error("expected pinnedAt=nil after unpin")
 	}
 
-	// idempotent
+	// second unpin must be a no-op
 	m.Unpin()
 	if m.Pinned() {
 		t.Error("expected pinned=false after second unpin")

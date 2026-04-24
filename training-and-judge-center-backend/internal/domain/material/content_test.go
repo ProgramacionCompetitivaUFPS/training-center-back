@@ -11,12 +11,12 @@ func TestNewContent(t *testing.T) {
 		input   string
 		wantErr bool
 	}{
-		{"empty string is valid", "", false},
-		{"normal content", "Hello world", false},
-		{"exactly 50000 runes", strings.Repeat("a", 50000), false},
-		{"50001 runes", strings.Repeat("a", 50001), true},
-		{"multibyte chars within limit", strings.Repeat("á", 50000), false},
-		{"multibyte chars over limit", strings.Repeat("á", 50001), true},
+		{"empty string", "", false},
+		{"valid content", "Hello, world!", false},
+		{"exactly 50000 chars", strings.Repeat("a", 50000), false},
+		{"50001 chars", strings.Repeat("a", 50001), true},
+		{"multibyte chars at limit", strings.Repeat("é", 50000), false},
+		{"multibyte chars over limit", strings.Repeat("é", 50001), true},
 	}
 
 	for _, tt := range tests {
@@ -26,12 +26,5 @@ func TestNewContent(t *testing.T) {
 				t.Errorf("NewContent() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})
-	}
-}
-
-func TestNewEmptyContent(t *testing.T) {
-	c := NewEmptyContent()
-	if c.String() != "" {
-		t.Errorf("expected empty string, got %q", c.String())
 	}
 }

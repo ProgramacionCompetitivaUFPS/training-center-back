@@ -53,7 +53,7 @@ func NewTags(values []string) (Tags, error) {
 				Message: "invalid tag: " + t,
 			})
 		}
-	return Tags{}, apperror.NewValidation(fieldErrs)
+		return Tags{}, apperror.NewValidation(fieldErrs)
 	}
 
 	return Tags{values: deduped}, nil
