@@ -11,7 +11,9 @@ func NewStatus(value string) (Status, error) {
 	case "DRAFT", "PUBLISHED":
 		return Status{value: value}, nil
 	default:
-		return Status{}, apperror.NewBadRequest(apperror.ErrCodeBadRequest, "invalid material status: "+value)
+		return Status{}, apperror.NewValidation([]apperror.FieldError{
+			{Field: "status", Message: "invalid status: must be DRAFT or PUBLISHED"},
+		})
 	}
 }
 

@@ -1,7 +1,6 @@
 package material
 
 import (
-	"strings"
 	"unicode"
 	"unicode/utf8"
 
@@ -14,12 +13,6 @@ type Title struct {
 }
 
 func NewTitle(value string) (Title, error) {
-	if strings.TrimSpace(value) == "" {
-		return Title{}, apperror.NewValidation([]apperror.FieldError{
-			{Field: "title", Message: "Title is required"},
-		})
-	}
-
 	normalized := norm.NFKC.String(value)
 	trimmed := strings.TrimFunc(normalized, func(r rune) bool {
 		return unicode.IsSpace(r) || unicode.Is(unicode.Cf, r)

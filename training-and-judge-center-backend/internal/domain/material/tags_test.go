@@ -1,6 +1,10 @@
 package material
 
-import "testing"
+import (
+	"testing"
+
+	"github.com/training-judge-center/backend/pkg/apperror"
+)
 
 func TestNewTags(t *testing.T) {
 	tests := []struct {
@@ -32,6 +36,17 @@ func TestNewTags(t *testing.T) {
 				t.Errorf("NewTags(%v) error = %v, wantErr %v", tt.input, err, tt.wantErr)
 			}
 		})
+	}
+}
+
+func TestNewTags_InvalidReturnsErrCode(t *testing.T) {
+	_, err := NewTags([]string{"Invalid-Tag"})
+	if err == nil {
+		t.Fatal("expected error for invalid tag")
+	}
+	appErr, ok := err.(*apperror.AppError)
+	if !ok || appErr.Code != ErrCodeInvalidTagFormat {
+		t.Errorf("expected error code %s, got %v", ErrCodeInvalidTagFormat, err)
 	}
 }
 

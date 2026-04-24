@@ -19,6 +19,9 @@ type Material struct {
 	authorID    shared.UserID
 	createdAt   time.Time
 	updatedAt   time.Time
+	// publishedAt is the timestamp of the first time this material was published.
+	// It is never cleared once set, even if the material is unpublished.
+	// A non-nil publishedAt means "has ever been published", not "is currently published".
 	publishedAt *time.Time
 	clock       func() time.Time
 }
@@ -38,7 +41,16 @@ func (m *Material) CreatedAt() time.Time    { return m.createdAt }
 func (m *Material) UpdatedAt() time.Time    { return m.updatedAt }
 func (m *Material) PublishedAt() *time.Time { return m.publishedAt }
 
-func NewMaterial(id, groupID string, authorID shared.UserID, title Title, content Content, tags Tags, clock func() time.Time) (*Material, error) {
+// NewMaterial constructs a validated Material. Pass a non-nil clock for deterministic
+// timestamps in tests; nil defaults to time.Now.
+func NewMaterial(
+	id, groupID string,
+	authorID shared.UserID,
+	title Title,
+	content Content,
+	tags Tags,
+	clock func() time.Time,
+) (*Material, error) {
 	if id == "" {
 		return nil, apperror.NewBadRequest("INVALID_MATERIAL_ID", "material id cannot be empty")
 	}
@@ -65,6 +77,11 @@ func NewMaterial(id, groupID string, authorID shared.UserID, title Title, conten
 		createdAt: now,
 		updatedAt: now,
 	}, nil
+}
+
+func (m *Material) WithClock(fn func() time.Time) *Material {
+	m.clock = fn
+	return m
 }
 
 func RestoreMaterial(
@@ -95,18 +112,21 @@ func RestoreMaterial(
 	}
 }
 
-func (m *Material) Publish() {
+func (m *Material) Publish() error {
 	if m.status.IsPublished() {
-		return
+		return apperror.NewConflict(ErrCodeAlreadyPublished, "material is already published")
 	}
+	now := m.now()
 	m.status = NewStatusPublished()
-	if m.publishedAt == nil {
-		now := m.now()
-		m.publishedAt = &now
-	}
-	m.updatedAt = m.now()
+	m.publishedAt = &now
+	m.updatedAt = now
+	return nil
 }
 
+// Unpublish reverts the material to DRAFT. publishedAt is preserved as a
+// first-publish timestamp — (status=DRAFT, publishedAt!=nil) is a valid state
+// meaning "was published at least once". List queries must filter by status,
+// not by publishedAt, to determine visibility.
 func (m *Material) Unpublish() error {
 	if m.status.IsDraft() {
 		return apperror.NewConflict(ErrCodeAlreadyDraft, "material is already unpublished")

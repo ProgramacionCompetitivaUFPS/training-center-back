@@ -19,6 +19,6 @@ func NewContent(value string) (Content, error) {
 	return Content{value: value}, nil
 }
 
-func NewEmptyContent() Content    { return Content{value: ""} }
+func NewEmptyContent() Content          { return Content{value: ""} }
 func RestoreContent(value string) Content { return Content{value: value} }
-func (c Content) String() string  { return c.value }
+func (c Content) String() string          { return c.value }

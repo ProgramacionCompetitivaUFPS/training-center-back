@@ -1,6 +1,7 @@
 package material
 
 import (
+	"errors"
 	"testing"
 	"time"
 
@@ -24,7 +25,9 @@ func newTestMaterial() *Material {
 func TestPublish(t *testing.T) {
 	m := newTestMaterial()
 
-	m.Publish()
+	if err := m.Publish(); err != nil {
+		t.Fatalf("unexpected error on first publish: %v", err)
+	}
 	if !m.Status().IsPublished() {
 		t.Error("expected PUBLISHED status")
 	}
@@ -35,7 +38,14 @@ func TestPublish(t *testing.T) {
 	firstPublishedAt := *m.PublishedAt()
 
 	// publishedAt must not change on subsequent publishes
-	m.Publish()
+	if err := m.Publish(); err == nil {
+		t.Fatal("expected error when publishing an already published material")
+	} else {
+		var appErr *apperror.AppError
+		if !errors.As(err, &appErr) || appErr.Code != ErrCodeAlreadyPublished {
+			t.Errorf("expected error code %s, got %v", ErrCodeAlreadyPublished, err)
+		}
+	}
 	if *m.PublishedAt() != firstPublishedAt {
 		t.Error("publishedAt should not change on second publish")
 	}
@@ -43,7 +53,9 @@ func TestPublish(t *testing.T) {
 
 func TestUnpublish(t *testing.T) {
 	m := newTestMaterial()
-	m.Publish()
+	if err := m.Publish(); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
 
 	if err := m.Unpublish(); err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -61,14 +73,16 @@ func TestUnpublish_AlreadyDraftReturnsError(t *testing.T) {
 		t.Fatal("expected error when unpublishing a DRAFT material")
 	}
 	var appErr *apperror.AppError
-	if !isAppError(err, &appErr) || appErr.Code != ErrCodeAlreadyDraft {
+	if !errors.As(err, &appErr) || appErr.Code != ErrCodeAlreadyDraft {
 		t.Errorf("expected error code %s, got %v", ErrCodeAlreadyDraft, err)
 	}
 }
 
 func TestUnpublish_AutoUnpin(t *testing.T) {
 	m := newTestMaterial()
-	m.Publish()
+	if err := m.Publish(); err != nil {
+		t.Fatalf("unexpected publish error: %v", err)
+	}
 	if err := m.Pin(); err != nil {
 		t.Fatalf("unexpected pin error: %v", err)
 	}
@@ -86,7 +100,9 @@ func TestUnpublish_AutoUnpin(t *testing.T) {
 
 func TestUnpublish_PreservesPublishedAt(t *testing.T) {
 	m := newTestMaterial()
-	m.Publish()
+	if err := m.Publish(); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
 	publishedAt := *m.PublishedAt()
 
 	if err := m.Unpublish(); err != nil {
@@ -99,7 +115,9 @@ func TestUnpublish_PreservesPublishedAt(t *testing.T) {
 
 func TestPin(t *testing.T) {
 	m := newTestMaterial()
-	m.Publish()
+	if err := m.Publish(); err != nil {
+		t.Fatalf("unexpected publish error: %v", err)
+	}
 
 	if err := m.Pin(); err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -130,14 +148,16 @@ func TestPin_DraftReturnsError(t *testing.T) {
 		t.Fatal("expected error when pinning a DRAFT material")
 	}
 	var appErr *apperror.AppError
-	if !isAppError(err, &appErr) || appErr.Code != ErrCodeCannotPinDraft {
+	if !errors.As(err, &appErr) || appErr.Code != ErrCodeCannotPinDraft {
 		t.Errorf("expected error code %s, got %v", ErrCodeCannotPinDraft, err)
 	}
 }
 
 func TestUnpin(t *testing.T) {
 	m := newTestMaterial()
-	m.Publish()
+	if err := m.Publish(); err != nil {
+		t.Fatalf("unexpected publish error: %v", err)
+	}
 	if err := m.Pin(); err != nil {
 		t.Fatalf("unexpected pin error: %v", err)
 	}
@@ -223,11 +243,3 @@ func TestCanBePinnedBy(t *testing.T) {
 	}
 }
 
-// isAppError is a helper to avoid importing errors package in tests.
-func isAppError(err error, target **apperror.AppError) bool {
-	if appErr, ok := err.(*apperror.AppError); ok {
-		*target = appErr
-		return true
-	}
-	return false
-}
