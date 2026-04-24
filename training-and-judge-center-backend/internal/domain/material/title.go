@@ -1,6 +1,7 @@
 package material
 
 import (
+	"strings"
 	"unicode"
 	"unicode/utf8"
 

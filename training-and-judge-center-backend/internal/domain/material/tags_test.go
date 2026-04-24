@@ -39,14 +39,14 @@ func TestNewTags(t *testing.T) {
 	}
 }
 
-func TestNewTags_InvalidReturnsErrCode(t *testing.T) {
+func TestNewTags_InvalidReturnsValidationError(t *testing.T) {
 	_, err := NewTags([]string{"Invalid-Tag"})
 	if err == nil {
 		t.Fatal("expected error for invalid tag")
 	}
 	appErr, ok := err.(*apperror.AppError)
-	if !ok || appErr.Code != ErrCodeInvalidTagFormat {
-		t.Errorf("expected error code %s, got %v", ErrCodeInvalidTagFormat, err)
+	if !ok || appErr.Code != apperror.ErrCodeValidationError {
+		t.Errorf("expected VALIDATION_ERROR, got %v", err)
 	}
 }
 
