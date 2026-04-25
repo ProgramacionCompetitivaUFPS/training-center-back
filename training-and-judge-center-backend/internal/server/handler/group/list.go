@@ -14,12 +14,13 @@ func (h *Handler) ListGroups(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	page, err := parseIntParam(r.URL.Query().Get("page"), 1)
+	q := r.URL.Query()
+	page, err := parseIntParam(q.Get("page"), 1)
 	if err != nil {
 		writeBadPagination(w, "page", "page must be a positive integer")
 		return
 	}
-	limit, err := parseIntParam(r.URL.Query().Get("limit"), appGroup.DefaultPageLimit)
+	limit, err := parseIntParam(q.Get("limit"), appGroup.DefaultPageLimit)
 	if err != nil {
 		writeBadPagination(w, "limit", "limit must be an integer")
 		return
@@ -27,11 +28,11 @@ func (h *Handler) ListGroups(w http.ResponseWriter, r *http.Request) {
 
 	in := appGroup.ListGroupsInput{
 		CurrentUser: *currentUser,
-		Search:      r.URL.Query().Get("search"),
-		Visibility:  queryStringPtr(r.URL.Query().Get("visibility")),
-		JoinPolicy:  queryStringPtr(r.URL.Query().Get("joinPolicy")),
-		SortBy:      r.URL.Query().Get("sortBy"),
-		Order:       r.URL.Query().Get("order"),
+		Search:      q.Get("search"),
+		Visibility:  queryStringPtr(q.Get("visibility")),
+		JoinPolicy:  queryStringPtr(q.Get("joinPolicy")),
+		SortBy:      q.Get("sortBy"),
+		Order:       q.Get("order"),
 		Page:        page,
 		Limit:       limit,
 	}

@@ -2,8 +2,6 @@ package group
 
 import (
 	"context"
-	"fmt"
-	"math"
 	"strings"
 
 	domainGroup "github.com/training-judge-center/backend/internal/domain/group"
@@ -51,15 +49,8 @@ func NewListGroupsUseCase(repo domainGroup.Repository, memberRepo domainGroup.Me
 }
 
 func (uc *ListGroupsUseCase) Execute(ctx context.Context, in ListGroupsInput) (*ListGroupsOutput, error) {
-	if in.Page < 1 {
-		return nil, apperror.NewValidation([]apperror.FieldError{
-			{Field: "page", Message: "page must be a positive integer"},
-		})
-	}
-	if in.Limit < 1 || in.Limit > MaxPageLimit {
-		return nil, apperror.NewValidation([]apperror.FieldError{
-			{Field: "limit", Message: fmt.Sprintf("limit must be between 1 and %d", MaxPageLimit)},
-		})
+	if err := validatePagination(in.Page, in.Limit); err != nil {
+		return nil, err
 	}
 
 	filters := domainGroup.ListFilters{
@@ -90,7 +81,11 @@ func (uc *ListGroupsUseCase) Execute(ctx context.Context, in ListGroupsInput) (*
 		filters.JoinPolicy = &jp
 	}
 
-	sortBy, err := parseSort(in.SortBy, domainGroup.SortByName, validListSortFields())
+	sortBy, err := parseSort(in.SortBy, domainGroup.SortByName, []domainGroup.SortField{
+		domainGroup.SortByName,
+		domainGroup.SortByCreatedAt,
+		domainGroup.SortByMemberCount,
+	})
 	if err != nil {
 		return nil, err
 	}
@@ -131,57 +126,11 @@ func (uc *ListGroupsUseCase) Execute(ctx context.Context, in ListGroupsInput) (*
 		})
 	}
 
-	totalPages := 0
-	if in.Limit > 0 {
-		totalPages = int(math.Ceil(float64(total) / float64(in.Limit)))
-	}
-
 	return &ListGroupsOutput{
 		Groups:     items,
 		TotalCount: total,
-		TotalPages: totalPages,
+		TotalPages: calcTotalPages(total, in.Limit),
 		Page:       in.Page,
 		Limit:      in.Limit,
 	}, nil
-}
-
-func validListSortFields() []domainGroup.SortField {
-	return []domainGroup.SortField{
-		domainGroup.SortByName,
-		domainGroup.SortByCreatedAt,
-		domainGroup.SortByMemberCount,
-	}
-}
-
-func parseSort(raw string, def domainGroup.SortField, allowed []domainGroup.SortField) (domainGroup.SortField, error) {
-	if raw == "" {
-		return def, nil
-	}
-	for _, f := range allowed {
-		if string(f) == raw {
-			return f, nil
-		}
-	}
-	names := make([]string, len(allowed))
-	for i, f := range allowed {
-		names[i] = string(f)
-	}
-	return "", apperror.NewValidation([]apperror.FieldError{
-		{Field: "sortBy", Message: fmt.Sprintf("invalid sortBy; must be one of: %s", strings.Join(names, ", "))},
-	})
-}
-
-func parseOrder(raw string) (domainGroup.SortOrder, error) {
-	switch raw {
-	case "":
-		return domainGroup.OrderAsc, nil
-	case "asc":
-		return domainGroup.OrderAsc, nil
-	case "desc":
-		return domainGroup.OrderDesc, nil
-	default:
-		return "", apperror.NewValidation([]apperror.FieldError{
-			{Field: "order", Message: "invalid order; must be asc or desc"},
-		})
-	}
 }

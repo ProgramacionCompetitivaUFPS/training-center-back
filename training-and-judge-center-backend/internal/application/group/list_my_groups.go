@@ -2,8 +2,6 @@ package group
 
 import (
 	"context"
-	"fmt"
-	"math"
 	"strings"
 
 	domainGroup "github.com/training-judge-center/backend/internal/domain/group"
@@ -47,15 +45,8 @@ func NewListMyGroupsUseCase(repo domainGroup.Repository, memberRepo domainGroup.
 }
 
 func (uc *ListMyGroupsUseCase) Execute(ctx context.Context, in ListMyGroupsInput) (*ListMyGroupsOutput, error) {
-	if in.Page < 1 {
-		return nil, apperror.NewValidation([]apperror.FieldError{
-			{Field: "page", Message: "page must be a positive integer"},
-		})
-	}
-	if in.Limit < 1 || in.Limit > MaxPageLimit {
-		return nil, apperror.NewValidation([]apperror.FieldError{
-			{Field: "limit", Message: fmt.Sprintf("limit must be between 1 and %d", MaxPageLimit)},
-		})
+	if err := validatePagination(in.Page, in.Limit); err != nil {
+		return nil, err
 	}
 
 	hide, err := uc.preferences.HideGlobalGroup(ctx, in.CurrentUser.ID)
@@ -125,15 +116,10 @@ func (uc *ListMyGroupsUseCase) Execute(ctx context.Context, in ListMyGroupsInput
 		})
 	}
 
-	totalPages := 0
-	if in.Limit > 0 {
-		totalPages = int(math.Ceil(float64(total) / float64(in.Limit)))
-	}
-
 	return &ListMyGroupsOutput{
 		Groups:     items,
 		TotalCount: total,
-		TotalPages: totalPages,
+		TotalPages: calcTotalPages(total, in.Limit),
 		Page:       in.Page,
 		Limit:      in.Limit,
 	}, nil
