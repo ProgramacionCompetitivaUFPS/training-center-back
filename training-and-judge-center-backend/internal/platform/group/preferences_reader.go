@@ -39,7 +39,6 @@ func (p *PreferencesReader) HideGlobalGroup(ctx context.Context, userID string) 
 	}
 	var prefs userPreferences
 	if err := json.Unmarshal(raw, &prefs); err != nil {
-		// Preferencias corruptas: default seguro.
 		slog.WarnContext(ctx, "user preferences JSON is invalid; defaulting hideGlobalGroup=false", "user_id", userID)
 		return false, nil
 	}

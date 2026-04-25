@@ -63,7 +63,6 @@ func NewRouter(h *Handlers, s *Services) *chi.Mux {
 		})
 	})
 
-	// Group routes — require authentication
 	r.Group(func(r chi.Router) {
 		r.Use(middleware.Auth(s.TokenService, s.SessionInvalidator))
 

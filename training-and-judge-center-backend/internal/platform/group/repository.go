@@ -25,11 +25,6 @@ func NewGroupRepository(db *pgxpool.Pool) *GroupRepository {
 	return &GroupRepository{db: db}
 }
 
-// Save es un placeholder — G-2 lo implementa.
-func (r *GroupRepository) Save(ctx context.Context, g *domainGroup.Group) error {
-	return apperror.NewInternal()
-}
-
 func (r *GroupRepository) FindByID(ctx context.Context, id string) (*domainGroup.Group, error) {
 	const q = `
 		SELECT id, name, description, visibility, join_policy, is_default,
@@ -76,11 +71,6 @@ func (r *GroupRepository) FindDefault(ctx context.Context) (*domainGroup.Group, 
 	return g, nil
 }
 
-// Delete es un placeholder — G-8 lo implementa.
-func (r *GroupRepository) Delete(ctx context.Context, id string) error {
-	return apperror.NewInternal()
-}
-
 func (r *GroupRepository) List(ctx context.Context, filters domainGroup.ListFilters) ([]*domainGroup.Group, int, error) {
 	var conds []string
 	var args []any
@@ -92,8 +82,6 @@ func (r *GroupRepository) List(ctx context.Context, filters domainGroup.ListFilt
 		return s
 	}
 
-	// viewerArg is lazy: only added to args on first use, to avoid sending
-	// unused parameters that cause PostgreSQL to fail type inference.
 	var viewerArgStr string
 	viewerArg := func() string {
 		if viewerArgStr == "" {
@@ -102,7 +90,6 @@ func (r *GroupRepository) List(ctx context.Context, filters domainGroup.ListFilt
 		return viewerArgStr
 	}
 
-	// Visibilidad / permisos
 	if filters.OnlyMyGroups {
 		if filters.RoleFilter != nil {
 			roleArg := nextArg(string(*filters.RoleFilter))
@@ -147,7 +134,6 @@ func (r *GroupRepository) List(ctx context.Context, filters domainGroup.ListFilt
 
 	orderBy := mapSortClause(filters, viewerArg)
 
-	// Si ordenamos por memberCount necesitamos un subquery scalar en SELECT.
 	memberCountSelect := ""
 	if filters.SortBy == domainGroup.SortByMemberCount {
 		memberCountSelect = ", (SELECT COUNT(*) FROM group_members gm2 WHERE gm2.group_id = g.id) AS mc"
@@ -204,8 +190,6 @@ func (r *GroupRepository) List(ctx context.Context, filters domainGroup.ListFilt
 	}
 	return result, total, nil
 }
-
-// --- helpers ---
 
 type rowScanner interface {
 	Scan(dest ...any) error

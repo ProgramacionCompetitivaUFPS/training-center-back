@@ -28,7 +28,7 @@ type GroupStatistics struct {
 type UserMembership struct {
 	IsMember bool
 	Role     *domainGroup.MemberRole
-	JoinedAt *string // RFC3339 formateado — la capa HTTP lo pasa tal cual
+	JoinedAt *string
 }
 
 type GetGroupOutput struct {
@@ -63,13 +63,11 @@ func (uc *GetGroupUseCase) Execute(ctx context.Context, in GetGroupInput) (*GetG
 	viewerID := shared.RestoreUserID(in.CurrentUser.ID)
 	isAdmin := in.CurrentUser.IsAdmin()
 
-	// Membership del viewer
 	membership, err := uc.memberRepo.FindByGroupAndUser(ctx, g.ID(), viewerID)
 	if err != nil {
 		return nil, err
 	}
 
-	// Visibilidad: NOT_VISIBLE + no-miembro + no-admin => 404 (no leakear)
 	if g.Visibility() == domainGroup.VisibilityNotVisible && membership == nil && !isAdmin {
 		return nil, apperror.NewNotFound(domainGroup.ErrCodeGroupNotFound, "group not found")
 	}

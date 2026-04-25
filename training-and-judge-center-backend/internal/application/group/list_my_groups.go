@@ -21,12 +21,11 @@ type ListMyGroupsInput struct {
 	Limit       int
 }
 
-// MyGroupItem: un grupo donde el viewer es miembro.
 type MyGroupItem struct {
 	Group       *domainGroup.Group
 	MemberCount int
 	MyRole      domainGroup.MemberRole
-	JoinedAt    string // RFC3339
+	JoinedAt    string
 }
 
 type ListMyGroupsOutput struct {
@@ -69,7 +68,7 @@ func (uc *ListMyGroupsUseCase) Execute(ctx context.Context, in ListMyGroupsInput
 		Page:           in.Page,
 		Limit:          in.Limit,
 		ViewerID:       shared.RestoreUserID(in.CurrentUser.ID),
-		ViewerIsAdmin:  false, // /me/groups IGNORA permisos implícitos de admin (FR-VG-025)
+		ViewerIsAdmin:  false,
 		OnlyMyGroups:   true,
 		ExcludeDefault: hide,
 	}
@@ -110,7 +109,7 @@ func (uc *ListMyGroupsUseCase) Execute(ctx context.Context, in ListMyGroupsInput
 			return nil, err
 		}
 		if m == nil {
-			continue // defensivo: el repo ya filtró por OnlyMyGroups
+			continue
 		}
 		count, err := uc.memberRepo.CountMembers(ctx, g.ID())
 		if err != nil {

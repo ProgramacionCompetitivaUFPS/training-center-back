@@ -27,12 +27,10 @@ type ListGroupsInput struct {
 	Limit       int
 }
 
-// ListedGroup es el item enriquecido para la respuesta de lista.
-// Además del agregado Group incluye memberCount y userRole.
 type ListedGroup struct {
 	Group       *domainGroup.Group
 	MemberCount int
-	UserRole    *domainGroup.MemberRole // nil si no es miembro
+	UserRole    *domainGroup.MemberRole
 }
 
 type ListGroupsOutput struct {
@@ -142,8 +140,6 @@ func (uc *ListGroupsUseCase) Execute(ctx context.Context, in ListGroupsInput) (*
 		Limit:      in.Limit,
 	}, nil
 }
-
-// Helpers compartidos entre use cases.
 
 func validListSortFields() []domainGroup.SortField {
 	return []domainGroup.SortField{
