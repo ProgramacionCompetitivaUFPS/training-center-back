@@ -79,9 +79,6 @@ func (uc *CreateMaterial) Execute(ctx context.Context, in CreateMaterialInput) (
 	} else {
 		content = domainMaterial.NewEmptyContent()
 	}
-	if err := apperror.AccumulateFieldErrors(contentErr, &fieldErrs); err != nil {
-		return nil, err
-	}
 
 	tags, tagsErr := domainMaterial.NewTags(in.Tags)
 	if err := apperror.AccumulateFieldErrors(tagsErr, &fieldErrs); err != nil {

@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	appMaterial "github.com/training-judge-center/backend/internal/application/material"
+	domainMaterial "github.com/training-judge-center/backend/internal/domain/material"
 	"github.com/training-judge-center/backend/pkg/apperror"
 )
 
@@ -100,7 +101,7 @@ func TestUpdateMaterial_MaterialNotFound(t *testing.T) {
 	})
 
 	var appErr *apperror.AppError
-	if !errors.As(err, &appErr) || appErr.Code != appMaterial.ErrCodeMaterialNotFound {
+	if !errors.As(err, &appErr) || appErr.Code != domainMaterial.ErrCodeMaterialNotFound {
 		t.Errorf("expected MATERIAL_NOT_FOUND, got %v", err)
 	}
 }
@@ -118,7 +119,7 @@ func TestUpdateMaterial_MaterialNotInGroup(t *testing.T) {
 	})
 
 	var appErr *apperror.AppError
-	if !errors.As(err, &appErr) || appErr.Code != appMaterial.ErrCodeMaterialNotFound {
+	if !errors.As(err, &appErr) || appErr.Code != domainMaterial.ErrCodeMaterialNotFound {
 		t.Errorf("expected MATERIAL_NOT_FOUND, got %v", err)
 	}
 }

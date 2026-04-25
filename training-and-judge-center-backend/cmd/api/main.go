@@ -168,6 +168,12 @@ func main() {
 	requestDeactUC := appuser.NewRequestDeactivationUseCase(userRepo, deactRepo, emailSender)
 	confirmDeactUC := appuser.NewConfirmDeactivationUseCase(userRepo, deactRepo, auditRepo, emailSender, sessionInvalidator, txManager)
 
+	// Material — disabled until group domain is implemented
+	// materialRepo := platformMaterial.NewMaterialRepository(dbPool)
+	// createMaterialUC := usecase.NewCreateMaterial(materialRepo, nil, nil)
+	// updateMaterialUC := usecase.NewUpdateMaterial(materialRepo, nil)
+	// materialHandler := handlerMaterial.NewHandler(createMaterialUC, updateMaterialUC)
+
 	// Handlers
 	userHandler := handlerUser.NewUserHandler(createUserUC, getUserProfileUC, updateUserUC, updatePasswordUC, adminUpdateUserUC, adminDeactivateUserUC, listUsersUC, requestEmailChangeUC, confirmEmailChangeUC, requestPasswordRecoveryUC, resetPasswordUC, requestDeactUC, confirmDeactUC)
 	authHandler := handler.NewAuthHandler(loginUC)
