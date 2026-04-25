@@ -7,6 +7,7 @@ import (
 	domainGroup "github.com/training-judge-center/backend/internal/domain/group"
 	"github.com/training-judge-center/backend/internal/domain/shared"
 	"github.com/training-judge-center/backend/pkg/apperror"
+	"github.com/training-judge-center/backend/pkg/timeutil"
 )
 
 type ListMyGroupsInput struct {
@@ -112,7 +113,7 @@ func (uc *ListMyGroupsUseCase) Execute(ctx context.Context, in ListMyGroupsInput
 			Group:       g,
 			MemberCount: s.Count,
 			MyRole:      s.Membership.Role(),
-			JoinedAt:    s.Membership.JoinedAt().Format(timestampFormat),
+			JoinedAt:    s.Membership.JoinedAt().Format(timeutil.RFC3339UTC),
 		})
 	}
 

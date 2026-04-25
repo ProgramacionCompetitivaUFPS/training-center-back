@@ -7,9 +7,8 @@ import (
 	domainGroup "github.com/training-judge-center/backend/internal/domain/group"
 	"github.com/training-judge-center/backend/internal/domain/shared"
 	"github.com/training-judge-center/backend/pkg/apperror"
+	"github.com/training-judge-center/backend/pkg/timeutil"
 )
-
-const timestampFormat = "2006-01-02T15:04:05Z"
 
 type GetGroupInput struct {
 	GroupID     string
@@ -112,7 +111,7 @@ func (uc *GetGroupUseCase) Execute(ctx context.Context, in GetGroupInput) (*GetG
 	if membership != nil {
 		r := membership.Role()
 		um.Role = &r
-		ja := membership.JoinedAt().Format(timestampFormat)
+		ja := membership.JoinedAt().Format(timeutil.RFC3339UTC)
 		um.JoinedAt = &ja
 	}
 

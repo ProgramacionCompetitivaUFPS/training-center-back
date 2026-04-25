@@ -1,7 +1,5 @@
 package group
 
-const timestampFormat = "2006-01-02T15:04:05Z"
-
 type paginationResp struct {
 	TotalCount   int  `json:"totalCount"`
 	CurrentPage  int  `json:"currentPage"`

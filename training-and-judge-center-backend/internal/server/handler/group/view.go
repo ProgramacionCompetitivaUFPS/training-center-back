@@ -5,6 +5,7 @@ import (
 
 	appGroup "github.com/training-judge-center/backend/internal/application/group"
 	"github.com/training-judge-center/backend/internal/server/handler"
+	"github.com/training-judge-center/backend/pkg/timeutil"
 )
 
 func (h *Handler) GetGroup(w http.ResponseWriter, r *http.Request) {
@@ -44,8 +45,8 @@ func (h *Handler) GetGroup(w http.ResponseWriter, r *http.Request) {
 		Statistics:     statisticsResp{MemberCount: out.Statistics.MemberCount, LeadCount: out.Statistics.LeadCount},
 		Leads:          leads,
 		UserMembership: um,
-		CreatedAt:      g.CreatedAt().Format(timestampFormat),
-		UpdatedAt:      g.UpdatedAt().Format(timestampFormat),
+		CreatedAt:      g.CreatedAt().Format(timeutil.RFC3339UTC),
+		UpdatedAt:      g.UpdatedAt().Format(timeutil.RFC3339UTC),
 	}
 
 	handler.WriteJSON(w, http.StatusOK, resp)

@@ -5,6 +5,7 @@ import (
 
 	appGroup "github.com/training-judge-center/backend/internal/application/group"
 	"github.com/training-judge-center/backend/internal/server/handler"
+	"github.com/training-judge-center/backend/pkg/timeutil"
 )
 
 func (h *Handler) ListMyGroups(w http.ResponseWriter, r *http.Request) {
@@ -54,7 +55,7 @@ func (h *Handler) ListMyGroups(w http.ResponseWriter, r *http.Request) {
 			MyRole:      string(mg.MyRole),
 			JoinedAt:    mg.JoinedAt,
 			MemberCount: mg.MemberCount,
-			CreatedAt:   g.CreatedAt().Format(timestampFormat),
+			CreatedAt:   g.CreatedAt().Format(timeutil.RFC3339UTC),
 		})
 	}
 
