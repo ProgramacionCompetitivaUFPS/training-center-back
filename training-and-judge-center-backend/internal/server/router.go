@@ -6,6 +6,7 @@ import (
 	"github.com/training-judge-center/backend/internal/domain/user"
 	"github.com/training-judge-center/backend/internal/server/handler"
 	"github.com/training-judge-center/backend/internal/server/handler/group"
+	handlerMaterial "github.com/training-judge-center/backend/internal/server/handler/material"
 	"github.com/training-judge-center/backend/internal/server/handler/problem"
 	handlerUser "github.com/training-judge-center/backend/internal/server/handler/user"
 	"github.com/training-judge-center/backend/internal/server/middleware"
@@ -16,6 +17,7 @@ type Handlers struct {
 	User    *handlerUser.UserHandler
 	Auth    *handler.AuthHandler
 	Group   *group.Handler
+	Material *handlerMaterial.Handler
 }
 
 type Services struct {
@@ -36,6 +38,11 @@ func NewRouter(h *Handlers, s *Services) *chi.Mux {
 	// Problem routes — require authentication
 	r.Group(func(r chi.Router) {
 		r.Use(middleware.Auth(s.TokenService, s.SessionInvalidator))
+
+		r.Route("/groups/{groupId}/materials", func(r chi.Router) {
+			r.Post("/", h.Material.Create)
+			r.Put("/{materialId}", h.Material.Update)
+		})
 
 		r.Route("/problems", func(r chi.Router) {
 			r.Get("/", h.Problem.ListProblems)
