@@ -1,0 +1,33 @@
+training-and-judge-center-backend/internal/platform/group/repository.go
+  ebc5e4b6903748c4 28-31,50-51,54-55,178-181,207-217
+training-and-judge-center-backend/internal/application/group/list_groups.go
+  ebc5e4b6903748c4 110-118,121,123-124,129
+training-and-judge-center-backend/internal/application/group/list_groups_test.go
+  ebc5e4b6903748c4 78-87
+training-and-judge-center-backend/internal/platform/group/member_repository.go
+  ebc5e4b6903748c4 11,26-37,52,75-150,169
+training-and-judge-center-backend/internal/platform/group/user_provider.go
+  ebc5e4b6903748c4 5,10,27-28,36-37,41-45
+training-and-judge-center-backend/internal/application/group/list_my_groups.go
+  ebc5e4b6903748c4 105-113,116-117,122-124
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.3.4",
+  "base_commit_sha": "27862b1c1a422bc50d5ad67f56227269ad1cf702",
+  "prompts": {
+    "ebc5e4b6903748c4": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "82ed38ba-964c-4378-83a2-6cb3ed2021f6",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "AlexaVJ",
+      "messages": [],
+      "total_additions": 50,
+      "total_deletions": 161,
+      "accepted_lines": 517,
+      "overriden_lines": 0
+    }
+  }
+}
