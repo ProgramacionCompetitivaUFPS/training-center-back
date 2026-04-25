@@ -1,0 +1,23 @@
+training-and-judge-center-backend/.gitignore
+  ebc5e4b6903748c4 3
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.3.4",
+  "base_commit_sha": "58a1962eeb42a9f3a54b13cfea181cf3c598c413",
+  "prompts": {
+    "ebc5e4b6903748c4": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "82ed38ba-964c-4378-83a2-6cb3ed2021f6",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "AlexaVJ",
+      "messages": [],
+      "total_additions": 1,
+      "total_deletions": 0,
+      "accepted_lines": 259,
+      "overriden_lines": 0
+    }
+  }
+}
