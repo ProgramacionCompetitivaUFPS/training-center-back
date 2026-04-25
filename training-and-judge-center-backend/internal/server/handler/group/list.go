@@ -29,8 +29,8 @@ func (h *Handler) ListGroups(w http.ResponseWriter, r *http.Request) {
 	in := appGroup.ListGroupsInput{
 		CurrentUser: *currentUser,
 		Search:      q.Get("search"),
-		Visibility:  queryStringPtr(q.Get("visibility")),
-		JoinPolicy:  queryStringPtr(q.Get("joinPolicy")),
+		Visibility:  stringPtrOrNil(q.Get("visibility")),
+		JoinPolicy:  stringPtrOrNil(q.Get("joinPolicy")),
 		SortBy:      q.Get("sortBy"),
 		Order:       q.Get("order"),
 		Page:        page,
@@ -46,11 +46,6 @@ func (h *Handler) ListGroups(w http.ResponseWriter, r *http.Request) {
 	items := make([]groupListItemResp, 0, len(out.Groups))
 	for _, lg := range out.Groups {
 		g := lg.Group
-		var role *string
-		if lg.UserRole != nil {
-			s := string(*lg.UserRole)
-			role = &s
-		}
 		items = append(items, groupListItemResp{
 			ID:          g.ID(),
 			Name:        g.Name().String(),
@@ -59,7 +54,7 @@ func (h *Handler) ListGroups(w http.ResponseWriter, r *http.Request) {
 			JoinPolicy:  g.JoinPolicy().String(),
 			IsGlobal:    g.IsDefault(),
 			MemberCount: lg.MemberCount,
-			UserRole:    role,
+			UserRole:    memberRoleToStringPtr(lg.UserRole),
 			CreatedAt:   g.CreatedAt().Format(timestampFormat),
 		})
 	}

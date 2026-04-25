@@ -28,10 +28,10 @@ func (h *Handler) GetGroup(w http.ResponseWriter, r *http.Request) {
 		leads = append(leads, leadResp{UserID: l.UserID, Nickname: l.Nickname, Name: l.Name})
 	}
 
-	um := userMembershipResp{IsMember: out.Membership.IsMember, JoinedAt: out.Membership.JoinedAt}
-	if out.Membership.Role != nil {
-		s := string(*out.Membership.Role)
-		um.Role = &s
+	um := userMembershipResp{
+		IsMember: out.Membership.IsMember,
+		Role:     memberRoleToStringPtr(out.Membership.Role),
+		JoinedAt: out.Membership.JoinedAt,
 	}
 
 	resp := getGroupResponse{

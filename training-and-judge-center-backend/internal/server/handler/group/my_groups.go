@@ -27,7 +27,7 @@ func (h *Handler) ListMyGroups(w http.ResponseWriter, r *http.Request) {
 
 	in := appGroup.ListMyGroupsInput{
 		CurrentUser: *currentUser,
-		Role:        queryStringPtr(q.Get("role")),
+		Role:        stringPtrOrNil(q.Get("role")),
 		Search:      q.Get("search"),
 		SortBy:      q.Get("sortBy"),
 		Order:       q.Get("order"),
