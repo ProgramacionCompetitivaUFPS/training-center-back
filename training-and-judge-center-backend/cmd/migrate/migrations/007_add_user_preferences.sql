@@ -1,7 +1,7 @@
 -- +goose Up
 
 ALTER TABLE users
-    ADD COLUMN IF NOT EXISTS preferences JSONB;
+    ADD COLUMN IF NOT EXISTS preferences JSONB NOT NULL DEFAULT '{}'::jsonb;
 
 -- +goose Down
 
