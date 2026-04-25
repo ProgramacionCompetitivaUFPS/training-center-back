@@ -1,7 +1,7 @@
 -- +goose Up
 
 ALTER TABLE users
-    ADD COLUMN preferences JSONB;
+    ADD COLUMN IF NOT EXISTS preferences JSONB;
 
 -- +goose Down
 
