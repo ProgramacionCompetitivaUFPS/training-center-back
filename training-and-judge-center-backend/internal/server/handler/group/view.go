@@ -4,25 +4,18 @@ import (
 	"net/http"
 
 	appGroup "github.com/training-judge-center/backend/internal/application/group"
-	"github.com/training-judge-center/backend/internal/domain/shared"
 	"github.com/training-judge-center/backend/internal/server/handler"
-	"github.com/training-judge-center/backend/internal/server/middleware"
-	"github.com/training-judge-center/backend/pkg/apperror"
 )
 
 func (h *Handler) GetGroup(w http.ResponseWriter, r *http.Request) {
-	claims := middleware.GetClaims(r.Context())
-	if claims == nil {
-		handler.WriteJSON(w, http.StatusUnauthorized, apperror.AppError{Code: apperror.ErrCodeUnauthorized, Message: "Invalid or missing authentication token"})
+	currentUser, ok := h.requireCurrentUser(w, r)
+	if !ok {
 		return
 	}
 
-	groupID := r.PathValue("groupId")
-	currentUser := shared.CurrentUser{ID: claims.UserID, Role: claims.Role.String()}
-
 	out, err := h.getUC.Execute(r.Context(), appGroup.GetGroupInput{
-		GroupID:     groupID,
-		CurrentUser: currentUser,
+		GroupID:     r.PathValue("groupId"),
+		CurrentUser: *currentUser,
 	})
 	if err != nil {
 		handler.WriteError(w, err)

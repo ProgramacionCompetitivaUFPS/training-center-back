@@ -4,16 +4,13 @@ import (
 	"net/http"
 
 	appGroup "github.com/training-judge-center/backend/internal/application/group"
-	"github.com/training-judge-center/backend/internal/domain/shared"
 	"github.com/training-judge-center/backend/internal/server/handler"
-	"github.com/training-judge-center/backend/internal/server/middleware"
 	"github.com/training-judge-center/backend/pkg/apperror"
 )
 
 func (h *Handler) ListGroups(w http.ResponseWriter, r *http.Request) {
-	claims := middleware.GetClaims(r.Context())
-	if claims == nil {
-		handler.WriteJSON(w, http.StatusUnauthorized, apperror.AppError{Code: apperror.ErrCodeUnauthorized, Message: "Invalid or missing authentication token"})
+	currentUser, ok := h.requireCurrentUser(w, r)
+	if !ok {
 		return
 	}
 
@@ -28,10 +25,8 @@ func (h *Handler) ListGroups(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	currentUser := shared.CurrentUser{ID: claims.UserID, Role: claims.Role.String()}
-
 	in := appGroup.ListGroupsInput{
-		CurrentUser: currentUser,
+		CurrentUser: *currentUser,
 		Search:      r.URL.Query().Get("search"),
 		Visibility:  queryStringPtr(r.URL.Query().Get("visibility")),
 		JoinPolicy:  queryStringPtr(r.URL.Query().Get("joinPolicy")),
