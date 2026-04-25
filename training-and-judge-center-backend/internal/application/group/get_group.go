@@ -9,6 +9,8 @@ import (
 	"github.com/training-judge-center/backend/pkg/apperror"
 )
 
+const timestampFormat = "2006-01-02T15:04:05Z"
+
 type GetGroupInput struct {
 	GroupID     string
 	CurrentUser shared.CurrentUser
@@ -110,7 +112,7 @@ func (uc *GetGroupUseCase) Execute(ctx context.Context, in GetGroupInput) (*GetG
 	if membership != nil {
 		r := membership.Role()
 		um.Role = &r
-		ja := membership.JoinedAt().Format("2006-01-02T15:04:05Z")
+		ja := membership.JoinedAt().Format(timestampFormat)
 		um.JoinedAt = &ja
 	}
 

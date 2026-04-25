@@ -53,7 +53,7 @@ func (h *Handler) ListMyGroups(w http.ResponseWriter, r *http.Request) {
 			MyRole:      string(mg.MyRole),
 			JoinedAt:    mg.JoinedAt,
 			MemberCount: mg.MemberCount,
-			CreatedAt:   g.CreatedAt().Format("2006-01-02T15:04:05Z"),
+			CreatedAt:   g.CreatedAt().Format(timestampFormat),
 		})
 	}
 

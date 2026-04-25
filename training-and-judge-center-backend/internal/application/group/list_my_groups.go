@@ -121,7 +121,7 @@ func (uc *ListMyGroupsUseCase) Execute(ctx context.Context, in ListMyGroupsInput
 			Group:       g,
 			MemberCount: s.Count,
 			MyRole:      s.Membership.Role(),
-			JoinedAt:    s.Membership.JoinedAt().Format("2006-01-02T15:04:05Z"),
+			JoinedAt:    s.Membership.JoinedAt().Format(timestampFormat),
 		})
 	}
 

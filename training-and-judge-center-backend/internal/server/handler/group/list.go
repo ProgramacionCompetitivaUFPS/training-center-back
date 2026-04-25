@@ -59,7 +59,7 @@ func (h *Handler) ListGroups(w http.ResponseWriter, r *http.Request) {
 			IsGlobal:    g.IsDefault(),
 			MemberCount: lg.MemberCount,
 			UserRole:    role,
-			CreatedAt:   g.CreatedAt().Format("2006-01-02T15:04:05Z"),
+			CreatedAt:   g.CreatedAt().Format(timestampFormat),
 		})
 	}
 
