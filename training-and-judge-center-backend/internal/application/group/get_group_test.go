@@ -2,6 +2,7 @@ package group
 
 import (
 	"context"
+	"errors"
 	"testing"
 	"time"
 
@@ -12,9 +13,13 @@ import (
 
 type fakeUserProvider struct {
 	displays map[string]*UserDisplay
+	err      error
 }
 
 func (f *fakeUserProvider) GetDisplays(ctx context.Context, ids []string) (map[string]*UserDisplay, error) {
+	if f.err != nil {
+		return nil, f.err
+	}
 	out := make(map[string]*UserDisplay, len(ids))
 	for _, id := range ids {
 		if d, ok := f.displays[id]; ok {
@@ -32,6 +37,48 @@ func notVisibleGroup(t *testing.T) *domainGroup.Group {
 func visibleGroup(t *testing.T) *domainGroup.Group {
 	t.Helper()
 	return mustGroup(t, "g1", "Open Club", domainGroup.VisibilityVisible, domainGroup.JoinPolicyOpen)
+}
+
+func TestGetGroup_EmptyGroupIDReturnsValidationError(t *testing.T) {
+	uc := NewGetGroupUseCase(&fakeRepo{}, &fakeMemberRepo{}, &fakeUserProvider{})
+
+	_, err := uc.Execute(context.Background(), GetGroupInput{
+		GroupID:     "",
+		CurrentUser: currentUser("u1", shared.RoleContestant),
+	})
+	if err == nil {
+		t.Fatal("expected validation error for empty groupId")
+	}
+	ae, ok := err.(*apperror.AppError)
+	if !ok || ae.Code != apperror.ErrCodeValidationError {
+		t.Fatalf("expected VALIDATION_ERROR, got %v", err)
+	}
+}
+
+func TestGetGroup_UserProviderErrorReturnsInternal(t *testing.T) {
+	g := visibleGroup(t)
+	uidLead := shared.RestoreUserID("lead1")
+	lead, _ := domainGroup.NewGroupMember("m1", "g1", uidLead, domainGroup.MemberRoleLead, func() time.Time { return time.Now() })
+
+	repo := &fakeRepo{groups: []*domainGroup.Group{g}}
+	memberRepo := &fakeMemberRepo{
+		memberCounts: map[string]int{"g1": 1},
+		leadCounts:   map[string]int{"g1": 1},
+		leads:        map[string][]*domainGroup.GroupMember{"g1": {lead}},
+	}
+	uc := NewGetGroupUseCase(repo, memberRepo, &fakeUserProvider{err: errors.New("db down")})
+
+	_, err := uc.Execute(context.Background(), GetGroupInput{
+		GroupID:     "g1",
+		CurrentUser: currentUser("u1", shared.RoleContestant),
+	})
+	if err == nil {
+		t.Fatal("expected error when user provider fails")
+	}
+	ae, ok := err.(*apperror.AppError)
+	if !ok || ae.Code != apperror.ErrCodeInternalError {
+		t.Fatalf("expected INTERNAL_ERROR, got %v", err)
+	}
 }
 
 func TestGetGroup_NotVisibleHiddenFromStranger(t *testing.T) {

@@ -7,6 +7,7 @@ import (
 
 	domainGroup "github.com/training-judge-center/backend/internal/domain/group"
 	"github.com/training-judge-center/backend/internal/domain/shared"
+	"github.com/training-judge-center/backend/pkg/apperror"
 )
 
 type fakePreferences struct {
@@ -15,6 +16,25 @@ type fakePreferences struct {
 
 func (f *fakePreferences) HideGlobalGroup(ctx context.Context, userID string) (bool, error) {
 	return f.hide, nil
+}
+
+func TestListMyGroups_InvalidRoleReturnsValidationError(t *testing.T) {
+	uc := NewListMyGroupsUseCase(&fakeRepo{}, &fakeMemberRepo{}, &fakePreferences{})
+	role := "OWNER"
+
+	_, err := uc.Execute(context.Background(), ListMyGroupsInput{
+		CurrentUser: currentUser("u1", shared.RoleContestant),
+		Role:        &role,
+		Page:        1,
+		Limit:       20,
+	})
+	if err == nil {
+		t.Fatal("expected validation error for invalid role")
+	}
+	ae, ok := err.(*apperror.AppError)
+	if !ok || ae.Code != apperror.ErrCodeValidationError {
+		t.Fatalf("expected VALIDATION_ERROR, got %v", err)
+	}
 }
 
 func TestListMyGroups_ExcludeDefaultSetWhenPreferenceTrue(t *testing.T) {
