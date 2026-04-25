@@ -4,6 +4,8 @@ import (
 	"context"
 	"log/slog"
 
+	"golang.org/x/sync/errgroup"
+
 	domainGroup "github.com/training-judge-center/backend/internal/domain/group"
 	"github.com/training-judge-center/backend/internal/domain/shared"
 	"github.com/training-judge-center/backend/pkg/apperror"
@@ -73,17 +75,26 @@ func (uc *GetGroupUseCase) Execute(ctx context.Context, in GetGroupInput) (*GetG
 		return nil, apperror.NewNotFound(domainGroup.ErrCodeGroupNotFound, "group not found")
 	}
 
-	memberCount, err := uc.memberRepo.CountMembers(ctx, g.ID())
-	if err != nil {
-		return nil, err
-	}
-	leadCount, err := uc.memberRepo.CountLeads(ctx, g.ID())
-	if err != nil {
-		return nil, err
-	}
+	var memberCount, leadCount int
+	var leadMembers []*domainGroup.GroupMember
 
-	leadMembers, err := uc.memberRepo.ListLeads(ctx, g.ID())
-	if err != nil {
+	eg, egCtx := errgroup.WithContext(ctx)
+	eg.Go(func() error {
+		var err error
+		memberCount, err = uc.memberRepo.CountMembers(egCtx, g.ID())
+		return err
+	})
+	eg.Go(func() error {
+		var err error
+		leadCount, err = uc.memberRepo.CountLeads(egCtx, g.ID())
+		return err
+	})
+	eg.Go(func() error {
+		var err error
+		leadMembers, err = uc.memberRepo.ListLeads(egCtx, g.ID())
+		return err
+	})
+	if err := eg.Wait(); err != nil {
 		return nil, err
 	}
 
