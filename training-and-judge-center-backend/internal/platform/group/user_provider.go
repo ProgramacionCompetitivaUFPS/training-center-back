@@ -2,10 +2,12 @@ package group
 
 import (
 	"context"
+	"log/slog"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	appGroup "github.com/training-judge-center/backend/internal/application/group"
+	"github.com/training-judge-center/backend/pkg/apperror"
 )
 
 type UserProvider struct {
@@ -22,7 +24,8 @@ func (p *UserProvider) GetDisplays(ctx context.Context, userIDs []string) (map[s
 	}
 	rows, err := p.db.Query(ctx, `SELECT id, nickname, name FROM users WHERE id = ANY($1)`, userIDs)
 	if err != nil {
-		return nil, err
+		slog.ErrorContext(ctx, "GetDisplays query failed", "error", err)
+		return nil, apperror.NewInternal()
 	}
 	defer rows.Close()
 
@@ -30,9 +33,14 @@ func (p *UserProvider) GetDisplays(ctx context.Context, userIDs []string) (map[s
 	for rows.Next() {
 		var id, nickname, name string
 		if err := rows.Scan(&id, &nickname, &name); err != nil {
-			return nil, err
+			slog.ErrorContext(ctx, "GetDisplays scan failed", "error", err)
+			return nil, apperror.NewInternal()
 		}
 		out[id] = &appGroup.UserDisplay{Nickname: nickname, Name: name}
 	}
-	return out, rows.Err()
+	if err := rows.Err(); err != nil {
+		slog.ErrorContext(ctx, "GetDisplays rows failed", "error", err)
+		return nil, apperror.NewInternal()
+	}
+	return out, nil
 }

@@ -25,6 +25,10 @@ func NewGroupRepository(db *pgxpool.Pool) *GroupRepository {
 	return &GroupRepository{db: db}
 }
 
+func (r *GroupRepository) Save(_ context.Context, _ *domainGroup.Group) error {
+	panic("not implemented")
+}
+
 func (r *GroupRepository) FindByID(ctx context.Context, id string) (*domainGroup.Group, error) {
 	const q = `
 		SELECT id, name, description, visibility, join_policy, is_default,
@@ -43,32 +47,12 @@ func (r *GroupRepository) FindByID(ctx context.Context, id string) (*domainGroup
 	return g, nil
 }
 
-func (r *GroupRepository) ExistsByName(ctx context.Context, n domainGroup.GroupName) (bool, error) {
-	var exists bool
-	err := r.db.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM groups WHERE LOWER(name) = LOWER($1))`, n.String()).Scan(&exists)
-	if err != nil {
-		slog.ErrorContext(ctx, "ExistsByName failed", "error", err)
-		return false, apperror.NewInternal()
-	}
-	return exists, nil
+func (r *GroupRepository) ExistsByName(_ context.Context, _ domainGroup.GroupName) (bool, error) {
+	panic("not implemented")
 }
 
-func (r *GroupRepository) FindDefault(ctx context.Context) (*domainGroup.Group, error) {
-	const q = `
-		SELECT id, name, description, visibility, join_policy, is_default,
-		       created_by, created_at, updated_at
-		FROM groups WHERE is_default = TRUE
-	`
-	row := r.db.QueryRow(ctx, q)
-	g, err := scanGroup(row)
-	if err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
-			return nil, nil
-		}
-		slog.ErrorContext(ctx, "FindDefault failed", "error", err)
-		return nil, apperror.NewInternal()
-	}
-	return g, nil
+func (r *GroupRepository) FindDefault(_ context.Context) (*domainGroup.Group, error) {
+	panic("not implemented")
 }
 
 func (r *GroupRepository) List(ctx context.Context, filters domainGroup.ListFilters) ([]*domainGroup.Group, int, error) {
@@ -191,6 +175,10 @@ func (r *GroupRepository) List(ctx context.Context, filters domainGroup.ListFilt
 	return result, total, nil
 }
 
+func (r *GroupRepository) Delete(_ context.Context, _ string) error {
+	panic("not implemented")
+}
+
 type rowScanner interface {
 	Scan(dest ...any) error
 }
@@ -216,19 +204,17 @@ func scanGroupRow(row rowScanner, hasMemberCount bool) (*domainGroup.Group, erro
 		return nil, err
 	}
 
-	gname, err := domainGroup.NewGroupName(name)
-	if err != nil {
-		return nil, err
-	}
-	v, err := domainGroup.NewVisibility(visibility)
-	if err != nil {
-		return nil, err
-	}
-	jp, err := domainGroup.NewJoinPolicy(joinPolicy)
-	if err != nil {
-		return nil, err
-	}
-	return domainGroup.RestoreGroup(id, gname, description, v, jp, isDefault, shared.RestoreUserID(createdBy), createdAt, updatedAt), nil
+	return domainGroup.RestoreGroup(
+		id,
+		domainGroup.RestoreGroupName(name),
+		description,
+		domainGroup.RestoreVisibility(visibility),
+		domainGroup.RestoreJoinPolicy(joinPolicy),
+		isDefault,
+		shared.RestoreUserID(createdBy),
+		createdAt,
+		updatedAt,
+	), nil
 }
 
 func mapSortClause(f domainGroup.ListFilters, viewerArg func() string) string {

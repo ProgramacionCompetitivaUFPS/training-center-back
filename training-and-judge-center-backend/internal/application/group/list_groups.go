@@ -107,22 +107,26 @@ func (uc *ListGroupsUseCase) Execute(ctx context.Context, in ListGroupsInput) (*
 		return nil, err
 	}
 
+	groupIDs := make([]string, len(groups))
+	for i, g := range groups {
+		groupIDs[i] = g.ID()
+	}
+	stats, err := uc.memberRepo.BulkStats(ctx, groupIDs, filters.ViewerID)
+	if err != nil {
+		return nil, err
+	}
+
 	items := make([]ListedGroup, 0, len(groups))
 	for _, g := range groups {
-		count, err := uc.memberRepo.CountMembers(ctx, g.ID())
-		if err != nil {
-			return nil, err
-		}
-
+		s := stats[g.ID()]
 		var role *domainGroup.MemberRole
-		m, err := uc.memberRepo.FindByGroupAndUser(ctx, g.ID(), filters.ViewerID)
-		if err == nil && m != nil {
-			r := m.Role()
+		if s.Membership != nil {
+			r := s.Membership.Role()
 			role = &r
 		}
 		items = append(items, ListedGroup{
 			Group:       g,
-			MemberCount: count,
+			MemberCount: s.Count,
 			UserRole:    role,
 		})
 	}
