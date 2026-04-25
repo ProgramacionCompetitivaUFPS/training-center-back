@@ -92,8 +92,15 @@ func (r *GroupRepository) List(ctx context.Context, filters domainGroup.ListFilt
 		return s
 	}
 
-	// Primero consumimos viewerID (se usa tanto en WHERE como en ORDER BY).
-	viewerArg := nextArg(filters.ViewerID.Value())
+	// viewerArg is lazy: only added to args on first use, to avoid sending
+	// unused parameters that cause PostgreSQL to fail type inference.
+	var viewerArgStr string
+	viewerArg := func() string {
+		if viewerArgStr == "" {
+			viewerArgStr = nextArg(filters.ViewerID.Value())
+		}
+		return viewerArgStr
+	}
 
 	// Visibilidad / permisos
 	if filters.OnlyMyGroups {
@@ -101,18 +108,18 @@ func (r *GroupRepository) List(ctx context.Context, filters domainGroup.ListFilt
 			roleArg := nextArg(string(*filters.RoleFilter))
 			conds = append(conds, fmt.Sprintf(
 				"EXISTS (SELECT 1 FROM group_members gm WHERE gm.group_id = g.id AND gm.user_id = %s AND gm.member_role = %s)",
-				viewerArg, roleArg,
+				viewerArg(), roleArg,
 			))
 		} else {
 			conds = append(conds, fmt.Sprintf(
 				"EXISTS (SELECT 1 FROM group_members gm WHERE gm.group_id = g.id AND gm.user_id = %s)",
-				viewerArg,
+				viewerArg(),
 			))
 		}
 	} else if !filters.ViewerIsAdmin {
 		conds = append(conds, fmt.Sprintf(
 			"(g.visibility = 'VISIBLE' OR EXISTS (SELECT 1 FROM group_members gm WHERE gm.group_id = g.id AND gm.user_id = %s))",
-			viewerArg,
+			viewerArg(),
 		))
 	}
 
@@ -240,7 +247,7 @@ func scanGroupRow(row rowScanner, hasMemberCount bool) (*domainGroup.Group, erro
 	return domainGroup.RestoreGroup(id, gname, description, v, jp, isDefault, shared.RestoreUserID(createdBy), createdAt, updatedAt), nil
 }
 
-func mapSortClause(f domainGroup.ListFilters, viewerArg string) string {
+func mapSortClause(f domainGroup.ListFilters, viewerArg func() string) string {
 	dir := "ASC"
 	if f.Order == domainGroup.OrderDesc {
 		dir = "DESC"
@@ -253,7 +260,7 @@ func mapSortClause(f domainGroup.ListFilters, viewerArg string) string {
 	case domainGroup.SortByJoinedAt:
 		return fmt.Sprintf(
 			"(SELECT joined_at FROM group_members gm WHERE gm.group_id = g.id AND gm.user_id = %s) %s, g.name ASC",
-			viewerArg, dir,
+			viewerArg(), dir,
 		)
 	default:
 		return fmt.Sprintf("g.name %s", dir)
