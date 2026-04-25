@@ -66,12 +66,12 @@ func (r *GroupRepository) List(ctx context.Context, filters domainGroup.ListFilt
 		return s
 	}
 
-	var viewerArgStr string
-	viewerArg := func() string {
-		if viewerArgStr == "" {
-			viewerArgStr = nextArg(filters.ViewerID.Value())
-		}
-		return viewerArgStr
+	// Register viewerID upfront when it may appear in WHERE or ORDER BY,
+	// so its placeholder index is stable regardless of condition order.
+	viewerArg := func() string { return "" }
+	if filters.OnlyMyGroups || !filters.ViewerIsAdmin || filters.SortBy == domainGroup.SortByJoinedAt {
+		placeholder := nextArg(filters.ViewerID.Value())
+		viewerArg = func() string { return placeholder }
 	}
 
 	if filters.OnlyMyGroups {
