@@ -37,19 +37,15 @@ func (r *MemberRepository) FindByGroup(_ context.Context, _ string, _ domainGrou
 
 func (r *MemberRepository) FindByGroupAndUser(ctx context.Context, groupID string, userID shared.UserID) (*domainGroup.GroupMember, error) {
 	const q = `SELECT id, group_id, user_id, member_role, joined_at FROM group_members WHERE group_id = $1 AND user_id = $2`
-	row := r.db.QueryRow(ctx, q, groupID, userID.Value())
-	var (
-		id, gid, uid, role string
-		joinedAt           time.Time
-	)
-	if err := row.Scan(&id, &gid, &uid, &role, &joinedAt); err != nil {
+	m, err := scanMember(r.db.QueryRow(ctx, q, groupID, userID.Value()))
+	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, nil
 		}
 		slog.ErrorContext(ctx, "FindByGroupAndUser failed", "error", err)
 		return nil, apperror.NewInternal()
 	}
-	return domainGroup.RestoreGroupMember(id, gid, shared.RestoreUserID(uid), domainGroup.RestoreMemberRole(role), joinedAt), nil
+	return m, nil
 }
 
 func (r *MemberRepository) CountLeads(ctx context.Context, groupID string) (int, error) {
@@ -121,12 +117,11 @@ func (r *MemberRepository) BulkStats(ctx context.Context, groupIDs []string, vie
 		}
 		defer rows.Close()
 		for rows.Next() {
-			var id, gid, uid, role string
-			var joinedAt time.Time
-			if err := rows.Scan(&id, &gid, &uid, &role, &joinedAt); err != nil {
+			m, err := scanMember(rows)
+			if err != nil {
 				return apperror.NewInternal()
 			}
-			memberships[gid] = domainGroup.RestoreGroupMember(id, gid, shared.RestoreUserID(uid), domainGroup.RestoreMemberRole(role), joinedAt)
+			memberships[m.GroupID()] = m
 		}
 		if err := rows.Err(); err != nil {
 			return apperror.NewInternal()
@@ -148,6 +143,15 @@ func (r *MemberRepository) BulkStats(ctx context.Context, groupIDs []string, vie
 	return result, nil
 }
 
+func scanMember(row rowScanner) (*domainGroup.GroupMember, error) {
+	var id, gid, uid, role string
+	var joinedAt time.Time
+	if err := row.Scan(&id, &gid, &uid, &role, &joinedAt); err != nil {
+		return nil, err
+	}
+	return domainGroup.RestoreGroupMember(id, gid, shared.RestoreUserID(uid), domainGroup.RestoreMemberRole(role), joinedAt), nil
+}
+
 func (r *MemberRepository) ListLeads(ctx context.Context, groupID string) ([]*domainGroup.GroupMember, error) {
 	const q = `SELECT id, group_id, user_id, member_role, joined_at FROM group_members WHERE group_id = $1 AND member_role = 'LEAD' ORDER BY joined_at ASC`
 	rows, err := r.db.Query(ctx, q, groupID)
@@ -159,14 +163,11 @@ func (r *MemberRepository) ListLeads(ctx context.Context, groupID string) ([]*do
 
 	var out []*domainGroup.GroupMember
 	for rows.Next() {
-		var (
-			id, gid, uid, role string
-			joinedAt           time.Time
-		)
-		if err := rows.Scan(&id, &gid, &uid, &role, &joinedAt); err != nil {
+		m, err := scanMember(rows)
+		if err != nil {
 			return nil, apperror.NewInternal()
 		}
-		out = append(out, domainGroup.RestoreGroupMember(id, gid, shared.RestoreUserID(uid), domainGroup.RestoreMemberRole(role), joinedAt))
+		out = append(out, m)
 	}
 	if err := rows.Err(); err != nil {
 		return nil, apperror.NewInternal()

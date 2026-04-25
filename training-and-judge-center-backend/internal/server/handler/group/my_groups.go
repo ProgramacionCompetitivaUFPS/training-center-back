@@ -15,14 +15,8 @@ func (h *Handler) ListMyGroups(w http.ResponseWriter, r *http.Request) {
 	}
 
 	q := r.URL.Query()
-	page, err := parseIntParam(q.Get("page"), 1)
-	if err != nil {
-		writeBadPagination(w, "page", "page must be a positive integer")
-		return
-	}
-	limit, err := parseIntParam(q.Get("limit"), appGroup.DefaultPageLimit)
-	if err != nil {
-		writeBadPagination(w, "limit", "limit must be an integer")
+	page, limit, ok := parsePaginationParams(q, w)
+	if !ok {
 		return
 	}
 

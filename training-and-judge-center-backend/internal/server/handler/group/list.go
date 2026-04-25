@@ -6,7 +6,6 @@ import (
 	appGroup "github.com/training-judge-center/backend/internal/application/group"
 	"github.com/training-judge-center/backend/internal/server/handler"
 	"github.com/training-judge-center/backend/pkg/timeutil"
-	"github.com/training-judge-center/backend/pkg/apperror"
 )
 
 func (h *Handler) ListGroups(w http.ResponseWriter, r *http.Request) {
@@ -16,14 +15,8 @@ func (h *Handler) ListGroups(w http.ResponseWriter, r *http.Request) {
 	}
 
 	q := r.URL.Query()
-	page, err := parseIntParam(q.Get("page"), 1)
-	if err != nil {
-		writeBadPagination(w, "page", "page must be a positive integer")
-		return
-	}
-	limit, err := parseIntParam(q.Get("limit"), appGroup.DefaultPageLimit)
-	if err != nil {
-		writeBadPagination(w, "limit", "limit must be an integer")
+	page, limit, ok := parsePaginationParams(q, w)
+	if !ok {
 		return
 	}
 
@@ -63,13 +56,5 @@ func (h *Handler) ListGroups(w http.ResponseWriter, r *http.Request) {
 	handler.WriteJSON(w, http.StatusOK, listGroupsResponse{
 		Groups:     items,
 		Pagination: buildPagination(out.TotalCount, out.Page, out.TotalPages, out.Limit),
-	})
-}
-
-func writeBadPagination(w http.ResponseWriter, field, msg string) {
-	handler.WriteJSON(w, http.StatusBadRequest, apperror.AppError{
-		Code:    apperror.ErrCodeValidationError,
-		Message: "Invalid request parameters",
-		Details: []apperror.FieldError{{Field: field, Message: msg}},
 	})
 }
