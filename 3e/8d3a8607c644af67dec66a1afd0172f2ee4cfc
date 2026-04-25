@@ -1,0 +1,25 @@
+training-and-judge-center-backend/internal/application/group/get_group_test.go
+  ebc5e4b6903748c4 5,16,20-22,42-83
+training-and-judge-center-backend/internal/application/group/list_my_groups_test.go
+  ebc5e4b6903748c4 10,21-39
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.3.4",
+  "base_commit_sha": "3e8d3a8607c644af67dec66a1afd0172f2ee4cfc",
+  "prompts": {
+    "ebc5e4b6903748c4": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "82ed38ba-964c-4378-83a2-6cb3ed2021f6",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "AlexaVJ",
+      "messages": [],
+      "total_additions": 67,
+      "total_deletions": 0,
+      "accepted_lines": 67,
+      "overriden_lines": 0
+    }
+  }
+}
