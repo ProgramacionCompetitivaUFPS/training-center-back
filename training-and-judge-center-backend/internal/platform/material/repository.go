@@ -10,7 +10,7 @@ import (
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
-	appMaterial "github.com/training-judge-center/backend/internal/application/material"
+	"golang.org/x/sync/errgroup"
 	"github.com/training-judge-center/backend/internal/domain/material"
 	"github.com/training-judge-center/backend/internal/domain/shared"
 	"github.com/training-judge-center/backend/pkg/apperror"
@@ -74,7 +74,7 @@ func (r *MaterialRepository) FindByID(ctx context.Context, id string) (*material
 	m, err := scanMaterial(row)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			return nil, apperror.NewNotFound(appMaterial.ErrCodeMaterialNotFound, "material not found")
+			return nil, apperror.NewNotFound(material.ErrCodeMaterialNotFound, "material not found")
 		}
 		slog.ErrorContext(ctx, "database error in FindByID", "error", err, "material_id", id)
 		return nil, apperror.NewInternal()
@@ -141,30 +141,33 @@ func (r *MaterialRepository) List(ctx context.Context, groupID string, filters m
 
 	countQuery := fmt.Sprintf("SELECT COUNT(*) FROM materials %s", where)
 
+	g, gCtx := errgroup.WithContext(ctx)
+
 	var result []*material.Material
 	var total int
 
-	rows, err := r.db.Query(ctx, selectQuery, args...)
-	if err != nil {
-		slog.ErrorContext(ctx, "database error in List (select)", "error", err)
-		return nil, 0, apperror.NewInternal()
-	}
-	defer rows.Close()
-	for rows.Next() {
-		m, err := scanMaterial(rows)
-		if err != nil {
-			slog.ErrorContext(ctx, "database error scanning material in List", "error", err)
-			return nil, 0, apperror.NewInternal()
+	g.Go(func() error {
+		rows, queryErr := r.db.Query(gCtx, selectQuery, args...)
+		if queryErr != nil {
+			return queryErr
 		}
-		result = append(result, m)
-	}
-	if err := rows.Err(); err != nil {
-		slog.ErrorContext(ctx, "database error iterating materials in List", "error", err)
-		return nil, 0, apperror.NewInternal()
-	}
+		defer rows.Close()
+		for rows.Next() {
+			m, err := scanMaterial(rows)
+			if err != nil {
+				return err
+			}
+			result = append(result, m)
+		}
+		return rows.Err()
+	})
 
-	if err := r.db.QueryRow(ctx, countQuery, countArgs...).Scan(&total); err != nil {
-		slog.ErrorContext(ctx, "database error in List (count)", "error", err)
+	g.Go(func() error {
+		return r.db.QueryRow(gCtx, countQuery, countArgs...).Scan(&total)
+	})
+
+	if err := g.Wait(); err != nil {
+		slog.ErrorContext(ctx, "database error in List", "error", err)
 		return nil, 0, apperror.NewInternal()
 	}
 
@@ -182,7 +185,7 @@ func (r *MaterialRepository) Delete(ctx context.Context, id string) error {
 		return apperror.NewInternal()
 	}
 	if tag.RowsAffected() == 0 {
-		return apperror.NewNotFound(appMaterial.ErrCodeMaterialNotFound, "material not found")
+		return apperror.NewNotFound(material.ErrCodeMaterialNotFound, "material not found")
 	}
 	return nil
 }

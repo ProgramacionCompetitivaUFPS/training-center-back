@@ -1,11 +1,12 @@
-package material
+package usecase
 
 import (
 	"context"
 	"log/slog"
 
 	"github.com/google/uuid"
-	"github.com/training-judge-center/backend/internal/domain/material"
+	"github.com/training-judge-center/backend/internal/application/material"
+	domainMaterial "github.com/training-judge-center/backend/internal/domain/material"
 	"github.com/training-judge-center/backend/internal/domain/shared"
 	"github.com/training-judge-center/backend/pkg/apperror"
 )
@@ -19,35 +20,35 @@ type CreateMaterialInput struct {
 }
 
 type CreateMaterialOutput struct {
-	Material *material.Material
+	Material *domainMaterial.Material
 }
 
-type CreateMaterialUseCase struct {
-	repo          material.Repository
-	groupProvider GroupProvider
-	memberProvider GroupMemberProvider
+type CreateMaterial struct {
+	repo           domainMaterial.Repository
+	groupProvider  material.GroupProvider
+	memberProvider material.GroupMemberProvider
 }
 
-func NewCreateMaterialUseCase(
-	repo material.Repository,
-	groupProvider GroupProvider,
-	memberProvider GroupMemberProvider,
-) *CreateMaterialUseCase {
-	return &CreateMaterialUseCase{
+func NewCreateMaterial(
+	repo domainMaterial.Repository,
+	groupProvider material.GroupProvider,
+	memberProvider material.GroupMemberProvider,
+) *CreateMaterial {
+	return &CreateMaterial{
 		repo:           repo,
 		groupProvider:  groupProvider,
 		memberProvider: memberProvider,
 	}
 }
 
-func (uc *CreateMaterialUseCase) Execute(ctx context.Context, in CreateMaterialInput) (*CreateMaterialOutput, error) {
+func (uc *CreateMaterial) Execute(ctx context.Context, in CreateMaterialInput) (*CreateMaterialOutput, error) {
 	exists, err := uc.groupProvider.Exists(ctx, in.GroupID)
 	if err != nil {
 		slog.ErrorContext(ctx, "failed to check group existence", "error", err, "group_id", in.GroupID)
 		return nil, apperror.NewInternal()
 	}
 	if !exists {
-		return nil, apperror.NewNotFound(ErrCodeGroupNotFound, "group not found")
+		return nil, apperror.NewNotFound(material.ErrCodeGroupNotFound, "group not found")
 	}
 
 	if !in.CurrentUser.IsAdmin() {
@@ -57,28 +58,33 @@ func (uc *CreateMaterialUseCase) Execute(ctx context.Context, in CreateMaterialI
 			return nil, apperror.NewInternal()
 		}
 		if !isLead {
-			return nil, apperror.NewForbidden(ErrCodeInsufficientPerms, "only group leads can create materials")
+			return nil, apperror.NewForbidden(material.ErrCodeInsufficientPerms, "only group leads can create materials")
 		}
 	}
 
 	var fieldErrs []apperror.FieldError
 
-	title, err := material.NewTitle(in.Title)
-	if err := apperror.AccumulateFieldErrors(err, &fieldErrs); err != nil {
+	title, titleErr := domainMaterial.NewTitle(in.Title)
+	if err := apperror.AccumulateFieldErrors(titleErr, &fieldErrs); err != nil {
 		return nil, err
 	}
 
-	contentStr := ""
+	var content domainMaterial.Content
 	if in.Content != nil {
-		contentStr = *in.Content
+		var contentErr error
+		content, contentErr = domainMaterial.NewContent(*in.Content)
+		if err := apperror.AccumulateFieldErrors(contentErr, &fieldErrs); err != nil {
+			return nil, err
+		}
+	} else {
+		content = domainMaterial.NewEmptyContent()
 	}
-	content, err := material.NewContent(contentStr)
-	if err := apperror.AccumulateFieldErrors(err, &fieldErrs); err != nil {
+	if err := apperror.AccumulateFieldErrors(contentErr, &fieldErrs); err != nil {
 		return nil, err
 	}
 
-	tags, err := material.NewTags(in.Tags)
-	if err := apperror.AccumulateFieldErrors(err, &fieldErrs); err != nil {
+	tags, tagsErr := domainMaterial.NewTags(in.Tags)
+	if err := apperror.AccumulateFieldErrors(tagsErr, &fieldErrs); err != nil {
 		return nil, err
 	}
 
@@ -86,7 +92,7 @@ func (uc *CreateMaterialUseCase) Execute(ctx context.Context, in CreateMaterialI
 		return nil, apperror.NewValidation(fieldErrs)
 	}
 
-	m, err := material.NewMaterial(
+	m, err := domainMaterial.NewMaterial(
 		uuid.New().String(),
 		in.GroupID,
 		shared.RestoreUserID(in.CurrentUser.ID),

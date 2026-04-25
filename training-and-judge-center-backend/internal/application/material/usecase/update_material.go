@@ -1,10 +1,11 @@
-package material
+package usecase
 
 import (
 	"context"
 	"log/slog"
 
-	"github.com/training-judge-center/backend/internal/domain/material"
+	"github.com/training-judge-center/backend/internal/application/material"
+	domainMaterial "github.com/training-judge-center/backend/internal/domain/material"
 	"github.com/training-judge-center/backend/internal/domain/shared"
 	"github.com/training-judge-center/backend/pkg/apperror"
 )
@@ -19,49 +20,53 @@ type UpdateMaterialInput struct {
 }
 
 type UpdateMaterialOutput struct {
-	Material *material.Material
+	Material *domainMaterial.Material
 }
 
-type UpdateMaterialUseCase struct {
-	repo          material.Repository
-	groupProvider GroupProvider
+type UpdateMaterial struct {
+	repo          domainMaterial.Repository
+	groupProvider material.GroupProvider
 }
 
-func NewUpdateMaterialUseCase(
-	repo material.Repository,
-	groupProvider GroupProvider,
-) *UpdateMaterialUseCase {
-	return &UpdateMaterialUseCase{repo: repo, groupProvider: groupProvider}
+func NewUpdateMaterial(
+	repo domainMaterial.Repository,
+	groupProvider material.GroupProvider,
+) *UpdateMaterial {
+	return &UpdateMaterial{repo: repo, groupProvider: groupProvider}
 }
 
-func (uc *UpdateMaterialUseCase) Execute(ctx context.Context, in UpdateMaterialInput) (*UpdateMaterialOutput, error) {
+func (uc *UpdateMaterial) Execute(ctx context.Context, in UpdateMaterialInput) (*UpdateMaterialOutput, error) {
 	exists, err := uc.groupProvider.Exists(ctx, in.GroupID)
 	if err != nil {
 		slog.ErrorContext(ctx, "failed to check group existence", "error", err, "group_id", in.GroupID)
 		return nil, apperror.NewInternal()
 	}
 	if !exists {
-		return nil, apperror.NewNotFound(ErrCodeGroupNotFound, "group not found")
+		return nil, apperror.NewNotFound(material.ErrCodeGroupNotFound, "group not found")
 	}
 
 	m, err := uc.repo.FindByID(ctx, in.MaterialID)
 	if err != nil {
-		return nil, err
+		if appErr, ok := err.(*apperror.AppError); ok && appErr.Code == domainMaterial.ErrCodeMaterialNotFound {
+			return nil, err
+		}
+		slog.ErrorContext(ctx, "failed to fetch material", "error", err, "material_id", in.MaterialID)
+		return nil, apperror.NewInternal()
 	}
 
 	if m.GroupID() != in.GroupID {
-		return nil, apperror.NewNotFound(ErrCodeMaterialNotFound, "material not found")
+		return nil, apperror.NewNotFound(domainMaterial.ErrCodeMaterialNotFound, "material not found")
 	}
 
 	if !m.CanBeEditedBy(shared.RestoreUserID(in.CurrentUser.ID), in.CurrentUser.IsAdmin()) {
-		return nil, apperror.NewForbidden(ErrCodeNotMaterialAuthor, "only the material author can update this material")
+		return nil, apperror.NewForbidden(material.ErrCodeNotMaterialAuthor, "only the material author can update this material")
 	}
 
 	var fieldErrs []apperror.FieldError
 
-	var title *material.Title
+	var title *domainMaterial.Title
 	if in.Title != nil {
-		t, tErr := material.NewTitle(*in.Title)
+		t, tErr := domainMaterial.NewTitle(*in.Title)
 		if err := apperror.AccumulateFieldErrors(tErr, &fieldErrs); err != nil {
 			return nil, err
 		}
@@ -70,9 +75,9 @@ func (uc *UpdateMaterialUseCase) Execute(ctx context.Context, in UpdateMaterialI
 		}
 	}
 
-	var content *material.Content
+	var content *domainMaterial.Content
 	if in.Content != nil {
-		c, cErr := material.NewContent(*in.Content)
+		c, cErr := domainMaterial.NewContent(*in.Content)
 		if err := apperror.AccumulateFieldErrors(cErr, &fieldErrs); err != nil {
 			return nil, err
 		}
@@ -81,9 +86,9 @@ func (uc *UpdateMaterialUseCase) Execute(ctx context.Context, in UpdateMaterialI
 		}
 	}
 
-	var tags *material.Tags
+	var tags *domainMaterial.Tags
 	if in.Tags != nil {
-		t, tErr := material.NewTags(*in.Tags)
+		t, tErr := domainMaterial.NewTags(*in.Tags)
 		if err := apperror.AccumulateFieldErrors(tErr, &fieldErrs); err != nil {
 			return nil, err
 		}

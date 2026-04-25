@@ -1,15 +1,16 @@
-package material
+package usecase
 
 import (
 	"context"
 	"errors"
 	"testing"
 
+	appMaterial "github.com/training-judge-center/backend/internal/application/material"
 	"github.com/training-judge-center/backend/pkg/apperror"
 )
 
-func newCreateUC(repo *mockMaterialRepository, group *mockGroupProvider, member *mockGroupMemberProvider) *CreateMaterialUseCase {
-	return NewCreateMaterialUseCase(repo, group, member)
+func newCreateUC(repo *mockMaterialRepository, group *mockGroupProvider, member *mockGroupMemberProvider) *CreateMaterial {
+	return NewCreateMaterial(repo, group, member)
 }
 
 func TestCreateMaterial_SuccessByLead(t *testing.T) {
@@ -65,7 +66,7 @@ func TestCreateMaterial_GroupNotFound(t *testing.T) {
 	})
 
 	var appErr *apperror.AppError
-	if !errors.As(err, &appErr) || appErr.Code != ErrCodeGroupNotFound {
+	if !errors.As(err, &appErr) || appErr.Code != appMaterial.ErrCodeGroupNotFound {
 		t.Errorf("expected GROUP_NOT_FOUND, got %v", err)
 	}
 }
@@ -80,7 +81,7 @@ func TestCreateMaterial_ForbiddenIfNotLead(t *testing.T) {
 	})
 
 	var appErr *apperror.AppError
-	if !errors.As(err, &appErr) || appErr.Code != ErrCodeInsufficientPerms {
+	if !errors.As(err, &appErr) || appErr.Code != appMaterial.ErrCodeInsufficientPerms {
 		t.Errorf("expected INSUFFICIENT_PERMISSIONS, got %v", err)
 	}
 }
@@ -95,7 +96,7 @@ func TestCreateMaterial_ForbiddenIfContestant(t *testing.T) {
 	})
 
 	var appErr *apperror.AppError
-	if !errors.As(err, &appErr) || appErr.Code != ErrCodeInsufficientPerms {
+	if !errors.As(err, &appErr) || appErr.Code != appMaterial.ErrCodeInsufficientPerms {
 		t.Errorf("expected INSUFFICIENT_PERMISSIONS, got %v", err)
 	}
 }

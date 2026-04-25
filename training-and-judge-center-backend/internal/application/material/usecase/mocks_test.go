@@ -1,4 +1,4 @@
-package material
+package usecase
 
 import (
 	"context"
@@ -16,10 +16,10 @@ func fixedClock() time.Time { return testNow }
 // ── Repository mock ──────────────────────────────────────────────────────────
 
 type mockMaterialRepository struct {
-	saveFn      func(ctx context.Context, m *domainMaterial.Material) error
-	findByIDFn  func(ctx context.Context, id string) (*domainMaterial.Material, error)
-	listFn      func(ctx context.Context, groupID string, f domainMaterial.ListFilters) ([]*domainMaterial.Material, int, error)
-	deleteFn    func(ctx context.Context, id string) error
+	saveFn     func(ctx context.Context, m *domainMaterial.Material) error
+	findByIDFn func(ctx context.Context, id string) (*domainMaterial.Material, error)
+	listFn     func(ctx context.Context, groupID string, f domainMaterial.ListFilters) ([]*domainMaterial.Material, int, error)
+	deleteFn   func(ctx context.Context, id string) error
 }
 
 func (m *mockMaterialRepository) Save(ctx context.Context, mat *domainMaterial.Material) error {
@@ -32,7 +32,7 @@ func (m *mockMaterialRepository) FindByID(ctx context.Context, id string) (*doma
 	if m.findByIDFn != nil {
 		return m.findByIDFn(ctx, id)
 	}
-	return nil, apperror.NewNotFound(ErrCodeMaterialNotFound, "material not found")
+	return nil, apperror.NewNotFound(domainMaterial.ErrCodeMaterialNotFound, "material not found")
 }
 func (m *mockMaterialRepository) List(ctx context.Context, groupID string, f domainMaterial.ListFilters) ([]*domainMaterial.Material, int, error) {
 	if m.listFn != nil {

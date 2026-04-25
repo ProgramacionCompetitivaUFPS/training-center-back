@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 
-	appMaterial "github.com/training-judge-center/backend/internal/application/material"
+	"github.com/training-judge-center/backend/internal/application/material/usecase"
 	"github.com/training-judge-center/backend/internal/domain/shared"
 	"github.com/training-judge-center/backend/internal/server/handler"
 	"github.com/training-judge-center/backend/internal/server/middleware"
@@ -13,13 +13,6 @@ import (
 
 func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
 	claims := middleware.GetClaims(r.Context())
-	if claims == nil {
-		handler.WriteJSON(w, http.StatusUnauthorized, apperror.AppError{
-			Code:    apperror.ErrCodeUnauthorized,
-			Message: "Invalid or missing authentication token",
-		})
-		return
-	}
 
 	groupID := r.PathValue("groupId")
 	if groupID == "" {
@@ -39,7 +32,7 @@ func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	out, err := h.createUC.Execute(r.Context(), appMaterial.CreateMaterialInput{
+	out, err := h.createUC.Execute(r.Context(), usecase.CreateMaterialInput{
 		CurrentUser: shared.CurrentUser{ID: claims.UserID, Role: claims.Role.String()},
 		GroupID:     groupID,
 		Title:       body.Title,
@@ -56,13 +49,6 @@ func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
 
 func (h *Handler) Update(w http.ResponseWriter, r *http.Request) {
 	claims := middleware.GetClaims(r.Context())
-	if claims == nil {
-		handler.WriteJSON(w, http.StatusUnauthorized, apperror.AppError{
-			Code:    apperror.ErrCodeUnauthorized,
-			Message: "Invalid or missing authentication token",
-		})
-		return
-	}
 
 	groupID := r.PathValue("groupId")
 	materialID := r.PathValue("materialId")
@@ -83,7 +69,7 @@ func (h *Handler) Update(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	out, err := h.updateUC.Execute(r.Context(), appMaterial.UpdateMaterialInput{
+	out, err := h.updateUC.Execute(r.Context(), usecase.UpdateMaterialInput{
 		CurrentUser: shared.CurrentUser{ID: claims.UserID, Role: claims.Role.String()},
 		GroupID:     groupID,
 		MaterialID:  materialID,

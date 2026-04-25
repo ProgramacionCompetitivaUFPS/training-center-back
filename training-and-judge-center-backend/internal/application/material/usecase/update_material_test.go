@@ -1,15 +1,16 @@
-package material
+package usecase
 
 import (
 	"context"
 	"errors"
 	"testing"
 
+	appMaterial "github.com/training-judge-center/backend/internal/application/material"
 	"github.com/training-judge-center/backend/pkg/apperror"
 )
 
-func newUpdateUC(repo *mockMaterialRepository, group *mockGroupProvider) *UpdateMaterialUseCase {
-	return NewUpdateMaterialUseCase(repo, group)
+func newUpdateUC(repo *mockMaterialRepository, group *mockGroupProvider) *UpdateMaterial {
+	return NewUpdateMaterial(repo, group)
 }
 
 func TestUpdateMaterial_SuccessByAuthor(t *testing.T) {
@@ -65,7 +66,7 @@ func TestUpdateMaterial_ForbiddenIfNotAuthor(t *testing.T) {
 	})
 
 	var appErr *apperror.AppError
-	if !errors.As(err, &appErr) || appErr.Code != ErrCodeNotMaterialAuthor {
+	if !errors.As(err, &appErr) || appErr.Code != appMaterial.ErrCodeNotMaterialAuthor {
 		t.Errorf("expected NOT_MATERIAL_AUTHOR, got %v", err)
 	}
 }
@@ -82,7 +83,7 @@ func TestUpdateMaterial_GroupNotFound(t *testing.T) {
 	})
 
 	var appErr *apperror.AppError
-	if !errors.As(err, &appErr) || appErr.Code != ErrCodeGroupNotFound {
+	if !errors.As(err, &appErr) || appErr.Code != appMaterial.ErrCodeGroupNotFound {
 		t.Errorf("expected GROUP_NOT_FOUND, got %v", err)
 	}
 }
@@ -99,7 +100,7 @@ func TestUpdateMaterial_MaterialNotFound(t *testing.T) {
 	})
 
 	var appErr *apperror.AppError
-	if !errors.As(err, &appErr) || appErr.Code != ErrCodeMaterialNotFound {
+	if !errors.As(err, &appErr) || appErr.Code != appMaterial.ErrCodeMaterialNotFound {
 		t.Errorf("expected MATERIAL_NOT_FOUND, got %v", err)
 	}
 }
@@ -117,7 +118,7 @@ func TestUpdateMaterial_MaterialNotInGroup(t *testing.T) {
 	})
 
 	var appErr *apperror.AppError
-	if !errors.As(err, &appErr) || appErr.Code != ErrCodeMaterialNotFound {
+	if !errors.As(err, &appErr) || appErr.Code != appMaterial.ErrCodeMaterialNotFound {
 		t.Errorf("expected MATERIAL_NOT_FOUND, got %v", err)
 	}
 }
