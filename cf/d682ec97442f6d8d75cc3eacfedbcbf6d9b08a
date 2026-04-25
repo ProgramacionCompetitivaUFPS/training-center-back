@@ -1,0 +1,27 @@
+training-and-judge-center-backend/pkg/timeutil/timeutil.go
+  ebc5e4b6903748c4 1-9
+training-and-judge-center-backend/internal/application/group/list_my_groups.go
+  ebc5e4b6903748c4 10
+training-and-judge-center-backend/internal/application/group/get_group.go
+  ebc5e4b6903748c4 10,114
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.3.4",
+  "base_commit_sha": "cfd682ec97442f6d8d75cc3eacfedbcbf6d9b08a",
+  "prompts": {
+    "ebc5e4b6903748c4": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "82ed38ba-964c-4378-83a2-6cb3ed2021f6",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "AlexaVJ",
+      "messages": [],
+      "total_additions": 456,
+      "total_deletions": 5,
+      "accepted_lines": 12,
+      "overriden_lines": 0
+    }
+  }
+}
