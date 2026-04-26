@@ -278,6 +278,34 @@ func TestUpdateMaterial_SaveRepositoryError(t *testing.T) {
 	}
 }
 
+func TestUpdateMaterial_NoOpAllNil_StillSavesAndUpdatesTimestamp(t *testing.T) {
+	m := newTestMaterial()
+	saved := false
+	repo := &mockMaterialRepository{
+		findByIDFn: func(_ context.Context, _ string) (*domainMaterial.Material, error) {
+			return m, nil
+		},
+		saveFn: func(_ context.Context, _ *domainMaterial.Material) error {
+			saved = true
+			return nil
+		},
+	}
+	uc := newUpdateUC(repo, groupExists())
+
+	_, err := uc.Execute(context.Background(), UpdateMaterialInput{
+		CurrentUser: asCoach(testAuthorID),
+		GroupID:     testGroupID,
+		MaterialID:  testMaterialID,
+	})
+
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !saved {
+		t.Error("expected repo.Save to be called even for a no-op update")
+	}
+}
+
 func TestUpdateMaterial_ValidationErrorEmptyTitle(t *testing.T) {
 	m := newTestMaterial()
 	uc := newUpdateUC(repoWith(m), groupExists())
