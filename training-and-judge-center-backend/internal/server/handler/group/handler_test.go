@@ -1,0 +1,333 @@
+package group
+
+import (
+	"context"
+	"encoding/json"
+	"net/http"
+	"net/http/httptest"
+	"testing"
+	"time"
+
+	appGroup "github.com/training-judge-center/backend/internal/application/group"
+	domainGroup "github.com/training-judge-center/backend/internal/domain/group"
+	"github.com/training-judge-center/backend/internal/domain/shared"
+	domainUser "github.com/training-judge-center/backend/internal/domain/user"
+	"github.com/training-judge-center/backend/internal/server/middleware"
+	"github.com/training-judge-center/backend/pkg/apperror"
+)
+
+type stubGroupRepo struct {
+	findByIDFn func(id string) (*domainGroup.Group, error)
+}
+
+func (s *stubGroupRepo) Save(_ context.Context, _ *domainGroup.Group) error { return nil }
+func (s *stubGroupRepo) FindByID(_ context.Context, id string) (*domainGroup.Group, error) {
+	if s.findByIDFn != nil {
+		return s.findByIDFn(id)
+	}
+	return nil, nil
+}
+func (s *stubGroupRepo) ExistsByName(_ context.Context, _ domainGroup.GroupName) (bool, error) {
+	return false, nil
+}
+func (s *stubGroupRepo) FindDefault(_ context.Context) (*domainGroup.Group, error) { return nil, nil }
+func (s *stubGroupRepo) Delete(_ context.Context, _ string) error                  { return nil }
+func (s *stubGroupRepo) List(_ context.Context, _ domainGroup.ListFilters) ([]*domainGroup.Group, int, error) {
+	return nil, 0, nil
+}
+
+type stubMemberRepo struct {
+	findByGroupAndUserFn func(groupID string, userID shared.UserID) (*domainGroup.GroupMember, error)
+	countMembersFn       func(groupID string) (int, error)
+	countLeadsFn         func(groupID string) (int, error)
+	listLeadsFn          func(groupID string) ([]*domainGroup.GroupMember, error)
+}
+
+func (s *stubMemberRepo) Save(_ context.Context, _ *domainGroup.GroupMember) error { return nil }
+func (s *stubMemberRepo) SaveAll(_ context.Context, _ []*domainGroup.GroupMember) error {
+	return nil
+}
+func (s *stubMemberRepo) FindByGroupAndUser(_ context.Context, groupID string, userID shared.UserID) (*domainGroup.GroupMember, error) {
+	if s.findByGroupAndUserFn != nil {
+		return s.findByGroupAndUserFn(groupID, userID)
+	}
+	return nil, nil
+}
+func (s *stubMemberRepo) FindByGroup(_ context.Context, _ string, _ domainGroup.MemberFilters) ([]*domainGroup.GroupMember, int, error) {
+	return nil, 0, nil
+}
+func (s *stubMemberRepo) Delete(_ context.Context, _ string, _ shared.UserID) error { return nil }
+func (s *stubMemberRepo) CountLeads(_ context.Context, groupID string) (int, error) {
+	if s.countLeadsFn != nil {
+		return s.countLeadsFn(groupID)
+	}
+	return 0, nil
+}
+func (s *stubMemberRepo) CountMembers(_ context.Context, groupID string) (int, error) {
+	if s.countMembersFn != nil {
+		return s.countMembersFn(groupID)
+	}
+	return 0, nil
+}
+func (s *stubMemberRepo) ListLeads(_ context.Context, groupID string) ([]*domainGroup.GroupMember, error) {
+	if s.listLeadsFn != nil {
+		return s.listLeadsFn(groupID)
+	}
+	return nil, nil
+}
+func (s *stubMemberRepo) BulkStats(_ context.Context, _ []string, _ shared.UserID) (map[string]domainGroup.MemberStats, error) {
+	return nil, nil
+}
+
+type stubUserProvider struct{}
+
+func (s *stubUserProvider) GetDisplays(_ context.Context, _ []string) (map[string]*appGroup.UserDisplay, error) {
+	return nil, nil
+}
+
+// stubPrefsReader is a no-op preferences reader for tests that don't reach the use case.
+type stubPrefsReader struct{}
+
+func (s *stubPrefsReader) HideGlobalGroup(_ context.Context, _ string) (bool, error) {
+	return false, nil
+}
+
+func stubHandler() *Handler {
+	repo := &stubGroupRepo{}
+	memberRepo := &stubMemberRepo{}
+	return NewHandler(
+		appGroup.NewCreateGroupUseCase(repo),
+		appGroup.NewListGroupsUseCase(repo, memberRepo),
+		appGroup.NewGetGroupUseCase(repo, memberRepo, &stubUserProvider{}),
+		appGroup.NewListMyGroupsUseCase(repo, memberRepo, &stubPrefsReader{}),
+	)
+}
+
+// mockTokenSvc always validates successfully with a contestant role.
+type mockTokenSvc struct{}
+
+func (m *mockTokenSvc) GenerateToken(_ *domainUser.User) (string, error) { return "tok", nil }
+func (m *mockTokenSvc) ValidateToken(_ string) (*domainUser.TokenClaims, error) {
+	return &domainUser.TokenClaims{UserID: "u1", Role: domainUser.RoleContestant}, nil
+}
+
+func authedRequest(method, target string) *http.Request {
+	r := httptest.NewRequest(method, target, nil)
+	r.Header.Set("Authorization", "Bearer tok")
+	return r
+}
+
+func wrapAuth(h http.Handler) http.Handler {
+	return middleware.Auth(&mockTokenSvc{}, nil)(h)
+}
+
+func TestListGroups_NonIntegerPageReturns400(t *testing.T) {
+	h := stubHandler()
+	w := httptest.NewRecorder()
+
+	wrapAuth(http.HandlerFunc(h.ListGroups)).ServeHTTP(w, authedRequest("GET", "/groups?page=abc"))
+
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400, got %d", w.Code)
+	}
+	var body apperror.AppError
+	if err := json.NewDecoder(w.Body).Decode(&body); err != nil {
+		t.Fatalf("could not decode response: %v", err)
+	}
+	if body.Code != apperror.ErrCodeValidationError {
+		t.Errorf("expected VALIDATION_ERROR, got %s", body.Code)
+	}
+}
+
+func TestListGroups_NonIntegerLimitReturns400(t *testing.T) {
+	h := stubHandler()
+	w := httptest.NewRecorder()
+
+	wrapAuth(http.HandlerFunc(h.ListGroups)).ServeHTTP(w, authedRequest("GET", "/groups?limit=xyz"))
+
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400, got %d", w.Code)
+	}
+	var body apperror.AppError
+	if err := json.NewDecoder(w.Body).Decode(&body); err != nil {
+		t.Fatalf("could not decode response: %v", err)
+	}
+	if body.Code != apperror.ErrCodeValidationError {
+		t.Errorf("expected VALIDATION_ERROR, got %s", body.Code)
+	}
+}
+
+func TestListMyGroups_NonIntegerPageReturns400(t *testing.T) {
+	h := stubHandler()
+	w := httptest.NewRecorder()
+
+	wrapAuth(http.HandlerFunc(h.ListMyGroups)).ServeHTTP(w, authedRequest("GET", "/users/me/groups?page=abc"))
+
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400, got %d", w.Code)
+	}
+}
+
+func TestGetGroup_NotFoundReturns404(t *testing.T) {
+	repo := &stubGroupRepo{
+		findByIDFn: func(_ string) (*domainGroup.Group, error) {
+			return nil, apperror.NewNotFound(domainGroup.ErrCodeGroupNotFound, "group not found")
+		},
+	}
+	h := NewHandler(
+		appGroup.NewCreateGroupUseCase(repo),
+		appGroup.NewListGroupsUseCase(repo, &stubMemberRepo{}),
+		appGroup.NewGetGroupUseCase(repo, &stubMemberRepo{}, &stubUserProvider{}),
+		appGroup.NewListMyGroupsUseCase(repo, &stubMemberRepo{}, &stubPrefsReader{}),
+	)
+
+	r := authedRequest("GET", "/groups/nonexistent")
+	r.SetPathValue("groupId", "nonexistent")
+	w := httptest.NewRecorder()
+
+	wrapAuth(http.HandlerFunc(h.GetGroup)).ServeHTTP(w, r)
+
+	if w.Code != http.StatusNotFound {
+		t.Fatalf("expected 404, got %d", w.Code)
+	}
+}
+
+func TestGetGroup_NonMemberHasNilRoleAndJoinedAt(t *testing.T) {
+	group := domainGroup.RestoreGroup(
+		"g-1", domainGroup.RestoreGroupName("Test Group"), nil,
+		domainGroup.VisibilityVisible, domainGroup.JoinPolicyOpen,
+		false, shared.RestoreUserID("author-1"), testTime(), testTime(),
+	)
+	repo := &stubGroupRepo{
+		findByIDFn: func(_ string) (*domainGroup.Group, error) { return group, nil },
+	}
+	// FindByGroupAndUser returns nil, nil — viewer is not a member
+	h := NewHandler(
+		appGroup.NewCreateGroupUseCase(repo),
+		appGroup.NewListGroupsUseCase(repo, &stubMemberRepo{}),
+		appGroup.NewGetGroupUseCase(repo, &stubMemberRepo{}, &stubUserProvider{}),
+		appGroup.NewListMyGroupsUseCase(repo, &stubMemberRepo{}, &stubPrefsReader{}),
+	)
+
+	r := authedRequest("GET", "/groups/g-1")
+	r.SetPathValue("groupId", "g-1")
+	w := httptest.NewRecorder()
+
+	wrapAuth(http.HandlerFunc(h.GetGroup)).ServeHTTP(w, r)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", w.Code)
+	}
+	var body getGroupResponse
+	if err := json.NewDecoder(w.Body).Decode(&body); err != nil {
+		t.Fatalf("could not decode response: %v", err)
+	}
+	if body.UserMembership.IsMember {
+		t.Error("expected IsMember=false for non-member")
+	}
+	if body.UserMembership.Role != nil {
+		t.Errorf("expected Role=nil for non-member, got %v", body.UserMembership.Role)
+	}
+	if body.UserMembership.JoinedAt != nil {
+		t.Errorf("expected JoinedAt=nil for non-member, got %v", body.UserMembership.JoinedAt)
+	}
+}
+
+func TestGetGroup_ResponseShape(t *testing.T) {
+	g := domainGroup.RestoreGroup(
+		"g-2", domainGroup.RestoreGroupName("My Group"), nil,
+		domainGroup.VisibilityVisible, domainGroup.JoinPolicyOpen,
+		false, shared.RestoreUserID("author-1"), testTime(), testTime(),
+	)
+	repo := &stubGroupRepo{
+		findByIDFn: func(_ string) (*domainGroup.Group, error) { return g, nil },
+	}
+	h := NewHandler(
+		appGroup.NewCreateGroupUseCase(repo),
+		appGroup.NewListGroupsUseCase(repo, &stubMemberRepo{}),
+		appGroup.NewGetGroupUseCase(repo, &stubMemberRepo{}, &stubUserProvider{}),
+		appGroup.NewListMyGroupsUseCase(repo, &stubMemberRepo{}, &stubPrefsReader{}),
+	)
+
+	r := authedRequest("GET", "/groups/g-2")
+	r.SetPathValue("groupId", "g-2")
+	w := httptest.NewRecorder()
+
+	wrapAuth(http.HandlerFunc(h.GetGroup)).ServeHTTP(w, r)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", w.Code)
+	}
+	var body getGroupResponse
+	if err := json.NewDecoder(w.Body).Decode(&body); err != nil {
+		t.Fatalf("could not decode response: %v", err)
+	}
+	if body.ID != "g-2" {
+		t.Errorf("expected ID=g-2, got %s", body.ID)
+	}
+	if body.Name != "My Group" {
+		t.Errorf("expected Name='My Group', got %s", body.Name)
+	}
+	if body.Visibility != "VISIBLE" {
+		t.Errorf("expected Visibility=VISIBLE, got %s", body.Visibility)
+	}
+	if body.CreatedAt == "" || body.UpdatedAt == "" {
+		t.Error("expected non-empty CreatedAt and UpdatedAt")
+	}
+}
+
+func testTime() time.Time {
+	return time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)
+}
+
+// --- buildPagination tests ---
+
+func TestBuildPagination_FirstPageOfMany_HasNextNoPrev(t *testing.T) {
+	p := buildPagination(30, 1, 3, 10)
+	if !p.HasNextPage {
+		t.Error("expected HasNextPage=true on page 1 of 3")
+	}
+	if p.HasPrevPage {
+		t.Error("expected HasPrevPage=false on page 1")
+	}
+}
+
+func TestBuildPagination_LastPage_HasPrevNoNext(t *testing.T) {
+	p := buildPagination(30, 3, 3, 10)
+	if p.HasNextPage {
+		t.Error("expected HasNextPage=false on last page")
+	}
+	if !p.HasPrevPage {
+		t.Error("expected HasPrevPage=true on page 3 of 3")
+	}
+}
+
+func TestBuildPagination_MiddlePage_HasBoth(t *testing.T) {
+	p := buildPagination(30, 2, 3, 10)
+	if !p.HasNextPage {
+		t.Error("expected HasNextPage=true on middle page")
+	}
+	if !p.HasPrevPage {
+		t.Error("expected HasPrevPage=true on middle page")
+	}
+}
+
+func TestBuildPagination_SinglePage_HasNeither(t *testing.T) {
+	p := buildPagination(5, 1, 1, 10)
+	if p.HasNextPage {
+		t.Error("expected HasNextPage=false on single page")
+	}
+	if p.HasPrevPage {
+		t.Error("expected HasPrevPage=false on single page")
+	}
+}
+
+func TestBuildPagination_ZeroResults_HasNeither(t *testing.T) {
+	p := buildPagination(0, 1, 0, 10)
+	if p.HasNextPage {
+		t.Error("expected HasNextPage=false with 0 results")
+	}
+	if p.HasPrevPage {
+		t.Error("expected HasPrevPage=false with 0 results")
+	}
+}

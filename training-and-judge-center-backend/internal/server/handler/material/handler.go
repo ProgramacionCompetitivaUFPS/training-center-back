@@ -1,9 +1,9 @@
-package group
+package material
 
 import (
 	"net/http"
 
-	appGroup "github.com/training-judge-center/backend/internal/application/group"
+	appMaterial "github.com/training-judge-center/backend/internal/application/material"
 	"github.com/training-judge-center/backend/internal/domain/shared"
 	"github.com/training-judge-center/backend/internal/server/handler"
 	"github.com/training-judge-center/backend/internal/server/middleware"
@@ -11,19 +11,12 @@ import (
 )
 
 type Handler struct {
-	createGroup  *appGroup.CreateGroupUseCase
-	listGroups   *appGroup.ListGroupsUseCase
-	getGroup     *appGroup.GetGroupUseCase
-	listMyGroups *appGroup.ListMyGroupsUseCase
+	createUC *appMaterial.CreateMaterial
+	updateUC *appMaterial.UpdateMaterial
 }
 
-func NewHandler(
-	createGroup  *appGroup.CreateGroupUseCase,
-	listGroups   *appGroup.ListGroupsUseCase,
-	getGroup     *appGroup.GetGroupUseCase,
-	listMyGroups *appGroup.ListMyGroupsUseCase,
-) *Handler {
-	return &Handler{createGroup: createGroup, listGroups: listGroups, getGroup: getGroup, listMyGroups: listMyGroups}
+func NewHandler(createUC *appMaterial.CreateMaterial, updateUC *appMaterial.UpdateMaterial) *Handler {
+	return &Handler{createUC: createUC, updateUC: updateUC}
 }
 
 func (h *Handler) requireCurrentUser(w http.ResponseWriter, r *http.Request) (*shared.CurrentUser, bool) {

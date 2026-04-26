@@ -12,6 +12,7 @@ import (
 	"github.com/redis/go-redis/v9"
 
 	appGroup "github.com/training-judge-center/backend/internal/application/group"
+	appMaterial "github.com/training-judge-center/backend/internal/application/material"
 	appProblem "github.com/training-judge-center/backend/internal/application/problem"
 	appuser "github.com/training-judge-center/backend/internal/application/user"
 	"github.com/training-judge-center/backend/internal/config"
@@ -20,13 +21,16 @@ import (
 	platformConfig "github.com/training-judge-center/backend/internal/platform/config"
 	"github.com/training-judge-center/backend/internal/platform/email"
 	platformGroup "github.com/training-judge-center/backend/internal/platform/group"
+	platformMaterial "github.com/training-judge-center/backend/internal/platform/material"
 	platformProblem "github.com/training-judge-center/backend/internal/platform/problem"
 	"github.com/training-judge-center/backend/internal/platform/ratelimit"
 	platformUser "github.com/training-judge-center/backend/internal/platform/user"
 	"github.com/training-judge-center/backend/internal/server"
 	"github.com/training-judge-center/backend/internal/server/handler"
 	handlerGroup "github.com/training-judge-center/backend/internal/server/handler/group"
-	"github.com/training-judge-center/backend/internal/server/handler/problem"
+	handlerMaterial "github.com/training-judge-center/backend/internal/server/handler/material"
+	handlerProblem "github.com/training-judge-center/backend/internal/server/handler/problem"
+	handlerUser "github.com/training-judge-center/backend/internal/server/handler/user"
 )
 
 func main() {
@@ -119,7 +123,7 @@ func main() {
 	changeAccessibilityUseCase := appProblem.NewChangeAccessibilityUseCase(problemRepo)
 	deleteProblemUseCase := appProblem.NewDeleteProblemUseCase(problemRepo, fileStorage)
 
-	problemHandler := problem.NewHandler(
+	problemHandler := handlerProblem.NewHandler(
 		createProblemUseCase,
 		importProblemUseCase,
 		updateProblemUseCase,
@@ -167,20 +171,41 @@ func main() {
 	requestDeactUC := appuser.NewRequestDeactivationUseCase(userRepo, deactRepo, emailSender)
 	confirmDeactUC := appuser.NewConfirmDeactivationUseCase(userRepo, deactRepo, auditRepo, emailSender, sessionInvalidator, txManager)
 
-	// Group repositories & use cases
-	groupRepo := platformGroup.NewGroupRepository(dbPool)
-	createGroupUseCase := appGroup.NewCreateGroupUseCase(groupRepo)
-	groupHandler := handlerGroup.NewGroupHandler(createGroupUseCase)
-
 	// Handlers
-	userHandler := handler.NewUserHandler(createUserUC, getUserProfileUC, updateUserUC, updatePasswordUC, adminUpdateUserUC, adminDeactivateUserUC, listUsersUC, requestEmailChangeUC, confirmEmailChangeUC, requestPasswordRecoveryUC, resetPasswordUC, requestDeactUC, confirmDeactUC)
+	userHandler := handlerUser.NewUserHandler(createUserUC, getUserProfileUC, updateUserUC, updatePasswordUC, adminUpdateUserUC, adminDeactivateUserUC, listUsersUC, requestEmailChangeUC, confirmEmailChangeUC, requestPasswordRecoveryUC, resetPasswordUC, requestDeactUC, confirmDeactUC)
 	authHandler := handler.NewAuthHandler(loginUC)
 
+	// Group repositories & platform adapters
+	groupRepo := platformGroup.NewGroupRepository(dbPool)
+	groupMemberRepo := platformGroup.NewMemberRepository(dbPool)
+	groupUserProvider := platformGroup.NewUserProvider(dbPool)
+	groupPrefsReader := platformGroup.NewPreferencesReader(dbPool)
+
+	// Group use cases
+	createGroupUseCase := appGroup.NewCreateGroupUseCase(groupRepo)
+	listGroupsUC := appGroup.NewListGroupsUseCase(groupRepo, groupMemberRepo)
+	getGroupUC := appGroup.NewGetGroupUseCase(groupRepo, groupMemberRepo, groupUserProvider)
+	listMyGroupsUC := appGroup.NewListMyGroupsUseCase(groupRepo, groupMemberRepo, groupPrefsReader)
+
+	groupHandler := handlerGroup.NewHandler(createGroupUseCase, listGroupsUC, getGroupUC, listMyGroupsUC)
+
+	// Material platform adapters
+	materialRepo := platformMaterial.NewMaterialRepository(dbPool)
+	groupProvider := platformMaterial.NewGroupProvider(dbPool)
+	groupMemberProvider := platformMaterial.NewGroupMemberProvider(dbPool)
+
+	// Material use cases
+	createMaterialUC := appMaterial.NewCreateMaterial(materialRepo, groupProvider, groupMemberProvider)
+	updateMaterialUC := appMaterial.NewUpdateMaterial(materialRepo, groupProvider)
+
+	materialHandler := handlerMaterial.NewHandler(createMaterialUC, updateMaterialUC)
+
 	router := server.NewRouter(&server.Handlers{
-		Problem: problemHandler,
-		User:    userHandler,
-		Auth:    authHandler,
-		Group:   groupHandler,
+		Problem:  problemHandler,
+		User:     userHandler,
+		Auth:     authHandler,
+		Group:    groupHandler,
+		Material: materialHandler,
 	}, &server.Services{
 		TokenService:       jwtService,
 		SessionInvalidator: sessionInvalidator,

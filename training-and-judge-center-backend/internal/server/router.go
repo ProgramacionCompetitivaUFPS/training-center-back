@@ -5,16 +5,19 @@ import (
 	chimw "github.com/go-chi/chi/v5/middleware"
 	"github.com/training-judge-center/backend/internal/domain/user"
 	"github.com/training-judge-center/backend/internal/server/handler"
-	handlerGroup "github.com/training-judge-center/backend/internal/server/handler/group"
+	"github.com/training-judge-center/backend/internal/server/handler/group"
+	handlerMaterial "github.com/training-judge-center/backend/internal/server/handler/material"
 	"github.com/training-judge-center/backend/internal/server/handler/problem"
+	handlerUser "github.com/training-judge-center/backend/internal/server/handler/user"
 	"github.com/training-judge-center/backend/internal/server/middleware"
 )
 
 type Handlers struct {
-	Problem *problem.Handler
-	User    *handler.UserHandler
-	Auth    *handler.AuthHandler
-	Group   *handlerGroup.GroupHandler
+	Problem  *problem.Handler
+	User     *handlerUser.UserHandler
+	Auth     *handler.AuthHandler
+	Group    *group.Handler
+	Material *handlerMaterial.Handler
 }
 
 type Services struct {
@@ -38,6 +41,13 @@ func NewRouter(h *Handlers, s *Services) *chi.Mux {
 
 		r.Route("/groups", func(r chi.Router) {
 			r.Post("/", h.Group.Create)
+			r.Get("/", h.Group.ListGroups)
+			r.Get("/{groupId}", h.Group.GetGroup)
+
+			r.Route("/{groupId}/materials", func(r chi.Router) {
+				r.Post("/", h.Material.Create)
+				r.Patch("/{materialId}", h.Material.Update)
+			})
 		})
 
 		r.Route("/problems", func(r chi.Router) {
@@ -80,6 +90,7 @@ func NewRouter(h *Handlers, s *Services) *chi.Mux {
 		r.Use(middleware.Auth(s.TokenService, s.SessionInvalidator))
 
 		r.Get("/users/me", h.User.GetMyProfile)
+		r.Get("/users/me/groups", h.Group.ListMyGroups)
 		r.Get("/users/{nickname}", h.User.GetByNickname)
 		r.Put("/users", h.User.UpdateProfile)
 		r.Put("/users/password", h.User.UpdatePassword)

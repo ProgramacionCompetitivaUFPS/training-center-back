@@ -113,7 +113,7 @@ As the author of a material, I want to clear certain fields so that I can remove
 ### Endpoint
 
 ```
-PUT /groups/{groupId}/materials/{materialId}
+PATCH /groups/{groupId}/materials/{materialId}
 ```
 
 ### Request Headers

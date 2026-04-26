@@ -30,7 +30,7 @@ type groupResponse struct {
 	UpdatedAt   string  `json:"updatedAt"`
 }
 
-func (h *GroupHandler) Create(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
 	claims := middleware.GetClaims(r.Context())
 	if claims == nil {
 		handler.WriteJSON(w, http.StatusUnauthorized, apperror.AppError{
