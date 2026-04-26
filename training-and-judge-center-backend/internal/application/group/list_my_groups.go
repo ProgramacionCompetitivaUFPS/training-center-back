@@ -56,16 +56,7 @@ func (uc *ListMyGroupsUseCase) Execute(ctx context.Context, in ListMyGroupsInput
 		return nil, err
 	}
 
-	filters := domainGroup.ListFilters{
-		Search:         strings.TrimSpace(in.Search),
-		Page:           in.Page,
-		Limit:          in.Limit,
-		ViewerID:       shared.RestoreUserID(in.CurrentUser.ID),
-		ViewerIsAdmin:  false,
-		OnlyMyGroups:   true,
-		ExcludeDefault: hide,
-	}
-
+	membership := &domainGroup.MembershipFilter{}
 	if in.Role != nil {
 		r, err := domainGroup.NewMemberRole(*in.Role)
 		if err != nil {
@@ -73,7 +64,17 @@ func (uc *ListMyGroupsUseCase) Execute(ctx context.Context, in ListMyGroupsInput
 				{Field: "role", Message: "invalid role; must be MEMBER or LEAD"},
 			})
 		}
-		filters.RoleFilter = &r
+		membership.RoleFilter = &r
+	}
+
+	filters := domainGroup.ListFilters{
+		Search:         strings.TrimSpace(in.Search),
+		Page:           in.Page,
+		Limit:          in.Limit,
+		ViewerID:       shared.RestoreUserID(in.CurrentUser.ID),
+		ViewerIsAdmin:  false,
+		OnlyMyGroups:   membership,
+		ExcludeDefault: hide,
 	}
 
 	sortBy, err := parseSort(in.SortBy, domainGroup.SortByName, []domainGroup.SortField{

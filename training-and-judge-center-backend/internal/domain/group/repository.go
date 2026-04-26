@@ -22,6 +22,10 @@ const (
 	OrderDesc SortOrder = "desc"
 )
 
+type MembershipFilter struct {
+	RoleFilter *MemberRole
+}
+
 type ListFilters struct {
 	Search     string
 	Visibility *Visibility
@@ -34,9 +38,7 @@ type ListFilters struct {
 	ViewerID      shared.UserID
 	ViewerIsAdmin bool
 
-	OnlyMyGroups bool
-
-	RoleFilter *MemberRole
+	OnlyMyGroups *MembershipFilter
 
 	ExcludeDefault bool
 }

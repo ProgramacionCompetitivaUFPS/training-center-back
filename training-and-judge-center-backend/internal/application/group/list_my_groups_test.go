@@ -52,8 +52,8 @@ func TestListMyGroups_ExcludeDefaultSetWhenPreferenceTrue(t *testing.T) {
 	if !repo.lastFilters.ExcludeDefault {
 		t.Error("expected ExcludeDefault=true when hideGlobalGroup=true")
 	}
-	if !repo.lastFilters.OnlyMyGroups {
-		t.Error("expected OnlyMyGroups=true")
+	if repo.lastFilters.OnlyMyGroups == nil {
+		t.Error("expected OnlyMyGroups to be set")
 	}
 }
 

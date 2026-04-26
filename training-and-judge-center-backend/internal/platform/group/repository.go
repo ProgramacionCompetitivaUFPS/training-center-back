@@ -69,14 +69,14 @@ func (r *GroupRepository) List(ctx context.Context, filters domainGroup.ListFilt
 	// Register viewerID upfront when it may appear in WHERE or ORDER BY,
 	// so its placeholder index is stable regardless of condition order.
 	viewerArg := func() string { return "" }
-	if filters.OnlyMyGroups || !filters.ViewerIsAdmin || filters.SortBy == domainGroup.SortByJoinedAt {
+	if filters.OnlyMyGroups != nil || !filters.ViewerIsAdmin || filters.SortBy == domainGroup.SortByJoinedAt {
 		placeholder := nextArg(filters.ViewerID.Value())
 		viewerArg = func() string { return placeholder }
 	}
 
-	if filters.OnlyMyGroups {
-		if filters.RoleFilter != nil {
-			roleArg := nextArg(string(*filters.RoleFilter))
+	if filters.OnlyMyGroups != nil {
+		if filters.OnlyMyGroups.RoleFilter != nil {
+			roleArg := nextArg(string(*filters.OnlyMyGroups.RoleFilter))
 			conds = append(conds, fmt.Sprintf(
 				"EXISTS (SELECT 1 FROM group_members gm WHERE gm.group_id = g.id AND gm.user_id = %s AND gm.member_role = %s)",
 				viewerArg(), roleArg,
