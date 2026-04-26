@@ -71,6 +71,26 @@ func TestUpdateMaterial_ForbiddenIfNotAuthor(t *testing.T) {
 	}
 }
 
+func TestUpdateMaterial_GroupProviderError(t *testing.T) {
+	group := &mockGroupProvider{
+		existsFn: func(_ context.Context, _ string) (bool, error) {
+			return false, errors.New("redis timeout")
+		},
+	}
+	uc := newUpdateUC(&mockMaterialRepository{}, group)
+	newTitle := "Title"
+	_, err := uc.Execute(context.Background(), UpdateMaterialInput{
+		CurrentUser: asCoach(testAuthorID),
+		GroupID:     testGroupID,
+		MaterialID:  testMaterialID,
+		Title:       &newTitle,
+	})
+	var appErr *apperror.AppError
+	if !errors.As(err, &appErr) || appErr.Code != apperror.ErrCodeInternalError {
+		t.Errorf("expected INTERNAL_ERROR from group provider error, got %v", err)
+	}
+}
+
 func TestUpdateMaterial_GroupNotFound(t *testing.T) {
 	uc := newUpdateUC(&mockMaterialRepository{}, groupNotFound())
 
