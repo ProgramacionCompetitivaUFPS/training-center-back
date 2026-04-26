@@ -60,10 +60,44 @@ func (m *mockGroupProvider) Exists(ctx context.Context, groupID string) (bool, e
 	return true, nil
 }
 
+// ── GroupVisibilityProvider mock ─────────────────────────────────────────────
+
+type mockGroupVisibilityProvider struct {
+	findVisibilityFn func(ctx context.Context, groupID string) (string, bool, error)
+}
+
+func (m *mockGroupVisibilityProvider) FindVisibility(ctx context.Context, groupID string) (string, bool, error) {
+	if m.findVisibilityFn != nil {
+		return m.findVisibilityFn(ctx, groupID)
+	}
+	return "VISIBLE", true, nil
+}
+
+func visibleGroup() *mockGroupVisibilityProvider {
+	return &mockGroupVisibilityProvider{}
+}
+
+func notVisibleGroup() *mockGroupVisibilityProvider {
+	return &mockGroupVisibilityProvider{
+		findVisibilityFn: func(_ context.Context, _ string) (string, bool, error) {
+			return "NOT_VISIBLE", true, nil
+		},
+	}
+}
+
+func groupVisibilityNotFound() *mockGroupVisibilityProvider {
+	return &mockGroupVisibilityProvider{
+		findVisibilityFn: func(_ context.Context, _ string) (string, bool, error) {
+			return "", false, nil
+		},
+	}
+}
+
 // ── GroupMemberProvider mock ─────────────────────────────────────────────────
 
 type mockGroupMemberProvider struct {
-	isLeadFn func(ctx context.Context, userID, groupID string) (bool, error)
+	isLeadFn    func(ctx context.Context, userID, groupID string) (bool, error)
+	isMemberFn  func(ctx context.Context, userID, groupID string) (bool, error)
 }
 
 func (m *mockGroupMemberProvider) IsLeadOfGroup(ctx context.Context, userID, groupID string) (bool, error) {
@@ -72,6 +106,53 @@ func (m *mockGroupMemberProvider) IsLeadOfGroup(ctx context.Context, userID, gro
 	}
 	return false, nil
 }
+
+func (m *mockGroupMemberProvider) IsMemberOfGroup(ctx context.Context, userID, groupID string) (bool, error) {
+	if m.isMemberFn != nil {
+		return m.isMemberFn(ctx, userID, groupID)
+	}
+	return false, nil
+}
+
+func isLead() *mockGroupMemberProvider {
+	return &mockGroupMemberProvider{
+		isLeadFn:   func(_ context.Context, _, _ string) (bool, error) { return true, nil },
+		isMemberFn: func(_ context.Context, _, _ string) (bool, error) { return true, nil },
+	}
+}
+
+func notLead() *mockGroupMemberProvider {
+	return &mockGroupMemberProvider{
+		isLeadFn:   func(_ context.Context, _, _ string) (bool, error) { return false, nil },
+		isMemberFn: func(_ context.Context, _, _ string) (bool, error) { return false, nil },
+	}
+}
+
+func isMemberNotLead() *mockGroupMemberProvider {
+	return &mockGroupMemberProvider{
+		isLeadFn:   func(_ context.Context, _, _ string) (bool, error) { return false, nil },
+		isMemberFn: func(_ context.Context, _, _ string) (bool, error) { return true, nil },
+	}
+}
+
+// ── AuthorProvider mock ──────────────────────────────────────────────────────
+
+type mockAuthorProvider struct {
+	getDisplaysFn func(ctx context.Context, userIDs []string) (map[string]*AuthorDisplay, error)
+}
+
+func (m *mockAuthorProvider) GetDisplays(ctx context.Context, userIDs []string) (map[string]*AuthorDisplay, error) {
+	if m.getDisplaysFn != nil {
+		return m.getDisplaysFn(ctx, userIDs)
+	}
+	result := make(map[string]*AuthorDisplay, len(userIDs))
+	for _, id := range userIDs {
+		result[id] = &AuthorDisplay{Nickname: "author", Name: "Author Name"}
+	}
+	return result, nil
+}
+
+func noopAuthorProvider() *mockAuthorProvider { return &mockAuthorProvider{} }
 
 // ── CurrentUser helpers ──────────────────────────────────────────────────────
 
@@ -105,10 +186,36 @@ func newTestMaterial() *domainMaterial.Material {
 	).WithClock(fixedClock)
 }
 
+func newPublishedMaterial() *domainMaterial.Material {
+	now := testNow
+	return domainMaterial.RestoreMaterial(
+		testMaterialID,
+		testGroupID,
+		shared.RestoreUserID(testAuthorID),
+		"Test Title",
+		"",
+		nil,
+		"PUBLISHED",
+		false,
+		nil,
+		testNow,
+		testNow,
+		&now,
+	).WithClock(fixedClock)
+}
+
 func repoWith(m *domainMaterial.Material) *mockMaterialRepository {
 	return &mockMaterialRepository{
 		findByIDFn: func(_ context.Context, _ string) (*domainMaterial.Material, error) {
 			return m, nil
+		},
+	}
+}
+
+func repoWithList(materials []*domainMaterial.Material) *mockMaterialRepository {
+	return &mockMaterialRepository{
+		listFn: func(_ context.Context, _ string, _ domainMaterial.ListFilters) ([]*domainMaterial.Material, int, error) {
+			return materials, len(materials), nil
 		},
 	}
 }
@@ -119,12 +226,4 @@ func groupExists() *mockGroupProvider {
 
 func groupNotFound() *mockGroupProvider {
 	return &mockGroupProvider{existsFn: func(_ context.Context, _ string) (bool, error) { return false, nil }}
-}
-
-func isLead() *mockGroupMemberProvider {
-	return &mockGroupMemberProvider{isLeadFn: func(_ context.Context, _, _ string) (bool, error) { return true, nil }}
-}
-
-func notLead() *mockGroupMemberProvider {
-	return &mockGroupMemberProvider{isLeadFn: func(_ context.Context, _, _ string) (bool, error) { return false, nil }}
 }

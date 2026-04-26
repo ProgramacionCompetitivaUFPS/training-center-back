@@ -39,9 +39,18 @@ type stubGroupProvider struct{}
 
 func (s *stubGroupProvider) Exists(_ context.Context, _ string) (bool, error) { return true, nil }
 
+type stubGroupVisibilityProvider struct{}
+
+func (s *stubGroupVisibilityProvider) FindVisibility(_ context.Context, _ string) (string, bool, error) {
+	return "VISIBLE", true, nil
+}
+
 type stubGroupMemberProvider struct{}
 
 func (s *stubGroupMemberProvider) IsLeadOfGroup(_ context.Context, _, _ string) (bool, error) {
+	return true, nil
+}
+func (s *stubGroupMemberProvider) IsMemberOfGroup(_ context.Context, _, _ string) (bool, error) {
 	return true, nil
 }
 
@@ -50,11 +59,26 @@ type stubNotLeadMemberProvider struct{}
 func (s *stubNotLeadMemberProvider) IsLeadOfGroup(_ context.Context, _, _ string) (bool, error) {
 	return false, nil
 }
+func (s *stubNotLeadMemberProvider) IsMemberOfGroup(_ context.Context, _, _ string) (bool, error) {
+	return true, nil
+}
+
+type stubAuthorProvider struct{}
+
+func (s *stubAuthorProvider) GetDisplays(_ context.Context, ids []string) (map[string]*appMaterial.AuthorDisplay, error) {
+	out := make(map[string]*appMaterial.AuthorDisplay, len(ids))
+	for _, id := range ids {
+		out[id] = &appMaterial.AuthorDisplay{Nickname: "author", Name: "Author Name"}
+	}
+	return out, nil
+}
 
 func stubHandler() *Handler {
 	return NewHandler(
 		appMaterial.NewCreateMaterial(&stubMaterialRepo{}, &stubGroupProvider{}, &stubGroupMemberProvider{}),
 		appMaterial.NewUpdateMaterial(&stubMaterialRepo{}, &stubGroupProvider{}),
+		appMaterial.NewGetMaterial(&stubMaterialRepo{}, &stubGroupVisibilityProvider{}, &stubGroupMemberProvider{}, &stubAuthorProvider{}),
+		appMaterial.NewListMaterials(&stubMaterialRepo{}, &stubGroupVisibilityProvider{}, &stubGroupMemberProvider{}, &stubAuthorProvider{}),
 	)
 }
 
@@ -166,6 +190,8 @@ func TestCreateMaterial_Forbidden_Returns403(t *testing.T) {
 	h := NewHandler(
 		appMaterial.NewCreateMaterial(&stubMaterialRepo{}, &stubGroupProvider{}, &stubNotLeadMemberProvider{}),
 		appMaterial.NewUpdateMaterial(&stubMaterialRepo{}, &stubGroupProvider{}),
+		appMaterial.NewGetMaterial(&stubMaterialRepo{}, &stubGroupVisibilityProvider{}, &stubGroupMemberProvider{}, &stubAuthorProvider{}),
+		appMaterial.NewListMaterials(&stubMaterialRepo{}, &stubGroupVisibilityProvider{}, &stubGroupMemberProvider{}, &stubAuthorProvider{}),
 	)
 
 	body, _ := json.Marshal(map[string]string{"title": "My Material"})
@@ -201,6 +227,8 @@ func TestUpdateMaterial_ValidRequest_Returns200(t *testing.T) {
 				return mat, nil
 			},
 		}, &stubGroupProvider{}),
+		appMaterial.NewGetMaterial(&stubMaterialRepo{}, &stubGroupVisibilityProvider{}, &stubGroupMemberProvider{}, &stubAuthorProvider{}),
+		appMaterial.NewListMaterials(&stubMaterialRepo{}, &stubGroupVisibilityProvider{}, &stubGroupMemberProvider{}, &stubAuthorProvider{}),
 	)
 
 	body, _ := json.Marshal(map[string]string{"title": "Updated"})
@@ -290,5 +318,183 @@ func TestUpdateMaterial_InvalidBody_Returns400(t *testing.T) {
 	}
 	if resp.Code != apperror.ErrCodeValidationError {
 		t.Errorf("expected VALIDATION_ERROR, got %s", resp.Code)
+	}
+}
+
+// ── Get handler tests ─────────────────────────────────────────────────────────
+
+func TestGetMaterial_Unauthenticated_Returns401(t *testing.T) {
+	h := stubHandler()
+	r := httptest.NewRequest(http.MethodGet, "/groups/g1/materials/m1", nil)
+	r.SetPathValue("groupId", "g1")
+	r.SetPathValue("materialId", "m1")
+	w := httptest.NewRecorder()
+
+	http.HandlerFunc(h.Get).ServeHTTP(w, r)
+
+	if w.Code != http.StatusUnauthorized {
+		t.Fatalf("expected 401, got %d", w.Code)
+	}
+}
+
+func TestGetMaterial_MissingPathParams_Returns400(t *testing.T) {
+	h := stubHandler()
+	r := authedRequest(http.MethodGet, "/groups//materials/", nil)
+	w := httptest.NewRecorder()
+
+	wrapAuth(http.HandlerFunc(h.Get)).ServeHTTP(w, r)
+
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400, got %d", w.Code)
+	}
+}
+
+func TestGetMaterial_NotFound_Returns404(t *testing.T) {
+	h := stubHandler() // stubMaterialRepo returns 404 by default
+	r := authedRequest(http.MethodGet, "/groups/g1/materials/missing", nil)
+	r.SetPathValue("groupId", "g1")
+	r.SetPathValue("materialId", "missing")
+	w := httptest.NewRecorder()
+
+	wrapAuth(http.HandlerFunc(h.Get)).ServeHTTP(w, r)
+
+	if w.Code != http.StatusNotFound {
+		t.Fatalf("expected 404, got %d", w.Code)
+	}
+}
+
+func TestGetMaterial_ValidRequest_Returns200(t *testing.T) {
+	mat := domainMaterial.RestoreMaterial(
+		"m1", "g1", shared.RestoreUserID("u1"),
+		"Title", "", nil, "PUBLISHED", false, nil,
+		time.Now(), time.Now(), nil,
+	)
+	repo := &stubMaterialRepo{
+		findByIDFn: func(_ context.Context, _ string) (*domainMaterial.Material, error) {
+			return mat, nil
+		},
+	}
+	h := NewHandler(
+		appMaterial.NewCreateMaterial(repo, &stubGroupProvider{}, &stubGroupMemberProvider{}),
+		appMaterial.NewUpdateMaterial(repo, &stubGroupProvider{}),
+		appMaterial.NewGetMaterial(repo, &stubGroupVisibilityProvider{}, &stubGroupMemberProvider{}, &stubAuthorProvider{}),
+		appMaterial.NewListMaterials(repo, &stubGroupVisibilityProvider{}, &stubGroupMemberProvider{}, &stubAuthorProvider{}),
+	)
+
+	r := authedRequest(http.MethodGet, "/groups/g1/materials/m1", nil)
+	r.SetPathValue("groupId", "g1")
+	r.SetPathValue("materialId", "m1")
+	w := httptest.NewRecorder()
+
+	wrapAuth(http.HandlerFunc(h.Get)).ServeHTTP(w, r)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+	var resp materialDetailResponse
+	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
+		t.Fatalf("could not decode response: %v", err)
+	}
+	if resp.Title != "Title" {
+		t.Errorf("expected title 'Title', got %q", resp.Title)
+	}
+	if resp.Author == nil {
+		t.Error("expected author to be populated")
+	}
+}
+
+// ── List handler tests ────────────────────────────────────────────────────────
+
+func TestListMaterials_Unauthenticated_Returns401(t *testing.T) {
+	h := stubHandler()
+	r := httptest.NewRequest(http.MethodGet, "/groups/g1/materials", nil)
+	r.SetPathValue("groupId", "g1")
+	w := httptest.NewRecorder()
+
+	http.HandlerFunc(h.List).ServeHTTP(w, r)
+
+	if w.Code != http.StatusUnauthorized {
+		t.Fatalf("expected 401, got %d", w.Code)
+	}
+}
+
+func TestListMaterials_MissingGroupId_Returns400(t *testing.T) {
+	h := stubHandler()
+	r := authedRequest(http.MethodGet, "/groups//materials", nil)
+	w := httptest.NewRecorder()
+
+	wrapAuth(http.HandlerFunc(h.List)).ServeHTTP(w, r)
+
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400, got %d", w.Code)
+	}
+}
+
+func TestListMaterials_InvalidPage_Returns400(t *testing.T) {
+	h := stubHandler()
+	r := authedRequest(http.MethodGet, "/groups/g1/materials?page=0", nil)
+	r.SetPathValue("groupId", "g1")
+	w := httptest.NewRecorder()
+
+	wrapAuth(http.HandlerFunc(h.List)).ServeHTTP(w, r)
+
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400, got %d", w.Code)
+	}
+	var resp apperror.AppError
+	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
+		t.Fatalf("could not decode error: %v", err)
+	}
+	if resp.Code != apperror.ErrCodeValidationError {
+		t.Errorf("expected VALIDATION_ERROR, got %s", resp.Code)
+	}
+}
+
+func TestListMaterials_InvalidLimit_Returns400(t *testing.T) {
+	h := stubHandler()
+	r := authedRequest(http.MethodGet, "/groups/g1/materials?limit=101", nil)
+	r.SetPathValue("groupId", "g1")
+	w := httptest.NewRecorder()
+
+	wrapAuth(http.HandlerFunc(h.List)).ServeHTTP(w, r)
+
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400, got %d", w.Code)
+	}
+}
+
+func TestListMaterials_ValidRequest_Returns200WithPagination(t *testing.T) {
+	h := stubHandler() // repo.List returns empty slice by default
+	r := authedRequest(http.MethodGet, "/groups/g1/materials", nil)
+	r.SetPathValue("groupId", "g1")
+	w := httptest.NewRecorder()
+
+	wrapAuth(http.HandlerFunc(h.List)).ServeHTTP(w, r)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+	var resp listMaterialsResponse
+	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
+		t.Fatalf("could not decode response: %v", err)
+	}
+	if resp.Materials == nil {
+		t.Error("expected materials array, got nil")
+	}
+	if resp.Pagination.ItemsPerPage != appMaterial.DefaultLimit {
+		t.Errorf("expected itemsPerPage=%d, got %d", appMaterial.DefaultLimit, resp.Pagination.ItemsPerPage)
+	}
+}
+
+func TestListMaterials_InvalidPinnedParam_Returns400(t *testing.T) {
+	h := stubHandler()
+	r := authedRequest(http.MethodGet, "/groups/g1/materials?pinned=notabool", nil)
+	r.SetPathValue("groupId", "g1")
+	w := httptest.NewRecorder()
+
+	wrapAuth(http.HandlerFunc(h.List)).ServeHTTP(w, r)
+
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400, got %d", w.Code)
 	}
 }

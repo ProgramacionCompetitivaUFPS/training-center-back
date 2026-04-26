@@ -76,6 +76,22 @@ func NewRouter(h *Handlers, s *Services) *chi.Mux {
 		})
 	})
 
+	r.Group(func(r chi.Router) {
+		r.Use(middleware.Auth(s.TokenService, s.SessionInvalidator))
+
+		r.Route("/groups", func(r chi.Router) {
+			r.Get("/", h.Group.ListGroups)
+			r.Get("/{groupId}", h.Group.GetGroup)
+
+		r.Route("/{groupId}/materials", func(r chi.Router) {
+				r.Post("/", h.Material.Create)
+				r.Patch("/{materialId}", h.Material.Update)
+				r.Get("/", h.Material.List)
+				r.Get("/{materialId}", h.Material.Get)
+			})
+		})
+	})
+
 	// Public user routes
 	r.Post("/users", h.User.Create)
 	r.Post("/password/forgot", h.User.RequestPasswordRecovery)
