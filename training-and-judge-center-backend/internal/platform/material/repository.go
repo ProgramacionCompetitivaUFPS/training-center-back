@@ -156,7 +156,7 @@ func (r *MaterialRepository) List(ctx context.Context, groupID string, filters m
 		for rows.Next() {
 			m, err := scanMaterial(rows)
 			if err != nil {
-				return err
+				return fmt.Errorf("scanning material row: %w", err)
 			}
 			result = append(result, m)
 		}
