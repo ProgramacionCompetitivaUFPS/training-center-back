@@ -46,16 +46,11 @@ func buildResponse(m appMaterial.MaterialData) materialResponse {
 		publishedAt = &s
 	}
 
-	tags := m.Tags
-	if tags == nil {
-		tags = []string{}
-	}
-
 	return materialResponse{
 		ID:          m.ID,
 		Title:       m.Title,
 		Content:     m.Content,
-		Tags:        tags,
+		Tags:        m.Tags,
 		Status:      m.Status,
 		Pinned:      m.Pinned,
 		PinnedAt:    pinnedAt,

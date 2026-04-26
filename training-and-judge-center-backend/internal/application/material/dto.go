@@ -22,13 +22,17 @@ type MaterialData struct {
 }
 
 func toMaterialData(m *domainMaterial.Material) MaterialData {
+	tags := m.Tags().Values()
+	if tags == nil {
+		tags = []string{}
+	}
 	return MaterialData{
 		ID:          m.ID(),
 		GroupID:     m.GroupID(),
 		AuthorID:    m.AuthorID().Value(),
 		Title:       m.Title().String(),
 		Content:     m.Content().String(),
-		Tags:        m.Tags().Values(),
+		Tags:        tags,
 		Status:      m.Status().String(),
 		Pinned:      m.Pinned(),
 		PinnedAt:    m.PinnedAt(),
