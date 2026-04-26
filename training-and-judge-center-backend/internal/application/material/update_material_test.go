@@ -215,6 +215,30 @@ func TestUpdateMaterial_ImmutableFields(t *testing.T) {
 	}
 }
 
+func TestUpdateMaterial_SaveRepositoryError(t *testing.T) {
+	m := newTestMaterial()
+	repo := &mockMaterialRepository{
+		findByIDFn: func(_ context.Context, _ string) (*domainMaterial.Material, error) {
+			return m, nil
+		},
+		saveFn: func(_ context.Context, _ *domainMaterial.Material) error {
+			return errors.New("db connection lost")
+		},
+	}
+	uc := newUpdateUC(repo, groupExists())
+	newTitle := "Updated"
+	_, err := uc.Execute(context.Background(), UpdateMaterialInput{
+		CurrentUser: asCoach(testAuthorID),
+		GroupID:     testGroupID,
+		MaterialID:  testMaterialID,
+		Title:       &newTitle,
+	})
+	var appErr *apperror.AppError
+	if !errors.As(err, &appErr) || appErr.Code != apperror.ErrCodeInternalError {
+		t.Errorf("expected INTERNAL_ERROR from save failure, got %v", err)
+	}
+}
+
 func TestUpdateMaterial_ValidationErrorEmptyTitle(t *testing.T) {
 	m := newTestMaterial()
 	uc := newUpdateUC(repoWith(m), groupExists())
