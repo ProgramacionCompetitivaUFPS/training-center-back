@@ -108,7 +108,7 @@ func (uc *ListMyGroupsUseCase) Execute(ctx context.Context, in ListMyGroupsInput
 	items := make([]MyGroupItem, 0, len(groups))
 	for _, g := range groups {
 		s := stats[g.ID()]
-		if s.Membership == nil {
+		if !s.IsMember {
 			slog.WarnContext(ctx, "BulkStats returned no membership for listed group; possible TOCTOU",
 				"group_id", g.ID(), "viewer_id", filters.ViewerID.Value())
 			continue
@@ -116,8 +116,8 @@ func (uc *ListMyGroupsUseCase) Execute(ctx context.Context, in ListMyGroupsInput
 		items = append(items, MyGroupItem{
 			Group:       g,
 			MemberCount: s.Count,
-			MyRole:      s.Membership.Role(),
-			JoinedAt:    s.Membership.JoinedAt(),
+			MyRole:      s.Role,
+			JoinedAt:    s.JoinedAt,
 		})
 	}
 

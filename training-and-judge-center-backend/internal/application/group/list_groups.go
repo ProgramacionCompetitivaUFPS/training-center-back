@@ -115,8 +115,8 @@ func (uc *ListGroupsUseCase) Execute(ctx context.Context, in ListGroupsInput) (*
 	for _, g := range groups {
 		s := stats[g.ID()]
 		var role *domainGroup.MemberRole
-		if s.Membership != nil {
-			r := s.Membership.Role()
+		if s.IsMember {
+			r := s.Role
 			role = &r
 		}
 		items = append(items, ListedGroup{

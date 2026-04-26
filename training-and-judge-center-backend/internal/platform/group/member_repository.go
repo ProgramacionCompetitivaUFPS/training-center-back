@@ -141,10 +141,13 @@ func (r *MemberRepository) BulkStats(ctx context.Context, groupIDs []string, vie
 
 	result := make(map[string]domainGroup.MemberStats, len(groupIDs))
 	for _, gid := range groupIDs {
-		result[gid] = domainGroup.MemberStats{
-			Count:      counts[gid],
-			Membership: memberships[gid],
+		s := domainGroup.MemberStats{Count: counts[gid]}
+		if m := memberships[gid]; m != nil {
+			s.IsMember = true
+			s.Role = m.Role()
+			s.JoinedAt = m.JoinedAt()
 		}
+		result[gid] = s
 	}
 	return result, nil
 }

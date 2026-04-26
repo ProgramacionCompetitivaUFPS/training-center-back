@@ -2,6 +2,7 @@ package group
 
 import (
 	"context"
+	"time"
 
 	"github.com/training-judge-center/backend/internal/domain/shared"
 )
@@ -59,8 +60,10 @@ type Repository interface {
 }
 
 type MemberStats struct {
-	Count      int
-	Membership *GroupMember
+	Count    int
+	IsMember bool
+	Role     MemberRole
+	JoinedAt time.Time
 }
 
 type MemberRepository interface {

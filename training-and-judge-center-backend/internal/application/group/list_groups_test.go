@@ -78,10 +78,13 @@ func (f *fakeMemberRepo) ListLeads(ctx context.Context, groupID string) ([]*doma
 func (f *fakeMemberRepo) BulkStats(ctx context.Context, groupIDs []string, viewerID shared.UserID) (map[string]domainGroup.MemberStats, error) {
 	result := make(map[string]domainGroup.MemberStats, len(groupIDs))
 	for _, gid := range groupIDs {
-		result[gid] = domainGroup.MemberStats{
-			Count:      f.memberCounts[gid],
-			Membership: f.memberships[keyOf(gid, viewerID)],
+		s := domainGroup.MemberStats{Count: f.memberCounts[gid]}
+		if m := f.memberships[keyOf(gid, viewerID)]; m != nil {
+			s.IsMember = true
+			s.Role = m.Role()
+			s.JoinedAt = m.JoinedAt()
 		}
+		result[gid] = s
 	}
 	return result, nil
 }
