@@ -28,7 +28,11 @@ Go backend (DDD + Hexagonal). Layers: `domain` → `application` → `platform` 
 - Use cases: `Execute(ctx, input) (output, error)`
 - Domain construction: `New*()` validates and returns `AppError` on failure
 - DB reconstruction: `Restore*()` bypasses validation — trust the DB
-- Ports (interfaces for external deps): `application/problem/ports.go`
+- Ports (interfaces for external deps): viven donde los necesita quien los consume.
+  - Puertos de **use cases**: en `application/<domain>/ports.go` (ej. `UserProvider`, `ZipParser` en `problem`).
+  - Puertos de **dominio**: en archivos propios dentro de `domain/<domain>/` (ej. `TokenService`, `SessionInvalidator`, `TransactionManager` en `user` — son contratos que el dominio mismo define).
+  - DTOs compartidos entre use cases de un mismo dominio: en `application/<domain>/dto.go` (ej. `UserDTO` en `user`).
+- Handlers: `handler.go` define el struct con `*UseCase` concretos (no interfaces); un archivo `*_handler.go` por operación; `types.go` para DTOs de respuesta compartidos dentro del mismo handler package.
 - Errors: always via `pkg/apperror`
 
 ## Non-obvious decisions
@@ -39,4 +43,4 @@ Go backend (DDD + Hexagonal). Layers: `domain` → `application` → `platform` 
 
 **Cross-domain primitives:** `UserID` and `CurrentUser` live in `domain/shared/`. Each domain defines its own local types for display/enrichment (e.g., `application/problem/ports.go` defines `UserDisplay` locally). Platform adapters per domain implement the local port (e.g., `platform/problem/user_provider.go` queries the `users` table). Don't import `domain/user` from other domains.
 
-**`domain/user/user.go`** is a stub — not the real User domain yet. Ignore it.
+**Dominios en progreso:** `domain/group/` y `domain/material/` tienen implementación de dominio + tests, pero sin application layer ni handlers todavía. `application/contest/`, `application/submission/`, `platform/mongo/`, `platform/queue/`, `platform/storage/` son directorios placeholder para trabajo futuro — están vacíos intencionalmente.
