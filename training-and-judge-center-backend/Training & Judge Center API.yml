@@ -11,6 +11,8 @@ config:
           secret: true
         - name: token_admin
           secret: true
+        - name: token_contestant
+          secret: true
 items:
   - info:
       name: Admin
@@ -767,6 +769,100 @@ items:
           auth:
             type: bearer
             token: '{{token}}'
+        settings:
+          encodeUrl: true
+          timeout: 0
+          followRedirects: true
+          maxRedirects: 5
+      - info:
+          name: Create Group
+          type: http
+          seq: 4
+        http:
+          method: POST
+          url: '{{baseUrl}}/groups'
+          body:
+            type: json
+            data: |-
+              {
+                "name": "Grupo de prueba",
+                "description": "Descripción del grupo",
+                "joinMode": "OPEN",
+                "visibility": "VISIBLE"
+              }
+          auth:
+            type: bearer
+            token: '{{token}}'
+        settings:
+          encodeUrl: true
+          timeout: 0
+          followRedirects: true
+          maxRedirects: 5
+      - info:
+          name: Create Group - Private
+          type: http
+          seq: 5
+        http:
+          method: POST
+          url: '{{baseUrl}}/groups'
+          body:
+            type: json
+            data: |-
+              {
+                "name": "Grupo privado",
+                "description": null,
+                "joinMode": "INVITE",
+                "visibility": "NOT_VISIBLE"
+              }
+          auth:
+            type: bearer
+            token: '{{token}}'
+        settings:
+          encodeUrl: true
+          timeout: 0
+          followRedirects: true
+          maxRedirects: 5
+      - info:
+          name: Create Group - Invalid combination
+          type: http
+          seq: 6
+        http:
+          method: POST
+          url: '{{baseUrl}}/groups'
+          body:
+            type: json
+            data: |-
+              {
+                "name": "Grupo inválido",
+                "joinMode": "OPEN",
+                "visibility": "NOT_VISIBLE"
+              }
+          auth:
+            type: bearer
+            token: '{{token}}'
+        settings:
+          encodeUrl: true
+          timeout: 0
+          followRedirects: true
+          maxRedirects: 5
+      - info:
+          name: Create Group - Contestant
+          type: http
+          seq: 7
+        http:
+          method: POST
+          url: '{{baseUrl}}/groups'
+          body:
+            type: json
+            data: |-
+              {
+                "name": "Grupo sin permiso",
+                "joinMode": "OPEN",
+                "visibility": "VISIBLE"
+              }
+          auth:
+            type: bearer
+            token: '{{token_contestant}}'
         settings:
           encodeUrl: true
           timeout: 0
