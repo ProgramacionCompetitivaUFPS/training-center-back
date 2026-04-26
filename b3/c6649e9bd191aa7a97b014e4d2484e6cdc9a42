@@ -1,0 +1,23 @@
+training-and-judge-center-backend/internal/server/handler/group/handler_test.go
+  126ca936170b293f 9,19-21,23-27,39-44,50-53,60-75,169-329
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.3.4",
+  "base_commit_sha": "b3c6649e9bd191aa7a97b014e4d2484e6cdc9a42",
+  "prompts": {
+    "126ca936170b293f": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "4638d5ce-5ce5-4815-9b2e-75426ea864a2",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "AlexaVJ",
+      "messages": [],
+      "total_additions": 209,
+      "total_deletions": 351,
+      "accepted_lines": 849,
+      "overriden_lines": 0
+    }
+  }
+}
