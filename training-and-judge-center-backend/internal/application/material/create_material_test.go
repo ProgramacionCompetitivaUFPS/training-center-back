@@ -5,6 +5,7 @@ import (
 	"errors"
 	"testing"
 
+	domainMaterial "github.com/training-judge-center/backend/internal/domain/material"
 	"github.com/training-judge-center/backend/pkg/apperror"
 )
 
@@ -112,6 +113,24 @@ func TestCreateMaterial_ValidationErrorEmptyTitle(t *testing.T) {
 	var appErr *apperror.AppError
 	if !errors.As(err, &appErr) || appErr.Code != apperror.ErrCodeValidationError {
 		t.Errorf("expected VALIDATION_ERROR, got %v", err)
+	}
+}
+
+func TestCreateMaterial_SaveRepositoryError(t *testing.T) {
+	repo := &mockMaterialRepository{
+		saveFn: func(_ context.Context, _ *domainMaterial.Material) error {
+			return errors.New("db connection lost")
+		},
+	}
+	uc := newCreateUC(repo, groupExists(), isLead())
+	_, err := uc.Execute(context.Background(), CreateMaterialInput{
+		CurrentUser: asCoach(testAuthorID),
+		GroupID:     testGroupID,
+		Title:       "Hello World",
+	})
+	var appErr *apperror.AppError
+	if !errors.As(err, &appErr) || appErr.Code != apperror.ErrCodeInternalError {
+		t.Errorf("expected INTERNAL_ERROR from save failure, got %v", err)
 	}
 }
 
