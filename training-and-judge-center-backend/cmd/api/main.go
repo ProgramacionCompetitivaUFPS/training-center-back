@@ -12,6 +12,7 @@ import (
 	"github.com/redis/go-redis/v9"
 
 	appGroup "github.com/training-judge-center/backend/internal/application/group"
+	appMaterial "github.com/training-judge-center/backend/internal/application/material"
 	appProblem "github.com/training-judge-center/backend/internal/application/problem"
 	appuser "github.com/training-judge-center/backend/internal/application/user"
 	"github.com/training-judge-center/backend/internal/config"
@@ -20,12 +21,14 @@ import (
 	platformConfig "github.com/training-judge-center/backend/internal/platform/config"
 	"github.com/training-judge-center/backend/internal/platform/email"
 	platformGroup "github.com/training-judge-center/backend/internal/platform/group"
+	platformMaterial "github.com/training-judge-center/backend/internal/platform/material"
 	platformProblem "github.com/training-judge-center/backend/internal/platform/problem"
 	"github.com/training-judge-center/backend/internal/platform/ratelimit"
 	platformUser "github.com/training-judge-center/backend/internal/platform/user"
 	"github.com/training-judge-center/backend/internal/server"
 	"github.com/training-judge-center/backend/internal/server/handler"
 	handlerGroup "github.com/training-judge-center/backend/internal/server/handler/group"
+	handlerMaterial "github.com/training-judge-center/backend/internal/server/handler/material"
 	handlerProblem "github.com/training-judge-center/backend/internal/server/handler/problem"
 	handlerUser "github.com/training-judge-center/backend/internal/server/handler/user"
 )
@@ -185,11 +188,22 @@ func main() {
 
 	groupHandler := handlerGroup.NewHandler(listGroupsUC, getGroupUC, listMyGroupsUC)
 
+	// Material platform adapters & use cases
+	materialRepo := platformMaterial.NewMaterialRepository(dbPool)
+	groupProvider := platformMaterial.NewGroupProvider(dbPool)
+	groupMemberProvider := platformMaterial.NewGroupMemberProvider(dbPool)
+
+	createMaterialUC := appMaterial.NewCreateMaterial(materialRepo, groupProvider, groupMemberProvider)
+	updateMaterialUC := appMaterial.NewUpdateMaterial(materialRepo, groupProvider)
+
+	materialHandler := handlerMaterial.NewHandler(createMaterialUC, updateMaterialUC)
+
 	router := server.NewRouter(&server.Handlers{
-		Problem: problemHandler,
-		User:    userHandler,
-		Auth:    authHandler,
-		Group:   groupHandler,
+		Problem:  problemHandler,
+		User:     userHandler,
+		Auth:     authHandler,
+		Group:    groupHandler,
+		Material: materialHandler,
 	}, &server.Services{
 		TokenService:       jwtService,
 		SessionInvalidator: sessionInvalidator,
