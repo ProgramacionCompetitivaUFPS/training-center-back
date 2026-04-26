@@ -72,7 +72,7 @@ func (r *MaterialRepository) FindByID(ctx context.Context, id string) (*material
 		WHERE id = $1
 	`
 	row := r.db.QueryRow(ctx, query, id)
-	m, err := scanMaterial(row)
+	m, err := scanMaterial(ctx, row)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, apperror.NewNotFound(material.ErrCodeMaterialNotFound, "material not found")
@@ -154,7 +154,7 @@ func (r *MaterialRepository) List(ctx context.Context, groupID string, filters m
 		}
 		defer rows.Close()
 		for rows.Next() {
-			m, err := scanMaterial(rows)
+			m, err := scanMaterial(gCtx, rows)
 			if err != nil {
 				return fmt.Errorf("scanning material row: %w", err)
 			}
@@ -191,7 +191,7 @@ func (r *MaterialRepository) Delete(ctx context.Context, id string) error {
 	return nil
 }
 
-func scanMaterial(row pgx.Row) (*material.Material, error) {
+func scanMaterial(ctx context.Context, row pgx.Row) (*material.Material, error) {
 	var id, groupID, authorID, title, content, status string
 	var tags []string
 	var pinned bool
@@ -206,7 +206,7 @@ func scanMaterial(row pgx.Row) (*material.Material, error) {
 		return nil, err
 	}
 
-	return material.RestoreMaterial(
+	m := material.RestoreMaterial(
 		id,
 		groupID,
 		shared.RestoreUserID(authorID),
@@ -219,5 +219,9 @@ func scanMaterial(row pgx.Row) (*material.Material, error) {
 		createdAt,
 		updatedAt,
 		publishedAt,
-	), nil
+	)
+	if !m.Status().IsDraft() && !m.Status().IsPublished() {
+		slog.WarnContext(ctx, "unrecognised material status restored from DB", "material_id", id, "status", status)
+	}
+	return m, nil
 }

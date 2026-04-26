@@ -28,6 +28,8 @@ func (p *GroupProvider) Exists(ctx context.Context, groupID string) (bool, error
 	return exists, nil
 }
 
+const memberRoleLead = "LEAD"
+
 type GroupMemberProvider struct {
 	db *pgxpool.Pool
 }
@@ -49,5 +51,8 @@ func (p *GroupMemberProvider) IsLeadOfGroup(ctx context.Context, userID, groupID
 		slog.ErrorContext(ctx, "GroupMemberProvider.IsLeadOfGroup failed", "error", err, "group_id", groupID, "user_id", userID)
 		return false, apperror.NewInternal()
 	}
-	return role == "LEAD", nil
+	if role != "" && role != memberRoleLead {
+		slog.WarnContext(ctx, "unrecognised group member role", "role", role, "group_id", groupID, "user_id", userID)
+	}
+	return role == memberRoleLead, nil
 }

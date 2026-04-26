@@ -45,6 +45,12 @@ func (s *stubGroupMemberProvider) IsLeadOfGroup(_ context.Context, _, _ string) 
 	return true, nil
 }
 
+type stubNotLeadMemberProvider struct{}
+
+func (s *stubNotLeadMemberProvider) IsLeadOfGroup(_ context.Context, _, _ string) (bool, error) {
+	return false, nil
+}
+
 func stubHandler() *Handler {
 	return NewHandler(
 		appMaterial.NewCreateMaterial(&stubMaterialRepo{}, &stubGroupProvider{}, &stubGroupMemberProvider{}),
@@ -92,7 +98,7 @@ func TestCreateMaterial_Unauthenticated_Returns401(t *testing.T) {
 	}
 }
 
-func TestCreateMaterial_MissingGroupId_Returns400(t *testing.T) {
+func TestCreateMaterial_EmptyGroupId_Returns400(t *testing.T) {
 	h := stubHandler()
 	body, _ := json.Marshal(map[string]string{"title": "Hello"})
 	r := authedRequest(http.MethodPost, "/groups//materials", body)
@@ -104,7 +110,9 @@ func TestCreateMaterial_MissingGroupId_Returns400(t *testing.T) {
 		t.Fatalf("expected 400, got %d", w.Code)
 	}
 	var resp apperror.AppError
-	json.NewDecoder(w.Body).Decode(&resp)
+	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
+		t.Fatalf("could not decode error response: %v (body: %s)", err, w.Body.String())
+	}
 	if resp.Code != apperror.ErrCodeBadRequest {
 		t.Errorf("expected BAD_REQUEST, got %s", resp.Code)
 	}
@@ -122,7 +130,9 @@ func TestCreateMaterial_InvalidBody_Returns400(t *testing.T) {
 		t.Fatalf("expected 400, got %d", w.Code)
 	}
 	var resp apperror.AppError
-	json.NewDecoder(w.Body).Decode(&resp)
+	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
+		t.Fatalf("could not decode error response: %v (body: %s)", err, w.Body.String())
+	}
 	if resp.Code != apperror.ErrCodeValidationError {
 		t.Errorf("expected VALIDATION_ERROR, got %s", resp.Code)
 	}
@@ -149,6 +159,31 @@ func TestCreateMaterial_ValidRequest_Returns201(t *testing.T) {
 	}
 	if resp.Status != "DRAFT" {
 		t.Errorf("expected status DRAFT, got %q", resp.Status)
+	}
+}
+
+func TestCreateMaterial_Forbidden_Returns403(t *testing.T) {
+	h := NewHandler(
+		appMaterial.NewCreateMaterial(&stubMaterialRepo{}, &stubGroupProvider{}, &stubNotLeadMemberProvider{}),
+		appMaterial.NewUpdateMaterial(&stubMaterialRepo{}, &stubGroupProvider{}),
+	)
+
+	body, _ := json.Marshal(map[string]string{"title": "My Material"})
+	r := authedRequest(http.MethodPost, "/groups/g1/materials", body)
+	r.SetPathValue("groupId", "g1")
+	w := httptest.NewRecorder()
+
+	wrapAuth(http.HandlerFunc(h.Create)).ServeHTTP(w, r)
+
+	if w.Code != http.StatusForbidden {
+		t.Fatalf("expected 403, got %d: %s", w.Code, w.Body.String())
+	}
+	var resp apperror.AppError
+	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
+		t.Fatalf("could not decode error response: %v (body: %s)", err, w.Body.String())
+	}
+	if resp.Code != appMaterial.ErrCodeInsufficientPerms {
+		t.Errorf("expected INSUFFICIENT_PERMISSIONS, got %s", resp.Code)
 	}
 }
 
@@ -180,7 +215,9 @@ func TestUpdateMaterial_ValidRequest_Returns200(t *testing.T) {
 		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
 	}
 	var resp materialResponse
-	json.NewDecoder(w.Body).Decode(&resp)
+	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
+		t.Fatalf("could not decode response: %v (body: %s)", err, w.Body.String())
+	}
 	if resp.Title != "Updated" {
 		t.Errorf("expected title 'Updated', got %q", resp.Title)
 	}
@@ -227,7 +264,9 @@ func TestUpdateMaterial_MissingPathParams_Returns400(t *testing.T) {
 		t.Fatalf("expected 400, got %d", w.Code)
 	}
 	var resp apperror.AppError
-	json.NewDecoder(w.Body).Decode(&resp)
+	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
+		t.Fatalf("could not decode error response: %v (body: %s)", err, w.Body.String())
+	}
 	if resp.Code != apperror.ErrCodeBadRequest {
 		t.Errorf("expected BAD_REQUEST, got %s", resp.Code)
 	}
@@ -246,7 +285,9 @@ func TestUpdateMaterial_InvalidBody_Returns400(t *testing.T) {
 		t.Fatalf("expected 400, got %d", w.Code)
 	}
 	var resp apperror.AppError
-	json.NewDecoder(w.Body).Decode(&resp)
+	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
+		t.Fatalf("could not decode error response: %v (body: %s)", err, w.Body.String())
+	}
 	if resp.Code != apperror.ErrCodeValidationError {
 		t.Errorf("expected VALIDATION_ERROR, got %s", resp.Code)
 	}

@@ -13,10 +13,10 @@ import (
 )
 
 type Handlers struct {
-	Problem *problem.Handler
-	User    *handlerUser.UserHandler
-	Auth    *handler.AuthHandler
-	Group   *group.Handler
+	Problem  *problem.Handler
+	User     *handlerUser.UserHandler
+	Auth     *handler.AuthHandler
+	Group    *group.Handler
 	Material *handlerMaterial.Handler
 }
 

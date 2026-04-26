@@ -188,11 +188,12 @@ func main() {
 
 	groupHandler := handlerGroup.NewHandler(listGroupsUC, getGroupUC, listMyGroupsUC)
 
-	// Material platform adapters & use cases
+	// Material platform adapters
 	materialRepo := platformMaterial.NewMaterialRepository(dbPool)
 	groupProvider := platformMaterial.NewGroupProvider(dbPool)
 	groupMemberProvider := platformMaterial.NewGroupMemberProvider(dbPool)
 
+	// Material use cases
 	createMaterialUC := appMaterial.NewCreateMaterial(materialRepo, groupProvider, groupMemberProvider)
 	updateMaterialUC := appMaterial.NewUpdateMaterial(materialRepo, groupProvider)
 

@@ -174,10 +174,8 @@ func (m *Material) UpdateMetadata(title *Title, content *Content, tags *Tags) {
 	m.updatedAt = m.now()
 }
 
-// CanBeEditedBy returns true if the given user may edit this material.
-// Edit rights are based on authorship, not on current group role — a user
-// who created a material retains edit rights even if later demoted or removed
-// from the group. Only admins can edit materials they did not author.
+// Edit rights are tied to authorship, not current group membership — a user
+// who created a material retains edit rights even if later demoted or removed.
 func (m *Material) CanBeEditedBy(userID shared.UserID, isAdmin bool) bool {
 	return isAdmin || m.authorID == userID
 }

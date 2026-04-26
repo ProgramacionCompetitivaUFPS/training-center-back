@@ -51,7 +51,8 @@ func (uc *UpdateMaterial) Execute(ctx context.Context, in UpdateMaterialInput) (
 		return nil, err
 	}
 
-	if m.GroupID() != in.GroupID {
+	// Treat material in another group as not found to avoid cross-group existence leak.
+		if m.GroupID() != in.GroupID {
 		return nil, apperror.NewNotFound(domainMaterial.ErrCodeMaterialNotFound, "material not found")
 	}
 

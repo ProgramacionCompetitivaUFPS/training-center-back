@@ -111,7 +111,7 @@ func TestUpdateMaterial_GroupNotFound(t *testing.T) {
 func TestUpdateMaterial_FindByIDInternalError(t *testing.T) {
 	repo := &mockMaterialRepository{
 		findByIDFn: func(_ context.Context, _ string) (*domainMaterial.Material, error) {
-			return nil, errors.New("db timeout")
+			return nil, apperror.NewInternal()
 		},
 	}
 	uc := newUpdateUC(repo, groupExists())
@@ -122,8 +122,9 @@ func TestUpdateMaterial_FindByIDInternalError(t *testing.T) {
 		MaterialID:  testMaterialID,
 		Title:       &newTitle,
 	})
-	if err == nil {
-		t.Error("expected error from FindByID failure, got nil")
+	var appErr *apperror.AppError
+	if !errors.As(err, &appErr) || appErr.Code != apperror.ErrCodeInternalError {
+		t.Errorf("expected INTERNAL_ERROR from FindByID failure, got %v", err)
 	}
 }
 
