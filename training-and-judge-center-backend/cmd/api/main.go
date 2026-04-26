@@ -23,7 +23,7 @@ import (
 	platformUser "github.com/training-judge-center/backend/internal/platform/user"
 	"github.com/training-judge-center/backend/internal/server"
 	"github.com/training-judge-center/backend/internal/server/handler"
-	"github.com/training-judge-center/backend/internal/server/handler/problem"
+	handlerProblem "github.com/training-judge-center/backend/internal/server/handler/problem"
 	handlerUser "github.com/training-judge-center/backend/internal/server/handler/user"
 )
 
@@ -117,7 +117,7 @@ func main() {
 	changeAccessibilityUseCase := appProblem.NewChangeAccessibilityUseCase(problemRepo)
 	deleteProblemUseCase := appProblem.NewDeleteProblemUseCase(problemRepo, fileStorage)
 
-	problemHandler := problem.NewHandler(
+	problemHandler := handlerProblem.NewHandler(
 		createProblemUseCase,
 		importProblemUseCase,
 		updateProblemUseCase,

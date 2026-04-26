@@ -32,7 +32,7 @@ Go backend (DDD + Hexagonal). Layers: `domain` → `application` → `platform` 
   - Puertos de **use cases**: en `application/<domain>/ports.go` (ej. `UserProvider`, `ZipParser` en `problem`).
   - Puertos de **dominio**: en archivos propios dentro de `domain/<domain>/` (ej. `TokenService`, `SessionInvalidator`, `TransactionManager` en `user` — son contratos que el dominio mismo define).
   - DTOs compartidos entre use cases de un mismo dominio: en `application/<domain>/dto.go` (ej. `UserDTO` en `user`).
-- Handlers: `handler.go` define el struct con `*UseCase` concretos (no interfaces); un archivo `*_handler.go` por operación; `types.go` para DTOs de respuesta compartidos dentro del mismo handler package.
+- Handlers: `handler.go` define el struct con `*UseCase` concretos (no interfaces); un archivo `*_handler.go` por operación; `types.go` para DTOs de respuesta compartidos dentro del mismo handler package. En `main.go`, los handler packages siempre se importan con alias `handler<Domain>` (ej. `handlerProblem`, `handlerUser`) para simetría.
 - Errors: always via `pkg/apperror`
 
 ## Non-obvious decisions
