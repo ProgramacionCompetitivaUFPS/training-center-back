@@ -36,13 +36,13 @@ type materialResponse struct {
 func buildResponse(m *domainMaterial.Material) materialResponse {
 	var pinnedAt *string
 	if m.PinnedAt() != nil {
-		s := formatTime(m.PinnedAt())
+		s := m.PinnedAt().Format(time.RFC3339)
 		pinnedAt = &s
 	}
 
 	var publishedAt *string
 	if m.PublishedAt() != nil {
-		s := formatTime(m.PublishedAt())
+		s := m.PublishedAt().Format(time.RFC3339)
 		publishedAt = &s
 	}
 
@@ -65,8 +65,4 @@ func buildResponse(m *domainMaterial.Material) materialResponse {
 		UpdatedAt:   m.UpdatedAt().Format(time.RFC3339),
 		PublishedAt: publishedAt,
 	}
-}
-
-func formatTime(t *time.Time) string {
-	return t.Format(time.RFC3339)
 }

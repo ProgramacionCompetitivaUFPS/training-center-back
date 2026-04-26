@@ -39,12 +39,6 @@ func NewRouter(h *Handlers, s *Services) *chi.Mux {
 	r.Group(func(r chi.Router) {
 		r.Use(middleware.Auth(s.TokenService, s.SessionInvalidator))
 
-	// Material — disabled until group domain is implemented
-	// r.Route("/groups/{groupId}/materials", func(r chi.Router) {
-	// 	r.Post("/", h.Material.Create)
-	// 	r.Put("/{materialId}", h.Material.Update)
-	// })
-
 		r.Route("/problems", func(r chi.Router) {
 			r.Get("/", h.Problem.ListProblems)
 			r.Post("/", h.Problem.Create)

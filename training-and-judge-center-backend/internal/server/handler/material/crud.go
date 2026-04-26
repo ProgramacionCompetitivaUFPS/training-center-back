@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 
-	"github.com/training-judge-center/backend/internal/application/material/usecase"
+	appMaterial "github.com/training-judge-center/backend/internal/application/material"
 	"github.com/training-judge-center/backend/internal/domain/shared"
 	"github.com/training-judge-center/backend/internal/server/handler"
 	"github.com/training-judge-center/backend/internal/server/middleware"
@@ -16,23 +16,17 @@ func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
 
 	groupID := r.PathValue("groupId")
 	if groupID == "" {
-		handler.WriteJSON(w, http.StatusBadRequest, apperror.AppError{
-			Code:    apperror.ErrCodeBadRequest,
-			Message: "groupId is required",
-		})
+		handler.WriteJSON(w, http.StatusBadRequest, apperror.NewBadRequest(apperror.ErrCodeBadRequest, "groupId is required"))
 		return
 	}
 
 	var body createMaterialRequest
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-		handler.WriteJSON(w, http.StatusBadRequest, apperror.AppError{
-			Code:    apperror.ErrCodeValidationError,
-			Message: "Invalid request body",
-		})
+		handler.WriteJSON(w, http.StatusBadRequest, apperror.NewBadRequest(apperror.ErrCodeValidationError, "Invalid request body"))
 		return
 	}
 
-	out, err := h.createUC.Execute(r.Context(), usecase.CreateMaterialInput{
+	out, err := h.createUC.Execute(r.Context(), appMaterial.CreateMaterialInput{
 		CurrentUser: shared.CurrentUser{ID: claims.UserID, Role: claims.Role.String()},
 		GroupID:     groupID,
 		Title:       body.Title,
@@ -53,23 +47,17 @@ func (h *Handler) Update(w http.ResponseWriter, r *http.Request) {
 	groupID := r.PathValue("groupId")
 	materialID := r.PathValue("materialId")
 	if groupID == "" || materialID == "" {
-		handler.WriteJSON(w, http.StatusBadRequest, apperror.AppError{
-			Code:    apperror.ErrCodeBadRequest,
-			Message: "groupId and materialId are required",
-		})
+		handler.WriteJSON(w, http.StatusBadRequest, apperror.NewBadRequest(apperror.ErrCodeBadRequest, "groupId and materialId are required"))
 		return
 	}
 
 	var body updateMaterialRequest
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-		handler.WriteJSON(w, http.StatusBadRequest, apperror.AppError{
-			Code:    apperror.ErrCodeValidationError,
-			Message: "Invalid request body",
-		})
+		handler.WriteJSON(w, http.StatusBadRequest, apperror.NewBadRequest(apperror.ErrCodeValidationError, "Invalid request body"))
 		return
 	}
 
-	out, err := h.updateUC.Execute(r.Context(), usecase.UpdateMaterialInput{
+	out, err := h.updateUC.Execute(r.Context(), appMaterial.UpdateMaterialInput{
 		CurrentUser: shared.CurrentUser{ID: claims.UserID, Role: claims.Role.String()},
 		GroupID:     groupID,
 		MaterialID:  materialID,

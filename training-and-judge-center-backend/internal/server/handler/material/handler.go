@@ -3,15 +3,15 @@ package material
 import (
 	"context"
 
-	"github.com/training-judge-center/backend/internal/application/material/usecase"
+	appMaterial "github.com/training-judge-center/backend/internal/application/material"
 )
 
 type createMaterialUC interface {
-	Execute(ctx context.Context, in usecase.CreateMaterialInput) (*usecase.CreateMaterialOutput, error)
+	Execute(ctx context.Context, in appMaterial.CreateMaterialInput) (*appMaterial.CreateMaterialOutput, error)
 }
 
 type updateMaterialUC interface {
-	Execute(ctx context.Context, in usecase.UpdateMaterialInput) (*usecase.UpdateMaterialOutput, error)
+	Execute(ctx context.Context, in appMaterial.UpdateMaterialInput) (*appMaterial.UpdateMaterialOutput, error)
 }
 
 type Handler struct {

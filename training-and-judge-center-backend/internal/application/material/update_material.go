@@ -1,10 +1,10 @@
-package usecase
+package material
 
 import (
 	"context"
+	"errors"
 	"log/slog"
 
-	"github.com/training-judge-center/backend/internal/application/material"
 	domainMaterial "github.com/training-judge-center/backend/internal/domain/material"
 	"github.com/training-judge-center/backend/internal/domain/shared"
 	"github.com/training-judge-center/backend/pkg/apperror"
@@ -25,12 +25,12 @@ type UpdateMaterialOutput struct {
 
 type UpdateMaterial struct {
 	repo          domainMaterial.Repository
-	groupProvider material.GroupProvider
+	groupProvider shared.GroupProvider
 }
 
 func NewUpdateMaterial(
 	repo domainMaterial.Repository,
-	groupProvider material.GroupProvider,
+	groupProvider shared.GroupProvider,
 ) *UpdateMaterial {
 	return &UpdateMaterial{repo: repo, groupProvider: groupProvider}
 }
@@ -42,12 +42,13 @@ func (uc *UpdateMaterial) Execute(ctx context.Context, in UpdateMaterialInput) (
 		return nil, apperror.NewInternal()
 	}
 	if !exists {
-		return nil, apperror.NewNotFound(material.ErrCodeGroupNotFound, "group not found")
+		return nil, apperror.NewNotFound(ErrCodeGroupNotFound, "group not found")
 	}
 
 	m, err := uc.repo.FindByID(ctx, in.MaterialID)
 	if err != nil {
-		if appErr, ok := err.(*apperror.AppError); ok && appErr.Code == domainMaterial.ErrCodeMaterialNotFound {
+		var appErr *apperror.AppError
+		if errors.As(err, &appErr) && appErr.Code == domainMaterial.ErrCodeMaterialNotFound {
 			return nil, err
 		}
 		slog.ErrorContext(ctx, "failed to fetch material", "error", err, "material_id", in.MaterialID)
@@ -59,7 +60,7 @@ func (uc *UpdateMaterial) Execute(ctx context.Context, in UpdateMaterialInput) (
 	}
 
 	if !m.CanBeEditedBy(shared.RestoreUserID(in.CurrentUser.ID), in.CurrentUser.IsAdmin()) {
-		return nil, apperror.NewForbidden(material.ErrCodeNotMaterialAuthor, "only the material author can update this material")
+		return nil, apperror.NewForbidden(ErrCodeNotMaterialAuthor, "only the material author can update this material")
 	}
 
 	var fieldErrs []apperror.FieldError

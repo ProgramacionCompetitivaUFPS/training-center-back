@@ -1,11 +1,10 @@
-package usecase
+package material
 
 import (
 	"context"
 	"log/slog"
 
 	"github.com/google/uuid"
-	"github.com/training-judge-center/backend/internal/application/material"
 	domainMaterial "github.com/training-judge-center/backend/internal/domain/material"
 	"github.com/training-judge-center/backend/internal/domain/shared"
 	"github.com/training-judge-center/backend/pkg/apperror"
@@ -25,14 +24,14 @@ type CreateMaterialOutput struct {
 
 type CreateMaterial struct {
 	repo           domainMaterial.Repository
-	groupProvider  material.GroupProvider
-	memberProvider material.GroupMemberProvider
+	groupProvider  shared.GroupProvider
+	memberProvider shared.GroupMemberProvider
 }
 
 func NewCreateMaterial(
 	repo domainMaterial.Repository,
-	groupProvider material.GroupProvider,
-	memberProvider material.GroupMemberProvider,
+	groupProvider shared.GroupProvider,
+	memberProvider shared.GroupMemberProvider,
 ) *CreateMaterial {
 	return &CreateMaterial{
 		repo:           repo,
@@ -48,7 +47,7 @@ func (uc *CreateMaterial) Execute(ctx context.Context, in CreateMaterialInput) (
 		return nil, apperror.NewInternal()
 	}
 	if !exists {
-		return nil, apperror.NewNotFound(material.ErrCodeGroupNotFound, "group not found")
+		return nil, apperror.NewNotFound(ErrCodeGroupNotFound, "group not found")
 	}
 
 	if !in.CurrentUser.IsAdmin() {
@@ -58,7 +57,7 @@ func (uc *CreateMaterial) Execute(ctx context.Context, in CreateMaterialInput) (
 			return nil, apperror.NewInternal()
 		}
 		if !isLead {
-			return nil, apperror.NewForbidden(material.ErrCodeInsufficientPerms, "only group leads can create materials")
+			return nil, apperror.NewForbidden(ErrCodeInsufficientPerms, "only group leads can create materials")
 		}
 	}
 

@@ -1,11 +1,10 @@
-package usecase
+package material
 
 import (
 	"context"
 	"errors"
 	"testing"
 
-	appMaterial "github.com/training-judge-center/backend/internal/application/material"
 	domainMaterial "github.com/training-judge-center/backend/internal/domain/material"
 	"github.com/training-judge-center/backend/pkg/apperror"
 )
@@ -67,7 +66,7 @@ func TestUpdateMaterial_ForbiddenIfNotAuthor(t *testing.T) {
 	})
 
 	var appErr *apperror.AppError
-	if !errors.As(err, &appErr) || appErr.Code != appMaterial.ErrCodeNotMaterialAuthor {
+	if !errors.As(err, &appErr) || appErr.Code != ErrCodeNotMaterialAuthor {
 		t.Errorf("expected NOT_MATERIAL_AUTHOR, got %v", err)
 	}
 }
@@ -84,7 +83,7 @@ func TestUpdateMaterial_GroupNotFound(t *testing.T) {
 	})
 
 	var appErr *apperror.AppError
-	if !errors.As(err, &appErr) || appErr.Code != appMaterial.ErrCodeGroupNotFound {
+	if !errors.As(err, &appErr) || appErr.Code != ErrCodeGroupNotFound {
 		t.Errorf("expected GROUP_NOT_FOUND, got %v", err)
 	}
 }
