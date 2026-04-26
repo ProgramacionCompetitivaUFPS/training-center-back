@@ -2,15 +2,46 @@ package group
 
 import (
 	"context"
+	"time"
 
 	"github.com/training-judge-center/backend/internal/domain/shared"
 )
 
+type SortField string
+
+const (
+	SortByName        SortField = "name"
+	SortByCreatedAt   SortField = "createdAt"
+	SortByMemberCount SortField = "memberCount"
+	SortByJoinedAt    SortField = "joinedAt"
+)
+
+type SortOrder string
+
+const (
+	OrderAsc  SortOrder = "asc"
+	OrderDesc SortOrder = "desc"
+)
+
+type MembershipFilter struct {
+	RoleFilter *MemberRole
+}
+
 type ListFilters struct {
 	Search     string
 	Visibility *Visibility
+	JoinPolicy *JoinPolicy
+	SortBy     SortField
+	Order      SortOrder
 	Page       int
 	Limit      int
+
+	ViewerID      shared.UserID
+	ViewerIsAdmin bool
+
+	OnlyMyGroups *MembershipFilter
+
+	ExcludeDefault bool
 }
 
 type MemberFilters struct {
@@ -28,6 +59,13 @@ type Repository interface {
 	List(ctx context.Context, filters ListFilters) ([]*Group, int, error)
 }
 
+type MemberStats struct {
+	Count    int
+	IsMember bool
+	Role     MemberRole
+	JoinedAt time.Time
+}
+
 type MemberRepository interface {
 	Save(ctx context.Context, m *GroupMember) error
 	SaveAll(ctx context.Context, members []*GroupMember) error
@@ -35,4 +73,7 @@ type MemberRepository interface {
 	FindByGroup(ctx context.Context, groupID string, filters MemberFilters) ([]*GroupMember, int, error)
 	Delete(ctx context.Context, groupID string, userID shared.UserID) error
 	CountLeads(ctx context.Context, groupID string) (int, error)
+	CountMembers(ctx context.Context, groupID string) (int, error)
+	ListLeads(ctx context.Context, groupID string) ([]*GroupMember, error)
+	BulkStats(ctx context.Context, groupIDs []string, viewerID shared.UserID) (map[string]MemberStats, error)
 }
