@@ -48,7 +48,7 @@ func (h *Handler) ListGroups(w http.ResponseWriter, r *http.Request) {
 			JoinPolicy:  g.JoinPolicy().String(),
 			IsGlobal:    g.IsDefault(),
 			MemberCount: lg.MemberCount,
-			UserRole:    memberRoleToStringPtr(lg.UserRole),
+			UserRole:    memberRoleValueToStringPtr(lg.UserRole),
 			CreatedAt:   g.CreatedAt().Format(timeutil.RFC3339UTC),
 		})
 	}
