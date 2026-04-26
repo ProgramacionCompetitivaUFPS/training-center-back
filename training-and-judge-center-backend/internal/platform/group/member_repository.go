@@ -35,6 +35,8 @@ func (r *MemberRepository) FindByGroup(_ context.Context, _ string, _ domainGrou
 	panic("not implemented")
 }
 
+// FindByGroupAndUser returns (nil, nil) when the user is not a member of the group.
+// Callers must check for a nil member before accessing its fields.
 func (r *MemberRepository) FindByGroupAndUser(ctx context.Context, groupID string, userID shared.UserID) (*domainGroup.GroupMember, error) {
 	const q = `SELECT id, group_id, user_id, member_role, joined_at FROM group_members WHERE group_id = $1 AND user_id = $2`
 	m, err := scanMember(r.db.QueryRow(ctx, q, groupID, userID.Value()))
@@ -82,7 +84,7 @@ func (r *MemberRepository) BulkStats(ctx context.Context, groupIDs []string, vie
 
 	eg, egCtx := errgroup.WithContext(ctx)
 
-	eg.Go(func() error {
+	eg.Go(func() error { // writes only to counts — no other goroutine touches counts
 		rows, err := r.db.Query(egCtx,
 			`SELECT group_id, COUNT(*) FROM group_members WHERE group_id = ANY($1) GROUP BY group_id`,
 			groupIDs,
@@ -108,7 +110,7 @@ func (r *MemberRepository) BulkStats(ctx context.Context, groupIDs []string, vie
 		return nil
 	})
 
-	eg.Go(func() error {
+	eg.Go(func() error { // writes only to memberships — no other goroutine touches memberships
 		rows, err := r.db.Query(egCtx,
 			`SELECT id, group_id, user_id, member_role, joined_at FROM group_members WHERE group_id = ANY($1) AND user_id = $2`,
 			groupIDs, viewerID.Value(),
