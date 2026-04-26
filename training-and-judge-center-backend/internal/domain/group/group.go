@@ -27,6 +27,8 @@ func (g *Group) WithClock(fn func() time.Time) *Group {
 	return g
 }
 
+// NewGroup constructs a validated Group. Pass a non-nil clock for deterministic
+// timestamps in tests; nil defaults to time.Now.
 func NewGroup(id string, name GroupName, description *string, visibility Visibility, joinPolicy JoinPolicy, createdBy shared.UserID, clock func() time.Time) (*Group, error) {
 	if id == "" {
 		return nil, apperror.NewBadRequest(apperror.ErrCodeBadRequest, "group id cannot be empty")
@@ -79,6 +81,11 @@ func (g *Group) UpdatedAt() time.Time     { return g.updatedAt }
 
 func (g *Group) CanBeDeleted() bool { return !g.isDefault }
 
+// UpdateMetadata updates name and/or description.
+//   - Pass nil for name to leave it unchanged.
+//   - Pass nil for description to leave it unchanged.
+//   - Pass &nilPtr (where nilPtr is a nil *string) to clear the description.
+//   - Pass &ptr (where ptr points to a string) to set a new value.
 func (g *Group) UpdateMetadata(name *GroupName, description **string) {
 	if name == nil && description == nil {
 		return

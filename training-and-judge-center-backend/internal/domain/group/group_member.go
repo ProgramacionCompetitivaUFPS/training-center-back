@@ -15,6 +15,8 @@ type GroupMember struct {
 	joinedAt time.Time
 }
 
+// NewGroupMember constructs a validated GroupMember. Pass a non-nil clock for
+// deterministic joinedAt in tests; nil defaults to time.Now.
 func NewGroupMember(id, groupID string, userID shared.UserID, role MemberRole, clock func() time.Time) (*GroupMember, error) {
 	if id == "" {
 		return nil, apperror.NewBadRequest(apperror.ErrCodeBadRequest, "group member id cannot be empty")
