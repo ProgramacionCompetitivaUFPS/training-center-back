@@ -24,14 +24,14 @@ type CreateMaterialOutput struct {
 
 type CreateMaterial struct {
 	repo           domainMaterial.Repository
-	groupProvider  shared.GroupProvider
-	memberProvider shared.GroupMemberProvider
+	groupProvider  GroupProvider
+	memberProvider GroupMemberProvider
 }
 
 func NewCreateMaterial(
 	repo domainMaterial.Repository,
-	groupProvider shared.GroupProvider,
-	memberProvider shared.GroupMemberProvider,
+	groupProvider GroupProvider,
+	memberProvider GroupMemberProvider,
 ) *CreateMaterial {
 	return &CreateMaterial{
 		repo:           repo,

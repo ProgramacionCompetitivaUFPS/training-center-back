@@ -25,12 +25,12 @@ type UpdateMaterialOutput struct {
 
 type UpdateMaterial struct {
 	repo          domainMaterial.Repository
-	groupProvider shared.GroupProvider
+	groupProvider GroupProvider
 }
 
 func NewUpdateMaterial(
 	repo domainMaterial.Repository,
-	groupProvider shared.GroupProvider,
+	groupProvider GroupProvider,
 ) *UpdateMaterial {
 	return &UpdateMaterial{repo: repo, groupProvider: groupProvider}
 }
