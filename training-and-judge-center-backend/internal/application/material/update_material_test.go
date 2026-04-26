@@ -28,8 +28,8 @@ func TestUpdateMaterial_SuccessByAuthor(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if out.Material.Title().String() != "Updated Title" {
-		t.Errorf("expected updated title, got %q", out.Material.Title().String())
+	if out.Material.Title != "Updated Title" {
+		t.Errorf("expected updated title, got %q", out.Material.Title)
 	}
 }
 
@@ -48,8 +48,8 @@ func TestUpdateMaterial_SuccessByAdmin(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if out.Material.Title().String() != "Admin Update" {
-		t.Errorf("expected 'Admin Update', got %q", out.Material.Title().String())
+	if out.Material.Title != "Admin Update" {
+		t.Errorf("expected 'Admin Update', got %q", out.Material.Title)
 	}
 }
 
@@ -138,10 +138,10 @@ func TestUpdateMaterial_PartialUpdate(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if out.Material.Title().String() != "Only Title" {
-		t.Errorf("expected 'Only Title', got %q", out.Material.Title().String())
+	if out.Material.Title != "Only Title" {
+		t.Errorf("expected 'Only Title', got %q", out.Material.Title)
 	}
-	if out.Material.Content().String() != "" {
+	if out.Material.Content != "" {
 		t.Error("content should remain unchanged")
 	}
 }
@@ -161,8 +161,8 @@ func TestUpdateMaterial_ClearTags(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if len(out.Material.Tags().Values()) != 0 {
-		t.Errorf("expected empty tags, got %v", out.Material.Tags().Values())
+	if len(out.Material.Tags) != 0 {
+		t.Errorf("expected empty tags, got %v", out.Material.Tags)
 	}
 }
 
@@ -181,8 +181,8 @@ func TestUpdateMaterial_ClearContent(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if out.Material.Content().String() != "" {
-		t.Errorf("expected empty content, got %q", out.Material.Content().String())
+	if out.Material.Content != "" {
+		t.Errorf("expected empty content, got %q", out.Material.Content)
 	}
 }
 
@@ -201,16 +201,16 @@ func TestUpdateMaterial_ImmutableFields(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if out.Material.Status().String() != "DRAFT" {
+	if out.Material.Status != "DRAFT" {
 		t.Error("status should remain unchanged")
 	}
-	if out.Material.Pinned() {
+	if out.Material.Pinned {
 		t.Error("pinned should remain unchanged")
 	}
-	if out.Material.AuthorID().Value() != testAuthorID {
+	if out.Material.AuthorID != testAuthorID {
 		t.Error("authorID should remain unchanged")
 	}
-	if out.Material.GroupID() != testGroupID {
+	if out.Material.GroupID != testGroupID {
 		t.Error("groupID should remain unchanged")
 	}
 }

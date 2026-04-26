@@ -24,17 +24,17 @@ func TestCreateMaterial_SuccessByLead(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if out.Material.Title().String() != "Hello World" {
-		t.Errorf("expected title 'Hello World', got %q", out.Material.Title().String())
+	if out.Material.Title != "Hello World" {
+		t.Errorf("expected title 'Hello World', got %q", out.Material.Title)
 	}
-	if out.Material.Status().String() != "DRAFT" {
-		t.Errorf("expected DRAFT status, got %q", out.Material.Status().String())
+	if out.Material.Status != "DRAFT" {
+		t.Errorf("expected DRAFT status, got %q", out.Material.Status)
 	}
-	if out.Material.AuthorID().Value() != testAuthorID {
-		t.Errorf("expected authorID %q, got %q", testAuthorID, out.Material.AuthorID().Value())
+	if out.Material.AuthorID != testAuthorID {
+		t.Errorf("expected authorID %q, got %q", testAuthorID, out.Material.AuthorID)
 	}
-	if out.Material.GroupID() != testGroupID {
-		t.Errorf("expected groupID %q, got %q", testGroupID, out.Material.GroupID())
+	if out.Material.GroupID != testGroupID {
+		t.Errorf("expected groupID %q, got %q", testGroupID, out.Material.GroupID)
 	}
 }
 
@@ -50,8 +50,8 @@ func TestCreateMaterial_SuccessByAdmin(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if out.Material == nil {
-		t.Fatal("expected material, got nil")
+	if out == nil {
+		t.Fatal("expected output, got nil")
 	}
 }
 
@@ -143,10 +143,10 @@ func TestCreateMaterial_DefaultsContentAndTags(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if out.Material.Content().String() != "" {
-		t.Errorf("expected empty content, got %q", out.Material.Content().String())
+	if out.Material.Content != "" {
+		t.Errorf("expected empty content, got %q", out.Material.Content)
 	}
-	if len(out.Material.Tags().Values()) != 0 {
-		t.Errorf("expected empty tags, got %v", out.Material.Tags().Values())
+	if len(out.Material.Tags) != 0 {
+		t.Errorf("expected empty tags, got %v", out.Material.Tags)
 	}
 }

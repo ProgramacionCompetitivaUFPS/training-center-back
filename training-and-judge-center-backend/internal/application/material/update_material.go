@@ -20,7 +20,7 @@ type UpdateMaterialInput struct {
 }
 
 type UpdateMaterialOutput struct {
-	Material *domainMaterial.Material
+	Material MaterialData
 }
 
 type UpdateMaterial struct {
@@ -109,5 +109,5 @@ func (uc *UpdateMaterial) Execute(ctx context.Context, in UpdateMaterialInput) (
 		return nil, apperror.NewInternal()
 	}
 
-	return &UpdateMaterialOutput{Material: m}, nil
+	return &UpdateMaterialOutput{Material: toMaterialData(m)}, nil
 }

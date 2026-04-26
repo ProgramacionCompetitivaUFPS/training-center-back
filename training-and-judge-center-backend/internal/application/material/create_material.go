@@ -19,7 +19,7 @@ type CreateMaterialInput struct {
 }
 
 type CreateMaterialOutput struct {
-	Material *domainMaterial.Material
+	Material MaterialData
 }
 
 type CreateMaterial struct {
@@ -106,5 +106,5 @@ func (uc *CreateMaterial) Execute(ctx context.Context, in CreateMaterialInput) (
 		return nil, apperror.NewInternal()
 	}
 
-	return &CreateMaterialOutput{Material: m}, nil
+	return &CreateMaterialOutput{Material: toMaterialData(m)}, nil
 }
