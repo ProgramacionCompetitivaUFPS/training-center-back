@@ -78,16 +78,8 @@ func (uc *ListMaterials) Execute(ctx context.Context, in ListMaterialsInput) (*L
 		return nil, apperror.NewNotFound(ErrCodeGroupNotFound, "group not found")
 	}
 
-	// Reuse the same group access check from GetMaterial logic.
-	if visibility != "VISIBLE" && !in.CurrentUser.IsAdmin() {
-		isMember, err := uc.memberProvider.IsMemberOfGroup(ctx, in.CurrentUser.ID, in.GroupID)
-		if err != nil {
-			slog.ErrorContext(ctx, "failed to check group membership", "error", err)
-			return nil, apperror.NewInternal()
-		}
-		if !isMember {
-			return nil, apperror.NewForbidden(ErrCodeInsufficientPerms, "you do not have permission to view materials in this group")
-		}
+	if err := checkGroupAccess(ctx, uc.memberProvider, in.CurrentUser, in.GroupID, visibility); err != nil {
+		return nil, err
 	}
 
 	filters, err := uc.buildFilters(ctx, in)
@@ -104,8 +96,8 @@ func (uc *ListMaterials) Execute(ctx context.Context, in ListMaterialsInput) (*L
 	authorIDs := uniqueAuthorIDs(materials)
 	displays, err := uc.authorProvider.GetDisplays(ctx, authorIDs)
 	if err != nil {
-		slog.WarnContext(ctx, "failed to resolve author displays", "error", err)
-		displays = map[string]*AuthorDisplay{}
+		slog.ErrorContext(ctx, "failed to resolve author displays", "error", err, "group_id", in.GroupID)
+		return nil, apperror.NewInternal()
 	}
 
 	items := make([]MaterialData, 0, len(materials))
@@ -142,11 +134,8 @@ func (uc *ListMaterials) buildFilters(ctx context.Context, in ListMaterialsInput
 		Limit:  in.Limit,
 	}
 
+	// Admin sees everything — no status filter, repo returns all.
 	if in.CurrentUser.IsAdmin() {
-		filters.Statuses = []domainMaterial.Status{
-			domainMaterial.NewStatusDraft(),
-			domainMaterial.NewStatusPublished(),
-		}
 		return filters, nil
 	}
 
@@ -156,15 +145,16 @@ func (uc *ListMaterials) buildFilters(ctx context.Context, in ListMaterialsInput
 		return filters, apperror.NewInternal()
 	}
 
+	// Lead sees everything — no status filter, repo returns all.
+	// Note: unlike problems (where ViewerModifierID controls draft visibility via authorship),
+	// materials tie draft visibility to group role (Lead), not authorship. An empty Statuses
+	// slice means no status filter per the repository contract (CLAUDE.md).
 	if isLead {
-		filters.Statuses = []domainMaterial.Status{
-			domainMaterial.NewStatusDraft(),
-			domainMaterial.NewStatusPublished(),
-		}
-	} else {
-		filters.Statuses = []domainMaterial.Status{domainMaterial.NewStatusPublished()}
+		return filters, nil
 	}
 
+	// Members and non-members only see PUBLISHED.
+	filters.Statuses = []domainMaterial.Status{domainMaterial.NewStatusPublished()}
 	return filters, nil
 }
 

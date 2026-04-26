@@ -8,7 +8,7 @@ import (
 )
 
 func newListUC(repo *mockMaterialRepository, vis *mockGroupVisibilityProvider, mem *mockGroupMemberProvider) *ListMaterials {
-	return NewListMaterials(repo, vis, mem, noopAuthorProvider())
+	return NewListMaterials(repo, vis, mem, stubAuthorProvider())
 }
 
 func defaultListInput() ListMaterialsInput {
@@ -88,8 +88,9 @@ func TestListMaterials_Lead_FiltersDraftAndPublished(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	if len(capturedFilters.Statuses) != 2 {
-		t.Errorf("expected 2 statuses (DRAFT+PUBLISHED), got %v", capturedFilters.Statuses)
+	// Lead: no status filter — empty Statuses means repo returns all (CLAUDE.md contract).
+	if len(capturedFilters.Statuses) != 0 {
+		t.Errorf("expected no status filter for Lead, got %v", capturedFilters.Statuses)
 	}
 }
 
@@ -109,8 +110,9 @@ func TestListMaterials_Admin_FiltersDraftAndPublished(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	if len(capturedFilters.Statuses) != 2 {
-		t.Errorf("expected 2 statuses (DRAFT+PUBLISHED), got %v", capturedFilters.Statuses)
+	// Admin: no status filter — empty Statuses means repo returns all (CLAUDE.md contract).
+	if len(capturedFilters.Statuses) != 0 {
+		t.Errorf("expected no status filter for Admin, got %v", capturedFilters.Statuses)
 	}
 }
 

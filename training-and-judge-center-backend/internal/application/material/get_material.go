@@ -50,7 +50,7 @@ func (uc *GetMaterial) Execute(ctx context.Context, in GetMaterialInput) (*GetMa
 		return nil, apperror.NewNotFound(ErrCodeGroupNotFound, "group not found")
 	}
 
-	if err := uc.checkGroupAccess(ctx, in.CurrentUser, in.GroupID, visibility); err != nil {
+	if err := checkGroupAccess(ctx, uc.memberProvider, in.CurrentUser, in.GroupID, visibility); err != nil {
 		return nil, err
 	}
 
@@ -75,17 +75,23 @@ func (uc *GetMaterial) Execute(ctx context.Context, in GetMaterialInput) (*GetMa
 	}
 
 	data := toMaterialData(m)
-	data.Author = uc.resolveAuthor(ctx, m.AuthorID().Value())
+	displays, err := uc.authorProvider.GetDisplays(ctx, []string{m.AuthorID().Value()})
+	if err != nil {
+		slog.ErrorContext(ctx, "failed to resolve author display", "error", err, "author_id", m.AuthorID().Value())
+		return nil, apperror.NewInternal()
+	}
+	if d := displays[m.AuthorID().Value()]; d != nil {
+		data.Author = &AuthorData{Nickname: d.Nickname, Name: d.Name}
+	}
 
 	return &GetMaterialOutput{Material: data}, nil
 }
 
-// checkGroupAccess returns 403 if the group is NOT_VISIBLE and the user is not a member/admin.
-func (uc *GetMaterial) checkGroupAccess(ctx context.Context, user shared.CurrentUser, groupID, visibility string) error {
+func checkGroupAccess(ctx context.Context, mp GroupMemberProvider, user shared.CurrentUser, groupID, visibility string) error {
 	if visibility == "VISIBLE" || user.IsAdmin() {
 		return nil
 	}
-	isMember, err := uc.memberProvider.IsMemberOfGroup(ctx, user.ID, groupID)
+	isMember, err := mp.IsMemberOfGroup(ctx, user.ID, groupID)
 	if err != nil {
 		slog.ErrorContext(ctx, "failed to check group membership", "error", err)
 		return apperror.NewInternal()
@@ -96,15 +102,3 @@ func (uc *GetMaterial) checkGroupAccess(ctx context.Context, user shared.Current
 	return nil
 }
 
-func (uc *GetMaterial) resolveAuthor(ctx context.Context, authorID string) *AuthorData {
-	displays, err := uc.authorProvider.GetDisplays(ctx, []string{authorID})
-	if err != nil {
-		slog.WarnContext(ctx, "failed to resolve author display", "author_id", authorID)
-		return nil
-	}
-	d := displays[authorID]
-	if d == nil {
-		return nil
-	}
-	return &AuthorData{Nickname: d.Nickname, Name: d.Name}
-}

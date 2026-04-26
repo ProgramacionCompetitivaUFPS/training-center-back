@@ -152,7 +152,7 @@ func (m *mockAuthorProvider) GetDisplays(ctx context.Context, userIDs []string) 
 	return result, nil
 }
 
-func noopAuthorProvider() *mockAuthorProvider { return &mockAuthorProvider{} }
+func stubAuthorProvider() *mockAuthorProvider { return &mockAuthorProvider{} }
 
 // ── CurrentUser helpers ──────────────────────────────────────────────────────
 

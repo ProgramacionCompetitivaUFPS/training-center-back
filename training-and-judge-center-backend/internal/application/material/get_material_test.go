@@ -9,7 +9,7 @@ import (
 )
 
 func newGetUC(repo *mockMaterialRepository, vis *mockGroupVisibilityProvider, mem *mockGroupMemberProvider) *GetMaterial {
-	return NewGetMaterial(repo, vis, mem, noopAuthorProvider())
+	return NewGetMaterial(repo, vis, mem, stubAuthorProvider())
 }
 
 func TestGetMaterial_GroupNotFound_Returns404(t *testing.T) {
@@ -157,5 +157,40 @@ func assertErrCode(t *testing.T, err error, code string) {
 	}
 	if appErr.Code != code {
 		t.Errorf("expected error code %q, got %q", code, appErr.Code)
+	}
+}
+
+func TestGetMaterial_AuthorProviderError_Returns500(t *testing.T) {
+	repo := repoWith(newPublishedMaterial())
+	authorProvider := &mockAuthorProvider{
+		getDisplaysFn: func(_ context.Context, _ []string) (map[string]*AuthorDisplay, error) {
+			return nil, apperror.NewInternal()
+		},
+	}
+	uc := NewGetMaterial(repo, visibleGroup(), isMemberNotLead(), authorProvider)
+
+	_, err := uc.Execute(context.Background(), GetMaterialInput{
+		CurrentUser: asCoach(testOtherID),
+		GroupID:     testGroupID,
+		MaterialID:  testMaterialID,
+	})
+
+	if err == nil {
+		t.Fatal("expected error on author provider failure, got nil")
+	}
+}
+
+func TestListMaterials_AuthorProviderError_Returns500(t *testing.T) {
+	authorProvider := &mockAuthorProvider{
+		getDisplaysFn: func(_ context.Context, _ []string) (map[string]*AuthorDisplay, error) {
+			return nil, apperror.NewInternal()
+		},
+	}
+	uc := NewListMaterials(repoWithList([]*domainMaterial.Material{newPublishedMaterial()}), visibleGroup(), isMemberNotLead(), authorProvider)
+
+	_, err := uc.Execute(context.Background(), defaultListInput())
+
+	if err == nil {
+		t.Fatal("expected error on author provider failure, got nil")
 	}
 }
