@@ -120,8 +120,8 @@ func TestGetGroup_NotVisibleReturnedToMember(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if !out.Membership.IsMember {
-		t.Error("expected isMember=true")
+	if out.Membership.Role == nil {
+		t.Error("expected membership role to be set")
 	}
 	if out.Statistics.MemberCount != 5 || out.Statistics.LeadCount != 1 {
 		t.Errorf("bad stats: %+v", out.Statistics)

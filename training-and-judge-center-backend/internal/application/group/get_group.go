@@ -27,8 +27,9 @@ type GroupStatistics struct {
 	LeadCount   int
 }
 
+// UserMembership describes the caller's relationship with a group.
+// Role and JoinedAt are non-nil if and only if the caller is a member.
 type UserMembership struct {
-	IsMember bool
 	Role     *domainGroup.MemberRole
 	JoinedAt *time.Time
 }
@@ -116,7 +117,7 @@ func (uc *GetGroupUseCase) Execute(ctx context.Context, in GetGroupInput) (*GetG
 		leads = append(leads, LeadDisplay{UserID: id, Nickname: d.Nickname, Name: d.Name})
 	}
 
-	um := UserMembership{IsMember: membership != nil}
+	var um UserMembership
 	if membership != nil {
 		r := membership.Role()
 		um.Role = &r

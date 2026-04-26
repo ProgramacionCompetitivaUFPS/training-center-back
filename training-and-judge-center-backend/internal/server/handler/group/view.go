@@ -35,7 +35,7 @@ func (h *Handler) GetGroup(w http.ResponseWriter, r *http.Request) {
 		joinedAt = &s
 	}
 	um := userMembershipResp{
-		IsMember: out.Membership.IsMember,
+		IsMember: out.Membership.Role != nil,
 		Role:     memberRoleToStringPtr(out.Membership.Role),
 		JoinedAt: joinedAt,
 	}
