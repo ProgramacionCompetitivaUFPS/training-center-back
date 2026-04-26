@@ -2,7 +2,6 @@ package material
 
 import (
 	"context"
-	"errors"
 	"log/slog"
 
 	domainMaterial "github.com/training-judge-center/backend/internal/domain/material"
@@ -47,12 +46,7 @@ func (uc *UpdateMaterial) Execute(ctx context.Context, in UpdateMaterialInput) (
 
 	m, err := uc.repo.FindByID(ctx, in.MaterialID)
 	if err != nil {
-		var appErr *apperror.AppError
-		if errors.As(err, &appErr) && appErr.Code == domainMaterial.ErrCodeMaterialNotFound {
-			return nil, err
-		}
-		slog.ErrorContext(ctx, "failed to fetch material", "error", err, "material_id", in.MaterialID)
-		return nil, apperror.NewInternal()
+		return nil, err
 	}
 
 	if m.GroupID() != in.GroupID {
