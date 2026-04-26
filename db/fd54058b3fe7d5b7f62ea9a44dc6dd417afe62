@@ -1,0 +1,23 @@
+training-and-judge-center-backend/internal/platform/group/preferences_reader.go
+  126ca936170b293f 42
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.3.4",
+  "base_commit_sha": "dbfd54058b3fe7d5b7f62ea9a44dc6dd417afe62",
+  "prompts": {
+    "126ca936170b293f": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "4638d5ce-5ce5-4815-9b2e-75426ea864a2",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "AlexaVJ",
+      "messages": [],
+      "total_additions": 1,
+      "total_deletions": 1,
+      "accepted_lines": 645,
+      "overriden_lines": 0
+    }
+  }
+}
