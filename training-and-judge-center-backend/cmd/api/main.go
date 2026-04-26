@@ -11,6 +11,7 @@ import (
 	googleStorage "cloud.google.com/go/storage"
 	"github.com/redis/go-redis/v9"
 
+	appGroup "github.com/training-judge-center/backend/internal/application/group"
 	appProblem "github.com/training-judge-center/backend/internal/application/problem"
 	appuser "github.com/training-judge-center/backend/internal/application/user"
 	"github.com/training-judge-center/backend/internal/config"
@@ -18,11 +19,13 @@ import (
 	platformAuth "github.com/training-judge-center/backend/internal/platform/auth"
 	platformConfig "github.com/training-judge-center/backend/internal/platform/config"
 	"github.com/training-judge-center/backend/internal/platform/email"
+	platformGroup "github.com/training-judge-center/backend/internal/platform/group"
 	platformProblem "github.com/training-judge-center/backend/internal/platform/problem"
 	"github.com/training-judge-center/backend/internal/platform/ratelimit"
 	platformUser "github.com/training-judge-center/backend/internal/platform/user"
 	"github.com/training-judge-center/backend/internal/server"
 	"github.com/training-judge-center/backend/internal/server/handler"
+	handlerGroup "github.com/training-judge-center/backend/internal/server/handler/group"
 	"github.com/training-judge-center/backend/internal/server/handler/problem"
 )
 
@@ -164,6 +167,11 @@ func main() {
 	requestDeactUC := appuser.NewRequestDeactivationUseCase(userRepo, deactRepo, emailSender)
 	confirmDeactUC := appuser.NewConfirmDeactivationUseCase(userRepo, deactRepo, auditRepo, emailSender, sessionInvalidator, txManager)
 
+	// Group repositories & use cases
+	groupRepo := platformGroup.NewGroupRepository(dbPool)
+	createGroupUseCase := appGroup.NewCreateGroupUseCase(groupRepo)
+	groupHandler := handlerGroup.NewGroupHandler(createGroupUseCase)
+
 	// Handlers
 	userHandler := handler.NewUserHandler(createUserUC, getUserProfileUC, updateUserUC, updatePasswordUC, adminUpdateUserUC, adminDeactivateUserUC, listUsersUC, requestEmailChangeUC, confirmEmailChangeUC, requestPasswordRecoveryUC, resetPasswordUC, requestDeactUC, confirmDeactUC)
 	authHandler := handler.NewAuthHandler(loginUC)
@@ -172,6 +180,7 @@ func main() {
 		Problem: problemHandler,
 		User:    userHandler,
 		Auth:    authHandler,
+		Group:   groupHandler,
 	}, &server.Services{
 		TokenService:       jwtService,
 		SessionInvalidator: sessionInvalidator,

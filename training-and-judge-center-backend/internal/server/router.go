@@ -5,6 +5,7 @@ import (
 	chimw "github.com/go-chi/chi/v5/middleware"
 	"github.com/training-judge-center/backend/internal/domain/user"
 	"github.com/training-judge-center/backend/internal/server/handler"
+	handlerGroup "github.com/training-judge-center/backend/internal/server/handler/group"
 	"github.com/training-judge-center/backend/internal/server/handler/problem"
 	"github.com/training-judge-center/backend/internal/server/middleware"
 )
@@ -13,6 +14,7 @@ type Handlers struct {
 	Problem *problem.Handler
 	User    *handler.UserHandler
 	Auth    *handler.AuthHandler
+	Group   *handlerGroup.GroupHandler
 }
 
 type Services struct {
@@ -30,9 +32,13 @@ func NewRouter(h *Handlers, s *Services) *chi.Mux {
 	healthHandler := handler.NewHealthHandler()
 	r.Get("/ping", healthHandler.Ping)
 
-	// Problem routes — require authentication
+	// Group and Problem routes — require authentication
 	r.Group(func(r chi.Router) {
 		r.Use(middleware.Auth(s.TokenService, s.SessionInvalidator))
+
+		r.Route("/groups", func(r chi.Router) {
+			r.Post("/", h.Group.Create)
+		})
 
 		r.Route("/problems", func(r chi.Router) {
 			r.Get("/", h.Problem.ListProblems)
