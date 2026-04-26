@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	appMaterial "github.com/training-judge-center/backend/internal/application/material"
 	domainMaterial "github.com/training-judge-center/backend/internal/domain/material"
@@ -18,10 +19,15 @@ import (
 
 // ── Stubs ────────────────────────────────────────────────────────────────────
 
-type stubMaterialRepo struct{}
+type stubMaterialRepo struct {
+	findByIDFn func(ctx context.Context, id string) (*domainMaterial.Material, error)
+}
 
 func (s *stubMaterialRepo) Save(_ context.Context, _ *domainMaterial.Material) error { return nil }
-func (s *stubMaterialRepo) FindByID(_ context.Context, _ string) (*domainMaterial.Material, error) {
+func (s *stubMaterialRepo) FindByID(ctx context.Context, id string) (*domainMaterial.Material, error) {
+	if s.findByIDFn != nil {
+		return s.findByIDFn(ctx, id)
+	}
 	return nil, apperror.NewNotFound(domainMaterial.ErrCodeMaterialNotFound, "not found")
 }
 func (s *stubMaterialRepo) List(_ context.Context, _ string, _ domainMaterial.ListFilters) ([]*domainMaterial.Material, int, error) {
@@ -146,7 +152,54 @@ func TestCreateMaterial_ValidRequest_Returns201(t *testing.T) {
 	}
 }
 
-// ── Update handler tests ──────────────────────────────────────────────────────
+func TestUpdateMaterial_ValidRequest_Returns200(t *testing.T) {
+	mat := domainMaterial.RestoreMaterial(
+		"m1", "g1", shared.RestoreUserID("u1"),
+		"Old Title", "", nil, "DRAFT", false, nil,
+		time.Now(), time.Now(), nil,
+	)
+	repo := &stubMaterialRepo{}
+	h := NewHandler(
+		appMaterial.NewCreateMaterial(repo, &stubGroupProvider{}, &stubGroupMemberProvider{}),
+		appMaterial.NewUpdateMaterial(&stubMaterialRepo{
+			findByIDFn: func(_ context.Context, _ string) (*domainMaterial.Material, error) {
+				return mat, nil
+			},
+		}, &stubGroupProvider{}),
+	)
+
+	body, _ := json.Marshal(map[string]string{"title": "Updated"})
+	r := authedRequest(http.MethodPatch, "/groups/g1/materials/m1", body)
+	r.SetPathValue("groupId", "g1")
+	r.SetPathValue("materialId", "m1")
+	w := httptest.NewRecorder()
+
+	wrapAuth(http.HandlerFunc(h.Update)).ServeHTTP(w, r)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+	var resp materialResponse
+	json.NewDecoder(w.Body).Decode(&resp)
+	if resp.Title != "Updated" {
+		t.Errorf("expected title 'Updated', got %q", resp.Title)
+	}
+}
+
+func TestUpdateMaterial_NotFound_Returns404(t *testing.T) {
+	h := stubHandler()
+	body, _ := json.Marshal(map[string]string{"title": "X"})
+	r := authedRequest(http.MethodPatch, "/groups/g1/materials/missing", body)
+	r.SetPathValue("groupId", "g1")
+	r.SetPathValue("materialId", "missing")
+	w := httptest.NewRecorder()
+
+	wrapAuth(http.HandlerFunc(h.Update)).ServeHTTP(w, r)
+
+	if w.Code != http.StatusNotFound {
+		t.Fatalf("expected 404, got %d", w.Code)
+	}
+}
 
 func TestUpdateMaterial_Unauthenticated_Returns401(t *testing.T) {
 	h := stubHandler()
