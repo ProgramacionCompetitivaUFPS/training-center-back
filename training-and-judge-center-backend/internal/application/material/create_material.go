@@ -103,7 +103,7 @@ func (uc *CreateMaterial) Execute(ctx context.Context, in CreateMaterialInput) (
 	}
 
 	if err := uc.repo.Save(ctx, m); err != nil {
-		slog.ErrorContext(ctx, "failed to save material", "error", err)
+		slog.ErrorContext(ctx, "failed to save material", "error", err, "material_id", m.ID())
 		return nil, apperror.NewInternal()
 	}
 
