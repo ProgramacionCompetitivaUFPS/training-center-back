@@ -16,14 +16,19 @@ type GroupName struct {
 func NewGroupName(s string) (GroupName, error) {
 	trimmed := strings.TrimSpace(s)
 	if trimmed == "" {
-		return GroupName{}, apperror.NewBadRequest(ErrCodeInvalidName, "group name cannot be empty")
+		return GroupName{}, apperror.NewValidation([]apperror.FieldError{
+			{Field: "name", Message: "group name cannot be empty"},
+		})
 	}
 	if len([]rune(trimmed)) > MaxGroupNameLength {
-		return GroupName{}, apperror.NewBadRequest(ErrCodeInvalidName,
-			fmt.Sprintf("group name cannot exceed %d characters", MaxGroupNameLength))
+		return GroupName{}, apperror.NewValidation([]apperror.FieldError{
+			{Field: "name", Message: fmt.Sprintf("group name cannot exceed %d characters", MaxGroupNameLength)},
+		})
 	}
 	if strings.EqualFold(trimmed, "global") {
-		return GroupName{}, apperror.NewBadRequest(ErrCodeReservedName, "the group name 'global' is reserved")
+		return GroupName{}, apperror.NewValidation([]apperror.FieldError{
+			{Field: "name", Message: "the group name 'global' is reserved"},
+		})
 	}
 	return GroupName{value: trimmed}, nil
 }

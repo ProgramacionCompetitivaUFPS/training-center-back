@@ -4,7 +4,6 @@ import (
 	"testing"
 
 	"github.com/training-judge-center/backend/internal/domain/group"
-	"github.com/training-judge-center/backend/pkg/apperror"
 )
 
 func TestNewGroupName_Valid(t *testing.T) {
@@ -35,13 +34,7 @@ func TestNewGroupName_Empty(t *testing.T) {
 			t.Errorf("NewGroupName(%q) expected error, got nil", input)
 			continue
 		}
-		appErr, ok := err.(*apperror.AppError)
-		if !ok {
-			t.Fatalf("NewGroupName(%q): expected *apperror.AppError, got %T", input, err)
-		}
-		if appErr.Code != group.ErrCodeInvalidName {
-			t.Errorf("NewGroupName(%q) Code = %q, want %q", input, appErr.Code, group.ErrCodeInvalidName)
-		}
+		assertValidationField(t, "NewGroupName("+input+")", err, "name")
 	}
 }
 
@@ -54,29 +47,17 @@ func TestNewGroupName_TooLong(t *testing.T) {
 	if err == nil {
 		t.Fatalf("NewGroupName with %d chars expected error, got nil", group.MaxGroupNameLength+1)
 	}
-	appErr, ok := err.(*apperror.AppError)
-	if !ok {
-		t.Fatalf("expected *apperror.AppError, got %T", err)
-	}
-	if appErr.Code != group.ErrCodeInvalidName {
-		t.Errorf("Code = %q, want %q", appErr.Code, group.ErrCodeInvalidName)
-	}
+	assertValidationField(t, "NewGroupName(too long)", err, "name")
 }
 
 func TestNewGroupName_ReservedName(t *testing.T) {
 	for _, reserved := range []string{"global", "Global", "GLOBAL", "  global  "} {
 		_, err := group.NewGroupName(reserved)
 		if err == nil {
-			t.Errorf("NewGroupName(%q) expected RESERVED_NAME error, got nil", reserved)
+			t.Errorf("NewGroupName(%q) expected reserved-name error, got nil", reserved)
 			continue
 		}
-		appErr, ok := err.(*apperror.AppError)
-		if !ok {
-			t.Fatalf("NewGroupName(%q): expected *apperror.AppError, got %T", reserved, err)
-		}
-		if appErr.Code != group.ErrCodeReservedName {
-			t.Errorf("NewGroupName(%q) Code = %q, want %q", reserved, appErr.Code, group.ErrCodeReservedName)
-		}
+		assertValidationField(t, "NewGroupName("+reserved+")", err, "name")
 	}
 }
 

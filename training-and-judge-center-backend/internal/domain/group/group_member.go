@@ -19,13 +19,13 @@ type GroupMember struct {
 // deterministic joinedAt in tests; nil defaults to time.Now.
 func NewGroupMember(id, groupID string, userID shared.UserID, role MemberRole, clock func() time.Time) (*GroupMember, error) {
 	if id == "" {
-		return nil, apperror.NewBadRequest(apperror.ErrCodeBadRequest, "group member id cannot be empty")
+		return nil, apperror.NewInternal()
 	}
 	if groupID == "" {
-		return nil, apperror.NewBadRequest(apperror.ErrCodeBadRequest, "group id cannot be empty")
+		return nil, apperror.NewInternal()
 	}
 	if userID.Value() == "" {
-		return nil, apperror.NewBadRequest(apperror.ErrCodeBadRequest, "user id cannot be empty")
+		return nil, apperror.NewInternal()
 	}
 	if clock == nil {
 		clock = time.Now

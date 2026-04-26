@@ -71,8 +71,8 @@ func TestNewGroup_EmptyID(t *testing.T) {
 	if !ok {
 		t.Fatalf("expected *apperror.AppError, got %T", err)
 	}
-	if appErr.Code != apperror.ErrCodeBadRequest {
-		t.Errorf("Code = %q, want %q", appErr.Code, apperror.ErrCodeBadRequest)
+	if appErr.Code != apperror.ErrCodeInternalError {
+		t.Errorf("Code = %q, want %q", appErr.Code, apperror.ErrCodeInternalError)
 	}
 }
 

@@ -2,7 +2,6 @@ package group
 
 import (
 	"context"
-	"errors"
 	"log/slog"
 
 	"github.com/google/uuid"
@@ -42,17 +41,17 @@ func (uc *CreateGroupUseCase) Execute(ctx context.Context, input CreateGroupInpu
 	var fieldErrs []apperror.FieldError
 
 	groupName, err := domainGroup.NewGroupName(input.Name)
-	if err := appendFieldErr(err, "name", &fieldErrs); err != nil {
+	if err := apperror.AccumulateFieldErrors(err, &fieldErrs); err != nil {
 		return nil, err
 	}
 
 	joinPolicy, err := domainGroup.NewJoinPolicy(input.JoinMode)
-	if err := appendFieldErr(err, "joinMode", &fieldErrs); err != nil {
+	if err := apperror.AccumulateFieldErrors(err, &fieldErrs); err != nil {
 		return nil, err
 	}
 
 	visibility, err := domainGroup.NewVisibility(input.Visibility)
-	if err := appendFieldErr(err, "visibility", &fieldErrs); err != nil {
+	if err := apperror.AccumulateFieldErrors(err, &fieldErrs); err != nil {
 		return nil, err
 	}
 
@@ -79,7 +78,6 @@ func (uc *CreateGroupUseCase) Execute(ctx context.Context, input CreateGroupInpu
 		nil,
 	)
 	if err != nil {
-		// NewGroup retorna ErrCodeInvalidPolicyCombination si visibility+joinPolicy es inválida.
 		return nil, err
 	}
 
@@ -89,20 +87,4 @@ func (uc *CreateGroupUseCase) Execute(ctx context.Context, input CreateGroupInpu
 	}
 
 	return &CreateGroupResult{Group: g}, nil
-}
-
-// appendFieldErr convierte un AppError de dominio (sin Details) en un FieldError acumulable.
-// Los validadores del dominio group retornan NewBadRequest sin Details, por lo que
-// AccumulateFieldErrors los consumiría silenciosamente. Este helper extrae el mensaje
-// y lo empaqueta con el nombre de campo correcto para la respuesta al cliente.
-func appendFieldErr(err error, field string, fieldErrs *[]apperror.FieldError) error {
-	if err == nil {
-		return nil
-	}
-	var ae *apperror.AppError
-	if errors.As(err, &ae) {
-		*fieldErrs = append(*fieldErrs, apperror.FieldError{Field: field, Message: ae.Message})
-		return nil
-	}
-	return apperror.NewInternal()
 }
