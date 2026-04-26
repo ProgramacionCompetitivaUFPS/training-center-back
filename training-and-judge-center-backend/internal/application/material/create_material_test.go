@@ -186,6 +186,24 @@ func TestCreateMaterial_ValidationErrorInvalidTags(t *testing.T) {
 	}
 }
 
+func TestCreateMaterial_NilTagsTreatedAsEmpty(t *testing.T) {
+	uc := newCreateUC(&mockMaterialRepository{}, groupExists(), isLead())
+
+	out, err := uc.Execute(context.Background(), CreateMaterialInput{
+		CurrentUser: asCoach(testAuthorID),
+		GroupID:     testGroupID,
+		Title:       "Nil Tags",
+		Tags:        nil,
+	})
+
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(out.Material.Tags) != 0 {
+		t.Errorf("nil Tags should produce empty tag list, got %v", out.Material.Tags)
+	}
+}
+
 func TestCreateMaterial_DefaultsContentAndTags(t *testing.T) {
 	uc := newCreateUC(&mockMaterialRepository{}, groupExists(), isLead())
 
