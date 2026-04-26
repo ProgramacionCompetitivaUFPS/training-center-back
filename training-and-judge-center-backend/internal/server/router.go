@@ -6,12 +6,13 @@ import (
 	"github.com/training-judge-center/backend/internal/domain/user"
 	"github.com/training-judge-center/backend/internal/server/handler"
 	"github.com/training-judge-center/backend/internal/server/handler/problem"
+	handlerUser "github.com/training-judge-center/backend/internal/server/handler/user"
 	"github.com/training-judge-center/backend/internal/server/middleware"
 )
 
 type Handlers struct {
 	Problem *problem.Handler
-	User    *handler.UserHandler
+	User    *handlerUser.UserHandler
 	Auth    *handler.AuthHandler
 }
 

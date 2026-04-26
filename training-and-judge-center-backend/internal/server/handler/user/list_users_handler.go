@@ -1,4 +1,4 @@
-package handler
+package user
 
 import (
 	"math"
@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	appuser "github.com/training-judge-center/backend/internal/application/user"
+	"github.com/training-judge-center/backend/internal/server/handler"
 )
 
 type listUserItem struct {
@@ -25,9 +26,9 @@ type listUserItem struct {
 }
 
 type paginationMeta struct {
-	TotalCount  int `json:"totalCount"`
-	CurrentPage int `json:"currentPage"`
-	TotalPages  int `json:"totalPages"`
+	TotalCount   int `json:"totalCount"`
+	CurrentPage  int `json:"currentPage"`
+	TotalPages   int `json:"totalPages"`
 	ItemsPerPage int `json:"itemsPerPage"`
 }
 
@@ -39,13 +40,11 @@ type listUsersResponse struct {
 func (h *UserHandler) ListUsers(w http.ResponseWriter, r *http.Request) {
 	q := r.URL.Query()
 
-	// Parse roles (comma-separated)
 	var roles []string
 	if raw := q.Get("role"); raw != "" {
 		roles = strings.Split(raw, ",")
 	}
 
-	// Parse page/limit
 	page, _ := strconv.Atoi(q.Get("page"))
 	limit, _ := strconv.Atoi(q.Get("limit"))
 
@@ -65,11 +64,10 @@ func (h *UserHandler) ListUsers(w http.ResponseWriter, r *http.Request) {
 
 	result, err := h.listUsers.Execute(r.Context(), input)
 	if err != nil {
-		respondError(w, err)
+		handler.WriteError(w, err)
 		return
 	}
 
-	// Build response items
 	items := make([]listUserItem, 0, len(result.Users))
 	for _, u := range result.Users {
 		item := listUserItem{
@@ -102,7 +100,7 @@ func (h *UserHandler) ListUsers(w http.ResponseWriter, r *http.Request) {
 		totalPages = int(math.Ceil(float64(result.TotalCount) / float64(result.Limit)))
 	}
 
-	respondJSON(w, http.StatusOK, listUsersResponse{
+	handler.WriteJSON(w, http.StatusOK, listUsersResponse{
 		Users: items,
 		Pagination: paginationMeta{
 			TotalCount:   result.TotalCount,

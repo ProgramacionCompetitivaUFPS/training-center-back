@@ -1,4 +1,4 @@
-package handler
+package user
 
 import (
 	"encoding/json"
@@ -6,6 +6,7 @@ import (
 	"net/http"
 
 	appuser "github.com/training-judge-center/backend/internal/application/user"
+	"github.com/training-judge-center/backend/internal/server/handler"
 	"github.com/training-judge-center/backend/internal/server/middleware"
 )
 
@@ -17,7 +18,7 @@ type updatePasswordRequest struct {
 func (h *UserHandler) UpdatePassword(w http.ResponseWriter, r *http.Request) {
 	claims := middleware.GetClaims(r.Context())
 	if claims == nil {
-		respondJSON(w, http.StatusUnauthorized, map[string]string{
+		handler.WriteJSON(w, http.StatusUnauthorized, map[string]string{
 			"error":   "UNAUTHORIZED",
 			"message": "Invalid or missing authentication token",
 		})
@@ -26,7 +27,7 @@ func (h *UserHandler) UpdatePassword(w http.ResponseWriter, r *http.Request) {
 
 	var req updatePasswordRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		respondJSON(w, http.StatusBadRequest, map[string]string{
+		handler.WriteJSON(w, http.StatusBadRequest, map[string]string{
 			"error":   "INVALID_JSON",
 			"message": "Request body must be valid JSON",
 		})
@@ -39,12 +40,12 @@ func (h *UserHandler) UpdatePassword(w http.ResponseWriter, r *http.Request) {
 		NewPassword:     req.NewPassword,
 	})
 	if err != nil && !errors.Is(err, appuser.ErrSessionsNotInvalidated) {
-		respondError(w, err)
+		handler.WriteError(w, err)
 		return
 	}
 
 	if errors.Is(err, appuser.ErrSessionsNotInvalidated) {
-		respondJSON(w, http.StatusOK, map[string]string{
+		handler.WriteJSON(w, http.StatusOK, map[string]string{
 			"code":    "SESSIONS_NOT_INVALIDATED",
 			"message": "Your password was changed successfully. We couldn't close your other active sessions — to close them, please change your password again.",
 		})

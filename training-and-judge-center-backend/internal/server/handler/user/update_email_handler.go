@@ -1,4 +1,4 @@
-package handler
+package user
 
 import (
 	"encoding/json"
@@ -6,6 +6,7 @@ import (
 	"time"
 
 	appuser "github.com/training-judge-center/backend/internal/application/user"
+	"github.com/training-judge-center/backend/internal/server/handler"
 	"github.com/training-judge-center/backend/internal/server/middleware"
 )
 
@@ -17,7 +18,7 @@ type requestEmailChangeBody struct {
 func (h *UserHandler) RequestEmailChange(w http.ResponseWriter, r *http.Request) {
 	claims := middleware.GetClaims(r.Context())
 	if claims == nil {
-		respondJSON(w, http.StatusUnauthorized, map[string]string{
+		handler.WriteJSON(w, http.StatusUnauthorized, map[string]string{
 			"error":   "UNAUTHORIZED",
 			"message": "Invalid or missing authentication token",
 		})
@@ -28,7 +29,7 @@ func (h *UserHandler) RequestEmailChange(w http.ResponseWriter, r *http.Request)
 
 	var body requestEmailChangeBody
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-		respondJSON(w, http.StatusBadRequest, map[string]string{
+		handler.WriteJSON(w, http.StatusBadRequest, map[string]string{
 			"error":   "INVALID_JSON",
 			"message": "Request body must be valid JSON",
 		})
@@ -36,7 +37,7 @@ func (h *UserHandler) RequestEmailChange(w http.ResponseWriter, r *http.Request)
 	}
 
 	if body.Password == "" || body.NewEmail == "" {
-		respondJSON(w, http.StatusBadRequest, map[string]interface{}{
+		handler.WriteJSON(w, http.StatusBadRequest, map[string]interface{}{
 			"error":   "VALIDATION_ERROR",
 			"message": "Invalid request data",
 			"details": []map[string]string{
@@ -53,11 +54,11 @@ func (h *UserHandler) RequestEmailChange(w http.ResponseWriter, r *http.Request)
 	}
 
 	if err := h.requestEmailChange.Execute(ctx, input); err != nil {
-		respondError(w, err)
+		handler.WriteError(w, err)
 		return
 	}
 
-	respondJSON(w, http.StatusOK, map[string]interface{}{
+	handler.WriteJSON(w, http.StatusOK, map[string]interface{}{
 		"message":   "Verification code sent to the new email address",
 		"expiresAt": time.Now().Add(15 * time.Minute).Format(time.RFC3339),
 	})
@@ -70,7 +71,7 @@ type confirmEmailChangeBody struct {
 func (h *UserHandler) ConfirmEmailChange(w http.ResponseWriter, r *http.Request) {
 	claims := middleware.GetClaims(r.Context())
 	if claims == nil {
-		respondJSON(w, http.StatusUnauthorized, map[string]string{
+		handler.WriteJSON(w, http.StatusUnauthorized, map[string]string{
 			"error":   "UNAUTHORIZED",
 			"message": "Invalid or missing authentication token",
 		})
@@ -81,7 +82,7 @@ func (h *UserHandler) ConfirmEmailChange(w http.ResponseWriter, r *http.Request)
 
 	var body confirmEmailChangeBody
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-		respondJSON(w, http.StatusBadRequest, map[string]string{
+		handler.WriteJSON(w, http.StatusBadRequest, map[string]string{
 			"error":   "INVALID_JSON",
 			"message": "Request body must be valid JSON",
 		})
@@ -89,7 +90,7 @@ func (h *UserHandler) ConfirmEmailChange(w http.ResponseWriter, r *http.Request)
 	}
 
 	if !digitCodeRegex.MatchString(body.Code) {
-		respondJSON(w, http.StatusBadRequest, map[string]interface{}{
+		handler.WriteJSON(w, http.StatusBadRequest, map[string]interface{}{
 			"error":   "VALIDATION_ERROR",
 			"message": "Invalid request data",
 			"details": []map[string]string{
@@ -106,11 +107,11 @@ func (h *UserHandler) ConfirmEmailChange(w http.ResponseWriter, r *http.Request)
 
 	newEmail, err := h.confirmEmailChange.Execute(ctx, input)
 	if err != nil {
-		respondError(w, err)
+		handler.WriteError(w, err)
 		return
 	}
 
-	respondJSON(w, http.StatusOK, map[string]interface{}{
+	handler.WriteJSON(w, http.StatusOK, map[string]interface{}{
 		"message": "Email updated successfully",
 		"email":   newEmail.String(),
 	})

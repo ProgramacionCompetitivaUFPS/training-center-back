@@ -12,12 +12,6 @@ import (
 	"github.com/training-judge-center/backend/pkg/apperror"
 )
 
-type unpublishResponse struct {
-	Slug    string `json:"slug"`
-	Status  string `json:"status"`
-	Message string `json:"message"`
-}
-
 type changeAccessibilityRequest struct {
 	Accessibility string `json:"accessibility"`
 }
@@ -27,32 +21,6 @@ type changeAccessibilityResponse struct {
 	Accessibility string `json:"accessibility"`
 	Status        string `json:"status"`
 	Message       string `json:"message"`
-}
-
-func (h *Handler) Unpublish(w http.ResponseWriter, r *http.Request) {
-	claims := middleware.GetClaims(r.Context())
-	if claims == nil {
-		handler.WriteJSON(w, http.StatusUnauthorized, apperror.AppError{Code: apperror.ErrCodeUnauthorized, Message: "Invalid or missing authentication token"})
-		return
-	}
-
-	slug := r.PathValue("slug")
-	currentUser := shared.CurrentUser{ID: claims.UserID, Role: claims.Role.String()}
-
-	p, err := h.unpublishUC.Execute(r.Context(), appProblem.UnpublishProblemInput{
-		Slug:        slug,
-		CurrentUser: currentUser,
-	})
-	if err != nil {
-		handler.WriteError(w, err)
-		return
-	}
-
-	handler.WriteJSON(w, http.StatusOK, unpublishResponse{
-		Slug:    p.Slug().String(),
-		Status:  p.Status().String(),
-		Message: "Problem unpublished successfully. You can now make changes.",
-	})
 }
 
 func (h *Handler) ChangeAccessibility(w http.ResponseWriter, r *http.Request) {
