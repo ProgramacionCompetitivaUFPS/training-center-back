@@ -16,13 +16,19 @@ func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
 
 	groupID := r.PathValue("groupId")
 	if groupID == "" {
-		handler.WriteJSON(w, http.StatusBadRequest, apperror.NewBadRequest(apperror.ErrCodeBadRequest, "groupId is required"))
+		handler.WriteJSON(w, http.StatusBadRequest, apperror.AppError{
+			Code:    apperror.ErrCodeBadRequest,
+			Message: "groupId is required",
+		})
 		return
 	}
 
 	var body createMaterialRequest
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-		handler.WriteJSON(w, http.StatusBadRequest, apperror.NewBadRequest(apperror.ErrCodeValidationError, "Invalid request body"))
+		handler.WriteJSON(w, http.StatusBadRequest, apperror.AppError{
+			Code:    apperror.ErrCodeValidationError,
+			Message: "Invalid request body",
+		})
 		return
 	}
 
@@ -47,13 +53,19 @@ func (h *Handler) Update(w http.ResponseWriter, r *http.Request) {
 	groupID := r.PathValue("groupId")
 	materialID := r.PathValue("materialId")
 	if groupID == "" || materialID == "" {
-		handler.WriteJSON(w, http.StatusBadRequest, apperror.NewBadRequest(apperror.ErrCodeBadRequest, "groupId and materialId are required"))
+		handler.WriteJSON(w, http.StatusBadRequest, apperror.AppError{
+			Code:    apperror.ErrCodeBadRequest,
+			Message: "groupId and materialId are required",
+		})
 		return
 	}
 
 	var body updateMaterialRequest
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-		handler.WriteJSON(w, http.StatusBadRequest, apperror.NewBadRequest(apperror.ErrCodeValidationError, "Invalid request body"))
+		handler.WriteJSON(w, http.StatusBadRequest, apperror.AppError{
+			Code:    apperror.ErrCodeValidationError,
+			Message: "Invalid request body",
+		})
 		return
 	}
 
