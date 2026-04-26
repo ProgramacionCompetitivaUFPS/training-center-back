@@ -154,11 +154,16 @@ func (r *GroupRepository) List(ctx context.Context, filters domainGroup.ListFilt
 		for rows.Next() {
 			g, err := scanGroupRow(rows, memberCountSelect != "")
 			if err != nil {
+				slog.ErrorContext(gCtx, "List groups scan failed", "error", err)
 				return err
 			}
 			result = append(result, g)
 		}
-		return rows.Err()
+		if err := rows.Err(); err != nil {
+			slog.ErrorContext(gCtx, "List groups rows error", "error", err)
+			return err
+		}
+		return nil
 	})
 
 	eg.Go(func() error {

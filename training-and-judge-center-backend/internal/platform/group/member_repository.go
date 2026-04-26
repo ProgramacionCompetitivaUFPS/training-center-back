@@ -96,11 +96,13 @@ func (r *MemberRepository) BulkStats(ctx context.Context, groupIDs []string, vie
 			var gid string
 			var n int
 			if err := rows.Scan(&gid, &n); err != nil {
+				slog.ErrorContext(egCtx, "BulkStats count scan failed", "error", err)
 				return apperror.NewInternal()
 			}
 			counts[gid] = n
 		}
 		if err := rows.Err(); err != nil {
+			slog.ErrorContext(egCtx, "BulkStats count rows error", "error", err)
 			return apperror.NewInternal()
 		}
 		return nil
@@ -119,11 +121,13 @@ func (r *MemberRepository) BulkStats(ctx context.Context, groupIDs []string, vie
 		for rows.Next() {
 			m, err := scanMember(rows)
 			if err != nil {
+				slog.ErrorContext(egCtx, "BulkStats membership scan failed", "error", err)
 				return apperror.NewInternal()
 			}
 			memberships[m.GroupID()] = m
 		}
 		if err := rows.Err(); err != nil {
+			slog.ErrorContext(egCtx, "BulkStats membership rows error", "error", err)
 			return apperror.NewInternal()
 		}
 		return nil
