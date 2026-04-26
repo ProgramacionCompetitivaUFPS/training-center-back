@@ -16,7 +16,7 @@ type UpdateMaterialInput struct {
 	MaterialID  string
 	Title       *string
 	Content     *string
-	Tags        *[]string
+	Tags        *[]string // nil = no change; &[]string{} = clear all tags
 }
 
 type UpdateMaterialOutput struct {
