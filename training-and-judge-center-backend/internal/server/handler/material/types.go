@@ -36,13 +36,13 @@ type materialResponse struct {
 func buildResponse(m appMaterial.MaterialData) materialResponse {
 	var pinnedAt *string
 	if m.PinnedAt != nil {
-		s := m.PinnedAt.Format(time.RFC3339)
+		s := m.PinnedAt.Format(time.RFC3339Nano)
 		pinnedAt = &s
 	}
 
 	var publishedAt *string
 	if m.PublishedAt != nil {
-		s := m.PublishedAt.Format(time.RFC3339)
+		s := m.PublishedAt.Format(time.RFC3339Nano)
 		publishedAt = &s
 	}
 
@@ -61,8 +61,8 @@ func buildResponse(m appMaterial.MaterialData) materialResponse {
 		PinnedAt:    pinnedAt,
 		GroupID:     m.GroupID,
 		AuthorID:    m.AuthorID,
-		CreatedAt:   m.CreatedAt.Format(time.RFC3339),
-		UpdatedAt:   m.UpdatedAt.Format(time.RFC3339),
+		CreatedAt:   m.CreatedAt.Format(time.RFC3339Nano),
+		UpdatedAt:   m.UpdatedAt.Format(time.RFC3339Nano),
 		PublishedAt: publishedAt,
 	}
 }
