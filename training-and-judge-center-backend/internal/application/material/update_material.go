@@ -11,6 +11,8 @@ import (
 
 type UpdateMaterialInput struct {
 	CurrentUser shared.CurrentUser
+	// GroupID scopes the operation: the material must belong to this group.
+	// A material whose GroupID differs from this value is treated as not found.
 	GroupID     string
 	MaterialID  string
 	Title       *string
