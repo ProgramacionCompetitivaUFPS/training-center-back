@@ -772,6 +772,67 @@ items:
           timeout: 0
           followRedirects: true
           maxRedirects: 5
+  - info:
+      name: Materials
+      type: folder
+      seq: 6
+    items:
+      - info:
+          name: Create Material
+          type: http
+          seq: 1
+        http:
+          method: POST
+          url: '{{baseUrl}}/groups/:groupId/materials'
+          params:
+            - name: groupId
+              value: 00000000-0000-0000-0000-000000000000
+              type: path
+          body:
+            type: json
+            data: |-
+              {
+                "title": "Introducción a Grafos",
+                "content": "# Grafos\n\nUn grafo es una estructura de datos...",
+                "tags": ["grafos", "intro"]
+              }
+          auth:
+            type: bearer
+            token: '{{token}}'
+        settings:
+          encodeUrl: true
+          timeout: 0
+          followRedirects: true
+          maxRedirects: 5
+      - info:
+          name: Update Material
+          type: http
+          seq: 2
+        http:
+          method: PATCH
+          url: '{{baseUrl}}/groups/:groupId/materials/:materialId'
+          params:
+            - name: groupId
+              value: 00000000-0000-0000-0000-000000000000
+              type: path
+            - name: materialId
+              value: 00000000-0000-0000-0000-000000000000
+              type: path
+          body:
+            type: json
+            data: |-
+              {
+                "title": "Introducción a Grafos (actualizado)",
+                "tags": ["grafos", "teoria"]
+              }
+          auth:
+            type: bearer
+            token: '{{token}}'
+        settings:
+          encodeUrl: true
+          timeout: 0
+          followRedirects: true
+          maxRedirects: 5
 bundled: true
 extensions:
   bruno:
