@@ -4,11 +4,11 @@ import (
 	"context"
 	"log/slog"
 	"strings"
+	"time"
 
 	domainGroup "github.com/training-judge-center/backend/internal/domain/group"
 	"github.com/training-judge-center/backend/internal/domain/shared"
 	"github.com/training-judge-center/backend/pkg/apperror"
-	"github.com/training-judge-center/backend/pkg/timeutil"
 )
 
 type ListMyGroupsInput struct {
@@ -25,7 +25,7 @@ type MyGroupItem struct {
 	Group       *domainGroup.Group
 	MemberCount int
 	MyRole      domainGroup.MemberRole
-	JoinedAt    string
+	JoinedAt    time.Time
 }
 
 type ListMyGroupsOutput struct {
@@ -116,7 +116,7 @@ func (uc *ListMyGroupsUseCase) Execute(ctx context.Context, in ListMyGroupsInput
 			Group:       g,
 			MemberCount: s.Count,
 			MyRole:      s.Membership.Role(),
-			JoinedAt:    s.Membership.JoinedAt().Format(timeutil.RFC3339UTC),
+			JoinedAt:    s.Membership.JoinedAt(),
 		})
 	}
 

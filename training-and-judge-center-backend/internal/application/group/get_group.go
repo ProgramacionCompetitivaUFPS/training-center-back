@@ -2,13 +2,13 @@ package group
 
 import (
 	"context"
+	"time"
 
 	"golang.org/x/sync/errgroup"
 
 	domainGroup "github.com/training-judge-center/backend/internal/domain/group"
 	"github.com/training-judge-center/backend/internal/domain/shared"
 	"github.com/training-judge-center/backend/pkg/apperror"
-	"github.com/training-judge-center/backend/pkg/timeutil"
 )
 
 type GetGroupInput struct {
@@ -30,7 +30,7 @@ type GroupStatistics struct {
 type UserMembership struct {
 	IsMember bool
 	Role     *domainGroup.MemberRole
-	JoinedAt *string
+	JoinedAt *time.Time
 }
 
 type GetGroupOutput struct {
@@ -120,7 +120,7 @@ func (uc *GetGroupUseCase) Execute(ctx context.Context, in GetGroupInput) (*GetG
 	if membership != nil {
 		r := membership.Role()
 		um.Role = &r
-		ja := membership.JoinedAt().Format(timeutil.RFC3339UTC)
+		ja := membership.JoinedAt()
 		um.JoinedAt = &ja
 	}
 

@@ -47,7 +47,7 @@ func (h *Handler) ListMyGroups(w http.ResponseWriter, r *http.Request) {
 			JoinPolicy:  g.JoinPolicy().String(),
 			IsGlobal:    g.IsDefault(),
 			MyRole:      string(mg.MyRole),
-			JoinedAt:    mg.JoinedAt,
+			JoinedAt:    mg.JoinedAt.Format(timeutil.RFC3339UTC),
 			MemberCount: mg.MemberCount,
 			CreatedAt:   g.CreatedAt().Format(timeutil.RFC3339UTC),
 		})

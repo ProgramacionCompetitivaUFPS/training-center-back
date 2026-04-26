@@ -105,7 +105,7 @@ func TestListMyGroups_EnrichesEachResult(t *testing.T) {
 	if out.Groups[0].MemberCount != 3 {
 		t.Errorf("expected memberCount=3, got %d", out.Groups[0].MemberCount)
 	}
-	if out.Groups[0].JoinedAt == "" {
+	if out.Groups[0].JoinedAt.IsZero() {
 		t.Error("expected joinedAt to be set")
 	}
 }
