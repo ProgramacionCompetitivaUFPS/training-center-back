@@ -1,0 +1,23 @@
+training-and-judge-center-backend/cmd/migrate/migrations/007_add_user_preferences.sql
+  ebc5e4b6903748c4 4
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.3.4",
+  "base_commit_sha": "f9a12c6367b3ad66c6a584eaf5c56f957625bb72",
+  "prompts": {
+    "ebc5e4b6903748c4": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "82ed38ba-964c-4378-83a2-6cb3ed2021f6",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "AlexaVJ",
+      "messages": [],
+      "total_additions": 50,
+      "total_deletions": 161,
+      "accepted_lines": 1,
+      "overriden_lines": 0
+    }
+  }
+}
