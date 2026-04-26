@@ -31,7 +31,7 @@ func (h *Handler) ListGroups(w http.ResponseWriter, r *http.Request) {
 		Limit:       limit,
 	}
 
-	out, err := h.listUC.Execute(r.Context(), in)
+	out, err := h.listGroups.Execute(r.Context(), in)
 	if err != nil {
 		handler.WriteError(w, err)
 		return

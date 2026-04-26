@@ -31,7 +31,7 @@ func (g *Group) WithClock(fn func() time.Time) *Group {
 // timestamps in tests; nil defaults to time.Now.
 func NewGroup(id string, name GroupName, description *string, visibility Visibility, joinPolicy JoinPolicy, createdBy shared.UserID, clock func() time.Time) (*Group, error) {
 	if id == "" {
-		return nil, apperror.NewBadRequest(apperror.ErrCodeBadRequest, "group id cannot be empty")
+		return nil, apperror.NewInternal()
 	}
 	if err := validatePolicyCombination(visibility, joinPolicy); err != nil {
 		return nil, err
@@ -122,7 +122,9 @@ func (g *Group) UpdatePolicies(visibility *Visibility, joinPolicy *JoinPolicy) e
 
 func validatePolicyCombination(v Visibility, jp JoinPolicy) error {
 	if v == VisibilityNotVisible && jp != JoinPolicyInvite {
-		return apperror.NewBadRequest(ErrCodeInvalidPolicyCombination, "non-visible groups can only use the INVITE join policy")
+		return apperror.NewValidation([]apperror.FieldError{
+			{Field: "joinPolicy", Message: "non-visible groups can only use the INVITE join policy"},
+		})
 	}
 	return nil
 }

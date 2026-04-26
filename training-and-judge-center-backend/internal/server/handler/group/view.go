@@ -14,7 +14,7 @@ func (h *Handler) GetGroup(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	out, err := h.getUC.Execute(r.Context(), appGroup.GetGroupInput{
+	out, err := h.getGroup.Execute(r.Context(), appGroup.GetGroupInput{
 		GroupID:     r.PathValue("groupId"),
 		CurrentUser: *currentUser,
 	})

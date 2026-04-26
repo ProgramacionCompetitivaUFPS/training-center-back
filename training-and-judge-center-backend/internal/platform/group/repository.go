@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"golang.org/x/sync/errgroup"
 
@@ -25,8 +26,35 @@ func NewGroupRepository(db *pgxpool.Pool) *GroupRepository {
 	return &GroupRepository{db: db}
 }
 
-func (r *GroupRepository) Save(_ context.Context, _ *domainGroup.Group) error {
-	panic("not implemented")
+func (r *GroupRepository) Save(ctx context.Context, g *domainGroup.Group) error {
+	query := `
+		INSERT INTO groups (
+			id, name, description, visibility, join_policy,
+			is_default, created_by, created_at, updated_at
+		) VALUES (
+			$1, $2, $3, $4, $5, $6, $7, $8, $9
+		)
+	`
+	_, err := r.db.Exec(ctx, query,
+		g.ID(),
+		g.Name().Value(),
+		g.Description(),
+		g.Visibility().String(),
+		g.JoinPolicy().String(),
+		g.IsDefault(),
+		g.CreatedBy().Value(),
+		g.CreatedAt(),
+		g.UpdatedAt(),
+	)
+	if err != nil {
+		var pgErr *pgconn.PgError
+		if errors.As(err, &pgErr) && pgErr.Code == "23505" {
+			return apperror.NewConflict(domainGroup.ErrCodeNameAlreadyExists, "A group with this name already exists")
+		}
+		slog.ErrorContext(ctx, "failed to save group", "error", err, "group_id", g.ID())
+		return apperror.NewInternal()
+	}
+	return nil
 }
 
 func (r *GroupRepository) FindByID(ctx context.Context, id string) (*domainGroup.Group, error) {
@@ -47,12 +75,48 @@ func (r *GroupRepository) FindByID(ctx context.Context, id string) (*domainGroup
 	return g, nil
 }
 
-func (r *GroupRepository) ExistsByName(_ context.Context, _ domainGroup.GroupName) (bool, error) {
-	panic("not implemented")
+func (r *GroupRepository) ExistsByName(ctx context.Context, name domainGroup.GroupName) (bool, error) {
+	var exists bool
+	err := r.db.QueryRow(ctx,
+		`SELECT EXISTS(SELECT 1 FROM groups WHERE LOWER(name) = LOWER($1))`,
+		name.Value(),
+	).Scan(&exists)
+	if err != nil {
+		slog.ErrorContext(ctx, "failed to check group name existence", "error", err)
+		return false, apperror.NewInternal()
+	}
+	return exists, nil
 }
 
-func (r *GroupRepository) FindDefault(_ context.Context) (*domainGroup.Group, error) {
-	panic("not implemented")
+func (r *GroupRepository) FindDefault(ctx context.Context) (*domainGroup.Group, error) {
+	row := r.db.QueryRow(ctx, `
+		SELECT id, name, description, visibility, join_policy,
+		       is_default, created_by, created_at, updated_at
+		FROM groups
+		WHERE is_default = TRUE
+		LIMIT 1
+	`)
+	g, err := scanGroup(row)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, apperror.NewNotFound(domainGroup.ErrCodeGroupNotFound, "group not found")
+		}
+		slog.ErrorContext(ctx, "FindDefault failed", "error", err)
+		return nil, apperror.NewInternal()
+	}
+	return g, nil
+}
+
+func (r *GroupRepository) Delete(ctx context.Context, id string) error {
+	tag, err := r.db.Exec(ctx, `DELETE FROM groups WHERE id = $1`, id)
+	if err != nil {
+		slog.ErrorContext(ctx, "failed to delete group", "error", err, "group_id", id)
+		return apperror.NewInternal()
+	}
+	if tag.RowsAffected() == 0 {
+		return apperror.NewNotFound(domainGroup.ErrCodeGroupNotFound, "group not found")
+	}
+	return nil
 }
 
 func (r *GroupRepository) List(ctx context.Context, filters domainGroup.ListFilters) ([]*domainGroup.Group, int, error) {
@@ -178,10 +242,6 @@ func (r *GroupRepository) List(ctx context.Context, filters domainGroup.ListFilt
 		result = []*domainGroup.Group{}
 	}
 	return result, total, nil
-}
-
-func (r *GroupRepository) Delete(_ context.Context, _ string) error {
-	panic("not implemented")
 }
 
 type rowScanner interface {

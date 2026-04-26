@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
@@ -17,7 +18,8 @@ import (
 )
 
 type stubGroupRepo struct {
-	findByIDFn func(id string) (*domainGroup.Group, error)
+	findByIDFn     func(id string) (*domainGroup.Group, error)
+	existsByNameFn func(name domainGroup.GroupName) (bool, error)
 }
 
 func (s *stubGroupRepo) Save(_ context.Context, _ *domainGroup.Group) error { return nil }
@@ -27,7 +29,10 @@ func (s *stubGroupRepo) FindByID(_ context.Context, id string) (*domainGroup.Gro
 	}
 	return nil, nil
 }
-func (s *stubGroupRepo) ExistsByName(_ context.Context, _ domainGroup.GroupName) (bool, error) {
+func (s *stubGroupRepo) ExistsByName(_ context.Context, n domainGroup.GroupName) (bool, error) {
+	if s.existsByNameFn != nil {
+		return s.existsByNameFn(n)
+	}
 	return false, nil
 }
 func (s *stubGroupRepo) FindDefault(_ context.Context) (*domainGroup.Group, error) { return nil, nil }
@@ -96,6 +101,7 @@ func stubHandler() *Handler {
 	repo := &stubGroupRepo{}
 	memberRepo := &stubMemberRepo{}
 	return NewHandler(
+		appGroup.NewCreateGroupUseCase(repo),
 		appGroup.NewListGroupsUseCase(repo, memberRepo),
 		appGroup.NewGetGroupUseCase(repo, memberRepo, &stubUserProvider{}),
 		appGroup.NewListMyGroupsUseCase(repo, memberRepo, &stubPrefsReader{}),
@@ -110,14 +116,33 @@ func (m *mockTokenSvc) ValidateToken(_ string) (*domainUser.TokenClaims, error) 
 	return &domainUser.TokenClaims{UserID: "u1", Role: domainUser.RoleContestant}, nil
 }
 
+// mockAdminTokenSvc always validates successfully with an admin role.
+type mockAdminTokenSvc struct{}
+
+func (m *mockAdminTokenSvc) GenerateToken(_ *domainUser.User) (string, error) { return "tok", nil }
+func (m *mockAdminTokenSvc) ValidateToken(_ string) (*domainUser.TokenClaims, error) {
+	return &domainUser.TokenClaims{UserID: "admin-1", Role: domainUser.RoleAdmin}, nil
+}
+
 func authedRequest(method, target string) *http.Request {
 	r := httptest.NewRequest(method, target, nil)
 	r.Header.Set("Authorization", "Bearer tok")
 	return r
 }
 
+func authedPostRequest(target, body string) *http.Request {
+	r := httptest.NewRequest("POST", target, strings.NewReader(body))
+	r.Header.Set("Authorization", "Bearer tok")
+	r.Header.Set("Content-Type", "application/json")
+	return r
+}
+
 func wrapAuth(h http.Handler) http.Handler {
 	return middleware.Auth(&mockTokenSvc{}, nil)(h)
+}
+
+func wrapAuthAsAdmin(h http.Handler) http.Handler {
+	return middleware.Auth(&mockAdminTokenSvc{}, nil)(h)
 }
 
 func TestListGroups_NonIntegerPageReturns400(t *testing.T) {
@@ -174,6 +199,7 @@ func TestGetGroup_NotFoundReturns404(t *testing.T) {
 		},
 	}
 	h := NewHandler(
+		appGroup.NewCreateGroupUseCase(repo),
 		appGroup.NewListGroupsUseCase(repo, &stubMemberRepo{}),
 		appGroup.NewGetGroupUseCase(repo, &stubMemberRepo{}, &stubUserProvider{}),
 		appGroup.NewListMyGroupsUseCase(repo, &stubMemberRepo{}, &stubPrefsReader{}),
@@ -201,6 +227,7 @@ func TestGetGroup_NonMemberHasNilRoleAndJoinedAt(t *testing.T) {
 	}
 	// FindByGroupAndUser returns nil, nil — viewer is not a member
 	h := NewHandler(
+		appGroup.NewCreateGroupUseCase(repo),
 		appGroup.NewListGroupsUseCase(repo, &stubMemberRepo{}),
 		appGroup.NewGetGroupUseCase(repo, &stubMemberRepo{}, &stubUserProvider{}),
 		appGroup.NewListMyGroupsUseCase(repo, &stubMemberRepo{}, &stubPrefsReader{}),
@@ -240,6 +267,7 @@ func TestGetGroup_ResponseShape(t *testing.T) {
 		findByIDFn: func(_ string) (*domainGroup.Group, error) { return g, nil },
 	}
 	h := NewHandler(
+		appGroup.NewCreateGroupUseCase(repo),
 		appGroup.NewListGroupsUseCase(repo, &stubMemberRepo{}),
 		appGroup.NewGetGroupUseCase(repo, &stubMemberRepo{}, &stubUserProvider{}),
 		appGroup.NewListMyGroupsUseCase(repo, &stubMemberRepo{}, &stubPrefsReader{}),
@@ -325,5 +353,73 @@ func TestBuildPagination_ZeroResults_HasNeither(t *testing.T) {
 	}
 	if p.HasPrevPage {
 		t.Error("expected HasPrevPage=false with 0 results")
+	}
+}
+
+// --- Create handler tests ---
+
+func TestCreate_InvalidJSONReturns400(t *testing.T) {
+	h := stubHandler()
+	w := httptest.NewRecorder()
+
+	r := authedPostRequest("/groups", `{invalid json}`)
+	wrapAuth(http.HandlerFunc(h.Create)).ServeHTTP(w, r)
+
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400, got %d", w.Code)
+	}
+}
+
+func TestCreate_ContestantReturns403(t *testing.T) {
+	h := stubHandler()
+	w := httptest.NewRecorder()
+
+	r := authedPostRequest("/groups", `{"name":"Test","joinMode":"OPEN","visibility":"VISIBLE"}`)
+	wrapAuth(http.HandlerFunc(h.Create)).ServeHTTP(w, r)
+
+	if w.Code != http.StatusForbidden {
+		t.Fatalf("expected 403, got %d", w.Code)
+	}
+}
+
+func TestCreate_ValidAdminRequestReturns201(t *testing.T) {
+	h := stubHandler()
+	w := httptest.NewRecorder()
+
+	r := authedPostRequest("/groups", `{"name":"Algorithms Club","joinMode":"OPEN","visibility":"VISIBLE"}`)
+	wrapAuthAsAdmin(http.HandlerFunc(h.Create)).ServeHTTP(w, r)
+
+	if w.Code != http.StatusCreated {
+		t.Fatalf("expected 201, got %d\nbody: %s", w.Code, w.Body.String())
+	}
+	var body groupResponse
+	if err := json.NewDecoder(w.Body).Decode(&body); err != nil {
+		t.Fatalf("could not decode response: %v", err)
+	}
+	if body.Name != "Algorithms Club" {
+		t.Errorf("Name = %q, want %q", body.Name, "Algorithms Club")
+	}
+	if body.ID == "" {
+		t.Error("expected non-empty ID in response")
+	}
+}
+
+func TestCreate_DuplicateNameReturns409(t *testing.T) {
+	repo := &stubGroupRepo{
+		existsByNameFn: func(_ domainGroup.GroupName) (bool, error) { return true, nil },
+	}
+	h := NewHandler(
+		appGroup.NewCreateGroupUseCase(repo),
+		appGroup.NewListGroupsUseCase(repo, &stubMemberRepo{}),
+		appGroup.NewGetGroupUseCase(repo, &stubMemberRepo{}, &stubUserProvider{}),
+		appGroup.NewListMyGroupsUseCase(repo, &stubMemberRepo{}, &stubPrefsReader{}),
+	)
+	w := httptest.NewRecorder()
+
+	r := authedPostRequest("/groups", `{"name":"Existing Group","joinMode":"OPEN","visibility":"VISIBLE"}`)
+	wrapAuthAsAdmin(http.HandlerFunc(h.Create)).ServeHTTP(w, r)
+
+	if w.Code != http.StatusConflict {
+		t.Fatalf("expected 409, got %d", w.Code)
 	}
 }

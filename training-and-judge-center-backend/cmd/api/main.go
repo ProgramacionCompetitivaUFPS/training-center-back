@@ -182,11 +182,12 @@ func main() {
 	groupPrefsReader := platformGroup.NewPreferencesReader(dbPool)
 
 	// Group use cases
-	listGroupsUC := appGroup.NewListGroupsUseCase(groupRepo, groupMemberRepo)
-	getGroupUC := appGroup.NewGetGroupUseCase(groupRepo, groupMemberRepo, groupUserProvider)
-	listMyGroupsUC := appGroup.NewListMyGroupsUseCase(groupRepo, groupMemberRepo, groupPrefsReader)
+	createGroupUseCase := appGroup.NewCreateGroupUseCase(groupRepo)
+	listGroupsUseCase := appGroup.NewListGroupsUseCase(groupRepo, groupMemberRepo)
+	getGroupUseCase := appGroup.NewGetGroupUseCase(groupRepo, groupMemberRepo, groupUserProvider)
+	listMyGroupsUseCase := appGroup.NewListMyGroupsUseCase(groupRepo, groupMemberRepo, groupPrefsReader)
 
-	groupHandler := handlerGroup.NewHandler(listGroupsUC, getGroupUC, listMyGroupsUC)
+	groupHandler := handlerGroup.NewHandler(createGroupUseCase, listGroupsUseCase, getGroupUseCase, listMyGroupsUseCase)
 
 	// Material platform adapters
 	materialRepo := platformMaterial.NewMaterialRepository(dbPool)

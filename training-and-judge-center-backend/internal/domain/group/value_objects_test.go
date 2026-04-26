@@ -7,18 +7,26 @@ import (
 	"github.com/training-judge-center/backend/pkg/apperror"
 )
 
-func assertErrCode(t *testing.T, label string, err error, wantCode string) {
+// assertValidationField verifies that err is a VALIDATION_ERROR with at least one FieldError
+// whose Field matches wantField.
+func assertValidationField(t *testing.T, label string, err error, wantField string) {
 	t.Helper()
 	if err == nil {
-		t.Errorf("%s: expected error with code %q, got nil", label, wantCode)
+		t.Errorf("%s: expected validation error, got nil", label)
 		return
 	}
 	appErr, ok := err.(*apperror.AppError)
 	if !ok {
 		t.Fatalf("%s: expected *apperror.AppError, got %T", label, err)
 	}
-	if appErr.Code != wantCode {
-		t.Errorf("%s: Code = %q, want %q", label, appErr.Code, wantCode)
+	if appErr.Code != apperror.ErrCodeValidationError {
+		t.Errorf("%s: Code = %q, want %q", label, appErr.Code, apperror.ErrCodeValidationError)
+	}
+	if len(appErr.Details) == 0 {
+		t.Fatalf("%s: expected Details with field %q, got empty", label, wantField)
+	}
+	if appErr.Details[0].Field != wantField {
+		t.Errorf("%s: Details[0].Field = %q, want %q", label, appErr.Details[0].Field, wantField)
 	}
 }
 
@@ -45,7 +53,7 @@ func TestNewJoinPolicy(t *testing.T) {
 				t.Errorf("NewJoinPolicy(%q) = %q, want %q", tc.input, got, tc.wantValue)
 			}
 		} else {
-			assertErrCode(t, "NewJoinPolicy("+tc.input+")", err, group.ErrCodeInvalidJoinPolicy)
+			assertValidationField(t, "NewJoinPolicy("+tc.input+")", err, "joinPolicy")
 		}
 	}
 }
@@ -72,7 +80,7 @@ func TestNewVisibility(t *testing.T) {
 				t.Errorf("NewVisibility(%q) = %q, want %q", tc.input, got, tc.wantValue)
 			}
 		} else {
-			assertErrCode(t, "NewVisibility("+tc.input+")", err, group.ErrCodeInvalidVisibility)
+			assertValidationField(t, "NewVisibility("+tc.input+")", err, "visibility")
 		}
 	}
 }
@@ -99,7 +107,7 @@ func TestNewMemberRole(t *testing.T) {
 				t.Errorf("NewMemberRole(%q) = %q, want %q", tc.input, got, tc.wantValue)
 			}
 		} else {
-			assertErrCode(t, "NewMemberRole("+tc.input+")", err, group.ErrCodeInvalidMemberRole)
+			assertValidationField(t, "NewMemberRole("+tc.input+")", err, "role")
 		}
 	}
 }

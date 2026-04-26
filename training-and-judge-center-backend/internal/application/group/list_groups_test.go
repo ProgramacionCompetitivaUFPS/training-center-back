@@ -13,13 +13,15 @@ import (
 // --- fakes ---
 
 type fakeRepo struct {
-	groups      []*domainGroup.Group
-	total       int
-	lastFilters domainGroup.ListFilters
-	returnErr   error
+	groups         []*domainGroup.Group
+	total          int
+	lastFilters    domainGroup.ListFilters
+	returnErr      error
+	existsByNameFn func(name domainGroup.GroupName) (bool, error)
+	saveErr        error
 }
 
-func (f *fakeRepo) Save(ctx context.Context, g *domainGroup.Group) error { return nil }
+func (f *fakeRepo) Save(ctx context.Context, g *domainGroup.Group) error { return f.saveErr }
 func (f *fakeRepo) FindByID(ctx context.Context, id string) (*domainGroup.Group, error) {
 	for _, g := range f.groups {
 		if g.ID() == id {
@@ -29,6 +31,9 @@ func (f *fakeRepo) FindByID(ctx context.Context, id string) (*domainGroup.Group,
 	return nil, apperror.NewNotFound(domainGroup.ErrCodeGroupNotFound, "group not found")
 }
 func (f *fakeRepo) ExistsByName(ctx context.Context, n domainGroup.GroupName) (bool, error) {
+	if f.existsByNameFn != nil {
+		return f.existsByNameFn(n)
+	}
 	return false, nil
 }
 func (f *fakeRepo) FindDefault(ctx context.Context) (*domainGroup.Group, error) { return nil, nil }

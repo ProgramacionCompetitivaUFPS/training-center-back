@@ -35,9 +35,20 @@ func NewRouter(h *Handlers, s *Services) *chi.Mux {
 	healthHandler := handler.NewHealthHandler()
 	r.Get("/ping", healthHandler.Ping)
 
-	// Problem routes — require authentication
+	// Group and Problem routes — require authentication
 	r.Group(func(r chi.Router) {
 		r.Use(middleware.Auth(s.TokenService, s.SessionInvalidator))
+
+		r.Route("/groups", func(r chi.Router) {
+			r.Post("/", h.Group.Create)
+			r.Get("/", h.Group.ListGroups)
+			r.Get("/{groupId}", h.Group.GetGroup)
+
+			r.Route("/{groupId}/materials", func(r chi.Router) {
+				r.Post("/", h.Material.Create)
+				r.Patch("/{materialId}", h.Material.Update)
+			})
+		})
 
 		r.Route("/problems", func(r chi.Router) {
 			r.Get("/", h.Problem.ListProblems)
@@ -61,20 +72,6 @@ func NewRouter(h *Handlers, s *Services) *chi.Mux {
 					r.Get("/", h.Problem.ListModifiers)
 					r.Delete("/{userId}", h.Problem.RemoveModifier)
 				})
-			})
-		})
-	})
-
-	r.Group(func(r chi.Router) {
-		r.Use(middleware.Auth(s.TokenService, s.SessionInvalidator))
-
-		r.Route("/groups", func(r chi.Router) {
-			r.Get("/", h.Group.ListGroups)
-			r.Get("/{groupId}", h.Group.GetGroup)
-
-			r.Route("/{groupId}/materials", func(r chi.Router) {
-				r.Post("/", h.Material.Create)
-				r.Patch("/{materialId}", h.Material.Update)
 			})
 		})
 	})

@@ -30,7 +30,7 @@ func (h *Handler) ListMyGroups(w http.ResponseWriter, r *http.Request) {
 		Limit:       limit,
 	}
 
-	out, err := h.listMyUC.Execute(r.Context(), in)
+	out, err := h.listMyGroups.Execute(r.Context(), in)
 	if err != nil {
 		handler.WriteError(w, err)
 		return

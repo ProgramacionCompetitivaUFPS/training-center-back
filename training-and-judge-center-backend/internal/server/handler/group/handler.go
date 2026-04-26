@@ -11,13 +11,19 @@ import (
 )
 
 type Handler struct {
-	listUC   *appGroup.ListGroupsUseCase
-	getUC    *appGroup.GetGroupUseCase
-	listMyUC *appGroup.ListMyGroupsUseCase
+	createGroup  *appGroup.CreateGroupUseCase
+	listGroups   *appGroup.ListGroupsUseCase
+	getGroup     *appGroup.GetGroupUseCase
+	listMyGroups *appGroup.ListMyGroupsUseCase
 }
 
-func NewHandler(listUC *appGroup.ListGroupsUseCase, getUC *appGroup.GetGroupUseCase, listMyUC *appGroup.ListMyGroupsUseCase) *Handler {
-	return &Handler{listUC: listUC, getUC: getUC, listMyUC: listMyUC}
+func NewHandler(
+	createGroup  *appGroup.CreateGroupUseCase,
+	listGroups   *appGroup.ListGroupsUseCase,
+	getGroup     *appGroup.GetGroupUseCase,
+	listMyGroups *appGroup.ListMyGroupsUseCase,
+) *Handler {
+	return &Handler{createGroup: createGroup, listGroups: listGroups, getGroup: getGroup, listMyGroups: listMyGroups}
 }
 
 func (h *Handler) requireCurrentUser(w http.ResponseWriter, r *http.Request) (*shared.CurrentUser, bool) {
