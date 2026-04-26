@@ -168,7 +168,7 @@ func (r *MaterialRepository) List(ctx context.Context, groupID string, filters m
 	})
 
 	if err := g.Wait(); err != nil {
-		slog.ErrorContext(ctx, "database error in List", "error", err)
+		slog.ErrorContext(ctx, "database error in List", "error", err, "group_id", groupID)
 		return nil, 0, apperror.NewInternal()
 	}
 
