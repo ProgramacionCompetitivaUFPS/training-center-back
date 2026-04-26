@@ -98,7 +98,8 @@ func (uc *CreateMaterial) Execute(ctx context.Context, in CreateMaterialInput) (
 		nil,
 	)
 	if err != nil {
-		return nil, err
+		slog.ErrorContext(ctx, "unexpected error constructing material", "error", err, "group_id", in.GroupID)
+		return nil, apperror.NewInternal()
 	}
 
 	if err := uc.repo.Save(ctx, m); err != nil {
