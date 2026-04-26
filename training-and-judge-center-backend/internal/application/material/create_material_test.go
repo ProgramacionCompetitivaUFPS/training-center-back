@@ -89,6 +89,24 @@ func TestCreateMaterial_GroupNotFound(t *testing.T) {
 	}
 }
 
+func TestCreateMaterial_MemberProviderError(t *testing.T) {
+	member := &mockGroupMemberProvider{
+		isLeadFn: func(_ context.Context, _, _ string) (bool, error) {
+			return false, errors.New("group service unavailable")
+		},
+	}
+	uc := newCreateUC(&mockMaterialRepository{}, groupExists(), member)
+	_, err := uc.Execute(context.Background(), CreateMaterialInput{
+		CurrentUser: asCoach(testAuthorID),
+		GroupID:     testGroupID,
+		Title:       "Hello",
+	})
+	var appErr *apperror.AppError
+	if !errors.As(err, &appErr) || appErr.Code != apperror.ErrCodeInternalError {
+		t.Errorf("expected INTERNAL_ERROR from member provider error, got %v", err)
+	}
+}
+
 func TestCreateMaterial_ForbiddenIfNotLead(t *testing.T) {
 	uc := newCreateUC(&mockMaterialRepository{}, groupExists(), notLead())
 
