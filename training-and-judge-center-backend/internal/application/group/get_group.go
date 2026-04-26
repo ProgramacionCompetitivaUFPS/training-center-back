@@ -2,7 +2,6 @@ package group
 
 import (
 	"context"
-	"log/slog"
 
 	"golang.org/x/sync/errgroup"
 
@@ -104,7 +103,6 @@ func (uc *GetGroupUseCase) Execute(ctx context.Context, in GetGroupInput) (*GetG
 	}
 	displays, err := uc.userProvider.GetDisplays(ctx, leadIDs)
 	if err != nil {
-		slog.ErrorContext(ctx, "failed to fetch lead displays", "error", err, "group_id", g.ID())
 		return nil, apperror.NewInternal()
 	}
 
