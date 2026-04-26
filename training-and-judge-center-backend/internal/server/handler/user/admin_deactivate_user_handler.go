@@ -1,17 +1,18 @@
-package handler
+package user
 
 import (
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
 	appuser "github.com/training-judge-center/backend/internal/application/user"
+	"github.com/training-judge-center/backend/internal/server/handler"
 	"github.com/training-judge-center/backend/internal/server/middleware"
 )
 
 func (h *UserHandler) AdminDeactivateUser(w http.ResponseWriter, r *http.Request) {
 	claims := middleware.GetClaims(r.Context())
 	if claims == nil {
-		respondJSON(w, http.StatusUnauthorized, map[string]string{
+		handler.WriteJSON(w, http.StatusUnauthorized, map[string]string{
 			"error":   "UNAUTHORIZED",
 			"message": "Invalid or missing authentication token",
 		})
@@ -24,7 +25,7 @@ func (h *UserHandler) AdminDeactivateUser(w http.ResponseWriter, r *http.Request
 		RequesterID: claims.UserID,
 		TargetID:    targetID,
 	}); err != nil {
-		respondError(w, err)
+		handler.WriteError(w, err)
 		return
 	}
 

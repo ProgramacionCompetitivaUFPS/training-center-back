@@ -5,32 +5,11 @@ import (
 	domainProblem "github.com/training-judge-center/backend/internal/domain/problem"
 )
 
-type createProblemRequest struct {
-	Slug          string                `json:"slug"`
-	Title         string                `json:"title"`
-	Statement     *string               `json:"statement"`
-	TimeLimit     *int                  `json:"timeLimit"`
-	MemoryLimit   *int                  `json:"memoryLimit"`
-	LangOverrides []langOverrideRequest `json:"languageOverrides"`
-	Tags          []string              `json:"tags"`
-}
-
 type langOverrideRequest struct {
 	Language    string `json:"language"`
 	TimeLimit   *int   `json:"timeLimit"`
 	MemoryLimit *int   `json:"memoryLimit"`
 }
-
-type updateProblemRequest struct {
-	Title         *string               `json:"title"`
-	Statement     *string               `json:"statement"`
-	TimeLimit     *int                  `json:"timeLimit"`
-	MemoryLimit   *int                  `json:"memoryLimit"`
-	LangOverrides []langOverrideRequest `json:"languageOverrides"`
-	Tags          []string              `json:"tags"`
-	Accessibility *string               `json:"accessibility"`
-}
-
 
 type langOverrideResp struct {
 	Language    string `json:"language"`

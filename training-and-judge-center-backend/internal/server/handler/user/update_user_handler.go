@@ -1,10 +1,11 @@
-package handler
+package user
 
 import (
 	"encoding/json"
 	"net/http"
 
 	appuser "github.com/training-judge-center/backend/internal/application/user"
+	"github.com/training-judge-center/backend/internal/server/handler"
 	"github.com/training-judge-center/backend/internal/server/middleware"
 )
 
@@ -19,7 +20,7 @@ type updateUserRequest struct {
 func (h *UserHandler) UpdateProfile(w http.ResponseWriter, r *http.Request) {
 	claims := middleware.GetClaims(r.Context())
 	if claims == nil {
-		respondJSON(w, http.StatusUnauthorized, map[string]string{
+		handler.WriteJSON(w, http.StatusUnauthorized, map[string]string{
 			"error":   "UNAUTHORIZED",
 			"message": "Invalid or missing authentication token",
 		})
@@ -28,7 +29,7 @@ func (h *UserHandler) UpdateProfile(w http.ResponseWriter, r *http.Request) {
 
 	var req updateUserRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		respondJSON(w, http.StatusBadRequest, map[string]string{
+		handler.WriteJSON(w, http.StatusBadRequest, map[string]string{
 			"error":   "INVALID_JSON",
 			"message": "Request body must be valid JSON",
 		})
@@ -44,7 +45,7 @@ func (h *UserHandler) UpdateProfile(w http.ResponseWriter, r *http.Request) {
 		Country:     req.Country,
 	})
 	if err != nil {
-		respondError(w, err)
+		handler.WriteError(w, err)
 		return
 	}
 
@@ -64,5 +65,5 @@ func (h *UserHandler) UpdateProfile(w http.ResponseWriter, r *http.Request) {
 		resp.UpdatedAt = result.UpdatedAt.Format("2006-01-02T15:04:05Z")
 	}
 
-	respondJSON(w, http.StatusOK, resp)
+	handler.WriteJSON(w, http.StatusOK, resp)
 }

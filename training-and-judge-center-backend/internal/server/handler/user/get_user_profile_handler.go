@@ -1,10 +1,11 @@
-package handler
+package user
 
 import (
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
 	appuser "github.com/training-judge-center/backend/internal/application/user"
+	"github.com/training-judge-center/backend/internal/server/handler"
 	"github.com/training-judge-center/backend/internal/server/middleware"
 )
 
@@ -31,7 +32,7 @@ type publicUserResponse struct {
 func (h *UserHandler) GetMyProfile(w http.ResponseWriter, r *http.Request) {
 	claims := middleware.GetClaims(r.Context())
 	if claims == nil {
-		respondJSON(w, http.StatusUnauthorized, map[string]string{
+		handler.WriteJSON(w, http.StatusUnauthorized, map[string]string{
 			"error":   "UNAUTHORIZED",
 			"message": "Invalid or missing authentication token",
 		})
@@ -40,17 +41,17 @@ func (h *UserHandler) GetMyProfile(w http.ResponseWriter, r *http.Request) {
 
 	result, err := h.getUserProfile.GetMyProfile(r.Context(), claims.UserID)
 	if err != nil {
-		respondError(w, err)
+		handler.WriteError(w, err)
 		return
 	}
 
-	respondJSON(w, http.StatusOK, buildFullResponse(result))
+	handler.WriteJSON(w, http.StatusOK, buildFullResponse(result))
 }
 
 func (h *UserHandler) GetByNickname(w http.ResponseWriter, r *http.Request) {
 	claims := middleware.GetClaims(r.Context())
 	if claims == nil {
-		respondJSON(w, http.StatusUnauthorized, map[string]string{
+		handler.WriteJSON(w, http.StatusUnauthorized, map[string]string{
 			"error":   "UNAUTHORIZED",
 			"message": "Invalid or missing authentication token",
 		})
@@ -61,14 +62,14 @@ func (h *UserHandler) GetByNickname(w http.ResponseWriter, r *http.Request) {
 
 	result, err := h.getUserProfile.GetUserByNickname(r.Context(), claims.UserID, claims.Role, nickname)
 	if err != nil {
-		respondError(w, err)
+		handler.WriteError(w, err)
 		return
 	}
 
 	if result.IsFullProfile {
-		respondJSON(w, http.StatusOK, buildFullResponse(result))
+		handler.WriteJSON(w, http.StatusOK, buildFullResponse(result))
 	} else {
-		respondJSON(w, http.StatusOK, publicUserResponse{
+		handler.WriteJSON(w, http.StatusOK, publicUserResponse{
 			Name:        result.User.Name,
 			Nickname:    result.User.Nickname,
 			Institution: result.User.Institution,

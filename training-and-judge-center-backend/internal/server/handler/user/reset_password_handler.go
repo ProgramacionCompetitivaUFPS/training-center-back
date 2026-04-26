@@ -1,4 +1,4 @@
-package handler
+package user
 
 import (
 	"encoding/json"
@@ -6,6 +6,7 @@ import (
 	"net/http"
 
 	appuser "github.com/training-judge-center/backend/internal/application/user"
+	"github.com/training-judge-center/backend/internal/server/handler"
 )
 
 type resetPasswordBody struct {
@@ -18,7 +19,7 @@ func (h *UserHandler) ResetPassword(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	var body resetPasswordBody
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-		respondJSON(w, http.StatusBadRequest, map[string]string{
+		handler.WriteJSON(w, http.StatusBadRequest, map[string]string{
 			"error":   "INVALID_JSON",
 			"message": "Request body must be valid JSON",
 		})
@@ -26,7 +27,7 @@ func (h *UserHandler) ResetPassword(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if body.Email == "" || !digitCodeRegex.MatchString(body.Code) || body.NewPassword == "" {
-		respondJSON(w, http.StatusBadRequest, map[string]interface{}{
+		handler.WriteJSON(w, http.StatusBadRequest, map[string]interface{}{
 			"error":   "VALIDATION_ERROR",
 			"message": "Invalid request data",
 			"details": []map[string]string{
@@ -44,19 +45,19 @@ func (h *UserHandler) ResetPassword(w http.ResponseWriter, r *http.Request) {
 
 	err := h.resetPassword.Execute(ctx, input)
 	if err != nil && !errors.Is(err, appuser.ErrSessionsNotInvalidated) {
-		respondError(w, err)
+		handler.WriteError(w, err)
 		return
 	}
 
 	if errors.Is(err, appuser.ErrSessionsNotInvalidated) {
-		respondJSON(w, http.StatusOK, map[string]string{
+		handler.WriteJSON(w, http.StatusOK, map[string]string{
 			"code":    "SESSIONS_NOT_INVALIDATED",
 			"message": "Your password was reset successfully. We couldn't close your other active sessions — to close them, please change your password again.",
 		})
 		return
 	}
 
-	respondJSON(w, http.StatusOK, map[string]string{
+	handler.WriteJSON(w, http.StatusOK, map[string]string{
 		"message": "Password has been reset successfully. Please log in with your new password",
 	})
 }
