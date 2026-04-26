@@ -2,6 +2,7 @@ package group
 
 import (
 	"context"
+	"log/slog"
 	"strings"
 
 	domainGroup "github.com/training-judge-center/backend/internal/domain/group"
@@ -107,6 +108,8 @@ func (uc *ListMyGroupsUseCase) Execute(ctx context.Context, in ListMyGroupsInput
 	for _, g := range groups {
 		s := stats[g.ID()]
 		if s.Membership == nil {
+			slog.WarnContext(ctx, "BulkStats returned no membership for listed group; possible TOCTOU",
+				"group_id", g.ID(), "viewer_id", filters.ViewerID.Value())
 			continue
 		}
 		items = append(items, MyGroupItem{
@@ -119,7 +122,7 @@ func (uc *ListMyGroupsUseCase) Execute(ctx context.Context, in ListMyGroupsInput
 
 	return &ListMyGroupsOutput{
 		Groups:     items,
-		TotalCount: total,
+		TotalCount: len(items),
 		TotalPages: calcTotalPages(total, in.Limit),
 		Page:       in.Page,
 		Limit:      in.Limit,
