@@ -48,6 +48,10 @@ func NewRouter(h *Handlers, s *Services) *chi.Mux {
 				r.Post("/", h.Material.Create)
 				r.Patch("/{materialId}", h.Material.Update)
 			})
+
+			r.Route("/{groupId}/members", func(r chi.Router) {
+				r.Post("/", h.Group.AddMember)
+			})
 		})
 
 		r.Route("/problems", func(r chi.Router) {
