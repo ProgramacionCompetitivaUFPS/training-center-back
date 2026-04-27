@@ -1,0 +1,36 @@
+package group
+
+import (
+	"net/http"
+
+	appGroup "github.com/training-judge-center/backend/internal/application/group"
+	"github.com/training-judge-center/backend/internal/server/handler"
+	"github.com/training-judge-center/backend/pkg/timeutil"
+)
+
+type joinGroupResponse struct {
+	Role     string `json:"role"`
+	JoinedAt string `json:"joinedAt"`
+}
+
+func (h *Handler) Join(w http.ResponseWriter, r *http.Request) {
+	currentUser, ok := h.requireCurrentUser(w, r)
+	if !ok {
+		return
+	}
+
+	out, err := h.joinGroup.Execute(r.Context(), appGroup.JoinGroupInput{
+		GroupID:     r.PathValue("groupId"),
+		CurrentUser: *currentUser,
+	})
+	if err != nil {
+		handler.WriteError(w, err)
+		return
+	}
+
+	m := out.Member
+	handler.WriteJSON(w, http.StatusCreated, joinGroupResponse{
+		Role:     string(m.Role()),
+		JoinedAt: m.JoinedAt().Format(timeutil.RFC3339UTC),
+	})
+}

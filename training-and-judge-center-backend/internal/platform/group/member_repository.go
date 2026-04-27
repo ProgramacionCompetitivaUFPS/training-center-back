@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"golang.org/x/sync/errgroup"
 
@@ -23,8 +24,21 @@ func NewMemberRepository(db *pgxpool.Pool) *MemberRepository {
 	return &MemberRepository{db: db}
 }
 
-func (r *MemberRepository) Save(_ context.Context, _ *domainGroup.GroupMember) error {
-	panic("not implemented")
+func (r *MemberRepository) Save(ctx context.Context, m *domainGroup.GroupMember) error {
+	const q = `INSERT INTO group_members (id, group_id, user_id, member_role, joined_at)
+	           VALUES ($1, $2, $3, $4, $5)`
+	_, err := r.db.Exec(ctx, q,
+		m.ID(), m.GroupID(), m.UserID().Value(), string(m.Role()), m.JoinedAt(),
+	)
+	if err != nil {
+		var pgErr *pgconn.PgError
+		if errors.As(err, &pgErr) && pgErr.Code == "23505" {
+			return apperror.NewConflict(domainGroup.ErrCodeAlreadyMember, "User is already a member of this group")
+		}
+		slog.ErrorContext(ctx, "MemberRepository.Save failed", "error", err)
+		return apperror.NewInternal()
+	}
+	return nil
 }
 
 func (r *MemberRepository) SaveAll(_ context.Context, _ []*domainGroup.GroupMember) error {

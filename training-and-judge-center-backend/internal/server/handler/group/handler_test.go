@@ -105,6 +105,7 @@ func stubHandler() *Handler {
 		appGroup.NewListGroupsUseCase(repo, memberRepo),
 		appGroup.NewGetGroupUseCase(repo, memberRepo, &stubUserProvider{}),
 		appGroup.NewListMyGroupsUseCase(repo, memberRepo, &stubPrefsReader{}),
+		appGroup.NewJoinGroupUseCase(repo, memberRepo),
 	)
 }
 
@@ -203,6 +204,7 @@ func TestGetGroup_NotFoundReturns404(t *testing.T) {
 		appGroup.NewListGroupsUseCase(repo, &stubMemberRepo{}),
 		appGroup.NewGetGroupUseCase(repo, &stubMemberRepo{}, &stubUserProvider{}),
 		appGroup.NewListMyGroupsUseCase(repo, &stubMemberRepo{}, &stubPrefsReader{}),
+		appGroup.NewJoinGroupUseCase(repo, &stubMemberRepo{}),
 	)
 
 	r := authedRequest("GET", "/groups/nonexistent")
@@ -231,6 +233,7 @@ func TestGetGroup_NonMemberHasNilRoleAndJoinedAt(t *testing.T) {
 		appGroup.NewListGroupsUseCase(repo, &stubMemberRepo{}),
 		appGroup.NewGetGroupUseCase(repo, &stubMemberRepo{}, &stubUserProvider{}),
 		appGroup.NewListMyGroupsUseCase(repo, &stubMemberRepo{}, &stubPrefsReader{}),
+		appGroup.NewJoinGroupUseCase(repo, &stubMemberRepo{}),
 	)
 
 	r := authedRequest("GET", "/groups/g-1")
@@ -271,6 +274,7 @@ func TestGetGroup_ResponseShape(t *testing.T) {
 		appGroup.NewListGroupsUseCase(repo, &stubMemberRepo{}),
 		appGroup.NewGetGroupUseCase(repo, &stubMemberRepo{}, &stubUserProvider{}),
 		appGroup.NewListMyGroupsUseCase(repo, &stubMemberRepo{}, &stubPrefsReader{}),
+		appGroup.NewJoinGroupUseCase(repo, &stubMemberRepo{}),
 	)
 
 	r := authedRequest("GET", "/groups/g-2")
@@ -413,6 +417,7 @@ func TestCreate_DuplicateNameReturns409(t *testing.T) {
 		appGroup.NewListGroupsUseCase(repo, &stubMemberRepo{}),
 		appGroup.NewGetGroupUseCase(repo, &stubMemberRepo{}, &stubUserProvider{}),
 		appGroup.NewListMyGroupsUseCase(repo, &stubMemberRepo{}, &stubPrefsReader{}),
+		appGroup.NewJoinGroupUseCase(repo, &stubMemberRepo{}),
 	)
 	w := httptest.NewRecorder()
 
@@ -421,5 +426,133 @@ func TestCreate_DuplicateNameReturns409(t *testing.T) {
 
 	if w.Code != http.StatusConflict {
 		t.Fatalf("expected 409, got %d", w.Code)
+	}
+}
+
+// --- Join handler tests ---
+
+func TestJoin_GroupNotFoundReturns404(t *testing.T) {
+	repo := &stubGroupRepo{
+		findByIDFn: func(_ string) (*domainGroup.Group, error) {
+			return nil, apperror.NewNotFound(domainGroup.ErrCodeGroupNotFound, "group not found")
+		},
+	}
+	h := NewHandler(
+		appGroup.NewCreateGroupUseCase(repo),
+		appGroup.NewListGroupsUseCase(repo, &stubMemberRepo{}),
+		appGroup.NewGetGroupUseCase(repo, &stubMemberRepo{}, &stubUserProvider{}),
+		appGroup.NewListMyGroupsUseCase(repo, &stubMemberRepo{}, &stubPrefsReader{}),
+		appGroup.NewJoinGroupUseCase(repo, &stubMemberRepo{}),
+	)
+
+	r := authedRequest("POST", "/groups/nonexistent/join")
+	r.SetPathValue("groupId", "nonexistent")
+	w := httptest.NewRecorder()
+
+	wrapAuth(http.HandlerFunc(h.Join)).ServeHTTP(w, r)
+
+	if w.Code != http.StatusNotFound {
+		t.Fatalf("expected 404, got %d", w.Code)
+	}
+}
+
+func TestJoin_NonOpenPolicyReturns403(t *testing.T) {
+	g := domainGroup.RestoreGroup(
+		"g-invite", domainGroup.RestoreGroupName("Invite Club"), nil,
+		domainGroup.VisibilityVisible, domainGroup.JoinPolicyInvite,
+		false, shared.RestoreUserID("author-1"), testTime(), testTime(),
+	)
+	repo := &stubGroupRepo{
+		findByIDFn: func(_ string) (*domainGroup.Group, error) { return g, nil },
+	}
+	h := NewHandler(
+		appGroup.NewCreateGroupUseCase(repo),
+		appGroup.NewListGroupsUseCase(repo, &stubMemberRepo{}),
+		appGroup.NewGetGroupUseCase(repo, &stubMemberRepo{}, &stubUserProvider{}),
+		appGroup.NewListMyGroupsUseCase(repo, &stubMemberRepo{}, &stubPrefsReader{}),
+		appGroup.NewJoinGroupUseCase(repo, &stubMemberRepo{}),
+	)
+
+	r := authedRequest("POST", "/groups/g-invite/join")
+	r.SetPathValue("groupId", "g-invite")
+	w := httptest.NewRecorder()
+
+	wrapAuth(http.HandlerFunc(h.Join)).ServeHTTP(w, r)
+
+	if w.Code != http.StatusForbidden {
+		t.Fatalf("expected 403, got %d", w.Code)
+	}
+}
+
+func TestJoin_AlreadyMemberReturns409(t *testing.T) {
+	g := domainGroup.RestoreGroup(
+		"g-open", domainGroup.RestoreGroupName("Open Club"), nil,
+		domainGroup.VisibilityVisible, domainGroup.JoinPolicyOpen,
+		false, shared.RestoreUserID("author-1"), testTime(), testTime(),
+	)
+	userID := shared.RestoreUserID("u1")
+	existingMember := domainGroup.RestoreGroupMember("m1", "g-open", userID, domainGroup.MemberRoleMember, testTime())
+	repo := &stubGroupRepo{
+		findByIDFn: func(_ string) (*domainGroup.Group, error) { return g, nil },
+	}
+	memberRepo := &stubMemberRepo{
+		findByGroupAndUserFn: func(_ string, _ shared.UserID) (*domainGroup.GroupMember, error) {
+			return existingMember, nil
+		},
+	}
+	h := NewHandler(
+		appGroup.NewCreateGroupUseCase(repo),
+		appGroup.NewListGroupsUseCase(repo, memberRepo),
+		appGroup.NewGetGroupUseCase(repo, memberRepo, &stubUserProvider{}),
+		appGroup.NewListMyGroupsUseCase(repo, memberRepo, &stubPrefsReader{}),
+		appGroup.NewJoinGroupUseCase(repo, memberRepo),
+	)
+
+	r := authedRequest("POST", "/groups/g-open/join")
+	r.SetPathValue("groupId", "g-open")
+	w := httptest.NewRecorder()
+
+	wrapAuth(http.HandlerFunc(h.Join)).ServeHTTP(w, r)
+
+	if w.Code != http.StatusConflict {
+		t.Fatalf("expected 409, got %d", w.Code)
+	}
+}
+
+func TestJoin_SuccessReturns201WithRoleAndJoinedAt(t *testing.T) {
+	g := domainGroup.RestoreGroup(
+		"g-open", domainGroup.RestoreGroupName("Open Club"), nil,
+		domainGroup.VisibilityVisible, domainGroup.JoinPolicyOpen,
+		false, shared.RestoreUserID("author-1"), testTime(), testTime(),
+	)
+	repo := &stubGroupRepo{
+		findByIDFn: func(_ string) (*domainGroup.Group, error) { return g, nil },
+	}
+	h := NewHandler(
+		appGroup.NewCreateGroupUseCase(repo),
+		appGroup.NewListGroupsUseCase(repo, &stubMemberRepo{}),
+		appGroup.NewGetGroupUseCase(repo, &stubMemberRepo{}, &stubUserProvider{}),
+		appGroup.NewListMyGroupsUseCase(repo, &stubMemberRepo{}, &stubPrefsReader{}),
+		appGroup.NewJoinGroupUseCase(repo, &stubMemberRepo{}),
+	)
+
+	r := authedRequest("POST", "/groups/g-open/join")
+	r.SetPathValue("groupId", "g-open")
+	w := httptest.NewRecorder()
+
+	wrapAuth(http.HandlerFunc(h.Join)).ServeHTTP(w, r)
+
+	if w.Code != http.StatusCreated {
+		t.Fatalf("expected 201, got %d\nbody: %s", w.Code, w.Body.String())
+	}
+	var body joinGroupResponse
+	if err := json.NewDecoder(w.Body).Decode(&body); err != nil {
+		t.Fatalf("could not decode response: %v", err)
+	}
+	if body.Role != "MEMBER" {
+		t.Errorf("Role = %q, want %q", body.Role, "MEMBER")
+	}
+	if body.JoinedAt == "" {
+		t.Error("expected non-empty JoinedAt")
 	}
 }

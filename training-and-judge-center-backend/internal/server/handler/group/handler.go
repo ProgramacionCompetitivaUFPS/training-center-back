@@ -15,6 +15,7 @@ type Handler struct {
 	listGroups   *appGroup.ListGroupsUseCase
 	getGroup     *appGroup.GetGroupUseCase
 	listMyGroups *appGroup.ListMyGroupsUseCase
+	joinGroup    *appGroup.JoinGroupUseCase
 }
 
 func NewHandler(
@@ -22,8 +23,9 @@ func NewHandler(
 	listGroups   *appGroup.ListGroupsUseCase,
 	getGroup     *appGroup.GetGroupUseCase,
 	listMyGroups *appGroup.ListMyGroupsUseCase,
+	joinGroup    *appGroup.JoinGroupUseCase,
 ) *Handler {
-	return &Handler{createGroup: createGroup, listGroups: listGroups, getGroup: getGroup, listMyGroups: listMyGroups}
+	return &Handler{createGroup: createGroup, listGroups: listGroups, getGroup: getGroup, listMyGroups: listMyGroups, joinGroup: joinGroup}
 }
 
 func (h *Handler) requireCurrentUser(w http.ResponseWriter, r *http.Request) (*shared.CurrentUser, bool) {
