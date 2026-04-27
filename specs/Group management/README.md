@@ -266,6 +266,7 @@ View Groups (P2) ← (discovery, search, dashboard)
 ### Future Specs (Considered)
 * **Group Analytics** - Participation and activity metrics
 * **Bulk Operations** - Mass management of members and invitations
+* **Membership Notifications** - Email/in-app alerts for membership events (removed, role changed, invited). Adding this feature is also the trigger to migrate audit writes to a synchronous in-process event bus — see *Key Design Decisions* for the planned migration path.
 
 ---
 
@@ -369,6 +370,28 @@ The **Create Group** spec includes:
 * **Performance**: Significantly reduces log volume
 * **Maintainability**: Less data to clean and manage
 * **Focus**: Concentrates on changes that really matter for compliance and debugging
+
+### Why direct audit writes instead of a domain event bus?
+
+Current implementation writes to `group_membership_audit_log` directly inside the use case, within the same DB transaction as the membership change.
+
+**Why not an event bus right now:**
+* No side effects beyond the audit log exist yet — a bus adds abstraction without a second consumer to justify it
+* Direct writes are synchronous, testable, and transactionally safe without extra infrastructure
+
+**Path forward — when to migrate to Option B (synchronous in-process event bus):**
+
+When membership notifications are added (e.g. "You were removed from group X", "Your role was changed to Lead"), the use case would have 2+ independent side effects (audit + email). At that point, refactoring to a synchronous event bus makes sense:
+
+```
+UseCase → eventBus.Publish(MemberRemoved{...})
+              → AuditLogHandler    (saves audit log, same TX)
+              → NotificationHandler (sends email, async or sync)
+```
+
+This requires no message broker — just in-process function dispatch. The migration is localized to the use case layer and does not affect the domain or infrastructure.
+
+**If guaranteed delivery is ever needed** (e.g. notifications must not be lost even if the process crashes mid-operation), the right approach is the **Transactional Outbox Pattern** using Postgres itself — no external broker required. An `outbox_events` table is written in the same TX; a background worker processes and delivers the events.
 
 ### Why Admin has implicit permissions without membership?
 * **Clean architecture**: Separates system permissions from group permissions
