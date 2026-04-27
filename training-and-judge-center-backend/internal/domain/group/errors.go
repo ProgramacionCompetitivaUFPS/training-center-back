@@ -19,4 +19,11 @@ const (
 	ErrCodeInvalidVisibility        = "INVALID_VISIBILITY"
 	ErrCodeInvalidMemberRole        = "INVALID_MEMBER_ROLE"
 	ErrCodeRoleUnchanged            = "ROLE_UNCHANGED"
+
+	ErrCodeNicknameNotFound            = "NICKNAME_NOT_FOUND"
+	ErrCodeCannotRemoveLastLead        = "CANNOT_REMOVE_LAST_LEAD"
+	ErrCodeCannotRemoveFromGlobal      = "CANNOT_REMOVE_FROM_GLOBAL_GROUP"
+	ErrCodeCannotRemoveAdminFromGlobal = "CANNOT_REMOVE_ADMIN_FROM_GLOBAL_GROUP"
+	ErrCodeCannotLeaveGlobal           = "CANNOT_LEAVE_GLOBAL_GROUP"
+	ErrCodeCannotLeaveAsLastLead       = "CANNOT_LEAVE_AS_LAST_LEAD"
 )
