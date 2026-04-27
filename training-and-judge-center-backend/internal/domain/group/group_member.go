@@ -8,53 +8,73 @@ import (
 )
 
 type GroupMember struct {
-	id       string
-	groupID  string
-	userID   shared.UserID
-	role     MemberRole
-	joinedAt time.Time
+	id         string
+	groupID    string
+	userID     shared.UserID
+	role       MemberRole
+	joinedAt   time.Time
+	addedBy    *shared.UserID
+	joinMethod JoinMethod
+	removedAt  *time.Time
 }
 
-// NewGroupMember constructs a validated GroupMember. Pass a non-nil clock for
-// deterministic joinedAt in tests; nil defaults to time.Now.
-func NewGroupMember(id, groupID string, userID shared.UserID, role MemberRole, clock func() time.Time) (*GroupMember, error) {
-	if id == "" {
-		return nil, apperror.NewInternal()
-	}
-	if groupID == "" {
-		return nil, apperror.NewInternal()
-	}
-	if userID.Value() == "" {
+// NewGroupMember constructs a validated active GroupMember.
+// Pass a non-nil clock for deterministic joinedAt in tests; nil defaults to time.Now.
+func NewGroupMember(
+	id, groupID string,
+	userID shared.UserID,
+	role MemberRole,
+	addedBy *shared.UserID,
+	joinMethod JoinMethod,
+	clock func() time.Time,
+) (*GroupMember, error) {
+	if id == "" || groupID == "" || userID.Value() == "" {
 		return nil, apperror.NewInternal()
 	}
 	if clock == nil {
 		clock = time.Now
 	}
 	return &GroupMember{
-		id:       id,
-		groupID:  groupID,
-		userID:   userID,
-		role:     role,
-		joinedAt: clock().UTC(),
+		id:         id,
+		groupID:    groupID,
+		userID:     userID,
+		role:       role,
+		joinedAt:   clock().UTC(),
+		addedBy:    addedBy,
+		joinMethod: joinMethod,
 	}, nil
 }
 
-func RestoreGroupMember(id, groupID string, userID shared.UserID, role MemberRole, joinedAt time.Time) *GroupMember {
+func RestoreGroupMember(
+	id, groupID string,
+	userID shared.UserID,
+	role MemberRole,
+	joinedAt time.Time,
+	addedBy *shared.UserID,
+	joinMethod JoinMethod,
+	removedAt *time.Time,
+) *GroupMember {
 	return &GroupMember{
-		id:       id,
-		groupID:  groupID,
-		userID:   userID,
-		role:     role,
-		joinedAt: joinedAt,
+		id:         id,
+		groupID:    groupID,
+		userID:     userID,
+		role:       role,
+		joinedAt:   joinedAt,
+		addedBy:    addedBy,
+		joinMethod: joinMethod,
+		removedAt:  removedAt,
 	}
 }
 
-func (m *GroupMember) ID() string            { return m.id }
-func (m *GroupMember) GroupID() string       { return m.groupID }
-func (m *GroupMember) UserID() shared.UserID { return m.userID }
-func (m *GroupMember) Role() MemberRole      { return m.role }
-func (m *GroupMember) JoinedAt() time.Time   { return m.joinedAt }
-func (m *GroupMember) IsLead() bool          { return m.role == MemberRoleLead }
+func (m *GroupMember) ID() string              { return m.id }
+func (m *GroupMember) GroupID() string         { return m.groupID }
+func (m *GroupMember) UserID() shared.UserID   { return m.userID }
+func (m *GroupMember) Role() MemberRole        { return m.role }
+func (m *GroupMember) JoinedAt() time.Time     { return m.joinedAt }
+func (m *GroupMember) AddedBy() *shared.UserID { return m.addedBy }
+func (m *GroupMember) JoinMethod() JoinMethod  { return m.joinMethod }
+func (m *GroupMember) RemovedAt() *time.Time   { return m.removedAt }
+func (m *GroupMember) IsLead() bool            { return m.role == MemberRoleLead }
 
 func (m *GroupMember) Promote() error {
 	if m.role == MemberRoleLead {
