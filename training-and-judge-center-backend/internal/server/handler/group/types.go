@@ -75,6 +75,16 @@ type listMyGroupsResponse struct {
 	Pagination paginationResp    `json:"pagination"`
 }
 
+type addMemberResp struct {
+	GroupID    string `json:"groupId"`
+	UserID     string `json:"userId"`
+	Nickname   string `json:"nickname"`
+	Role       string `json:"role"`
+	JoinedAt   string `json:"joinedAt"`
+	AddedBy    string `json:"addedBy"`
+	JoinMethod string `json:"joinMethod"`
+}
+
 func buildPagination(total, page, totalPages, limit int) paginationResp {
 	return paginationResp{
 		TotalCount:   total,

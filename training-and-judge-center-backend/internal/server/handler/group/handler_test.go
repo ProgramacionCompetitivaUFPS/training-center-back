@@ -105,6 +105,7 @@ func stubHandler() *Handler {
 		appGroup.NewListGroupsUseCase(repo, memberRepo),
 		appGroup.NewGetGroupUseCase(repo, memberRepo, &stubUserProvider{}),
 		appGroup.NewListMyGroupsUseCase(repo, memberRepo, &stubPrefsReader{}),
+		nil,
 	)
 }
 
@@ -203,6 +204,7 @@ func TestGetGroup_NotFoundReturns404(t *testing.T) {
 		appGroup.NewListGroupsUseCase(repo, &stubMemberRepo{}),
 		appGroup.NewGetGroupUseCase(repo, &stubMemberRepo{}, &stubUserProvider{}),
 		appGroup.NewListMyGroupsUseCase(repo, &stubMemberRepo{}, &stubPrefsReader{}),
+		nil,
 	)
 
 	r := authedRequest("GET", "/groups/nonexistent")
@@ -231,6 +233,7 @@ func TestGetGroup_NonMemberHasNilRoleAndJoinedAt(t *testing.T) {
 		appGroup.NewListGroupsUseCase(repo, &stubMemberRepo{}),
 		appGroup.NewGetGroupUseCase(repo, &stubMemberRepo{}, &stubUserProvider{}),
 		appGroup.NewListMyGroupsUseCase(repo, &stubMemberRepo{}, &stubPrefsReader{}),
+		nil,
 	)
 
 	r := authedRequest("GET", "/groups/g-1")
@@ -271,6 +274,7 @@ func TestGetGroup_ResponseShape(t *testing.T) {
 		appGroup.NewListGroupsUseCase(repo, &stubMemberRepo{}),
 		appGroup.NewGetGroupUseCase(repo, &stubMemberRepo{}, &stubUserProvider{}),
 		appGroup.NewListMyGroupsUseCase(repo, &stubMemberRepo{}, &stubPrefsReader{}),
+		nil,
 	)
 
 	r := authedRequest("GET", "/groups/g-2")
@@ -413,6 +417,7 @@ func TestCreate_DuplicateNameReturns409(t *testing.T) {
 		appGroup.NewListGroupsUseCase(repo, &stubMemberRepo{}),
 		appGroup.NewGetGroupUseCase(repo, &stubMemberRepo{}, &stubUserProvider{}),
 		appGroup.NewListMyGroupsUseCase(repo, &stubMemberRepo{}, &stubPrefsReader{}),
+		nil,
 	)
 	w := httptest.NewRecorder()
 
