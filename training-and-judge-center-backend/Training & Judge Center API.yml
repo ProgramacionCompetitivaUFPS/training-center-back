@@ -868,6 +868,110 @@ items:
           timeout: 0
           followRedirects: true
           maxRedirects: 5
+      - info:
+          name: Join Group
+          type: http
+          seq: 8
+        http:
+          method: POST
+          url: '{{baseUrl}}/groups/:groupId/join'
+          params:
+            - name: groupId
+              value: 00000000-0000-0000-0000-000000000000
+              type: path
+          auth:
+            type: bearer
+            token: '{{token_contestant}}'
+        settings:
+          encodeUrl: true
+          timeout: 0
+          followRedirects: true
+          maxRedirects: 5
+        docs: |
+          Caso feliz: un contestant se une a un grupo OPEN.
+          Respuesta esperada: 201 Created con { role: "MEMBER", joinedAt: "..." }
+
+          Pasos:
+          1. Crea un grupo con joinMode OPEN (usar "Create Group")
+          2. Copia el ID del grupo creado y reemplaza el :groupId
+          3. Ejecuta con token_contestant
+      - info:
+          name: Join Group - Already Member
+          type: http
+          seq: 9
+        http:
+          method: POST
+          url: '{{baseUrl}}/groups/:groupId/join'
+          params:
+            - name: groupId
+              value: 00000000-0000-0000-0000-000000000000
+              type: path
+          auth:
+            type: bearer
+            token: '{{token_contestant}}'
+        settings:
+          encodeUrl: true
+          timeout: 0
+          followRedirects: true
+          maxRedirects: 5
+        docs: |
+          Error 409 ALREADY_MEMBER: el mismo usuario intenta unirse dos veces.
+          Respuesta esperada: 409 Conflict con { error: "ALREADY_MEMBER" }
+
+          Pasos:
+          1. Ejecuta primero "Join Group" (seq 8) para entrar al grupo
+          2. Ejecuta esta petición con el mismo groupId y token_contestant
+      - info:
+          name: Join Group - Política no OPEN
+          type: http
+          seq: 10
+        http:
+          method: POST
+          url: '{{baseUrl}}/groups/:groupId/join'
+          params:
+            - name: groupId
+              value: 00000000-0000-0000-0000-000000000000
+              type: path
+          auth:
+            type: bearer
+            token: '{{token_contestant}}'
+        settings:
+          encodeUrl: true
+          timeout: 0
+          followRedirects: true
+          maxRedirects: 5
+        docs: |
+          Error 403 INSUFFICIENT_PERMISSIONS: el grupo no permite unirse directamente.
+          Respuesta esperada: 403 Forbidden con { error: "INSUFFICIENT_PERMISSIONS" }
+
+          Pasos:
+          1. Crea un grupo con joinMode INVITE (usar "Create Group - Private")
+          2. Copia el ID del grupo creado y reemplaza el :groupId
+          3. Ejecuta con token_contestant
+      - info:
+          name: Join Group - Grupo no encontrado
+          type: http
+          seq: 11
+        http:
+          method: POST
+          url: '{{baseUrl}}/groups/:groupId/join'
+          params:
+            - name: groupId
+              value: 00000000-0000-0000-0000-000000000099
+              type: path
+          auth:
+            type: bearer
+            token: '{{token_contestant}}'
+        settings:
+          encodeUrl: true
+          timeout: 0
+          followRedirects: true
+          maxRedirects: 5
+        docs: |
+          Error 404 GROUP_NOT_FOUND: el groupId no corresponde a ningún grupo.
+          Respuesta esperada: 404 Not Found con { error: "GROUP_NOT_FOUND" }
+
+          El UUID ...0099 es un ID ficticio que no existe en la base de datos.
   - info:
       name: Materials
       type: folder
