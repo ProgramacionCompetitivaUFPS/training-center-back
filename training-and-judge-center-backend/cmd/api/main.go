@@ -180,14 +180,16 @@ func main() {
 	groupMemberRepo := platformGroup.NewMemberRepository(dbPool)
 	groupUserProvider := platformGroup.NewUserProvider(dbPool)
 	groupPrefsReader := platformGroup.NewPreferencesReader(dbPool)
+	groupNicknameResolver := platformGroup.NewNicknameResolver(dbPool)
 
 	// Group use cases
 	createGroupUseCase := appGroup.NewCreateGroupUseCase(groupRepo)
 	listGroupsUseCase := appGroup.NewListGroupsUseCase(groupRepo, groupMemberRepo)
 	getGroupUseCase := appGroup.NewGetGroupUseCase(groupRepo, groupMemberRepo, groupUserProvider)
 	listMyGroupsUseCase := appGroup.NewListMyGroupsUseCase(groupRepo, groupMemberRepo, groupPrefsReader)
+	addMemberUseCase := appGroup.NewAddMemberUseCase(groupRepo, groupMemberRepo, groupNicknameResolver, txManager)
 
-	groupHandler := handlerGroup.NewHandler(createGroupUseCase, listGroupsUseCase, getGroupUseCase, listMyGroupsUseCase)
+	groupHandler := handlerGroup.NewHandler(createGroupUseCase, listGroupsUseCase, getGroupUseCase, listMyGroupsUseCase, addMemberUseCase)
 
 	// Material platform adapters
 	materialRepo := platformMaterial.NewMaterialRepository(dbPool)
