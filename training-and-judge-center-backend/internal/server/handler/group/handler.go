@@ -11,21 +11,45 @@ import (
 )
 
 type Handler struct {
-	createGroup  *appGroup.CreateGroupUseCase
-	listGroups   *appGroup.ListGroupsUseCase
-	getGroup     *appGroup.GetGroupUseCase
-	listMyGroups *appGroup.ListMyGroupsUseCase
-	joinGroup    *appGroup.JoinGroupUseCase
+	createGroup     *appGroup.CreateGroupUseCase
+	listGroups      *appGroup.ListGroupsUseCase
+	getGroup        *appGroup.GetGroupUseCase
+	listMyGroups    *appGroup.ListMyGroupsUseCase
+	joinGroup       *appGroup.JoinGroupUseCase
+	requestJoin     *appGroup.RequestJoinUseCase
+	approveRequest  *appGroup.ApproveRequestUseCase
+	rejectRequest   *appGroup.RejectRequestUseCase
+	listRequests    *appGroup.ListJoinRequestsUseCase
+	getMyRequest    *appGroup.GetMyRequestUseCase
+	cancelMyRequest *appGroup.CancelMyRequestUseCase
 }
 
 func NewHandler(
-	createGroup  *appGroup.CreateGroupUseCase,
-	listGroups   *appGroup.ListGroupsUseCase,
-	getGroup     *appGroup.GetGroupUseCase,
+	createGroup *appGroup.CreateGroupUseCase,
+	listGroups *appGroup.ListGroupsUseCase,
+	getGroup *appGroup.GetGroupUseCase,
 	listMyGroups *appGroup.ListMyGroupsUseCase,
-	joinGroup    *appGroup.JoinGroupUseCase,
+	joinGroup *appGroup.JoinGroupUseCase,
+	requestJoin *appGroup.RequestJoinUseCase,
+	approveRequest *appGroup.ApproveRequestUseCase,
+	rejectRequest *appGroup.RejectRequestUseCase,
+	listRequests *appGroup.ListJoinRequestsUseCase,
+	getMyRequest *appGroup.GetMyRequestUseCase,
+	cancelMyRequest *appGroup.CancelMyRequestUseCase,
 ) *Handler {
-	return &Handler{createGroup: createGroup, listGroups: listGroups, getGroup: getGroup, listMyGroups: listMyGroups, joinGroup: joinGroup}
+	return &Handler{
+		createGroup:     createGroup,
+		listGroups:      listGroups,
+		getGroup:        getGroup,
+		listMyGroups:    listMyGroups,
+		joinGroup:       joinGroup,
+		requestJoin:     requestJoin,
+		approveRequest:  approveRequest,
+		rejectRequest:   rejectRequest,
+		listRequests:    listRequests,
+		getMyRequest:    getMyRequest,
+		cancelMyRequest: cancelMyRequest,
+	}
 }
 
 func (h *Handler) requireCurrentUser(w http.ResponseWriter, r *http.Request) (*shared.CurrentUser, bool) {

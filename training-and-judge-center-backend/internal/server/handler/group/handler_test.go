@@ -97,15 +97,52 @@ func (s *stubPrefsReader) HideGlobalGroup(_ context.Context, _ string) (bool, er
 	return false, nil
 }
 
+type stubJoinRequestRepo struct {
+	findByIDFn          func(id string) (*domainGroup.JoinRequest, error)
+	findByGroupAndUserFn func(groupID string, userID shared.UserID) (*domainGroup.JoinRequest, error)
+}
+
+func (s *stubJoinRequestRepo) Save(_ context.Context, _ *domainGroup.JoinRequest) error { return nil }
+func (s *stubJoinRequestRepo) FindByID(_ context.Context, id string) (*domainGroup.JoinRequest, error) {
+	if s.findByIDFn != nil {
+		return s.findByIDFn(id)
+	}
+	return nil, nil
+}
+func (s *stubJoinRequestRepo) FindByGroupAndUser(_ context.Context, groupID string, userID shared.UserID) (*domainGroup.JoinRequest, error) {
+	if s.findByGroupAndUserFn != nil {
+		return s.findByGroupAndUserFn(groupID, userID)
+	}
+	return nil, nil
+}
+func (s *stubJoinRequestRepo) FindByGroup(_ context.Context, _ string, _ domainGroup.JoinRequestFilters) ([]*domainGroup.JoinRequest, int, error) {
+	return nil, 0, nil
+}
+func (s *stubJoinRequestRepo) Delete(_ context.Context, _ string) error { return nil }
+
+type stubTxManager struct{}
+
+func (s *stubTxManager) WithTx(ctx context.Context, fn func(context.Context) error) error {
+	return fn(ctx)
+}
+
 func stubHandler() *Handler {
 	repo := &stubGroupRepo{}
 	memberRepo := &stubMemberRepo{}
+	joinRequestRepo := &stubJoinRequestRepo{}
+	txMgr := &stubTxManager{}
 	return NewHandler(
 		appGroup.NewCreateGroupUseCase(repo),
 		appGroup.NewListGroupsUseCase(repo, memberRepo),
 		appGroup.NewGetGroupUseCase(repo, memberRepo, &stubUserProvider{}),
 		appGroup.NewListMyGroupsUseCase(repo, memberRepo, &stubPrefsReader{}),
 		appGroup.NewJoinGroupUseCase(repo, memberRepo),
+		appGroup.NewRequestJoinUseCase(repo, memberRepo, joinRequestRepo),
+		appGroup.NewApproveRequestUseCase(memberRepo, joinRequestRepo, txMgr),
+		appGroup.NewRejectRequestUseCase(memberRepo, joinRequestRepo),
+		appGroup.NewListJoinRequestsUseCase(memberRepo, joinRequestRepo, &stubUserProvider{}),
+		appGroup.NewGetMyRequestUseCase(joinRequestRepo),
+		appGroup.NewCancelMyRequestUseCase(joinRequestRepo),
 	)
 }
 
@@ -205,6 +242,12 @@ func TestGetGroup_NotFoundReturns404(t *testing.T) {
 		appGroup.NewGetGroupUseCase(repo, &stubMemberRepo{}, &stubUserProvider{}),
 		appGroup.NewListMyGroupsUseCase(repo, &stubMemberRepo{}, &stubPrefsReader{}),
 		appGroup.NewJoinGroupUseCase(repo, &stubMemberRepo{}),
+		appGroup.NewRequestJoinUseCase(repo, &stubMemberRepo{}, &stubJoinRequestRepo{}),
+		appGroup.NewApproveRequestUseCase(&stubMemberRepo{}, &stubJoinRequestRepo{}, &stubTxManager{}),
+		appGroup.NewRejectRequestUseCase(&stubMemberRepo{}, &stubJoinRequestRepo{}),
+		appGroup.NewListJoinRequestsUseCase(&stubMemberRepo{}, &stubJoinRequestRepo{}, &stubUserProvider{}),
+		appGroup.NewGetMyRequestUseCase(&stubJoinRequestRepo{}),
+		appGroup.NewCancelMyRequestUseCase(&stubJoinRequestRepo{}),
 	)
 
 	r := authedRequest("GET", "/groups/nonexistent")
@@ -234,6 +277,12 @@ func TestGetGroup_NonMemberHasNilRoleAndJoinedAt(t *testing.T) {
 		appGroup.NewGetGroupUseCase(repo, &stubMemberRepo{}, &stubUserProvider{}),
 		appGroup.NewListMyGroupsUseCase(repo, &stubMemberRepo{}, &stubPrefsReader{}),
 		appGroup.NewJoinGroupUseCase(repo, &stubMemberRepo{}),
+		appGroup.NewRequestJoinUseCase(repo, &stubMemberRepo{}, &stubJoinRequestRepo{}),
+		appGroup.NewApproveRequestUseCase(&stubMemberRepo{}, &stubJoinRequestRepo{}, &stubTxManager{}),
+		appGroup.NewRejectRequestUseCase(&stubMemberRepo{}, &stubJoinRequestRepo{}),
+		appGroup.NewListJoinRequestsUseCase(&stubMemberRepo{}, &stubJoinRequestRepo{}, &stubUserProvider{}),
+		appGroup.NewGetMyRequestUseCase(&stubJoinRequestRepo{}),
+		appGroup.NewCancelMyRequestUseCase(&stubJoinRequestRepo{}),
 	)
 
 	r := authedRequest("GET", "/groups/g-1")
@@ -275,6 +324,12 @@ func TestGetGroup_ResponseShape(t *testing.T) {
 		appGroup.NewGetGroupUseCase(repo, &stubMemberRepo{}, &stubUserProvider{}),
 		appGroup.NewListMyGroupsUseCase(repo, &stubMemberRepo{}, &stubPrefsReader{}),
 		appGroup.NewJoinGroupUseCase(repo, &stubMemberRepo{}),
+		appGroup.NewRequestJoinUseCase(repo, &stubMemberRepo{}, &stubJoinRequestRepo{}),
+		appGroup.NewApproveRequestUseCase(&stubMemberRepo{}, &stubJoinRequestRepo{}, &stubTxManager{}),
+		appGroup.NewRejectRequestUseCase(&stubMemberRepo{}, &stubJoinRequestRepo{}),
+		appGroup.NewListJoinRequestsUseCase(&stubMemberRepo{}, &stubJoinRequestRepo{}, &stubUserProvider{}),
+		appGroup.NewGetMyRequestUseCase(&stubJoinRequestRepo{}),
+		appGroup.NewCancelMyRequestUseCase(&stubJoinRequestRepo{}),
 	)
 
 	r := authedRequest("GET", "/groups/g-2")
@@ -418,6 +473,12 @@ func TestCreate_DuplicateNameReturns409(t *testing.T) {
 		appGroup.NewGetGroupUseCase(repo, &stubMemberRepo{}, &stubUserProvider{}),
 		appGroup.NewListMyGroupsUseCase(repo, &stubMemberRepo{}, &stubPrefsReader{}),
 		appGroup.NewJoinGroupUseCase(repo, &stubMemberRepo{}),
+		appGroup.NewRequestJoinUseCase(repo, &stubMemberRepo{}, &stubJoinRequestRepo{}),
+		appGroup.NewApproveRequestUseCase(&stubMemberRepo{}, &stubJoinRequestRepo{}, &stubTxManager{}),
+		appGroup.NewRejectRequestUseCase(&stubMemberRepo{}, &stubJoinRequestRepo{}),
+		appGroup.NewListJoinRequestsUseCase(&stubMemberRepo{}, &stubJoinRequestRepo{}, &stubUserProvider{}),
+		appGroup.NewGetMyRequestUseCase(&stubJoinRequestRepo{}),
+		appGroup.NewCancelMyRequestUseCase(&stubJoinRequestRepo{}),
 	)
 	w := httptest.NewRecorder()
 
@@ -441,6 +502,12 @@ func TestJoin_GroupNotFoundReturns404(t *testing.T) {
 		appGroup.NewGetGroupUseCase(repo, &stubMemberRepo{}, &stubUserProvider{}),
 		appGroup.NewListMyGroupsUseCase(repo, &stubMemberRepo{}, &stubPrefsReader{}),
 		appGroup.NewJoinGroupUseCase(repo, &stubMemberRepo{}),
+		appGroup.NewRequestJoinUseCase(repo, &stubMemberRepo{}, &stubJoinRequestRepo{}),
+		appGroup.NewApproveRequestUseCase(&stubMemberRepo{}, &stubJoinRequestRepo{}, &stubTxManager{}),
+		appGroup.NewRejectRequestUseCase(&stubMemberRepo{}, &stubJoinRequestRepo{}),
+		appGroup.NewListJoinRequestsUseCase(&stubMemberRepo{}, &stubJoinRequestRepo{}, &stubUserProvider{}),
+		appGroup.NewGetMyRequestUseCase(&stubJoinRequestRepo{}),
+		appGroup.NewCancelMyRequestUseCase(&stubJoinRequestRepo{}),
 	)
 
 	r := authedRequest("POST", "/groups/nonexistent/join")
@@ -469,6 +536,12 @@ func TestJoin_NonOpenPolicyReturns403(t *testing.T) {
 		appGroup.NewGetGroupUseCase(repo, &stubMemberRepo{}, &stubUserProvider{}),
 		appGroup.NewListMyGroupsUseCase(repo, &stubMemberRepo{}, &stubPrefsReader{}),
 		appGroup.NewJoinGroupUseCase(repo, &stubMemberRepo{}),
+		appGroup.NewRequestJoinUseCase(repo, &stubMemberRepo{}, &stubJoinRequestRepo{}),
+		appGroup.NewApproveRequestUseCase(&stubMemberRepo{}, &stubJoinRequestRepo{}, &stubTxManager{}),
+		appGroup.NewRejectRequestUseCase(&stubMemberRepo{}, &stubJoinRequestRepo{}),
+		appGroup.NewListJoinRequestsUseCase(&stubMemberRepo{}, &stubJoinRequestRepo{}, &stubUserProvider{}),
+		appGroup.NewGetMyRequestUseCase(&stubJoinRequestRepo{}),
+		appGroup.NewCancelMyRequestUseCase(&stubJoinRequestRepo{}),
 	)
 
 	r := authedRequest("POST", "/groups/g-invite/join")
@@ -504,6 +577,12 @@ func TestJoin_AlreadyMemberReturns409(t *testing.T) {
 		appGroup.NewGetGroupUseCase(repo, memberRepo, &stubUserProvider{}),
 		appGroup.NewListMyGroupsUseCase(repo, memberRepo, &stubPrefsReader{}),
 		appGroup.NewJoinGroupUseCase(repo, memberRepo),
+		appGroup.NewRequestJoinUseCase(repo, memberRepo, &stubJoinRequestRepo{}),
+		appGroup.NewApproveRequestUseCase(memberRepo, &stubJoinRequestRepo{}, &stubTxManager{}),
+		appGroup.NewRejectRequestUseCase(memberRepo, &stubJoinRequestRepo{}),
+		appGroup.NewListJoinRequestsUseCase(memberRepo, &stubJoinRequestRepo{}, &stubUserProvider{}),
+		appGroup.NewGetMyRequestUseCase(&stubJoinRequestRepo{}),
+		appGroup.NewCancelMyRequestUseCase(&stubJoinRequestRepo{}),
 	)
 
 	r := authedRequest("POST", "/groups/g-open/join")
@@ -532,6 +611,12 @@ func TestJoin_SuccessReturns201WithRoleAndJoinedAt(t *testing.T) {
 		appGroup.NewGetGroupUseCase(repo, &stubMemberRepo{}, &stubUserProvider{}),
 		appGroup.NewListMyGroupsUseCase(repo, &stubMemberRepo{}, &stubPrefsReader{}),
 		appGroup.NewJoinGroupUseCase(repo, &stubMemberRepo{}),
+		appGroup.NewRequestJoinUseCase(repo, &stubMemberRepo{}, &stubJoinRequestRepo{}),
+		appGroup.NewApproveRequestUseCase(&stubMemberRepo{}, &stubJoinRequestRepo{}, &stubTxManager{}),
+		appGroup.NewRejectRequestUseCase(&stubMemberRepo{}, &stubJoinRequestRepo{}),
+		appGroup.NewListJoinRequestsUseCase(&stubMemberRepo{}, &stubJoinRequestRepo{}, &stubUserProvider{}),
+		appGroup.NewGetMyRequestUseCase(&stubJoinRequestRepo{}),
+		appGroup.NewCancelMyRequestUseCase(&stubJoinRequestRepo{}),
 	)
 
 	r := authedRequest("POST", "/groups/g-open/join")

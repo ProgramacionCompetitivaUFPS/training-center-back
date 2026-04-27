@@ -1,0 +1,114 @@
+package group
+
+import (
+	"context"
+
+	domainGroup "github.com/training-judge-center/backend/internal/domain/group"
+	"github.com/training-judge-center/backend/internal/domain/shared"
+	"github.com/training-judge-center/backend/pkg/apperror"
+)
+
+const (
+	defaultRequestsPageLimit = 20
+	maxRequestsPageLimit     = 100
+)
+
+type JoinRequestDetail struct {
+	Request *domainGroup.JoinRequest
+	Display *UserDisplay
+}
+
+type ListJoinRequestsInput struct {
+	GroupID     string
+	Status      string
+	Page        int
+	Limit       int
+	CurrentUser shared.CurrentUser
+}
+
+type ListJoinRequestsOutput struct {
+	Requests   []JoinRequestDetail
+	Total      int
+	TotalPages int
+}
+
+type ListJoinRequestsUseCase struct {
+	memberRepo      domainGroup.MemberRepository
+	joinRequestRepo domainGroup.JoinRequestRepository
+	userProvider    UserProvider
+}
+
+func NewListJoinRequestsUseCase(
+	memberRepo domainGroup.MemberRepository,
+	joinRequestRepo domainGroup.JoinRequestRepository,
+	userProvider UserProvider,
+) *ListJoinRequestsUseCase {
+	return &ListJoinRequestsUseCase{memberRepo: memberRepo, joinRequestRepo: joinRequestRepo, userProvider: userProvider}
+}
+
+func (uc *ListJoinRequestsUseCase) Execute(ctx context.Context, input ListJoinRequestsInput) (*ListJoinRequestsOutput, error) {
+	if err := requireLeadOrAdmin(ctx, uc.memberRepo, input.GroupID, input.CurrentUser); err != nil {
+		return nil, err
+	}
+
+	page := input.Page
+	if page < 1 {
+		page = 1
+	}
+	limit := input.Limit
+	if limit < 1 {
+		limit = defaultRequestsPageLimit
+	}
+	if limit > maxRequestsPageLimit {
+		return nil, apperror.NewValidation([]apperror.FieldError{
+			{Field: "limit", Message: "limit must not exceed 100"},
+		})
+	}
+
+	var statusFilter *domainGroup.JoinRequestStatus
+	if input.Status != "" {
+		s, err := domainGroup.NewJoinRequestStatus(input.Status)
+		if err != nil {
+			return nil, apperror.NewValidation([]apperror.FieldError{
+				{Field: "status", Message: "invalid status filter; must be PENDING, APPROVED, or REJECTED"},
+			})
+		}
+		statusFilter = &s
+	} else {
+		pending := domainGroup.JoinRequestStatusPending
+		statusFilter = &pending
+	}
+
+	requests, total, err := uc.joinRequestRepo.FindByGroup(ctx, input.GroupID, domainGroup.JoinRequestFilters{
+		Status: statusFilter,
+		Page:   page,
+		Limit:  limit,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	userIDs := make([]string, 0, len(requests))
+	for _, r := range requests {
+		userIDs = append(userIDs, r.RequesterUserID().Value())
+	}
+	displays, err := uc.userProvider.GetDisplays(ctx, userIDs)
+	if err != nil {
+		return nil, apperror.NewInternal()
+	}
+
+	details := make([]JoinRequestDetail, 0, len(requests))
+	for _, r := range requests {
+		d := displays[r.RequesterUserID().Value()]
+		if d == nil {
+			d = &UserDisplay{Nickname: "unknown"}
+		}
+		details = append(details, JoinRequestDetail{Request: r, Display: d})
+	}
+
+	return &ListJoinRequestsOutput{
+		Requests:   details,
+		Total:      total,
+		TotalPages: calcTotalPages(total, limit),
+	}, nil
+}

@@ -45,3 +45,7 @@ func txFromContext(ctx context.Context) pgx.Tx {
 	}
 	return nil
 }
+
+func TxFromContext(ctx context.Context) pgx.Tx {
+	return txFromContext(ctx)
+}

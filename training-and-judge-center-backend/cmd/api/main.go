@@ -180,6 +180,8 @@ func main() {
 	groupMemberRepo := platformGroup.NewMemberRepository(dbPool)
 	groupUserProvider := platformGroup.NewUserProvider(dbPool)
 	groupPrefsReader := platformGroup.NewPreferencesReader(dbPool)
+	joinRequestRepo := platformGroup.NewJoinRequestRepository(dbPool)
+	groupTxManager := infraPostgres.NewPostgresTransactionManager(dbPool)
 
 	// Group use cases
 	createGroupUseCase := appGroup.NewCreateGroupUseCase(groupRepo)
@@ -187,8 +189,19 @@ func main() {
 	getGroupUseCase := appGroup.NewGetGroupUseCase(groupRepo, groupMemberRepo, groupUserProvider)
 	listMyGroupsUseCase := appGroup.NewListMyGroupsUseCase(groupRepo, groupMemberRepo, groupPrefsReader)
 	joinGroupUseCase := appGroup.NewJoinGroupUseCase(groupRepo, groupMemberRepo)
+	requestJoinUseCase := appGroup.NewRequestJoinUseCase(groupRepo, groupMemberRepo, joinRequestRepo)
+	approveRequestUseCase := appGroup.NewApproveRequestUseCase(groupMemberRepo, joinRequestRepo, groupTxManager)
+	rejectRequestUseCase := appGroup.NewRejectRequestUseCase(groupMemberRepo, joinRequestRepo)
+	listJoinRequestsUseCase := appGroup.NewListJoinRequestsUseCase(groupMemberRepo, joinRequestRepo, groupUserProvider)
+	getMyRequestUseCase := appGroup.NewGetMyRequestUseCase(joinRequestRepo)
+	cancelMyRequestUseCase := appGroup.NewCancelMyRequestUseCase(joinRequestRepo)
 
-	groupHandler := handlerGroup.NewHandler(createGroupUseCase, listGroupsUseCase, getGroupUseCase, listMyGroupsUseCase, joinGroupUseCase)
+	groupHandler := handlerGroup.NewHandler(
+		createGroupUseCase, listGroupsUseCase, getGroupUseCase, listMyGroupsUseCase,
+		joinGroupUseCase,
+		requestJoinUseCase, approveRequestUseCase, rejectRequestUseCase,
+		listJoinRequestsUseCase, getMyRequestUseCase, cancelMyRequestUseCase,
+	)
 
 	// Material platform adapters
 	materialRepo := platformMaterial.NewMaterialRepository(dbPool)
