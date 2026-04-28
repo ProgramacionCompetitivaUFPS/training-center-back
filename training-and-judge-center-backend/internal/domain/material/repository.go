@@ -16,6 +16,7 @@ const (
 // filters by the use case layer before calling the repository.
 // Limit must be between 1 and 100; enforcement is the responsibility of the use case layer.
 type ListFilters struct {
+	// Statuses filters by status; empty means no status constraint (all statuses returned).
 	Statuses    []Status
 	ViewerID    *string
 	AuthorID    *string

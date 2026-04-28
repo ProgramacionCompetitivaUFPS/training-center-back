@@ -1,6 +1,7 @@
 package material
 
 import (
+	"fmt"
 	"net/http"
 	"strconv"
 	"strings"
@@ -43,9 +44,9 @@ func (h *Handler) List(w http.ResponseWriter, r *http.Request) {
 
 	var tags []string
 	if raw := q.Get("tags"); raw != "" {
-		for _, t := range strings.Split(raw, ",") {
-			if t = strings.TrimSpace(t); t != "" {
-				tags = append(tags, t)
+		for _, part := range strings.Split(raw, ",") {
+			if tag := strings.TrimSpace(part); tag != "" {
+				tags = append(tags, tag)
 			}
 		}
 	}
@@ -63,9 +64,9 @@ func (h *Handler) List(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	items := make([]materialDetailResponse, 0, len(out.Materials))
+	items := make([]materialResponse, 0, len(out.Materials))
 	for _, m := range out.Materials {
-		items = append(items, buildDetailResponse(m))
+		items = append(items, buildResponse(m))
 	}
 
 	handler.WriteJSON(w, http.StatusOK, listMaterialsResponse{
@@ -98,7 +99,7 @@ func parsePagination(w http.ResponseWriter, rawPage, rawLimit string) (page, lim
 		v, err := strconv.Atoi(rawLimit)
 		if err != nil || v < 1 || v > appMaterial.MaxLimit {
 			handler.WriteError(w, apperror.NewValidation([]apperror.FieldError{
-				{Field: "limit", Message: "limit must be between 1 and 100"},
+				{Field: "limit", Message: fmt.Sprintf("limit must be between 1 and %d", appMaterial.MaxLimit)},
 			}))
 			return 0, 0, false
 		}

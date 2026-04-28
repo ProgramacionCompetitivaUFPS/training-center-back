@@ -6,16 +6,11 @@ import (
 	domainMaterial "github.com/training-judge-center/backend/internal/domain/material"
 )
 
-type AuthorData struct {
-	Nickname string
-	Name     string
-}
-
 type MaterialData struct {
 	ID          string
 	GroupID     string
 	AuthorID    string
-	Author      *AuthorData
+	Author      *AuthorDisplay
 	Title       string
 	Content     string
 	Tags        []string

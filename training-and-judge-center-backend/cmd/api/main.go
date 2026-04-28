@@ -196,8 +196,8 @@ func main() {
 	authorProvider := platformMaterial.NewAuthorProvider(dbPool)
 
 	// Material use cases
-	createMaterialUC := appMaterial.NewCreateMaterial(materialRepo, groupProvider, groupMemberProvider)
-	updateMaterialUC := appMaterial.NewUpdateMaterial(materialRepo, groupProvider)
+	createMaterialUC := appMaterial.NewCreateMaterial(materialRepo, groupProvider, groupMemberProvider, authorProvider)
+	updateMaterialUC := appMaterial.NewUpdateMaterial(materialRepo, groupProvider, authorProvider)
 	getMaterialUC := appMaterial.NewGetMaterial(materialRepo, groupProvider, groupMemberProvider, authorProvider)
 	listMaterialsUC := appMaterial.NewListMaterials(materialRepo, groupProvider, groupMemberProvider, authorProvider)
 

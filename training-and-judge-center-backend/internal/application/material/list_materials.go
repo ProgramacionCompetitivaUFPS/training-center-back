@@ -2,6 +2,7 @@ package material
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
 
 	domainMaterial "github.com/training-judge-center/backend/internal/domain/material"
@@ -65,7 +66,7 @@ func (uc *ListMaterials) Execute(ctx context.Context, in ListMaterialsInput) (*L
 	}
 	if in.Limit < 1 || in.Limit > MaxLimit {
 		return nil, apperror.NewValidation([]apperror.FieldError{
-			{Field: "limit", Message: "limit must be between 1 and 100"},
+			{Field: "limit", Message: fmt.Sprintf("limit must be between 1 and %d", MaxLimit)},
 		})
 	}
 
@@ -103,9 +104,7 @@ func (uc *ListMaterials) Execute(ctx context.Context, in ListMaterialsInput) (*L
 	items := make([]MaterialData, 0, len(materials))
 	for _, m := range materials {
 		d := toMaterialData(m)
-		if ad := displays[m.AuthorID().Value()]; ad != nil {
-			d.Author = &AuthorData{Nickname: ad.Nickname, Name: ad.Name}
-		}
+		d.Author = displays[m.AuthorID().Value()]
 		items = append(items, d)
 	}
 
@@ -134,21 +133,18 @@ func (uc *ListMaterials) buildFilters(ctx context.Context, in ListMaterialsInput
 		Limit:  in.Limit,
 	}
 
-	// Admin sees everything — no status filter, repo returns all.
 	if in.CurrentUser.IsAdmin() {
 		return filters, nil
 	}
 
 	isLead, err := uc.memberProvider.IsLeadOfGroup(ctx, in.CurrentUser.ID, in.GroupID)
 	if err != nil {
-		slog.ErrorContext(ctx, "failed to check lead role", "error", err)
-		return filters, apperror.NewInternal()
+		slog.ErrorContext(ctx, "failed to check lead role", "error", err, "user_id", in.CurrentUser.ID, "group_id", in.GroupID)
+		return domainMaterial.ListFilters{}, apperror.NewInternal()
 	}
 
-	// Lead sees everything — no status filter, repo returns all.
-	// Note: unlike problems (where ViewerModifierID controls draft visibility via authorship),
-	// materials tie draft visibility to group role (Lead), not authorship. An empty Statuses
-	// slice means no status filter per the repository contract (CLAUDE.md).
+	// Unlike problems (where ViewerModifierID controls draft visibility via authorship),
+	// materials tie draft visibility to group role (Lead), not authorship.
 	if isLead {
 		return filters, nil
 	}

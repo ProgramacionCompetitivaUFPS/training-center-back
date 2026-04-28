@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	domainMaterial "github.com/training-judge-center/backend/internal/domain/material"
+	"github.com/training-judge-center/backend/pkg/apperror"
 )
 
 func newListUC(repo *mockMaterialRepository, vis *mockGroupVisibilityProvider, mem *mockGroupMemberProvider) *ListMaterials {
@@ -53,6 +54,17 @@ func TestListMaterials_NotVisibleGroup_NonMember_Returns403(t *testing.T) {
 	assertErrCode(t, err, ErrCodeInsufficientPerms)
 }
 
+func TestListMaterials_VisibleGroup_NonMember_Returns200(t *testing.T) {
+	uc := newListUC(repoWithList(nil), visibleGroup(), notLead())
+	in := defaultListInput()
+	in.CurrentUser = asContestant(testOtherID)
+
+	_, err := uc.Execute(context.Background(), in)
+	if err != nil {
+		t.Fatalf("expected no error for VISIBLE group non-member, got %v", err)
+	}
+}
+
 func TestListMaterials_Member_FiltersOnlyPublished(t *testing.T) {
 	var capturedFilters domainMaterial.ListFilters
 	repo := &mockMaterialRepository{
@@ -88,7 +100,6 @@ func TestListMaterials_Lead_FiltersDraftAndPublished(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	// Lead: no status filter — empty Statuses means repo returns all (CLAUDE.md contract).
 	if len(capturedFilters.Statuses) != 0 {
 		t.Errorf("expected no status filter for Lead, got %v", capturedFilters.Statuses)
 	}
@@ -110,9 +121,28 @@ func TestListMaterials_Admin_FiltersDraftAndPublished(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	// Admin: no status filter — empty Statuses means repo returns all (CLAUDE.md contract).
 	if len(capturedFilters.Statuses) != 0 {
 		t.Errorf("expected no status filter for Admin, got %v", capturedFilters.Statuses)
+	}
+}
+
+func TestListMaterials_Admin_NotVisibleGroup_SeesAll(t *testing.T) {
+	var capturedFilters domainMaterial.ListFilters
+	repo := &mockMaterialRepository{
+		listFn: func(_ context.Context, _ string, f domainMaterial.ListFilters) ([]*domainMaterial.Material, int, error) {
+			capturedFilters = f
+			return nil, 0, nil
+		},
+	}
+	uc := newListUC(repo, notVisibleGroup(), notLead())
+	in := defaultListInput()
+	in.CurrentUser = asAdmin(testOtherID)
+
+	if _, err := uc.Execute(context.Background(), in); err != nil {
+		t.Fatalf("expected no error for admin on non-visible group, got %v", err)
+	}
+	if len(capturedFilters.Statuses) != 0 {
+		t.Errorf("expected no status filter for admin, got %v", capturedFilters.Statuses)
 	}
 }
 
@@ -171,4 +201,29 @@ func TestListMaterials_EmptyResult_ReturnsPaginationZero(t *testing.T) {
 	if out.Pagination.TotalPages != 0 {
 		t.Errorf("expected totalPages=0, got %d", out.Pagination.TotalPages)
 	}
+}
+
+func TestListMaterials_LeadCheckError_Returns500(t *testing.T) {
+	mem := &mockGroupMemberProvider{
+		isLeadFn: func(_ context.Context, _, _ string) (bool, error) {
+			return false, apperror.NewInternal()
+		},
+		isMemberFn: func(_ context.Context, _, _ string) (bool, error) {
+			return true, nil
+		},
+	}
+	uc := NewListMaterials(&mockMaterialRepository{}, visibleGroup(), mem, stubAuthorProvider())
+	_, err := uc.Execute(context.Background(), defaultListInput())
+	assertErrCode(t, err, apperror.ErrCodeInternalError)
+}
+
+func TestListMaterials_RepoError_Returns500(t *testing.T) {
+	repo := &mockMaterialRepository{
+		listFn: func(_ context.Context, _ string, _ domainMaterial.ListFilters) ([]*domainMaterial.Material, int, error) {
+			return nil, 0, apperror.NewInternal()
+		},
+	}
+	uc := newListUC(repo, visibleGroup(), isMemberNotLead())
+	_, err := uc.Execute(context.Background(), defaultListInput())
+	assertErrCode(t, err, apperror.ErrCodeInternalError)
 }

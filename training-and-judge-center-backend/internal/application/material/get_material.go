@@ -62,11 +62,10 @@ func (uc *GetMaterial) Execute(ctx context.Context, in GetMaterialInput) (*GetMa
 		return nil, apperror.NewNotFound(domainMaterial.ErrCodeMaterialNotFound, "material not found")
 	}
 
-	isAdmin := in.CurrentUser.IsAdmin()
-	if !isAdmin {
+	if !in.CurrentUser.IsAdmin() {
 		isLead, err := uc.memberProvider.IsLeadOfGroup(ctx, in.CurrentUser.ID, in.GroupID)
 		if err != nil {
-			slog.ErrorContext(ctx, "failed to check lead role", "error", err)
+			slog.ErrorContext(ctx, "failed to check lead role", "error", err, "user_id", in.CurrentUser.ID, "group_id", in.GroupID)
 			return nil, apperror.NewInternal()
 		}
 		if m.Status().IsDraft() && !isLead {
@@ -80,20 +79,21 @@ func (uc *GetMaterial) Execute(ctx context.Context, in GetMaterialInput) (*GetMa
 		slog.ErrorContext(ctx, "failed to resolve author display", "error", err, "author_id", m.AuthorID().Value())
 		return nil, apperror.NewInternal()
 	}
-	if d := displays[m.AuthorID().Value()]; d != nil {
-		data.Author = &AuthorData{Nickname: d.Nickname, Name: d.Name}
-	}
+	data.Author = displays[m.AuthorID().Value()]
 
 	return &GetMaterialOutput{Material: data}, nil
 }
 
-func checkGroupAccess(ctx context.Context, mp GroupMemberProvider, user shared.CurrentUser, groupID, visibility string) error {
-	if visibility == "VISIBLE" || user.IsAdmin() {
+func checkGroupAccess(ctx context.Context, mp GroupMemberProvider, user shared.CurrentUser, groupID string, visibility GroupVisibility) error {
+	if visibility == GroupVisibilityVisible || user.IsAdmin() {
 		return nil
+	}
+	if visibility != GroupVisibilityNotVisible {
+		slog.WarnContext(ctx, "unrecognised group visibility value, treating as NOT_VISIBLE", "visibility", visibility, "group_id", groupID)
 	}
 	isMember, err := mp.IsMemberOfGroup(ctx, user.ID, groupID)
 	if err != nil {
-		slog.ErrorContext(ctx, "failed to check group membership", "error", err)
+		slog.ErrorContext(ctx, "failed to check group membership", "error", err, "user_id", user.ID, "group_id", groupID)
 		return apperror.NewInternal()
 	}
 	if !isMember {

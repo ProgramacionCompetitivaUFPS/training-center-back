@@ -10,7 +10,7 @@ import (
 )
 
 func newCreateUC(repo *mockMaterialRepository, group *mockGroupProvider, member *mockGroupMemberProvider) *CreateMaterial {
-	return NewCreateMaterial(repo, group, member)
+	return NewCreateMaterial(repo, group, member, stubAuthorProvider())
 }
 
 func TestCreateMaterial_SuccessByLead(t *testing.T) {

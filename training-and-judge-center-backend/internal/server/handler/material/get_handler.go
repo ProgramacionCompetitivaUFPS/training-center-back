@@ -31,5 +31,5 @@ func (h *Handler) Get(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	handler.WriteJSON(w, http.StatusOK, buildDetailResponse(out.Material))
+	handler.WriteJSON(w, http.StatusOK, buildResponse(out.Material))
 }

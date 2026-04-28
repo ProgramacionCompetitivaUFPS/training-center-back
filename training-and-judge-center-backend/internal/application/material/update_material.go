@@ -25,15 +25,17 @@ type UpdateMaterialOutput struct {
 }
 
 type UpdateMaterial struct {
-	repo          domainMaterial.Repository
-	groupProvider GroupProvider
+	repo           domainMaterial.Repository
+	groupProvider  GroupProvider
+	authorProvider AuthorProvider
 }
 
 func NewUpdateMaterial(
 	repo domainMaterial.Repository,
 	groupProvider GroupProvider,
+	authorProvider AuthorProvider,
 ) *UpdateMaterial {
-	return &UpdateMaterial{repo: repo, groupProvider: groupProvider}
+	return &UpdateMaterial{repo: repo, groupProvider: groupProvider, authorProvider: authorProvider}
 }
 
 func (uc *UpdateMaterial) Execute(ctx context.Context, in UpdateMaterialInput) (*UpdateMaterialOutput, error) {
@@ -52,7 +54,7 @@ func (uc *UpdateMaterial) Execute(ctx context.Context, in UpdateMaterialInput) (
 	}
 
 	// Treat material in another group as not found to avoid cross-group existence leak.
-		if m.GroupID() != in.GroupID {
+	if m.GroupID() != in.GroupID {
 		return nil, apperror.NewNotFound(domainMaterial.ErrCodeMaterialNotFound, "material not found")
 	}
 
@@ -106,5 +108,13 @@ func (uc *UpdateMaterial) Execute(ctx context.Context, in UpdateMaterialInput) (
 		return nil, apperror.NewInternal()
 	}
 
-	return &UpdateMaterialOutput{Material: toMaterialData(m)}, nil
+	data := toMaterialData(m)
+	displays, err := uc.authorProvider.GetDisplays(ctx, []string{m.AuthorID().Value()})
+	if err != nil {
+		slog.ErrorContext(ctx, "failed to resolve author display", "error", err, "author_id", m.AuthorID().Value())
+		return nil, apperror.NewInternal()
+	}
+	data.Author = displays[m.AuthorID().Value()]
+
+	return &UpdateMaterialOutput{Material: data}, nil
 }

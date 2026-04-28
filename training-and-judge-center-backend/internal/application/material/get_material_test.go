@@ -56,7 +56,7 @@ func TestGetMaterial_MaterialNotFound_Returns404(t *testing.T) {
 }
 
 func TestGetMaterial_MaterialBelongsToDifferentGroup_Returns404(t *testing.T) {
-	m := newPublishedMaterial() // belongs to testGroupID
+	m := newPublishedMaterial()
 	repo := repoWith(m)
 	uc := newGetUC(repo, visibleGroup(), isMemberNotLead())
 	_, err := uc.Execute(context.Background(), GetMaterialInput{
@@ -68,7 +68,7 @@ func TestGetMaterial_MaterialBelongsToDifferentGroup_Returns404(t *testing.T) {
 }
 
 func TestGetMaterial_DraftMaterial_Member_Returns404(t *testing.T) {
-	repo := repoWith(newTestMaterial()) // DRAFT
+	repo := repoWith(newTestMaterial())
 	uc := newGetUC(repo, visibleGroup(), isMemberNotLead())
 	_, err := uc.Execute(context.Background(), GetMaterialInput{
 		CurrentUser: asCoach(testOtherID),
@@ -79,7 +79,7 @@ func TestGetMaterial_DraftMaterial_Member_Returns404(t *testing.T) {
 }
 
 func TestGetMaterial_DraftMaterial_Lead_Returns200(t *testing.T) {
-	repo := repoWith(newTestMaterial()) // DRAFT
+	repo := repoWith(newTestMaterial())
 	uc := newGetUC(repo, visibleGroup(), isLead())
 	out, err := uc.Execute(context.Background(), GetMaterialInput{
 		CurrentUser: asCoach(testOtherID),
@@ -95,7 +95,7 @@ func TestGetMaterial_DraftMaterial_Lead_Returns200(t *testing.T) {
 }
 
 func TestGetMaterial_DraftMaterial_Admin_Returns200(t *testing.T) {
-	repo := repoWith(newTestMaterial()) // DRAFT
+	repo := repoWith(newTestMaterial())
 	uc := newGetUC(repo, visibleGroup(), notLead())
 	out, err := uc.Execute(context.Background(), GetMaterialInput{
 		CurrentUser: asAdmin(testOtherID),
@@ -193,4 +193,75 @@ func TestListMaterials_AuthorProviderError_Returns500(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected error on author provider failure, got nil")
 	}
+}
+
+func TestGetMaterial_GroupVisibilityError_Returns500(t *testing.T) {
+	vis := &mockGroupVisibilityProvider{
+		findVisibilityFn: func(_ context.Context, _ string) (GroupVisibility, bool, error) {
+			return "", false, apperror.NewInternal()
+		},
+	}
+	uc := newGetUC(&mockMaterialRepository{}, vis, notLead())
+	_, err := uc.Execute(context.Background(), GetMaterialInput{
+		CurrentUser: asCoach(testAuthorID),
+		GroupID:     testGroupID,
+		MaterialID:  testMaterialID,
+	})
+	assertErrCode(t, err, apperror.ErrCodeInternalError)
+}
+
+func TestListMaterials_GroupVisibilityError_Returns500(t *testing.T) {
+	vis := &mockGroupVisibilityProvider{
+		findVisibilityFn: func(_ context.Context, _ string) (GroupVisibility, bool, error) {
+			return "", false, apperror.NewInternal()
+		},
+	}
+	uc := newListUC(&mockMaterialRepository{}, vis, notLead())
+	_, err := uc.Execute(context.Background(), defaultListInput())
+	assertErrCode(t, err, apperror.ErrCodeInternalError)
+}
+
+func TestGetMaterial_MemberCheckError_Returns500(t *testing.T) {
+	mem := &mockGroupMemberProvider{
+		isMemberFn: func(_ context.Context, _, _ string) (bool, error) {
+			return false, apperror.NewInternal()
+		},
+	}
+	uc := newGetUC(&mockMaterialRepository{}, notVisibleGroup(), mem)
+	_, err := uc.Execute(context.Background(), GetMaterialInput{
+		CurrentUser: asCoach(testOtherID),
+		GroupID:     testGroupID,
+		MaterialID:  testMaterialID,
+	})
+	assertErrCode(t, err, apperror.ErrCodeInternalError)
+}
+
+func TestListMaterials_MemberCheckError_Returns500(t *testing.T) {
+	mem := &mockGroupMemberProvider{
+		isMemberFn: func(_ context.Context, _, _ string) (bool, error) {
+			return false, apperror.NewInternal()
+		},
+	}
+	uc := newListUC(&mockMaterialRepository{}, notVisibleGroup(), mem)
+	_, err := uc.Execute(context.Background(), defaultListInput())
+	assertErrCode(t, err, apperror.ErrCodeInternalError)
+}
+
+func TestGetMaterial_LeadCheckError_Returns500(t *testing.T) {
+	mem := &mockGroupMemberProvider{
+		isLeadFn: func(_ context.Context, _, _ string) (bool, error) {
+			return false, apperror.NewInternal()
+		},
+		isMemberFn: func(_ context.Context, _, _ string) (bool, error) {
+			return true, nil
+		},
+	}
+	repo := repoWith(newTestMaterial())
+	uc := NewGetMaterial(repo, visibleGroup(), mem, stubAuthorProvider())
+	_, err := uc.Execute(context.Background(), GetMaterialInput{
+		CurrentUser: asCoach(testOtherID),
+		GroupID:     testGroupID,
+		MaterialID:  testMaterialID,
+	})
+	assertErrCode(t, err, apperror.ErrCodeInternalError)
 }

@@ -7,6 +7,7 @@ import (
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
+	appMaterial "github.com/training-judge-center/backend/internal/application/material"
 	"github.com/training-judge-center/backend/pkg/apperror"
 )
 
@@ -28,7 +29,7 @@ func (p *GroupProvider) Exists(ctx context.Context, groupID string) (bool, error
 	return exists, nil
 }
 
-func (p *GroupProvider) FindVisibility(ctx context.Context, groupID string) (string, bool, error) {
+func (p *GroupProvider) FindVisibility(ctx context.Context, groupID string) (appMaterial.GroupVisibility, bool, error) {
 	var visibility string
 	err := p.db.QueryRow(ctx, `SELECT visibility FROM groups WHERE id = $1`, groupID).Scan(&visibility)
 	if err != nil {
@@ -38,7 +39,7 @@ func (p *GroupProvider) FindVisibility(ctx context.Context, groupID string) (str
 		slog.ErrorContext(ctx, "GroupProvider.FindVisibility failed", "error", err, "group_id", groupID)
 		return "", false, apperror.NewInternal()
 	}
-	return visibility, true, nil
+	return appMaterial.GroupVisibility(visibility), true, nil
 }
 
 const memberRoleLead = "LEAD"

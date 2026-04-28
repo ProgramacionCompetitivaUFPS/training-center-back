@@ -63,14 +63,14 @@ func (m *mockGroupProvider) Exists(ctx context.Context, groupID string) (bool, e
 // ── GroupVisibilityProvider mock ─────────────────────────────────────────────
 
 type mockGroupVisibilityProvider struct {
-	findVisibilityFn func(ctx context.Context, groupID string) (string, bool, error)
+	findVisibilityFn func(ctx context.Context, groupID string) (GroupVisibility, bool, error)
 }
 
-func (m *mockGroupVisibilityProvider) FindVisibility(ctx context.Context, groupID string) (string, bool, error) {
+func (m *mockGroupVisibilityProvider) FindVisibility(ctx context.Context, groupID string) (GroupVisibility, bool, error) {
 	if m.findVisibilityFn != nil {
 		return m.findVisibilityFn(ctx, groupID)
 	}
-	return "VISIBLE", true, nil
+	return GroupVisibilityVisible, true, nil
 }
 
 func visibleGroup() *mockGroupVisibilityProvider {
@@ -79,15 +79,15 @@ func visibleGroup() *mockGroupVisibilityProvider {
 
 func notVisibleGroup() *mockGroupVisibilityProvider {
 	return &mockGroupVisibilityProvider{
-		findVisibilityFn: func(_ context.Context, _ string) (string, bool, error) {
-			return "NOT_VISIBLE", true, nil
+		findVisibilityFn: func(_ context.Context, _ string) (GroupVisibility, bool, error) {
+			return GroupVisibilityNotVisible, true, nil
 		},
 	}
 }
 
 func groupVisibilityNotFound() *mockGroupVisibilityProvider {
 	return &mockGroupVisibilityProvider{
-		findVisibilityFn: func(_ context.Context, _ string) (string, bool, error) {
+		findVisibilityFn: func(_ context.Context, _ string) (GroupVisibility, bool, error) {
 			return "", false, nil
 		},
 	}

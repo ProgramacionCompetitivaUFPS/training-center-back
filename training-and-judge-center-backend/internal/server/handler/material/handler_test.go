@@ -41,8 +41,8 @@ func (s *stubGroupProvider) Exists(_ context.Context, _ string) (bool, error) { 
 
 type stubGroupVisibilityProvider struct{}
 
-func (s *stubGroupVisibilityProvider) FindVisibility(_ context.Context, _ string) (string, bool, error) {
-	return "VISIBLE", true, nil
+func (s *stubGroupVisibilityProvider) FindVisibility(_ context.Context, _ string) (appMaterial.GroupVisibility, bool, error) {
+	return appMaterial.GroupVisibilityVisible, true, nil
 }
 
 type stubGroupMemberProvider struct{}
@@ -63,6 +63,21 @@ func (s *stubNotLeadMemberProvider) IsMemberOfGroup(_ context.Context, _, _ stri
 	return true, nil
 }
 
+type stubNotVisibleGroupVisibilityProvider struct{}
+
+func (s *stubNotVisibleGroupVisibilityProvider) FindVisibility(_ context.Context, _ string) (appMaterial.GroupVisibility, bool, error) {
+	return appMaterial.GroupVisibilityNotVisible, true, nil
+}
+
+type stubNonMemberProvider struct{}
+
+func (s *stubNonMemberProvider) IsLeadOfGroup(_ context.Context, _, _ string) (bool, error) {
+	return false, nil
+}
+func (s *stubNonMemberProvider) IsMemberOfGroup(_ context.Context, _, _ string) (bool, error) {
+	return false, nil
+}
+
 type stubAuthorProvider struct{}
 
 func (s *stubAuthorProvider) GetDisplays(_ context.Context, ids []string) (map[string]*appMaterial.AuthorDisplay, error) {
@@ -75,8 +90,8 @@ func (s *stubAuthorProvider) GetDisplays(_ context.Context, ids []string) (map[s
 
 func stubHandler() *Handler {
 	return NewHandler(
-		appMaterial.NewCreateMaterial(&stubMaterialRepo{}, &stubGroupProvider{}, &stubGroupMemberProvider{}),
-		appMaterial.NewUpdateMaterial(&stubMaterialRepo{}, &stubGroupProvider{}),
+		appMaterial.NewCreateMaterial(&stubMaterialRepo{}, &stubGroupProvider{}, &stubGroupMemberProvider{}, &stubAuthorProvider{}),
+		appMaterial.NewUpdateMaterial(&stubMaterialRepo{}, &stubGroupProvider{}, &stubAuthorProvider{}),
 		appMaterial.NewGetMaterial(&stubMaterialRepo{}, &stubGroupVisibilityProvider{}, &stubGroupMemberProvider{}, &stubAuthorProvider{}),
 		appMaterial.NewListMaterials(&stubMaterialRepo{}, &stubGroupVisibilityProvider{}, &stubGroupMemberProvider{}, &stubAuthorProvider{}),
 	)
@@ -188,8 +203,8 @@ func TestCreateMaterial_ValidRequest_Returns201(t *testing.T) {
 
 func TestCreateMaterial_Forbidden_Returns403(t *testing.T) {
 	h := NewHandler(
-		appMaterial.NewCreateMaterial(&stubMaterialRepo{}, &stubGroupProvider{}, &stubNotLeadMemberProvider{}),
-		appMaterial.NewUpdateMaterial(&stubMaterialRepo{}, &stubGroupProvider{}),
+		appMaterial.NewCreateMaterial(&stubMaterialRepo{}, &stubGroupProvider{}, &stubNotLeadMemberProvider{}, &stubAuthorProvider{}),
+		appMaterial.NewUpdateMaterial(&stubMaterialRepo{}, &stubGroupProvider{}, &stubAuthorProvider{}),
 		appMaterial.NewGetMaterial(&stubMaterialRepo{}, &stubGroupVisibilityProvider{}, &stubGroupMemberProvider{}, &stubAuthorProvider{}),
 		appMaterial.NewListMaterials(&stubMaterialRepo{}, &stubGroupVisibilityProvider{}, &stubGroupMemberProvider{}, &stubAuthorProvider{}),
 	)
@@ -221,12 +236,12 @@ func TestUpdateMaterial_ValidRequest_Returns200(t *testing.T) {
 	)
 	repo := &stubMaterialRepo{}
 	h := NewHandler(
-		appMaterial.NewCreateMaterial(repo, &stubGroupProvider{}, &stubGroupMemberProvider{}),
+		appMaterial.NewCreateMaterial(repo, &stubGroupProvider{}, &stubGroupMemberProvider{}, &stubAuthorProvider{}),
 		appMaterial.NewUpdateMaterial(&stubMaterialRepo{
 			findByIDFn: func(_ context.Context, _ string) (*domainMaterial.Material, error) {
 				return mat, nil
 			},
-		}, &stubGroupProvider{}),
+		}, &stubGroupProvider{}, &stubAuthorProvider{}),
 		appMaterial.NewGetMaterial(&stubMaterialRepo{}, &stubGroupVisibilityProvider{}, &stubGroupMemberProvider{}, &stubAuthorProvider{}),
 		appMaterial.NewListMaterials(&stubMaterialRepo{}, &stubGroupVisibilityProvider{}, &stubGroupMemberProvider{}, &stubAuthorProvider{}),
 	)
@@ -375,8 +390,8 @@ func TestGetMaterial_ValidRequest_Returns200(t *testing.T) {
 		},
 	}
 	h := NewHandler(
-		appMaterial.NewCreateMaterial(repo, &stubGroupProvider{}, &stubGroupMemberProvider{}),
-		appMaterial.NewUpdateMaterial(repo, &stubGroupProvider{}),
+		appMaterial.NewCreateMaterial(repo, &stubGroupProvider{}, &stubGroupMemberProvider{}, &stubAuthorProvider{}),
+		appMaterial.NewUpdateMaterial(repo, &stubGroupProvider{}, &stubAuthorProvider{}),
 		appMaterial.NewGetMaterial(repo, &stubGroupVisibilityProvider{}, &stubGroupMemberProvider{}, &stubAuthorProvider{}),
 		appMaterial.NewListMaterials(repo, &stubGroupVisibilityProvider{}, &stubGroupMemberProvider{}, &stubAuthorProvider{}),
 	)
@@ -391,7 +406,7 @@ func TestGetMaterial_ValidRequest_Returns200(t *testing.T) {
 	if w.Code != http.StatusOK {
 		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
 	}
-	var resp materialDetailResponse
+	var resp materialResponse
 	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
 		t.Fatalf("could not decode response: %v", err)
 	}
@@ -400,6 +415,32 @@ func TestGetMaterial_ValidRequest_Returns200(t *testing.T) {
 	}
 	if resp.Author == nil {
 		t.Error("expected author to be populated")
+	}
+}
+
+func TestGetMaterial_Forbidden_Returns403(t *testing.T) {
+	h := NewHandler(
+		appMaterial.NewCreateMaterial(&stubMaterialRepo{}, &stubGroupProvider{}, &stubGroupMemberProvider{}, &stubAuthorProvider{}),
+		appMaterial.NewUpdateMaterial(&stubMaterialRepo{}, &stubGroupProvider{}, &stubAuthorProvider{}),
+		appMaterial.NewGetMaterial(&stubMaterialRepo{}, &stubNotVisibleGroupVisibilityProvider{}, &stubNonMemberProvider{}, &stubAuthorProvider{}),
+		appMaterial.NewListMaterials(&stubMaterialRepo{}, &stubGroupVisibilityProvider{}, &stubGroupMemberProvider{}, &stubAuthorProvider{}),
+	)
+	r := authedRequest(http.MethodGet, "/groups/g1/materials/m1", nil)
+	r.SetPathValue("groupId", "g1")
+	r.SetPathValue("materialId", "m1")
+	w := httptest.NewRecorder()
+
+	wrapAuth(http.HandlerFunc(h.Get)).ServeHTTP(w, r)
+
+	if w.Code != http.StatusForbidden {
+		t.Fatalf("expected 403, got %d: %s", w.Code, w.Body.String())
+	}
+	var resp apperror.AppError
+	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
+		t.Fatalf("could not decode error response: %v (body: %s)", err, w.Body.String())
+	}
+	if resp.Code != appMaterial.ErrCodeInsufficientPerms {
+		t.Errorf("expected INSUFFICIENT_PERMISSIONS, got %s", resp.Code)
 	}
 }
 
@@ -464,7 +505,7 @@ func TestListMaterials_InvalidLimit_Returns400(t *testing.T) {
 }
 
 func TestListMaterials_ValidRequest_Returns200WithPagination(t *testing.T) {
-	h := stubHandler() // repo.List returns empty slice by default
+	h := stubHandler()
 	r := authedRequest(http.MethodGet, "/groups/g1/materials", nil)
 	r.SetPathValue("groupId", "g1")
 	w := httptest.NewRecorder()
