@@ -13,10 +13,17 @@ import (
 type Handler struct {
 	createUC *appMaterial.CreateMaterial
 	updateUC *appMaterial.UpdateMaterial
+	getUC    *appMaterial.GetMaterial
+	listUC   *appMaterial.ListMaterials
 }
 
-func NewHandler(createUC *appMaterial.CreateMaterial, updateUC *appMaterial.UpdateMaterial) *Handler {
-	return &Handler{createUC: createUC, updateUC: updateUC}
+func NewHandler(
+	createUC *appMaterial.CreateMaterial,
+	updateUC *appMaterial.UpdateMaterial,
+	getUC *appMaterial.GetMaterial,
+	listUC *appMaterial.ListMaterials,
+) *Handler {
+	return &Handler{createUC: createUC, updateUC: updateUC, getUC: getUC, listUC: listUC}
 }
 
 func (h *Handler) requireCurrentUser(w http.ResponseWriter, r *http.Request) (*shared.CurrentUser, bool) {

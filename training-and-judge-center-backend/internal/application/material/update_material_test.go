@@ -10,7 +10,7 @@ import (
 )
 
 func newUpdateUC(repo *mockMaterialRepository, group *mockGroupProvider) *UpdateMaterial {
-	return NewUpdateMaterial(repo, group)
+	return NewUpdateMaterial(repo, group, stubAuthorProvider())
 }
 
 func TestUpdateMaterial_SuccessByAuthor(t *testing.T) {

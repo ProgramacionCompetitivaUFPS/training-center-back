@@ -26,17 +26,20 @@ type CreateMaterial struct {
 	repo           domainMaterial.Repository
 	groupProvider  GroupProvider
 	memberProvider GroupMemberProvider
+	authorProvider AuthorProvider
 }
 
 func NewCreateMaterial(
 	repo domainMaterial.Repository,
 	groupProvider GroupProvider,
 	memberProvider GroupMemberProvider,
+	authorProvider AuthorProvider,
 ) *CreateMaterial {
 	return &CreateMaterial{
 		repo:           repo,
 		groupProvider:  groupProvider,
 		memberProvider: memberProvider,
+		authorProvider: authorProvider,
 	}
 }
 
@@ -107,5 +110,13 @@ func (uc *CreateMaterial) Execute(ctx context.Context, in CreateMaterialInput) (
 		return nil, apperror.NewInternal()
 	}
 
-	return &CreateMaterialOutput{Material: toMaterialData(m)}, nil
+	data := toMaterialData(m)
+	displays, err := uc.authorProvider.GetDisplays(ctx, []string{m.AuthorID().Value()})
+	if err != nil {
+		slog.ErrorContext(ctx, "failed to resolve author display", "error", err, "author_id", m.AuthorID().Value())
+		return nil, apperror.NewInternal()
+	}
+	data.Author = displays[m.AuthorID().Value()]
+
+	return &CreateMaterialOutput{Material: data}, nil
 }

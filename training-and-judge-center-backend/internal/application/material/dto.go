@@ -10,6 +10,7 @@ type MaterialData struct {
 	ID          string
 	GroupID     string
 	AuthorID    string
+	Author      *AuthorDisplay
 	Title       string
 	Content     string
 	Tags        []string
