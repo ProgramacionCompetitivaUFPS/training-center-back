@@ -195,12 +195,15 @@ func main() {
 	materialRepo := platformMaterial.NewMaterialRepository(dbPool)
 	groupProvider := platformMaterial.NewGroupProvider(dbPool)
 	groupMemberProvider := platformMaterial.NewGroupMemberProvider(dbPool)
+	authorProvider := platformMaterial.NewAuthorProvider(dbPool)
 
 	// Material use cases
-	createMaterialUC := appMaterial.NewCreateMaterial(materialRepo, groupProvider, groupMemberProvider)
-	updateMaterialUC := appMaterial.NewUpdateMaterial(materialRepo, groupProvider)
+	createMaterialUC := appMaterial.NewCreateMaterial(materialRepo, groupProvider, groupMemberProvider, authorProvider)
+	updateMaterialUC := appMaterial.NewUpdateMaterial(materialRepo, groupProvider, authorProvider)
+	getMaterialUC := appMaterial.NewGetMaterial(materialRepo, groupProvider, groupMemberProvider, authorProvider)
+	listMaterialsUC := appMaterial.NewListMaterials(materialRepo, groupProvider, groupMemberProvider, authorProvider)
 
-	materialHandler := handlerMaterial.NewHandler(createMaterialUC, updateMaterialUC)
+	materialHandler := handlerMaterial.NewHandler(createMaterialUC, updateMaterialUC, getMaterialUC, listMaterialsUC)
 
 	router := server.NewRouter(&server.Handlers{
 		Problem:  problemHandler,
