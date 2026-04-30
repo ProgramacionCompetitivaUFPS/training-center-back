@@ -204,6 +204,24 @@ func newPublishedMaterial() *domainMaterial.Material {
 	).WithClock(fixedClock)
 }
 
+func newPinnedMaterial() *domainMaterial.Material {
+	now := testNow
+	return domainMaterial.RestoreMaterial(
+		testMaterialID,
+		testGroupID,
+		shared.RestoreUserID(testAuthorID),
+		"Test Title",
+		"",
+		nil,
+		"PUBLISHED",
+		true,
+		&now,
+		testNow,
+		testNow,
+		&now,
+	).WithClock(fixedClock)
+}
+
 func repoWith(m *domainMaterial.Material) *mockMaterialRepository {
 	return &mockMaterialRepository{
 		findByIDFn: func(_ context.Context, _ string) (*domainMaterial.Material, error) {
