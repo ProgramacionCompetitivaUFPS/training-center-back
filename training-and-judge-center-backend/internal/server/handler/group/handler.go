@@ -16,6 +16,7 @@ type Handler struct {
 	getGroup     *appGroup.GetGroupUseCase
 	listMyGroups *appGroup.ListMyGroupsUseCase
 	addMember    *appGroup.AddMemberUseCase
+	joinGroup    *appGroup.JoinGroupUseCase
 }
 
 func NewHandler(
@@ -24,11 +25,12 @@ func NewHandler(
 	getGroup     *appGroup.GetGroupUseCase,
 	listMyGroups *appGroup.ListMyGroupsUseCase,
 	addMember    *appGroup.AddMemberUseCase,
+	joinGroup    *appGroup.JoinGroupUseCase,
 ) *Handler {
 	return &Handler{
 		createGroup: createGroup, listGroups: listGroups,
 		getGroup: getGroup, listMyGroups: listMyGroups,
-		addMember: addMember,
+		addMember: addMember, joinGroup: joinGroup,
 	}
 }
 

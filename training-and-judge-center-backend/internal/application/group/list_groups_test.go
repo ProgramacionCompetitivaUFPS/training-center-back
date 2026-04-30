@@ -47,19 +47,28 @@ func (f *fakeRepo) List(ctx context.Context, filters domainGroup.ListFilters) ([
 }
 
 type fakeMemberRepo struct {
-	memberCounts map[string]int
-	memberships  map[string]*domainGroup.GroupMember // key: groupID+userID
-	leadCounts   map[string]int
-	leads        map[string][]*domainGroup.GroupMember
+	memberCounts         map[string]int
+	memberships          map[string]*domainGroup.GroupMember // key: groupID+userID
+	leadCounts           map[string]int
+	leads                map[string][]*domainGroup.GroupMember
+	saveErr              error
+	savedMember          *domainGroup.GroupMember
+	findByGroupAndUserErr error
 }
 
 func keyOf(groupID string, userID shared.UserID) string { return groupID + "::" + userID.Value() }
 
-func (f *fakeMemberRepo) Save(ctx context.Context, m *domainGroup.GroupMember) error { return nil }
+func (f *fakeMemberRepo) Save(_ context.Context, m *domainGroup.GroupMember) error {
+	f.savedMember = m
+	return f.saveErr
+}
 func (f *fakeMemberRepo) SaveAll(ctx context.Context, members []*domainGroup.GroupMember) error {
 	return nil
 }
 func (f *fakeMemberRepo) FindByGroupAndUser(ctx context.Context, groupID string, userID shared.UserID) (*domainGroup.GroupMember, error) {
+	if f.findByGroupAndUserErr != nil {
+		return nil, f.findByGroupAndUserErr
+	}
 	if m, ok := f.memberships[keyOf(groupID, userID)]; ok {
 		return m, nil
 	}

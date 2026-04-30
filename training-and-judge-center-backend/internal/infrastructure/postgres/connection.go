@@ -10,11 +10,11 @@ import (
 
 func NewConnectionPool(ctx context.Context, cfg *config.Config) (*pgxpool.Pool, error) {
 	dsn := fmt.Sprintf(
-		"postgres://%s:%s@%s:%s/%s?sslmode=disable",
-		cfg.DBUser,
-		cfg.DBPassword,
+		"host=%s port=%s user=%s password=%s dbname=%s sslmode=disable",
 		cfg.DBHost,
 		cfg.DBPort,
+		cfg.DBUser,
+		cfg.DBPassword,
 		cfg.DBName,
 	)
 

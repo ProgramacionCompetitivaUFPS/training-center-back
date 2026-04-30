@@ -1,0 +1,9 @@
+services:
+  migrate:
+    image: ${API_IMAGE}
+
+  backend:
+    image: ${API_IMAGE}
+    environment:
+      SMTP_HOST: ${SMTP_HOST:-mailhog}
+      SMTP_PORT: ${SMTP_PORT:-1025}
