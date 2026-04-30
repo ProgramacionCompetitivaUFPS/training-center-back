@@ -1,0 +1,23 @@
+training-and-judge-center-backend/internal/platform/group/repository.go
+  e448ea9cc3638364 247
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.3.4",
+  "base_commit_sha": "17b60ba903dde73b082883799f9a1378457d5f93",
+  "prompts": {
+    "e448ea9cc3638364": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "76e8d6d5-81ef-4f16-b3d4-8ff731686e4d",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "AlexaVJ",
+      "messages": [],
+      "total_additions": 0,
+      "total_deletions": 0,
+      "accepted_lines": 2,
+      "overriden_lines": 0
+    }
+  }
+}
