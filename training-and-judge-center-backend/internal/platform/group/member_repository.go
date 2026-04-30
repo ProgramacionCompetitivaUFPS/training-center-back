@@ -32,8 +32,10 @@ func (r *MemberRepository) Save(ctx context.Context, m *domainGroup.GroupMember)
 	)
 	if err != nil {
 		var pgErr *pgconn.PgError
-		if errors.As(err, &pgErr) && pgErr.Code == "23505" {
-			return apperror.NewConflict(domainGroup.ErrCodeAlreadyMember, "User is already a member of this group")
+		if errors.As(err, &pgErr) && pgErr.Code == "23505" && pgErr.ConstraintName == "group_members_group_id_user_id_key" {
+			slog.WarnContext(ctx, "MemberRepository.Save: unique constraint hit (possible TOCTOU race)",
+				"group_id", m.GroupID(), "user_id", m.UserID().Value(), "constraint", pgErr.ConstraintName)
+			return apperror.NewConflict(domainGroup.ErrCodeAlreadyMember, "You are already a member of this group")
 		}
 		slog.ErrorContext(ctx, "MemberRepository.Save failed", "error", err)
 		return apperror.NewInternal()

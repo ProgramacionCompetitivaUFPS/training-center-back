@@ -429,8 +429,6 @@ func TestCreate_DuplicateNameReturns409(t *testing.T) {
 	}
 }
 
-// --- Join handler tests ---
-
 func TestJoin_GroupNotFoundReturns404(t *testing.T) {
 	repo := &stubGroupRepo{
 		findByIDFn: func(_ string) (*domainGroup.Group, error) {
@@ -554,5 +552,19 @@ func TestJoin_SuccessReturns201WithRoleAndJoinedAt(t *testing.T) {
 	}
 	if body.JoinedAt == "" {
 		t.Error("expected non-empty JoinedAt")
+	}
+	if _, parseErr := time.Parse("2006-01-02T15:04:05Z", body.JoinedAt); parseErr != nil {
+		t.Errorf("JoinedAt %q is not RFC3339 UTC format: %v", body.JoinedAt, parseErr)
+	}
+}
+
+func TestJoin_UnauthenticatedReturns401(t *testing.T) {
+	h := stubHandler()
+	w := httptest.NewRecorder()
+	r := httptest.NewRequest("POST", "/groups/g-open/join", nil)
+	r.SetPathValue("groupId", "g-open")
+	wrapAuth(http.HandlerFunc(h.Join)).ServeHTTP(w, r)
+	if w.Code != http.StatusUnauthorized {
+		t.Fatalf("expected 401, got %d", w.Code)
 	}
 }

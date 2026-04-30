@@ -149,3 +149,18 @@ func TestJoinGroup_SaveFailurePropagatesError(t *testing.T) {
 		t.Fatal("expected error from Save, got nil")
 	}
 }
+
+func TestJoinGroup_FindMemberErrorPropagates(t *testing.T) {
+	g := openGroup(t)
+	memberRepo := &fakeMemberRepo{findByGroupAndUserErr: errors.New("db timeout")}
+	uc := NewJoinGroupUseCase(&fakeRepo{groups: []*domainGroup.Group{g}}, memberRepo)
+
+	_, err := uc.Execute(context.Background(), JoinGroupInput{
+		GroupID:     "g1",
+		CurrentUser: currentUser("u1", shared.RoleContestant),
+	})
+
+	if err == nil {
+		t.Fatal("expected error from FindByGroupAndUser, got nil")
+	}
+}
