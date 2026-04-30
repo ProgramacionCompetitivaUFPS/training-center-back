@@ -1,0 +1,27 @@
+training-and-judge-center-backend/internal/server/handler/group/helpers.go
+  e448ea9cc3638364 10,67-74
+training-and-judge-center-backend/internal/server/handler/group/types.go
+  e448ea9cc3638364 79-85
+training-and-judge-center-backend/internal/server/handler/group/add_member_handler.go
+  e448ea9cc3638364 50
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.3.4",
+  "base_commit_sha": "62c503d86c10513c05e3061be09da2ba3efb4723",
+  "prompts": {
+    "e448ea9cc3638364": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "76e8d6d5-81ef-4f16-b3d4-8ff731686e4d",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "AlexaVJ",
+      "messages": [],
+      "total_additions": 17,
+      "total_deletions": 12,
+      "accepted_lines": 17,
+      "overriden_lines": 0
+    }
+  }
+}
