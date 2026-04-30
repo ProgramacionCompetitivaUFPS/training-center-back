@@ -40,8 +40,9 @@ func (uc *JoinGroupUseCase) Execute(ctx context.Context, input JoinGroupInput) (
 		return nil, err
 	}
 
+	// Policy check precedes membership check: a non-OPEN group returns 403 regardless of the caller's membership status.
 	if g.JoinPolicy() != domainGroup.JoinPolicyOpen {
-		return nil, apperror.NewForbidden(domainGroup.ErrCodeInsufficientPermissions, "This group requires an invitation to join")
+		return nil, apperror.NewForbidden(domainGroup.ErrCodeInsufficientPermissions, "This group does not allow direct joining")
 	}
 
 	userID := shared.RestoreUserID(input.CurrentUser.ID)
