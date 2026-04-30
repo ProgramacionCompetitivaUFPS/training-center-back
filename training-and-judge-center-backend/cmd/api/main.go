@@ -196,12 +196,19 @@ func main() {
 	authorProvider := platformMaterial.NewAuthorProvider(dbPool)
 
 	// Material use cases
-	createMaterialUC := appMaterial.NewCreateMaterial(materialRepo, groupProvider, groupMemberProvider, authorProvider)
-	updateMaterialUC := appMaterial.NewUpdateMaterial(materialRepo, groupProvider, authorProvider)
-	getMaterialUC := appMaterial.NewGetMaterial(materialRepo, groupProvider, groupMemberProvider, authorProvider)
-	listMaterialsUC := appMaterial.NewListMaterials(materialRepo, groupProvider, groupMemberProvider, authorProvider)
+	createMaterialUC    := appMaterial.NewCreateMaterial(materialRepo, groupProvider, groupMemberProvider, authorProvider)
+	updateMaterialUC    := appMaterial.NewUpdateMaterial(materialRepo, groupProvider, authorProvider)
+	getMaterialUC       := appMaterial.NewGetMaterial(materialRepo, groupProvider, groupMemberProvider, authorProvider)
+	listMaterialsUC     := appMaterial.NewListMaterials(materialRepo, groupProvider, groupMemberProvider, authorProvider)
+	publishMaterialUC   := appMaterial.NewPublishMaterial(materialRepo, groupProvider, authorProvider)
+	unpublishMaterialUC := appMaterial.NewUnpublishMaterial(materialRepo, groupProvider, authorProvider)
+	pinMaterialUC       := appMaterial.NewPinMaterial(materialRepo, groupProvider, groupMemberProvider, authorProvider)
+	unpinMaterialUC     := appMaterial.NewUnpinMaterial(materialRepo, groupProvider, groupMemberProvider, authorProvider)
 
-	materialHandler := handlerMaterial.NewHandler(createMaterialUC, updateMaterialUC, getMaterialUC, listMaterialsUC)
+	materialHandler := handlerMaterial.NewHandler(
+		createMaterialUC, updateMaterialUC, getMaterialUC, listMaterialsUC,
+		publishMaterialUC, unpublishMaterialUC, pinMaterialUC, unpinMaterialUC,
+	)
 
 	router := server.NewRouter(&server.Handlers{
 		Problem:  problemHandler,
