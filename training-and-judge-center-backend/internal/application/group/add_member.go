@@ -46,11 +46,9 @@ func (uc *AddMemberUseCase) Execute(ctx context.Context, input AddMemberInput) (
 		return nil, apperror.NewNotFound(domainGroup.ErrCodeNicknameNotFound, "The specified nickname does not exist")
 	}
 
-	g, err := uc.groupRepo.FindByID(ctx, input.GroupID)
-	if err != nil {
+	if _, err := uc.groupRepo.FindByID(ctx, input.GroupID); err != nil {
 		return nil, err
 	}
-	_ = g
 
 	if !input.CurrentUser.IsAdmin() {
 		callerMembership, err := uc.memberRepo.FindByGroupAndUser(ctx, input.GroupID, shared.RestoreUserID(input.CurrentUser.ID))
