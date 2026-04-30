@@ -10,7 +10,8 @@ jobs:
   claude-review:
     if: |
       contains(github.event.comment.body, '/review-claude') &&
-      (github.event.issue.pull_request != null || github.event.pull_request != null)
+      (github.event.issue.pull_request != null || github.event.pull_request != null) &&
+      contains(fromJSON('["CarlosSalazar84","AlexaVJ","Daluca21"]'), github.event.comment.user.login)
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -31,13 +32,11 @@ jobs:
           TOKEN_CARLOSSALAZAR84: ${{ secrets.CLAUDE_TOKEN_CARLOSSALAZAR84 }}
           TOKEN_ALEXAVJ: ${{ secrets.CLAUDE_TOKEN_ALEXAVJ }}
           TOKEN_DALUCA21: ${{ secrets.CLAUDE_TOKEN_DALUCA21 }}
-          FALLBACK_TOKEN: ${{ secrets.CLAUDE_TOKEN_CARLOSSALAZAR84 }}
         run: |
           case "$COMMENTER" in
             "CarlosSalazar84") echo "token=$TOKEN_CARLOSSALAZAR84" >> $GITHUB_OUTPUT ;;
             "AlexaVJ")         echo "token=$TOKEN_ALEXAVJ"         >> $GITHUB_OUTPUT ;;
             "Daluca21")        echo "token=$TOKEN_DALUCA21"        >> $GITHUB_OUTPUT ;;
-            *)                 echo "token=$FALLBACK_TOKEN"        >> $GITHUB_OUTPUT ;;
           esac
 
       - name: Run Claude PR Review Toolkit
@@ -49,7 +48,6 @@ jobs:
           trigger_phrase: '/review-claude'
           plugin_marketplaces: 'https://github.com/anthropics/claude-code.git'
           plugins: 'pr-review-toolkit@claude-code-plugins'
-          show_full_output: true
           claude_args: >-
             --allowedTools "Skill,Bash(gh pr comment:*),Bash(gh pr diff:*),Bash(gh pr view:*),Bash(gh api:*),Bash(git diff:*),Bash(git log:*),mcp__github_inline_comment__create_inline_comment"
           prompt: |
