@@ -24,13 +24,17 @@ func NewMemberRepository(db *pgxpool.Pool) *MemberRepository {
 	return &MemberRepository{db: db}
 }
 
+func userIDToPtr(uid *shared.UserID) *string {
+	if uid == nil {
+		return nil
+	}
+	v := uid.Value()
+	return &v
+}
+
 func (r *MemberRepository) Save(ctx context.Context, m *domainGroup.GroupMember) error {
 	q := infraPostgres.GetQuerier(ctx, r.db)
-	var addedByID *string
-	if ab := m.AddedBy(); ab != nil {
-		v := ab.Value()
-		addedByID = &v
-	}
+	addedByID := userIDToPtr(m.AddedBy())
 	const sql = `
 		INSERT INTO group_members (id, group_id, user_id, member_role, joined_at, added_by, join_method)
 		VALUES ($1, $2, $3, $4, $5, $6, $7)
@@ -51,11 +55,7 @@ func (r *MemberRepository) SaveAll(ctx context.Context, members []*domainGroup.G
 	}
 	q := infraPostgres.GetQuerier(ctx, r.db)
 	for _, m := range members {
-		var addedByID *string
-		if ab := m.AddedBy(); ab != nil {
-			v := ab.Value()
-			addedByID = &v
-		}
+		addedByID := userIDToPtr(m.AddedBy())
 		const sql = `
 			INSERT INTO group_members (id, group_id, user_id, member_role, joined_at, added_by, join_method)
 			VALUES ($1, $2, $3, $4, $5, $6, $7)
