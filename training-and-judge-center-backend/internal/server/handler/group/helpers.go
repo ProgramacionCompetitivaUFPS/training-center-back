@@ -7,6 +7,7 @@ import (
 
 	appGroup "github.com/training-judge-center/backend/internal/application/group"
 	domainGroup "github.com/training-judge-center/backend/internal/domain/group"
+	"github.com/training-judge-center/backend/internal/domain/shared"
 	"github.com/training-judge-center/backend/internal/server/handler"
 	"github.com/training-judge-center/backend/pkg/apperror"
 )
@@ -62,4 +63,12 @@ func memberRoleValueToStringPtr(r domainGroup.MemberRole) *string {
 	}
 	s := string(r)
 	return &s
+}
+
+func userIDPtrToStringPtr(uid *shared.UserID) *string {
+	if uid == nil {
+		return nil
+	}
+	v := uid.Value()
+	return &v
 }

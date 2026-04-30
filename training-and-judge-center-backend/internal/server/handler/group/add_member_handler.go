@@ -41,17 +41,13 @@ func (h *Handler) AddMember(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	addedBy := ""
-	if ab := out.Member.AddedBy(); ab != nil {
-		addedBy = ab.Value()
-	}
 	handler.WriteJSON(w, http.StatusCreated, addMemberResp{
 		GroupID:    out.Member.GroupID(),
 		UserID:     out.Member.UserID().Value(),
 		Nickname:   out.Nickname,
 		Role:       string(out.Member.Role()),
 		JoinedAt:   out.Member.JoinedAt().Format(time.RFC3339),
-		AddedBy:    addedBy,
+		AddedBy:    userIDPtrToStringPtr(out.Member.AddedBy()),
 		JoinMethod: string(out.Member.JoinMethod()),
 	})
 }
