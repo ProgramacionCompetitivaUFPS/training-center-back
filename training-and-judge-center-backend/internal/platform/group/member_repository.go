@@ -3,7 +3,9 @@ package group
 import (
 	"context"
 	"errors"
+	"fmt"
 	"log/slog"
+	"strings"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -53,20 +55,37 @@ func (r *MemberRepository) SaveAll(ctx context.Context, members []*domainGroup.G
 	if len(members) == 0 {
 		return nil
 	}
+
+	const colCount = 7
+	const maxBatchSize = 65535 / colCount // PostgreSQL hard limit: 65535 bind parameters
+
+	if len(members) > maxBatchSize {
+		slog.ErrorContext(ctx, "MemberRepository.SaveAll: batch too large", "count", len(members), "max", maxBatchSize)
+		return apperror.NewInternal()
+	}
+
 	q := infraPostgres.GetQuerier(ctx, r.db)
-	for _, m := range members {
-		addedByID := userIDToPtr(m.AddedBy())
-		const sql = `
-			INSERT INTO group_members (id, group_id, user_id, member_role, joined_at, added_by, join_method)
-			VALUES ($1, $2, $3, $4, $5, $6, $7)
-			ON CONFLICT (id) DO NOTHING`
-		if _, err := q.Exec(ctx, sql,
+	args := make([]any, 0, len(members)*colCount)
+	placeholders := make([]string, 0, len(members))
+
+	for i, m := range members {
+		base := i * colCount
+		placeholders = append(placeholders, fmt.Sprintf(
+			"($%d,$%d,$%d,$%d,$%d,$%d,$%d)",
+			base+1, base+2, base+3, base+4, base+5, base+6, base+7,
+		))
+		args = append(args,
 			m.ID(), m.GroupID(), m.UserID().Value(),
-			string(m.Role()), m.JoinedAt(), addedByID, string(m.JoinMethod()),
-		); err != nil {
-			slog.ErrorContext(ctx, "MemberRepository.SaveAll failed", "error", err)
-			return apperror.NewInternal()
-		}
+			string(m.Role()), m.JoinedAt(), userIDToPtr(m.AddedBy()), string(m.JoinMethod()),
+		)
+	}
+
+	sql := `INSERT INTO group_members (id, group_id, user_id, member_role, joined_at, added_by, join_method) VALUES ` +
+		strings.Join(placeholders, ",") +
+		` ON CONFLICT (id) DO NOTHING`
+	if _, err := q.Exec(ctx, sql, args...); err != nil {
+		slog.ErrorContext(ctx, "MemberRepository.SaveAll failed", "error", err)
+		return apperror.NewInternal()
 	}
 	return nil
 }
