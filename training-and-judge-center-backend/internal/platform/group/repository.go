@@ -244,6 +244,7 @@ func (r *GroupRepository) List(ctx context.Context, filters domainGroup.ListFilt
 	return result, total, nil
 }
 
+// rowScanner abstracts pgx.Row and pgx.Rows so scan helpers work with both.
 type rowScanner interface {
 	Scan(dest ...any) error
 }
