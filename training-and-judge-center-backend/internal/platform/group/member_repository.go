@@ -34,13 +34,12 @@ func userIDToPtr(uid *shared.UserID) *string {
 	return &v
 }
 
+const insertGroupMemberPrefix = `INSERT INTO group_members (id, group_id, user_id, member_role, joined_at, added_by, join_method) VALUES `
+
 func (r *MemberRepository) Save(ctx context.Context, m *domainGroup.GroupMember) error {
 	q := infraPostgres.GetQuerier(ctx, r.db)
 	addedByID := userIDToPtr(m.AddedBy())
-	const sql = `
-		INSERT INTO group_members (id, group_id, user_id, member_role, joined_at, added_by, join_method)
-		VALUES ($1, $2, $3, $4, $5, $6, $7)
-		ON CONFLICT (id) DO UPDATE SET member_role = EXCLUDED.member_role`
+	sql := insertGroupMemberPrefix + `($1,$2,$3,$4,$5,$6,$7) ON CONFLICT (id) DO UPDATE SET member_role = EXCLUDED.member_role`
 	if _, err := q.Exec(ctx, sql,
 		m.ID(), m.GroupID(), m.UserID().Value(),
 		string(m.Role()), m.JoinedAt(), addedByID, string(m.JoinMethod()),
@@ -80,9 +79,7 @@ func (r *MemberRepository) SaveAll(ctx context.Context, members []*domainGroup.G
 		)
 	}
 
-	sql := `INSERT INTO group_members (id, group_id, user_id, member_role, joined_at, added_by, join_method) VALUES ` +
-		strings.Join(placeholders, ",") +
-		` ON CONFLICT (id) DO NOTHING`
+	sql := insertGroupMemberPrefix + strings.Join(placeholders, ",") + ` ON CONFLICT (id) DO NOTHING`
 	if _, err := q.Exec(ctx, sql, args...); err != nil {
 		slog.ErrorContext(ctx, "MemberRepository.SaveAll failed", "error", err)
 		return apperror.NewInternal()
@@ -117,7 +114,10 @@ func (r *MemberRepository) Delete(_ context.Context, _ string, _ shared.UserID) 
 func (r *MemberRepository) CountLeads(ctx context.Context, groupID string) (int, error) {
 	q := infraPostgres.GetQuerier(ctx, r.db)
 	var n int
-	err := q.QueryRow(ctx, `SELECT COUNT(*) FROM group_members WHERE group_id = $1 AND member_role = 'LEAD' AND removed_at IS NULL`, groupID).Scan(&n)
+	err := q.QueryRow(ctx,
+		`SELECT COUNT(*) FROM group_members WHERE group_id = $1 AND member_role = $2 AND removed_at IS NULL`,
+		groupID, string(domainGroup.MemberRoleLead),
+	).Scan(&n)
 	if err != nil {
 		slog.ErrorContext(ctx, "CountLeads failed", "error", err)
 		return 0, apperror.NewInternal()
@@ -138,8 +138,8 @@ func (r *MemberRepository) CountMembers(ctx context.Context, groupID string) (in
 
 func (r *MemberRepository) ListLeads(ctx context.Context, groupID string) ([]*domainGroup.GroupMember, error) {
 	q := infraPostgres.GetQuerier(ctx, r.db)
-	sql := `SELECT ` + selectMemberCols + ` FROM group_members WHERE group_id = $1 AND member_role = 'LEAD' AND removed_at IS NULL ORDER BY joined_at ASC`
-	rows, err := q.Query(ctx, sql, groupID)
+	sql := `SELECT ` + selectMemberCols + ` FROM group_members WHERE group_id = $1 AND member_role = $2 AND removed_at IS NULL ORDER BY joined_at ASC`
+	rows, err := q.Query(ctx, sql, groupID, string(domainGroup.MemberRoleLead))
 	if err != nil {
 		slog.ErrorContext(ctx, "ListLeads failed", "error", err)
 		return nil, apperror.NewInternal()
