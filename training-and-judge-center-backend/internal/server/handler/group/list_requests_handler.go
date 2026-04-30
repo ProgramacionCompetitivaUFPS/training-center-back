@@ -41,6 +41,6 @@ func (h *Handler) ListJoinRequests(w http.ResponseWriter, r *http.Request) {
 
 	handler.WriteJSON(w, http.StatusOK, listRequestsResponse{
 		Requests:   items,
-		Pagination: buildPagination(out.Total, 1, out.TotalPages, limit),
+		Pagination: buildPagination(out.Total, page, out.TotalPages, limit),
 	})
 }

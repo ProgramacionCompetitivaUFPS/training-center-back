@@ -2,6 +2,7 @@ package group
 
 import (
 	"encoding/json"
+	"io"
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
@@ -24,7 +25,7 @@ func (h *Handler) RequestJoin(w http.ResponseWriter, r *http.Request) {
 	groupID := chi.URLParam(r, "groupId")
 
 	var body requestJoinBody
-	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil && err != io.EOF {
 		handler.WriteJSON(w, http.StatusBadRequest, apperror.AppError{
 			Code:    apperror.ErrCodeValidationError,
 			Message: "Invalid request body",

@@ -55,17 +55,3 @@ func (uc *RejectRequestUseCase) Execute(ctx context.Context, input RejectRequest
 
 	return &RejectRequestOutput{Request: req}, nil
 }
-
-func requireLeadOrAdmin(ctx context.Context, memberRepo domainGroup.MemberRepository, groupID string, caller shared.CurrentUser) error {
-	if caller.IsAdmin() {
-		return nil
-	}
-	member, err := memberRepo.FindByGroupAndUser(ctx, groupID, shared.RestoreUserID(caller.ID))
-	if err != nil {
-		return err
-	}
-	if member == nil || !member.IsLead() {
-		return apperror.NewForbidden(domainGroup.ErrCodeInsufficientPermissions, "only leads can manage join requests")
-	}
-	return nil
-}

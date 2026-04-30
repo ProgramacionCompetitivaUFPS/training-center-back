@@ -47,27 +47,22 @@ func (uc *ApproveRequestUseCase) Execute(ctx context.Context, input ApproveReque
 		return nil, apperror.NewNotFound(domainGroup.ErrCodeRequestNotFound, "join request not found")
 	}
 
-	if err := req.Approve(); err != nil {
-		return nil, err
-	}
-
-	var alreadyMember bool
 	if err := uc.txManager.WithTx(ctx, func(ctx context.Context) error {
 		existing, err := uc.memberRepo.FindByGroupAndUser(ctx, input.GroupID, req.RequesterUserID())
 		if err != nil {
 			return err
 		}
 		if existing != nil {
-			alreadyMember = true
+			return apperror.NewConflict(domainGroup.ErrCodeAlreadyMember, "user is already a member of this group")
+		}
+
+		if err := req.Approve(); err != nil {
+			return err
 		}
 
 		if err := uc.joinRequestRepo.Save(ctx, req); err != nil {
 			slog.ErrorContext(ctx, "failed to save approved request", "error", err)
 			return apperror.NewInternal()
-		}
-
-		if alreadyMember {
-			return nil
 		}
 
 		newMember, err := domainGroup.NewGroupMember(uuid.New().String(), input.GroupID, req.RequesterUserID(), domainGroup.MemberRoleMember, nil)
@@ -77,10 +72,6 @@ func (uc *ApproveRequestUseCase) Execute(ctx context.Context, input ApproveReque
 		return uc.memberRepo.Save(ctx, newMember)
 	}); err != nil {
 		return nil, err
-	}
-
-	if alreadyMember {
-		return nil, apperror.NewConflict(domainGroup.ErrCodeAlreadyMember, "user is already a member of this group")
 	}
 
 	return &ApproveRequestOutput{Request: req}, nil

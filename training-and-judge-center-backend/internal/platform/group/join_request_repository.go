@@ -56,7 +56,7 @@ func (r *JoinRequestRepository) FindByID(ctx context.Context, id string) (*domai
 		SELECT id, group_id, requester_user_id, message, status, created_at
 		FROM join_requests WHERE id = $1
 	`
-	req, err := scanJoinRequest(r.db.QueryRow(ctx, q, id))
+	req, err := scanJoinRequest(r.dbFor(ctx).QueryRow(ctx, q, id))
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, nil
@@ -68,6 +68,9 @@ func (r *JoinRequestRepository) FindByID(ctx context.Context, id string) (*domai
 }
 
 func (r *JoinRequestRepository) FindByGroupAndUser(ctx context.Context, groupID string, userID shared.UserID) (*domainGroup.JoinRequest, error) {
+	// PENDING is sorted first: a user can have at most one pending request
+	// (enforced by idx_join_requests_pending), but historical closed requests
+	// remain in the table. Callers expect the pending record when one exists.
 	const q = `
 		SELECT id, group_id, requester_user_id, message, status, created_at
 		FROM join_requests
@@ -75,7 +78,7 @@ func (r *JoinRequestRepository) FindByGroupAndUser(ctx context.Context, groupID 
 		ORDER BY CASE WHEN status = 'PENDING' THEN 0 ELSE 1 END, created_at DESC
 		LIMIT 1
 	`
-	req, err := scanJoinRequest(r.db.QueryRow(ctx, q, groupID, userID.Value()))
+	req, err := scanJoinRequest(r.dbFor(ctx).QueryRow(ctx, q, groupID, userID.Value()))
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, nil
@@ -87,6 +90,7 @@ func (r *JoinRequestRepository) FindByGroupAndUser(ctx context.Context, groupID 
 }
 
 func (r *JoinRequestRepository) FindByGroup(ctx context.Context, groupID string, filters domainGroup.JoinRequestFilters) ([]*domainGroup.JoinRequest, int, error) {
+	db := r.dbFor(ctx)
 	args := []any{groupID}
 	idx := 2
 	where := "group_id = $1"
@@ -99,7 +103,7 @@ func (r *JoinRequestRepository) FindByGroup(ctx context.Context, groupID string,
 
 	countQuery := fmt.Sprintf("SELECT COUNT(*) FROM join_requests WHERE %s", where)
 	var total int
-	if err := r.db.QueryRow(ctx, countQuery, args...).Scan(&total); err != nil {
+	if err := db.QueryRow(ctx, countQuery, args...).Scan(&total); err != nil {
 		slog.ErrorContext(ctx, "JoinRequestRepository.FindByGroup count failed", "error", err)
 		return nil, 0, apperror.NewInternal()
 	}
@@ -121,7 +125,7 @@ func (r *JoinRequestRepository) FindByGroup(ctx context.Context, groupID string,
 		LIMIT $%d OFFSET $%d
 	`, where, idx, idx+1)
 
-	rows, err := r.db.Query(ctx, selectQuery, selectArgs...)
+	rows, err := db.Query(ctx, selectQuery, selectArgs...)
 	if err != nil {
 		slog.ErrorContext(ctx, "JoinRequestRepository.FindByGroup query failed", "error", err)
 		return nil, 0, apperror.NewInternal()
@@ -138,6 +142,7 @@ func (r *JoinRequestRepository) FindByGroup(ctx context.Context, groupID string,
 		out = append(out, req)
 	}
 	if err := rows.Err(); err != nil {
+		slog.ErrorContext(ctx, "JoinRequestRepository.FindByGroup rows error", "error", err)
 		return nil, 0, apperror.NewInternal()
 	}
 	if out == nil {
@@ -147,13 +152,13 @@ func (r *JoinRequestRepository) FindByGroup(ctx context.Context, groupID string,
 }
 
 func (r *JoinRequestRepository) Delete(ctx context.Context, id string) error {
-	tag, err := r.db.Exec(ctx, `DELETE FROM join_requests WHERE id = $1`, id)
+	tag, err := r.dbFor(ctx).Exec(ctx, `DELETE FROM join_requests WHERE id = $1 AND status = 'PENDING'`, id)
 	if err != nil {
 		slog.ErrorContext(ctx, "JoinRequestRepository.Delete failed", "error", err)
 		return apperror.NewInternal()
 	}
 	if tag.RowsAffected() == 0 {
-		return apperror.NewNotFound(domainGroup.ErrCodeRequestNotFound, "join request not found")
+		return apperror.NewConflict(domainGroup.ErrCodeRequestAlreadyProcessed, "join request has already been processed")
 	}
 	return nil
 }
@@ -182,6 +187,7 @@ func scanJoinRequest(row joinRequestScanner) (*domainGroup.JoinRequest, error) {
 type joinRequestDBQuerier interface {
 	Exec(ctx context.Context, sql string, arguments ...any) (pgconn.CommandTag, error)
 	QueryRow(ctx context.Context, sql string, args ...any) pgx.Row
+	Query(ctx context.Context, sql string, args ...any) (pgx.Rows, error)
 }
 
 func (r *JoinRequestRepository) dbFor(ctx context.Context) joinRequestDBQuerier {

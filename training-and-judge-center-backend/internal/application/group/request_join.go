@@ -39,6 +39,9 @@ func (uc *RequestJoinUseCase) Execute(ctx context.Context, input RequestJoinInpu
 	if err != nil {
 		return nil, err
 	}
+	if g == nil {
+		return nil, apperror.NewNotFound(domainGroup.ErrCodeGroupNotFound, "group not found")
+	}
 
 	if g.Visibility() == domainGroup.VisibilityNotVisible {
 		return nil, apperror.NewNotFound(domainGroup.ErrCodeGroupNotFound, "group not found")

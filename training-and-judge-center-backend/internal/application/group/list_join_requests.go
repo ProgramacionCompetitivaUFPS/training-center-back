@@ -13,11 +13,6 @@ const (
 	maxRequestsPageLimit     = 100
 )
 
-type JoinRequestDetail struct {
-	Request *domainGroup.JoinRequest
-	Display *UserDisplay
-}
-
 type ListJoinRequestsInput struct {
 	GroupID     string
 	Status      string

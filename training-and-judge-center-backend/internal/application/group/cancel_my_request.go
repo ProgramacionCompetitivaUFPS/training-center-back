@@ -2,7 +2,6 @@ package group
 
 import (
 	"context"
-	"log/slog"
 
 	domainGroup "github.com/training-judge-center/backend/internal/domain/group"
 	"github.com/training-judge-center/backend/internal/domain/shared"
@@ -36,10 +35,5 @@ func (uc *CancelMyRequestUseCase) Execute(ctx context.Context, input CancelMyReq
 		return apperror.NewBadRequest(domainGroup.ErrCodeRequestAlreadyProcessed, "cannot cancel a request that has already been processed")
 	}
 
-	if err := uc.joinRequestRepo.Delete(ctx, req.ID()); err != nil {
-		slog.ErrorContext(ctx, "failed to delete join request", "error", err)
-		return apperror.NewInternal()
-	}
-
-	return nil
+	return uc.joinRequestRepo.Delete(ctx, req.ID())
 }
