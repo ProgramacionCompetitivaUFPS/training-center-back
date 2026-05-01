@@ -1,0 +1,47 @@
+training-and-judge-center-backend/internal/server/router.go
+  962ac9301344f275 6,29,32-38
+training-and-judge-center-backend/docker-compose.yml
+  8046308510b0e716 34-56,60-61,81,108-110
+training-and-judge-center-backend/nginx/conf.d/default.conf
+  8046308510b0e716 1-12
+training-and-judge-center-backend/internal/config/config.go
+  962ac9301344f275 7,32,57,85-96
+training-and-judge-center-backend/.env.example
+  962ac9301344f275 32-34
+  8046308510b0e716 35-38
+training-and-judge-center-backend/cmd/api/main.go
+  962ac9301344f275 216
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.3.4",
+  "base_commit_sha": "3ac34ee0e8577373402052d558b51db912bb80d5",
+  "prompts": {
+    "8046308510b0e716": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "2e144fda-f89e-47c4-a14f-564aedc9dc32",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "AlexaVJ",
+      "messages": [],
+      "total_additions": 47,
+      "total_deletions": 4,
+      "accepted_lines": 45,
+      "overriden_lines": 0
+    },
+    "962ac9301344f275": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "0e523b56-2def-4f52-9b83-1bfdf56655e2",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "AlexaVJ",
+      "messages": [],
+      "total_additions": 623,
+      "total_deletions": 2,
+      "accepted_lines": 28,
+      "overriden_lines": 0
+    }
+  }
+}
