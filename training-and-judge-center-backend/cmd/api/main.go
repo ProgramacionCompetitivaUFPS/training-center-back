@@ -213,7 +213,7 @@ func main() {
 	}, &server.Services{
 		TokenService:       jwtService,
 		SessionInvalidator: sessionInvalidator,
-	})
+	}, cfg.AllowedOrigins)
 
 	slog.Info("server starting", "port", cfg.Port)
 	if err := http.ListenAndServe(fmt.Sprintf(":%s", cfg.Port), router); err != nil {
