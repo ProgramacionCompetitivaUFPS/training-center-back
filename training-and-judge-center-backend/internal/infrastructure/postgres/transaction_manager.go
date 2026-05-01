@@ -2,7 +2,9 @@ package postgres
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"log/slog"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -25,7 +27,11 @@ func (tm *PostgresTransactionManager) WithTx(ctx context.Context, fn func(ctx co
 	if err != nil {
 		return fmt.Errorf("failed to begin transaction: %w", err)
 	}
-	defer tx.Rollback(ctx)
+	defer func() {
+		if rbErr := tx.Rollback(ctx); rbErr != nil && !errors.Is(rbErr, pgx.ErrTxClosed) {
+			slog.ErrorContext(ctx, "failed to rollback transaction", "error", rbErr)
+		}
+	}()
 
 	txCtx := context.WithValue(ctx, txContextKey, tx)
 	if err := fn(txCtx); err != nil {
@@ -39,13 +45,9 @@ func (tm *PostgresTransactionManager) WithTx(ctx context.Context, fn func(ctx co
 	return nil
 }
 
-func txFromContext(ctx context.Context) pgx.Tx {
+func TxFromContext(ctx context.Context) pgx.Tx {
 	if tx, ok := ctx.Value(txContextKey).(pgx.Tx); ok {
 		return tx
 	}
 	return nil
-}
-
-func TxFromContext(ctx context.Context) pgx.Tx {
-	return txFromContext(ctx)
 }

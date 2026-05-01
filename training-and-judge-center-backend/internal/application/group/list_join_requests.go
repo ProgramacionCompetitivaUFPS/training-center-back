@@ -2,6 +2,7 @@ package group
 
 import (
 	"context"
+	"log/slog"
 
 	domainGroup "github.com/training-judge-center/backend/internal/domain/group"
 	"github.com/training-judge-center/backend/internal/domain/shared"
@@ -89,6 +90,7 @@ func (uc *ListJoinRequestsUseCase) Execute(ctx context.Context, input ListJoinRe
 	}
 	displays, err := uc.userProvider.GetDisplays(ctx, userIDs)
 	if err != nil {
+		slog.ErrorContext(ctx, "failed to get user displays for join requests", "error", err)
 		return nil, apperror.NewInternal()
 	}
 
@@ -96,6 +98,7 @@ func (uc *ListJoinRequestsUseCase) Execute(ctx context.Context, input ListJoinRe
 	for _, r := range requests {
 		d := displays[r.RequesterUserID().Value()]
 		if d == nil {
+			slog.ErrorContext(ctx, "user display not found for join request", "user_id", r.RequesterUserID().Value())
 			d = &UserDisplay{Nickname: "unknown"}
 		}
 		details = append(details, JoinRequestDetail{Request: r, Display: d})

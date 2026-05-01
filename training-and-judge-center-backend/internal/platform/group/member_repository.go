@@ -69,7 +69,7 @@ func (r *MemberRepository) FindByGroup(_ context.Context, _ string, _ domainGrou
 // Callers must check for a nil member before accessing its fields.
 func (r *MemberRepository) FindByGroupAndUser(ctx context.Context, groupID string, userID shared.UserID) (*domainGroup.GroupMember, error) {
 	const q = `SELECT id, group_id, user_id, member_role, joined_at FROM group_members WHERE group_id = $1 AND user_id = $2`
-	m, err := scanMember(r.db.QueryRow(ctx, q, groupID, userID.Value()))
+	m, err := scanMember(memberDBFor(ctx, r.db).QueryRow(ctx, q, groupID, userID.Value()))
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, nil
