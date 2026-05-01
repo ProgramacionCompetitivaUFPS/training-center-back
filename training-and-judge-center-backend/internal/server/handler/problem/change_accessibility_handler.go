@@ -23,6 +23,17 @@ type changeAccessibilityResponse struct {
 	Message       string `json:"message"`
 }
 
+// @Summary      Change problem accessibility
+// @Tags         problems
+// @Accept       json
+// @Produce      json
+// @Security     BearerAuth
+// @Param        slug path string true "Problem slug"
+// @Param        body body changeAccessibilityRequest true "Accessibility value"
+// @Success      200 {object} changeAccessibilityResponse
+// @Failure      400 {object} apperror.AppError
+// @Failure      401 {object} apperror.AppError
+// @Router       /problems/p/{slug}/accessibility [patch]
 func (h *Handler) ChangeAccessibility(w http.ResponseWriter, r *http.Request) {
 	claims := middleware.GetClaims(r.Context())
 	if claims == nil {

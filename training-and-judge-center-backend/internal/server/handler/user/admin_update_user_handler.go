@@ -19,6 +19,18 @@ type adminUpdateUserRequest struct {
 	Role        *string `json:"role"`
 }
 
+// @Summary      Update user (admin)
+// @Tags         admin
+// @Accept       json
+// @Produce      json
+// @Security     BearerAuth
+// @Param        id path string true "User ID"
+// @Param        body body adminUpdateUserRequest true "Fields to update"
+// @Success      200 {object} fullUserResponse
+// @Failure      400 {object} apperror.AppError
+// @Failure      401 {object} apperror.AppError
+// @Failure      403 {object} apperror.AppError
+// @Router       /admin/users/{id} [put]
 func (h *UserHandler) AdminUpdateUser(w http.ResponseWriter, r *http.Request) {
 	targetID := chi.URLParam(r, "id")
 

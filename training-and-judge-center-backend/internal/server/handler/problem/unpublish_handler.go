@@ -16,6 +16,15 @@ type unpublishResponse struct {
 	Message string `json:"message"`
 }
 
+// @Summary      Unpublish problem
+// @Tags         problems
+// @Produce      json
+// @Security     BearerAuth
+// @Param        slug path string true "Problem slug"
+// @Success      200 {object} unpublishResponse
+// @Failure      401 {object} apperror.AppError
+// @Failure      404 {object} apperror.AppError
+// @Router       /problems/p/{slug}/unpublish [post]
 func (h *Handler) Unpublish(w http.ResponseWriter, r *http.Request) {
 	claims := middleware.GetClaims(r.Context())
 	if claims == nil {

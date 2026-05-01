@@ -11,6 +11,11 @@ func NewHealthHandler() *HealthHandler {
 	return &HealthHandler{}
 }
 
+// @Summary      Health check
+// @Tags         health
+// @Produce      json
+// @Success      200 {object} map[string]string
+// @Router       /ping [get]
 func (h *HealthHandler) Ping(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)

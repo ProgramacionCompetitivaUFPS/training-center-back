@@ -15,6 +15,16 @@ type requestEmailChangeBody struct {
 	NewEmail string `json:"newEmail"`
 }
 
+// @Summary      Request email change
+// @Tags         users
+// @Accept       json
+// @Produce      json
+// @Security     BearerAuth
+// @Param        body body requestEmailChangeBody true "New email data"
+// @Success      200 {object} map[string]string
+// @Failure      400 {object} apperror.AppError
+// @Failure      401 {object} apperror.AppError
+// @Router       /users/email-change/request [post]
 func (h *UserHandler) RequestEmailChange(w http.ResponseWriter, r *http.Request) {
 	claims := middleware.GetClaims(r.Context())
 	if claims == nil {
@@ -68,6 +78,16 @@ type confirmEmailChangeBody struct {
 	Code string `json:"code"`
 }
 
+// @Summary      Confirm email change
+// @Tags         users
+// @Accept       json
+// @Produce      json
+// @Security     BearerAuth
+// @Param        body body confirmEmailChangeBody true "Confirmation code"
+// @Success      200 {object} map[string]string
+// @Failure      400 {object} apperror.AppError
+// @Failure      401 {object} apperror.AppError
+// @Router       /users/email-change/confirm [post]
 func (h *UserHandler) ConfirmEmailChange(w http.ResponseWriter, r *http.Request) {
 	claims := middleware.GetClaims(r.Context())
 	if claims == nil {

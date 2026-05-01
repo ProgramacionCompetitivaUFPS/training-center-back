@@ -11,6 +11,18 @@ import (
 	"github.com/training-judge-center/backend/pkg/apperror"
 )
 
+// @Summary      List materials
+// @Tags         materials
+// @Produce      json
+// @Security     BearerAuth
+// @Param        groupId path string true "Group ID"
+// @Param        page query int false "Page number"
+// @Param        limit query int false "Items per page"
+// @Param        pinned query bool false "Filter pinned"
+// @Param        tags query string false "Comma-separated tags"
+// @Success      200 {object} listMaterialsResponse
+// @Failure      401 {object} apperror.AppError
+// @Router       /groups/{groupId}/materials [get]
 func (h *Handler) List(w http.ResponseWriter, r *http.Request) {
 	currentUser, ok := h.requireCurrentUser(w, r)
 	if !ok {

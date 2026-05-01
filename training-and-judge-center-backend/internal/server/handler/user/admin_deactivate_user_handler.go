@@ -9,6 +9,15 @@ import (
 	"github.com/training-judge-center/backend/internal/server/middleware"
 )
 
+// @Summary      Deactivate user (admin)
+// @Tags         admin
+// @Produce      json
+// @Security     BearerAuth
+// @Param        id path string true "User ID"
+// @Success      204
+// @Failure      401 {object} apperror.AppError
+// @Failure      403 {object} apperror.AppError
+// @Router       /admin/users/{id}/deactivate [post]
 func (h *UserHandler) AdminDeactivateUser(w http.ResponseWriter, r *http.Request) {
 	claims := middleware.GetClaims(r.Context())
 	if claims == nil {

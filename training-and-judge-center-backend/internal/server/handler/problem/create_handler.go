@@ -22,6 +22,16 @@ type createProblemRequest struct {
 	Tags          []string              `json:"tags"`
 }
 
+// @Summary      Create problem
+// @Tags         problems
+// @Accept       json
+// @Produce      json
+// @Security     BearerAuth
+// @Param        body body createProblemRequest true "Problem data"
+// @Success      201 {object} getProblemResponse
+// @Failure      400 {object} apperror.AppError
+// @Failure      401 {object} apperror.AppError
+// @Router       /problems [post]
 func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
 	claims := middleware.GetClaims(r.Context())
 	if claims == nil {

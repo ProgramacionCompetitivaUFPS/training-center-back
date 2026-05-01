@@ -29,6 +29,13 @@ type publicUserResponse struct {
 	CreatedAt   string `json:"createdAt"`
 }
 
+// @Summary      Get my profile
+// @Tags         users
+// @Produce      json
+// @Security     BearerAuth
+// @Success      200 {object} fullUserResponse
+// @Failure      401 {object} apperror.AppError
+// @Router       /users/me [get]
 func (h *UserHandler) GetMyProfile(w http.ResponseWriter, r *http.Request) {
 	claims := middleware.GetClaims(r.Context())
 	if claims == nil {
@@ -48,6 +55,15 @@ func (h *UserHandler) GetMyProfile(w http.ResponseWriter, r *http.Request) {
 	handler.WriteJSON(w, http.StatusOK, buildFullResponse(result))
 }
 
+// @Summary      Get user by nickname
+// @Tags         users
+// @Produce      json
+// @Security     BearerAuth
+// @Param        nickname path string true "User nickname"
+// @Success      200 {object} fullUserResponse
+// @Failure      401 {object} apperror.AppError
+// @Failure      404 {object} apperror.AppError
+// @Router       /users/{nickname} [get]
 func (h *UserHandler) GetByNickname(w http.ResponseWriter, r *http.Request) {
 	claims := middleware.GetClaims(r.Context())
 	if claims == nil {
