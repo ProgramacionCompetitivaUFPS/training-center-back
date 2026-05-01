@@ -184,7 +184,7 @@ func main() {
 	groupTxManager := infraPostgres.NewPostgresTransactionManager(dbPool)
 
 	// Group use cases
-	createGroupUseCase := appGroup.NewCreateGroupUseCase(groupRepo)
+	createGroupUseCase := appGroup.NewCreateGroupUseCase(groupRepo, groupMemberRepo, groupTxManager)
 	listGroupsUseCase := appGroup.NewListGroupsUseCase(groupRepo, groupMemberRepo)
 	getGroupUseCase := appGroup.NewGetGroupUseCase(groupRepo, groupMemberRepo, groupUserProvider)
 	listMyGroupsUseCase := appGroup.NewListMyGroupsUseCase(groupRepo, groupMemberRepo, groupPrefsReader)

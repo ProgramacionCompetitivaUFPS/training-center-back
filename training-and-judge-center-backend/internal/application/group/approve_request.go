@@ -47,6 +47,10 @@ func (uc *ApproveRequestUseCase) Execute(ctx context.Context, input ApproveReque
 		return nil, apperror.NewNotFound(domainGroup.ErrCodeRequestNotFound, "join request not found")
 	}
 
+	if err := req.Approve(); err != nil {
+		return nil, err
+	}
+
 	if err := uc.txManager.WithTx(ctx, func(ctx context.Context) error {
 		existing, err := uc.memberRepo.FindByGroupAndUser(ctx, input.GroupID, req.RequesterUserID())
 		if err != nil {
@@ -54,10 +58,6 @@ func (uc *ApproveRequestUseCase) Execute(ctx context.Context, input ApproveReque
 		}
 		if existing != nil {
 			return apperror.NewConflict(domainGroup.ErrCodeAlreadyMember, "user is already a member of this group")
-		}
-
-		if err := req.Approve(); err != nil {
-			return err
 		}
 
 		if err := uc.joinRequestRepo.Save(ctx, req); err != nil {
