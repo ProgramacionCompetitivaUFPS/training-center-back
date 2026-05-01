@@ -1,7 +1,7 @@
 -- +goose Up
 
 -- Usuario sistema: referencia interna para entidades de sistema.
--- status=INACTIVE + email=NULL pasa el CHECK constraint de users
+-- status=DEACTIVATED + email=NULL pasa el CHECK constraint de users
 -- (que exige email solo cuando status='ACTIVE').
 -- ON CONFLICT DO NOTHING garantiza idempotencia en re-ejecuciones.
 INSERT INTO users (
@@ -17,7 +17,7 @@ INSERT INTO users (
     'N/A',
     'N/A',
     'ADMIN',
-    'INACTIVE',
+    'DEACTIVATED',
     NOW()
 ) ON CONFLICT (id) DO NOTHING;
 

@@ -25,7 +25,7 @@ type ConfirmDeactivationUseCase struct {
 	auditRepo          user.DeactivationAuditLogRepository
 	emailSender        notification.EmailSender
 	sessionInvalidator user.SessionInvalidator
-	txManager          user.TransactionManager
+	txManager          TransactionManager
 }
 
 func NewConfirmDeactivationUseCase(
@@ -34,7 +34,7 @@ func NewConfirmDeactivationUseCase(
 	auditRepo user.DeactivationAuditLogRepository,
 	emailSender notification.EmailSender,
 	sessionInvalidator user.SessionInvalidator,
-	txManager user.TransactionManager,
+	txManager TransactionManager,
 ) *ConfirmDeactivationUseCase {
 	return &ConfirmDeactivationUseCase{
 		userRepo:           userRepo,

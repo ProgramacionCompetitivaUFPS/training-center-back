@@ -22,14 +22,14 @@ type ResetPasswordUseCase struct {
 	userRepo           user.UserRepository
 	recoveryRepo       user.PasswordRecoveryRepository
 	sessionInvalidator user.SessionInvalidator
-	txManager          user.TransactionManager
+	txManager          TransactionManager
 }
 
 func NewResetPasswordUseCase(
 	userRepo user.UserRepository,
 	recoveryRepo user.PasswordRecoveryRepository,
 	sessionInvalidator user.SessionInvalidator,
-	txManager user.TransactionManager,
+	txManager TransactionManager,
 ) *ResetPasswordUseCase {
 	return &ResetPasswordUseCase{
 		userRepo:           userRepo,

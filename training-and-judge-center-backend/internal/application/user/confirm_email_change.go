@@ -21,14 +21,14 @@ type ConfirmEmailChangeUseCase struct {
 	userRepo        user.UserRepository
 	emailChangeRepo user.EmailChangeRepository
 	emailSender     notification.EmailSender
-	txManager       user.TransactionManager
+	txManager       TransactionManager
 }
 
 func NewConfirmEmailChangeUseCase(
 	userRepo user.UserRepository,
 	emailChangeRepo user.EmailChangeRepository,
 	emailSender notification.EmailSender,
-	txManager user.TransactionManager,
+	txManager TransactionManager,
 ) *ConfirmEmailChangeUseCase {
 	return &ConfirmEmailChangeUseCase{
 		userRepo:        userRepo,

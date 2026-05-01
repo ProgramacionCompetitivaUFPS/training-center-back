@@ -13,6 +13,7 @@ import (
 
 	domainGroup "github.com/training-judge-center/backend/internal/domain/group"
 	"github.com/training-judge-center/backend/internal/domain/shared"
+	infraPostgres "github.com/training-judge-center/backend/internal/infrastructure/postgres"
 	"github.com/training-judge-center/backend/pkg/apperror"
 )
 
@@ -25,11 +26,12 @@ func NewMemberRepository(db *pgxpool.Pool) *MemberRepository {
 }
 
 func (r *MemberRepository) Save(ctx context.Context, m *domainGroup.GroupMember) error {
-	const q = `INSERT INTO group_members (id, group_id, user_id, member_role, joined_at)
-	           VALUES ($1, $2, $3, $4, $5)`
-	_, err := r.db.Exec(ctx, q,
-		m.ID(), m.GroupID(), m.UserID().Value(), string(m.Role()), m.JoinedAt(),
-	)
+	const q = `
+		INSERT INTO group_members (id, group_id, user_id, member_role, joined_at)
+		VALUES ($1, $2, $3, $4, $5)
+	`
+	db := memberDBFor(ctx, r.db)
+	_, err := db.Exec(ctx, q, m.ID(), m.GroupID(), m.UserID().Value(), m.Role().String(), m.JoinedAt())
 	if err != nil {
 		var pgErr *pgconn.PgError
 		if errors.As(err, &pgErr) && pgErr.Code == "23505" && pgErr.ConstraintName == "group_members_group_id_user_id_key" {
@@ -41,6 +43,18 @@ func (r *MemberRepository) Save(ctx context.Context, m *domainGroup.GroupMember)
 		return apperror.NewInternal()
 	}
 	return nil
+}
+
+type memberDBQuerier interface {
+	Exec(ctx context.Context, sql string, arguments ...any) (pgconn.CommandTag, error)
+	QueryRow(ctx context.Context, sql string, args ...any) pgx.Row
+}
+
+func memberDBFor(ctx context.Context, pool *pgxpool.Pool) memberDBQuerier {
+	if tx := infraPostgres.TxFromContext(ctx); tx != nil {
+		return tx
+	}
+	return pool
 }
 
 func (r *MemberRepository) SaveAll(_ context.Context, _ []*domainGroup.GroupMember) error {
@@ -55,7 +69,7 @@ func (r *MemberRepository) FindByGroup(_ context.Context, _ string, _ domainGrou
 // Callers must check for a nil member before accessing its fields.
 func (r *MemberRepository) FindByGroupAndUser(ctx context.Context, groupID string, userID shared.UserID) (*domainGroup.GroupMember, error) {
 	const q = `SELECT id, group_id, user_id, member_role, joined_at FROM group_members WHERE group_id = $1 AND user_id = $2`
-	m, err := scanMember(r.db.QueryRow(ctx, q, groupID, userID.Value()))
+	m, err := scanMember(memberDBFor(ctx, r.db).QueryRow(ctx, q, groupID, userID.Value()))
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, nil

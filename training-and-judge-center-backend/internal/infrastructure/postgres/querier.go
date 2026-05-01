@@ -14,7 +14,7 @@ type Querier interface {
 }
 
 func GetQuerier(ctx context.Context, defaultQuerier Querier) Querier {
-	if tx := txFromContext(ctx); tx != nil {
+	if tx := TxFromContext(ctx); tx != nil {
 		return tx
 	}
 	return defaultQuerier

@@ -19,4 +19,7 @@ const (
 	ErrCodeInvalidVisibility        = "INVALID_VISIBILITY"
 	ErrCodeInvalidMemberRole        = "INVALID_MEMBER_ROLE"
 	ErrCodeRoleUnchanged            = "ROLE_UNCHANGED"
+	ErrCodeRequestAlreadyProcessed  = "REQUEST_ALREADY_PROCESSED"
+	ErrCodeRequestAlreadyPending    = "REQUEST_ALREADY_PENDING"
+	ErrCodeRequestNotFound          = "REQUEST_NOT_FOUND"
 )
