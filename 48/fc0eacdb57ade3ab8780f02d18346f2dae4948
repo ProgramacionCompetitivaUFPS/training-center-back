@@ -1,0 +1,40 @@
+training-and-judge-center-backend/internal/server/handler/group/cancel_my_request_handler.go
+  9c709a6947be540a 11-20
+training-and-judge-center-backend/internal/server/handler/group/update_request_handler.go
+  9c709a6947be540a 18-31
+training-and-judge-center-backend/internal/server/handler/group/request_join_handler.go
+  9c709a6947be540a 19-31
+"training-and-judge-center-backend/Training & Judge Center API.yml"
+  9c709a6947be540a 1706-1774
+training-and-judge-center-backend/internal/server/handler/group/get_my_request_handler.go
+  9c709a6947be540a 11-19
+training-and-judge-center-backend/.gitignore
+  h_d193fb36118fbd 40-43
+training-and-judge-center-backend/internal/server/handler/group/list_requests_handler.go
+  9c709a6947be540a 11-24
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.3.4",
+  "base_commit_sha": "48fc0eacdb57ade3ab8780f02d18346f2dae4948",
+  "prompts": {
+    "9c709a6947be540a": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "c775a491-0819-4bbe-85db-f732ddf934d3",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "AlexaVJ",
+      "messages": [],
+      "total_additions": 9073,
+      "total_deletions": 10957,
+      "accepted_lines": 206,
+      "overriden_lines": 0
+    }
+  },
+  "humans": {
+    "h_d193fb36118fbd": {
+      "author": "AlexaVJ"
+    }
+  }
+}
