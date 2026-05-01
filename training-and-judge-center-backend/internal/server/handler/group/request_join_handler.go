@@ -16,6 +16,19 @@ type requestJoinBody struct {
 	Message *string `json:"message"`
 }
 
+// @Summary      Request to join a group
+// @Tags         groups
+// @Accept       json
+// @Produce      json
+// @Security     BearerAuth
+// @Param        groupId path string true "Group ID"
+// @Param        body body requestJoinBody false "Optional message"
+// @Success      201 {object} joinRequestResp
+// @Failure      400 {object} apperror.AppError
+// @Failure      401 {object} apperror.AppError
+// @Failure      404 {object} apperror.AppError
+// @Failure      409 {object} apperror.AppError
+// @Router       /groups/{groupId}/requests [post]
 func (h *Handler) RequestJoin(w http.ResponseWriter, r *http.Request) {
 	caller, ok := h.requireCurrentUser(w, r)
 	if !ok {

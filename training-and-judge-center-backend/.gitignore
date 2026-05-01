@@ -37,3 +37,7 @@ Thumbs.db
 # E2E test temp files
 tmp_e2e_*
 tmp_dummy_*
+
+# docs
+docs/swagger.json
+docs/swagger.yaml
