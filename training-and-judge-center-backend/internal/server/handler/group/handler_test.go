@@ -132,7 +132,7 @@ func stubHandler() *Handler {
 	joinRequestRepo := &stubJoinRequestRepo{}
 	txMgr := &stubTxManager{}
 	return NewHandler(
-		appGroup.NewCreateGroupUseCase(repo),
+		appGroup.NewCreateGroupUseCase(repo, memberRepo, txMgr),
 		appGroup.NewListGroupsUseCase(repo, memberRepo),
 		appGroup.NewGetGroupUseCase(repo, memberRepo, &stubUserProvider{}),
 		appGroup.NewListMyGroupsUseCase(repo, memberRepo, &stubPrefsReader{}),
@@ -237,7 +237,7 @@ func TestGetGroup_NotFoundReturns404(t *testing.T) {
 		},
 	}
 	h := NewHandler(
-		appGroup.NewCreateGroupUseCase(repo),
+		appGroup.NewCreateGroupUseCase(repo, &stubMemberRepo{}, &stubTxManager{}),
 		appGroup.NewListGroupsUseCase(repo, &stubMemberRepo{}),
 		appGroup.NewGetGroupUseCase(repo, &stubMemberRepo{}, &stubUserProvider{}),
 		appGroup.NewListMyGroupsUseCase(repo, &stubMemberRepo{}, &stubPrefsReader{}),
@@ -272,7 +272,7 @@ func TestGetGroup_NonMemberHasNilRoleAndJoinedAt(t *testing.T) {
 	}
 	// FindByGroupAndUser returns nil, nil — viewer is not a member
 	h := NewHandler(
-		appGroup.NewCreateGroupUseCase(repo),
+		appGroup.NewCreateGroupUseCase(repo, &stubMemberRepo{}, &stubTxManager{}),
 		appGroup.NewListGroupsUseCase(repo, &stubMemberRepo{}),
 		appGroup.NewGetGroupUseCase(repo, &stubMemberRepo{}, &stubUserProvider{}),
 		appGroup.NewListMyGroupsUseCase(repo, &stubMemberRepo{}, &stubPrefsReader{}),
@@ -319,7 +319,7 @@ func TestGetGroup_ResponseShape(t *testing.T) {
 		findByIDFn: func(_ string) (*domainGroup.Group, error) { return g, nil },
 	}
 	h := NewHandler(
-		appGroup.NewCreateGroupUseCase(repo),
+		appGroup.NewCreateGroupUseCase(repo, &stubMemberRepo{}, &stubTxManager{}),
 		appGroup.NewListGroupsUseCase(repo, &stubMemberRepo{}),
 		appGroup.NewGetGroupUseCase(repo, &stubMemberRepo{}, &stubUserProvider{}),
 		appGroup.NewListMyGroupsUseCase(repo, &stubMemberRepo{}, &stubPrefsReader{}),
@@ -468,7 +468,7 @@ func TestCreate_DuplicateNameReturns409(t *testing.T) {
 		existsByNameFn: func(_ domainGroup.GroupName) (bool, error) { return true, nil },
 	}
 	h := NewHandler(
-		appGroup.NewCreateGroupUseCase(repo),
+		appGroup.NewCreateGroupUseCase(repo, &stubMemberRepo{}, &stubTxManager{}),
 		appGroup.NewListGroupsUseCase(repo, &stubMemberRepo{}),
 		appGroup.NewGetGroupUseCase(repo, &stubMemberRepo{}, &stubUserProvider{}),
 		appGroup.NewListMyGroupsUseCase(repo, &stubMemberRepo{}, &stubPrefsReader{}),
@@ -497,7 +497,7 @@ func TestJoin_GroupNotFoundReturns404(t *testing.T) {
 		},
 	}
 	h := NewHandler(
-		appGroup.NewCreateGroupUseCase(repo),
+		appGroup.NewCreateGroupUseCase(repo, &stubMemberRepo{}, &stubTxManager{}),
 		appGroup.NewListGroupsUseCase(repo, &stubMemberRepo{}),
 		appGroup.NewGetGroupUseCase(repo, &stubMemberRepo{}, &stubUserProvider{}),
 		appGroup.NewListMyGroupsUseCase(repo, &stubMemberRepo{}, &stubPrefsReader{}),
@@ -531,7 +531,7 @@ func TestJoin_NonOpenPolicyReturns403(t *testing.T) {
 		findByIDFn: func(_ string) (*domainGroup.Group, error) { return g, nil },
 	}
 	h := NewHandler(
-		appGroup.NewCreateGroupUseCase(repo),
+		appGroup.NewCreateGroupUseCase(repo, &stubMemberRepo{}, &stubTxManager{}),
 		appGroup.NewListGroupsUseCase(repo, &stubMemberRepo{}),
 		appGroup.NewGetGroupUseCase(repo, &stubMemberRepo{}, &stubUserProvider{}),
 		appGroup.NewListMyGroupsUseCase(repo, &stubMemberRepo{}, &stubPrefsReader{}),
@@ -572,7 +572,7 @@ func TestJoin_AlreadyMemberReturns409(t *testing.T) {
 		},
 	}
 	h := NewHandler(
-		appGroup.NewCreateGroupUseCase(repo),
+		appGroup.NewCreateGroupUseCase(repo, memberRepo, &stubTxManager{}),
 		appGroup.NewListGroupsUseCase(repo, memberRepo),
 		appGroup.NewGetGroupUseCase(repo, memberRepo, &stubUserProvider{}),
 		appGroup.NewListMyGroupsUseCase(repo, memberRepo, &stubPrefsReader{}),
@@ -606,7 +606,7 @@ func TestJoin_SuccessReturns201WithRoleAndJoinedAt(t *testing.T) {
 		findByIDFn: func(_ string) (*domainGroup.Group, error) { return g, nil },
 	}
 	h := NewHandler(
-		appGroup.NewCreateGroupUseCase(repo),
+		appGroup.NewCreateGroupUseCase(repo, &stubMemberRepo{}, &stubTxManager{}),
 		appGroup.NewListGroupsUseCase(repo, &stubMemberRepo{}),
 		appGroup.NewGetGroupUseCase(repo, &stubMemberRepo{}, &stubUserProvider{}),
 		appGroup.NewListMyGroupsUseCase(repo, &stubMemberRepo{}, &stubPrefsReader{}),
@@ -688,7 +688,7 @@ func TestRequestJoin_EmptyBodyIsValid(t *testing.T) {
 		findByIDFn: func(_ string) (*domainGroup.Group, error) { return g, nil },
 	}
 	h := NewHandler(
-		appGroup.NewCreateGroupUseCase(repo),
+		appGroup.NewCreateGroupUseCase(repo, &stubMemberRepo{}, &stubTxManager{}),
 		appGroup.NewListGroupsUseCase(repo, &stubMemberRepo{}),
 		appGroup.NewGetGroupUseCase(repo, &stubMemberRepo{}, &stubUserProvider{}),
 		appGroup.NewListMyGroupsUseCase(repo, &stubMemberRepo{}, &stubPrefsReader{}),
