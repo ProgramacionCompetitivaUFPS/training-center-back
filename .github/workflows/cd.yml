@@ -46,28 +46,36 @@ jobs:
     needs: docker
     if: github.ref == 'refs/heads/develop'
     runs-on: ubuntu-latest
+    permissions:
+      contents: 'read'
+      id-token: 'write'
 
     steps:
-      - name: Deploy via SSH
-        uses: appleboy/ssh-action@v1
+      - id: 'auth'
+        name: 'Authenticate to Google Cloud'
+        uses: 'google-github-actions/auth@v2'
         with:
-          host: ${{ secrets.STAGING_HOST }}
-          username: ${{ secrets.STAGING_USER }}
-          key: ${{ secrets.STAGING_SSH_KEY }}
-          envs: GHCR_TOKEN,GHCR_USER,API_IMAGE
-          script: |
-            cd /opt/training-center
-            git pull origin develop
-            echo "$GHCR_TOKEN" | docker login ghcr.io -u "$GHCR_USER" --password-stdin
-            cd training-and-judge-center-backend
-            API_IMAGE=$API_IMAGE docker compose -f docker-compose.yml -f docker-compose.deploy.yml pull
-            API_IMAGE=$API_IMAGE docker compose -f docker-compose.yml -f docker-compose.deploy.yml up -d --remove-orphans
+          workload_identity_provider: ${{ secrets.WIF_PROVIDER }}
+          service_account: ${{ secrets.GCP_SERVICE_ACCOUNT }}
+
+      - name: Set up gcloud CLI
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: Deploy via IAP tunnel
         env:
           GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GHCR_USER: ${{ github.actor }}
           API_IMAGE: ${{ needs.docker.outputs.image }}:${{ github.sha }}
-
-  # deploy-prod:
-  #   name: Deploy to Kubernetes (Production)
-  #   needs: docker
-  #   TODO
+        run: |
+          gcloud compute ssh ${{ secrets.STAGING_VM_NAME }} \
+            --zone=${{ secrets.STAGING_ZONE }} \
+            --tunnel-through-iap \
+            --quiet \
+            --command="
+              cd /opt/training-center
+              git pull origin develop
+              echo '$GHCR_TOKEN' | docker login ghcr.io -u '$GHCR_USER' --password-stdin
+              cd training-and-judge-center-backend
+              API_IMAGE=$API_IMAGE docker compose -f docker-compose.yml -f docker-compose.deploy.yml pull
+              API_IMAGE=$API_IMAGE docker compose -f docker-compose.yml -f docker-compose.deploy.yml up -d --remove-orphans
+            "
