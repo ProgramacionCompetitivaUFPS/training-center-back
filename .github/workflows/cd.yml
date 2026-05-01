@@ -72,11 +72,10 @@ jobs:
             --tunnel-through-iap \
             --quiet \
             --command="
-              git config --global --add safe.directory /opt/training-center
               cd /opt/training-center
-              sudo git pull origin develop
-              echo '$GHCR_TOKEN' | sudo docker login ghcr.io -u '$GHCR_USER' --password-stdin
+              git pull origin develop
+              echo '$GHCR_TOKEN' | docker login ghcr.io -u '$GHCR_USER' --password-stdin
               cd training-and-judge-center-backend
-              sudo -E API_IMAGE=$API_IMAGE docker compose -f docker-compose.yml -f docker-compose.deploy.yml pull
-              sudo -E API_IMAGE=$API_IMAGE docker compose -f docker-compose.yml -f docker-compose.deploy.yml up -d --remove-orphans
+              API_IMAGE=$API_IMAGE docker compose -f docker-compose.yml -f docker-compose.deploy.yml pull
+              API_IMAGE=$API_IMAGE docker compose -f docker-compose.yml -f docker-compose.deploy.yml up -d --remove-orphans
             "
