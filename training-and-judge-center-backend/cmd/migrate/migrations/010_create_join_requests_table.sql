@@ -1,3 +1,4 @@
+-- +goose Up
 CREATE TABLE join_requests (
     id                UUID        PRIMARY KEY,
     group_id          UUID        NOT NULL REFERENCES groups(id),
@@ -13,3 +14,8 @@ CREATE UNIQUE INDEX idx_join_requests_pending
 
 CREATE INDEX idx_join_requests_group_status
     ON join_requests(group_id, status);
+
+-- +goose Down
+DROP INDEX IF EXISTS idx_join_requests_group_status;
+DROP INDEX IF EXISTS idx_join_requests_pending;
+DROP TABLE IF EXISTS join_requests;
