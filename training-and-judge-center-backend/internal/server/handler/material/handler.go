@@ -11,10 +11,14 @@ import (
 )
 
 type Handler struct {
-	createUC *appMaterial.CreateMaterial
-	updateUC *appMaterial.UpdateMaterial
-	getUC    *appMaterial.GetMaterial
-	listUC   *appMaterial.ListMaterials
+	createUC    *appMaterial.CreateMaterial
+	updateUC    *appMaterial.UpdateMaterial
+	getUC       *appMaterial.GetMaterial
+	listUC      *appMaterial.ListMaterials
+	publishUC   *appMaterial.PublishMaterial
+	unpublishUC *appMaterial.UnpublishMaterial
+	pinUC       *appMaterial.PinMaterial
+	unpinUC     *appMaterial.UnpinMaterial
 }
 
 func NewHandler(
@@ -22,8 +26,21 @@ func NewHandler(
 	updateUC *appMaterial.UpdateMaterial,
 	getUC *appMaterial.GetMaterial,
 	listUC *appMaterial.ListMaterials,
+	publishUC *appMaterial.PublishMaterial,
+	unpublishUC *appMaterial.UnpublishMaterial,
+	pinUC *appMaterial.PinMaterial,
+	unpinUC *appMaterial.UnpinMaterial,
 ) *Handler {
-	return &Handler{createUC: createUC, updateUC: updateUC, getUC: getUC, listUC: listUC}
+	return &Handler{
+		createUC:    createUC,
+		updateUC:    updateUC,
+		getUC:       getUC,
+		listUC:      listUC,
+		publishUC:   publishUC,
+		unpublishUC: unpublishUC,
+		pinUC:       pinUC,
+		unpinUC:     unpinUC,
+	}
 }
 
 func (h *Handler) requireCurrentUser(w http.ResponseWriter, r *http.Request) (*shared.CurrentUser, bool) {

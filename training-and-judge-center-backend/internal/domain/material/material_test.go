@@ -226,19 +226,19 @@ func TestCanBeEditedBy(t *testing.T) {
 	}
 }
 
-func TestCanBePinnedBy(t *testing.T) {
+func TestCanModifyPinStateBy(t *testing.T) {
 	m := newTestMaterial()
 
-	if !m.CanBePinnedBy(shared.RestoreUserID("author-1"), false, false) {
+	if !m.CanModifyPinStateBy(shared.RestoreUserID("author-1"), false, false) {
 		t.Error("author should be able to pin")
 	}
-	if !m.CanBePinnedBy(shared.RestoreUserID("other"), true, false) {
+	if !m.CanModifyPinStateBy(shared.RestoreUserID("other"), true, false) {
 		t.Error("admin should be able to pin")
 	}
-	if !m.CanBePinnedBy(shared.RestoreUserID("other"), false, true) {
+	if !m.CanModifyPinStateBy(shared.RestoreUserID("other"), false, true) {
 		t.Error("group lead should be able to pin")
 	}
-	if m.CanBePinnedBy(shared.RestoreUserID("other"), false, false) {
+	if m.CanModifyPinStateBy(shared.RestoreUserID("other"), false, false) {
 		t.Error("regular member should not be able to pin")
 	}
 }

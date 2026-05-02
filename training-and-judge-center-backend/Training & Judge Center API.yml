@@ -1703,6 +1703,135 @@ items:
           timeout: 0
           followRedirects: true
           maxRedirects: 5
+      - info:
+          name: List Materials
+          type: http
+          seq: 3
+        http:
+          method: GET
+          url: '{{baseUrl}}/groups/:groupId/materials'
+          params:
+            - name: groupId
+              value: 00000000-0000-0000-0000-000000000000
+              type: path
+          auth:
+            type: bearer
+            token: '{{token}}'
+        settings:
+          encodeUrl: true
+          timeout: 0
+          followRedirects: true
+          maxRedirects: 5
+      - info:
+          name: Get Material
+          type: http
+          seq: 4
+        http:
+          method: GET
+          url: '{{baseUrl}}/groups/:groupId/materials/:materialId'
+          params:
+            - name: groupId
+              value: 00000000-0000-0000-0000-000000000000
+              type: path
+            - name: materialId
+              value: 00000000-0000-0000-0000-000000000000
+              type: path
+          auth:
+            type: bearer
+            token: '{{token}}'
+        settings:
+          encodeUrl: true
+          timeout: 0
+          followRedirects: true
+          maxRedirects: 5
+      - info:
+          name: Publish Material
+          type: http
+          seq: 5
+        http:
+          method: POST
+          url: '{{baseUrl}}/groups/:groupId/materials/:materialId/publish'
+          params:
+            - name: groupId
+              value: 00000000-0000-0000-0000-000000000000
+              type: path
+            - name: materialId
+              value: 00000000-0000-0000-0000-000000000000
+              type: path
+          auth:
+            type: bearer
+            token: '{{token}}'
+        settings:
+          encodeUrl: true
+          timeout: 0
+          followRedirects: true
+          maxRedirects: 5
+      - info:
+          name: Unpublish Material
+          type: http
+          seq: 6
+        http:
+          method: POST
+          url: '{{baseUrl}}/groups/:groupId/materials/:materialId/unpublish'
+          params:
+            - name: groupId
+              value: 00000000-0000-0000-0000-000000000000
+              type: path
+            - name: materialId
+              value: 00000000-0000-0000-0000-000000000000
+              type: path
+          auth:
+            type: bearer
+            token: '{{token}}'
+        settings:
+          encodeUrl: true
+          timeout: 0
+          followRedirects: true
+          maxRedirects: 5
+      - info:
+          name: Pin Material
+          type: http
+          seq: 7
+        http:
+          method: POST
+          url: '{{baseUrl}}/groups/:groupId/materials/:materialId/pin'
+          params:
+            - name: groupId
+              value: 00000000-0000-0000-0000-000000000000
+              type: path
+            - name: materialId
+              value: 00000000-0000-0000-0000-000000000000
+              type: path
+          auth:
+            type: bearer
+            token: '{{token}}'
+        settings:
+          encodeUrl: true
+          timeout: 0
+          followRedirects: true
+          maxRedirects: 5
+      - info:
+          name: Unpin Material
+          type: http
+          seq: 8
+        http:
+          method: POST
+          url: '{{baseUrl}}/groups/:groupId/materials/:materialId/unpin'
+          params:
+            - name: groupId
+              value: 00000000-0000-0000-0000-000000000000
+              type: path
+            - name: materialId
+              value: 00000000-0000-0000-0000-000000000000
+              type: path
+          auth:
+            type: bearer
+            token: '{{token}}'
+        settings:
+          encodeUrl: true
+          timeout: 0
+          followRedirects: true
+          maxRedirects: 5
 bundled: true
 extensions:
   bruno:

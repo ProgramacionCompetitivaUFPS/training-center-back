@@ -180,6 +180,6 @@ func (m *Material) CanBeEditedBy(userID shared.UserID, isAdmin bool) bool {
 	return isAdmin || m.authorID == userID
 }
 
-func (m *Material) CanBePinnedBy(userID shared.UserID, isAdmin, isGroupLead bool) bool {
+func (m *Material) CanModifyPinStateBy(userID shared.UserID, isAdmin, isGroupLead bool) bool {
 	return isAdmin || isGroupLead || m.authorID == userID
 }

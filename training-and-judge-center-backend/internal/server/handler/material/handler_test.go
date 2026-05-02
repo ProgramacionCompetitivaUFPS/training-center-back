@@ -89,11 +89,19 @@ func (s *stubAuthorProvider) GetDisplays(_ context.Context, ids []string) (map[s
 }
 
 func stubHandler() *Handler {
+	return handlerWithRepo(&stubMaterialRepo{})
+}
+
+func handlerWithRepo(repo domainMaterial.Repository) *Handler {
 	return NewHandler(
-		appMaterial.NewCreateMaterial(&stubMaterialRepo{}, &stubGroupProvider{}, &stubGroupMemberProvider{}, &stubAuthorProvider{}),
-		appMaterial.NewUpdateMaterial(&stubMaterialRepo{}, &stubGroupProvider{}, &stubAuthorProvider{}),
-		appMaterial.NewGetMaterial(&stubMaterialRepo{}, &stubGroupVisibilityProvider{}, &stubGroupMemberProvider{}, &stubAuthorProvider{}),
-		appMaterial.NewListMaterials(&stubMaterialRepo{}, &stubGroupVisibilityProvider{}, &stubGroupMemberProvider{}, &stubAuthorProvider{}),
+		appMaterial.NewCreateMaterial(repo, &stubGroupProvider{}, &stubGroupMemberProvider{}, &stubAuthorProvider{}),
+		appMaterial.NewUpdateMaterial(repo, &stubGroupProvider{}, &stubAuthorProvider{}),
+		appMaterial.NewGetMaterial(repo, &stubGroupVisibilityProvider{}, &stubGroupMemberProvider{}, &stubAuthorProvider{}),
+		appMaterial.NewListMaterials(repo, &stubGroupVisibilityProvider{}, &stubGroupMemberProvider{}, &stubAuthorProvider{}),
+		appMaterial.NewPublishMaterial(repo, &stubGroupProvider{}, &stubAuthorProvider{}),
+		appMaterial.NewUnpublishMaterial(repo, &stubGroupProvider{}, &stubAuthorProvider{}),
+		appMaterial.NewPinMaterial(repo, &stubGroupProvider{}, &stubGroupMemberProvider{}, &stubAuthorProvider{}),
+		appMaterial.NewUnpinMaterial(repo, &stubGroupProvider{}, &stubGroupMemberProvider{}, &stubAuthorProvider{}),
 	)
 }
 
@@ -207,6 +215,10 @@ func TestCreateMaterial_Forbidden_Returns403(t *testing.T) {
 		appMaterial.NewUpdateMaterial(&stubMaterialRepo{}, &stubGroupProvider{}, &stubAuthorProvider{}),
 		appMaterial.NewGetMaterial(&stubMaterialRepo{}, &stubGroupVisibilityProvider{}, &stubGroupMemberProvider{}, &stubAuthorProvider{}),
 		appMaterial.NewListMaterials(&stubMaterialRepo{}, &stubGroupVisibilityProvider{}, &stubGroupMemberProvider{}, &stubAuthorProvider{}),
+		appMaterial.NewPublishMaterial(&stubMaterialRepo{}, &stubGroupProvider{}, &stubAuthorProvider{}),
+		appMaterial.NewUnpublishMaterial(&stubMaterialRepo{}, &stubGroupProvider{}, &stubAuthorProvider{}),
+		appMaterial.NewPinMaterial(&stubMaterialRepo{}, &stubGroupProvider{}, &stubGroupMemberProvider{}, &stubAuthorProvider{}),
+		appMaterial.NewUnpinMaterial(&stubMaterialRepo{}, &stubGroupProvider{}, &stubGroupMemberProvider{}, &stubAuthorProvider{}),
 	)
 
 	body, _ := json.Marshal(map[string]string{"title": "My Material"})
@@ -244,6 +256,10 @@ func TestUpdateMaterial_ValidRequest_Returns200(t *testing.T) {
 		}, &stubGroupProvider{}, &stubAuthorProvider{}),
 		appMaterial.NewGetMaterial(&stubMaterialRepo{}, &stubGroupVisibilityProvider{}, &stubGroupMemberProvider{}, &stubAuthorProvider{}),
 		appMaterial.NewListMaterials(&stubMaterialRepo{}, &stubGroupVisibilityProvider{}, &stubGroupMemberProvider{}, &stubAuthorProvider{}),
+		appMaterial.NewPublishMaterial(&stubMaterialRepo{}, &stubGroupProvider{}, &stubAuthorProvider{}),
+		appMaterial.NewUnpublishMaterial(&stubMaterialRepo{}, &stubGroupProvider{}, &stubAuthorProvider{}),
+		appMaterial.NewPinMaterial(&stubMaterialRepo{}, &stubGroupProvider{}, &stubGroupMemberProvider{}, &stubAuthorProvider{}),
+		appMaterial.NewUnpinMaterial(&stubMaterialRepo{}, &stubGroupProvider{}, &stubGroupMemberProvider{}, &stubAuthorProvider{}),
 	)
 
 	body, _ := json.Marshal(map[string]string{"title": "Updated"})
@@ -394,6 +410,10 @@ func TestGetMaterial_ValidRequest_Returns200(t *testing.T) {
 		appMaterial.NewUpdateMaterial(repo, &stubGroupProvider{}, &stubAuthorProvider{}),
 		appMaterial.NewGetMaterial(repo, &stubGroupVisibilityProvider{}, &stubGroupMemberProvider{}, &stubAuthorProvider{}),
 		appMaterial.NewListMaterials(repo, &stubGroupVisibilityProvider{}, &stubGroupMemberProvider{}, &stubAuthorProvider{}),
+		appMaterial.NewPublishMaterial(repo, &stubGroupProvider{}, &stubAuthorProvider{}),
+		appMaterial.NewUnpublishMaterial(repo, &stubGroupProvider{}, &stubAuthorProvider{}),
+		appMaterial.NewPinMaterial(repo, &stubGroupProvider{}, &stubGroupMemberProvider{}, &stubAuthorProvider{}),
+		appMaterial.NewUnpinMaterial(repo, &stubGroupProvider{}, &stubGroupMemberProvider{}, &stubAuthorProvider{}),
 	)
 
 	r := authedRequest(http.MethodGet, "/groups/g1/materials/m1", nil)
@@ -424,6 +444,10 @@ func TestGetMaterial_Forbidden_Returns403(t *testing.T) {
 		appMaterial.NewUpdateMaterial(&stubMaterialRepo{}, &stubGroupProvider{}, &stubAuthorProvider{}),
 		appMaterial.NewGetMaterial(&stubMaterialRepo{}, &stubNotVisibleGroupVisibilityProvider{}, &stubNonMemberProvider{}, &stubAuthorProvider{}),
 		appMaterial.NewListMaterials(&stubMaterialRepo{}, &stubGroupVisibilityProvider{}, &stubGroupMemberProvider{}, &stubAuthorProvider{}),
+		appMaterial.NewPublishMaterial(&stubMaterialRepo{}, &stubGroupProvider{}, &stubAuthorProvider{}),
+		appMaterial.NewUnpublishMaterial(&stubMaterialRepo{}, &stubGroupProvider{}, &stubAuthorProvider{}),
+		appMaterial.NewPinMaterial(&stubMaterialRepo{}, &stubGroupProvider{}, &stubGroupMemberProvider{}, &stubAuthorProvider{}),
+		appMaterial.NewUnpinMaterial(&stubMaterialRepo{}, &stubGroupProvider{}, &stubGroupMemberProvider{}, &stubAuthorProvider{}),
 	)
 	r := authedRequest(http.MethodGet, "/groups/g1/materials/m1", nil)
 	r.SetPathValue("groupId", "g1")
@@ -537,5 +561,278 @@ func TestListMaterials_InvalidPinnedParam_Returns400(t *testing.T) {
 
 	if w.Code != http.StatusBadRequest {
 		t.Fatalf("expected 400, got %d", w.Code)
+	}
+}
+
+// ── Publish handler tests ─────────────────────────────────────────────────────
+
+func TestPublishMaterial_Unauthenticated_Returns401(t *testing.T) {
+	h := stubHandler()
+	r := httptest.NewRequest(http.MethodPost, "/groups/g1/materials/m1/publish", nil)
+	r.SetPathValue("groupId", "g1")
+	r.SetPathValue("materialId", "m1")
+	w := httptest.NewRecorder()
+
+	http.HandlerFunc(h.Publish).ServeHTTP(w, r)
+
+	if w.Code != http.StatusUnauthorized {
+		t.Fatalf("expected 401, got %d", w.Code)
+	}
+}
+
+func TestPublishMaterial_NotFound_Returns404(t *testing.T) {
+	h := stubHandler()
+	r := authedRequest(http.MethodPost, "/groups/g1/materials/missing/publish", nil)
+	r.SetPathValue("groupId", "g1")
+	r.SetPathValue("materialId", "missing")
+	w := httptest.NewRecorder()
+
+	wrapAuth(http.HandlerFunc(h.Publish)).ServeHTTP(w, r)
+
+	if w.Code != http.StatusNotFound {
+		t.Fatalf("expected 404, got %d", w.Code)
+	}
+}
+
+func TestPublishMaterial_Success_Returns200(t *testing.T) {
+	mat := domainMaterial.RestoreMaterial(
+		"m1", "g1", shared.RestoreUserID("u1"),
+		"Title", "", nil, "DRAFT", false, nil,
+		time.Now(), time.Now(), nil,
+	)
+	h := handlerWithRepo(&stubMaterialRepo{
+		findByIDFn: func(_ context.Context, _ string) (*domainMaterial.Material, error) {
+			return mat, nil
+		},
+	})
+	r := authedRequest(http.MethodPost, "/groups/g1/materials/m1/publish", nil)
+	r.SetPathValue("groupId", "g1")
+	r.SetPathValue("materialId", "m1")
+	w := httptest.NewRecorder()
+
+	wrapAuth(http.HandlerFunc(h.Publish)).ServeHTTP(w, r)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+	var resp materialResponse
+	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
+		t.Fatalf("could not decode response: %v", err)
+	}
+	if resp.Status != "PUBLISHED" {
+		t.Errorf("expected status PUBLISHED, got %q", resp.Status)
+	}
+}
+
+// ── Unpublish handler tests ───────────────────────────────────────────────────
+
+func TestUnpublishMaterial_Unauthenticated_Returns401(t *testing.T) {
+	h := stubHandler()
+	r := httptest.NewRequest(http.MethodPost, "/groups/g1/materials/m1/unpublish", nil)
+	r.SetPathValue("groupId", "g1")
+	r.SetPathValue("materialId", "m1")
+	w := httptest.NewRecorder()
+
+	http.HandlerFunc(h.Unpublish).ServeHTTP(w, r)
+
+	if w.Code != http.StatusUnauthorized {
+		t.Fatalf("expected 401, got %d", w.Code)
+	}
+}
+
+func TestUnpublishMaterial_NotFound_Returns404(t *testing.T) {
+	h := stubHandler()
+	r := authedRequest(http.MethodPost, "/groups/g1/materials/missing/unpublish", nil)
+	r.SetPathValue("groupId", "g1")
+	r.SetPathValue("materialId", "missing")
+	w := httptest.NewRecorder()
+
+	wrapAuth(http.HandlerFunc(h.Unpublish)).ServeHTTP(w, r)
+
+	if w.Code != http.StatusNotFound {
+		t.Fatalf("expected 404, got %d", w.Code)
+	}
+}
+
+func TestUnpublishMaterial_Success_Returns200(t *testing.T) {
+	now := time.Now()
+	mat := domainMaterial.RestoreMaterial(
+		"m1", "g1", shared.RestoreUserID("u1"),
+		"Title", "", nil, "PUBLISHED", false, nil,
+		time.Now(), time.Now(), &now,
+	)
+	h := handlerWithRepo(&stubMaterialRepo{
+		findByIDFn: func(_ context.Context, _ string) (*domainMaterial.Material, error) {
+			return mat, nil
+		},
+	})
+	r := authedRequest(http.MethodPost, "/groups/g1/materials/m1/unpublish", nil)
+	r.SetPathValue("groupId", "g1")
+	r.SetPathValue("materialId", "m1")
+	w := httptest.NewRecorder()
+
+	wrapAuth(http.HandlerFunc(h.Unpublish)).ServeHTTP(w, r)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+	var resp materialResponse
+	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
+		t.Fatalf("could not decode response: %v", err)
+	}
+	if resp.Status != "DRAFT" {
+		t.Errorf("expected status DRAFT, got %q", resp.Status)
+	}
+}
+
+// ── Pin handler tests ─────────────────────────────────────────────────────────
+
+func TestPinMaterial_Unauthenticated_Returns401(t *testing.T) {
+	h := stubHandler()
+	r := httptest.NewRequest(http.MethodPost, "/groups/g1/materials/m1/pin", nil)
+	r.SetPathValue("groupId", "g1")
+	r.SetPathValue("materialId", "m1")
+	w := httptest.NewRecorder()
+
+	http.HandlerFunc(h.Pin).ServeHTTP(w, r)
+
+	if w.Code != http.StatusUnauthorized {
+		t.Fatalf("expected 401, got %d", w.Code)
+	}
+}
+
+func TestPinMaterial_NotFound_Returns404(t *testing.T) {
+	h := stubHandler()
+	r := authedRequest(http.MethodPost, "/groups/g1/materials/missing/pin", nil)
+	r.SetPathValue("groupId", "g1")
+	r.SetPathValue("materialId", "missing")
+	w := httptest.NewRecorder()
+
+	wrapAuth(http.HandlerFunc(h.Pin)).ServeHTTP(w, r)
+
+	if w.Code != http.StatusNotFound {
+		t.Fatalf("expected 404, got %d", w.Code)
+	}
+}
+
+func TestPinMaterial_CannotPinDraft_Returns400(t *testing.T) {
+	mat := domainMaterial.RestoreMaterial(
+		"m1", "g1", shared.RestoreUserID("u1"),
+		"Title", "", nil, "DRAFT", false, nil,
+		time.Now(), time.Now(), nil,
+	)
+	h := handlerWithRepo(&stubMaterialRepo{
+		findByIDFn: func(_ context.Context, _ string) (*domainMaterial.Material, error) {
+			return mat, nil
+		},
+	})
+	r := authedRequest(http.MethodPost, "/groups/g1/materials/m1/pin", nil)
+	r.SetPathValue("groupId", "g1")
+	r.SetPathValue("materialId", "m1")
+	w := httptest.NewRecorder()
+
+	wrapAuth(http.HandlerFunc(h.Pin)).ServeHTTP(w, r)
+
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400, got %d: %s", w.Code, w.Body.String())
+	}
+	var resp apperror.AppError
+	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
+		t.Fatalf("could not decode error response: %v", err)
+	}
+	if resp.Code != domainMaterial.ErrCodeCannotPinDraft {
+		t.Errorf("expected %s, got %s", domainMaterial.ErrCodeCannotPinDraft, resp.Code)
+	}
+}
+
+func TestPinMaterial_Success_Returns200(t *testing.T) {
+	now := time.Now()
+	mat := domainMaterial.RestoreMaterial(
+		"m1", "g1", shared.RestoreUserID("u1"),
+		"Title", "", nil, "PUBLISHED", false, nil,
+		time.Now(), time.Now(), &now,
+	)
+	h := handlerWithRepo(&stubMaterialRepo{
+		findByIDFn: func(_ context.Context, _ string) (*domainMaterial.Material, error) {
+			return mat, nil
+		},
+	})
+	r := authedRequest(http.MethodPost, "/groups/g1/materials/m1/pin", nil)
+	r.SetPathValue("groupId", "g1")
+	r.SetPathValue("materialId", "m1")
+	w := httptest.NewRecorder()
+
+	wrapAuth(http.HandlerFunc(h.Pin)).ServeHTTP(w, r)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+	var resp materialResponse
+	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
+		t.Fatalf("could not decode response: %v", err)
+	}
+	if !resp.Pinned {
+		t.Error("expected pinned=true")
+	}
+}
+
+// ── Unpin handler tests ───────────────────────────────────────────────────────
+
+func TestUnpinMaterial_Unauthenticated_Returns401(t *testing.T) {
+	h := stubHandler()
+	r := httptest.NewRequest(http.MethodPost, "/groups/g1/materials/m1/unpin", nil)
+	r.SetPathValue("groupId", "g1")
+	r.SetPathValue("materialId", "m1")
+	w := httptest.NewRecorder()
+
+	http.HandlerFunc(h.Unpin).ServeHTTP(w, r)
+
+	if w.Code != http.StatusUnauthorized {
+		t.Fatalf("expected 401, got %d", w.Code)
+	}
+}
+
+func TestUnpinMaterial_NotFound_Returns404(t *testing.T) {
+	h := stubHandler()
+	r := authedRequest(http.MethodPost, "/groups/g1/materials/missing/unpin", nil)
+	r.SetPathValue("groupId", "g1")
+	r.SetPathValue("materialId", "missing")
+	w := httptest.NewRecorder()
+
+	wrapAuth(http.HandlerFunc(h.Unpin)).ServeHTTP(w, r)
+
+	if w.Code != http.StatusNotFound {
+		t.Fatalf("expected 404, got %d", w.Code)
+	}
+}
+
+func TestUnpinMaterial_Success_Returns200(t *testing.T) {
+	now := time.Now()
+	mat := domainMaterial.RestoreMaterial(
+		"m1", "g1", shared.RestoreUserID("u1"),
+		"Title", "", nil, "PUBLISHED", true, &now,
+		time.Now(), time.Now(), &now,
+	)
+	h := handlerWithRepo(&stubMaterialRepo{
+		findByIDFn: func(_ context.Context, _ string) (*domainMaterial.Material, error) {
+			return mat, nil
+		},
+	})
+	r := authedRequest(http.MethodPost, "/groups/g1/materials/m1/unpin", nil)
+	r.SetPathValue("groupId", "g1")
+	r.SetPathValue("materialId", "m1")
+	w := httptest.NewRecorder()
+
+	wrapAuth(http.HandlerFunc(h.Unpin)).ServeHTTP(w, r)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+	var resp materialResponse
+	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
+		t.Fatalf("could not decode response: %v", err)
+	}
+	if resp.Pinned {
+		t.Error("expected pinned=false")
 	}
 }
