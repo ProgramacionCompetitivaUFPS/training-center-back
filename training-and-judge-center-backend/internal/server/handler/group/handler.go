@@ -22,6 +22,8 @@ type Handler struct {
 	listRequests    *appGroup.ListJoinRequestsUseCase
 	getMyRequest    *appGroup.GetMyRequestUseCase
 	cancelMyRequest *appGroup.CancelMyRequestUseCase
+	generateInvite  *appGroup.GenerateInviteUseCase
+	acceptInvite    *appGroup.AcceptInviteUseCase
 }
 
 func NewHandler(
@@ -36,6 +38,8 @@ func NewHandler(
 	listRequests *appGroup.ListJoinRequestsUseCase,
 	getMyRequest *appGroup.GetMyRequestUseCase,
 	cancelMyRequest *appGroup.CancelMyRequestUseCase,
+	generateInvite *appGroup.GenerateInviteUseCase,
+	acceptInvite *appGroup.AcceptInviteUseCase,
 ) *Handler {
 	return &Handler{
 		createGroup:     createGroup,
@@ -49,6 +53,8 @@ func NewHandler(
 		listRequests:    listRequests,
 		getMyRequest:    getMyRequest,
 		cancelMyRequest: cancelMyRequest,
+		generateInvite:  generateInvite,
+		acceptInvite:    acceptInvite,
 	}
 }
 
