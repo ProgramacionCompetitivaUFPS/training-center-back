@@ -1,0 +1,23 @@
+training-and-judge-center-backend/cmd/seed/main.go
+  54066a909b1b6bda 20-21,34-35,44-50
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.3.4",
+  "base_commit_sha": "030f8780b458ff4c11cd9bf88cb050a94d8018dc",
+  "prompts": {
+    "54066a909b1b6bda": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "0ff7082b-75d8-4d91-bd24-64697326108f",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "AlexaVJ",
+      "messages": [],
+      "total_additions": 542,
+      "total_deletions": 392,
+      "accepted_lines": 308,
+      "overriden_lines": 0
+    }
+  }
+}
