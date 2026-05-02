@@ -66,6 +66,8 @@ jobs:
           GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GHCR_USER: ${{ github.actor }}
           API_IMAGE: ${{ needs.docker.outputs.image }}:${{ github.sha }}
+          ADMIN_EMAIL: ${{ secrets.ADMIN_EMAIL }}
+          ADMIN_PASSWORD: ${{ secrets.ADMIN_PASSWORD }}
         run: |
           gcloud compute ssh ${{ secrets.STAGING_VM_NAME }} \
             --zone=${{ secrets.STAGING_ZONE }} \
@@ -76,6 +78,8 @@ jobs:
               git pull origin develop
               echo '$GHCR_TOKEN' | docker login ghcr.io -u '$GHCR_USER' --password-stdin
               cd training-and-judge-center-backend
-              API_IMAGE=$API_IMAGE docker compose -f docker-compose.yml -f docker-compose.deploy.yml pull
-              API_IMAGE=$API_IMAGE docker compose -f docker-compose.yml -f docker-compose.deploy.yml up -d --remove-orphans
+              API_IMAGE=$API_IMAGE ADMIN_EMAIL=$ADMIN_EMAIL ADMIN_PASSWORD=$ADMIN_PASSWORD \
+              docker compose -f docker-compose.yml -f docker-compose.deploy.yml pull
+              API_IMAGE=$API_IMAGE ADMIN_EMAIL=$ADMIN_EMAIL ADMIN_PASSWORD=$ADMIN_PASSWORD \
+              docker compose -f docker-compose.yml -f docker-compose.deploy.yml up -d --remove-orphans
             "

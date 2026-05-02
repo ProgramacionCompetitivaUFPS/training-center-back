@@ -9,6 +9,7 @@ COPY . .
 
 RUN CGO_ENABLED=0 GOOS=linux go build -o /bin/api ./cmd/api
 RUN CGO_ENABLED=0 GOOS=linux go build -o /bin/migrate ./cmd/migrate
+RUN CGO_ENABLED=0 GOOS=linux go build -o /bin/seed ./cmd/seed
 
 FROM alpine:3.21
 
@@ -16,6 +17,7 @@ RUN apk --no-cache add ca-certificates tzdata
 
 COPY --from=builder /bin/api /bin/api
 COPY --from=builder /bin/migrate /bin/migrate
+COPY --from=builder /bin/seed /bin/seed
 COPY --from=builder /app/config /config
 
 EXPOSE 8080

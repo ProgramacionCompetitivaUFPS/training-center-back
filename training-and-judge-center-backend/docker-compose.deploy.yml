@@ -2,6 +2,9 @@ services:
   migrate:
     image: ${API_IMAGE}
 
+  seed:
+    image: ${API_IMAGE}
+
   backend:
     image: ${API_IMAGE}
     environment:
