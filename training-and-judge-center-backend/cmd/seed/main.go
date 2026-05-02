@@ -56,12 +56,22 @@ func main() {
 	}
 	defer pool.Close()
 
-	query := `
-		INSERT INTO users (id, email, password, name, nickname, country, city, institution, role, status, created_at)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'ADMIN', 'ACTIVE', $9)
-		ON CONFLICT DO NOTHING`
+	tag, err := pool.Exec(ctx,
+		`UPDATE users SET password = $1 WHERE email = $2`,
+		passwordVO.Hash(), email,
+	)
+	if err != nil {
+		slog.Error("failed to update admin user", "error", err)
+		os.Exit(1)
+	}
+	if tag.RowsAffected() > 0 {
+		slog.Info("admin password updated", "email", email)
+		return
+	}
 
-	tag, err := pool.Exec(ctx, query,
+	_, err = pool.Exec(ctx,
+		`INSERT INTO users (id, email, password, name, nickname, country, city, institution, role, status, created_at)
+		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'ADMIN', 'ACTIVE', $9)`,
 		uuid.New().String(),
 		email,
 		passwordVO.Hash(),
@@ -75,11 +85,6 @@ func main() {
 	if err != nil {
 		slog.Error("failed to insert admin user", "error", err)
 		os.Exit(1)
-	}
-
-	if tag.RowsAffected() == 0 {
-		slog.Info("admin user already exists, skipping", "email", email)
-		return
 	}
 
 	slog.Info("admin user created", "email", email, "nickname", nickname)
