@@ -42,10 +42,7 @@ func NewRouter(h *Handlers, s *Services, allowedOrigins []string) *chi.Mux {
 	r.Use(chimw.Recoverer)
 	r.Use(chimw.RequestID)
 
-	r.Group(func(r chi.Router) {
-		r.Use(middleware.Auth(s.TokenService, s.SessionInvalidator))
-		r.Get("/swagger/*", httpSwagger.WrapHandler)
-	})
+	r.Get("/swagger/*", httpSwagger.WrapHandler)
 
 	healthHandler := handler.NewHealthHandler()
 	r.Get("/ping", healthHandler.Ping)
