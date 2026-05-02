@@ -20,11 +20,11 @@ func main() {
 
 	email := requireEnv("ADMIN_EMAIL")
 	password := requireEnv("ADMIN_PASSWORD")
-	name := requireEnv("ADMIN_NAME")
-	nickname := requireEnv("ADMIN_NICKNAME")
-	country := getEnv("ADMIN_COUNTRY", "N/A")
-	city := getEnv("ADMIN_CITY", "N/A")
-	institution := getEnv("ADMIN_INSTITUTION", "N/A")
+	name := getEnv("ADMIN_NAME", "admin")
+	nickname := getEnv("ADMIN_NICKNAME", "admin")
+	country := getEnv("ADMIN_COUNTRY", "admin")
+	city := getEnv("ADMIN_CITY", "admin")
+	institution := getEnv("ADMIN_INSTITUTION", "admin")
 
 	if _, err := domainUser.NewEmail(email); err != nil {
 		slog.Error("invalid ADMIN_EMAIL", "error", err)
