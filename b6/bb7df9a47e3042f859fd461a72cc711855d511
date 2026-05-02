@@ -1,0 +1,51 @@
+training-and-judge-center-backend/internal/server/handler/user/request_password_recovery_handler.go
+  cd078dfdcba6f816 21-22
+training-and-judge-center-backend/internal/server/handler/health_handler.go
+  cd078dfdcba6f816 18
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.3.4",
+  "base_commit_sha": "b6bb7df9a47e3042f859fd461a72cc711855d511",
+  "prompts": {
+    "5a4584ba814077f6": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ac88e9ec-a31d-4857-b0ad-6b6d437ffe8b",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "AlexaVJ",
+      "messages": [],
+      "total_additions": 0,
+      "total_deletions": 0,
+      "accepted_lines": 301,
+      "overriden_lines": 0
+    },
+    "a2c2e1987c4e8545": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "69133d35-d8ef-4de6-a3e6-88e9ee76f7be",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "AlexaVJ",
+      "messages": [],
+      "total_additions": 1,
+      "total_deletions": 0,
+      "accepted_lines": 0,
+      "overriden_lines": 0
+    },
+    "cd078dfdcba6f816": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "4290d5c7-f6d6-451b-a618-0240ef73bf3e",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "AlexaVJ",
+      "messages": [],
+      "total_additions": 3,
+      "total_deletions": 0,
+      "accepted_lines": 3,
+      "overriden_lines": 0
+    }
+  }
+}
