@@ -59,7 +59,7 @@ func main() {
 	query := `
 		INSERT INTO users (id, email, password, name, nickname, country, city, institution, role, status, created_at)
 		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'ADMIN', 'ACTIVE', $9)
-		ON CONFLICT (email) DO NOTHING`
+		ON CONFLICT DO NOTHING`
 
 	tag, err := pool.Exec(ctx, query,
 		uuid.New().String(),
