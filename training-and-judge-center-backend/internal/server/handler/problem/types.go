@@ -68,6 +68,14 @@ type problemListItemResp struct {
 	UpdatedAt     string     `json:"updatedAt"`
 }
 
+type addModifierRequest struct {
+	UserID string `json:"userId"`
+}
+
+type listModifiersResponse struct {
+	Modifiers []modifierResp `json:"modifiers"`
+}
+
 type paginationResp struct {
 	TotalCount  int `json:"totalCount"`
 	CurrentPage int `json:"currentPage"`

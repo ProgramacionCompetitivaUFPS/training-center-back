@@ -14,6 +14,17 @@ import (
 	"github.com/training-judge-center/backend/pkg/apperror"
 )
 
+// @Summary      Delete problem file
+// @Tags         problems
+// @Produce      json
+// @Security     BearerAuth
+// @Param        slug path string true "Problem slug"
+// @Param        fileType path string true "File type"
+// @Param        fileName query string false "File name (for solutions)"
+// @Success      204
+// @Failure      400 {object} apperror.AppError
+// @Failure      401 {object} apperror.AppError
+// @Router       /problems/p/{slug}/files/{fileType} [delete]
 func (h *Handler) DeleteFile(w http.ResponseWriter, r *http.Request) {
 	claims := middleware.GetClaims(r.Context())
 	if claims == nil {

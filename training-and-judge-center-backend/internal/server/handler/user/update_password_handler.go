@@ -15,6 +15,16 @@ type updatePasswordRequest struct {
 	NewPassword     string `json:"newPassword"`
 }
 
+// @Summary      Update password
+// @Tags         users
+// @Accept       json
+// @Produce      json
+// @Security     BearerAuth
+// @Param        body body updatePasswordRequest true "Password data"
+// @Success      204
+// @Failure      400 {object} apperror.AppError
+// @Failure      401 {object} apperror.AppError
+// @Router       /users/password [put]
 func (h *UserHandler) UpdatePassword(w http.ResponseWriter, r *http.Request) {
 	claims := middleware.GetClaims(r.Context())
 	if claims == nil {

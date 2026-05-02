@@ -10,6 +10,13 @@ import (
 	"github.com/training-judge-center/backend/internal/server/middleware"
 )
 
+// @Summary      Request account deactivation
+// @Tags         users
+// @Produce      json
+// @Security     BearerAuth
+// @Success      200 {object} map[string]string
+// @Failure      401 {object} apperror.AppError
+// @Router       /users/deactivation [post]
 func (h *UserHandler) RequestDeactivation(w http.ResponseWriter, r *http.Request) {
 	claims := middleware.GetClaims(r.Context())
 	if claims == nil {
@@ -36,6 +43,16 @@ type confirmDeactivationBody struct {
 	Code string `json:"code"`
 }
 
+// @Summary      Confirm account deactivation
+// @Tags         users
+// @Accept       json
+// @Produce      json
+// @Security     BearerAuth
+// @Param        body body confirmDeactivationBody true "Confirmation code"
+// @Success      204
+// @Failure      400 {object} apperror.AppError
+// @Failure      401 {object} apperror.AppError
+// @Router       /users/deactivation/confirm [post]
 func (h *UserHandler) ConfirmDeactivation(w http.ResponseWriter, r *http.Request) {
 	claims := middleware.GetClaims(r.Context())
 	if claims == nil {

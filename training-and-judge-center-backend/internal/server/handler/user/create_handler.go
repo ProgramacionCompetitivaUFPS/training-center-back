@@ -29,6 +29,15 @@ type createUserResponse struct {
 	CreatedAt   string `json:"createdAt"`
 }
 
+// @Summary      Create user
+// @Tags         users
+// @Accept       json
+// @Produce      json
+// @Param        body body createUserRequest true "User data"
+// @Success      201 {object} createUserResponse
+// @Failure      400 {object} apperror.AppError
+// @Failure      409 {object} apperror.AppError
+// @Router       /users [post]
 func (h *UserHandler) Create(w http.ResponseWriter, r *http.Request) {
 	var req createUserRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {

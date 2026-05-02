@@ -15,6 +15,18 @@ type deleteProblemRequest struct {
 	ConfirmSlug string `json:"confirmSlug"`
 }
 
+// @Summary      Delete problem
+// @Tags         problems
+// @Accept       json
+// @Produce      json
+// @Security     BearerAuth
+// @Param        slug path string true "Problem slug"
+// @Param        body body deleteProblemRequest true "Confirmation"
+// @Success      204
+// @Failure      400 {object} apperror.AppError
+// @Failure      401 {object} apperror.AppError
+// @Failure      404 {object} apperror.AppError
+// @Router       /problems/p/{slug} [delete]
 func (h *Handler) DeleteProblem(w http.ResponseWriter, r *http.Request) {
 	claims := middleware.GetClaims(r.Context())
 	if claims == nil {

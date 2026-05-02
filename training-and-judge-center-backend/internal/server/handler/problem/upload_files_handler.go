@@ -20,6 +20,18 @@ const (
 	uploadContextTimeout        = 2 * time.Minute
 )
 
+// @Summary      Upload problem files
+// @Tags         problems
+// @Accept       multipart/form-data
+// @Produce      json
+// @Security     BearerAuth
+// @Param        slug path string true "Problem slug"
+// @Param        fileType formData string true "File type (testCases, solution, checker, validator)"
+// @Param        file formData file true "File to upload"
+// @Success      200 {object} getProblemResponse
+// @Failure      400 {object} apperror.AppError
+// @Failure      401 {object} apperror.AppError
+// @Router       /problems/p/{slug}/files [post]
 func (h *Handler) UploadFiles(w http.ResponseWriter, r *http.Request) {
 	claims := middleware.GetClaims(r.Context())
 	if claims == nil {

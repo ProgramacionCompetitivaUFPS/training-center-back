@@ -17,6 +17,16 @@ type updateUserRequest struct {
 	Country     *string `json:"country"`
 }
 
+// @Summary      Update my profile
+// @Tags         users
+// @Accept       json
+// @Produce      json
+// @Security     BearerAuth
+// @Param        body body updateUserRequest true "Fields to update"
+// @Success      200 {object} fullUserResponse
+// @Failure      400 {object} apperror.AppError
+// @Failure      401 {object} apperror.AppError
+// @Router       /users [put]
 func (h *UserHandler) UpdateProfile(w http.ResponseWriter, r *http.Request) {
 	claims := middleware.GetClaims(r.Context())
 	if claims == nil {

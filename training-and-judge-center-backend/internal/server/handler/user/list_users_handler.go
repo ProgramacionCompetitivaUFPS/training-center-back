@@ -37,6 +37,18 @@ type listUsersResponse struct {
 	Pagination paginationMeta `json:"pagination"`
 }
 
+// @Summary      List users (admin)
+// @Tags         admin
+// @Produce      json
+// @Security     BearerAuth
+// @Param        page query int false "Page number"
+// @Param        limit query int false "Items per page"
+// @Param        role query string false "Filter by role"
+// @Param        status query string false "Filter by status"
+// @Success      200 {object} listUsersResponse
+// @Failure      401 {object} apperror.AppError
+// @Failure      403 {object} apperror.AppError
+// @Router       /admin/users [get]
 func (h *UserHandler) ListUsers(w http.ResponseWriter, r *http.Request) {
 	q := r.URL.Query()
 

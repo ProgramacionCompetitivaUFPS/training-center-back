@@ -1714,6 +1714,20 @@ items:
             - name: groupId
               value: 00000000-0000-0000-0000-000000000000
               type: path
+            - name: page
+              value: '1'
+              type: query
+            - name: limit
+              value: '20'
+              type: query
+            - name: pinned
+              value: 'true'
+              type: query
+              disabled: true
+            - name: tags
+              value: grafos,intro
+              type: query
+              disabled: true
           auth:
             type: bearer
             token: '{{token}}'
@@ -1722,6 +1736,13 @@ items:
           timeout: 0
           followRedirects: true
           maxRedirects: 5
+        docs: |
+          Lista los materiales de un grupo con paginación y filtros opcionales.
+          Respuesta esperada: 200 OK con { materials: [...], pagination: { totalCount, currentPage, totalPages, itemsPerPage } }
+
+          Filtros opcionales:
+          - pinned=true/false: filtra por materiales fijados
+          - tags=grafos,intro: filtra por tags (separados por coma)
       - info:
           name: Get Material
           type: http
@@ -1744,94 +1765,13 @@ items:
           timeout: 0
           followRedirects: true
           maxRedirects: 5
-      - info:
-          name: Publish Material
-          type: http
-          seq: 5
-        http:
-          method: POST
-          url: '{{baseUrl}}/groups/:groupId/materials/:materialId/publish'
-          params:
-            - name: groupId
-              value: 00000000-0000-0000-0000-000000000000
-              type: path
-            - name: materialId
-              value: 00000000-0000-0000-0000-000000000000
-              type: path
-          auth:
-            type: bearer
-            token: '{{token}}'
-        settings:
-          encodeUrl: true
-          timeout: 0
-          followRedirects: true
-          maxRedirects: 5
-      - info:
-          name: Unpublish Material
-          type: http
-          seq: 6
-        http:
-          method: POST
-          url: '{{baseUrl}}/groups/:groupId/materials/:materialId/unpublish'
-          params:
-            - name: groupId
-              value: 00000000-0000-0000-0000-000000000000
-              type: path
-            - name: materialId
-              value: 00000000-0000-0000-0000-000000000000
-              type: path
-          auth:
-            type: bearer
-            token: '{{token}}'
-        settings:
-          encodeUrl: true
-          timeout: 0
-          followRedirects: true
-          maxRedirects: 5
-      - info:
-          name: Pin Material
-          type: http
-          seq: 7
-        http:
-          method: POST
-          url: '{{baseUrl}}/groups/:groupId/materials/:materialId/pin'
-          params:
-            - name: groupId
-              value: 00000000-0000-0000-0000-000000000000
-              type: path
-            - name: materialId
-              value: 00000000-0000-0000-0000-000000000000
-              type: path
-          auth:
-            type: bearer
-            token: '{{token}}'
-        settings:
-          encodeUrl: true
-          timeout: 0
-          followRedirects: true
-          maxRedirects: 5
-      - info:
-          name: Unpin Material
-          type: http
-          seq: 8
-        http:
-          method: POST
-          url: '{{baseUrl}}/groups/:groupId/materials/:materialId/unpin'
-          params:
-            - name: groupId
-              value: 00000000-0000-0000-0000-000000000000
-              type: path
-            - name: materialId
-              value: 00000000-0000-0000-0000-000000000000
-              type: path
-          auth:
-            type: bearer
-            token: '{{token}}'
-        settings:
-          encodeUrl: true
-          timeout: 0
-          followRedirects: true
-          maxRedirects: 5
+        docs: |
+          Obtiene un material específico por su ID dentro de un grupo.
+          Respuesta esperada: 200 OK con { id, groupId, title, content, tags, status, pinned, pinnedAt, author, createdAt, updatedAt, publishedAt }
+
+          Errores posibles:
+          - 404 MATERIAL_NOT_FOUND: el materialId no existe en el grupo
+          - 401: sin autenticación
 bundled: true
 extensions:
   bruno:

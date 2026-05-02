@@ -1,3 +1,10 @@
+// @title           Training & Judge Center API
+// @version         1.0
+// @BasePath        /
+// @securityDefinitions.apikey BearerAuth
+// @in header
+// @name Authorization
+
 package main
 
 import (

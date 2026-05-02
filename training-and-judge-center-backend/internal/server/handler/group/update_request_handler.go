@@ -15,6 +15,20 @@ type updateRequestBody struct {
 	Status string `json:"status"`
 }
 
+// @Summary      Approve or reject a join request
+// @Tags         groups
+// @Accept       json
+// @Produce      json
+// @Security     BearerAuth
+// @Param        groupId path string true "Group ID"
+// @Param        requestId path string true "Request ID"
+// @Param        body body updateRequestBody true "New status (APPROVED or REJECTED)"
+// @Success      200 {object} joinRequestResp
+// @Failure      400 {object} apperror.AppError
+// @Failure      401 {object} apperror.AppError
+// @Failure      403 {object} apperror.AppError
+// @Failure      404 {object} apperror.AppError
+// @Router       /groups/{groupId}/requests/{requestId} [patch]
 func (h *Handler) UpdateJoinRequest(w http.ResponseWriter, r *http.Request) {
 	caller, ok := h.requireCurrentUser(w, r)
 	if !ok {

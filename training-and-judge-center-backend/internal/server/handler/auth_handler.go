@@ -36,6 +36,15 @@ func NewAuthHandler(loginUseCase *appuser.LoginUseCase) *AuthHandler {
 	return &AuthHandler{loginUseCase: loginUseCase}
 }
 
+// @Summary      Login
+// @Tags         auth
+// @Accept       json
+// @Produce      json
+// @Param        body body loginRequest true "Credentials"
+// @Success      200 {object} loginResponse
+// @Failure      400 {object} apperror.AppError
+// @Failure      401 {object} apperror.AppError
+// @Router       /auth/login [post]
 func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 	var req loginRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {

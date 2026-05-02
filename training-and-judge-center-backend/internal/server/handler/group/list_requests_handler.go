@@ -8,6 +8,20 @@ import (
 	"github.com/training-judge-center/backend/internal/server/handler"
 )
 
+// @Summary      List join requests for a group
+// @Tags         groups
+// @Produce      json
+// @Security     BearerAuth
+// @Param        groupId path string true "Group ID"
+// @Param        status query string false "Filter by status (PENDING, APPROVED, REJECTED)"
+// @Param        page query int false "Page number"
+// @Param        limit query int false "Items per page"
+// @Success      200 {object} listRequestsResponse
+// @Failure      400 {object} apperror.AppError
+// @Failure      401 {object} apperror.AppError
+// @Failure      403 {object} apperror.AppError
+// @Failure      404 {object} apperror.AppError
+// @Router       /groups/{groupId}/requests [get]
 func (h *Handler) ListJoinRequests(w http.ResponseWriter, r *http.Request) {
 	caller, ok := h.requireCurrentUser(w, r)
 	if !ok {

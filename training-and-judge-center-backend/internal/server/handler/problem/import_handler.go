@@ -12,6 +12,17 @@ import (
 	"github.com/training-judge-center/backend/pkg/apperror"
 )
 
+// @Summary      Import problem from ZIP
+// @Tags         problems
+// @Accept       multipart/form-data
+// @Produce      json
+// @Security     BearerAuth
+// @Param        slug formData string true "Problem slug"
+// @Param        file formData file true "ZIP archive"
+// @Success      201 {object} getProblemResponse
+// @Failure      400 {object} apperror.AppError
+// @Failure      401 {object} apperror.AppError
+// @Router       /problems/import [post]
 func (h *Handler) Import(w http.ResponseWriter, r *http.Request) {
 	claims := middleware.GetClaims(r.Context())
 	if claims == nil {
