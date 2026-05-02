@@ -1,6 +1,5 @@
 // @title           Training & Judge Center API
 // @version         1.0
-// @host            training-center-staging.duckdns.org
 // @BasePath        /
 // @securityDefinitions.apikey BearerAuth
 // @in header
