@@ -15,8 +15,9 @@ import (
 
 func main() {
 	_ = godotenv.Load()
-	cfg := config.Load()
 	ctx := context.Background()
+
+	slog.Info("seed: starting admin user bootstrap")
 
 	email := requireEnv("ADMIN_EMAIL")
 	password := requireEnv("ADMIN_PASSWORD")
@@ -30,7 +31,8 @@ func main() {
 		slog.Error("invalid ADMIN_EMAIL", "error", err)
 		os.Exit(1)
 	}
-	if _, err := domainUser.NewPassword(password); err != nil {
+	passwordVO, err := domainUser.NewPassword(password)
+	if err != nil {
 		slog.Error("invalid ADMIN_PASSWORD", "error", err)
 		os.Exit(1)
 	}
@@ -39,7 +41,13 @@ func main() {
 		os.Exit(1)
 	}
 
-	passwordVO, _ := domainUser.NewPassword(password)
+	cfg := &config.Config{
+		DBHost:     getEnv("DB_HOST", "localhost"),
+		DBPort:     getEnv("DB_PORT", "5432"),
+		DBUser:     getEnv("DB_USER", "postgres"),
+		DBPassword: getEnv("DB_PASSWORD", "postgres"),
+		DBName:     getEnv("DB_NAME", "training_center"),
+	}
 
 	pool, err := infraPostgres.NewConnectionPool(ctx, cfg)
 	if err != nil {
