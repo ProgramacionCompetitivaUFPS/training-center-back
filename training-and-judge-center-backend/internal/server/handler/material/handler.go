@@ -19,6 +19,7 @@ type Handler struct {
 	unpublishUC *appMaterial.UnpublishMaterial
 	pinUC       *appMaterial.PinMaterial
 	unpinUC     *appMaterial.UnpinMaterial
+	deleteUC    *appMaterial.DeleteMaterial
 }
 
 func NewHandler(
@@ -30,6 +31,7 @@ func NewHandler(
 	unpublishUC *appMaterial.UnpublishMaterial,
 	pinUC *appMaterial.PinMaterial,
 	unpinUC *appMaterial.UnpinMaterial,
+	deleteUC *appMaterial.DeleteMaterial,
 ) *Handler {
 	return &Handler{
 		createUC:    createUC,
@@ -40,6 +42,7 @@ func NewHandler(
 		unpublishUC: unpublishUC,
 		pinUC:       pinUC,
 		unpinUC:     unpinUC,
+		deleteUC:    deleteUC,
 	}
 }
 
