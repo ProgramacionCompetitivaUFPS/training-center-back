@@ -1,0 +1,46 @@
+CLAUDE.md
+  54066a909b1b6bda 8
+training-and-judge-center-backend/cmd/seed/main.go
+  54066a909b1b6bda 1-94
+training-and-judge-center-backend/.env.example
+  h_d193fb36118fbd 51
+  54066a909b1b6bda 42-50,52
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.3.4",
+  "base_commit_sha": "f200777646c1ac2f8dc78fcccb0cf4f6205ec051",
+  "prompts": {
+    "54066a909b1b6bda": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "0ff7082b-75d8-4d91-bd24-64697326108f",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "AlexaVJ",
+      "messages": [],
+      "total_additions": 283,
+      "total_deletions": 224,
+      "accepted_lines": 105,
+      "overriden_lines": 1
+    },
+    "908141ebc9c621b7": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "608a01a7-6b02-4e69-8af4-f5e199e0bfa7",
+        "model": "claude-haiku-4-5-20251001"
+      },
+      "human_author": "AlexaVJ",
+      "messages": [],
+      "total_additions": 6972,
+      "total_deletions": 9,
+      "accepted_lines": 274,
+      "overriden_lines": 4
+    }
+  },
+  "humans": {
+    "h_d193fb36118fbd": {
+      "author": "AlexaVJ"
+    }
+  }
+}
