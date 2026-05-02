@@ -1,0 +1,27 @@
+training-and-judge-center-backend/cmd/seed/main.go
+  54066a909b1b6bda 23-27
+.github/workflows/cd.yml
+  54066a909b1b6bda 81,83
+training-and-judge-center-backend/.env.example
+  54066a909b1b6bda 45,48-52
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.3.4",
+  "base_commit_sha": "ac7dfcf0b1bd1b0ec4e797b30ab31b52e5aac1f0",
+  "prompts": {
+    "54066a909b1b6bda": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "0ff7082b-75d8-4d91-bd24-64697326108f",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "AlexaVJ",
+      "messages": [],
+      "total_additions": 159,
+      "total_deletions": 178,
+      "accepted_lines": 13,
+      "overriden_lines": 0
+    }
+  }
+}
