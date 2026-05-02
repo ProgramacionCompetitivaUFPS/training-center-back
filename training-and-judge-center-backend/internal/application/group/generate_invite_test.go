@@ -151,6 +151,29 @@ func TestGenerateInvite_AdminReturnsToken(t *testing.T) {
 	}
 }
 
+func TestGenerateInvite_AdminOnOpenGroupReturns403ForPolicy(t *testing.T) {
+	g := mustGroup(t, "g1", "Open Club", domainGroup.VisibilityVisible, domainGroup.JoinPolicyOpen)
+	svc := &fakeInvitationSvc{token: "tok"}
+	uc := NewGenerateInviteUseCase(
+		&fakeRepo{groups: []*domainGroup.Group{g}},
+		&fakeMemberRepo{}, // admin bypasses member check
+		svc,
+	)
+
+	_, err := uc.Execute(context.Background(), GenerateInviteInput{
+		GroupID:     "g1",
+		CurrentUser: currentUser("u1", shared.RoleAdmin),
+	})
+
+	ae, ok := err.(*apperror.AppError)
+	if !ok || ae.Code != domainGroup.ErrCodeInsufficientPermissions {
+		t.Fatalf("expected INSUFFICIENT_PERMISSIONS for wrong policy, got %v", err)
+	}
+	if ae.StatusCode != 403 {
+		t.Errorf("expected HTTP 403, got %d", ae.StatusCode)
+	}
+}
+
 func TestGenerateInvite_ServiceErrorPropagates(t *testing.T) {
 	g := inviteGroup(t)
 	svc := &fakeInvitationSvc{genErr: errors.New("signing failed")}

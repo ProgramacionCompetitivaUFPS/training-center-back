@@ -21,8 +21,7 @@ type TransactionManager interface {
 }
 
 type InvitationClaims struct {
-	GroupID   string
-	InviterID string
+	GroupID string
 }
 
 type InvitationTokenService interface {

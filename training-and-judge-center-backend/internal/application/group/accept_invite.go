@@ -48,8 +48,13 @@ func (uc *AcceptInviteUseCase) Execute(ctx context.Context, input AcceptInviteIn
 		return nil, err
 	}
 
-	if _, err := uc.groupRepo.FindByID(ctx, claims.GroupID); err != nil {
+	g, err := uc.groupRepo.FindByID(ctx, claims.GroupID)
+	if err != nil {
 		return nil, err
+	}
+
+	if g.JoinPolicy() != domainGroup.JoinPolicyInvite {
+		return nil, apperror.NewForbidden(domainGroup.ErrCodeInsufficientPermissions, "this group no longer accepts invitations")
 	}
 
 	userID := shared.RestoreUserID(input.CurrentUser.ID)

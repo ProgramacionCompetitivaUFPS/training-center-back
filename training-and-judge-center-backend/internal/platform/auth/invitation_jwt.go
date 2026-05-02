@@ -11,7 +11,10 @@ import (
 	"github.com/training-judge-center/backend/pkg/apperror"
 )
 
-const invitationTokenDuration = 72 * time.Hour
+const (
+	invitationTokenDuration = 72 * time.Hour
+	invitationIssuer        = "group-invite"
+)
 
 type invitationJWTClaims struct {
 	GroupID   string `json:"group_id"`
@@ -32,6 +35,7 @@ func (s *GroupInvitationJWTService) GenerateInviteToken(groupID, inviterID strin
 		GroupID:   groupID,
 		InviterID: inviterID,
 		RegisteredClaims: jwt.RegisteredClaims{
+			Issuer:    invitationIssuer,
 			IssuedAt:  jwt.NewNumericDate(time.Now()),
 			ExpiresAt: jwt.NewNumericDate(time.Now().Add(invitationTokenDuration)),
 		},
@@ -50,7 +54,7 @@ func (s *GroupInvitationJWTService) ValidateInviteToken(tokenString string) (*ap
 			return nil, fmt.Errorf("unexpected signing method: %v", t.Header["alg"])
 		}
 		return s.secret, nil
-	})
+	}, jwt.WithIssuer(invitationIssuer))
 	if err != nil {
 		if errors.Is(err, jwt.ErrTokenExpired) {
 			return nil, apperror.NewBadRequest(domainGroup.ErrCodeExpiredInviteToken, "invitation link has expired")
@@ -63,8 +67,11 @@ func (s *GroupInvitationJWTService) ValidateInviteToken(tokenString string) (*ap
 		return nil, apperror.NewBadRequest(domainGroup.ErrCodeInvalidInviteToken, "invalid invitation token")
 	}
 
+	if claims.GroupID == "" {
+		return nil, apperror.NewBadRequest(domainGroup.ErrCodeInvalidInviteToken, "invalid invitation token")
+	}
+
 	return &appGroup.InvitationClaims{
-		GroupID:   claims.GroupID,
-		InviterID: claims.InviterID,
+		GroupID: claims.GroupID,
 	}, nil
 }

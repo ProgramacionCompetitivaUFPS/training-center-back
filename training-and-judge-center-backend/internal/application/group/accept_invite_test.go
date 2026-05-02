@@ -61,7 +61,7 @@ func TestAcceptInvite_ExpiredTokenPropagatesError(t *testing.T) {
 }
 
 func TestAcceptInvite_GroupNotFoundReturns404(t *testing.T) {
-	svc := &fakeInvitationSvc{claims: &InvitationClaims{GroupID: "nonexistent", InviterID: "lead1"}}
+	svc := &fakeInvitationSvc{claims: &InvitationClaims{GroupID: "nonexistent"}}
 	uc := NewAcceptInviteUseCase(&fakeRepo{}, &fakeMemberRepo{}, svc)
 
 	_, err := uc.Execute(context.Background(), AcceptInviteInput{
@@ -75,6 +75,25 @@ func TestAcceptInvite_GroupNotFoundReturns404(t *testing.T) {
 	}
 }
 
+func TestAcceptInvite_PolicyChangedReturns403(t *testing.T) {
+	g := mustGroup(t, "g1", "Open Club", domainGroup.VisibilityVisible, domainGroup.JoinPolicyOpen)
+	svc := &fakeInvitationSvc{claims: &InvitationClaims{GroupID: "g1"}}
+	uc := NewAcceptInviteUseCase(&fakeRepo{groups: []*domainGroup.Group{g}}, &fakeMemberRepo{}, svc)
+
+	_, err := uc.Execute(context.Background(), AcceptInviteInput{
+		Token:       "valid.token",
+		CurrentUser: currentUser("u1", shared.RoleContestant),
+	})
+
+	ae, ok := err.(*apperror.AppError)
+	if !ok || ae.Code != domainGroup.ErrCodeInsufficientPermissions {
+		t.Fatalf("expected INSUFFICIENT_PERMISSIONS, got %v", err)
+	}
+	if ae.StatusCode != 403 {
+		t.Errorf("expected HTTP 403, got %d", ae.StatusCode)
+	}
+}
+
 func TestAcceptInvite_AlreadyMemberReturns409(t *testing.T) {
 	g := inviteGroup(t)
 	userID := shared.RestoreUserID("u1")
@@ -84,7 +103,7 @@ func TestAcceptInvite_AlreadyMemberReturns409(t *testing.T) {
 			keyOf("g1", userID): existing,
 		},
 	}
-	svc := &fakeInvitationSvc{claims: &InvitationClaims{GroupID: "g1", InviterID: "lead1"}}
+	svc := &fakeInvitationSvc{claims: &InvitationClaims{GroupID: "g1"}}
 	uc := NewAcceptInviteUseCase(&fakeRepo{groups: []*domainGroup.Group{g}}, memberRepo, svc)
 
 	_, err := uc.Execute(context.Background(), AcceptInviteInput{
@@ -104,7 +123,7 @@ func TestAcceptInvite_AlreadyMemberReturns409(t *testing.T) {
 func TestAcceptInvite_SuccessCreatesMemberWithRoleMember(t *testing.T) {
 	g := inviteGroup(t)
 	memberRepo := &fakeMemberRepo{}
-	svc := &fakeInvitationSvc{claims: &InvitationClaims{GroupID: "g1", InviterID: "lead1"}}
+	svc := &fakeInvitationSvc{claims: &InvitationClaims{GroupID: "g1"}}
 	uc := NewAcceptInviteUseCase(&fakeRepo{groups: []*domainGroup.Group{g}}, memberRepo, svc)
 
 	out, err := uc.Execute(context.Background(), AcceptInviteInput{
@@ -135,7 +154,7 @@ func TestAcceptInvite_SuccessCreatesMemberWithRoleMember(t *testing.T) {
 func TestAcceptInvite_SaveFailurePropagatesError(t *testing.T) {
 	g := inviteGroup(t)
 	memberRepo := &fakeMemberRepo{saveErr: errors.New("db failure")}
-	svc := &fakeInvitationSvc{claims: &InvitationClaims{GroupID: "g1", InviterID: "lead1"}}
+	svc := &fakeInvitationSvc{claims: &InvitationClaims{GroupID: "g1"}}
 	uc := NewAcceptInviteUseCase(&fakeRepo{groups: []*domainGroup.Group{g}}, memberRepo, svc)
 
 	_, err := uc.Execute(context.Background(), AcceptInviteInput{
