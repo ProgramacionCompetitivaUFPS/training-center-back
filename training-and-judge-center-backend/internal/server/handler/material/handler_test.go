@@ -102,6 +102,7 @@ func handlerWithRepo(repo domainMaterial.Repository) *Handler {
 		appMaterial.NewUnpublishMaterial(repo, &stubGroupProvider{}, &stubAuthorProvider{}),
 		appMaterial.NewPinMaterial(repo, &stubGroupProvider{}, &stubGroupMemberProvider{}, &stubAuthorProvider{}),
 		appMaterial.NewUnpinMaterial(repo, &stubGroupProvider{}, &stubGroupMemberProvider{}, &stubAuthorProvider{}),
+		appMaterial.NewDeleteMaterial(repo, &stubGroupProvider{}),
 	)
 }
 
@@ -219,6 +220,7 @@ func TestCreateMaterial_Forbidden_Returns403(t *testing.T) {
 		appMaterial.NewUnpublishMaterial(&stubMaterialRepo{}, &stubGroupProvider{}, &stubAuthorProvider{}),
 		appMaterial.NewPinMaterial(&stubMaterialRepo{}, &stubGroupProvider{}, &stubGroupMemberProvider{}, &stubAuthorProvider{}),
 		appMaterial.NewUnpinMaterial(&stubMaterialRepo{}, &stubGroupProvider{}, &stubGroupMemberProvider{}, &stubAuthorProvider{}),
+		appMaterial.NewDeleteMaterial(&stubMaterialRepo{}, &stubGroupProvider{}),
 	)
 
 	body, _ := json.Marshal(map[string]string{"title": "My Material"})
@@ -260,6 +262,7 @@ func TestUpdateMaterial_ValidRequest_Returns200(t *testing.T) {
 		appMaterial.NewUnpublishMaterial(&stubMaterialRepo{}, &stubGroupProvider{}, &stubAuthorProvider{}),
 		appMaterial.NewPinMaterial(&stubMaterialRepo{}, &stubGroupProvider{}, &stubGroupMemberProvider{}, &stubAuthorProvider{}),
 		appMaterial.NewUnpinMaterial(&stubMaterialRepo{}, &stubGroupProvider{}, &stubGroupMemberProvider{}, &stubAuthorProvider{}),
+		appMaterial.NewDeleteMaterial(&stubMaterialRepo{}, &stubGroupProvider{}),
 	)
 
 	body, _ := json.Marshal(map[string]string{"title": "Updated"})
@@ -414,6 +417,7 @@ func TestGetMaterial_ValidRequest_Returns200(t *testing.T) {
 		appMaterial.NewUnpublishMaterial(repo, &stubGroupProvider{}, &stubAuthorProvider{}),
 		appMaterial.NewPinMaterial(repo, &stubGroupProvider{}, &stubGroupMemberProvider{}, &stubAuthorProvider{}),
 		appMaterial.NewUnpinMaterial(repo, &stubGroupProvider{}, &stubGroupMemberProvider{}, &stubAuthorProvider{}),
+		appMaterial.NewDeleteMaterial(repo, &stubGroupProvider{}),
 	)
 
 	r := authedRequest(http.MethodGet, "/groups/g1/materials/m1", nil)
@@ -448,6 +452,7 @@ func TestGetMaterial_Forbidden_Returns403(t *testing.T) {
 		appMaterial.NewUnpublishMaterial(&stubMaterialRepo{}, &stubGroupProvider{}, &stubAuthorProvider{}),
 		appMaterial.NewPinMaterial(&stubMaterialRepo{}, &stubGroupProvider{}, &stubGroupMemberProvider{}, &stubAuthorProvider{}),
 		appMaterial.NewUnpinMaterial(&stubMaterialRepo{}, &stubGroupProvider{}, &stubGroupMemberProvider{}, &stubAuthorProvider{}),
+		appMaterial.NewDeleteMaterial(&stubMaterialRepo{}, &stubGroupProvider{}),
 	)
 	r := authedRequest(http.MethodGet, "/groups/g1/materials/m1", nil)
 	r.SetPathValue("groupId", "g1")
