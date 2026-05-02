@@ -2,6 +2,7 @@ package material
 
 import (
 	"context"
+	"errors"
 	"time"
 
 	domainMaterial "github.com/training-judge-center/backend/internal/domain/material"
@@ -244,4 +245,8 @@ func groupExists() *mockGroupProvider {
 
 func groupNotFound() *mockGroupProvider {
 	return &mockGroupProvider{existsFn: func(_ context.Context, _ string) (bool, error) { return false, nil }}
+}
+
+func groupProviderError() *mockGroupProvider {
+	return &mockGroupProvider{existsFn: func(_ context.Context, _ string) (bool, error) { return false, errors.New("db timeout") }}
 }

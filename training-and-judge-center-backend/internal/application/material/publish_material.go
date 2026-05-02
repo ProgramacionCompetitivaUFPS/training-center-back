@@ -51,14 +51,17 @@ func (uc *PublishMaterial) Execute(ctx context.Context, in PublishMaterialInput)
 		return nil, apperror.NewNotFound(domainMaterial.ErrCodeMaterialNotFound, "material not found")
 	}
 
+	// Publish/unpublish is restricted to the author (and admins) — group leads are intentionally
+	// excluded. Leads can pin/unpin to control visibility within the feed, but deciding whether
+	// content is published at all is an authorship decision.
 	if !m.CanBeEditedBy(shared.RestoreUserID(in.CurrentUser.ID), in.CurrentUser.IsAdmin()) {
 		return nil, apperror.NewForbidden(ErrCodeNotMaterialAuthor, "only the material author can publish this material")
 	}
 
+	// Idempotent: already-published materials return 200 with current state.
 	if !m.Status().IsPublished() {
 		if err := m.Publish(); err != nil {
-			slog.ErrorContext(ctx, "unexpected error publishing material", "error", err, "material_id", in.MaterialID)
-			return nil, apperror.NewInternal()
+			return nil, err
 		}
 		if err := uc.repo.Save(ctx, m); err != nil {
 			slog.ErrorContext(ctx, "failed to save published material", "error", err, "material_id", in.MaterialID)
@@ -69,10 +72,10 @@ func (uc *PublishMaterial) Execute(ctx context.Context, in PublishMaterialInput)
 	data := toMaterialData(m)
 	displays, err := uc.authorProvider.GetDisplays(ctx, []string{m.AuthorID().Value()})
 	if err != nil {
-		slog.ErrorContext(ctx, "failed to resolve author display", "error", err, "author_id", m.AuthorID().Value())
-		return nil, apperror.NewInternal()
+		slog.WarnContext(ctx, "failed to resolve author display, returning without author info", "error", err, "author_id", m.AuthorID().Value())
+	} else {
+		data.Author = displays[m.AuthorID().Value()]
 	}
-	data.Author = displays[m.AuthorID().Value()]
 
 	return &PublishMaterialOutput{Material: data}, nil
 }

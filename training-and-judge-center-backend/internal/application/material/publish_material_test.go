@@ -152,6 +152,21 @@ func TestPublishMaterial_MaterialInOtherGroup(t *testing.T) {
 	}
 }
 
+func TestPublishMaterial_GroupProviderError_Returns500(t *testing.T) {
+	uc := newPublishUC(&mockMaterialRepository{}, groupProviderError())
+
+	_, err := uc.Execute(context.Background(), PublishMaterialInput{
+		CurrentUser: asCoach(testAuthorID),
+		GroupID:     testGroupID,
+		MaterialID:  testMaterialID,
+	})
+
+	var appErr *apperror.AppError
+	if !errors.As(err, &appErr) || appErr.Code != apperror.ErrCodeInternalError {
+		t.Errorf("expected INTERNAL_ERROR from group provider failure, got %v", err)
+	}
+}
+
 func TestPublishMaterial_SaveError(t *testing.T) {
 	m := newTestMaterial()
 	repo := &mockMaterialRepository{

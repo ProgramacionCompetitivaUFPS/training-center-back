@@ -67,24 +67,26 @@ func (uc *UnpinMaterial) Execute(ctx context.Context, in UnpinMaterialInput) (*U
 		}
 	}
 
-	if !m.CanBePinnedBy(shared.RestoreUserID(in.CurrentUser.ID), in.CurrentUser.IsAdmin(), isGroupLead) {
-		return nil, apperror.NewForbidden(ErrCodeInsufficientPerms, "only group leads can unpin materials")
+	if !m.CanModifyPinStateBy(shared.RestoreUserID(in.CurrentUser.ID), in.CurrentUser.IsAdmin(), isGroupLead) {
+		return nil, apperror.NewForbidden(ErrCodeInsufficientPerms, "only the material author, a group lead, or an admin can unpin materials")
 	}
 
-	m.Unpin()
-
-	if err := uc.repo.Save(ctx, m); err != nil {
-		slog.ErrorContext(ctx, "failed to save unpinned material", "error", err, "material_id", in.MaterialID)
-		return nil, apperror.NewInternal()
+	// Idempotent: already-unpinned materials return 200 with current state.
+	if m.Pinned() {
+		m.Unpin()
+		if err := uc.repo.Save(ctx, m); err != nil {
+			slog.ErrorContext(ctx, "failed to save unpinned material", "error", err, "material_id", in.MaterialID)
+			return nil, apperror.NewInternal()
+		}
 	}
 
 	data := toMaterialData(m)
 	displays, err := uc.authorProvider.GetDisplays(ctx, []string{m.AuthorID().Value()})
 	if err != nil {
-		slog.ErrorContext(ctx, "failed to resolve author display", "error", err, "author_id", m.AuthorID().Value())
-		return nil, apperror.NewInternal()
+		slog.WarnContext(ctx, "failed to resolve author display, returning without author info", "error", err, "author_id", m.AuthorID().Value())
+	} else {
+		data.Author = displays[m.AuthorID().Value()]
 	}
-	data.Author = displays[m.AuthorID().Value()]
 
 	return &UnpinMaterialOutput{Material: data}, nil
 }

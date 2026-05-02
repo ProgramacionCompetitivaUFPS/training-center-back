@@ -139,6 +139,41 @@ func TestUnpublishMaterial_Forbidden_NonAuthorLead(t *testing.T) {
 	}
 }
 
+func TestUnpublishMaterial_GroupProviderError_Returns500(t *testing.T) {
+	uc := newUnpublishUC(&mockMaterialRepository{}, groupProviderError())
+
+	_, err := uc.Execute(context.Background(), UnpublishMaterialInput{
+		CurrentUser: asCoach(testAuthorID),
+		GroupID:     testGroupID,
+		MaterialID:  testMaterialID,
+	})
+
+	var appErr *apperror.AppError
+	if !errors.As(err, &appErr) || appErr.Code != apperror.ErrCodeInternalError {
+		t.Errorf("expected INTERNAL_ERROR from group provider failure, got %v", err)
+	}
+}
+
+func TestUnpublishMaterial_SaveError(t *testing.T) {
+	m := newPublishedMaterial()
+	repo := &mockMaterialRepository{
+		findByIDFn: func(_ context.Context, _ string) (*domainMaterial.Material, error) { return m, nil },
+		saveFn:     func(_ context.Context, _ *domainMaterial.Material) error { return errors.New("db error") },
+	}
+	uc := newUnpublishUC(repo, groupExists())
+
+	_, err := uc.Execute(context.Background(), UnpublishMaterialInput{
+		CurrentUser: asCoach(testAuthorID),
+		GroupID:     testGroupID,
+		MaterialID:  testMaterialID,
+	})
+
+	var appErr *apperror.AppError
+	if !errors.As(err, &appErr) || appErr.Code != apperror.ErrCodeInternalError {
+		t.Errorf("expected INTERNAL_ERROR from save failure, got %v", err)
+	}
+}
+
 func TestUnpublishMaterial_GroupNotFound(t *testing.T) {
 	uc := newUnpublishUC(&mockMaterialRepository{}, groupNotFound())
 
@@ -151,6 +186,21 @@ func TestUnpublishMaterial_GroupNotFound(t *testing.T) {
 	var appErr *apperror.AppError
 	if !errors.As(err, &appErr) || appErr.Code != ErrCodeGroupNotFound {
 		t.Errorf("expected GROUP_NOT_FOUND, got %v", err)
+	}
+}
+
+func TestUnpublishMaterial_MaterialNotFound(t *testing.T) {
+	uc := newUnpublishUC(&mockMaterialRepository{}, groupExists())
+
+	_, err := uc.Execute(context.Background(), UnpublishMaterialInput{
+		CurrentUser: asCoach(testAuthorID),
+		GroupID:     testGroupID,
+		MaterialID:  "nonexistent",
+	})
+
+	var appErr *apperror.AppError
+	if !errors.As(err, &appErr) || appErr.Code != domainMaterial.ErrCodeMaterialNotFound {
+		t.Errorf("expected MATERIAL_NOT_FOUND, got %v", err)
 	}
 }
 

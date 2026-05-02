@@ -78,6 +78,31 @@ func TestPinMaterial_SuccessByAdmin(t *testing.T) {
 	}
 }
 
+func TestPinMaterial_Admin_SkipsLeadCheck(t *testing.T) {
+	m := newPublishedMaterial()
+	leadCheckCalled := false
+	member := &mockGroupMemberProvider{
+		isLeadFn: func(_ context.Context, _, _ string) (bool, error) {
+			leadCheckCalled = true
+			return false, errors.New("should not be called")
+		},
+	}
+	uc := newPinUC(repoWith(m), groupExists(), member)
+
+	_, err := uc.Execute(context.Background(), PinMaterialInput{
+		CurrentUser: asAdmin(testOtherID),
+		GroupID:     testGroupID,
+		MaterialID:  testMaterialID,
+	})
+
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if leadCheckCalled {
+		t.Error("IsLeadOfGroup must not be called for admin users")
+	}
+}
+
 func TestPinMaterial_Idempotent_AlreadyPinned(t *testing.T) {
 	m := newPinnedMaterial()
 	originalPinnedAt := m.PinnedAt()
@@ -129,6 +154,42 @@ func TestPinMaterial_Forbidden_Member(t *testing.T) {
 	var appErr *apperror.AppError
 	if !errors.As(err, &appErr) || appErr.Code != ErrCodeInsufficientPerms {
 		t.Errorf("expected INSUFFICIENT_PERMISSIONS, got %v", err)
+	}
+}
+
+func TestPinMaterial_MemberProviderError_Returns500(t *testing.T) {
+	m := newPublishedMaterial()
+	member := &mockGroupMemberProvider{
+		isLeadFn: func(_ context.Context, _, _ string) (bool, error) {
+			return false, errors.New("db timeout")
+		},
+	}
+	uc := newPinUC(repoWith(m), groupExists(), member)
+
+	_, err := uc.Execute(context.Background(), PinMaterialInput{
+		CurrentUser: asCoach(testOtherID),
+		GroupID:     testGroupID,
+		MaterialID:  testMaterialID,
+	})
+
+	var appErr *apperror.AppError
+	if !errors.As(err, &appErr) || appErr.Code != apperror.ErrCodeInternalError {
+		t.Errorf("expected INTERNAL_ERROR from member provider failure, got %v", err)
+	}
+}
+
+func TestPinMaterial_GroupProviderError_Returns500(t *testing.T) {
+	uc := newPinUC(&mockMaterialRepository{}, groupProviderError(), notLead())
+
+	_, err := uc.Execute(context.Background(), PinMaterialInput{
+		CurrentUser: asCoach(testAuthorID),
+		GroupID:     testGroupID,
+		MaterialID:  testMaterialID,
+	})
+
+	var appErr *apperror.AppError
+	if !errors.As(err, &appErr) || appErr.Code != apperror.ErrCodeInternalError {
+		t.Errorf("expected INTERNAL_ERROR from group provider failure, got %v", err)
 	}
 }
 

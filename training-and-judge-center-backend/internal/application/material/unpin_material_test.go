@@ -60,6 +60,49 @@ func TestUnpinMaterial_SuccessByOtherLead(t *testing.T) {
 	}
 }
 
+func TestUnpinMaterial_SuccessByAdmin(t *testing.T) {
+	m := newPinnedMaterial()
+	uc := newUnpinUC(repoWith(m), groupExists(), notLead())
+
+	out, err := uc.Execute(context.Background(), UnpinMaterialInput{
+		CurrentUser: asAdmin(testOtherID),
+		GroupID:     testGroupID,
+		MaterialID:  testMaterialID,
+	})
+
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if out.Material.Pinned {
+		t.Error("expected pinned=false after admin unpin")
+	}
+}
+
+func TestUnpinMaterial_Admin_SkipsLeadCheck(t *testing.T) {
+	m := newPinnedMaterial()
+	leadCheckCalled := false
+	member := &mockGroupMemberProvider{
+		isLeadFn: func(_ context.Context, _, _ string) (bool, error) {
+			leadCheckCalled = true
+			return false, errors.New("should not be called")
+		},
+	}
+	uc := newUnpinUC(repoWith(m), groupExists(), member)
+
+	_, err := uc.Execute(context.Background(), UnpinMaterialInput{
+		CurrentUser: asAdmin(testOtherID),
+		GroupID:     testGroupID,
+		MaterialID:  testMaterialID,
+	})
+
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if leadCheckCalled {
+		t.Error("IsLeadOfGroup must not be called for admin users")
+	}
+}
+
 func TestUnpinMaterial_Idempotent_AlreadyUnpinned(t *testing.T) {
 	m := newPublishedMaterial()
 	uc := newUnpinUC(repoWith(m), groupExists(), notLead())
@@ -94,6 +137,42 @@ func TestUnpinMaterial_Forbidden_Member(t *testing.T) {
 	var appErr *apperror.AppError
 	if !errors.As(err, &appErr) || appErr.Code != ErrCodeInsufficientPerms {
 		t.Errorf("expected INSUFFICIENT_PERMISSIONS, got %v", err)
+	}
+}
+
+func TestUnpinMaterial_MemberProviderError_Returns500(t *testing.T) {
+	m := newPinnedMaterial()
+	member := &mockGroupMemberProvider{
+		isLeadFn: func(_ context.Context, _, _ string) (bool, error) {
+			return false, errors.New("db timeout")
+		},
+	}
+	uc := newUnpinUC(repoWith(m), groupExists(), member)
+
+	_, err := uc.Execute(context.Background(), UnpinMaterialInput{
+		CurrentUser: asCoach(testOtherID),
+		GroupID:     testGroupID,
+		MaterialID:  testMaterialID,
+	})
+
+	var appErr *apperror.AppError
+	if !errors.As(err, &appErr) || appErr.Code != apperror.ErrCodeInternalError {
+		t.Errorf("expected INTERNAL_ERROR from member provider failure, got %v", err)
+	}
+}
+
+func TestUnpinMaterial_GroupProviderError_Returns500(t *testing.T) {
+	uc := newUnpinUC(&mockMaterialRepository{}, groupProviderError(), notLead())
+
+	_, err := uc.Execute(context.Background(), UnpinMaterialInput{
+		CurrentUser: asCoach(testAuthorID),
+		GroupID:     testGroupID,
+		MaterialID:  testMaterialID,
+	})
+
+	var appErr *apperror.AppError
+	if !errors.As(err, &appErr) || appErr.Code != apperror.ErrCodeInternalError {
+		t.Errorf("expected INTERNAL_ERROR from group provider failure, got %v", err)
 	}
 }
 
