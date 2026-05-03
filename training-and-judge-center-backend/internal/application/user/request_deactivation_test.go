@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/training-judge-center/backend/internal/domain/notification"
+	"github.com/training-judge-center/backend/internal/application/shared"
 	domain "github.com/training-judge-center/backend/internal/domain/user"
 	"github.com/training-judge-center/backend/pkg/apperror"
 )
@@ -78,7 +78,7 @@ func TestRequestDeactivation_Success(t *testing.T) {
 
 	emailSent := false
 	mockEmail := &mockEmailSender{
-		sendFn: func(ctx context.Context, msg notification.EmailMessage) error {
+		sendFn: func(ctx context.Context, msg shared.EmailMessage) error {
 			emailSent = true
 			if msg.To != "user-1@example.com" {
 				t.Errorf("expected user@example.com, got %s", msg.To)
@@ -205,7 +205,7 @@ func TestRequestDeactivation_EmailDeliveryFailure(t *testing.T) {
 	userRepo.findByIDFn = func(_ context.Context, _ string) (*domain.User, error) { return activeUser, nil }
 
 	emailSender := &mockEmailSender{
-		sendFn: func(_ context.Context, _ notification.EmailMessage) error {
+		sendFn: func(_ context.Context, _ shared.EmailMessage) error {
 			return errors.New("smtp error")
 		},
 	}

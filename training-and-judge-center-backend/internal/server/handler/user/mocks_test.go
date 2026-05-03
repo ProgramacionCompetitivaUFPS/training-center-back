@@ -4,7 +4,7 @@ import (
 	"context"
 	"time"
 
-	"github.com/training-judge-center/backend/internal/domain/notification"
+	"github.com/training-judge-center/backend/internal/application/shared"
 	domainuser "github.com/training-judge-center/backend/internal/domain/user"
 )
 
@@ -151,7 +151,7 @@ func (m *mockHandlerDeactAuditRepo) Save(_ context.Context, _ *domainuser.Deacti
 
 type mockHandlerEmailSender struct{}
 
-func (m *mockHandlerEmailSender) Send(_ context.Context, _ notification.EmailMessage) error {
+func (m *mockHandlerEmailSender) Send(_ context.Context, _ shared.EmailMessage) error {
 	return nil
 }
 

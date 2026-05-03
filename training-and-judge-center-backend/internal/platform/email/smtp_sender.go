@@ -8,7 +8,7 @@ import (
 	"net/smtp"
 	"strings"
 
-	"github.com/training-judge-center/backend/internal/domain/notification"
+	"github.com/training-judge-center/backend/internal/application/shared"
 )
 
 type SMTPSender struct {
@@ -29,7 +29,7 @@ func NewSMTPSender(host, port, username, password, from string) *SMTPSender {
 	}
 }
 
-func (s *SMTPSender) Send(ctx context.Context, msg notification.EmailMessage) error {
+func (s *SMTPSender) Send(ctx context.Context, msg shared.EmailMessage) error {
 	toAddr, err := mail.ParseAddress(msg.To)
 	if err != nil {
 		return fmt.Errorf("invalid recipient address: %w", err)

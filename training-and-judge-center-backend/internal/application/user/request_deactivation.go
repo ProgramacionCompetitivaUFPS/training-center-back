@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/training-judge-center/backend/internal/domain/notification"
+	"github.com/training-judge-center/backend/internal/application/shared"
 	"github.com/training-judge-center/backend/internal/domain/user"
 	"github.com/training-judge-center/backend/pkg/apperror"
 )
@@ -19,13 +19,13 @@ type RequestDeactivationInput struct {
 type RequestDeactivationUseCase struct {
 	userRepo        user.UserRepository
 	deactRepo       user.DeactivationRequestRepository
-	emailSender     notification.EmailSender
+	emailSender     shared.EmailSender
 }
 
 func NewRequestDeactivationUseCase(
 	userRepo user.UserRepository,
 	deactRepo user.DeactivationRequestRepository,
-	emailSender notification.EmailSender,
+	emailSender shared.EmailSender,
 ) *RequestDeactivationUseCase {
 	return &RequestDeactivationUseCase{
 		userRepo:    userRepo,
@@ -69,7 +69,7 @@ func (uc *RequestDeactivationUseCase) Execute(ctx context.Context, input Request
 		return apperror.NewInternal()
 	}
 
-	if err := uc.emailSender.Send(ctx, notification.EmailMessage{
+	if err := uc.emailSender.Send(ctx, shared.EmailMessage{
 		To:      foundUser.Email().String(),
 		Subject: "Account Deactivation Code",
 		Body:    fmt.Sprintf("You requested to deactivate your account.\n\nYour confirmation code is: %s\n\nThis code will expire in 15 minutes. Note: Confirming this code will completely anonymize your account and log you out immediately.", code),

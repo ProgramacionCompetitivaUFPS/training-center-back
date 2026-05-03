@@ -7,8 +7,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/training-judge-center/backend/internal/domain/notification"
-	"github.com/training-judge-center/backend/internal/domain/ratelimit"
+	"github.com/training-judge-center/backend/internal/application/shared"
 	"github.com/training-judge-center/backend/internal/domain/user"
 	"github.com/training-judge-center/backend/pkg/apperror"
 )
@@ -20,15 +19,15 @@ type RequestPasswordRecoveryInput struct {
 type RequestPasswordRecoveryUseCase struct {
 	userRepo     user.UserRepository
 	recoveryRepo user.PasswordRecoveryRepository
-	emailSender  notification.EmailSender
-	rateLimiter  ratelimit.RateLimiter
+	emailSender  shared.EmailSender
+	rateLimiter  shared.RateLimiter
 }
 
 func NewRequestPasswordRecoveryUseCase(
 	userRepo user.UserRepository,
 	recoveryRepo user.PasswordRecoveryRepository,
-	emailSender notification.EmailSender,
-	rateLimiter ratelimit.RateLimiter,
+	emailSender shared.EmailSender,
+	rateLimiter shared.RateLimiter,
 ) *RequestPasswordRecoveryUseCase {
 	return &RequestPasswordRecoveryUseCase{
 		userRepo:     userRepo,
@@ -88,7 +87,7 @@ func (uc *RequestPasswordRecoveryUseCase) Execute(ctx context.Context, input Req
 		return apperror.NewInternal()
 	}
 
-	if err := uc.emailSender.Send(ctx, notification.EmailMessage{
+	if err := uc.emailSender.Send(ctx, shared.EmailMessage{
 		To:      foundUser.Email().String(),
 		Subject: "Password Recovery Code",
 		Body:    fmt.Sprintf("Your password recovery code is: %s\nThis code will expire in 15 minutes.", code),

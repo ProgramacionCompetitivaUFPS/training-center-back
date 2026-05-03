@@ -6,7 +6,7 @@ import (
 	"net/http"
 	"testing"
 
-	"github.com/training-judge-center/backend/internal/domain/notification"
+	"github.com/training-judge-center/backend/internal/application/shared"
 	domain "github.com/training-judge-center/backend/internal/domain/user"
 	"github.com/training-judge-center/backend/pkg/apperror"
 )
@@ -24,7 +24,7 @@ func TestRequestEmailChange_Success(t *testing.T) {
 	
 	emailSent := false
 	mockEmail := &mockEmailSender{
-		sendFn: func(ctx context.Context, msg notification.EmailMessage) error {
+		sendFn: func(ctx context.Context, msg shared.EmailMessage) error {
 			emailSent = true
 			if msg.To != "newemail@example.com" {
 				t.Errorf("expected email to be sent to newemail@example.com, got %s", msg.To)
@@ -138,7 +138,7 @@ func TestRequestEmailChange_EmailDeliveryFails(t *testing.T) {
 	
 	// Simulate SMTP failure
 	mockEmail := &mockEmailSender{
-		sendFn: func(ctx context.Context, msg notification.EmailMessage) error {
+		sendFn: func(ctx context.Context, msg shared.EmailMessage) error {
 			return errors.New("smtp timeout")
 		},
 	}
