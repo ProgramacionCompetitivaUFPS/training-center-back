@@ -1642,6 +1642,188 @@ items:
             docs: |
               Error 400: el status debe ser APPROVED o REJECTED, no se acepta PENDING ni otros valores.
               Respuesta esperada: 400 Bad Request con error de validación
+      - info:
+          name: invitations
+          type: folder
+        items:
+          - info:
+              name: Generate Invite
+              type: http
+              seq: 1
+            http:
+              method: POST
+              url: '{{baseUrl}}/groups/:groupId/invitations'
+              params:
+                - name: groupId
+                  value: 00000000-0000-0000-0000-000000000000
+                  type: path
+              auth:
+                type: bearer
+                token: '{{token}}'
+            settings:
+              encodeUrl: true
+              timeout: 0
+              followRedirects: true
+              maxRedirects: 5
+            docs: |
+              Happy path: un Lead o Admin genera un token JWT de invitación (72h) para un grupo INVITE.
+              Respuesta esperada: 201 Created con { "token": "<jwt>" }
+
+              Pasos:
+              1. Crea un grupo con joinMode INVITE (usar "Create Group - Private", seq 5).
+              2. Copia el ID del grupo creado y reemplaza :groupId.
+              3. Ejecuta con token (Coach/Admin que es Lead del grupo).
+              4. Guarda el token retornado para usar en "Accept Invite" (seq 4 y 5).
+          - info:
+              name: Generate Invite - No INVITE policy
+              type: http
+              seq: 2
+            http:
+              method: POST
+              url: '{{baseUrl}}/groups/:groupId/invitations'
+              params:
+                - name: groupId
+                  value: 00000000-0000-0000-0000-000000000000
+                  type: path
+              auth:
+                type: bearer
+                token: '{{token}}'
+            settings:
+              encodeUrl: true
+              timeout: 0
+              followRedirects: true
+              maxRedirects: 5
+            docs: |
+              Error 403 INSUFFICIENT_PERMISSIONS: el grupo no usa joinMode INVITE.
+              Respuesta esperada: 403 Forbidden con { error: "INSUFFICIENT_PERMISSIONS" }
+
+              Pasos:
+              1. Usa el ID de un grupo OPEN o REQUEST.
+              2. Reemplaza :groupId.
+              3. Ejecuta con token (Lead o Admin).
+          - info:
+              name: Generate Invite - No es Lead
+              type: http
+              seq: 3
+            http:
+              method: POST
+              url: '{{baseUrl}}/groups/:groupId/invitations'
+              params:
+                - name: groupId
+                  value: 00000000-0000-0000-0000-000000000000
+                  type: path
+              auth:
+                type: bearer
+                token: '{{token_contestant}}'
+            settings:
+              encodeUrl: true
+              timeout: 0
+              followRedirects: true
+              maxRedirects: 5
+            docs: |
+              Error 403 INSUFFICIENT_PERMISSIONS: el usuario no es Lead ni Admin del grupo.
+              Respuesta esperada: 403 Forbidden con { error: "INSUFFICIENT_PERMISSIONS" }
+
+              Pasos:
+              1. Usa el ID del grupo INVITE creado en seq 1.
+              2. Reemplaza :groupId.
+              3. Ejecuta con token_contestant (no es Lead del grupo).
+          - info:
+              name: Accept Invite
+              type: http
+              seq: 4
+            http:
+              method: POST
+              url: '{{baseUrl}}/groups/:groupId/invitations/accept'
+              params:
+                - name: groupId
+                  value: 00000000-0000-0000-0000-000000000000
+                  type: path
+              body:
+                type: json
+                data: |-
+                  {
+                    "token": "<pegar jwt generado en seq 1>"
+                  }
+              auth:
+                type: bearer
+                token: '{{token_contestant}}'
+            settings:
+              encodeUrl: true
+              timeout: 0
+              followRedirects: true
+              maxRedirects: 5
+            docs: |
+              Happy path: un contestant acepta una invitación válida y se une al grupo.
+              Respuesta esperada: 201 Created con { "role": "MEMBER", "joinedAt": "..." }
+
+              Pasos:
+              1. Ejecuta primero "Generate Invite" (seq 1) para obtener el token JWT.
+              2. Reemplaza el valor de "token" en el body con el JWT obtenido.
+              3. Reemplaza :groupId con el mismo ID del grupo INVITE.
+              4. Ejecuta con token_contestant (distinto al usuario que generó la invitación).
+          - info:
+              name: Accept Invite - Ya es miembro
+              type: http
+              seq: 5
+            http:
+              method: POST
+              url: '{{baseUrl}}/groups/:groupId/invitations/accept'
+              params:
+                - name: groupId
+                  value: 00000000-0000-0000-0000-000000000000
+                  type: path
+              body:
+                type: json
+                data: |-
+                  {
+                    "token": "<mismo jwt de seq 1>"
+                  }
+              auth:
+                type: bearer
+                token: '{{token_contestant}}'
+            settings:
+              encodeUrl: true
+              timeout: 0
+              followRedirects: true
+              maxRedirects: 5
+            docs: |
+              Error 409 ALREADY_MEMBER: el usuario ya pertenece al grupo.
+              Respuesta esperada: 409 Conflict con { error: "ALREADY_MEMBER" }
+
+              Pasos:
+              1. Ejecuta primero "Accept Invite" (seq 4) para unirse al grupo.
+              2. Vuelve a ejecutar esta petición con el mismo token y token_contestant.
+          - info:
+              name: Accept Invite - Token inválido
+              type: http
+              seq: 6
+            http:
+              method: POST
+              url: '{{baseUrl}}/groups/:groupId/invitations/accept'
+              params:
+                - name: groupId
+                  value: 00000000-0000-0000-0000-000000000000
+                  type: path
+              body:
+                type: json
+                data: |-
+                  {
+                    "token": "invalid.token.here"
+                  }
+              auth:
+                type: bearer
+                token: '{{token_contestant}}'
+            settings:
+              encodeUrl: true
+              timeout: 0
+              followRedirects: true
+              maxRedirects: 5
+            docs: |
+              Error 400 INVALID_INVITE_TOKEN: el token no es un JWT válido firmado por el servidor.
+              Respuesta esperada: 400 Bad Request con { error: "INVALID_INVITE_TOKEN" }
+
+              Envía cualquier string que no sea un JWT válido como valor de "token".
   - info:
       name: Materials
       type: folder

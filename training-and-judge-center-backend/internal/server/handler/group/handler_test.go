@@ -126,11 +126,22 @@ func (s *stubTxManager) WithTx(ctx context.Context, fn func(context.Context) err
 	return fn(ctx)
 }
 
+type stubInvitationSvc struct{}
+
+func (s *stubInvitationSvc) GenerateInviteToken(_, _ string) (string, error) {
+	return "stub.invite.token", nil
+}
+
+func (s *stubInvitationSvc) ValidateInviteToken(_ string) (*appGroup.InvitationClaims, error) {
+	return &appGroup.InvitationClaims{GroupID: "g1"}, nil
+}
+
 func stubHandler() *Handler {
 	repo := &stubGroupRepo{}
 	memberRepo := &stubMemberRepo{}
 	joinRequestRepo := &stubJoinRequestRepo{}
 	txMgr := &stubTxManager{}
+	inviteSvc := &stubInvitationSvc{}
 	return NewHandler(
 		appGroup.NewCreateGroupUseCase(repo, memberRepo, txMgr),
 		appGroup.NewListGroupsUseCase(repo, memberRepo),
@@ -143,6 +154,8 @@ func stubHandler() *Handler {
 		appGroup.NewListJoinRequestsUseCase(memberRepo, joinRequestRepo, &stubUserProvider{}),
 		appGroup.NewGetMyRequestUseCase(joinRequestRepo),
 		appGroup.NewCancelMyRequestUseCase(joinRequestRepo),
+		appGroup.NewGenerateInviteUseCase(repo, memberRepo, inviteSvc),
+		appGroup.NewAcceptInviteUseCase(repo, memberRepo, inviteSvc),
 	)
 }
 
@@ -248,6 +261,8 @@ func TestGetGroup_NotFoundReturns404(t *testing.T) {
 		appGroup.NewListJoinRequestsUseCase(&stubMemberRepo{}, &stubJoinRequestRepo{}, &stubUserProvider{}),
 		appGroup.NewGetMyRequestUseCase(&stubJoinRequestRepo{}),
 		appGroup.NewCancelMyRequestUseCase(&stubJoinRequestRepo{}),
+		nil, /* generateInvite */
+		nil, /* acceptInvite */
 	)
 
 	r := authedRequest("GET", "/groups/nonexistent")
@@ -283,6 +298,8 @@ func TestGetGroup_NonMemberHasNilRoleAndJoinedAt(t *testing.T) {
 		appGroup.NewListJoinRequestsUseCase(&stubMemberRepo{}, &stubJoinRequestRepo{}, &stubUserProvider{}),
 		appGroup.NewGetMyRequestUseCase(&stubJoinRequestRepo{}),
 		appGroup.NewCancelMyRequestUseCase(&stubJoinRequestRepo{}),
+		nil, /* generateInvite */
+		nil, /* acceptInvite */
 	)
 
 	r := authedRequest("GET", "/groups/g-1")
@@ -330,6 +347,8 @@ func TestGetGroup_ResponseShape(t *testing.T) {
 		appGroup.NewListJoinRequestsUseCase(&stubMemberRepo{}, &stubJoinRequestRepo{}, &stubUserProvider{}),
 		appGroup.NewGetMyRequestUseCase(&stubJoinRequestRepo{}),
 		appGroup.NewCancelMyRequestUseCase(&stubJoinRequestRepo{}),
+		nil, /* generateInvite */
+		nil, /* acceptInvite */
 	)
 
 	r := authedRequest("GET", "/groups/g-2")
@@ -479,6 +498,8 @@ func TestCreate_DuplicateNameReturns409(t *testing.T) {
 		appGroup.NewListJoinRequestsUseCase(&stubMemberRepo{}, &stubJoinRequestRepo{}, &stubUserProvider{}),
 		appGroup.NewGetMyRequestUseCase(&stubJoinRequestRepo{}),
 		appGroup.NewCancelMyRequestUseCase(&stubJoinRequestRepo{}),
+		nil, /* generateInvite */
+		nil, /* acceptInvite */
 	)
 	w := httptest.NewRecorder()
 
@@ -508,6 +529,8 @@ func TestJoin_GroupNotFoundReturns404(t *testing.T) {
 		appGroup.NewListJoinRequestsUseCase(&stubMemberRepo{}, &stubJoinRequestRepo{}, &stubUserProvider{}),
 		appGroup.NewGetMyRequestUseCase(&stubJoinRequestRepo{}),
 		appGroup.NewCancelMyRequestUseCase(&stubJoinRequestRepo{}),
+		nil, /* generateInvite */
+		nil, /* acceptInvite */
 	)
 
 	r := authedRequest("POST", "/groups/nonexistent/join")
@@ -542,6 +565,8 @@ func TestJoin_NonOpenPolicyReturns403(t *testing.T) {
 		appGroup.NewListJoinRequestsUseCase(&stubMemberRepo{}, &stubJoinRequestRepo{}, &stubUserProvider{}),
 		appGroup.NewGetMyRequestUseCase(&stubJoinRequestRepo{}),
 		appGroup.NewCancelMyRequestUseCase(&stubJoinRequestRepo{}),
+		nil, /* generateInvite */
+		nil, /* acceptInvite */
 	)
 
 	r := authedRequest("POST", "/groups/g-invite/join")
@@ -583,6 +608,8 @@ func TestJoin_AlreadyMemberReturns409(t *testing.T) {
 		appGroup.NewListJoinRequestsUseCase(memberRepo, &stubJoinRequestRepo{}, &stubUserProvider{}),
 		appGroup.NewGetMyRequestUseCase(&stubJoinRequestRepo{}),
 		appGroup.NewCancelMyRequestUseCase(&stubJoinRequestRepo{}),
+		nil, /* generateInvite */
+		nil, /* acceptInvite */
 	)
 
 	r := authedRequest("POST", "/groups/g-open/join")
@@ -617,6 +644,8 @@ func TestJoin_SuccessReturns201WithRoleAndJoinedAt(t *testing.T) {
 		appGroup.NewListJoinRequestsUseCase(&stubMemberRepo{}, &stubJoinRequestRepo{}, &stubUserProvider{}),
 		appGroup.NewGetMyRequestUseCase(&stubJoinRequestRepo{}),
 		appGroup.NewCancelMyRequestUseCase(&stubJoinRequestRepo{}),
+		nil, /* generateInvite */
+		nil, /* acceptInvite */
 	)
 
 	r := authedRequest("POST", "/groups/g-open/join")
@@ -699,6 +728,8 @@ func TestRequestJoin_EmptyBodyIsValid(t *testing.T) {
 		appGroup.NewListJoinRequestsUseCase(&stubMemberRepo{}, &stubJoinRequestRepo{}, &stubUserProvider{}),
 		appGroup.NewGetMyRequestUseCase(&stubJoinRequestRepo{}),
 		appGroup.NewCancelMyRequestUseCase(&stubJoinRequestRepo{}),
+		nil, /* generateInvite */
+		nil, /* acceptInvite */
 	)
 
 	r := httptest.NewRequest("POST", "/groups/g-req/requests", nil)
@@ -829,5 +860,42 @@ func TestUpdateJoinRequest_InvalidStatusReturns400(t *testing.T) {
 	}
 	if body.Code != apperror.ErrCodeValidationError {
 		t.Errorf("expected VALIDATION_ERROR, got %s", body.Code)
+	}
+}
+
+// --- GenerateInvite handler tests ---
+
+func TestGenerateInvite_UnauthenticatedReturns401(t *testing.T) {
+	h := stubHandler()
+	w := httptest.NewRecorder()
+	r := httptest.NewRequest("POST", "/groups/g1/invitations", nil)
+	r.SetPathValue("groupId", "g1")
+	wrapAuth(http.HandlerFunc(h.GenerateInvite)).ServeHTTP(w, r)
+	if w.Code != http.StatusUnauthorized {
+		t.Fatalf("expected 401, got %d", w.Code)
+	}
+}
+
+// --- AcceptInvite handler tests ---
+
+func TestAcceptInvite_UnauthenticatedReturns401(t *testing.T) {
+	h := stubHandler()
+	w := httptest.NewRecorder()
+	r := httptest.NewRequest("POST", "/groups/g1/invitations/accept", nil)
+	r.SetPathValue("groupId", "g1")
+	wrapAuth(http.HandlerFunc(h.AcceptInvite)).ServeHTTP(w, r)
+	if w.Code != http.StatusUnauthorized {
+		t.Fatalf("expected 401, got %d", w.Code)
+	}
+}
+
+func TestAcceptInvite_InvalidJSONReturns400(t *testing.T) {
+	h := stubHandler()
+	w := httptest.NewRecorder()
+	r := authedPostRequest("/groups/g1/invitations/accept", `{invalid json}`)
+	r.SetPathValue("groupId", "g1")
+	wrapAuth(http.HandlerFunc(h.AcceptInvite)).ServeHTTP(w, r)
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400, got %d", w.Code)
 	}
 }

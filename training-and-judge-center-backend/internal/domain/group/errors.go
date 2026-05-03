@@ -22,4 +22,6 @@ const (
 	ErrCodeRequestAlreadyProcessed  = "REQUEST_ALREADY_PROCESSED"
 	ErrCodeRequestAlreadyPending    = "REQUEST_ALREADY_PENDING"
 	ErrCodeRequestNotFound          = "REQUEST_NOT_FOUND"
+	ErrCodeInvalidInviteToken       = "INVALID_INVITE_TOKEN"
+	ErrCodeExpiredInviteToken       = "EXPIRED_INVITE_TOKEN"
 )

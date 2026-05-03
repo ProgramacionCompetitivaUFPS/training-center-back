@@ -203,11 +203,16 @@ func main() {
 	getMyRequestUseCase := appGroup.NewGetMyRequestUseCase(joinRequestRepo)
 	cancelMyRequestUseCase := appGroup.NewCancelMyRequestUseCase(joinRequestRepo)
 
+	groupInvitationJWTSvc := platformAuth.NewGroupInvitationJWTService(cfg.JWTSecret)
+	generateInviteUseCase := appGroup.NewGenerateInviteUseCase(groupRepo, groupMemberRepo, groupInvitationJWTSvc)
+	acceptInviteUseCase := appGroup.NewAcceptInviteUseCase(groupRepo, groupMemberRepo, groupInvitationJWTSvc)
+
 	groupHandler := handlerGroup.NewHandler(
 		createGroupUseCase, listGroupsUseCase, getGroupUseCase, listMyGroupsUseCase,
 		joinGroupUseCase,
 		requestJoinUseCase, approveRequestUseCase, rejectRequestUseCase,
 		listJoinRequestsUseCase, getMyRequestUseCase, cancelMyRequestUseCase,
+		generateInviteUseCase, acceptInviteUseCase,
 	)
 
 	// Material platform adapters
