@@ -54,9 +54,9 @@ func TestStatus_IsValid(t *testing.T) {
 	}{
 		{"valid active", StatusActive, true},
 		{"valid deactivated", StatusDeactivated, true},
-		{"arbitrary cast bypass", Status("SUSPENDED"), false},
-		{"empty status", Status(""), false},
-		{"lowercase bypass", Status("active"), false},
+		{"arbitrary cast bypass", Status{value: "SUSPENDED"}, false},
+		{"empty status", Status{value: ""}, false},
+		{"lowercase bypass", Status{value: "active"}, false},
 	}
 
 	for _, tt := range tests {

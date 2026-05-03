@@ -47,8 +47,8 @@ func (h *Handler) UpdateJoinRequest(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	switch domainGroup.JoinRequestStatus(body.Status) {
-	case domainGroup.JoinRequestStatusApproved:
+	switch body.Status {
+	case domainGroup.JoinRequestStatusApproved.String():
 		out, err := h.approveRequest.Execute(r.Context(), appGroup.ApproveRequestInput{
 			GroupID:     groupID,
 			RequestID:   requestID,
@@ -60,7 +60,7 @@ func (h *Handler) UpdateJoinRequest(w http.ResponseWriter, r *http.Request) {
 		}
 		handler.WriteJSON(w, http.StatusOK, buildJoinRequestResp(out.Request, nil))
 
-	case domainGroup.JoinRequestStatusRejected:
+	case domainGroup.JoinRequestStatusRejected.String():
 		out, err := h.rejectRequest.Execute(r.Context(), appGroup.RejectRequestInput{
 			GroupID:     groupID,
 			RequestID:   requestID,

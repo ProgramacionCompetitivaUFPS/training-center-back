@@ -7,25 +7,25 @@ const (
 	visibilityNotVisible = "NOT_VISIBLE"
 )
 
-type Visibility string
+type Visibility struct{ value string }
 
-const (
-	VisibilityVisible    Visibility = visibilityVisible
-	VisibilityNotVisible Visibility = visibilityNotVisible
+var (
+	VisibilityVisible    = Visibility{value: visibilityVisible}
+	VisibilityNotVisible = Visibility{value: visibilityNotVisible}
 )
 
 func NewVisibility(s string) (Visibility, error) {
 	switch s {
 	case visibilityVisible, visibilityNotVisible:
-		return Visibility(s), nil
+		return Visibility{value: s}, nil
 	}
-	return "", apperror.NewValidation([]apperror.FieldError{
+	return Visibility{}, apperror.NewValidation([]apperror.FieldError{
 		{Field: "visibility", Message: "invalid visibility: " + s},
 	})
 }
 
-func NewVisibilityVisible() Visibility    { return Visibility(visibilityVisible) }
-func NewVisibilityNotVisible() Visibility { return Visibility(visibilityNotVisible) }
+func NewVisibilityVisible() Visibility    { return Visibility{value: visibilityVisible} }
+func NewVisibilityNotVisible() Visibility { return Visibility{value: visibilityNotVisible} }
 
-func RestoreVisibility(s string) Visibility { return Visibility(s) }
-func (v Visibility) String() string         { return string(v) }
+func RestoreVisibility(s string) Visibility { return Visibility{value: s} }
+func (v Visibility) String() string         { return v.value }

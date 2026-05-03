@@ -243,7 +243,38 @@ domain/user/
 
 ### D4 — Reglas de constructores: `New*`, `Restore*` y factorías de estado
 
-Todo tipo de dominio (entidad, value object, enum) tiene exactamente dos caminos de construcción:
+Todo tipo de dominio (entidad, value object, enum) tiene exactamente dos caminos de construcción.
+
+#### Representación interna: `struct{ value T }`, no type alias
+
+Todo value object y enum de dominio usa un struct con campo privado:
+
+```go
+// ✅ campo privado — paquetes externos no pueden construir valores arbitrarios
+type Status struct{ value string }
+
+// ❌ type alias — cualquier paquete puede hacer Status("ARBITRARY") sin pasar por el constructor
+type Status string
+```
+
+El campo `value` es privado (minúscula). Desde fuera del paquete, `Status{value: "..."}` no compila — el compilador lo bloquea. El único punto de entrada es `New*` o `Restore*`. Esto hace que las invariantes del tipo sean enforced por el sistema de tipos, no por convención.
+
+Las constantes exportadas se convierten en variables (los structs no pueden ser `const` en Go):
+
+```go
+// ✅
+var (
+    StatusActive      = Status{value: "ACTIVE"}
+    StatusDeactivated = Status{value: "DEACTIVATED"}
+)
+
+// ❌ — solo funciona con type alias
+const StatusActive Status = "ACTIVE"
+```
+
+Las comparaciones con `==` siguen funcionando porque Go soporta igualdad de structs con campos comparables. `string(s)` ya no compila — usar `.String()`.
+
+---
 
 #### `New*(...)` — input externo, valida invariantes
 

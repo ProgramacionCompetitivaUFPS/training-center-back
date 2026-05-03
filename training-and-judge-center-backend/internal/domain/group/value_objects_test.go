@@ -39,9 +39,9 @@ func TestNewJoinPolicy(t *testing.T) {
 		{"INVITE", true, group.JoinPolicyInvite},
 		{"REQUEST", true, group.JoinPolicyRequest},
 		{"OPEN", true, group.JoinPolicyOpen},
-		{"invite", false, ""},
-		{"", false, ""},
-		{"UNKNOWN", false, ""},
+		{"invite", false, group.JoinPolicy{}},
+		{"", false, group.JoinPolicy{}},
+		{"UNKNOWN", false, group.JoinPolicy{}},
 	}
 	for _, tc := range cases {
 		got, err := group.NewJoinPolicy(tc.input)
@@ -66,9 +66,9 @@ func TestNewVisibility(t *testing.T) {
 	}{
 		{"VISIBLE", true, group.VisibilityVisible},
 		{"NOT_VISIBLE", true, group.VisibilityNotVisible},
-		{"visible", false, ""},
-		{"", false, ""},
-		{"HIDDEN", false, ""},
+		{"visible", false, group.Visibility{}},
+		{"", false, group.Visibility{}},
+		{"HIDDEN", false, group.Visibility{}},
 	}
 	for _, tc := range cases {
 		got, err := group.NewVisibility(tc.input)
@@ -93,9 +93,9 @@ func TestNewMemberRole(t *testing.T) {
 	}{
 		{"LEAD", true, group.MemberRoleLead},
 		{"MEMBER", true, group.MemberRoleMember},
-		{"lead", false, ""},
-		{"", false, ""},
-		{"ADMIN", false, ""},
+		{"lead", false, group.MemberRole{}},
+		{"", false, group.MemberRole{}},
+		{"ADMIN", false, group.MemberRole{}},
 	}
 	for _, tc := range cases {
 		got, err := group.NewMemberRole(tc.input)

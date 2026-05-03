@@ -141,7 +141,7 @@ func (r *GroupRepository) List(ctx context.Context, filters domainGroup.ListFilt
 
 	if filters.OnlyMyGroups != nil {
 		if filters.OnlyMyGroups.RoleFilter != nil {
-			roleArg := nextArg(string(*filters.OnlyMyGroups.RoleFilter))
+			roleArg := nextArg(filters.OnlyMyGroups.RoleFilter.String())
 			conds = append(conds, fmt.Sprintf(
 				"EXISTS (SELECT 1 FROM group_members gm WHERE gm.group_id = g.id AND gm.user_id = %s AND gm.member_role = %s)",
 				viewerArg(), roleArg,

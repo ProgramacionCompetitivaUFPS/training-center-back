@@ -1,26 +1,28 @@
 package shared
 
-import "fmt"
+import "github.com/training-judge-center/backend/pkg/apperror"
 
-type Role string
+type Role struct{ value string }
 
-const (
-	RoleAdmin      Role = "ADMIN"
-	RoleCoach      Role = "COACH"
-	RoleContestant Role = "CONTESTANT"
+var (
+	RoleAdmin      = Role{value: "ADMIN"}
+	RoleCoach      = Role{value: "COACH"}
+	RoleContestant = Role{value: "CONTESTANT"}
 )
 
 func NewRole(value string) (Role, error) {
-	switch Role(value) {
-	case RoleAdmin, RoleCoach, RoleContestant:
-		return Role(value), nil
+	switch value {
+	case "ADMIN", "COACH", "CONTESTANT":
+		return Role{value: value}, nil
 	default:
-		return "", fmt.Errorf("invalid role: %s", value)
+		return Role{}, apperror.NewValidation([]apperror.FieldError{
+			{Field: "role", Message: "invalid role: " + value},
+		})
 	}
 }
 
 func RestoreRole(value string) Role {
-	return Role(value)
+	return Role{value: value}
 }
 
 func (r Role) IsValid() bool {
@@ -32,5 +34,5 @@ func (r Role) IsValid() bool {
 }
 
 func (r Role) String() string {
-	return string(r)
+	return r.value
 }

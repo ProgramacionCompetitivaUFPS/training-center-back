@@ -28,7 +28,7 @@ func (r *PasswordRecoveryRepository) Save(ctx context.Context, req *domainUser.P
 		req.ID(),
 		req.UserID(),
 		req.Code(),
-		string(req.Status()),
+		req.Status().String(),
 		req.ExpiresAt(),
 		req.CreatedAt(),
 		req.UpdatedAt(),
@@ -83,7 +83,7 @@ func (r *PasswordRecoveryRepository) Update(ctx context.Context, req *domainUser
 
 	querier := infraPostgres.GetQuerier(ctx, r.querier)
 	_, err := querier.Exec(ctx, query,
-		string(req.Status()),
+		req.Status().String(),
 		req.UpdatedAt(),
 		req.ID(),
 	)
@@ -104,7 +104,7 @@ func (r *PasswordRecoveryRepository) FindPendingByUserID(ctx context.Context, us
 	var updatedAt *time.Time
 	var statusStr string
 
-	err := r.querier.QueryRow(ctx, query, userID, string(domainUser.StatusPending)).Scan(
+	err := r.querier.QueryRow(ctx, query, userID, domainUser.StatusPending.String()).Scan(
 		&id,
 		&returnedUserID,
 		&code,
@@ -136,7 +136,7 @@ func (r *PasswordRecoveryRepository) InvalidatePendingByUserID(ctx context.Conte
 		WHERE user_id = $3 AND status = $4`
 
 	querier := infraPostgres.GetQuerier(ctx, r.querier)
-	_, err := querier.Exec(ctx, query, string(domainUser.StatusExpired), now, userID, string(domainUser.StatusPending))
+	_, err := querier.Exec(ctx, query, domainUser.StatusExpired.String(), now, userID, domainUser.StatusPending.String())
 	if err != nil {
 		return fmt.Errorf("failed to invalidate pending password recovery requests: %w", err)
 	}

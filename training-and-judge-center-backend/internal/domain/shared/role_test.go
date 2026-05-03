@@ -56,9 +56,9 @@ func TestRole_IsValid(t *testing.T) {
 		{"valid admin", RoleAdmin, true},
 		{"valid coach", RoleCoach, true},
 		{"valid contestant", RoleContestant, true},
-		{"arbitrary cast bypass", Role("SUPERUSER"), false},
-		{"empty role", Role(""), false},
-		{"lowercase bypass", Role("admin"), false},
+		{"arbitrary cast bypass", Role{value: "SUPERUSER"}, false},
+		{"empty role", Role{value: ""}, false},
+		{"lowercase bypass", Role{value: "admin"}, false},
 	}
 
 	for _, tt := range tests {

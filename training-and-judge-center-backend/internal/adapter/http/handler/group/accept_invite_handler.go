@@ -51,7 +51,7 @@ func (h *Handler) AcceptInvite(w http.ResponseWriter, r *http.Request) {
 
 	m := out.Member
 	handler.WriteJSON(w, http.StatusCreated, joinGroupResponse{
-		Role:     string(m.Role()),
+		Role:     m.Role().String(),
 		JoinedAt: m.JoinedAt().Format(timeutil.RFC3339UTC),
 	})
 }
