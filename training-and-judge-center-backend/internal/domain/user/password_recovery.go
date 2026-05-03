@@ -1,7 +1,6 @@
 package user
 
 import (
-	"fmt"
 	"time"
 
 	"github.com/training-judge-center/backend/pkg/apperror"
@@ -57,7 +56,7 @@ func (r *PasswordRecoveryRequest) IsExpired(now time.Time) bool {
 
 func (r *PasswordRecoveryRequest) MarkAsUsed(now time.Time) error {
 	if r.status != StatusPending {
-		return fmt.Errorf("cannot mark a %s request as used", r.status)
+		return apperror.NewConflict(ErrCodePasswordRecoveryNotPending, "password recovery request is not pending")
 	}
 	r.status = StatusUsed
 	r.updatedAt = &now

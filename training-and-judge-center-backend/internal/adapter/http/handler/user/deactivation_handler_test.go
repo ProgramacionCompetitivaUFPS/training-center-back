@@ -37,7 +37,7 @@ func wrapWithAuth(h http.Handler, claims *domainuser.TokenClaims) http.Handler {
 // keeping mock dependencies minimal.
 func activeUserWithNoEmail(id string) *domainuser.User {
 	p, _ := domainuser.NewPassword("Secret1!")
-	u, err := domainuser.RestoreUser(
+	return domainuser.RestoreUser(
 		id,
 		nil,
 		p.Hash(),
@@ -52,10 +52,6 @@ func activeUserWithNoEmail(id string) *domainuser.User {
 		nil,
 		nil,
 	)
-	if err != nil {
-		panic("activeUserWithNoEmail: " + err.Error())
-	}
-	return u
 }
 
 // pendingDeactRequest returns a valid pending deactivation request for userID with the given code.

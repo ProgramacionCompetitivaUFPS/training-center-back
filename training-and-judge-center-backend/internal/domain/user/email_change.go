@@ -1,7 +1,6 @@
 package user
 
 import (
-	"fmt"
 	"time"
 
 	"github.com/training-judge-center/backend/pkg/apperror"
@@ -61,7 +60,7 @@ func (r *EmailChangeRequest) IsExpired(now time.Time) bool {
 
 func (r *EmailChangeRequest) MarkAsUsed(now time.Time) error {
 	if r.status != StatusPending {
-		return fmt.Errorf("cannot mark a %s request as used", r.status)
+		return apperror.NewConflict(ErrCodeEmailChangeNotPending, "email change request is not pending")
 	}
 	r.status = StatusUsed
 	r.updatedAt = &now
