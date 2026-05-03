@@ -176,49 +176,26 @@ func RestoreUser(
 	createdAt time.Time,
 	updatedAt *time.Time,
 	deactivatedAt *time.Time,
-) (*User, error) {
+) *User {
 	u := &User{
 		id:            id,
 		name:          name,
 		country:       country,
 		city:          city,
 		institution:   institution,
+		password:      RestorePassword(passwordHash),
+		nickname:      RestoreNickname(nicknameStr),
+		role:          shared.RestoreRole(roleStr),
+		status:        RestoreStatus(statusStr),
 		createdAt:     createdAt,
 		updatedAt:     updatedAt,
 		deactivatedAt: deactivatedAt,
 	}
 
 	if emailStr != nil {
-		parsedEmail, err := NewEmail(*emailStr)
-		if err != nil {
-			return nil, fmt.Errorf("restoring user %s: invalid email: %w", id, err)
-		}
-		u.email = &parsedEmail
+		email := RestoreEmail(*emailStr)
+		u.email = &email
 	}
 
-	parsedPassword, err := NewPasswordFromHash(passwordHash)
-	if err != nil {
-		return nil, fmt.Errorf("restoring user %s: invalid password hash: %w", id, err)
-	}
-	u.password = parsedPassword
-
-	parsedNickname, err := NewNickname(nicknameStr)
-	if err != nil {
-		return nil, fmt.Errorf("restoring user %s: invalid nickname: %w", id, err)
-	}
-	u.nickname = parsedNickname
-
-	parsedRole, err := shared.NewRole(roleStr)
-	if err != nil {
-		return nil, fmt.Errorf("restoring user %s: invalid role: %w", id, err)
-	}
-	u.role = parsedRole
-
-	parsedStatus, err := NewStatus(statusStr)
-	if err != nil {
-		return nil, fmt.Errorf("restoring user %s: invalid status: %w", id, err)
-	}
-	u.status = parsedStatus
-
-	return u, nil
+	return u
 }

@@ -27,7 +27,7 @@ func newHandlerWithRequestEmailChange(uc *appuser.RequestEmailChangeUseCase) *Us
 // activeUserWithEmail returns a valid ACTIVE user with the given email address.
 func activeUserWithEmail(id, email string) *domainuser.User {
 	p, _ := domainuser.NewPassword("Secret1!")
-	u, err := domainuser.RestoreUser(
+	return domainuser.RestoreUser(
 		id,
 		&email,
 		p.Hash(),
@@ -42,10 +42,6 @@ func activeUserWithEmail(id, email string) *domainuser.User {
 		nil,
 		nil,
 	)
-	if err != nil {
-		panic("activeUserWithEmail: " + err.Error())
-	}
-	return u
 }
 
 // pendingEmailChangeRequest returns a valid pending EmailChangeRequest for userID with the given code.

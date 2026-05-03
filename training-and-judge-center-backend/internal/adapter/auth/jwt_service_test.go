@@ -14,7 +14,7 @@ import (
 func testUser() *user.User {
 	p, _ := user.NewPassword("Secret1!")
 	emailStr := "test@example.com"
-	u, err := user.RestoreUser(
+	return user.RestoreUser(
 		"user-id-123",
 		&emailStr,
 		p.Hash(),
@@ -26,10 +26,6 @@ func testUser() *user.User {
 		time.Now(),
 		nil, nil,
 	)
-	if err != nil {
-		panic("testUser: " + err.Error())
-	}
-	return u
 }
 
 func TestGenerateToken_ClaimsPresent(t *testing.T) {

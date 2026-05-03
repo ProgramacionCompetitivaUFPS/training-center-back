@@ -115,7 +115,7 @@ func newUserWithRole(id string, role shared.Role, status domain.Status) *domain.
 	emailStr := id + "@example.com"
 	nicknameStr := id
 
-	u, err := domain.RestoreUser(
+	return domain.RestoreUser(
 		id,
 		&emailStr,
 		p.Hash(),
@@ -130,10 +130,6 @@ func newUserWithRole(id string, role shared.Role, status domain.Status) *domain.
 		nil,
 		nil,
 	)
-	if err != nil {
-		panic("newUserWithRole: " + err.Error())
-	}
-	return u
 }
 
 type mockEmailChangeRepo struct {

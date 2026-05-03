@@ -28,8 +28,7 @@ func (m *mockTokenService) ValidateToken(tokenString string) (*domain.TokenClaim
 func newActiveUser() *domain.User {
 	password, _ := domain.NewPassword("Secret1!")
 	emailStr := "test@example.com"
-
-	u, err := domain.RestoreUser(
+	return domain.RestoreUser(
 		"user-uuid-123",
 		&emailStr,
 		password.Hash(),
@@ -44,10 +43,6 @@ func newActiveUser() *domain.User {
 		nil,
 		nil,
 	)
-	if err != nil {
-		panic("newActiveUser: " + err.Error())
-	}
-	return u
 }
 
 func newLoginDeps() (*mockUserRepository, *mockTokenService) {
@@ -299,7 +294,7 @@ func TestLogin_PasswordAtBcryptBoundary(t *testing.T) {
 		t.Fatalf("setup: %v", err)
 	}
 	emailStr := "boundary@example.com"
-	u, err := domain.RestoreUser(
+	u := domain.RestoreUser(
 		"user-boundary",
 		&emailStr,
 		password.Hash(),
@@ -314,9 +309,6 @@ func TestLogin_PasswordAtBcryptBoundary(t *testing.T) {
 		nil,
 		nil,
 	)
-	if err != nil {
-		t.Fatalf("setup: %v", err)
-	}
 
 	repo, tokenSvc := newLoginDeps()
 	repo.findByEmailFn = func(_ context.Context, _ domain.Email) (*domain.User, error) {

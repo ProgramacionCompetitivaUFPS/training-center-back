@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/training-judge-center/backend/internal/domain/shared"
+	"github.com/training-judge-center/backend/pkg/apperror"
 )
 
 type SortField string
@@ -22,7 +23,9 @@ func NewSortField(s string) (SortField, error) {
 	case SortByCreatedAt, SortByName, SortByNickname, SortByEmail, SortByDeactivatedAt:
 		return SortField(s), nil
 	}
-	return "", fmt.Errorf("invalid sort field: %q", s)
+	return "", apperror.NewValidation([]apperror.FieldError{
+		{Field: "sort", Message: "invalid sort field: " + s},
+	})
 }
 
 type SortOrder string
@@ -37,7 +40,9 @@ func NewSortOrder(s string) (SortOrder, error) {
 	case SortOrderAsc, SortOrderDesc:
 		return SortOrder(strings.ToLower(s)), nil
 	}
-	return "", fmt.Errorf("invalid sort order: %q", s)
+	return "", apperror.NewValidation([]apperror.FieldError{
+		{Field: "order", Message: "invalid sort order: " + s},
+	})
 }
 
 type SearchField string
@@ -55,7 +60,9 @@ func NewSearchField(s string) (SearchField, error) {
 	case SearchByName, SearchByNickname, SearchByEmail, SearchByInstitution, SearchByAll:
 		return SearchField(s), nil
 	}
-	return "", fmt.Errorf("invalid search field: %q", s)
+	return "", apperror.NewValidation([]apperror.FieldError{
+		{Field: "searchField", Message: "invalid search field: " + s},
+	})
 }
 
 type UserFilter struct {
@@ -74,10 +81,14 @@ type UserFilter struct {
 
 func NewUserFilter(roles []shared.Role, status *Status, country, city, institution string, searchField SearchField, searchTerm string, sort SortField, order SortOrder, page, limit int) (UserFilter, error) {
 	if page < 1 {
-		return UserFilter{}, fmt.Errorf("page must be >= 1, got %d", page)
+		return UserFilter{}, apperror.NewValidation([]apperror.FieldError{
+			{Field: "page", Message: fmt.Sprintf("page must be >= 1, got %d", page)},
+		})
 	}
 	if limit < 1 || limit > 100 {
-		return UserFilter{}, fmt.Errorf("limit must be between 1 and 100, got %d", limit)
+		return UserFilter{}, apperror.NewValidation([]apperror.FieldError{
+			{Field: "limit", Message: fmt.Sprintf("limit must be between 1 and 100, got %d", limit)},
+		})
 	}
 	return UserFilter{
 		Roles:       roles,

@@ -1,9 +1,10 @@
 package user
 
 import (
-	"fmt"
 	"net/mail"
 	"strings"
+
+	"github.com/training-judge-center/backend/pkg/apperror"
 )
 
 type Email struct {
@@ -13,12 +14,16 @@ type Email struct {
 func NewEmail(value string) (Email, error) {
 	trimmed := strings.TrimSpace(strings.ToLower(value))
 	if trimmed == "" {
-		return Email{}, fmt.Errorf("email is required")
+		return Email{}, apperror.NewValidation([]apperror.FieldError{
+			{Field: "email", Message: "email is required"},
+		})
 	}
 
 	parsed, err := mail.ParseAddress(trimmed)
 	if err != nil {
-		return Email{}, fmt.Errorf("invalid email format")
+		return Email{}, apperror.NewValidation([]apperror.FieldError{
+			{Field: "email", Message: "invalid email format"},
+		})
 	}
 
 	return Email{value: parsed.Address}, nil

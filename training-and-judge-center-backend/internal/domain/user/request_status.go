@@ -1,6 +1,6 @@
 package user
 
-import "fmt"
+import "github.com/training-judge-center/backend/pkg/apperror"
 
 type RequestStatus string
 
@@ -15,6 +15,8 @@ func NewRequestStatus(s string) (RequestStatus, error) {
 	case StatusPending, StatusUsed, StatusExpired:
 		return RequestStatus(s), nil
 	}
-	return "", fmt.Errorf("invalid request status: %q", s)
+	return "", apperror.NewValidation([]apperror.FieldError{
+		{Field: "status", Message: "invalid request status: " + s},
+	})
 }
 

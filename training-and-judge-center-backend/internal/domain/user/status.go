@@ -1,6 +1,6 @@
 package user
 
-import "fmt"
+import "github.com/training-judge-center/backend/pkg/apperror"
 
 type Status string
 
@@ -14,8 +14,14 @@ func NewStatus(value string) (Status, error) {
 	case StatusActive, StatusDeactivated:
 		return Status(value), nil
 	default:
-		return "", fmt.Errorf("invalid status: %s", value)
+		return "", apperror.NewValidation([]apperror.FieldError{
+			{Field: "status", Message: "invalid status: " + value},
+		})
 	}
+}
+
+func RestoreStatus(value string) Status {
+	return Status(value)
 }
 
 func (s Status) IsValid() bool {

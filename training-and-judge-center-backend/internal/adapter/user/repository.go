@@ -135,7 +135,7 @@ func scanUser(row pgx.Row) (*domainUser.User, error) {
 		return nil, err
 	}
 
-	u, err := domainUser.RestoreUser(
+	return domainUser.RestoreUser(
 		id,
 		emailStr,
 		passwordHash,
@@ -149,12 +149,7 @@ func scanUser(row pgx.Row) (*domainUser.User, error) {
 		createdAt,
 		updatedAt,
 		deactivatedAt,
-	)
-	if err != nil {
-		return nil, fmt.Errorf("failed to restore user from db row: %w", err)
-	}
-
-	return u, nil
+	), nil
 }
 
 func (r *UserRepository) FindByEmail(ctx context.Context, email domainUser.Email) (*domainUser.User, error) {
