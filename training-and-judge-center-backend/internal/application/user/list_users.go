@@ -32,10 +32,10 @@ type ListUsersOutput struct {
 }
 
 type ListUsersUseCase struct {
-	repo user.UserRepository
+	repo user.Repository
 }
 
-func NewListUsersUseCase(repo user.UserRepository) *ListUsersUseCase {
+func NewListUsersUseCase(repo user.Repository) *ListUsersUseCase {
 	return &ListUsersUseCase{repo: repo}
 }
 

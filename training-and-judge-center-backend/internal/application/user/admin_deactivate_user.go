@@ -16,11 +16,11 @@ type AdminDeactivateUserInput struct {
 }
 
 type AdminDeactivateUserUseCase struct {
-	repo               user.UserRepository
+	repo               user.Repository
 	sessionInvalidator user.SessionInvalidator
 }
 
-func NewAdminDeactivateUserUseCase(repo user.UserRepository, sessionInvalidator user.SessionInvalidator) *AdminDeactivateUserUseCase {
+func NewAdminDeactivateUserUseCase(repo user.Repository, sessionInvalidator user.SessionInvalidator) *AdminDeactivateUserUseCase {
 	return &AdminDeactivateUserUseCase{
 		repo:               repo,
 		sessionInvalidator: sessionInvalidator,

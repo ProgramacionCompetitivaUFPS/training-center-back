@@ -19,14 +19,14 @@ type ResetPasswordInput struct {
 }
 
 type ResetPasswordUseCase struct {
-	userRepo           user.UserRepository
+	userRepo           user.Repository
 	recoveryRepo       user.PasswordRecoveryRepository
 	sessionInvalidator user.SessionInvalidator
 	txManager          TransactionManager
 }
 
 func NewResetPasswordUseCase(
-	userRepo user.UserRepository,
+	userRepo user.Repository,
 	recoveryRepo user.PasswordRecoveryRepository,
 	sessionInvalidator user.SessionInvalidator,
 	txManager TransactionManager,

@@ -19,11 +19,11 @@ type LoginOutput struct {
 }
 
 type LoginUseCase struct {
-	repo         user.UserRepository
+	repo         user.Repository
 	tokenService user.TokenService
 }
 
-func NewLoginUseCase(repo user.UserRepository, tokenService user.TokenService) *LoginUseCase {
+func NewLoginUseCase(repo user.Repository, tokenService user.TokenService) *LoginUseCase {
 	return &LoginUseCase{repo: repo, tokenService: tokenService}
 }
 

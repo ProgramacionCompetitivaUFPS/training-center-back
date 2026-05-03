@@ -15,10 +15,10 @@ type UserProfileOutput struct {
 }
 
 type GetUserProfileUseCase struct {
-	repo user.UserRepository
+	repo user.Repository
 }
 
-func NewGetUserProfileUseCase(repo user.UserRepository) *GetUserProfileUseCase {
+func NewGetUserProfileUseCase(repo user.Repository) *GetUserProfileUseCase {
 	return &GetUserProfileUseCase{repo: repo}
 }
 

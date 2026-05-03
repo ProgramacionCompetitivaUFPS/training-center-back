@@ -21,14 +21,14 @@ type RequestEmailChangeInput struct {
 }
 
 type RequestEmailChangeUseCase struct {
-	userRepo        user.UserRepository
+	userRepo        user.Repository
 	emailChangeRepo user.EmailChangeRepository
 	emailSender     shared.EmailSender
 	rateLimiter     shared.RateLimiter
 }
 
 func NewRequestEmailChangeUseCase(
-	userRepo user.UserRepository,
+	userRepo user.Repository,
 	emailChangeRepo user.EmailChangeRepository,
 	emailSender shared.EmailSender,
 	rateLimiter shared.RateLimiter,

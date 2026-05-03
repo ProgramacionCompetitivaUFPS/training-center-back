@@ -18,13 +18,13 @@ type RequestDeactivationInput struct {
 }
 
 type RequestDeactivationUseCase struct {
-	userRepo        user.UserRepository
+	userRepo        user.Repository
 	deactRepo       user.DeactivationRequestRepository
 	emailSender     shared.EmailSender
 }
 
 func NewRequestDeactivationUseCase(
-	userRepo user.UserRepository,
+	userRepo user.Repository,
 	deactRepo user.DeactivationRequestRepository,
 	emailSender shared.EmailSender,
 ) *RequestDeactivationUseCase {

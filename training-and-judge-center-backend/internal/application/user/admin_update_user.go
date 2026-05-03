@@ -22,10 +22,10 @@ type AdminUpdateUserInput struct {
 }
 
 type AdminUpdateUserUseCase struct {
-	repo user.UserRepository
+	repo user.Repository
 }
 
-func NewAdminUpdateUserUseCase(repo user.UserRepository) *AdminUpdateUserUseCase {
+func NewAdminUpdateUserUseCase(repo user.Repository) *AdminUpdateUserUseCase {
 	return &AdminUpdateUserUseCase{repo: repo}
 }
 

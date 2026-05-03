@@ -20,10 +20,10 @@ type CreateUserInput struct {
 }
 
 type CreateUserUseCase struct {
-	repo user.UserRepository
+	repo user.Repository
 }
 
-func NewCreateUserUseCase(repo user.UserRepository) *CreateUserUseCase {
+func NewCreateUserUseCase(repo user.Repository) *CreateUserUseCase {
 	return &CreateUserUseCase{repo: repo}
 }
 

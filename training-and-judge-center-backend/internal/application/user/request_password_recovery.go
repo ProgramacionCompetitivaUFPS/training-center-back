@@ -17,14 +17,14 @@ type RequestPasswordRecoveryInput struct {
 }
 
 type RequestPasswordRecoveryUseCase struct {
-	userRepo     user.UserRepository
+	userRepo     user.Repository
 	recoveryRepo user.PasswordRecoveryRepository
 	emailSender  shared.EmailSender
 	rateLimiter  shared.RateLimiter
 }
 
 func NewRequestPasswordRecoveryUseCase(
-	userRepo user.UserRepository,
+	userRepo user.Repository,
 	recoveryRepo user.PasswordRecoveryRepository,
 	emailSender shared.EmailSender,
 	rateLimiter shared.RateLimiter,

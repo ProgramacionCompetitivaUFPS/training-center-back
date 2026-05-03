@@ -20,7 +20,7 @@ type ConfirmDeactivationInput struct {
 }
 
 type ConfirmDeactivationUseCase struct {
-	userRepo           user.UserRepository
+	userRepo           user.Repository
 	deactRepo          user.DeactivationRequestRepository
 	auditRepo          user.DeactivationAuditLogRepository
 	emailSender        shared.EmailSender
@@ -29,7 +29,7 @@ type ConfirmDeactivationUseCase struct {
 }
 
 func NewConfirmDeactivationUseCase(
-	userRepo user.UserRepository,
+	userRepo user.Repository,
 	deactRepo user.DeactivationRequestRepository,
 	auditRepo user.DeactivationAuditLogRepository,
 	emailSender shared.EmailSender,

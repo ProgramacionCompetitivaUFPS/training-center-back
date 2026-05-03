@@ -2,7 +2,7 @@ package user
 
 import "context"
 
-type UserRepository interface {
+type Repository interface {
 	Save(ctx context.Context, user *User) error
 	Update(ctx context.Context, user *User) error
 	FindByEmail(ctx context.Context, email Email) (*User, error)

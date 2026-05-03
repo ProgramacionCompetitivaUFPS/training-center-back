@@ -23,13 +23,13 @@ type UpdatePasswordInput struct {
 }
 
 type UpdatePasswordUseCase struct {
-	repo               user.UserRepository
+	repo               user.Repository
 	emailSender        shared.EmailSender
 	sessionInvalidator user.SessionInvalidator
 	rateLimiter        shared.RateLimiter
 }
 
-func NewUpdatePasswordUseCase(repo user.UserRepository, email shared.EmailSender, sessionInvalidator user.SessionInvalidator, rateLimiter shared.RateLimiter) *UpdatePasswordUseCase {
+func NewUpdatePasswordUseCase(repo user.Repository, email shared.EmailSender, sessionInvalidator user.SessionInvalidator, rateLimiter shared.RateLimiter) *UpdatePasswordUseCase {
 	return &UpdatePasswordUseCase{
 		repo:               repo,
 		emailSender:        email,

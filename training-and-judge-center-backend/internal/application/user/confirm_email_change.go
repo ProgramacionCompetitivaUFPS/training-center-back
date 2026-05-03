@@ -18,14 +18,14 @@ type ConfirmEmailChangeInput struct {
 }
 
 type ConfirmEmailChangeUseCase struct {
-	userRepo        user.UserRepository
+	userRepo        user.Repository
 	emailChangeRepo user.EmailChangeRepository
 	emailSender     shared.EmailSender
 	txManager       TransactionManager
 }
 
 func NewConfirmEmailChangeUseCase(
-	userRepo user.UserRepository,
+	userRepo user.Repository,
 	emailChangeRepo user.EmailChangeRepository,
 	emailSender shared.EmailSender,
 	txManager TransactionManager,
