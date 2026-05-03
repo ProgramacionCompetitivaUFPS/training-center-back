@@ -3,7 +3,7 @@
 ## Commands
 
 ```bash
-go run cmd/api/main.go                  # run server
+go run cmd/api/main.go
 go run cmd/migrate/main.go up|down|status
 go run cmd/seed/main.go                 # seed admin user from ADMIN_* env vars (idempotent)
 go test ./...
@@ -19,31 +19,91 @@ bash tests/test_e2e.sh                  # requires running server
 
 ## Architecture
 
-Go backend (DDD + Hexagonal). Layers: `domain` → `application` → `platform` / `infrastructure` → `server`.
+> **Ante cualquier duda de nombrado, distribución de archivos, ubicación de tipos, o decisiones de arquitectura en general: consulta primero `training-and-judge-center-backend/ARCHITECTURE.md`.** Ese archivo es la fuente de verdad. Este CLAUDE.md es un resumen de navegación, no un sustituto.
 
-- **`infrastructure/`** — pure technology, zero domain imports. Wraps external libraries (postgres connection, querier, transactions).
-- **`platform/`** — domain-aware adapters, organized by domain (`problem/`, `user/`, `auth/`) or cross-cutting concern (`email/`, `ratelimit/`, `config/`). Implements ports defined in `domain/` and `application/`.
-- **Rule:** if a file imports from `domain/` or `application/`, it goes in `platform/`. If not, it goes in `infrastructure/`.
+Full conventions live in `training-and-judge-center-backend/ARCHITECTURE.md` — read it top to bottom before modifying any layer. This file is a navigational summary, not a substitute.
 
-**Key conventions:**
-- Use cases: `Execute(ctx, input) (output, error)`
-- Domain construction: `New*()` validates and returns `AppError` on failure
-- DB reconstruction: `Restore*()` bypasses validation — trust the DB
-- Ports (interfaces for external deps): viven donde los necesita quien los consume. Un archivo por puerto, nombrado igual al tipo que contiene (`token_service.go`, `email_sender.go`). No usar `ports.go` genérico.
-  - Puertos de **dominio**: en `domain/<domain>/` (ej. `token_service.go`, `session.go` en `user` — contratos que el dominio define para su propia lógica).
-  - Puertos de **aplicación específicos**: en `application/<domain>/` como archivo propio (ej. `user_provider.go`, `file_repository.go` en `problem`).
-  - Puertos de **aplicación transversales**: en `application/shared/` (ej. `EmailSender`, `RateLimiter`, `TransactionManager` — usados por múltiples dominios de aplicación).
-  - DTOs compartidos entre use cases de un mismo dominio: en `application/<domain>/dto.go` (ej. `UserDTO` en `user`).
-- Naming de repositorios y puertos: `Repository` sin calificar para el aggregate principal — el paquete da el contexto (`user.Repository`, `group.Repository`). Sub-repositorios llevan prefijo del aggregate: `MemberRepository`, `JoinRequestRepository`. Otros puertos se nombran por comportamiento sin sufijo adicional: `EmailSender`, `TokenService`, `SessionInvalidator`.
-- Handlers: `handler.go` define el struct con `*UseCase` concretos (no interfaces); un archivo `*_handler.go` por operación; `types.go` para DTOs de respuesta compartidos dentro del mismo handler package. En `main.go`, los handler packages siempre se importan con alias `handler<Domain>` (ej. `handlerProblem`, `handlerUser`) para simetría.
-- Errors: always via `pkg/apperror`
+Go backend: DDD + Hexagonal Architecture. Dependency direction: `domain/` ← `application/` ← `adapter/` ← `cmd/`.
+
+```
+adapter/http/      ← driving adapter (handlers, middleware, router)
+adapter/postgres/  ← shared DB infrastructure
+adapter/user/      ← driven adapters: user domain
+adapter/problem/   ← driven adapters: problem domain
+adapter/group/     ← driven adapters: group domain
+adapter/material/  ← driven adapters: material domain
+adapter/auth/      ← driven adapter: authentication (transversal)
+adapter/email/     ← driven adapter: email (transversal)
+adapter/ratelimit/ ← driven adapter: rate limiting (transversal)
+```
+
+`adapter/http/` must NOT import `adapter/postgres/`, `adapter/user/`, etc. — only `application/` and `domain/shared/`.
+
+**Codebase in transition.** `internal/server/` → `adapter/http/`, `internal/platform/` → `adapter/<domain>/`, `internal/infrastructure/` → `adapter/postgres/`. New code goes in the target structure. `PENDIENTE_REFACTOR.md` has the full change list.
+
+## Conventions summary
+
+### Domain — §4 (D1–D9)
+
+- One file per concept: `user.go`, `email.go`, `status.go`, `repository.go`, `errors.go`
+- `New*()` validates and returns `apperror` on failure; `Restore*()` bypasses validation — no error return, no `New*` calls inside
+- `domain/shared/` — only `UserID` and `Role` (business primitives). `CurrentUser` → `application/shared/`
+- `errors.go` — string constants only (`ErrCodeEmailConflict = "EMAIL_CONFLICT"`); no sentinel `var ErrX = errors.New(...)`
+- Repository ports: primary aggregate → `repository.go`; secondary aggregates → `<aggregate>_repository.go`
+- Tests: `package <domain>_test`; table tests for value objects, individual functions for aggregates
+
+### Application — §5 (A1–A10)
+
+- `<Operation>UseCase` struct; `New<Operation>UseCase` constructor; `Execute(ctx, in) (*<Op>Output, error)` or `Execute(ctx, in) error`
+- No `ports.go` — one file per port, named after the type (`user_provider.go`, `transaction_manager.go`)
+- `dto.go` only when 2+ use cases in the same package share a type (actual reuse, not anticipated)
+- Shared logic between use cases → descriptive filename (`permissions.go`, `pagination.go`); never `helpers.go` or `utils.go`
+- Logging: `slog.ErrorContext(ctx, ...)` always; never `slog.Error(...)`
+- Tests: `mocks_test.go` for shared infrastructure; `mock*` naming; `testutil.AsAdmin/AsCoach/AsContestant` for CurrentUser helpers
+
+### Adapters — §6 (Ad1–Ad11)
+
+- Struct name = port name; no domain/tech prefix in type name — package provides context (`user.Repository`, not `user.UserRepository`)
+- Repositories: field type `postgres.Querier`; call `postgres.GetQuerier(ctx, r.db)` at the start of every method — reads and writes
+- All errors translated to `apperror` at the adapter boundary; never return raw `pgx` errors upstream
+- `adapter/http/handler/response.go` — only `WriteJSON` and `WriteError`; no private wrappers around them
+- `handler.go` — `Handler` struct with concrete `*<Op>UseCase` fields, never interfaces; one `<op>_handler.go` per method
+- Handler tests: `package <domain>` (same package); `newHandlerWith<Operation>` sets only that use case, rest `nil`
+
+### Middleware — §7 (M1–M7)
+
+- Naming: imperative verb — `Auth(...)`, `RequireRole(...)`; no `New` prefix, no `Middleware` suffix
+- Stores `shared.CurrentUser` in context (not `*user.TokenClaims`); read via `middleware.GetCurrentUser(ctx) (shared.CurrentUser, bool)`
+- One file per function (`auth.go`, `require_role.go`); private `writeError` helper inside each file
+- Dependencies always required — `&auth.NoOpSessionInvalidator{}` instead of nil; no nil checks in middleware body
+- Logging: `slog.ErrorContext(r.Context(), ...)`
+- Tests: `package middleware` (same package, context key stays private); mirrors source files; no `// Arrange / Act / Assert`
+
+### Router — §8 (R1–R4)
+
+- `Handlers` struct bundles all domain handlers; `Services` struct bundles middleware dependencies
+- One block per access level; lowercase comment describes the level (`// public`, `// authenticated`, `// admin only`)
+- `r.Group` for middleware-only grouping (no URL prefix); `r.Route` for URL prefix grouping
+- Global middleware order: CORS → RequestID → Logger → Recoverer
+
+### Composition root — §9 (C1–C5)
+
+- Use case variables: `createProblemUseCase`, never `createProblemUC`
+- Import aliases: all lowercase — `appgroup`, `appuser`, `handleruser`, `handlermaterial`, `googlestorage`
+- Section comments: `// infrastructure`, `// cross-cutting services`, `// <domain> adapters`, `// <domain> use cases`
+- One shared instance per stateless service; handler constructed at the end of its domain's use case block
+- Repository variables: full aggregate name — `deactivationRequestRepo`, never `deactRepo`
 
 ## Non-obvious decisions
 
-**`ListFilters.Statuses` (repository):** empty = no status filter. Visibility of DRAFTs is controlled by `ViewerModifierID`. Don't pre-fill with all statuses from the use case.
+**`ListFilters.Statuses`:** empty slice = no status filter. Visibility of DRAFTs is controlled by `ViewerModifierID`. The use case must not pre-fill with all statuses.
 
-**HTTP responses:** `getProblemResponse` is the single problem response type. Use `buildResponse(p, display)` in `types.go` for mutation endpoints (Create/Update/Import/UploadFiles). If an endpoint needs a different shape, build it directly in the handler — don't add parameters to `buildResponse`.
+**`domain/shared/` vs `application/shared/`:** `UserID` and `Role` are business primitives → `domain/shared/`. `CurrentUser` is request context → `application/shared/`. Never add request-lifecycle concepts to `domain/shared/`.
 
-**Cross-domain primitives:** `UserID` and `CurrentUser` live in `domain/shared/`. Each domain defines its own local types for display/enrichment (e.g., `application/problem/user_provider.go` defines `UserDisplay` locally). Platform adapters per domain implement the local port (e.g., `platform/problem/user_provider.go` queries the `users` table). Don't import `domain/user` from other domains.
+**Cross-domain data:** each domain defines its own display types locally (e.g., `UserDisplay` in `application/problem/user_provider.go`). Never import `domain/user` from other domains — each domain queries what it needs via its own port and adapter.
 
-**Dominios en progreso:** `domain/group/` y `domain/material/` tienen implementación de dominio + tests, pero sin application layer ni handlers todavía. `application/contest/`, `application/submission/`, `platform/mongo/`, `platform/queue/`, `platform/storage/` son directorios placeholder para trabajo futuro — están vacíos intencionalmente.
+**Handler tests and `wrapWithAuth`:** handler tests build real use cases with mocked dependencies — use cases use concrete types (Ad6), so they cannot be mocked directly. `wrapWithAuth` (in `mocks_test.go`) runs the real `Auth` middleware with a mock token service, which puts `shared.CurrentUser` in context exactly as production does.
+
+**Adapter double-logging:** the adapter logs the raw error before returning `apperror.NewInternal()`. The application layer must NOT log errors that come from adapters — they were already logged at the boundary.
+
+**Dominios en progreso:** `domain/group/` and `domain/material/` have domain implementation + tests but no application layer or handlers. `application/contest/`, `application/submission/` are intentionally empty placeholders for future work.
