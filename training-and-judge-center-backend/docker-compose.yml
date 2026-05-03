@@ -114,7 +114,7 @@ services:
     image: mailhog/mailhog
     container_name: training-center-mailhog
     ports:
-      - "1025:1025" # SMTP server
+      - "1025:1025" # SMTP http
       - "8025:8025" # Web UI
 
   redis:

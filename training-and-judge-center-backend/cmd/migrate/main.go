@@ -8,8 +8,8 @@ import (
 
 	_ "github.com/jackc/pgx/v5/stdlib"
 	"github.com/pressly/goose/v3"
+	infraPostgres "github.com/training-judge-center/backend/internal/adapter/postgres"
 	"github.com/training-judge-center/backend/internal/config"
-	infraPostgres "github.com/training-judge-center/backend/internal/infrastructure/postgres"
 )
 
 //go:embed migrations/*.sql
