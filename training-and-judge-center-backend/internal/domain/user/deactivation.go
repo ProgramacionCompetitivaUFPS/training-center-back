@@ -1,9 +1,6 @@
 package user
 
-import (
-	"context"
-	"time"
-)
+import "time"
 
 type DeactivationStatus string
 
@@ -128,14 +125,3 @@ func (l *DeactivationAuditLog) OccurredAt() time.Time    { return l.occurredAt }
 func (l *DeactivationAuditLog) IP() *string              { return l.ip }
 func (l *DeactivationAuditLog) UserAgent() *string       { return l.userAgent }
 
-type DeactivationRequestRepository interface {
-	Save(ctx context.Context, req *DeactivationRequest) error
-	FindPendingByUserID(ctx context.Context, userID string) (*DeactivationRequest, error)
-	FindByID(ctx context.Context, id string) (*DeactivationRequest, error)
-	Update(ctx context.Context, req *DeactivationRequest) error
-	InvalidatePendingByUserID(ctx context.Context, userID string, now time.Time) error
-}
-
-type DeactivationAuditLogRepository interface {
-	Save(ctx context.Context, log *DeactivationAuditLog) error
-}
