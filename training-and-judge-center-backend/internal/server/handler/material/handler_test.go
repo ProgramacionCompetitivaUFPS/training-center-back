@@ -102,6 +102,7 @@ func handlerWithRepo(repo domainMaterial.Repository) *Handler {
 		appMaterial.NewUnpublishMaterial(repo, &stubGroupProvider{}, &stubAuthorProvider{}),
 		appMaterial.NewPinMaterial(repo, &stubGroupProvider{}, &stubGroupMemberProvider{}, &stubAuthorProvider{}),
 		appMaterial.NewUnpinMaterial(repo, &stubGroupProvider{}, &stubGroupMemberProvider{}, &stubAuthorProvider{}),
+		appMaterial.NewDeleteMaterial(repo, &stubGroupProvider{}),
 	)
 }
 
@@ -219,6 +220,7 @@ func TestCreateMaterial_Forbidden_Returns403(t *testing.T) {
 		appMaterial.NewUnpublishMaterial(&stubMaterialRepo{}, &stubGroupProvider{}, &stubAuthorProvider{}),
 		appMaterial.NewPinMaterial(&stubMaterialRepo{}, &stubGroupProvider{}, &stubGroupMemberProvider{}, &stubAuthorProvider{}),
 		appMaterial.NewUnpinMaterial(&stubMaterialRepo{}, &stubGroupProvider{}, &stubGroupMemberProvider{}, &stubAuthorProvider{}),
+		appMaterial.NewDeleteMaterial(&stubMaterialRepo{}, &stubGroupProvider{}),
 	)
 
 	body, _ := json.Marshal(map[string]string{"title": "My Material"})
@@ -260,6 +262,7 @@ func TestUpdateMaterial_ValidRequest_Returns200(t *testing.T) {
 		appMaterial.NewUnpublishMaterial(&stubMaterialRepo{}, &stubGroupProvider{}, &stubAuthorProvider{}),
 		appMaterial.NewPinMaterial(&stubMaterialRepo{}, &stubGroupProvider{}, &stubGroupMemberProvider{}, &stubAuthorProvider{}),
 		appMaterial.NewUnpinMaterial(&stubMaterialRepo{}, &stubGroupProvider{}, &stubGroupMemberProvider{}, &stubAuthorProvider{}),
+		appMaterial.NewDeleteMaterial(&stubMaterialRepo{}, &stubGroupProvider{}),
 	)
 
 	body, _ := json.Marshal(map[string]string{"title": "Updated"})
@@ -414,6 +417,7 @@ func TestGetMaterial_ValidRequest_Returns200(t *testing.T) {
 		appMaterial.NewUnpublishMaterial(repo, &stubGroupProvider{}, &stubAuthorProvider{}),
 		appMaterial.NewPinMaterial(repo, &stubGroupProvider{}, &stubGroupMemberProvider{}, &stubAuthorProvider{}),
 		appMaterial.NewUnpinMaterial(repo, &stubGroupProvider{}, &stubGroupMemberProvider{}, &stubAuthorProvider{}),
+		appMaterial.NewDeleteMaterial(repo, &stubGroupProvider{}),
 	)
 
 	r := authedRequest(http.MethodGet, "/groups/g1/materials/m1", nil)
@@ -448,6 +452,7 @@ func TestGetMaterial_Forbidden_Returns403(t *testing.T) {
 		appMaterial.NewUnpublishMaterial(&stubMaterialRepo{}, &stubGroupProvider{}, &stubAuthorProvider{}),
 		appMaterial.NewPinMaterial(&stubMaterialRepo{}, &stubGroupProvider{}, &stubGroupMemberProvider{}, &stubAuthorProvider{}),
 		appMaterial.NewUnpinMaterial(&stubMaterialRepo{}, &stubGroupProvider{}, &stubGroupMemberProvider{}, &stubAuthorProvider{}),
+		appMaterial.NewDeleteMaterial(&stubMaterialRepo{}, &stubGroupProvider{}),
 	)
 	r := authedRequest(http.MethodGet, "/groups/g1/materials/m1", nil)
 	r.SetPathValue("groupId", "g1")
@@ -834,5 +839,93 @@ func TestUnpinMaterial_Success_Returns200(t *testing.T) {
 	}
 	if resp.Pinned {
 		t.Error("expected pinned=false")
+	}
+}
+
+// ── Delete handler tests ──────────────────────────────────────────────────────
+
+func TestDeleteMaterial_Unauthenticated_Returns401(t *testing.T) {
+	h := stubHandler()
+	r := httptest.NewRequest(http.MethodDelete, "/groups/g1/materials/m1", nil)
+	r.SetPathValue("groupId", "g1")
+	r.SetPathValue("materialId", "m1")
+	w := httptest.NewRecorder()
+
+	http.HandlerFunc(h.Delete).ServeHTTP(w, r)
+
+	if w.Code != http.StatusUnauthorized {
+		t.Fatalf("expected 401, got %d", w.Code)
+	}
+}
+
+func TestDeleteMaterial_NotFound_Returns404(t *testing.T) {
+	h := stubHandler()
+	r := authedRequest(http.MethodDelete, "/groups/g1/materials/missing", nil)
+	r.SetPathValue("groupId", "g1")
+	r.SetPathValue("materialId", "missing")
+	w := httptest.NewRecorder()
+
+	wrapAuth(http.HandlerFunc(h.Delete)).ServeHTTP(w, r)
+
+	if w.Code != http.StatusNotFound {
+		t.Fatalf("expected 404, got %d", w.Code)
+	}
+}
+
+func TestDeleteMaterial_Success_Returns204(t *testing.T) {
+	mat := domainMaterial.RestoreMaterial(
+		"m1", "g1", shared.RestoreUserID("u1"),
+		"Title", "", nil, "DRAFT", false, nil,
+		time.Now(), time.Now(), nil,
+	)
+	h := handlerWithRepo(&stubMaterialRepo{
+		findByIDFn: func(_ context.Context, _ string) (*domainMaterial.Material, error) {
+			return mat, nil
+		},
+	})
+	r := authedRequest(http.MethodDelete, "/groups/g1/materials/m1", nil)
+	r.SetPathValue("groupId", "g1")
+	r.SetPathValue("materialId", "m1")
+	w := httptest.NewRecorder()
+
+	wrapAuth(http.HandlerFunc(h.Delete)).ServeHTTP(w, r)
+
+	if w.Code != http.StatusNoContent {
+		t.Fatalf("expected 204, got %d: %s", w.Code, w.Body.String())
+	}
+	if w.Body.Len() != 0 {
+		t.Errorf("expected empty body for 204, got: %s", w.Body.String())
+	}
+}
+
+func TestDeleteMaterial_Forbidden_Returns403(t *testing.T) {
+	mat := domainMaterial.RestoreMaterial(
+		"m1", "g1", shared.RestoreUserID("other-author"),
+		"Title", "", nil, "DRAFT", false, nil,
+		time.Now(), time.Now(), nil,
+	)
+	h := handlerWithRepo(&stubMaterialRepo{
+		findByIDFn: func(_ context.Context, _ string) (*domainMaterial.Material, error) {
+			return mat, nil
+		},
+	})
+	r := authedRequest(http.MethodDelete, "/groups/g1/materials/m1", nil)
+	r.SetPathValue("groupId", "g1")
+	r.SetPathValue("materialId", "m1")
+	w := httptest.NewRecorder()
+
+	wrapAuth(http.HandlerFunc(h.Delete)).ServeHTTP(w, r)
+
+	if w.Code != http.StatusForbidden {
+		t.Fatalf("expected 403, got %d: %s", w.Code, w.Body.String())
+	}
+	var resp struct {
+		Error string `json:"error"`
+	}
+	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
+		t.Fatalf("could not decode error response: %v (body: %s)", err, w.Body.String())
+	}
+	if resp.Error != appMaterial.ErrCodeNotMaterialAuthor {
+		t.Errorf("expected NOT_MATERIAL_AUTHOR, got %s", resp.Error)
 	}
 }

@@ -230,10 +230,12 @@ func main() {
 	unpublishMaterialUC := appMaterial.NewUnpublishMaterial(materialRepo, groupProvider, authorProvider)
 	pinMaterialUC := appMaterial.NewPinMaterial(materialRepo, groupProvider, groupMemberProvider, authorProvider)
 	unpinMaterialUC := appMaterial.NewUnpinMaterial(materialRepo, groupProvider, groupMemberProvider, authorProvider)
+	deleteMaterialUC := appMaterial.NewDeleteMaterial(materialRepo, groupProvider)
 
 	materialHandler := handlerMaterial.NewHandler(
 		createMaterialUC, updateMaterialUC, getMaterialUC, listMaterialsUC,
 		publishMaterialUC, unpublishMaterialUC, pinMaterialUC, unpinMaterialUC,
+		deleteMaterialUC,
 	)
 
 	router := server.NewRouter(&server.Handlers{

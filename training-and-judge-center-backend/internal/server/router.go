@@ -75,6 +75,7 @@ func NewRouter(h *Handlers, s *Services, allowedOrigins []string) *chi.Mux {
 				r.Get("/", h.Material.List)
 				r.Get("/{materialId}", h.Material.Get)
 				r.Patch("/{materialId}", h.Material.Update)
+				r.Delete("/{materialId}", h.Material.Delete)
 				r.Post("/{materialId}/publish", h.Material.Publish)
 				r.Post("/{materialId}/unpublish", h.Material.Unpublish)
 				r.Post("/{materialId}/pin", h.Material.Pin)
