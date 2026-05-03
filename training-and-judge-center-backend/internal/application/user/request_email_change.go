@@ -83,9 +83,12 @@ func (uc *RequestEmailChangeUseCase) Execute(ctx context.Context, input RequestE
 	}
 
 	now := time.Now()
-	expiresAt := now.Add(15 * time.Minute)
 
-	req := user.RestoreEmailChangeRequest(uuid.New().String(), input.UserID, parsedNewEmail, code, user.StatusPending, expiresAt, now, nil)
+	req, err := user.NewEmailChangeRequest(uuid.New().String(), input.UserID, parsedNewEmail, code, now)
+	if err != nil {
+		slog.Error("failed to build email change request", "user_id", input.UserID, "error", err)
+		return apperror.NewInternal()
+	}
 
 	if err := uc.emailChangeRepo.Save(ctx, req); err != nil {
 		slog.Error("failed to save email change request", "user_id", input.UserID, "error", err)

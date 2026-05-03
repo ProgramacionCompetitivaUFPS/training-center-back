@@ -80,7 +80,11 @@ func (uc *RequestPasswordRecoveryUseCase) Execute(ctx context.Context, input Req
 		return apperror.NewInternal()
 	}
 
-	req := user.RestorePasswordRecoveryRequest(uuid.NewString(), foundUser.ID(), code, user.StatusPending, now.Add(15*time.Minute), now, nil)
+	req, err := user.NewPasswordRecoveryRequest(uuid.NewString(), foundUser.ID(), code, now)
+	if err != nil {
+		slog.Error("failed to build password recovery request", "user_id", foundUser.ID(), "error", err)
+		return apperror.NewInternal()
+	}
 
 	if err := uc.recoveryRepo.Save(ctx, req); err != nil {
 		slog.Error("failed to save password recovery request", "user_id", foundUser.ID(), "error", err)

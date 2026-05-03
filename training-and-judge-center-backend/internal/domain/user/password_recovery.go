@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 	"time"
+
+	"github.com/training-judge-center/backend/pkg/apperror"
 )
 
 type PasswordRecoveryRequest struct {
@@ -14,6 +16,20 @@ type PasswordRecoveryRequest struct {
 	expiresAt time.Time
 	createdAt time.Time
 	updatedAt *time.Time
+}
+
+func NewPasswordRecoveryRequest(id, userID, code string, now time.Time) (*PasswordRecoveryRequest, error) {
+	if id == "" || userID == "" || code == "" {
+		return nil, apperror.NewInternal()
+	}
+	return &PasswordRecoveryRequest{
+		id:        id,
+		userID:    userID,
+		code:      code,
+		status:    StatusPending,
+		expiresAt: now.Add(15 * time.Minute),
+		createdAt: now,
+	}, nil
 }
 
 func RestorePasswordRecoveryRequest(id, userID, code string, status RequestStatus, expiresAt, createdAt time.Time, updatedAt *time.Time) *PasswordRecoveryRequest {
