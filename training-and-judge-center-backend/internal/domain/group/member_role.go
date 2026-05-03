@@ -2,22 +2,22 @@ package group
 
 import "github.com/training-judge-center/backend/pkg/apperror"
 
-type MemberRole string
+type MemberRole struct{ value string }
 
-const (
-	MemberRoleLead   MemberRole = "LEAD"
-	MemberRoleMember MemberRole = "MEMBER"
+var (
+	MemberRoleLead   = MemberRole{value: "LEAD"}
+	MemberRoleMember = MemberRole{value: "MEMBER"}
 )
 
 func NewMemberRole(s string) (MemberRole, error) {
-	switch MemberRole(s) {
-	case MemberRoleLead, MemberRoleMember:
-		return MemberRole(s), nil
+	switch s {
+	case "LEAD", "MEMBER":
+		return MemberRole{value: s}, nil
 	}
-	return "", apperror.NewValidation([]apperror.FieldError{
+	return MemberRole{}, apperror.NewValidation([]apperror.FieldError{
 		{Field: "role", Message: "invalid member role: " + s},
 	})
 }
 
-func RestoreMemberRole(s string) MemberRole { return MemberRole(s) }
-func (r MemberRole) String() string         { return string(r) }
+func RestoreMemberRole(s string) MemberRole { return MemberRole{value: s} }
+func (r MemberRole) String() string         { return r.value }

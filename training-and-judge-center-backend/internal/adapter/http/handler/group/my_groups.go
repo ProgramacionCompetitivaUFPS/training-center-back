@@ -56,7 +56,7 @@ func (h *Handler) ListMyGroups(w http.ResponseWriter, r *http.Request) {
 			Visibility:  g.Visibility().String(),
 			JoinPolicy:  g.JoinPolicy().String(),
 			IsGlobal:    g.IsDefault(),
-			MyRole:      string(mg.MyRole),
+			MyRole:      mg.MyRole.String(),
 			JoinedAt:    mg.JoinedAt.Format(timeutil.RFC3339UTC),
 			MemberCount: mg.MemberCount,
 			CreatedAt:   g.CreatedAt().Format(timeutil.RFC3339UTC),

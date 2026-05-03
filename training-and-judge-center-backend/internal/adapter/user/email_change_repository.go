@@ -29,7 +29,7 @@ func (r *EmailChangeRepository) Save(ctx context.Context, req *domainUser.EmailC
 		req.UserID(),
 		req.NewEmail().String(),
 		req.Code(),
-		string(req.Status()),
+		req.Status().String(),
 		req.ExpiresAt(),
 		req.CreatedAt(),
 		req.UpdatedAt(),
@@ -87,7 +87,7 @@ func (r *EmailChangeRepository) Update(ctx context.Context, req *domainUser.Emai
 
 	querier := infraPostgres.GetQuerier(ctx, r.querier)
 	_, err := querier.Exec(ctx, query,
-		string(req.Status()),
+		req.Status().String(),
 		req.UpdatedAt(),
 		req.ID(),
 	)
@@ -144,10 +144,10 @@ func (r *EmailChangeRepository) InvalidatePendingByUserID(ctx context.Context, u
 
 	querier := infraPostgres.GetQuerier(ctx, r.querier)
 	_, err := querier.Exec(ctx, query,
-		string(domainUser.StatusExpired),
+		domainUser.StatusExpired.String(),
 		time.Now(),
 		userID,
-		string(domainUser.StatusPending),
+		domainUser.StatusPending.String(),
 	)
 	if err != nil {
 		return fmt.Errorf("failed to invalidate pending email change requests: %w", err)

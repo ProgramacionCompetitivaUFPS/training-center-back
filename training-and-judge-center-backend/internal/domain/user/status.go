@@ -2,26 +2,26 @@ package user
 
 import "github.com/training-judge-center/backend/pkg/apperror"
 
-type Status string
+type Status struct{ value string }
 
-const (
-	StatusActive      Status = "ACTIVE"
-	StatusDeactivated Status = "DEACTIVATED"
+var (
+	StatusActive      = Status{value: "ACTIVE"}
+	StatusDeactivated = Status{value: "DEACTIVATED"}
 )
 
 func NewStatus(value string) (Status, error) {
-	switch Status(value) {
-	case StatusActive, StatusDeactivated:
-		return Status(value), nil
+	switch value {
+	case "ACTIVE", "DEACTIVATED":
+		return Status{value: value}, nil
 	default:
-		return "", apperror.NewValidation([]apperror.FieldError{
+		return Status{}, apperror.NewValidation([]apperror.FieldError{
 			{Field: "status", Message: "invalid status: " + value},
 		})
 	}
 }
 
 func RestoreStatus(value string) Status {
-	return Status(value)
+	return Status{value: value}
 }
 
 func (s Status) IsValid() bool {
@@ -33,5 +33,5 @@ func (s Status) IsValid() bool {
 }
 
 func (s Status) String() string {
-	return string(s)
+	return s.value
 }

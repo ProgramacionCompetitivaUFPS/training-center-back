@@ -52,14 +52,14 @@ func memberRoleToStringPtr(r *domainGroup.MemberRole) *string {
 	if r == nil {
 		return nil
 	}
-	s := string(*r)
+	s := r.String()
 	return &s
 }
 
 func memberRoleValueToStringPtr(r domainGroup.MemberRole) *string {
-	if r == "" {
+	if r == (domainGroup.MemberRole{}) {
 		return nil
 	}
-	s := string(r)
+	s := r.String()
 	return &s
 }
