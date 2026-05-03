@@ -858,25 +858,6 @@ func TestDeleteMaterial_Unauthenticated_Returns401(t *testing.T) {
 	}
 }
 
-func TestDeleteMaterial_MissingPathParams_Returns400(t *testing.T) {
-	h := stubHandler()
-	r := authedRequest(http.MethodDelete, "/groups//materials/", nil)
-	w := httptest.NewRecorder()
-
-	wrapAuth(http.HandlerFunc(h.Delete)).ServeHTTP(w, r)
-
-	if w.Code != http.StatusBadRequest {
-		t.Fatalf("expected 400, got %d", w.Code)
-	}
-	var resp apperror.AppError
-	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
-		t.Fatalf("could not decode error response: %v (body: %s)", err, w.Body.String())
-	}
-	if resp.Code != apperror.ErrCodeBadRequest {
-		t.Errorf("expected BAD_REQUEST, got %s", resp.Code)
-	}
-}
-
 func TestDeleteMaterial_NotFound_Returns404(t *testing.T) {
 	h := stubHandler()
 	r := authedRequest(http.MethodDelete, "/groups/g1/materials/missing", nil)

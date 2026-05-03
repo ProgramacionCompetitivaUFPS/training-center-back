@@ -115,16 +115,12 @@ func TestDeleteMaterial_Forbidden_NonAuthorLead(t *testing.T) {
 		MaterialID:  testMaterialID,
 	})
 
-	var notAuthorErr *NotMaterialAuthorError
-	if !errors.As(err, &notAuthorErr) {
-		t.Fatalf("expected NotMaterialAuthorError, got %v", err)
-	}
-	if notAuthorErr.AuthorID != testAuthorID {
-		t.Errorf("expected authorId %q, got %q", testAuthorID, notAuthorErr.AuthorID)
-	}
 	var appErr *apperror.AppError
 	if !errors.As(err, &appErr) || appErr.Code != ErrCodeNotMaterialAuthor {
-		t.Errorf("expected NOT_MATERIAL_AUTHOR app error code, got %v", err)
+		t.Fatalf("expected NOT_MATERIAL_AUTHOR, got %v", err)
+	}
+	if appErr.Meta["authorId"] != testAuthorID {
+		t.Errorf("expected meta.authorId %q, got %v", testAuthorID, appErr.Meta["authorId"])
 	}
 }
 
@@ -171,6 +167,26 @@ func TestDeleteMaterial_MaterialInOtherGroup(t *testing.T) {
 	var appErr *apperror.AppError
 	if !errors.As(err, &appErr) || appErr.Code != domainMaterial.ErrCodeMaterialNotFound {
 		t.Errorf("expected MATERIAL_NOT_FOUND for cross-group access, got %v", err)
+	}
+}
+
+func TestDeleteMaterial_FindByIDInfraError_Returns500(t *testing.T) {
+	repo := &mockMaterialRepository{
+		findByIDFn: func(_ context.Context, _ string) (*domainMaterial.Material, error) {
+			return nil, errors.New("db connection lost")
+		},
+	}
+	uc := newDeleteUC(repo, groupExists())
+
+	err := uc.Execute(context.Background(), DeleteMaterialInput{
+		CurrentUser: asCoach(testAuthorID),
+		GroupID:     testGroupID,
+		MaterialID:  testMaterialID,
+	})
+
+	var appErr *apperror.AppError
+	if !errors.As(err, &appErr) || appErr.Code != apperror.ErrCodeInternalError {
+		t.Errorf("expected INTERNAL_ERROR from raw infra error in FindByID, got %v", err)
 	}
 }
 

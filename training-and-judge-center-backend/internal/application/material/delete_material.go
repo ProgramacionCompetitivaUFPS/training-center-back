@@ -2,12 +2,14 @@ package material
 
 import (
 	"context"
+	"errors"
 	"log/slog"
 
 	domainMaterial "github.com/training-judge-center/backend/internal/domain/material"
 	"github.com/training-judge-center/backend/internal/domain/shared"
 	"github.com/training-judge-center/backend/pkg/apperror"
 )
+
 
 type DeleteMaterialInput struct {
 	CurrentUser shared.CurrentUser
@@ -36,14 +38,20 @@ func (uc *DeleteMaterial) Execute(ctx context.Context, in DeleteMaterialInput) e
 
 	m, err := uc.repo.FindByID(ctx, in.MaterialID)
 	if err != nil {
-		return err
+		var appErr *apperror.AppError
+		if errors.As(err, &appErr) {
+			return err
+		}
+		slog.ErrorContext(ctx, "failed to find material", "error", err, "material_id", in.MaterialID)
+		return apperror.NewInternal()
 	}
 	if m.GroupID() != in.GroupID {
 		return apperror.NewNotFound(domainMaterial.ErrCodeMaterialNotFound, "material not found")
 	}
 
 	if !m.CanBeEditedBy(shared.RestoreUserID(in.CurrentUser.ID), in.CurrentUser.IsAdmin()) {
-		return NewNotMaterialAuthorError(m.AuthorID().Value())
+		return apperror.NewForbidden(ErrCodeNotMaterialAuthor, "only the material author can delete this material").
+			WithMeta("authorId", m.AuthorID().Value())
 	}
 
 	if err := uc.repo.Delete(ctx, in.MaterialID); err != nil {
