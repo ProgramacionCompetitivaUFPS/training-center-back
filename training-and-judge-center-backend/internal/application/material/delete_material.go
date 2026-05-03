@@ -10,7 +10,6 @@ import (
 	"github.com/training-judge-center/backend/pkg/apperror"
 )
 
-
 type DeleteMaterialInput struct {
 	CurrentUser shared.CurrentUser
 	GroupID     string
@@ -50,8 +49,7 @@ func (uc *DeleteMaterial) Execute(ctx context.Context, in DeleteMaterialInput) e
 	}
 
 	if !m.CanBeEditedBy(shared.RestoreUserID(in.CurrentUser.ID), in.CurrentUser.IsAdmin()) {
-		return apperror.NewForbidden(ErrCodeNotMaterialAuthor, "only the material author can delete this material").
-			WithMeta("authorId", m.AuthorID().Value())
+		return apperror.NewForbidden(ErrCodeNotMaterialAuthor, "only the material author can delete this material")
 	}
 
 	if err := uc.repo.Delete(ctx, in.MaterialID); err != nil {

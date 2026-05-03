@@ -119,9 +119,6 @@ func TestDeleteMaterial_Forbidden_NonAuthorLead(t *testing.T) {
 	if !errors.As(err, &appErr) || appErr.Code != ErrCodeNotMaterialAuthor {
 		t.Fatalf("expected NOT_MATERIAL_AUTHOR, got %v", err)
 	}
-	if appErr.Meta["authorId"] != testAuthorID {
-		t.Errorf("expected meta.authorId %q, got %v", testAuthorID, appErr.Meta["authorId"])
-	}
 }
 
 func TestDeleteMaterial_GroupNotFound(t *testing.T) {

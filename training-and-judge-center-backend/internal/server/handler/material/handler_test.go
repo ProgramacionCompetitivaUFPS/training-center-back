@@ -898,7 +898,7 @@ func TestDeleteMaterial_Success_Returns204(t *testing.T) {
 	}
 }
 
-func TestDeleteMaterial_Forbidden_Returns403WithAuthorId(t *testing.T) {
+func TestDeleteMaterial_Forbidden_Returns403(t *testing.T) {
 	mat := domainMaterial.RestoreMaterial(
 		"m1", "g1", shared.RestoreUserID("other-author"),
 		"Title", "", nil, "DRAFT", false, nil,
@@ -920,16 +920,12 @@ func TestDeleteMaterial_Forbidden_Returns403WithAuthorId(t *testing.T) {
 		t.Fatalf("expected 403, got %d: %s", w.Code, w.Body.String())
 	}
 	var resp struct {
-		Error    string `json:"error"`
-		AuthorID string `json:"authorId"`
+		Error string `json:"error"`
 	}
 	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
 		t.Fatalf("could not decode error response: %v (body: %s)", err, w.Body.String())
 	}
 	if resp.Error != appMaterial.ErrCodeNotMaterialAuthor {
 		t.Errorf("expected NOT_MATERIAL_AUTHOR, got %s", resp.Error)
-	}
-	if resp.AuthorID != "other-author" {
-		t.Errorf("expected authorId 'other-author', got %q", resp.AuthorID)
 	}
 }
