@@ -1,6 +1,10 @@
-package user
+package user_test
 
-import "testing"
+import (
+	"testing"
+
+	"github.com/training-judge-center/backend/internal/domain/user"
+)
 
 func TestNewEmail_Valid(t *testing.T) {
 	tests := []struct {
@@ -18,7 +22,7 @@ func TestNewEmail_Valid(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			email, err := NewEmail(tt.input)
+			email, err := user.NewEmail(tt.input)
 			if err != nil {
 				t.Fatalf("expected no error, got %v", err)
 			}
@@ -43,7 +47,7 @@ func TestNewEmail_Invalid(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			_, err := NewEmail(tt.input)
+			_, err := user.NewEmail(tt.input)
 			if err == nil {
 				t.Fatal("expected error, got nil")
 			}

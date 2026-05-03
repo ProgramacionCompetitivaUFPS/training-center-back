@@ -1,20 +1,22 @@
-package user
+package user_test
 
 import (
 	"testing"
 	"time"
+
+	"github.com/training-judge-center/backend/internal/domain/user"
 )
 
 func TestRestoreDeactivationRequest_BlockedWithNilBlockedUntil(t *testing.T) {
-	req := RestoreDeactivationRequest(
+	req := user.RestoreDeactivationRequest(
 		"req-id", "user-id", "123456",
 		time.Now().Add(time.Hour),
 		5, nil,
-		DeactivationStatusBlocked,
+		user.DeactivationStatusBlocked,
 		time.Now(), time.Now(),
 	)
 
-	if req.Status() != DeactivationStatusExpired {
+	if req.Status() != user.DeactivationStatusExpired {
 		t.Errorf("expected status EXPIRED when restored as BLOCKED with nil blockedUntil, got %q", req.Status())
 	}
 }
@@ -24,25 +26,25 @@ func TestIsCurrentlyBlocked(t *testing.T) {
 
 	tests := []struct {
 		name         string
-		status       DeactivationStatus
+		status       user.DeactivationStatus
 		blockedUntil *time.Time
 		expected     bool
 	}{
 		{
 			name:         "blocked and within period",
-			status:       DeactivationStatusBlocked,
+			status:       user.DeactivationStatusBlocked,
 			blockedUntil: ptr(now.Add(30 * time.Minute)),
 			expected:     true,
 		},
 		{
 			name:         "blocked but period expired",
-			status:       DeactivationStatusBlocked,
+			status:       user.DeactivationStatusBlocked,
 			blockedUntil: ptr(now.Add(-1 * time.Minute)),
 			expected:     false,
 		},
 		{
 			name:         "not blocked",
-			status:       DeactivationStatusPending,
+			status:       user.DeactivationStatusPending,
 			blockedUntil: nil,
 			expected:     false,
 		},
@@ -50,7 +52,7 @@ func TestIsCurrentlyBlocked(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			req := RestoreDeactivationRequest(
+			req := user.RestoreDeactivationRequest(
 				"req-id", "user-id", "123456",
 				now.Add(time.Hour),
 				0, tt.blockedUntil,
@@ -68,12 +70,12 @@ func TestIsCurrentlyBlocked(t *testing.T) {
 func ptr(t time.Time) *time.Time { return &t }
 
 func TestRegisterFailure(t *testing.T) {
-	newRequest := func(attempts int) *DeactivationRequest {
-		return RestoreDeactivationRequest(
+	newRequest := func(attempts int) *user.DeactivationRequest {
+		return user.RestoreDeactivationRequest(
 			"req-id", "user-id", "123456",
 			time.Now().Add(time.Hour),
 			attempts, nil,
-			DeactivationStatusPending,
+			user.DeactivationStatusPending,
 			time.Now(), time.Now(),
 		)
 	}
@@ -81,15 +83,15 @@ func TestRegisterFailure(t *testing.T) {
 	tests := []struct {
 		name            string
 		initialAttempts int
-		expectedStatus  DeactivationStatus
+		expectedStatus  user.DeactivationStatus
 		expectBlocked   bool
 	}{
-		{"first failure stays pending", 0, DeactivationStatusPending, false},
-		{"second failure stays pending", 1, DeactivationStatusPending, false},
-		{"third failure stays pending", 2, DeactivationStatusPending, false},
-		{"fourth failure stays pending", 3, DeactivationStatusPending, false},
-		{"exactly at threshold becomes blocked", 4, DeactivationStatusBlocked, true},
-		{"above threshold stays blocked", 5, DeactivationStatusBlocked, true},
+		{"first failure stays pending", 0, user.DeactivationStatusPending, false},
+		{"second failure stays pending", 1, user.DeactivationStatusPending, false},
+		{"third failure stays pending", 2, user.DeactivationStatusPending, false},
+		{"fourth failure stays pending", 3, user.DeactivationStatusPending, false},
+		{"exactly at threshold becomes blocked", 4, user.DeactivationStatusBlocked, true},
+		{"above threshold stays blocked", 5, user.DeactivationStatusBlocked, true},
 	}
 
 	for _, tt := range tests {
@@ -99,27 +101,27 @@ func TestRegisterFailure(t *testing.T) {
 
 			req.RegisterFailure()
 
-			if req.attempts != tt.initialAttempts+1 {
-				t.Errorf("attempts: got %d, want %d", req.attempts, tt.initialAttempts+1)
+			if req.Attempts() != tt.initialAttempts+1 {
+				t.Errorf("attempts: got %d, want %d", req.Attempts(), tt.initialAttempts+1)
 			}
-			if req.status != tt.expectedStatus {
-				t.Errorf("status: got %q, want %q", req.status, tt.expectedStatus)
+			if req.Status() != tt.expectedStatus {
+				t.Errorf("status: got %q, want %q", req.Status(), tt.expectedStatus)
 			}
 			if tt.expectBlocked {
-				if req.blockedUntil == nil {
+				if req.BlockedUntil() == nil {
 					t.Fatal("blockedUntil: got nil, want non-nil")
 				}
-				expectedBlockedUntil := before.Add(DeactivationBlockDuration)
-				if req.blockedUntil.Before(expectedBlockedUntil) {
-					t.Errorf("blockedUntil %v is earlier than expected %v", req.blockedUntil, expectedBlockedUntil)
+				expectedBlockedUntil := before.Add(user.DeactivationBlockDuration)
+				if req.BlockedUntil().Before(expectedBlockedUntil) {
+					t.Errorf("blockedUntil %v is earlier than expected %v", req.BlockedUntil(), expectedBlockedUntil)
 				}
 			} else {
-				if req.blockedUntil != nil {
-					t.Errorf("blockedUntil: got %v, want nil", req.blockedUntil)
+				if req.BlockedUntil() != nil {
+					t.Errorf("blockedUntil: got %v, want nil", req.BlockedUntil())
 				}
 			}
-			if req.updatedAt.Before(before) {
-				t.Errorf("updatedAt %v was not refreshed", req.updatedAt)
+			if req.UpdatedAt().Before(before) {
+				t.Errorf("updatedAt %v was not refreshed", req.UpdatedAt())
 			}
 		})
 	}

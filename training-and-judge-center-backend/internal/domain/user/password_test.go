@@ -1,12 +1,14 @@
-package user
+package user_test
 
 import (
 	"strings"
 	"testing"
+
+	"github.com/training-judge-center/backend/internal/domain/user"
 )
 
 func TestNewPassword_Valid(t *testing.T) {
-	pw, err := NewPassword("Secret1!")
+	pw, err := user.NewPassword("Secret1!")
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
@@ -20,7 +22,7 @@ func TestNewPassword_Valid(t *testing.T) {
 
 func TestNewPassword_Compare(t *testing.T) {
 	raw := "Secret1!"
-	pw, err := NewPassword(raw)
+	pw, err := user.NewPassword(raw)
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
@@ -34,7 +36,7 @@ func TestNewPassword_Compare(t *testing.T) {
 }
 
 func TestNewPassword_TooShort(t *testing.T) {
-	_, err := NewPassword("Sh1!")
+	_, err := user.NewPassword("Sh1!")
 	if err == nil {
 		t.Fatal("expected error for short password, got nil")
 	}
@@ -48,28 +50,28 @@ func TestNewPassword_TooLong(t *testing.T) {
 	long[0] = 'A'
 	long[1] = '1'
 	long[2] = '!'
-	_, err := NewPassword(string(long))
+	_, err := user.NewPassword(string(long))
 	if err == nil {
 		t.Fatal("expected error for 73-char password, got nil")
 	}
 }
 
 func TestNewPassword_MissingUppercase(t *testing.T) {
-	_, err := NewPassword("secret1!")
+	_, err := user.NewPassword("secret1!")
 	if err == nil {
 		t.Fatal("expected error for missing uppercase, got nil")
 	}
 }
 
 func TestNewPassword_MissingDigit(t *testing.T) {
-	_, err := NewPassword("Secret!!")
+	_, err := user.NewPassword("Secret!!")
 	if err == nil {
 		t.Fatal("expected error for missing digit, got nil")
 	}
 }
 
 func TestNewPassword_MissingSpecialChar(t *testing.T) {
-	_, err := NewPassword("Secret12")
+	_, err := user.NewPassword("Secret12")
 	if err == nil {
 		t.Fatal("expected error for missing special char, got nil")
 	}
@@ -77,7 +79,7 @@ func TestNewPassword_MissingSpecialChar(t *testing.T) {
 
 func TestRestorePassword(t *testing.T) {
 	hash := "$2a$10$somefakehashvalue"
-	pw := RestorePassword(hash)
+	pw := user.RestorePassword(hash)
 	if pw.Hash() != hash {
 		t.Errorf("expected hash %q, got %q", hash, pw.Hash())
 	}
@@ -85,7 +87,7 @@ func TestRestorePassword(t *testing.T) {
 
 func TestNewPassword_ExactlyAtBcryptLimit(t *testing.T) {
 	raw := "A1!" + strings.Repeat("a", 69)
-	pw, err := NewPassword(raw)
+	pw, err := user.NewPassword(raw)
 	if err != nil {
 		t.Fatalf("expected no error at 72 bytes, got %v", err)
 	}
@@ -95,11 +97,11 @@ func TestNewPassword_ExactlyAtBcryptLimit(t *testing.T) {
 }
 
 func TestRestorePassword_RoundTrip(t *testing.T) {
-	pw, err := NewPassword("Secret1!")
+	pw, err := user.NewPassword("Secret1!")
 	if err != nil {
 		t.Fatalf("unexpected error creating password: %v", err)
 	}
-	restored := RestorePassword(pw.Hash())
+	restored := user.RestorePassword(pw.Hash())
 	if !restored.Compare("Secret1!") {
 		t.Error("restored password should compare correctly against original")
 	}
@@ -109,7 +111,7 @@ func TestRestorePassword_RoundTrip(t *testing.T) {
 }
 
 func TestPassword_CompareEmpty(t *testing.T) {
-	pw, err := NewPassword("Secret1!")
+	pw, err := user.NewPassword("Secret1!")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
