@@ -1,0 +1,28 @@
+"specs/Group management/Manage group members/spec.md"
+  831f15ef5516fb16 55,59-67,226
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.3.4",
+  "base_commit_sha": "04cf474027a04e202ea278a74d0d13462ca7c8b3",
+  "prompts": {
+    "831f15ef5516fb16": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "36a70d75-40b8-4345-9ccd-b51a58845635",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "AlexaVJ",
+      "messages": [],
+      "total_additions": 11,
+      "total_deletions": 0,
+      "accepted_lines": 11,
+      "overriden_lines": 0
+    }
+  },
+  "humans": {
+    "h_d193fb36118fbd": {
+      "author": "AlexaVJ"
+    }
+  }
+}
