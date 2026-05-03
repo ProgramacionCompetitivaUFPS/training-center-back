@@ -29,7 +29,7 @@ func NewAdminDeactivateUserUseCase(repo user.Repository, sessionInvalidator user
 
 func (uc *AdminDeactivateUserUseCase) Execute(ctx context.Context, input AdminDeactivateUserInput) error {
 	if input.RequesterID == input.TargetID {
-		return apperror.NewForbidden(apperror.ErrCodeCannotSelfDeactivate, "Administrators cannot deactivate their own account").WithCause(user.ErrCannotSelfDeactivate)
+		return apperror.NewForbidden(user.ErrCodeCannotSelfDeactivate, "Administrators cannot deactivate their own account")
 	}
 
 	foundUser, err := uc.repo.FindByID(ctx, input.TargetID)
@@ -42,7 +42,7 @@ func (uc *AdminDeactivateUserUseCase) Execute(ctx context.Context, input AdminDe
 	}
 
 	if foundUser.Role() == shared.RoleAdmin {
-		return apperror.NewForbidden(apperror.ErrCodeCannotDeactivateAdmin, "Cannot deactivate another administrator").WithCause(user.ErrCannotDeactivateAdmin)
+		return apperror.NewForbidden(user.ErrCodeCannotDeactivateAdmin, "Cannot deactivate another administrator")
 	}
 
 	// Idempotent: already deactivated users return success immediately

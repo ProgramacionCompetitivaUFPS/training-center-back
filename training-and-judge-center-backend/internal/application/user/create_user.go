@@ -2,7 +2,6 @@ package user
 
 import (
 	"context"
-	"errors"
 	"log/slog"
 
 	"github.com/training-judge-center/backend/internal/domain/user"
@@ -69,14 +68,7 @@ func (uc *CreateUserUseCase) Execute(ctx context.Context, input CreateUserInput)
 	}
 
 	if err := uc.repo.Save(ctx, newUser); err != nil {
-		if errors.Is(err, user.ErrEmailConflict) {
-			return UserDTO{}, apperror.NewConflict("EMAIL_ALREADY_EXISTS", "The email address is already in use")
-		}
-		if errors.Is(err, user.ErrNicknameConflict) {
-			return UserDTO{}, apperror.NewConflict("NICKNAME_ALREADY_EXISTS", "The nickname is already in use")
-		}
-		slog.Error("failed to save new user", "error", err)
-		return UserDTO{}, apperror.NewInternal()
+		return UserDTO{}, err
 	}
 
 	return userToDTO(newUser), nil

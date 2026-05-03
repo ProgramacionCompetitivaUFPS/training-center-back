@@ -1,11 +1,9 @@
 package user
 
-import "errors"
-
-var (
-	ErrCannotSelfDeactivate  = errors.New("cannot self-deactivate")
-	ErrCannotDeactivateAdmin = errors.New("cannot deactivate admin")
-	ErrNicknameConflict      = errors.New("nickname already in use")
-	ErrEmailConflict         = errors.New("email already in use")
+const (
+	ErrCodeEmailConflict         = "EMAIL_CONFLICT"
+	ErrCodeNicknameConflict      = "NICKNAME_CONFLICT"
+	ErrCodeCannotSelfDeactivate  = "CANNOT_SELF_DEACTIVATE"
+	ErrCodeCannotDeactivateAdmin = "CANNOT_DEACTIVATE_ADMIN"
 )
 
