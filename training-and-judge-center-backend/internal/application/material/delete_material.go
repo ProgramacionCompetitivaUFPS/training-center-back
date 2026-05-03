@@ -43,7 +43,7 @@ func (uc *DeleteMaterial) Execute(ctx context.Context, in DeleteMaterialInput) e
 	}
 
 	if !m.CanBeEditedBy(shared.RestoreUserID(in.CurrentUser.ID), in.CurrentUser.IsAdmin()) {
-		return newNotMaterialAuthorError(m.AuthorID().Value())
+		return NewNotMaterialAuthorError(m.AuthorID().Value())
 	}
 
 	if err := uc.repo.Delete(ctx, in.MaterialID); err != nil {

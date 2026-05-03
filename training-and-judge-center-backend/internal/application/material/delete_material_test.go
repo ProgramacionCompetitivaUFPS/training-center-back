@@ -61,7 +61,12 @@ func TestDeleteMaterial_SuccessByAdmin(t *testing.T) {
 
 func TestDeleteMaterial_SuccessPublishedMaterial(t *testing.T) {
 	m := newPublishedMaterial()
-	uc := newDeleteUC(repoWith(m), groupExists())
+	deleted := false
+	repo := &mockMaterialRepository{
+		findByIDFn: func(_ context.Context, _ string) (*domainMaterial.Material, error) { return m, nil },
+		deleteFn:   func(_ context.Context, _ string) error { deleted = true; return nil },
+	}
+	uc := newDeleteUC(repo, groupExists())
 
 	err := uc.Execute(context.Background(), DeleteMaterialInput{
 		CurrentUser: asCoach(testAuthorID),
@@ -72,11 +77,19 @@ func TestDeleteMaterial_SuccessPublishedMaterial(t *testing.T) {
 	if err != nil {
 		t.Fatalf("expected published material to be deletable, got: %v", err)
 	}
+	if !deleted {
+		t.Error("expected repo.Delete to be called for published material")
+	}
 }
 
 func TestDeleteMaterial_SuccessPinnedMaterial(t *testing.T) {
 	m := newPinnedMaterial()
-	uc := newDeleteUC(repoWith(m), groupExists())
+	deleted := false
+	repo := &mockMaterialRepository{
+		findByIDFn: func(_ context.Context, _ string) (*domainMaterial.Material, error) { return m, nil },
+		deleteFn:   func(_ context.Context, _ string) error { deleted = true; return nil },
+	}
+	uc := newDeleteUC(repo, groupExists())
 
 	err := uc.Execute(context.Background(), DeleteMaterialInput{
 		CurrentUser: asCoach(testAuthorID),
@@ -86,6 +99,9 @@ func TestDeleteMaterial_SuccessPinnedMaterial(t *testing.T) {
 
 	if err != nil {
 		t.Fatalf("expected pinned material to be deletable, got: %v", err)
+	}
+	if !deleted {
+		t.Error("expected repo.Delete to be called for pinned material")
 	}
 }
 
