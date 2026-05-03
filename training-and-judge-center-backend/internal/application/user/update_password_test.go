@@ -3,7 +3,6 @@ package user
 import (
 	"context"
 	"errors"
-	"net/http"
 	"testing"
 	"time"
 
@@ -62,8 +61,8 @@ func TestUpdatePassword_UserNotFound(t *testing.T) {
 	if appErr.Code != "NOT_FOUND" {
 		t.Errorf("expected code NOT_FOUND, got %q", appErr.Code)
 	}
-	if appErr.StatusCode != http.StatusNotFound {
-		t.Errorf("expected status 404, got %d", appErr.StatusCode)
+	if appErr.Kind != apperror.KindNotFound {
+		t.Errorf("expected kind NOT_FOUND, got %s", appErr.Kind)
 	}
 }
 
@@ -91,8 +90,8 @@ func TestUpdatePassword_WrongCurrentPassword(t *testing.T) {
 	if appErr.Code != "VALIDATION_ERROR" {
 		t.Errorf("expected code VALIDATION_ERROR, got %q", appErr.Code)
 	}
-	if appErr.StatusCode != http.StatusBadRequest {
-		t.Errorf("expected status 400, got %d", appErr.StatusCode)
+	if appErr.Kind != apperror.KindValidation {
+		t.Errorf("expected kind VALIDATION, got %s", appErr.Kind)
 	}
 	if len(appErr.Details) == 0 || appErr.Details[0].Message != "Current password is incorrect" {
 		t.Errorf("expected message %q, got %v", "Current password is incorrect", appErr.Details)

@@ -24,13 +24,30 @@ func WriteError(w http.ResponseWriter, err error) {
 		slog.Error("unexpected internal error in handler", "error", err)
 		appErr = apperror.NewInternal()
 	}
+	WriteJSON(w, kindToStatus(appErr.Kind), appErr)
+}
 
-	status := appErr.StatusCode
-	if status == 0 {
-		status = http.StatusInternalServerError
+func kindToStatus(k apperror.Kind) int {
+	switch k {
+	case apperror.KindValidation:
+		return http.StatusBadRequest
+	case apperror.KindBadRequest:
+		return http.StatusBadRequest
+	case apperror.KindConflict:
+		return http.StatusConflict
+	case apperror.KindNotFound:
+		return http.StatusNotFound
+	case apperror.KindForbidden:
+		return http.StatusForbidden
+	case apperror.KindUnauthorized:
+		return http.StatusUnauthorized
+	case apperror.KindTooManyRequests:
+		return http.StatusTooManyRequests
+	case apperror.KindServiceUnavailable:
+		return http.StatusServiceUnavailable
+	default:
+		return http.StatusInternalServerError
 	}
-
-	WriteJSON(w, status, appErr)
 }
 
 func respondJSON(w http.ResponseWriter, status int, data any) {

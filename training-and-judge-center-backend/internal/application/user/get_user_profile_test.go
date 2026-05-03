@@ -3,7 +3,6 @@ package user
 import (
 	"context"
 	"errors"
-	"net/http"
 	"testing"
 
 	"github.com/training-judge-center/backend/internal/domain/shared"
@@ -53,8 +52,8 @@ func TestGetMyProfile_UserNotFound(t *testing.T) {
 	if appErr.Code != "NOT_FOUND" {
 		t.Errorf("expected code NOT_FOUND, got %q", appErr.Code)
 	}
-	if appErr.StatusCode != http.StatusNotFound {
-		t.Errorf("expected status 404, got %d", appErr.StatusCode)
+	if appErr.Kind != apperror.KindNotFound {
+		t.Errorf("expected kind NOT_FOUND, got %s", appErr.Kind)
 	}
 }
 
@@ -153,8 +152,8 @@ func TestGetByNickname_NonAdminViewsAdmin(t *testing.T) {
 	if appErr.Code != "ADMIN_PROFILE_RESTRICTED" {
 		t.Errorf("expected code ADMIN_PROFILE_RESTRICTED, got %q", appErr.Code)
 	}
-	if appErr.StatusCode != http.StatusForbidden {
-		t.Errorf("expected status 403, got %d", appErr.StatusCode)
+	if appErr.Kind != apperror.KindForbidden {
+		t.Errorf("expected kind FORBIDDEN, got %s", appErr.Kind)
 	}
 }
 
@@ -214,8 +213,8 @@ func TestGetByNickname_InvalidNickname(t *testing.T) {
 	if appErr.Code != "VALIDATION_ERROR" {
 		t.Errorf("expected code VALIDATION_ERROR, got %q", appErr.Code)
 	}
-	if appErr.StatusCode != http.StatusBadRequest {
-		t.Errorf("expected status 400, got %d", appErr.StatusCode)
+	if appErr.Kind != apperror.KindValidation {
+		t.Errorf("expected kind VALIDATION, got %s", appErr.Kind)
 	}
 }
 

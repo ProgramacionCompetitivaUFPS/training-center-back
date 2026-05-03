@@ -3,7 +3,6 @@ package user
 import (
 	"context"
 	"errors"
-	"net/http"
 	"testing"
 
 	"github.com/training-judge-center/backend/internal/domain/shared"
@@ -100,8 +99,8 @@ func TestAdminUpdateUser_UserNotFound(t *testing.T) {
 	if appErr.Code != "NOT_FOUND" {
 		t.Errorf("expected code NOT_FOUND, got %q", appErr.Code)
 	}
-	if appErr.StatusCode != http.StatusNotFound {
-		t.Errorf("expected status 404, got %d", appErr.StatusCode)
+	if appErr.Kind != apperror.KindNotFound {
+		t.Errorf("expected kind NOT_FOUND, got %s", appErr.Kind)
 	}
 }
 

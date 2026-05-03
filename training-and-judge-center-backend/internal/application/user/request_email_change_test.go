@@ -3,7 +3,6 @@ package user
 import (
 	"context"
 	"errors"
-	"net/http"
 	"testing"
 
 	"github.com/training-judge-center/backend/internal/application/shared"
@@ -160,7 +159,7 @@ func TestRequestEmailChange_EmailDeliveryFails(t *testing.T) {
 	if !ok || appErr.Code != "EMAIL_DELIVERY_FAILED" {
 		t.Errorf("expected EMAIL_DELIVERY_FAILED error, got %v", err)
 	}
-	if appErr.StatusCode != http.StatusServiceUnavailable {
-		t.Errorf("expected 503 status code, got %d", appErr.StatusCode)
+	if appErr.Kind != apperror.KindServiceUnavailable {
+		t.Errorf("expected kind SERVICE_UNAVAILABLE, got %s", appErr.Kind)
 	}
 }
