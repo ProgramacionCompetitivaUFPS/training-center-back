@@ -10,7 +10,7 @@ import (
 	"github.com/training-judge-center/backend/pkg/apperror"
 )
 
-func validCreateInput(role string) CreateGroupInput {
+func validCreateInput(role shared.Role) CreateGroupInput {
 	return CreateGroupInput{
 		Name:        "Algorithms Club",
 		Description: nil,

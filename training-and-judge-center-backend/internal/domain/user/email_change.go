@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 	"time"
+
+	"github.com/training-judge-center/backend/pkg/apperror"
 )
 
 type EmailChangeRequest struct {
@@ -15,6 +17,21 @@ type EmailChangeRequest struct {
 	expiresAt time.Time
 	createdAt time.Time
 	updatedAt *time.Time
+}
+
+func NewEmailChangeRequest(id, userID string, newEmail Email, code string, now time.Time) (*EmailChangeRequest, error) {
+	if id == "" || userID == "" || code == "" {
+		return nil, apperror.NewInternal()
+	}
+	return &EmailChangeRequest{
+		id:        id,
+		userID:    userID,
+		newEmail:  newEmail,
+		code:      code,
+		status:    StatusPending,
+		expiresAt: now.Add(15 * time.Minute),
+		createdAt: now,
+	}, nil
 }
 
 func RestoreEmailChangeRequest(id, userID string, newEmail Email, code string, status RequestStatus, expiresAt, createdAt time.Time, updatedAt *time.Time) *EmailChangeRequest {

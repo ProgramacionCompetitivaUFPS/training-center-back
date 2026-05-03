@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/training-judge-center/backend/internal/domain/shared"
 	domain "github.com/training-judge-center/backend/internal/domain/user"
 	"github.com/training-judge-center/backend/pkg/apperror"
 )
@@ -38,7 +39,7 @@ func newActiveUser() *domain.User {
 		"Colombia",
 		"Cúcuta",
 		"UFPS",
-		domain.RoleContestant.String(),
+		shared.RoleContestant.String(),
 		domain.StatusActive.String(),
 		time.Now(),
 		nil,
@@ -308,7 +309,7 @@ func TestLogin_PasswordAtBcryptBoundary(t *testing.T) {
 		"Colombia",
 		"Cúcuta",
 		"UFPS",
-		domain.RoleContestant.String(),
+		shared.RoleContestant.String(),
 		domain.StatusActive.String(),
 		time.Now(),
 		nil,

@@ -5,6 +5,7 @@ import (
 	"log/slog"
 	"time"
 
+	"github.com/training-judge-center/backend/internal/domain/shared"
 	"github.com/training-judge-center/backend/internal/domain/user"
 	"github.com/training-judge-center/backend/pkg/apperror"
 )
@@ -15,11 +16,11 @@ type AdminDeactivateUserInput struct {
 }
 
 type AdminDeactivateUserUseCase struct {
-	repo               user.UserRepository
+	repo               user.Repository
 	sessionInvalidator user.SessionInvalidator
 }
 
-func NewAdminDeactivateUserUseCase(repo user.UserRepository, sessionInvalidator user.SessionInvalidator) *AdminDeactivateUserUseCase {
+func NewAdminDeactivateUserUseCase(repo user.Repository, sessionInvalidator user.SessionInvalidator) *AdminDeactivateUserUseCase {
 	return &AdminDeactivateUserUseCase{
 		repo:               repo,
 		sessionInvalidator: sessionInvalidator,
@@ -40,7 +41,7 @@ func (uc *AdminDeactivateUserUseCase) Execute(ctx context.Context, input AdminDe
 		return apperror.NewNotFound(apperror.ErrCodeNotFound, "User not found")
 	}
 
-	if foundUser.Role() == user.RoleAdmin {
+	if foundUser.Role() == shared.RoleAdmin {
 		return apperror.NewForbidden(apperror.ErrCodeCannotDeactivateAdmin, "Cannot deactivate another administrator").WithCause(user.ErrCannotDeactivateAdmin)
 	}
 

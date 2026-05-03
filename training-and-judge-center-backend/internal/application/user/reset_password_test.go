@@ -6,13 +6,14 @@ import (
 	"testing"
 	"time"
 
+	"github.com/training-judge-center/backend/internal/domain/shared"
 	domain "github.com/training-judge-center/backend/internal/domain/user"
 	"github.com/training-judge-center/backend/pkg/apperror"
 )
 
 func TestResetPassword_Success(t *testing.T) {
 	userRepo := newNoConflictRepo()
-	activeUser := newUserWithRole("user-1", domain.RoleContestant, domain.StatusActive)
+	activeUser := newUserWithRole("user-1", shared.RoleContestant, domain.StatusActive)
 	userRepo.findByEmailFn = func(_ context.Context, email domain.Email) (*domain.User, error) {
 		return activeUser, nil
 	}
@@ -58,7 +59,7 @@ func TestResetPassword_Success(t *testing.T) {
 
 func TestResetPassword_InvalidCode(t *testing.T) {
 	userRepo := newNoConflictRepo()
-	activeUser := newUserWithRole("user-1", domain.RoleContestant, domain.StatusActive)
+	activeUser := newUserWithRole("user-1", shared.RoleContestant, domain.StatusActive)
 	userRepo.findByEmailFn = func(_ context.Context, email domain.Email) (*domain.User, error) {
 		return activeUser, nil
 	}
@@ -88,7 +89,7 @@ func TestResetPassword_InvalidCode(t *testing.T) {
 
 func TestResetPassword_NoPendingRequest(t *testing.T) {
 	userRepo := newNoConflictRepo()
-	activeUser := newUserWithRole("user-1", domain.RoleContestant, domain.StatusActive)
+	activeUser := newUserWithRole("user-1", shared.RoleContestant, domain.StatusActive)
 	userRepo.findByEmailFn = func(_ context.Context, email domain.Email) (*domain.User, error) {
 		return activeUser, nil
 	}
@@ -117,7 +118,7 @@ func TestResetPassword_NoPendingRequest(t *testing.T) {
 
 func TestResetPassword_ExpiredRequest(t *testing.T) {
 	userRepo := newNoConflictRepo()
-	activeUser := newUserWithRole("user-1", domain.RoleContestant, domain.StatusActive)
+	activeUser := newUserWithRole("user-1", shared.RoleContestant, domain.StatusActive)
 	userRepo.findByEmailFn = func(_ context.Context, _ domain.Email) (*domain.User, error) {
 		return activeUser, nil
 	}
@@ -148,7 +149,7 @@ func TestResetPassword_ExpiredRequest(t *testing.T) {
 
 func TestResetPassword_WeakPassword(t *testing.T) {
 	userRepo := newNoConflictRepo()
-	activeUser := newUserWithRole("user-1", domain.RoleContestant, domain.StatusActive)
+	activeUser := newUserWithRole("user-1", shared.RoleContestant, domain.StatusActive)
 	userRepo.findByEmailFn = func(_ context.Context, _ domain.Email) (*domain.User, error) {
 		return activeUser, nil
 	}
@@ -224,7 +225,7 @@ func TestResetPassword_UserNotFound(t *testing.T) {
 
 func TestResetPassword_TxFailure(t *testing.T) {
 	userRepo := newNoConflictRepo()
-	activeUser := newUserWithRole("user-1", domain.RoleContestant, domain.StatusActive)
+	activeUser := newUserWithRole("user-1", shared.RoleContestant, domain.StatusActive)
 	userRepo.findByEmailFn = func(_ context.Context, _ domain.Email) (*domain.User, error) {
 		return activeUser, nil
 	}
@@ -259,7 +260,7 @@ func TestResetPassword_TxFailure(t *testing.T) {
 
 func TestResetPassword_SessionInvalidationFailure(t *testing.T) {
 	userRepo := newNoConflictRepo()
-	activeUser := newUserWithRole("user-1", domain.RoleContestant, domain.StatusActive)
+	activeUser := newUserWithRole("user-1", shared.RoleContestant, domain.StatusActive)
 	userRepo.findByEmailFn = func(_ context.Context, _ domain.Email) (*domain.User, error) {
 		return activeUser, nil
 	}

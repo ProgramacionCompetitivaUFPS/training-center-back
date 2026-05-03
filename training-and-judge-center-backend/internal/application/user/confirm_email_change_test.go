@@ -7,14 +7,15 @@ import (
 	"testing"
 	"time"
 
-	"github.com/training-judge-center/backend/internal/domain/notification"
+	"github.com/training-judge-center/backend/internal/application/shared"
+	domainShared "github.com/training-judge-center/backend/internal/domain/shared"
 	domain "github.com/training-judge-center/backend/internal/domain/user"
 	"github.com/training-judge-center/backend/pkg/apperror"
 )
 
 func TestConfirmEmailChange_Success(t *testing.T) {
 	userRepo := newNoConflictRepo()
-	activeUser := newUserWithRole("user-1", domain.RoleContestant, domain.StatusActive)
+	activeUser := newUserWithRole("user-1", domainShared.RoleContestant, domain.StatusActive)
 	userRepo.findByIDFn = func(_ context.Context, id string) (*domain.User, error) {
 		if id == "user-1" {
 			return activeUser, nil
@@ -47,7 +48,7 @@ func TestConfirmEmailChange_Success(t *testing.T) {
 
 	emailsSent := 0
 	mockEmailSender := &mockEmailSender{
-		sendFn: func(ctx context.Context, msg notification.EmailMessage) error {
+		sendFn: func(ctx context.Context, msg shared.EmailMessage) error {
 			emailsSent++
 			return nil
 		},
@@ -76,7 +77,7 @@ func TestConfirmEmailChange_Success(t *testing.T) {
 
 func TestConfirmEmailChange_InvalidCode(t *testing.T) {
 	userRepo := newNoConflictRepo()
-	activeUser := newUserWithRole("user-1", domain.RoleContestant, domain.StatusActive)
+	activeUser := newUserWithRole("user-1", domainShared.RoleContestant, domain.StatusActive)
 	userRepo.findByIDFn = func(_ context.Context, id string) (*domain.User, error) {
 		return activeUser, nil
 	}
@@ -111,7 +112,7 @@ func TestConfirmEmailChange_InvalidCode(t *testing.T) {
 
 func TestConfirmEmailChange_ExpiredCode(t *testing.T) {
 	userRepo := newNoConflictRepo()
-	activeUser := newUserWithRole("user-1", domain.RoleContestant, domain.StatusActive)
+	activeUser := newUserWithRole("user-1", domainShared.RoleContestant, domain.StatusActive)
 	userRepo.findByIDFn = func(_ context.Context, id string) (*domain.User, error) {
 		return activeUser, nil
 	}
@@ -146,7 +147,7 @@ func TestConfirmEmailChange_ExpiredCode(t *testing.T) {
 
 func TestConfirmEmailChange_DuplicateEmailAtConfirmation(t *testing.T) {
 	userRepo := newNoConflictRepo()
-	activeUser := newUserWithRole("user-1", domain.RoleContestant, domain.StatusActive)
+	activeUser := newUserWithRole("user-1", domainShared.RoleContestant, domain.StatusActive)
 	userRepo.findByIDFn = func(_ context.Context, id string) (*domain.User, error) {
 		return activeUser, nil
 	}
@@ -220,7 +221,7 @@ func TestConfirmEmailChange_UserRepoError(t *testing.T) {
 
 func TestConfirmEmailChange_EmailChangeRepoError(t *testing.T) {
 	userRepo := newNoConflictRepo()
-	activeUser := newUserWithRole("user-1", domain.RoleContestant, domain.StatusActive)
+	activeUser := newUserWithRole("user-1", domainShared.RoleContestant, domain.StatusActive)
 	userRepo.findByIDFn = func(_ context.Context, _ string) (*domain.User, error) { return activeUser, nil }
 
 	emailChangeRepo := &mockEmailChangeRepo{
@@ -243,7 +244,7 @@ func TestConfirmEmailChange_EmailChangeRepoError(t *testing.T) {
 
 func TestConfirmEmailChange_TxFailure(t *testing.T) {
 	userRepo := newNoConflictRepo()
-	activeUser := newUserWithRole("user-1", domain.RoleContestant, domain.StatusActive)
+	activeUser := newUserWithRole("user-1", domainShared.RoleContestant, domain.StatusActive)
 	userRepo.findByIDFn = func(_ context.Context, _ string) (*domain.User, error) { return activeUser, nil }
 
 	mockEmail, _ := domain.NewEmail("new@example.com")

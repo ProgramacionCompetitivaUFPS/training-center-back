@@ -7,13 +7,14 @@ import (
 	"testing"
 	"time"
 
+	"github.com/training-judge-center/backend/internal/domain/shared"
 	domain "github.com/training-judge-center/backend/internal/domain/user"
 	"github.com/training-judge-center/backend/pkg/apperror"
 )
 
 func TestAdminDeactivateUser_Success(t *testing.T) {
 	repo := newNoConflictRepo()
-	target := newUserWithRole("target-1", domain.RoleContestant, domain.StatusActive)
+	target := newUserWithRole("target-1", shared.RoleContestant, domain.StatusActive)
 	repo.findByIDFn = func(_ context.Context, id string) (*domain.User, error) {
 		if id == "target-1" {
 			return target, nil
@@ -86,7 +87,7 @@ func TestAdminDeactivateUser_TargetNotFound(t *testing.T) {
 
 func TestAdminDeactivateUser_CannotDeactivateAdmin(t *testing.T) {
 	repo := newNoConflictRepo()
-	adminTarget := newUserWithRole("admin-2", domain.RoleAdmin, domain.StatusActive)
+	adminTarget := newUserWithRole("admin-2", shared.RoleAdmin, domain.StatusActive)
 	repo.findByIDFn = func(_ context.Context, _ string) (*domain.User, error) {
 		return adminTarget, nil
 	}
@@ -107,7 +108,7 @@ func TestAdminDeactivateUser_CannotDeactivateAdmin(t *testing.T) {
 
 func TestAdminDeactivateUser_AlreadyDeactivated_Idempotent(t *testing.T) {
 	repo := newNoConflictRepo()
-	target := newUserWithRole("target-1", domain.RoleContestant, domain.StatusDeactivated)
+	target := newUserWithRole("target-1", shared.RoleContestant, domain.StatusDeactivated)
 	repo.findByIDFn = func(_ context.Context, _ string) (*domain.User, error) {
 		return target, nil
 	}
@@ -146,7 +147,7 @@ func TestAdminDeactivateUser_RepositoryFindError(t *testing.T) {
 
 func TestAdminDeactivateUser_SessionInvalidationError_DoesNotPersist(t *testing.T) {
 	repo := newNoConflictRepo()
-	target := newUserWithRole("target-1", domain.RoleContestant, domain.StatusActive)
+	target := newUserWithRole("target-1", shared.RoleContestant, domain.StatusActive)
 	repo.findByIDFn = func(_ context.Context, _ string) (*domain.User, error) {
 		return target, nil
 	}
@@ -177,7 +178,7 @@ func TestAdminDeactivateUser_SessionInvalidationError_DoesNotPersist(t *testing.
 
 func TestAdminDeactivateUser_RepositoryUpdateError(t *testing.T) {
 	repo := newNoConflictRepo()
-	target := newUserWithRole("target-1", domain.RoleContestant, domain.StatusActive)
+	target := newUserWithRole("target-1", shared.RoleContestant, domain.StatusActive)
 	repo.findByIDFn = func(_ context.Context, _ string) (*domain.User, error) {
 		return target, nil
 	}

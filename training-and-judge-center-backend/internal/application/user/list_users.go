@@ -5,6 +5,7 @@ import (
 	"log/slog"
 	"strings"
 
+	"github.com/training-judge-center/backend/internal/domain/shared"
 	"github.com/training-judge-center/backend/internal/domain/user"
 	"github.com/training-judge-center/backend/pkg/apperror"
 )
@@ -31,20 +32,20 @@ type ListUsersOutput struct {
 }
 
 type ListUsersUseCase struct {
-	repo user.UserRepository
+	repo user.Repository
 }
 
-func NewListUsersUseCase(repo user.UserRepository) *ListUsersUseCase {
+func NewListUsersUseCase(repo user.Repository) *ListUsersUseCase {
 	return &ListUsersUseCase{repo: repo}
 }
 
 func (uc *ListUsersUseCase) Execute(ctx context.Context, input ListUsersInput) (*ListUsersOutput, error) {
-	var roles []user.Role
+	var roles []shared.Role
 	var status *user.Status
 	var fieldErrors []apperror.FieldError
 
 	for _, r := range input.Roles {
-		role, err := user.NewRole(strings.TrimSpace(r))
+		role, err := shared.NewRole(strings.TrimSpace(r))
 		if err != nil {
 			fieldErrors = append(fieldErrors, apperror.FieldError{
 				Field:   "role",

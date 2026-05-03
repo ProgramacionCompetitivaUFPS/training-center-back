@@ -8,8 +8,8 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/joho/godotenv"
+	infraPostgres "github.com/training-judge-center/backend/internal/adapter/postgres"
 	"github.com/training-judge-center/backend/internal/config"
-	infraPostgres "github.com/training-judge-center/backend/internal/infrastructure/postgres"
 	domainUser "github.com/training-judge-center/backend/internal/domain/user"
 )
 

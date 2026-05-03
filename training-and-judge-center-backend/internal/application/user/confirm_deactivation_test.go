@@ -6,7 +6,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/training-judge-center/backend/internal/domain/notification"
+	"github.com/training-judge-center/backend/internal/application/shared"
+	domainShared "github.com/training-judge-center/backend/internal/domain/shared"
 	domain "github.com/training-judge-center/backend/internal/domain/user"
 	"github.com/training-judge-center/backend/pkg/apperror"
 )
@@ -24,7 +25,7 @@ func (m *mockAuditRepo) Save(ctx context.Context, log *domain.DeactivationAuditL
 
 func TestConfirmDeactivation_Success(t *testing.T) {
 	userRepo := newNoConflictRepo()
-	activeUser := newUserWithRole("user-1", domain.RoleContestant, domain.StatusActive)
+	activeUser := newUserWithRole("user-1", domainShared.RoleContestant, domain.StatusActive)
 
 	userRepo.findByIDFn = func(_ context.Context, id string) (*domain.User, error) {
 		if id == "user-1" {
@@ -75,7 +76,7 @@ func TestConfirmDeactivation_Success(t *testing.T) {
 	
 	emailSent := false
 	mockEmail := &mockEmailSender{
-		sendFn: func(ctx context.Context, msg notification.EmailMessage) error {
+		sendFn: func(ctx context.Context, msg shared.EmailMessage) error {
 			emailSent = true
 			return nil
 		},
@@ -104,7 +105,7 @@ func TestConfirmDeactivation_Success(t *testing.T) {
 
 func TestConfirmDeactivation_InvalidCode(t *testing.T) {
 	userRepo := newNoConflictRepo()
-	activeUser := newUserWithRole("user-1", domain.RoleContestant, domain.StatusActive)
+	activeUser := newUserWithRole("user-1", domainShared.RoleContestant, domain.StatusActive)
 	userRepo.findByIDFn = func(_ context.Context, id string) (*domain.User, error) {
 		return activeUser, nil
 	}
@@ -140,7 +141,7 @@ func TestConfirmDeactivation_InvalidCode(t *testing.T) {
 func TestConfirmDeactivation_ExpiredCode_UpdateFails_ReturnsInternal(t *testing.T) {
 	userRepo := newNoConflictRepo()
 	userRepo.findByIDFn = func(_ context.Context, id string) (*domain.User, error) {
-		return newUserWithRole("user-1", domain.RoleContestant, domain.StatusActive), nil
+		return newUserWithRole("user-1", domainShared.RoleContestant, domain.StatusActive), nil
 	}
 
 	dbErr := errors.New("connection refused")
@@ -171,7 +172,7 @@ func TestConfirmDeactivation_ExpiredCode_UpdateFails_ReturnsInternal(t *testing.
 func TestConfirmDeactivation_InvalidCode_UpdateFails_ReturnsInternal(t *testing.T) {
 	userRepo := newNoConflictRepo()
 	userRepo.findByIDFn = func(_ context.Context, id string) (*domain.User, error) {
-		return newUserWithRole("user-1", domain.RoleContestant, domain.StatusActive), nil
+		return newUserWithRole("user-1", domainShared.RoleContestant, domain.StatusActive), nil
 	}
 
 	dbErr := errors.New("connection refused")
@@ -202,7 +203,7 @@ func TestConfirmDeactivation_InvalidCode_UpdateFails_ReturnsInternal(t *testing.
 func TestConfirmDeactivation_BlockedState_UpdateFails_ReturnsInternal(t *testing.T) {
 	userRepo := newNoConflictRepo()
 	userRepo.findByIDFn = func(_ context.Context, id string) (*domain.User, error) {
-		return newUserWithRole("user-1", domain.RoleContestant, domain.StatusActive), nil
+		return newUserWithRole("user-1", domainShared.RoleContestant, domain.StatusActive), nil
 	}
 
 	dbErr := errors.New("connection refused")
@@ -232,7 +233,7 @@ func TestConfirmDeactivation_BlockedState_UpdateFails_ReturnsInternal(t *testing
 
 func TestConfirmDeactivation_AuditLogSaveFails_ReturnsNil(t *testing.T) {
 	userRepo := newNoConflictRepo()
-	activeUser := newUserWithRole("user-1", domain.RoleContestant, domain.StatusActive)
+	activeUser := newUserWithRole("user-1", domainShared.RoleContestant, domain.StatusActive)
 	userRepo.findByIDFn = func(_ context.Context, id string) (*domain.User, error) {
 		return activeUser, nil
 	}
@@ -262,7 +263,7 @@ func TestConfirmDeactivation_AuditLogSaveFails_ReturnsNil(t *testing.T) {
 
 func TestConfirmDeactivation_EmailSendFails_ReturnsNil(t *testing.T) {
 	userRepo := newNoConflictRepo()
-	activeUser := newUserWithRole("user-1", domain.RoleContestant, domain.StatusActive)
+	activeUser := newUserWithRole("user-1", domainShared.RoleContestant, domain.StatusActive)
 	userRepo.findByIDFn = func(_ context.Context, id string) (*domain.User, error) {
 		return activeUser, nil
 	}
@@ -276,7 +277,7 @@ func TestConfirmDeactivation_EmailSendFails_ReturnsNil(t *testing.T) {
 	}
 
 	emailSender := &mockEmailSender{
-		sendFn: func(ctx context.Context, msg notification.EmailMessage) error {
+		sendFn: func(ctx context.Context, msg shared.EmailMessage) error {
 			return errors.New("smtp timeout")
 		},
 	}
@@ -293,7 +294,7 @@ func TestConfirmDeactivation_EmailSendFails_ReturnsNil(t *testing.T) {
 func TestConfirmDeactivation_BlockExpired_MarksExpiredAndReturnsError(t *testing.T) {
 	userRepo := newNoConflictRepo()
 	userRepo.findByIDFn = func(_ context.Context, id string) (*domain.User, error) {
-		return newUserWithRole("user-1", domain.RoleContestant, domain.StatusActive), nil
+		return newUserWithRole("user-1", domainShared.RoleContestant, domain.StatusActive), nil
 	}
 
 	expiredBlockedUntil := time.Now().Add(-1 * time.Minute)
@@ -325,7 +326,7 @@ func TestConfirmDeactivation_BlockExpired_MarksExpiredAndReturnsError(t *testing
 func TestConfirmDeactivation_BlockExpired_UpdateFails_ReturnsInternal(t *testing.T) {
 	userRepo := newNoConflictRepo()
 	userRepo.findByIDFn = func(_ context.Context, id string) (*domain.User, error) {
-		return newUserWithRole("user-1", domain.RoleContestant, domain.StatusActive), nil
+		return newUserWithRole("user-1", domainShared.RoleContestant, domain.StatusActive), nil
 	}
 
 	expiredBlockedUntil := time.Now().Add(-1 * time.Minute)
@@ -354,7 +355,7 @@ func TestConfirmDeactivation_BlockExpired_UpdateFails_ReturnsInternal(t *testing
 func TestConfirmDeactivation_ActiveBlock(t *testing.T) {
 	userRepo := newNoConflictRepo()
 	userRepo.findByIDFn = func(_ context.Context, _ string) (*domain.User, error) {
-		return newUserWithRole("user-1", domain.RoleContestant, domain.StatusActive), nil
+		return newUserWithRole("user-1", domainShared.RoleContestant, domain.StatusActive), nil
 	}
 
 	blockedUntil := time.Now().Add(30 * time.Minute)
@@ -378,7 +379,7 @@ func TestConfirmDeactivation_ActiveBlock(t *testing.T) {
 
 func TestConfirmDeactivation_ExceedAttemptsAndBlock(t *testing.T) {
 	userRepo := newNoConflictRepo()
-	activeUser := newUserWithRole("user-1", domain.RoleContestant, domain.StatusActive)
+	activeUser := newUserWithRole("user-1", domainShared.RoleContestant, domain.StatusActive)
 	userRepo.findByIDFn = func(_ context.Context, id string) (*domain.User, error) {
 		return activeUser, nil
 	}

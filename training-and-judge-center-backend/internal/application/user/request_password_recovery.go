@@ -7,8 +7,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/training-judge-center/backend/internal/domain/notification"
-	"github.com/training-judge-center/backend/internal/domain/ratelimit"
+	"github.com/training-judge-center/backend/internal/application/shared"
 	"github.com/training-judge-center/backend/internal/domain/user"
 	"github.com/training-judge-center/backend/pkg/apperror"
 )
@@ -18,17 +17,17 @@ type RequestPasswordRecoveryInput struct {
 }
 
 type RequestPasswordRecoveryUseCase struct {
-	userRepo     user.UserRepository
+	userRepo     user.Repository
 	recoveryRepo user.PasswordRecoveryRepository
-	emailSender  notification.EmailSender
-	rateLimiter  ratelimit.RateLimiter
+	emailSender  shared.EmailSender
+	rateLimiter  shared.RateLimiter
 }
 
 func NewRequestPasswordRecoveryUseCase(
-	userRepo user.UserRepository,
+	userRepo user.Repository,
 	recoveryRepo user.PasswordRecoveryRepository,
-	emailSender notification.EmailSender,
-	rateLimiter ratelimit.RateLimiter,
+	emailSender shared.EmailSender,
+	rateLimiter shared.RateLimiter,
 ) *RequestPasswordRecoveryUseCase {
 	return &RequestPasswordRecoveryUseCase{
 		userRepo:     userRepo,
@@ -81,14 +80,18 @@ func (uc *RequestPasswordRecoveryUseCase) Execute(ctx context.Context, input Req
 		return apperror.NewInternal()
 	}
 
-	req := user.RestorePasswordRecoveryRequest(uuid.NewString(), foundUser.ID(), code, user.StatusPending, now.Add(15*time.Minute), now, nil)
+	req, err := user.NewPasswordRecoveryRequest(uuid.NewString(), foundUser.ID(), code, now)
+	if err != nil {
+		slog.Error("failed to build password recovery request", "user_id", foundUser.ID(), "error", err)
+		return apperror.NewInternal()
+	}
 
 	if err := uc.recoveryRepo.Save(ctx, req); err != nil {
 		slog.Error("failed to save password recovery request", "user_id", foundUser.ID(), "error", err)
 		return apperror.NewInternal()
 	}
 
-	if err := uc.emailSender.Send(ctx, notification.EmailMessage{
+	if err := uc.emailSender.Send(ctx, shared.EmailMessage{
 		To:      foundUser.Email().String(),
 		Subject: "Password Recovery Code",
 		Body:    fmt.Sprintf("Your password recovery code is: %s\nThis code will expire in 15 minutes.", code),

@@ -17,27 +17,27 @@ import (
 
 	googleStorage "cloud.google.com/go/storage"
 	"github.com/redis/go-redis/v9"
+	"github.com/training-judge-center/backend/internal/adapter/auth"
+	platformConfig "github.com/training-judge-center/backend/internal/adapter/config"
+	"github.com/training-judge-center/backend/internal/adapter/email"
+	"github.com/training-judge-center/backend/internal/adapter/group"
+	"github.com/training-judge-center/backend/internal/adapter/http/handler"
+	handlerGroup "github.com/training-judge-center/backend/internal/adapter/http/handler/group"
+	handlerMaterial "github.com/training-judge-center/backend/internal/adapter/http/handler/material"
+	handlerProblem "github.com/training-judge-center/backend/internal/adapter/http/handler/problem"
+	handlerUser "github.com/training-judge-center/backend/internal/adapter/http/handler/user"
+	"github.com/training-judge-center/backend/internal/adapter/material"
+	"github.com/training-judge-center/backend/internal/adapter/postgres"
+	"github.com/training-judge-center/backend/internal/adapter/problem"
+	"github.com/training-judge-center/backend/internal/adapter/ratelimit"
+	"github.com/training-judge-center/backend/internal/adapter/user"
 
 	appGroup "github.com/training-judge-center/backend/internal/application/group"
 	appMaterial "github.com/training-judge-center/backend/internal/application/material"
 	appProblem "github.com/training-judge-center/backend/internal/application/problem"
 	appuser "github.com/training-judge-center/backend/internal/application/user"
 	"github.com/training-judge-center/backend/internal/config"
-	infraPostgres "github.com/training-judge-center/backend/internal/infrastructure/postgres"
-	platformAuth "github.com/training-judge-center/backend/internal/platform/auth"
-	platformConfig "github.com/training-judge-center/backend/internal/platform/config"
-	"github.com/training-judge-center/backend/internal/platform/email"
-	platformGroup "github.com/training-judge-center/backend/internal/platform/group"
-	platformMaterial "github.com/training-judge-center/backend/internal/platform/material"
-	platformProblem "github.com/training-judge-center/backend/internal/platform/problem"
-	"github.com/training-judge-center/backend/internal/platform/ratelimit"
-	platformUser "github.com/training-judge-center/backend/internal/platform/user"
-	"github.com/training-judge-center/backend/internal/server"
-	"github.com/training-judge-center/backend/internal/server/handler"
-	handlerGroup "github.com/training-judge-center/backend/internal/server/handler/group"
-	handlerMaterial "github.com/training-judge-center/backend/internal/server/handler/material"
-	handlerProblem "github.com/training-judge-center/backend/internal/server/handler/problem"
-	handlerUser "github.com/training-judge-center/backend/internal/server/handler/user"
+	adapterhttp "github.com/training-judge-center/backend/internal/adapter/http"
 )
 
 func main() {
@@ -50,7 +50,7 @@ func main() {
 
 	ctx := context.Background()
 
-	dbPool, err := infraPostgres.NewConnectionPool(ctx, cfg)
+	dbPool, err := postgres.NewConnectionPool(ctx, cfg)
 	if err != nil {
 		slog.Error("failed to connect to database", "error", err)
 		os.Exit(1)
@@ -74,7 +74,7 @@ func main() {
 	slog.Info("redis connected successfully")
 
 	// Problem repositories & settings
-	problemRepo := platformProblem.NewProblemRepository(dbPool)
+	problemRepo := problem.NewProblemRepository(dbPool)
 	settingsProvider := platformConfig.NewPlatformSettings(cfg.VirtualObject)
 
 	// File Storage
@@ -91,10 +91,10 @@ func main() {
 			os.Exit(1)
 		}
 		slog.Info("using GCS storage backend", "bucket", cfg.GCSBucket)
-		fileStorage = platformProblem.NewGCSProblemFileRepository(gcsClient, cfg.GCSBucket)
+		fileStorage = problem.NewGCSProblemFileRepository(gcsClient, cfg.GCSBucket)
 	default:
 		localDir := cfg.StorageLocalDir
-		localRepo, err := platformProblem.NewLocalStorageRepository(localDir)
+		localRepo, err := problem.NewLocalStorageRepository(localDir)
 		if err != nil {
 			slog.Error("failed to create local file storage", "error", err)
 			os.Exit(1)
@@ -103,17 +103,17 @@ func main() {
 		fileStorage = localRepo
 	}
 
-	icpcParser := platformProblem.NewICPCParser(
+	icpcParser := problem.NewICPCParser(
 		settingsProvider.GetMaxFileSizeTestCaseMB(),
 		settingsProvider.GetMaxFileSizeDefaultMB(),
 		settingsProvider.GetMaxFileCountTestCase(),
 		settingsProvider.GetMaxFileCountSample(),
 		cfg.VirtualObject.LanguageExtensions,
 	)
-	zipParserAdapter := platformProblem.NewICPCParserAdapter(icpcParser)
-	packageParserAdapter := platformProblem.NewICPCPackageParserAdapter(icpcParser)
+	zipParserAdapter := problem.NewICPCParserAdapter(icpcParser)
+	packageParserAdapter := problem.NewICPCPackageParserAdapter(icpcParser)
 
-	userProvider := platformProblem.NewProblemUserProvider(dbPool)
+	userProvider := problem.NewProblemUserProvider(dbPool)
 
 	// Problem use cases
 	createProblemUseCase := appProblem.NewCreateProblemUseCase(problemRepo, settingsProvider)
@@ -149,18 +149,18 @@ func main() {
 	)
 
 	// User platform adapters
-	userRepo := platformUser.NewUserRepository(dbPool)
-	passwordRecoveryRepo := platformUser.NewPasswordRecoveryRepository(dbPool)
-	emailChangeRepo := platformUser.NewEmailChangeRepository(dbPool)
-	deactRepo := platformUser.NewDeactivationRequestRepository(dbPool)
-	auditRepo := platformUser.NewDeactivationAuditLogRepository(dbPool)
+	userRepo := user.NewUserRepository(dbPool)
+	passwordRecoveryRepo := user.NewPasswordRecoveryRepository(dbPool)
+	emailChangeRepo := user.NewEmailChangeRepository(dbPool)
+	deactRepo := user.NewDeactivationRequestRepository(dbPool)
+	auditRepo := user.NewDeactivationAuditLogRepository(dbPool)
 
 	// Infrastructure and cross-cutting services
-	txManager := infraPostgres.NewPostgresTransactionManager(dbPool)
-	jwtService := platformAuth.NewJWTService(cfg.JWTSecret, cfg.JWTExpirationHours)
+	txManager := postgres.NewPostgresTransactionManager(dbPool)
+	jwtService := auth.NewJWTService(cfg.JWTSecret, cfg.JWTExpirationHours)
 	emailSender := email.NewSMTPSender(cfg.SMTPHost, cfg.SMTPPort, cfg.SMTPUser, cfg.SMTPPassword, cfg.SMTPFrom)
 	redisRateLimiter := ratelimit.NewRedisRateLimiter(redisClient)
-	sessionInvalidator := platformAuth.NewSessionInvalidator(redisClient, time.Duration(cfg.JWTExpirationHours)*time.Hour)
+	sessionInvalidator := auth.NewSessionInvalidator(redisClient, time.Duration(cfg.JWTExpirationHours)*time.Hour)
 
 	// User use cases
 	createUserUC := appuser.NewCreateUserUseCase(userRepo)
@@ -183,12 +183,12 @@ func main() {
 	authHandler := handler.NewAuthHandler(loginUC)
 
 	// Group repositories & platform adapters
-	groupRepo := platformGroup.NewGroupRepository(dbPool)
-	groupMemberRepo := platformGroup.NewMemberRepository(dbPool)
-	groupUserProvider := platformGroup.NewUserProvider(dbPool)
-	groupPrefsReader := platformGroup.NewPreferencesReader(dbPool)
-	joinRequestRepo := platformGroup.NewJoinRequestRepository(dbPool)
-	groupTxManager := infraPostgres.NewPostgresTransactionManager(dbPool)
+	groupRepo := group.NewGroupRepository(dbPool)
+	groupMemberRepo := group.NewMemberRepository(dbPool)
+	groupUserProvider := group.NewUserProvider(dbPool)
+	groupPrefsReader := group.NewPreferencesReader(dbPool)
+	joinRequestRepo := group.NewJoinRequestRepository(dbPool)
+	groupTxManager := postgres.NewPostgresTransactionManager(dbPool)
 
 	// Group use cases
 	createGroupUseCase := appGroup.NewCreateGroupUseCase(groupRepo, groupMemberRepo, groupTxManager)
@@ -203,7 +203,7 @@ func main() {
 	getMyRequestUseCase := appGroup.NewGetMyRequestUseCase(joinRequestRepo)
 	cancelMyRequestUseCase := appGroup.NewCancelMyRequestUseCase(joinRequestRepo)
 
-	groupInvitationJWTSvc := platformAuth.NewGroupInvitationJWTService(cfg.JWTSecret)
+	groupInvitationJWTSvc := auth.NewGroupInvitationJWTService(cfg.JWTSecret)
 	generateInviteUseCase := appGroup.NewGenerateInviteUseCase(groupRepo, groupMemberRepo, groupInvitationJWTSvc)
 	acceptInviteUseCase := appGroup.NewAcceptInviteUseCase(groupRepo, groupMemberRepo, groupInvitationJWTSvc)
 
@@ -216,10 +216,10 @@ func main() {
 	)
 
 	// Material platform adapters
-	materialRepo := platformMaterial.NewMaterialRepository(dbPool)
-	groupProvider := platformMaterial.NewGroupProvider(dbPool)
-	groupMemberProvider := platformMaterial.NewGroupMemberProvider(dbPool)
-	authorProvider := platformMaterial.NewAuthorProvider(dbPool)
+	materialRepo := material.NewMaterialRepository(dbPool)
+	groupProvider := material.NewGroupProvider(dbPool)
+	groupMemberProvider := material.NewGroupMemberProvider(dbPool)
+	authorProvider := material.NewAuthorProvider(dbPool)
 
 	// Material use cases
 	createMaterialUC := appMaterial.NewCreateMaterial(materialRepo, groupProvider, groupMemberProvider, authorProvider)
@@ -238,20 +238,20 @@ func main() {
 		deleteMaterialUC,
 	)
 
-	router := server.NewRouter(&server.Handlers{
+	router := adapterhttp.NewRouter(&adapterhttp.Handlers{
 		Problem:  problemHandler,
 		User:     userHandler,
 		Auth:     authHandler,
 		Group:    groupHandler,
 		Material: materialHandler,
-	}, &server.Services{
+	}, &adapterhttp.Services{
 		TokenService:       jwtService,
 		SessionInvalidator: sessionInvalidator,
 	}, cfg.AllowedOrigins)
 
-	slog.Info("server starting", "port", cfg.Port)
+	slog.Info("http starting", "port", cfg.Port)
 	if err := http.ListenAndServe(fmt.Sprintf(":%s", cfg.Port), router); err != nil {
-		slog.Error("server failed to start", "error", err)
+		slog.Error("http failed to start", "error", err)
 		os.Exit(1)
 	}
 }

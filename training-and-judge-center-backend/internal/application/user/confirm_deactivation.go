@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/training-judge-center/backend/internal/domain/notification"
+	"github.com/training-judge-center/backend/internal/application/shared"
 	"github.com/training-judge-center/backend/internal/domain/user"
 	"github.com/training-judge-center/backend/pkg/apperror"
 )
@@ -20,19 +20,19 @@ type ConfirmDeactivationInput struct {
 }
 
 type ConfirmDeactivationUseCase struct {
-	userRepo           user.UserRepository
+	userRepo           user.Repository
 	deactRepo          user.DeactivationRequestRepository
 	auditRepo          user.DeactivationAuditLogRepository
-	emailSender        notification.EmailSender
+	emailSender        shared.EmailSender
 	sessionInvalidator user.SessionInvalidator
 	txManager          TransactionManager
 }
 
 func NewConfirmDeactivationUseCase(
-	userRepo user.UserRepository,
+	userRepo user.Repository,
 	deactRepo user.DeactivationRequestRepository,
 	auditRepo user.DeactivationAuditLogRepository,
-	emailSender notification.EmailSender,
+	emailSender shared.EmailSender,
 	sessionInvalidator user.SessionInvalidator,
 	txManager TransactionManager,
 ) *ConfirmDeactivationUseCase {
@@ -153,7 +153,7 @@ func (uc *ConfirmDeactivationUseCase) Execute(ctx context.Context, input Confirm
 
 	// Send final email
 	if originalEmailStr != "" {
-		if err := uc.emailSender.Send(ctx, notification.EmailMessage{
+		if err := uc.emailSender.Send(ctx, shared.EmailMessage{
 			To:      originalEmailStr,
 			Subject: "Account Deactivated",
 			Body:    "Your account has been successfully deactivated based on your request. Your identity and email have been anonymized.",

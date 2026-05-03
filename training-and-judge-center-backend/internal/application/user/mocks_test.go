@@ -4,7 +4,8 @@ import (
 	"context"
 	"time"
 
-	"github.com/training-judge-center/backend/internal/domain/notification"
+	appShared "github.com/training-judge-center/backend/internal/application/shared"
+	"github.com/training-judge-center/backend/internal/domain/shared"
 	domain "github.com/training-judge-center/backend/internal/domain/user"
 )
 
@@ -30,10 +31,10 @@ func (m *mockRateLimiter) Reset(ctx context.Context, key string) error {
 }
 
 type mockEmailSender struct {
-	sendFn func(ctx context.Context, msg notification.EmailMessage) error
+	sendFn func(ctx context.Context, msg appShared.EmailMessage) error
 }
 
-func (m *mockEmailSender) Send(ctx context.Context, msg notification.EmailMessage) error {
+func (m *mockEmailSender) Send(ctx context.Context, msg appShared.EmailMessage) error {
 	if m.sendFn != nil {
 		return m.sendFn(ctx, msg)
 	}
@@ -109,7 +110,7 @@ func newNoConflictRepo() *mockUserRepository {
 	return &mockUserRepository{}
 }
 
-func newUserWithRole(id string, role domain.Role, status domain.Status) *domain.User {
+func newUserWithRole(id string, role shared.Role, status domain.Status) *domain.User {
 	p, _ := domain.NewPassword("Secret1!")
 	emailStr := id + "@example.com"
 	nicknameStr := id

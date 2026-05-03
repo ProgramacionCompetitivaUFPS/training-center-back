@@ -9,8 +9,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/training-judge-center/backend/internal/domain/notification"
-	"github.com/training-judge-center/backend/internal/domain/ratelimit"
+	"github.com/training-judge-center/backend/internal/application/shared"
 	"github.com/training-judge-center/backend/internal/domain/user"
 	"github.com/training-judge-center/backend/pkg/apperror"
 )
@@ -22,17 +21,17 @@ type RequestEmailChangeInput struct {
 }
 
 type RequestEmailChangeUseCase struct {
-	userRepo        user.UserRepository
+	userRepo        user.Repository
 	emailChangeRepo user.EmailChangeRepository
-	emailSender     notification.EmailSender
-	rateLimiter     ratelimit.RateLimiter
+	emailSender     shared.EmailSender
+	rateLimiter     shared.RateLimiter
 }
 
 func NewRequestEmailChangeUseCase(
-	userRepo user.UserRepository,
+	userRepo user.Repository,
 	emailChangeRepo user.EmailChangeRepository,
-	emailSender notification.EmailSender,
-	rateLimiter ratelimit.RateLimiter,
+	emailSender shared.EmailSender,
+	rateLimiter shared.RateLimiter,
 ) *RequestEmailChangeUseCase {
 	return &RequestEmailChangeUseCase{
 		userRepo:        userRepo,
@@ -84,16 +83,19 @@ func (uc *RequestEmailChangeUseCase) Execute(ctx context.Context, input RequestE
 	}
 
 	now := time.Now()
-	expiresAt := now.Add(15 * time.Minute)
 
-	req := user.RestoreEmailChangeRequest(uuid.New().String(), input.UserID, parsedNewEmail, code, user.StatusPending, expiresAt, now, nil)
+	req, err := user.NewEmailChangeRequest(uuid.New().String(), input.UserID, parsedNewEmail, code, now)
+	if err != nil {
+		slog.Error("failed to build email change request", "user_id", input.UserID, "error", err)
+		return apperror.NewInternal()
+	}
 
 	if err := uc.emailChangeRepo.Save(ctx, req); err != nil {
 		slog.Error("failed to save email change request", "user_id", input.UserID, "error", err)
 		return apperror.NewInternal()
 	}
 
-	if err := uc.emailSender.Send(ctx, notification.EmailMessage{
+	if err := uc.emailSender.Send(ctx, shared.EmailMessage{
 		To:      input.NewEmail,
 		Subject: "Verify your new email address",
 		Body:    fmt.Sprintf("Your email verification code is: %s. It will expire in 15 minutes.", code),

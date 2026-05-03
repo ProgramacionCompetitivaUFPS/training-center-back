@@ -19,10 +19,10 @@ type UpdateUserInput struct {
 }
 
 type UpdateUserUseCase struct {
-	repo user.UserRepository
+	repo user.Repository
 }
 
-func NewUpdateUserUseCase(repo user.UserRepository) *UpdateUserUseCase {
+func NewUpdateUserUseCase(repo user.Repository) *UpdateUserUseCase {
 	return &UpdateUserUseCase{repo: repo}
 }
 

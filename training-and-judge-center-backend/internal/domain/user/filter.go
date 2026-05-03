@@ -3,6 +3,8 @@ package user
 import (
 	"fmt"
 	"strings"
+
+	"github.com/training-judge-center/backend/internal/domain/shared"
 )
 
 type SortField string
@@ -57,7 +59,7 @@ func NewSearchField(s string) (SearchField, error) {
 }
 
 type UserFilter struct {
-	Roles       []Role
+	Roles       []shared.Role
 	Status      *Status
 	Country     string
 	City        string
@@ -70,7 +72,7 @@ type UserFilter struct {
 	Limit       int
 }
 
-func NewUserFilter(roles []Role, status *Status, country, city, institution string, searchField SearchField, searchTerm string, sort SortField, order SortOrder, page, limit int) (UserFilter, error) {
+func NewUserFilter(roles []shared.Role, status *Status, country, city, institution string, searchField SearchField, searchTerm string, sort SortField, order SortOrder, page, limit int) (UserFilter, error) {
 	if page < 1 {
 		return UserFilter{}, fmt.Errorf("page must be >= 1, got %d", page)
 	}

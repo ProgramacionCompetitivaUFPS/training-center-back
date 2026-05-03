@@ -6,14 +6,15 @@ import (
 	"net/http"
 	"testing"
 
-	"github.com/training-judge-center/backend/internal/domain/notification"
+	"github.com/training-judge-center/backend/internal/application/shared"
+	domainShared "github.com/training-judge-center/backend/internal/domain/shared"
 	domain "github.com/training-judge-center/backend/internal/domain/user"
 	"github.com/training-judge-center/backend/pkg/apperror"
 )
 
 func TestRequestEmailChange_Success(t *testing.T) {
 	userRepo := newNoConflictRepo()
-	activeUser := newUserWithRole("user-1", domain.RoleContestant, domain.StatusActive)
+	activeUser := newUserWithRole("user-1", domainShared.RoleContestant, domain.StatusActive)
 	userRepo.findByIDFn = func(_ context.Context, id string) (*domain.User, error) {
 		if id == "user-1" {
 			return activeUser, nil
@@ -24,7 +25,7 @@ func TestRequestEmailChange_Success(t *testing.T) {
 	
 	emailSent := false
 	mockEmail := &mockEmailSender{
-		sendFn: func(ctx context.Context, msg notification.EmailMessage) error {
+		sendFn: func(ctx context.Context, msg shared.EmailMessage) error {
 			emailSent = true
 			if msg.To != "newemail@example.com" {
 				t.Errorf("expected email to be sent to newemail@example.com, got %s", msg.To)
@@ -51,7 +52,7 @@ func TestRequestEmailChange_Success(t *testing.T) {
 
 func TestRequestEmailChange_WrongPassword(t *testing.T) {
 	userRepo := newNoConflictRepo()
-	activeUser := newUserWithRole("user-1", domain.RoleContestant, domain.StatusActive)
+	activeUser := newUserWithRole("user-1", domainShared.RoleContestant, domain.StatusActive)
 	userRepo.findByIDFn = func(_ context.Context, id string) (*domain.User, error) {
 		if id == "user-1" {
 			return activeUser, nil
@@ -103,7 +104,7 @@ func TestRequestEmailChange_UserNotFound(t *testing.T) {
 
 func TestRequestEmailChange_InvalidNewEmail(t *testing.T) {
 	userRepo := newNoConflictRepo()
-	activeUser := newUserWithRole("user-1", domain.RoleContestant, domain.StatusActive)
+	activeUser := newUserWithRole("user-1", domainShared.RoleContestant, domain.StatusActive)
 	userRepo.findByIDFn = func(_ context.Context, _ string) (*domain.User, error) { return activeUser, nil }
 
 	uc := NewRequestEmailChangeUseCase(userRepo, &mockEmailChangeRepo{}, &mockEmailSender{}, &mockRateLimiter{})
@@ -127,7 +128,7 @@ func TestRequestEmailChange_InvalidNewEmail(t *testing.T) {
 
 func TestRequestEmailChange_EmailDeliveryFails(t *testing.T) {
 	userRepo := newNoConflictRepo()
-	activeUser := newUserWithRole("user-1", domain.RoleContestant, domain.StatusActive)
+	activeUser := newUserWithRole("user-1", domainShared.RoleContestant, domain.StatusActive)
 	userRepo.findByIDFn = func(_ context.Context, id string) (*domain.User, error) {
 		if id == "user-1" {
 			return activeUser, nil
@@ -138,7 +139,7 @@ func TestRequestEmailChange_EmailDeliveryFails(t *testing.T) {
 	
 	// Simulate SMTP failure
 	mockEmail := &mockEmailSender{
-		sendFn: func(ctx context.Context, msg notification.EmailMessage) error {
+		sendFn: func(ctx context.Context, msg shared.EmailMessage) error {
 			return errors.New("smtp timeout")
 		},
 	}

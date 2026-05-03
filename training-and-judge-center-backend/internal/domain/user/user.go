@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/training-judge-center/backend/internal/domain/shared"
 )
 
 type User struct {
@@ -17,7 +18,7 @@ type User struct {
 	country       string
 	city          string
 	institution   string
-	role          Role
+	role          shared.Role
 	status        Status
 	createdAt     time.Time
 	updatedAt     *time.Time
@@ -33,7 +34,7 @@ func (u *User) Nickname() Nickname           { return u.nickname }
 func (u *User) Country() string              { return u.country }
 func (u *User) City() string                 { return u.city }
 func (u *User) Institution() string          { return u.institution }
-func (u *User) Role() Role                   { return u.role }
+func (u *User) Role() shared.Role            { return u.role }
 func (u *User) Status() Status               { return u.status }
 func (u *User) CreatedAt() time.Time         { return u.createdAt }
 func (u *User) UpdatedAt() *time.Time        { return u.updatedAt }
@@ -62,7 +63,7 @@ func NewUser(email Email, password Password, name string, nickname Nickname, cou
 		country:     country,
 		city:        city,
 		institution: institution,
-		role:        RoleContestant,
+		role:        shared.RoleContestant,
 		status:      StatusActive,
 		createdAt:   time.Now(),
 	}, nil
@@ -102,11 +103,11 @@ func (u *User) Update(name *string, nickname *Nickname, institution *string, cit
 	return nil
 }
 
-func (u *User) AdminUpdate(name *string, nickname *Nickname, institution *string, city *string, country *string, email *Email, role *Role) error {
+func (u *User) AdminUpdate(name *string, nickname *Nickname, institution *string, city *string, country *string, email *Email, role *shared.Role) error {
 	if role != nil && !role.IsValid() {
 		return fmt.Errorf("invalid role: %s", *role)
 	}
-	if role != nil && *role == RoleAdmin {
+	if role != nil && *role == shared.RoleAdmin {
 		return fmt.Errorf("role ADMIN cannot be assigned through standard update")
 	}
 
@@ -207,7 +208,7 @@ func RestoreUser(
 	}
 	u.nickname = parsedNickname
 
-	parsedRole, err := NewRole(roleStr)
+	parsedRole, err := shared.NewRole(roleStr)
 	if err != nil {
 		return nil, fmt.Errorf("restoring user %s: invalid role: %w", id, err)
 	}
@@ -221,4 +222,3 @@ func RestoreUser(
 
 	return u, nil
 }
-
