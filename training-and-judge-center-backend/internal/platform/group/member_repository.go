@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"golang.org/x/sync/errgroup"
 
@@ -39,11 +40,15 @@ const insertGroupMemberPrefix = `INSERT INTO group_members (id, group_id, user_i
 func (r *MemberRepository) Save(ctx context.Context, m *domainGroup.GroupMember) error {
 	q := infraPostgres.GetQuerier(ctx, r.db)
 	addedByID := userIDToPtr(m.AddedBy())
-	sql := insertGroupMemberPrefix + `($1,$2,$3,$4,$5,$6,$7) ON CONFLICT (id) DO UPDATE SET member_role = EXCLUDED.member_role`
+	sql := insertGroupMemberPrefix + `($1,$2,$3,$4,$5,$6,$7)`
 	if _, err := q.Exec(ctx, sql,
 		m.ID(), m.GroupID(), m.UserID().Value(),
 		string(m.Role()), m.JoinedAt(), addedByID, string(m.JoinMethod()),
 	); err != nil {
+		var pgErr *pgconn.PgError
+		if errors.As(err, &pgErr) && pgErr.Code == "23505" {
+			return apperror.NewConflict(domainGroup.ErrCodeAlreadyMember, "User is already a member of this group")
+		}
 		slog.ErrorContext(ctx, "MemberRepository.Save failed", "error", err)
 		return apperror.NewInternal()
 	}
@@ -60,7 +65,8 @@ func (r *MemberRepository) SaveAll(ctx context.Context, members []*domainGroup.G
 
 	if len(members) > maxBatchSize {
 		slog.ErrorContext(ctx, "MemberRepository.SaveAll: batch too large", "count", len(members), "max", maxBatchSize)
-		return apperror.NewInternal()
+		return apperror.NewBadRequest(apperror.ErrCodeValidationError,
+			fmt.Sprintf("batch size %d exceeds maximum of %d", len(members), maxBatchSize))
 	}
 
 	q := infraPostgres.GetQuerier(ctx, r.db)
@@ -97,18 +103,20 @@ func (r *MemberRepository) FindByGroupAndUser(ctx context.Context, groupID strin
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, nil
 		}
-		slog.ErrorContext(ctx, "FindByGroupAndUser failed", "error", err)
+		slog.ErrorContext(ctx, "FindByGroupAndUser failed", "error", err, "group_id", groupID, "user_id", userID.Value())
 		return nil, apperror.NewInternal()
 	}
 	return m, nil
 }
 
-func (r *MemberRepository) FindByGroup(_ context.Context, _ string, _ domainGroup.MemberFilters) ([]*domainGroup.GroupMember, int, error) {
-	panic("FindByGroup not implemented")
+func (r *MemberRepository) FindByGroup(ctx context.Context, groupID string, _ domainGroup.MemberFilters) ([]*domainGroup.GroupMember, int, error) {
+	slog.ErrorContext(ctx, "MemberRepository.FindByGroup: not implemented", "group_id", groupID)
+	return nil, 0, apperror.NewInternal()
 }
 
-func (r *MemberRepository) Delete(_ context.Context, _ string, _ shared.UserID) error {
-	panic("Delete not implemented")
+func (r *MemberRepository) Delete(ctx context.Context, groupID string, userID shared.UserID) error {
+	slog.ErrorContext(ctx, "MemberRepository.Delete: not implemented", "group_id", groupID, "user_id", userID.Value())
+	return apperror.NewInternal()
 }
 
 func (r *MemberRepository) CountLeads(ctx context.Context, groupID string) (int, error) {
@@ -119,7 +127,7 @@ func (r *MemberRepository) CountLeads(ctx context.Context, groupID string) (int,
 		groupID, string(domainGroup.MemberRoleLead),
 	).Scan(&n)
 	if err != nil {
-		slog.ErrorContext(ctx, "CountLeads failed", "error", err)
+		slog.ErrorContext(ctx, "CountLeads failed", "error", err, "group_id", groupID)
 		return 0, apperror.NewInternal()
 	}
 	return n, nil
@@ -130,7 +138,7 @@ func (r *MemberRepository) CountMembers(ctx context.Context, groupID string) (in
 	var n int
 	err := q.QueryRow(ctx, `SELECT COUNT(*) FROM group_members WHERE group_id = $1 AND removed_at IS NULL`, groupID).Scan(&n)
 	if err != nil {
-		slog.ErrorContext(ctx, "CountMembers failed", "error", err)
+		slog.ErrorContext(ctx, "CountMembers failed", "error", err, "group_id", groupID)
 		return 0, apperror.NewInternal()
 	}
 	return n, nil
@@ -150,11 +158,13 @@ func (r *MemberRepository) ListLeads(ctx context.Context, groupID string) ([]*do
 	for rows.Next() {
 		m, err := scanMember(rows)
 		if err != nil {
+			slog.ErrorContext(ctx, "ListLeads scan failed", "error", err, "group_id", groupID)
 			return nil, apperror.NewInternal()
 		}
 		out = append(out, m)
 	}
 	if err := rows.Err(); err != nil {
+		slog.ErrorContext(ctx, "ListLeads rows error", "error", err, "group_id", groupID)
 		return nil, apperror.NewInternal()
 	}
 	return out, nil
@@ -184,11 +194,16 @@ func (r *MemberRepository) BulkStats(ctx context.Context, groupIDs []string, vie
 			var gid string
 			var n int
 			if err := rows.Scan(&gid, &n); err != nil {
+				slog.ErrorContext(egCtx, "BulkStats count scan failed", "error", err)
 				return apperror.NewInternal()
 			}
 			counts[gid] = n
 		}
-		return rows.Err()
+		if err := rows.Err(); err != nil {
+			slog.ErrorContext(egCtx, "BulkStats count rows error", "error", err)
+			return apperror.NewInternal()
+		}
+		return nil
 	})
 
 	eg.Go(func() error {
@@ -202,15 +217,20 @@ func (r *MemberRepository) BulkStats(ctx context.Context, groupIDs []string, vie
 		for rows.Next() {
 			m, err := scanMember(rows)
 			if err != nil {
+				slog.ErrorContext(egCtx, "BulkStats memberships scan failed", "error", err)
 				return apperror.NewInternal()
 			}
 			memberships[m.GroupID()] = m
 		}
-		return rows.Err()
+		if err := rows.Err(); err != nil {
+			slog.ErrorContext(egCtx, "BulkStats memberships rows error", "error", err)
+			return apperror.NewInternal()
+		}
+		return nil
 	})
 
 	if err := eg.Wait(); err != nil {
-		return nil, apperror.NewInternal()
+		return nil, err
 	}
 
 	result := make(map[string]domainGroup.MemberStats, len(groupIDs))

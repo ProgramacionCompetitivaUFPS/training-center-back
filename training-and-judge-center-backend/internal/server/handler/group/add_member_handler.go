@@ -3,9 +3,8 @@ package group
 import (
 	"encoding/json"
 	"net/http"
+	"strings"
 	"time"
-
-	"github.com/go-chi/chi/v5"
 
 	appGroup "github.com/training-judge-center/backend/internal/application/group"
 	"github.com/training-judge-center/backend/internal/server/handler"
@@ -22,11 +21,15 @@ func (h *Handler) AddMember(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	groupID := chi.URLParam(r, "groupId")
+	groupID := r.PathValue("groupId")
 
 	var body addMemberRequest
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 		handler.WriteError(w, apperror.NewBadRequest(apperror.ErrCodeValidationError, "Invalid request body"))
+		return
+	}
+	if strings.TrimSpace(body.Nickname) == "" || body.Role == "" {
+		handler.WriteError(w, apperror.NewBadRequest(apperror.ErrCodeValidationError, "nickname and role are required"))
 		return
 	}
 

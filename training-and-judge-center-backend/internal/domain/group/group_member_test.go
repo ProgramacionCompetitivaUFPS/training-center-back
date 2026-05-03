@@ -13,7 +13,7 @@ func testUserID() shared.UserID { return shared.RestoreUserID("user-abc") }
 
 func newMember(t *testing.T, id, groupID string, role group.MemberRole) *group.GroupMember {
 	t.Helper()
-	m, err := group.NewGroupMember(id, groupID, testUserID(), role, nil, group.JoinMethodDirectAdd, nil)
+	m, err := group.NewGroupMember(id, groupID, testUserID(), role, nil, group.JoinMethodOpenJoin, nil)
 	if err != nil {
 		t.Fatalf("NewGroupMember: %v", err)
 	}
@@ -22,8 +22,9 @@ func newMember(t *testing.T, id, groupID string, role group.MemberRole) *group.G
 
 func TestNewGroupMember_Valid(t *testing.T) {
 	fixed := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
+	adder := shared.RestoreUserID("adder-1")
 	m, err := group.NewGroupMember("m-1", "g-1", testUserID(), group.MemberRoleMember,
-		nil, group.JoinMethodDirectAdd, func() time.Time { return fixed })
+		&adder, group.JoinMethodDirectAdd, func() time.Time { return fixed })
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}

@@ -8,9 +8,13 @@ import (
 
 type fakeNicknameResolver struct {
 	users map[string]*UserInfo
+	err   error
 }
 
 func (f *fakeNicknameResolver) ResolveByNickname(_ context.Context, nickname string) (*UserInfo, error) {
+	if f.err != nil {
+		return nil, f.err
+	}
 	if u, ok := f.users[nickname]; ok {
 		return u, nil
 	}

@@ -31,6 +31,15 @@ func NewGroupMember(
 	if id == "" || groupID == "" || userID.Value() == "" {
 		return nil, apperror.NewInternal()
 	}
+	if _, err := NewJoinMethod(string(joinMethod)); err != nil {
+		return nil, err
+	}
+	if joinMethod == JoinMethodDirectAdd && addedBy == nil {
+		return nil, apperror.NewInternal()
+	}
+	if joinMethod == JoinMethodOpenJoin && addedBy != nil {
+		return nil, apperror.NewInternal()
+	}
 	if clock == nil {
 		clock = time.Now
 	}

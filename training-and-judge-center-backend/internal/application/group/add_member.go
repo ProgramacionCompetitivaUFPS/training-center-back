@@ -71,7 +71,7 @@ func (uc *AddMemberUseCase) Execute(ctx context.Context, input AddMemberInput) (
 	}
 
 	actorID := shared.RestoreUserID(input.CurrentUser.ID)
-	targetUserID := shared.RestoreUserID(targetInfo.ID)
+	targetUserID := targetInfo.ID
 
 	var result *AddMemberResult
 	txErr := uc.tx.WithTx(ctx, func(txCtx context.Context) error {

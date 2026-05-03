@@ -9,6 +9,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	appGroup "github.com/training-judge-center/backend/internal/application/group"
+	"github.com/training-judge-center/backend/internal/domain/shared"
 	"github.com/training-judge-center/backend/pkg/apperror"
 )
 
@@ -28,8 +29,8 @@ func (r *NicknameResolver) ResolveByNickname(ctx context.Context, nickname strin
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, nil
 		}
-		slog.ErrorContext(ctx, "NicknameResolver.ResolveByNickname failed", "error", err)
+		slog.ErrorContext(ctx, "NicknameResolver.ResolveByNickname failed", "error", err, "nickname", nickname)
 		return nil, apperror.NewInternal()
 	}
-	return &appGroup.UserInfo{ID: id, Role: role}, nil
+	return &appGroup.UserInfo{ID: shared.RestoreUserID(id), Role: role}, nil
 }

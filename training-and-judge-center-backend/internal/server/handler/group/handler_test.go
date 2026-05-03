@@ -577,3 +577,149 @@ func TestJoin_UnauthenticatedReturns401(t *testing.T) {
 		t.Fatalf("expected 401, got %d", w.Code)
 	}
 }
+
+// --- stubNicknameResolver ---
+
+type stubNicknameResolver struct {
+	info *appGroup.UserInfo
+	err  error
+}
+
+func (s *stubNicknameResolver) ResolveByNickname(_ context.Context, _ string) (*appGroup.UserInfo, error) {
+	return s.info, s.err
+}
+
+type stubTxManager struct{}
+
+func (s *stubTxManager) WithTx(ctx context.Context, fn func(context.Context) error) error {
+	return fn(ctx)
+}
+
+func addMemberHandler(resolver appGroup.NicknameResolver, groupRepo domainGroup.Repository, memberRepo domainGroup.MemberRepository) *Handler {
+	uc := appGroup.NewAddMemberUseCase(groupRepo, memberRepo, resolver, &stubTxManager{})
+	return NewHandler(nil, nil, nil, nil, uc, nil)
+}
+
+// --- AddMember handler tests ---
+
+func TestAddMember_Handler_Success(t *testing.T) {
+	g := domainGroup.RestoreGroup(
+		"g-1", domainGroup.RestoreGroupName("Club"), nil,
+		domainGroup.VisibilityVisible, domainGroup.JoinPolicyOpen,
+		false, shared.RestoreUserID("admin-1"), testTime(), testTime(),
+	)
+	repo := &stubGroupRepo{findByIDFn: func(_ string) (*domainGroup.Group, error) { return g, nil }}
+	resolver := &stubNicknameResolver{
+		info: &appGroup.UserInfo{ID: shared.RestoreUserID("target-1"), Role: shared.RoleContestant},
+	}
+	h := addMemberHandler(resolver, repo, &stubMemberRepo{})
+
+	r := authedPostRequest("/groups/g-1/members", `{"nickname":"alice","role":"MEMBER"}`)
+	r.SetPathValue("groupId", "g-1")
+	w := httptest.NewRecorder()
+
+	wrapAuthAsAdmin(http.HandlerFunc(h.AddMember)).ServeHTTP(w, r)
+
+	if w.Code != http.StatusCreated {
+		t.Fatalf("expected 201, got %d\nbody: %s", w.Code, w.Body.String())
+	}
+	var body addMemberResp
+	if err := json.NewDecoder(w.Body).Decode(&body); err != nil {
+		t.Fatalf("could not decode response: %v", err)
+	}
+	if body.GroupID != "g-1" {
+		t.Errorf("GroupID = %q, want g-1", body.GroupID)
+	}
+	if body.Role != "MEMBER" {
+		t.Errorf("Role = %q, want MEMBER", body.Role)
+	}
+	if body.JoinMethod != "DIRECT_ADD" {
+		t.Errorf("JoinMethod = %q, want DIRECT_ADD", body.JoinMethod)
+	}
+	if body.JoinedAt == "" {
+		t.Error("expected non-empty JoinedAt")
+	}
+}
+
+func TestAddMember_Handler_EmptyNicknameReturns400(t *testing.T) {
+	h := addMemberHandler(&stubNicknameResolver{}, &stubGroupRepo{}, &stubMemberRepo{})
+
+	r := authedPostRequest("/groups/g-1/members", `{"nickname":"","role":"MEMBER"}`)
+	r.SetPathValue("groupId", "g-1")
+	w := httptest.NewRecorder()
+
+	wrapAuthAsAdmin(http.HandlerFunc(h.AddMember)).ServeHTTP(w, r)
+
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400, got %d", w.Code)
+	}
+}
+
+func TestAddMember_Handler_ForbiddenReturns403(t *testing.T) {
+	g := domainGroup.RestoreGroup(
+		"g-1", domainGroup.RestoreGroupName("Club"), nil,
+		domainGroup.VisibilityVisible, domainGroup.JoinPolicyOpen,
+		false, shared.RestoreUserID("admin-1"), testTime(), testTime(),
+	)
+	repo := &stubGroupRepo{findByIDFn: func(_ string) (*domainGroup.Group, error) { return g, nil }}
+	resolver := &stubNicknameResolver{
+		info: &appGroup.UserInfo{ID: shared.RestoreUserID("target-1"), Role: shared.RoleContestant},
+	}
+	// caller (u1/Contestant from mockTokenSvc) is not a lead
+	h := addMemberHandler(resolver, repo, &stubMemberRepo{})
+
+	r := authedPostRequest("/groups/g-1/members", `{"nickname":"alice","role":"MEMBER"}`)
+	r.SetPathValue("groupId", "g-1")
+	w := httptest.NewRecorder()
+
+	wrapAuth(http.HandlerFunc(h.AddMember)).ServeHTTP(w, r)
+
+	if w.Code != http.StatusForbidden {
+		t.Fatalf("expected 403, got %d", w.Code)
+	}
+}
+
+func TestAddMember_Handler_AlreadyMemberReturns409(t *testing.T) {
+	g := domainGroup.RestoreGroup(
+		"g-1", domainGroup.RestoreGroupName("Club"), nil,
+		domainGroup.VisibilityVisible, domainGroup.JoinPolicyOpen,
+		false, shared.RestoreUserID("admin-1"), testTime(), testTime(),
+	)
+	repo := &stubGroupRepo{findByIDFn: func(_ string) (*domainGroup.Group, error) { return g, nil }}
+	targetID := shared.RestoreUserID("target-1")
+	resolver := &stubNicknameResolver{
+		info: &appGroup.UserInfo{ID: targetID, Role: shared.RoleContestant},
+	}
+	existing := domainGroup.RestoreGroupMember("m1", "g-1", targetID, domainGroup.MemberRoleMember, testTime(), nil, domainGroup.JoinMethodOpenJoin, nil)
+	memberRepo := &stubMemberRepo{
+		findByGroupAndUserFn: func(_ string, _ shared.UserID) (*domainGroup.GroupMember, error) {
+			return existing, nil
+		},
+	}
+	h := addMemberHandler(resolver, repo, memberRepo)
+
+	r := authedPostRequest("/groups/g-1/members", `{"nickname":"alice","role":"MEMBER"}`)
+	r.SetPathValue("groupId", "g-1")
+	w := httptest.NewRecorder()
+
+	wrapAuthAsAdmin(http.HandlerFunc(h.AddMember)).ServeHTTP(w, r)
+
+	if w.Code != http.StatusConflict {
+		t.Fatalf("expected 409, got %d", w.Code)
+	}
+}
+
+func TestAddMember_Handler_UnauthenticatedReturns401(t *testing.T) {
+	h := addMemberHandler(&stubNicknameResolver{}, &stubGroupRepo{}, &stubMemberRepo{})
+
+	r := httptest.NewRequest("POST", "/groups/g-1/members", strings.NewReader(`{"nickname":"alice","role":"MEMBER"}`))
+	r.Header.Set("Content-Type", "application/json")
+	r.SetPathValue("groupId", "g-1")
+	w := httptest.NewRecorder()
+
+	wrapAuth(http.HandlerFunc(h.AddMember)).ServeHTTP(w, r)
+
+	if w.Code != http.StatusUnauthorized {
+		t.Fatalf("expected 401, got %d", w.Code)
+	}
+}

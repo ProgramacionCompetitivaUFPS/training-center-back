@@ -1,6 +1,10 @@
 package group
 
-import "context"
+import (
+	"context"
+
+	"github.com/training-judge-center/backend/internal/domain/shared"
+)
 
 type UserDisplay struct {
 	Nickname string
@@ -16,7 +20,7 @@ type PreferencesReader interface {
 }
 
 type UserInfo struct {
-	ID   string
+	ID   shared.UserID
 	Role string
 }
 
