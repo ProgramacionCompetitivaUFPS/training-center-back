@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/training-judge-center/backend/internal/application/shared"
+	domainShared "github.com/training-judge-center/backend/internal/domain/shared"
 	domain "github.com/training-judge-center/backend/internal/domain/user"
 	"github.com/training-judge-center/backend/pkg/apperror"
 )
@@ -51,7 +52,7 @@ func (m *mockPasswordRecoveryRepo) InvalidatePendingByUserID(ctx context.Context
 
 func TestRequestPasswordRecovery_Success(t *testing.T) {
 	userRepo := newNoConflictRepo()
-	activeUser := newUserWithRole("user-1", domain.RoleContestant, domain.StatusActive)
+	activeUser := newUserWithRole("user-1", domainShared.RoleContestant, domain.StatusActive)
 	userRepo.findByEmailFn = func(_ context.Context, email domain.Email) (*domain.User, error) {
 		if email.String() == "user-1@example.com" {
 			return activeUser, nil
@@ -137,7 +138,7 @@ func TestRequestPasswordRecovery_InvalidEmail(t *testing.T) {
 
 func TestRequestPasswordRecovery_EmailSendFailNoError(t *testing.T) {
 	userRepo := newNoConflictRepo()
-	activeUser := newUserWithRole("user-1", domain.RoleContestant, domain.StatusActive)
+	activeUser := newUserWithRole("user-1", domainShared.RoleContestant, domain.StatusActive)
 	userRepo.findByEmailFn = func(_ context.Context, email domain.Email) (*domain.User, error) {
 		if email.String() == "user-1@example.com" {
 			return activeUser, nil
@@ -170,7 +171,7 @@ func TestRequestPasswordRecovery_EmailSendFailNoError(t *testing.T) {
 
 func TestRequestPasswordRecovery_EmailSendFail_InvalidatesOrphanedCode(t *testing.T) {
 	userRepo := newNoConflictRepo()
-	activeUser := newUserWithRole("user-1", domain.RoleContestant, domain.StatusActive)
+	activeUser := newUserWithRole("user-1", domainShared.RoleContestant, domain.StatusActive)
 	userRepo.findByEmailFn = func(_ context.Context, email domain.Email) (*domain.User, error) {
 		return activeUser, nil
 	}

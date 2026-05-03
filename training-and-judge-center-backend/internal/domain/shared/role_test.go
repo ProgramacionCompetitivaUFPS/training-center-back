@@ -1,4 +1,4 @@
-package user
+package shared
 
 import "testing"
 

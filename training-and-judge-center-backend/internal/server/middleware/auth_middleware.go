@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/training-judge-center/backend/internal/domain/shared"
 	"github.com/training-judge-center/backend/internal/domain/user"
 )
 
@@ -65,7 +66,7 @@ func GetClaims(ctx context.Context) *user.TokenClaims {
 	return claims
 }
 
-func RequireRole(required user.Role) func(http.Handler) http.Handler {
+func RequireRole(required shared.Role) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			claims := GetClaims(r.Context())

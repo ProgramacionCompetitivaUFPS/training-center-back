@@ -11,6 +11,7 @@ import (
 
 	appuser "github.com/training-judge-center/backend/internal/application/user"
 	domainuser "github.com/training-judge-center/backend/internal/domain/user"
+	"github.com/training-judge-center/backend/internal/domain/shared"
 	"github.com/training-judge-center/backend/internal/server/middleware"
 )
 
@@ -45,7 +46,7 @@ func activeUserWithNoEmail(id string) *domainuser.User {
 		"Country",
 		"City",
 		"Institution",
-		domainuser.RoleContestant.String(),
+		shared.RoleContestant.String(),
 		domainuser.StatusActive.String(),
 		time.Now(),
 		nil,
@@ -90,7 +91,7 @@ func TestConfirmDeactivation_InvalidCodes_Return400(t *testing.T) {
 	h := newHandlerWithConfirmDeactivation(uc)
 	wrapped := wrapWithAuth(
 		http.HandlerFunc(h.ConfirmDeactivation),
-		&domainuser.TokenClaims{UserID: "user-abc", Role: domainuser.RoleContestant},
+		&domainuser.TokenClaims{UserID: "user-abc", Role: shared.RoleContestant},
 	)
 
 	for _, tc := range cases {
@@ -141,7 +142,7 @@ func TestConfirmDeactivation_ValidSixDigitCode_Returns204(t *testing.T) {
 	h := newHandlerWithConfirmDeactivation(uc)
 	wrapped := wrapWithAuth(
 		http.HandlerFunc(h.ConfirmDeactivation),
-		&domainuser.TokenClaims{UserID: userID, Role: domainuser.RoleContestant},
+		&domainuser.TokenClaims{UserID: userID, Role: shared.RoleContestant},
 	)
 
 	body := strings.NewReader(fmt.Sprintf(`{"code":%q}`, validCode))

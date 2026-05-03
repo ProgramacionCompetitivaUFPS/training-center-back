@@ -91,7 +91,7 @@ func (h *Handler) UploadFiles(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), uploadContextTimeout)
 	defer cancel()
 
-	currentUser := shared.CurrentUser{ID: claims.UserID, Role: claims.Role.String()}
+	currentUser := shared.CurrentUser{ID: claims.UserID, Role: claims.Role}
 
 	res, ucErr := h.uploadUC.Execute(ctx, appProblem.UploadProblemFilesInput{
 		Slug:        slug,

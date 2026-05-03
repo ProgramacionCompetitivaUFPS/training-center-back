@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/training-judge-center/backend/internal/application/shared"
+	domainShared "github.com/training-judge-center/backend/internal/domain/shared"
 	domain "github.com/training-judge-center/backend/internal/domain/user"
 	"github.com/training-judge-center/backend/pkg/apperror"
 )
@@ -52,7 +53,7 @@ func (m *mockDeactivationRepo) InvalidatePendingByUserID(ctx context.Context, us
 
 func TestRequestDeactivation_Success(t *testing.T) {
 	userRepo := newNoConflictRepo()
-	activeUser := newUserWithRole("user-1", domain.RoleContestant, domain.StatusActive)
+	activeUser := newUserWithRole("user-1", domainShared.RoleContestant, domain.StatusActive)
 
 	userRepo.findByIDFn = func(_ context.Context, id string) (*domain.User, error) {
 		if id == "user-1" {
@@ -100,7 +101,7 @@ func TestRequestDeactivation_Success(t *testing.T) {
 
 func TestRequestDeactivation_AdminForbidden(t *testing.T) {
 	userRepo := newNoConflictRepo()
-	adminUser := newUserWithRole("admin-1", domain.RoleAdmin, domain.StatusActive)
+	adminUser := newUserWithRole("admin-1", domainShared.RoleAdmin, domain.StatusActive)
 	userRepo.findByIDFn = func(_ context.Context, id string) (*domain.User, error) {
 		return adminUser, nil
 	}
@@ -155,7 +156,7 @@ func TestRequestDeactivation_UserRepoError(t *testing.T) {
 
 func TestRequestDeactivation_InvalidatePendingError(t *testing.T) {
 	userRepo := newNoConflictRepo()
-	activeUser := newUserWithRole("user-1", domain.RoleContestant, domain.StatusActive)
+	activeUser := newUserWithRole("user-1", domainShared.RoleContestant, domain.StatusActive)
 	userRepo.findByIDFn = func(_ context.Context, _ string) (*domain.User, error) { return activeUser, nil }
 
 	deactRepo := &mockDeactivationRepo{
@@ -178,7 +179,7 @@ func TestRequestDeactivation_InvalidatePendingError(t *testing.T) {
 
 func TestRequestDeactivation_SaveError(t *testing.T) {
 	userRepo := newNoConflictRepo()
-	activeUser := newUserWithRole("user-1", domain.RoleContestant, domain.StatusActive)
+	activeUser := newUserWithRole("user-1", domainShared.RoleContestant, domain.StatusActive)
 	userRepo.findByIDFn = func(_ context.Context, _ string) (*domain.User, error) { return activeUser, nil }
 
 	deactRepo := &mockDeactivationRepo{
@@ -201,7 +202,7 @@ func TestRequestDeactivation_SaveError(t *testing.T) {
 
 func TestRequestDeactivation_EmailDeliveryFailure(t *testing.T) {
 	userRepo := newNoConflictRepo()
-	activeUser := newUserWithRole("user-1", domain.RoleContestant, domain.StatusActive)
+	activeUser := newUserWithRole("user-1", domainShared.RoleContestant, domain.StatusActive)
 	userRepo.findByIDFn = func(_ context.Context, _ string) (*domain.User, error) { return activeUser, nil }
 
 	emailSender := &mockEmailSender{

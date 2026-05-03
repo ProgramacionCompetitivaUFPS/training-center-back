@@ -59,7 +59,7 @@ func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	currentUser := shared.CurrentUser{ID: claims.UserID, Role: claims.Role.String()}
+	currentUser := shared.CurrentUser{ID: claims.UserID, Role: claims.Role}
 
 	result, ucErr := h.createGroup.Execute(r.Context(), appGroup.CreateGroupInput{
 		Name:        body.Name,

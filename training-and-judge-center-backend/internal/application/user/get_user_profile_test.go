@@ -6,13 +6,14 @@ import (
 	"net/http"
 	"testing"
 
+	"github.com/training-judge-center/backend/internal/domain/shared"
 	domain "github.com/training-judge-center/backend/internal/domain/user"
 	"github.com/training-judge-center/backend/pkg/apperror"
 )
 
 func TestGetMyProfile_Success(t *testing.T) {
 	repo := newNoConflictRepo()
-	activeUser := newUserWithRole("user-1", domain.RoleContestant, domain.StatusActive)
+	activeUser := newUserWithRole("user-1", shared.RoleContestant, domain.StatusActive)
 	repo.findByIDFn = func(_ context.Context, id string) (*domain.User, error) {
 		if id == "user-1" {
 			return activeUser, nil
@@ -80,13 +81,13 @@ func TestGetMyProfile_RepositoryError(t *testing.T) {
 
 func TestGetByNickname_PublicProfile(t *testing.T) {
 	repo := newNoConflictRepo()
-	targetUser := newUserWithRole("target", domain.RoleCoach, domain.StatusActive)
+	targetUser := newUserWithRole("target", shared.RoleCoach, domain.StatusActive)
 	repo.findByNicknameFn = func(_ context.Context, _ domain.Nickname) (*domain.User, error) {
 		return targetUser, nil
 	}
 	uc := NewGetUserProfileUseCase(repo)
 
-	result, err := uc.GetUserByNickname(context.Background(), "requester-1", domain.RoleContestant, "target")
+	result, err := uc.GetUserByNickname(context.Background(), "requester-1", shared.RoleContestant, "target")
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
@@ -100,13 +101,13 @@ func TestGetByNickname_PublicProfile(t *testing.T) {
 
 func TestGetByNickname_AdminViewsAll(t *testing.T) {
 	repo := newNoConflictRepo()
-	targetUser := newUserWithRole("target", domain.RoleContestant, domain.StatusActive)
+	targetUser := newUserWithRole("target", shared.RoleContestant, domain.StatusActive)
 	repo.findByNicknameFn = func(_ context.Context, _ domain.Nickname) (*domain.User, error) {
 		return targetUser, nil
 	}
 	uc := NewGetUserProfileUseCase(repo)
 
-	result, err := uc.GetUserByNickname(context.Background(), "admin-1", domain.RoleAdmin, "target")
+	result, err := uc.GetUserByNickname(context.Background(), "admin-1", shared.RoleAdmin, "target")
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
@@ -117,13 +118,13 @@ func TestGetByNickname_AdminViewsAll(t *testing.T) {
 
 func TestGetByNickname_SelfViaNickname(t *testing.T) {
 	repo := newNoConflictRepo()
-	selfUser := newUserWithRole("self-user", domain.RoleContestant, domain.StatusActive)
+	selfUser := newUserWithRole("self-user", shared.RoleContestant, domain.StatusActive)
 	repo.findByNicknameFn = func(_ context.Context, _ domain.Nickname) (*domain.User, error) {
 		return selfUser, nil
 	}
 	uc := NewGetUserProfileUseCase(repo)
 
-	result, err := uc.GetUserByNickname(context.Background(), "self-user", domain.RoleContestant, "self-user")
+	result, err := uc.GetUserByNickname(context.Background(), "self-user", shared.RoleContestant, "self-user")
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
@@ -134,13 +135,13 @@ func TestGetByNickname_SelfViaNickname(t *testing.T) {
 
 func TestGetByNickname_NonAdminViewsAdmin(t *testing.T) {
 	repo := newNoConflictRepo()
-	adminUser := newUserWithRole("admin-target", domain.RoleAdmin, domain.StatusActive)
+	adminUser := newUserWithRole("admin-target", shared.RoleAdmin, domain.StatusActive)
 	repo.findByNicknameFn = func(_ context.Context, _ domain.Nickname) (*domain.User, error) {
 		return adminUser, nil
 	}
 	uc := NewGetUserProfileUseCase(repo)
 
-	_, err := uc.GetUserByNickname(context.Background(), "requester-1", domain.RoleContestant, "admin-target")
+	_, err := uc.GetUserByNickname(context.Background(), "requester-1", shared.RoleContestant, "admin-target")
 	if err == nil {
 		t.Fatal("expected error, got nil")
 	}
@@ -159,13 +160,13 @@ func TestGetByNickname_NonAdminViewsAdmin(t *testing.T) {
 
 func TestGetByNickname_DeactivatedUser(t *testing.T) {
 	repo := newNoConflictRepo()
-	deactivatedUser := newUserWithRole("deactivated", domain.RoleContestant, domain.StatusDeactivated)
+	deactivatedUser := newUserWithRole("deactivated", shared.RoleContestant, domain.StatusDeactivated)
 	repo.findByNicknameFn = func(_ context.Context, _ domain.Nickname) (*domain.User, error) {
 		return deactivatedUser, nil
 	}
 	uc := NewGetUserProfileUseCase(repo)
 
-	_, err := uc.GetUserByNickname(context.Background(), "requester-1", domain.RoleContestant, "deactivated")
+	_, err := uc.GetUserByNickname(context.Background(), "requester-1", shared.RoleContestant, "deactivated")
 	if err == nil {
 		t.Fatal("expected error, got nil")
 	}
@@ -183,7 +184,7 @@ func TestGetByNickname_UserNotFound(t *testing.T) {
 	repo := newNoConflictRepo()
 	uc := NewGetUserProfileUseCase(repo)
 
-	_, err := uc.GetUserByNickname(context.Background(), "requester-1", domain.RoleContestant, "nonexistent")
+	_, err := uc.GetUserByNickname(context.Background(), "requester-1", shared.RoleContestant, "nonexistent")
 	if err == nil {
 		t.Fatal("expected error, got nil")
 	}
@@ -201,7 +202,7 @@ func TestGetByNickname_InvalidNickname(t *testing.T) {
 	repo := newNoConflictRepo()
 	uc := NewGetUserProfileUseCase(repo)
 
-	_, err := uc.GetUserByNickname(context.Background(), "requester-1", domain.RoleContestant, "")
+	_, err := uc.GetUserByNickname(context.Background(), "requester-1", shared.RoleContestant, "")
 	if err == nil {
 		t.Fatal("expected error, got nil")
 	}
@@ -220,13 +221,13 @@ func TestGetByNickname_InvalidNickname(t *testing.T) {
 
 func TestGetByNickname_AdminViewsDeactivated(t *testing.T) {
 	repo := newNoConflictRepo()
-	deactivatedUser := newUserWithRole("deactivated", domain.RoleContestant, domain.StatusDeactivated)
+	deactivatedUser := newUserWithRole("deactivated", shared.RoleContestant, domain.StatusDeactivated)
 	repo.findByNicknameFn = func(_ context.Context, _ domain.Nickname) (*domain.User, error) {
 		return deactivatedUser, nil
 	}
 	uc := NewGetUserProfileUseCase(repo)
 
-	_, err := uc.GetUserByNickname(context.Background(), "admin-1", domain.RoleAdmin, "deactivated")
+	_, err := uc.GetUserByNickname(context.Background(), "admin-1", shared.RoleAdmin, "deactivated")
 	if err == nil {
 		t.Fatal("expected error, got nil")
 	}

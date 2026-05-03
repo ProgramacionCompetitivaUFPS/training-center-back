@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"testing"
 
+	"github.com/training-judge-center/backend/internal/domain/shared"
 	domain "github.com/training-judge-center/backend/internal/domain/user"
 	"github.com/training-judge-center/backend/pkg/apperror"
 )
@@ -20,8 +21,8 @@ func newListUsersRepo(users []*domain.User, total int, repoErr error) *mockUserR
 
 func TestListUsers_Success_NoFilters(t *testing.T) {
 	users := []*domain.User{
-		newUserWithRole("user-1", domain.RoleContestant, domain.StatusActive),
-		newUserWithRole("user-2", domain.RoleCoach, domain.StatusActive),
+		newUserWithRole("user-1", shared.RoleContestant, domain.StatusActive),
+		newUserWithRole("user-2", shared.RoleCoach, domain.StatusActive),
 	}
 	repo := newListUsersRepo(users, 2, nil)
 	uc := NewListUsersUseCase(repo)

@@ -38,7 +38,7 @@ func (h *Handler) AddModifier(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	currentUser := shared.CurrentUser{ID: claims.UserID, Role: claims.Role.String()}
+	currentUser := shared.CurrentUser{ID: claims.UserID, Role: claims.Role}
 
 	_, err := h.addModifierUC.Execute(r.Context(), appProblem.AddModifierInput{
 		Slug:        slug,

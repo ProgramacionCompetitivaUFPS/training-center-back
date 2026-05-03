@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/training-judge-center/backend/internal/domain/shared"
 	"github.com/training-judge-center/backend/internal/domain/user"
 )
 
@@ -22,7 +23,7 @@ func validClaims() *user.TokenClaims {
 	return &user.TokenClaims{
 		UserID:   "user-123",
 		Email:    email,
-		Role:     user.RoleContestant,
+		Role:     shared.RoleContestant,
 		IssuedAt: time.Now(),
 	}
 }
@@ -167,11 +168,11 @@ func TestAuth_ValidToken_ClaimsInContext(t *testing.T) {
 
 func TestRequireRole_CorrectRole(t *testing.T) {
 	// Arrange
-	handler := RequireRole(user.RoleAdmin)(okHandler())
+	handler := RequireRole(shared.RoleAdmin)(okHandler())
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
 	ctx := context.WithValue(req.Context(), claimsKey, &user.TokenClaims{
 		UserID: "admin-123",
-		Role:   user.RoleAdmin,
+		Role:   shared.RoleAdmin,
 	})
 	rr := httptest.NewRecorder()
 
@@ -186,11 +187,11 @@ func TestRequireRole_CorrectRole(t *testing.T) {
 
 func TestRequireRole_WrongRole(t *testing.T) {
 	// Arrange
-	handler := RequireRole(user.RoleAdmin)(okHandler())
+	handler := RequireRole(shared.RoleAdmin)(okHandler())
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
 	ctx := context.WithValue(req.Context(), claimsKey, &user.TokenClaims{
 		UserID: "coach-123",
-		Role:   user.RoleCoach,
+		Role:   shared.RoleCoach,
 	})
 	rr := httptest.NewRecorder()
 
@@ -205,7 +206,7 @@ func TestRequireRole_WrongRole(t *testing.T) {
 
 func TestRequireRole_NoClaims(t *testing.T) {
 	// Arrange — no claims in context (request that bypassed Auth middleware)
-	handler := RequireRole(user.RoleAdmin)(okHandler())
+	handler := RequireRole(shared.RoleAdmin)(okHandler())
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
 	rr := httptest.NewRecorder()
 

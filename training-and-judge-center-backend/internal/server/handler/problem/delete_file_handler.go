@@ -44,7 +44,7 @@ func (h *Handler) DeleteFile(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), 30*time.Second)
 	defer cancel()
 
-	currentUser := shared.CurrentUser{ID: claims.UserID, Role: claims.Role.String()}
+	currentUser := shared.CurrentUser{ID: claims.UserID, Role: claims.Role}
 
 	_, ucErr := h.deleteFileUC.Execute(ctx, appProblem.DeleteProblemFileInput{
 		Slug:        slug,

@@ -32,7 +32,7 @@ func (h *Handler) ListModifiers(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	currentUser := shared.CurrentUser{ID: claims.UserID, Role: claims.Role.String()}
+	currentUser := shared.CurrentUser{ID: claims.UserID, Role: claims.Role}
 
 	modifiers, err := h.listModifiersUC.Execute(r.Context(), appProblem.ListModifiersInput{
 		Slug:        slug,

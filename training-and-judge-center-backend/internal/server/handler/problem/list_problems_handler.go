@@ -57,7 +57,7 @@ func (h *Handler) ListProblems(w http.ResponseWriter, r *http.Request) {
 		tags = strings.Split(raw, ",")
 	}
 
-	currentUser := shared.CurrentUser{ID: claims.UserID, Role: claims.Role.String()}
+	currentUser := shared.CurrentUser{ID: claims.UserID, Role: claims.Role}
 
 	in := appProblem.ListProblemsInput{
 		CurrentUser:    currentUser,

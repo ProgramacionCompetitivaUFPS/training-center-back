@@ -7,13 +7,14 @@ import (
 	"testing"
 	"time"
 
+	"github.com/training-judge-center/backend/internal/domain/shared"
 	domain "github.com/training-judge-center/backend/internal/domain/user"
 	"github.com/training-judge-center/backend/pkg/apperror"
 )
 
 func TestUpdatePassword_Success(t *testing.T) {
 	repo := newNoConflictRepo()
-	activeUser := newUserWithRole("user-1", domain.RoleContestant, domain.StatusActive)
+	activeUser := newUserWithRole("user-1", shared.RoleContestant, domain.StatusActive)
 	repo.findByIDFn = func(_ context.Context, id string) (*domain.User, error) {
 		if id == "user-1" {
 			return activeUser, nil
@@ -68,7 +69,7 @@ func TestUpdatePassword_UserNotFound(t *testing.T) {
 
 func TestUpdatePassword_WrongCurrentPassword(t *testing.T) {
 	repo := newNoConflictRepo()
-	activeUser := newUserWithRole("user-1", domain.RoleContestant, domain.StatusActive)
+	activeUser := newUserWithRole("user-1", shared.RoleContestant, domain.StatusActive)
 	repo.findByIDFn = func(_ context.Context, _ string) (*domain.User, error) {
 		return activeUser, nil
 	}
@@ -100,7 +101,7 @@ func TestUpdatePassword_WrongCurrentPassword(t *testing.T) {
 
 func TestUpdatePassword_WeakNewPassword(t *testing.T) {
 	repo := newNoConflictRepo()
-	activeUser := newUserWithRole("user-1", domain.RoleContestant, domain.StatusActive)
+	activeUser := newUserWithRole("user-1", shared.RoleContestant, domain.StatusActive)
 	repo.findByIDFn = func(_ context.Context, _ string) (*domain.User, error) {
 		return activeUser, nil
 	}
@@ -129,7 +130,7 @@ func TestUpdatePassword_WeakNewPassword(t *testing.T) {
 
 func TestUpdatePassword_SamePassword(t *testing.T) {
 	repo := newNoConflictRepo()
-	activeUser := newUserWithRole("user-1", domain.RoleContestant, domain.StatusActive)
+	activeUser := newUserWithRole("user-1", shared.RoleContestant, domain.StatusActive)
 	repo.findByIDFn = func(_ context.Context, _ string) (*domain.User, error) {
 		return activeUser, nil
 	}
@@ -183,7 +184,7 @@ func TestUpdatePassword_RepositoryFindError(t *testing.T) {
 
 func TestUpdatePassword_RepositoryUpdateError(t *testing.T) {
 	repo := newNoConflictRepo()
-	activeUser := newUserWithRole("user-1", domain.RoleContestant, domain.StatusActive)
+	activeUser := newUserWithRole("user-1", shared.RoleContestant, domain.StatusActive)
 	repo.findByIDFn = func(_ context.Context, _ string) (*domain.User, error) {
 		return activeUser, nil
 	}
@@ -212,7 +213,7 @@ func TestUpdatePassword_RepositoryUpdateError(t *testing.T) {
 
 func TestUpdatePassword_SessionInvalidationFails_PasswordAlreadyChanged(t *testing.T) {
 	repo := newNoConflictRepo()
-	activeUser := newUserWithRole("user-1", domain.RoleContestant, domain.StatusActive)
+	activeUser := newUserWithRole("user-1", shared.RoleContestant, domain.StatusActive)
 	repo.findByIDFn = func(_ context.Context, _ string) (*domain.User, error) {
 		return activeUser, nil
 	}

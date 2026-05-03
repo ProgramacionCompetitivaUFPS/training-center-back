@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"testing"
 
+	"github.com/training-judge-center/backend/internal/domain/shared"
 	domain "github.com/training-judge-center/backend/internal/domain/user"
 	"github.com/training-judge-center/backend/pkg/apperror"
 )
@@ -14,7 +15,7 @@ func strPtr(s string) *string { return &s }
 
 func TestUpdateUser_Success_AllFields(t *testing.T) {
 	repo := newNoConflictRepo()
-	activeUser := newUserWithRole("user-1", domain.RoleContestant, domain.StatusActive)
+	activeUser := newUserWithRole("user-1", shared.RoleContestant, domain.StatusActive)
 	repo.findByIDFn = func(_ context.Context, id string) (*domain.User, error) {
 		if id == "user-1" {
 			return activeUser, nil
@@ -48,7 +49,7 @@ func TestUpdateUser_Success_AllFields(t *testing.T) {
 
 func TestUpdateUser_Success_PartialUpdate(t *testing.T) {
 	repo := newNoConflictRepo()
-	activeUser := newUserWithRole("user-1", domain.RoleContestant, domain.StatusActive)
+	activeUser := newUserWithRole("user-1", shared.RoleContestant, domain.StatusActive)
 	repo.findByIDFn = func(_ context.Context, id string) (*domain.User, error) {
 		if id == "user-1" {
 			return activeUser, nil
@@ -116,7 +117,7 @@ func TestUpdateUser_UserNotFound(t *testing.T) {
 
 func TestUpdateUser_EmptyNameValidation(t *testing.T) {
 	repo := newNoConflictRepo()
-	activeUser := newUserWithRole("user-1", domain.RoleContestant, domain.StatusActive)
+	activeUser := newUserWithRole("user-1", shared.RoleContestant, domain.StatusActive)
 	repo.findByIDFn = func(_ context.Context, _ string) (*domain.User, error) {
 		return activeUser, nil
 	}
@@ -141,7 +142,7 @@ func TestUpdateUser_EmptyNameValidation(t *testing.T) {
 
 func TestUpdateUser_NicknameAlreadyExists(t *testing.T) {
 	repo := newNoConflictRepo()
-	activeUser := newUserWithRole("user-1", domain.RoleContestant, domain.StatusActive)
+	activeUser := newUserWithRole("user-1", shared.RoleContestant, domain.StatusActive)
 	repo.findByIDFn = func(_ context.Context, _ string) (*domain.User, error) {
 		return activeUser, nil
 	}
@@ -169,7 +170,7 @@ func TestUpdateUser_NicknameAlreadyExists(t *testing.T) {
 
 func TestUpdateUser_SameNicknameNoConflict(t *testing.T) {
 	repo := newNoConflictRepo()
-	activeUser := newUserWithRole("user-1", domain.RoleContestant, domain.StatusActive)
+	activeUser := newUserWithRole("user-1", shared.RoleContestant, domain.StatusActive)
 	repo.findByIDFn = func(_ context.Context, _ string) (*domain.User, error) {
 		return activeUser, nil
 	}
@@ -189,7 +190,7 @@ func TestUpdateUser_SameNicknameNoConflict(t *testing.T) {
 
 func TestUpdateUser_RepositoryUpdateError(t *testing.T) {
 	repo := newNoConflictRepo()
-	activeUser := newUserWithRole("user-1", domain.RoleContestant, domain.StatusActive)
+	activeUser := newUserWithRole("user-1", shared.RoleContestant, domain.StatusActive)
 	repo.findByIDFn = func(_ context.Context, _ string) (*domain.User, error) {
 		return activeUser, nil
 	}
@@ -217,7 +218,7 @@ func TestUpdateUser_RepositoryUpdateError(t *testing.T) {
 
 func TestUpdateUser_NicknameLowercased(t *testing.T) {
 	repo := newNoConflictRepo()
-	activeUser := newUserWithRole("user-1", domain.RoleContestant, domain.StatusActive)
+	activeUser := newUserWithRole("user-1", shared.RoleContestant, domain.StatusActive)
 	repo.findByIDFn = func(_ context.Context, _ string) (*domain.User, error) {
 		return activeUser, nil
 	}
@@ -237,7 +238,7 @@ func TestUpdateUser_NicknameLowercased(t *testing.T) {
 
 func TestUpdateUser_Success_CityAndCountry(t *testing.T) {
 	repo := newNoConflictRepo()
-	activeUser := newUserWithRole("user-1", domain.RoleContestant, domain.StatusActive)
+	activeUser := newUserWithRole("user-1", shared.RoleContestant, domain.StatusActive)
 	repo.findByIDFn = func(_ context.Context, _ string) (*domain.User, error) {
 		return activeUser, nil
 	}
@@ -261,7 +262,7 @@ func TestUpdateUser_Success_CityAndCountry(t *testing.T) {
 
 func TestUpdateUser_EmptyCityValidation(t *testing.T) {
 	repo := newNoConflictRepo()
-	activeUser := newUserWithRole("user-1", domain.RoleContestant, domain.StatusActive)
+	activeUser := newUserWithRole("user-1", shared.RoleContestant, domain.StatusActive)
 	repo.findByIDFn = func(_ context.Context, _ string) (*domain.User, error) {
 		return activeUser, nil
 	}
@@ -285,7 +286,7 @@ func TestUpdateUser_EmptyCityValidation(t *testing.T) {
 
 func TestUpdateUser_EmptyCountryValidation(t *testing.T) {
 	repo := newNoConflictRepo()
-	activeUser := newUserWithRole("user-1", domain.RoleContestant, domain.StatusActive)
+	activeUser := newUserWithRole("user-1", shared.RoleContestant, domain.StatusActive)
 	repo.findByIDFn = func(_ context.Context, _ string) (*domain.User, error) {
 		return activeUser, nil
 	}

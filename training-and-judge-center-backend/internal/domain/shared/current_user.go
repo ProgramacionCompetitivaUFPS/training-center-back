@@ -1,14 +1,8 @@
 package shared
 
-const (
-	RoleAdmin      = "ADMIN"
-	RoleCoach      = "COACH"
-	RoleContestant = "CONTESTANT"
-)
-
 type CurrentUser struct {
 	ID   string
-	Role string
+	Role Role
 }
 
 func (c CurrentUser) IsAdmin() bool { return c.Role == RoleAdmin }

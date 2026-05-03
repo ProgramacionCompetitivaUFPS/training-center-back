@@ -5,6 +5,7 @@ import (
 	"errors"
 	"log/slog"
 
+	"github.com/training-judge-center/backend/internal/domain/shared"
 	"github.com/training-judge-center/backend/internal/domain/user"
 	"github.com/training-judge-center/backend/pkg/apperror"
 )
@@ -51,7 +52,7 @@ func (uc *AdminUpdateUserUseCase) Execute(ctx context.Context, input AdminUpdate
 	var cityToUpdate *string
 	var countryToUpdate *string
 	var emailToUpdate *user.Email
-	var roleToUpdate *user.Role
+	var roleToUpdate *shared.Role
 
 	if input.Name != nil {
 		if *input.Name == "" {
@@ -104,10 +105,10 @@ func (uc *AdminUpdateUserUseCase) Execute(ctx context.Context, input AdminUpdate
 	}
 
 	if input.Role != nil {
-		newRole, err := user.NewRole(*input.Role)
+		newRole, err := shared.NewRole(*input.Role)
 		if err != nil {
 			fieldErrors = append(fieldErrors, apperror.FieldError{Field: "role", Message: "Invalid role value"})
-		} else if newRole == user.RoleAdmin {
+		} else if newRole == shared.RoleAdmin {
 			fieldErrors = append(fieldErrors, apperror.FieldError{Field: "role", Message: "Cannot assign ADMIN role through this endpoint"})
 		} else {
 			roleToUpdate = &newRole

@@ -27,7 +27,7 @@ func (h *Handler) GetProblem(w http.ResponseWriter, r *http.Request) {
 	}
 
 	slug := r.PathValue("slug")
-	currentUser := shared.CurrentUser{ID: claims.UserID, Role: claims.Role.String()}
+	currentUser := shared.CurrentUser{ID: claims.UserID, Role: claims.Role}
 
 	out, err := h.getProblemUC.Execute(r.Context(), appProblem.GetProblemInput{
 		Slug:        slug,

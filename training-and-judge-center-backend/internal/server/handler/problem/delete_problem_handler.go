@@ -42,7 +42,7 @@ func (h *Handler) DeleteProblem(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	currentUser := shared.CurrentUser{ID: claims.UserID, Role: claims.Role.String()}
+	currentUser := shared.CurrentUser{ID: claims.UserID, Role: claims.Role}
 
 	_, err := h.deleteProblemUC.Execute(r.Context(), appProblem.DeleteProblemInput{
 		Slug:        slug,

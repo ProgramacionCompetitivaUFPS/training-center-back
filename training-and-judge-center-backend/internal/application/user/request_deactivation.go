@@ -8,6 +8,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/training-judge-center/backend/internal/application/shared"
+	domainShared "github.com/training-judge-center/backend/internal/domain/shared"
 	"github.com/training-judge-center/backend/internal/domain/user"
 	"github.com/training-judge-center/backend/pkg/apperror"
 )
@@ -44,7 +45,7 @@ func (uc *RequestDeactivationUseCase) Execute(ctx context.Context, input Request
 		return apperror.NewNotFound("NOT_FOUND", "User not found")
 	}
 
-	if foundUser.Role() == user.RoleAdmin {
+	if foundUser.Role() == domainShared.RoleAdmin {
 		return apperror.NewForbidden("FORBIDDEN", "Administrators cannot deactivate their own account")
 	}
 

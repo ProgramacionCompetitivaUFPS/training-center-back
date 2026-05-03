@@ -12,6 +12,7 @@ import (
 
 	appuser "github.com/training-judge-center/backend/internal/application/user"
 	domainuser "github.com/training-judge-center/backend/internal/domain/user"
+	"github.com/training-judge-center/backend/internal/domain/shared"
 )
 
 // newHandlerWithUpdatePassword builds a UserHandler with only updatePassword wired.
@@ -38,7 +39,7 @@ func TestUpdatePassword_Success_Returns204(t *testing.T) {
 	h := newHandlerWithUpdatePassword(uc)
 	wrapped := wrapWithAuth(
 		http.HandlerFunc(h.UpdatePassword),
-		&domainuser.TokenClaims{UserID: userID, Role: domainuser.RoleContestant},
+		&domainuser.TokenClaims{UserID: userID, Role: shared.RoleContestant},
 	)
 
 	body := strings.NewReader(`{"currentPassword":"Secret1!","newPassword":"NewSecret2@"}`)
@@ -77,7 +78,7 @@ func TestUpdatePassword_SessionsNotInvalidated_Returns200WithCode(t *testing.T) 
 	h := newHandlerWithUpdatePassword(uc)
 	wrapped := wrapWithAuth(
 		http.HandlerFunc(h.UpdatePassword),
-		&domainuser.TokenClaims{UserID: userID, Role: domainuser.RoleContestant},
+		&domainuser.TokenClaims{UserID: userID, Role: shared.RoleContestant},
 	)
 
 	body := strings.NewReader(`{"currentPassword":"Secret1!","newPassword":"NewSecret2@"}`)

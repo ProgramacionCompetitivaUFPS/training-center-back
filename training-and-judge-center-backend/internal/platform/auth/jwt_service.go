@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
+	"github.com/training-judge-center/backend/internal/domain/shared"
 	"github.com/training-judge-center/backend/internal/domain/user"
 	"github.com/training-judge-center/backend/pkg/apperror"
 )
@@ -71,7 +72,7 @@ func (s *JWTService) ValidateToken(tokenString string) (*user.TokenClaims, error
 		return nil, unauthorizedToken("invalid token: bad email claim", err)
 	}
 
-	parsedRole, err := user.NewRole(claims.Role)
+	parsedRole, err := shared.NewRole(claims.Role)
 	if err != nil {
 		return nil, unauthorizedToken("invalid token: bad role claim", err)
 	}

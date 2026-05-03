@@ -4,6 +4,7 @@ import (
 	"context"
 	"log/slog"
 
+	"github.com/training-judge-center/backend/internal/domain/shared"
 	"github.com/training-judge-center/backend/internal/domain/user"
 	"github.com/training-judge-center/backend/pkg/apperror"
 )
@@ -34,7 +35,7 @@ func (uc *GetUserProfileUseCase) GetMyProfile(ctx context.Context, userID string
 	return &UserProfileOutput{User: userToDTO(foundUser), IsFullProfile: true}, nil
 }
 
-func (uc *GetUserProfileUseCase) GetUserByNickname(ctx context.Context, requesterID string, requesterRole user.Role, nickname string) (*UserProfileOutput, error) {
+func (uc *GetUserProfileUseCase) GetUserByNickname(ctx context.Context, requesterID string, requesterRole shared.Role, nickname string) (*UserProfileOutput, error) {
 	parsedNickname, err := user.NewNickname(nickname)
 	if err != nil {
 		return nil, apperror.NewValidation([]apperror.FieldError{
@@ -60,9 +61,9 @@ func (uc *GetUserProfileUseCase) GetUserByNickname(ctx context.Context, requeste
 		return &UserProfileOutput{User: userToDTO(targetUser), IsFullProfile: true}, nil
 	}
 
-	isRequesterAdmin := requesterRole == user.RoleAdmin
+	isRequesterAdmin := requesterRole == shared.RoleAdmin
 
-	if !isRequesterAdmin && targetUser.Role() == user.RoleAdmin {
+	if !isRequesterAdmin && targetUser.Role() == shared.RoleAdmin {
 		return nil, apperror.NewForbidden("ADMIN_PROFILE_RESTRICTED", "Admin profiles are not accessible to non-admin users")
 	}
 

@@ -64,6 +64,6 @@ func (h *Handler) requireCurrentUser(w http.ResponseWriter, r *http.Request) (*s
 		handler.WriteError(w, apperror.NewUnauthorized(apperror.ErrCodeUnauthorized, "Invalid or missing authentication token"))
 		return nil, false
 	}
-	u := shared.CurrentUser{ID: claims.UserID, Role: claims.Role.String()}
+	u := shared.CurrentUser{ID: claims.UserID, Role: claims.Role}
 	return &u, true
 }

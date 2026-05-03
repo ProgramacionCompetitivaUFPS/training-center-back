@@ -120,7 +120,7 @@ func mustGroup(t *testing.T, id, name string, visibility domainGroup.Visibility,
 	return g
 }
 
-func currentUser(id, role string) shared.CurrentUser {
+func currentUser(id string, role shared.Role) shared.CurrentUser {
 	return shared.CurrentUser{ID: id, Role: role}
 }
 

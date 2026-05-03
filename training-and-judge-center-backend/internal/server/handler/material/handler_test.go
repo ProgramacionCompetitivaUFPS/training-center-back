@@ -112,7 +112,7 @@ type mockTokenSvc struct{}
 
 func (m *mockTokenSvc) GenerateToken(_ *domainUser.User) (string, error) { return "tok", nil }
 func (m *mockTokenSvc) ValidateToken(_ string) (*domainUser.TokenClaims, error) {
-	return &domainUser.TokenClaims{UserID: shared.RestoreUserID("u1").Value(), Role: domainUser.RoleCoach}, nil
+	return &domainUser.TokenClaims{UserID: shared.RestoreUserID("u1").Value(), Role: shared.RoleCoach}, nil
 }
 
 func authedRequest(method, target string, body []byte) *http.Request {

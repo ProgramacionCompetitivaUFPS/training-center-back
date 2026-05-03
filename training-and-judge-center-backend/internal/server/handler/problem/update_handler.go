@@ -58,7 +58,7 @@ func (h *Handler) Update(w http.ResponseWriter, r *http.Request) {
 		langOverrides = convertLangOverrides(body.LangOverrides)
 	}
 
-	currentUser := shared.CurrentUser{ID: claims.UserID, Role: claims.Role.String()}
+	currentUser := shared.CurrentUser{ID: claims.UserID, Role: claims.Role}
 
 	result, ucErr := h.updateUC.Execute(r.Context(), appProblem.UpdateProblemInput{
 		Slug:          slug,

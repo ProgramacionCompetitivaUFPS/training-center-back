@@ -11,6 +11,7 @@ import (
 
 	appuser "github.com/training-judge-center/backend/internal/application/user"
 	domainuser "github.com/training-judge-center/backend/internal/domain/user"
+	"github.com/training-judge-center/backend/internal/domain/shared"
 )
 
 // newHandlerWithConfirmEmailChange builds a UserHandler with only confirmEmailChange wired.
@@ -35,7 +36,7 @@ func activeUserWithEmail(id, email string) *domainuser.User {
 		"Country",
 		"City",
 		"Institution",
-		domainuser.RoleContestant.String(),
+		shared.RoleContestant.String(),
 		domainuser.StatusActive.String(),
 		time.Now(),
 		nil,
@@ -78,7 +79,7 @@ func TestConfirmEmailChange_InvalidCodes_Return400(t *testing.T) {
 	h := newHandlerWithConfirmEmailChange(uc)
 	wrapped := wrapWithAuth(
 		http.HandlerFunc(h.ConfirmEmailChange),
-		&domainuser.TokenClaims{UserID: "user-abc", Role: domainuser.RoleContestant},
+		&domainuser.TokenClaims{UserID: "user-abc", Role: shared.RoleContestant},
 	)
 
 	for _, tc := range cases {
@@ -122,7 +123,7 @@ func TestConfirmEmailChange_ValidSixDigitCode_Returns200(t *testing.T) {
 	h := newHandlerWithConfirmEmailChange(uc)
 	wrapped := wrapWithAuth(
 		http.HandlerFunc(h.ConfirmEmailChange),
-		&domainuser.TokenClaims{UserID: userID, Role: domainuser.RoleContestant},
+		&domainuser.TokenClaims{UserID: userID, Role: shared.RoleContestant},
 	)
 
 	body := strings.NewReader(fmt.Sprintf(`{"code":%q}`, validCode))
@@ -153,7 +154,7 @@ func TestRequestEmailChange_MissingFields_Return400(t *testing.T) {
 	h := newHandlerWithRequestEmailChange(uc)
 	wrapped := wrapWithAuth(
 		http.HandlerFunc(h.RequestEmailChange),
-		&domainuser.TokenClaims{UserID: "user-abc", Role: domainuser.RoleContestant},
+		&domainuser.TokenClaims{UserID: "user-abc", Role: shared.RoleContestant},
 	)
 
 	for _, tc := range cases {
@@ -191,7 +192,7 @@ func TestRequestEmailChange_ValidFields_PassesToUseCase(t *testing.T) {
 	h := newHandlerWithRequestEmailChange(uc)
 	wrapped := wrapWithAuth(
 		http.HandlerFunc(h.RequestEmailChange),
-		&domainuser.TokenClaims{UserID: userID, Role: domainuser.RoleContestant},
+		&domainuser.TokenClaims{UserID: userID, Role: shared.RoleContestant},
 	)
 
 	body := strings.NewReader(`{"password":"Secret1!","newEmail":"new@example.com"}`)

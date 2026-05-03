@@ -6,6 +6,7 @@ import (
 	"github.com/go-chi/cors"
 	httpSwagger "github.com/swaggo/http-swagger"
 	_ "github.com/training-judge-center/backend/docs"
+	"github.com/training-judge-center/backend/internal/domain/shared"
 	"github.com/training-judge-center/backend/internal/domain/user"
 	"github.com/training-judge-center/backend/internal/server/handler"
 	"github.com/training-judge-center/backend/internal/server/handler/group"
@@ -136,7 +137,7 @@ func NewRouter(h *Handlers, s *Services, allowedOrigins []string) *chi.Mux {
 	// Protected routes — admin only
 	r.Route("/admin", func(r chi.Router) {
 		r.Use(middleware.Auth(s.TokenService, s.SessionInvalidator))
-		r.Use(middleware.RequireRole(user.RoleAdmin))
+		r.Use(middleware.RequireRole(shared.RoleAdmin))
 
 		r.Get("/users", h.User.ListUsers)
 		r.Put("/users/{id}", h.User.AdminUpdateUser)

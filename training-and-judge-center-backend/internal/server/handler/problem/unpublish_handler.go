@@ -33,7 +33,7 @@ func (h *Handler) Unpublish(w http.ResponseWriter, r *http.Request) {
 	}
 
 	slug := r.PathValue("slug")
-	currentUser := shared.CurrentUser{ID: claims.UserID, Role: claims.Role.String()}
+	currentUser := shared.CurrentUser{ID: claims.UserID, Role: claims.Role}
 
 	p, err := h.unpublishUC.Execute(r.Context(), appProblem.UnpublishProblemInput{
 		Slug:        slug,
