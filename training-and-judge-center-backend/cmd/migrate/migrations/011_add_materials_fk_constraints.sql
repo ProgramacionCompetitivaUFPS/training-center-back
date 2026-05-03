@@ -1,8 +1,22 @@
 -- +goose Up
-ALTER TABLE materials
-    ADD CONSTRAINT fk_materials_group_id  FOREIGN KEY (group_id)  REFERENCES groups(id) ON DELETE CASCADE,
-    ADD CONSTRAINT fk_materials_author_id FOREIGN KEY (author_id) REFERENCES users(id),
-    ADD CONSTRAINT chk_materials_status   CHECK (status IN ('DRAFT', 'PUBLISHED'));
+-- +goose StatementBegin
+DO $$ BEGIN
+    ALTER TABLE materials ADD CONSTRAINT fk_materials_group_id FOREIGN KEY (group_id) REFERENCES groups(id) ON DELETE CASCADE;
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
+-- +goose StatementEnd
+-- +goose StatementBegin
+DO $$ BEGIN
+    ALTER TABLE materials ADD CONSTRAINT fk_materials_author_id FOREIGN KEY (author_id) REFERENCES users(id);
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
+-- +goose StatementEnd
+-- +goose StatementBegin
+DO $$ BEGIN
+    ALTER TABLE materials ADD CONSTRAINT chk_materials_status CHECK (status IN ('DRAFT', 'PUBLISHED'));
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
+-- +goose StatementEnd
 
 -- +goose Down
 ALTER TABLE materials

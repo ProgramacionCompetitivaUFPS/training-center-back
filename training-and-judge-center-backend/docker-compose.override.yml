@@ -6,3 +6,7 @@ services:
   nginx:
     profiles:
       - disabled
+
+  certbot:
+    profiles:
+      - disabled
