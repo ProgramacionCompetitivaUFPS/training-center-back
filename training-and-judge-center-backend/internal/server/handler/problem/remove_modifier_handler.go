@@ -10,6 +10,16 @@ import (
 	"github.com/training-judge-center/backend/pkg/apperror"
 )
 
+// @Summary      Remove problem modifier
+// @Tags         problems
+// @Produce      json
+// @Security     BearerAuth
+// @Param        slug path string true "Problem slug"
+// @Param        userId path string true "User ID"
+// @Success      204
+// @Failure      401 {object} apperror.AppError
+// @Failure      404 {object} apperror.AppError
+// @Router       /problems/p/{slug}/modifiers/{userId} [delete]
 func (h *Handler) RemoveModifier(w http.ResponseWriter, r *http.Request) {
 	claims := middleware.GetClaims(r.Context())
 	if claims == nil {

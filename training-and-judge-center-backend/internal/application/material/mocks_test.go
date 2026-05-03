@@ -2,6 +2,7 @@ package material
 
 import (
 	"context"
+	"errors"
 	"time"
 
 	domainMaterial "github.com/training-judge-center/backend/internal/domain/material"
@@ -204,6 +205,24 @@ func newPublishedMaterial() *domainMaterial.Material {
 	).WithClock(fixedClock)
 }
 
+func newPinnedMaterial() *domainMaterial.Material {
+	now := testNow
+	return domainMaterial.RestoreMaterial(
+		testMaterialID,
+		testGroupID,
+		shared.RestoreUserID(testAuthorID),
+		"Test Title",
+		"",
+		nil,
+		"PUBLISHED",
+		true,
+		&now,
+		testNow,
+		testNow,
+		&now,
+	).WithClock(fixedClock)
+}
+
 func repoWith(m *domainMaterial.Material) *mockMaterialRepository {
 	return &mockMaterialRepository{
 		findByIDFn: func(_ context.Context, _ string) (*domainMaterial.Material, error) {
@@ -226,4 +245,8 @@ func groupExists() *mockGroupProvider {
 
 func groupNotFound() *mockGroupProvider {
 	return &mockGroupProvider{existsFn: func(_ context.Context, _ string) (bool, error) { return false, nil }}
+}
+
+func groupProviderError() *mockGroupProvider {
+	return &mockGroupProvider{existsFn: func(_ context.Context, _ string) (bool, error) { return false, errors.New("db timeout") }}
 }

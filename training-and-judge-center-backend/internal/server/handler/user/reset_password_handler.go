@@ -15,6 +15,14 @@ type resetPasswordBody struct {
 	NewPassword string `json:"newPassword"`
 }
 
+// @Summary      Reset password
+// @Tags         auth
+// @Accept       json
+// @Produce      json
+// @Param        body body resetPasswordBody true "Reset data"
+// @Success      200 {object} map[string]string
+// @Failure      400 {object} apperror.AppError
+// @Router       /password/reset [post]
 func (h *UserHandler) ResetPassword(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	var body resetPasswordBody

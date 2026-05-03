@@ -1,3 +1,10 @@
+// @title           Training & Judge Center API
+// @version         1.0
+// @BasePath        /
+// @securityDefinitions.apikey BearerAuth
+// @in header
+// @name Authorization
+
 package main
 
 import (
@@ -181,16 +188,34 @@ func main() {
 	groupUserProvider := platformGroup.NewUserProvider(dbPool)
 	groupPrefsReader := platformGroup.NewPreferencesReader(dbPool)
 	groupNicknameResolver := platformGroup.NewNicknameResolver(dbPool)
+	joinRequestRepo := platformGroup.NewJoinRequestRepository(dbPool)
+	groupTxManager := infraPostgres.NewPostgresTransactionManager(dbPool)
 
 	// Group use cases
-	createGroupUseCase := appGroup.NewCreateGroupUseCase(groupRepo)
+	createGroupUseCase := appGroup.NewCreateGroupUseCase(groupRepo, groupMemberRepo, groupTxManager)
 	listGroupsUseCase := appGroup.NewListGroupsUseCase(groupRepo, groupMemberRepo)
 	getGroupUseCase := appGroup.NewGetGroupUseCase(groupRepo, groupMemberRepo, groupUserProvider)
 	listMyGroupsUseCase := appGroup.NewListMyGroupsUseCase(groupRepo, groupMemberRepo, groupPrefsReader)
 	addMemberUseCase := appGroup.NewAddMemberUseCase(groupRepo, groupMemberRepo, groupNicknameResolver, txManager)
 	joinGroupUseCase := appGroup.NewJoinGroupUseCase(groupRepo, groupMemberRepo)
+	requestJoinUseCase := appGroup.NewRequestJoinUseCase(groupRepo, groupMemberRepo, joinRequestRepo)
+	approveRequestUseCase := appGroup.NewApproveRequestUseCase(groupMemberRepo, joinRequestRepo, groupTxManager)
+	rejectRequestUseCase := appGroup.NewRejectRequestUseCase(groupMemberRepo, joinRequestRepo)
+	listJoinRequestsUseCase := appGroup.NewListJoinRequestsUseCase(groupMemberRepo, joinRequestRepo, groupUserProvider)
+	getMyRequestUseCase := appGroup.NewGetMyRequestUseCase(joinRequestRepo)
+	cancelMyRequestUseCase := appGroup.NewCancelMyRequestUseCase(joinRequestRepo)
 
-	groupHandler := handlerGroup.NewHandler(createGroupUseCase, listGroupsUseCase, getGroupUseCase, listMyGroupsUseCase, addMemberUseCase, joinGroupUseCase)
+	groupInvitationJWTSvc := platformAuth.NewGroupInvitationJWTService(cfg.JWTSecret)
+	generateInviteUseCase := appGroup.NewGenerateInviteUseCase(groupRepo, groupMemberRepo, groupInvitationJWTSvc)
+	acceptInviteUseCase := appGroup.NewAcceptInviteUseCase(groupRepo, groupMemberRepo, groupInvitationJWTSvc)
+
+	groupHandler := handlerGroup.NewHandler(
+		createGroupUseCase, listGroupsUseCase, getGroupUseCase, listMyGroupsUseCase,
+		addMemberUseCase, joinGroupUseCase,
+		requestJoinUseCase, approveRequestUseCase, rejectRequestUseCase,
+		listJoinRequestsUseCase, getMyRequestUseCase, cancelMyRequestUseCase,
+		generateInviteUseCase, acceptInviteUseCase,
+	)
 
 	// Material platform adapters
 	materialRepo := platformMaterial.NewMaterialRepository(dbPool)
@@ -203,8 +228,15 @@ func main() {
 	updateMaterialUC := appMaterial.NewUpdateMaterial(materialRepo, groupProvider, authorProvider)
 	getMaterialUC := appMaterial.NewGetMaterial(materialRepo, groupProvider, groupMemberProvider, authorProvider)
 	listMaterialsUC := appMaterial.NewListMaterials(materialRepo, groupProvider, groupMemberProvider, authorProvider)
+	publishMaterialUC := appMaterial.NewPublishMaterial(materialRepo, groupProvider, authorProvider)
+	unpublishMaterialUC := appMaterial.NewUnpublishMaterial(materialRepo, groupProvider, authorProvider)
+	pinMaterialUC := appMaterial.NewPinMaterial(materialRepo, groupProvider, groupMemberProvider, authorProvider)
+	unpinMaterialUC := appMaterial.NewUnpinMaterial(materialRepo, groupProvider, groupMemberProvider, authorProvider)
 
-	materialHandler := handlerMaterial.NewHandler(createMaterialUC, updateMaterialUC, getMaterialUC, listMaterialsUC)
+	materialHandler := handlerMaterial.NewHandler(
+		createMaterialUC, updateMaterialUC, getMaterialUC, listMaterialsUC,
+		publishMaterialUC, unpublishMaterialUC, pinMaterialUC, unpinMaterialUC,
+	)
 
 	router := server.NewRouter(&server.Handlers{
 		Problem:  problemHandler,
@@ -215,7 +247,7 @@ func main() {
 	}, &server.Services{
 		TokenService:       jwtService,
 		SessionInvalidator: sessionInvalidator,
-	})
+	}, cfg.AllowedOrigins)
 
 	slog.Info("server starting", "port", cfg.Port)
 	if err := http.ListenAndServe(fmt.Sprintf(":%s", cfg.Port), router); err != nil {

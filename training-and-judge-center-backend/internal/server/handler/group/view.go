@@ -8,6 +8,15 @@ import (
 	"github.com/training-judge-center/backend/pkg/timeutil"
 )
 
+// @Summary      Get group
+// @Tags         groups
+// @Produce      json
+// @Security     BearerAuth
+// @Param        groupId path string true "Group ID"
+// @Success      200 {object} getGroupResponse
+// @Failure      401 {object} apperror.AppError
+// @Failure      404 {object} apperror.AppError
+// @Router       /groups/{groupId} [get]
 func (h *Handler) GetGroup(w http.ResponseWriter, r *http.Request) {
 	currentUser, ok := h.requireCurrentUser(w, r)
 	if !ok {

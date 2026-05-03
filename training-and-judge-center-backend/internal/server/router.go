@@ -3,6 +3,9 @@ package server
 import (
 	"github.com/go-chi/chi/v5"
 	chimw "github.com/go-chi/chi/v5/middleware"
+	"github.com/go-chi/cors"
+	httpSwagger "github.com/swaggo/http-swagger"
+	_ "github.com/training-judge-center/backend/docs"
 	"github.com/training-judge-center/backend/internal/domain/user"
 	"github.com/training-judge-center/backend/internal/server/handler"
 	"github.com/training-judge-center/backend/internal/server/handler/group"
@@ -25,12 +28,21 @@ type Services struct {
 	SessionInvalidator user.SessionInvalidator
 }
 
-func NewRouter(h *Handlers, s *Services) *chi.Mux {
+func NewRouter(h *Handlers, s *Services, allowedOrigins []string) *chi.Mux {
 	r := chi.NewRouter()
 
+	r.Use(cors.Handler(cors.Options{
+		AllowedOrigins:   allowedOrigins,
+		AllowedMethods:   []string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"},
+		AllowedHeaders:   []string{"Accept", "Authorization", "Content-Type"},
+		AllowCredentials: true,
+		MaxAge:           300,
+	}))
 	r.Use(chimw.Logger)
 	r.Use(chimw.Recoverer)
 	r.Use(chimw.RequestID)
+
+	r.Get("/swagger/*", httpSwagger.WrapHandler)
 
 	healthHandler := handler.NewHealthHandler()
 	r.Get("/ping", healthHandler.Ping)
@@ -45,11 +57,28 @@ func NewRouter(h *Handlers, s *Services) *chi.Mux {
 			r.Get("/{groupId}", h.Group.GetGroup)
 			r.Post("/{groupId}/join", h.Group.Join)
 
+			r.Route("/{groupId}/invitations", func(r chi.Router) {
+				r.Post("/", h.Group.GenerateInvite)
+				r.Post("/accept", h.Group.AcceptInvite)
+			})
+
+			r.Route("/{groupId}/requests", func(r chi.Router) {
+				r.Post("/", h.Group.RequestJoin)
+				r.Get("/", h.Group.ListJoinRequests)
+				r.Get("/me", h.Group.GetMyRequest)
+				r.Delete("/me", h.Group.CancelMyRequest)
+				r.Patch("/{requestId}", h.Group.UpdateJoinRequest)
+			})
+
 			r.Route("/{groupId}/materials", func(r chi.Router) {
 				r.Post("/", h.Material.Create)
-				r.Patch("/{materialId}", h.Material.Update)
 				r.Get("/", h.Material.List)
 				r.Get("/{materialId}", h.Material.Get)
+				r.Patch("/{materialId}", h.Material.Update)
+				r.Post("/{materialId}/publish", h.Material.Publish)
+				r.Post("/{materialId}/unpublish", h.Material.Unpublish)
+				r.Post("/{materialId}/pin", h.Material.Pin)
+				r.Post("/{materialId}/unpin", h.Material.Unpin)
 			})
 
 			r.Route("/{groupId}/members", func(r chi.Router) {

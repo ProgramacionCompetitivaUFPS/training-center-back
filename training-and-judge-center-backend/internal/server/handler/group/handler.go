@@ -11,26 +11,53 @@ import (
 )
 
 type Handler struct {
-	createGroup  *appGroup.CreateGroupUseCase
-	listGroups   *appGroup.ListGroupsUseCase
-	getGroup     *appGroup.GetGroupUseCase
-	listMyGroups *appGroup.ListMyGroupsUseCase
-	addMember    *appGroup.AddMemberUseCase
-	joinGroup    *appGroup.JoinGroupUseCase
+	createGroup     *appGroup.CreateGroupUseCase
+	listGroups      *appGroup.ListGroupsUseCase
+	getGroup        *appGroup.GetGroupUseCase
+	listMyGroups    *appGroup.ListMyGroupsUseCase
+	addMember       *appGroup.AddMemberUseCase
+	joinGroup       *appGroup.JoinGroupUseCase
+	requestJoin     *appGroup.RequestJoinUseCase
+	approveRequest  *appGroup.ApproveRequestUseCase
+	rejectRequest   *appGroup.RejectRequestUseCase
+	listRequests    *appGroup.ListJoinRequestsUseCase
+	getMyRequest    *appGroup.GetMyRequestUseCase
+	cancelMyRequest *appGroup.CancelMyRequestUseCase
+	generateInvite  *appGroup.GenerateInviteUseCase
+	acceptInvite    *appGroup.AcceptInviteUseCase
 }
 
 func NewHandler(
-	createGroup  *appGroup.CreateGroupUseCase,
-	listGroups   *appGroup.ListGroupsUseCase,
-	getGroup     *appGroup.GetGroupUseCase,
+	createGroup *appGroup.CreateGroupUseCase,
+	listGroups *appGroup.ListGroupsUseCase,
+	getGroup *appGroup.GetGroupUseCase,
 	listMyGroups *appGroup.ListMyGroupsUseCase,
-	addMember    *appGroup.AddMemberUseCase,
-	joinGroup    *appGroup.JoinGroupUseCase,
+	addMember *appGroup.AddMemberUseCase,
+	joinGroup *appGroup.JoinGroupUseCase,
+	requestJoin *appGroup.RequestJoinUseCase,
+	approveRequest *appGroup.ApproveRequestUseCase,
+	rejectRequest *appGroup.RejectRequestUseCase,
+	listRequests *appGroup.ListJoinRequestsUseCase,
+	getMyRequest *appGroup.GetMyRequestUseCase,
+	cancelMyRequest *appGroup.CancelMyRequestUseCase,
+	generateInvite *appGroup.GenerateInviteUseCase,
+	acceptInvite *appGroup.AcceptInviteUseCase,
 ) *Handler {
 	return &Handler{
-		createGroup: createGroup, listGroups: listGroups,
-		getGroup: getGroup, listMyGroups: listMyGroups,
-		addMember: addMember, joinGroup: joinGroup,
+		createGroup:     createGroup,
+		listGroups:      listGroups,
+		getGroup:        getGroup,
+		listMyGroups:    listMyGroups,
+		addMember:       addMember,
+		joinGroup:       joinGroup,
+		requestJoin:     requestJoin,
+		approveRequest:  approveRequest,
+		rejectRequest:   rejectRequest,
+		listRequests:    listRequests,
+		getMyRequest:    getMyRequest,
+		cancelMyRequest: cancelMyRequest,
+		generateInvite:  generateInvite,
+		acceptInvite:    acceptInvite,
 	}
 }
 

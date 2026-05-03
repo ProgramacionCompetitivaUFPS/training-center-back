@@ -972,6 +972,858 @@ items:
           Respuesta esperada: 404 Not Found con { error: "GROUP_NOT_FOUND" }
 
           El UUID ...0099 es un ID ficticio que no existe en la base de datos.
+      - info:
+          name: Join Group - Grupo REQUEST (usar /requests)
+          type: http
+          seq: 12
+        http:
+          method: POST
+          url: '{{baseUrl}}/groups/:groupId/join'
+          params:
+            - name: groupId
+              value: 00000000-0000-0000-0000-000000000000
+              type: path
+          auth:
+            type: bearer
+            token: '{{token_contestant}}'
+        settings:
+          encodeUrl: true
+          timeout: 0
+          followRedirects: true
+          maxRedirects: 5
+        docs: |
+          Error 403 INSUFFICIENT_PERMISSIONS: el grupo usa joinMode REQUEST, no permite unirse directamente.
+          Respuesta esperada: 403 Forbidden con { error: "INSUFFICIENT_PERMISSIONS" }
+
+          Pasos:
+          1. Crea un grupo con joinMode REQUEST
+          2. Copia el ID del grupo y reemplaza :groupId
+          3. Ejecuta con token_contestant
+          Para unirse a este tipo de grupo usa "Request Join" en la subcarpeta join requests.
+      - info:
+          name: join requests
+          type: folder
+        items:
+          - info:
+              name: Request Join
+              type: http
+              seq: 1
+            http:
+              method: POST
+              url: '{{baseUrl}}/groups/:groupId/requests'
+              params:
+                - name: groupId
+                  value: 00000000-0000-0000-0000-000000000000
+                  type: path
+              auth:
+                type: bearer
+                token: '{{token_contestant}}'
+            settings:
+              encodeUrl: true
+              timeout: 0
+              followRedirects: true
+              maxRedirects: 5
+            docs: |
+              Happy path: contestant envía solicitud a un grupo con joinMode REQUEST, sin mensaje.
+              Respuesta esperada: 201 Created con { id, groupId, status: "PENDING", message: null, createdAt }
+
+              Pasos:
+              1. Crea un grupo con joinMode REQUEST (agrega ese campo a "Create Group")
+              2. Copia el ID del grupo y reemplaza :groupId
+              3. Ejecuta con token_contestant
+              Guarda el id de la solicitud retornada para usar en Approve/Reject Request.
+          - info:
+              name: Request Join - Con Mensaje
+              type: http
+              seq: 2
+            http:
+              method: POST
+              url: '{{baseUrl}}/groups/:groupId/requests'
+              params:
+                - name: groupId
+                  value: 00000000-0000-0000-0000-000000000000
+                  type: path
+              body:
+                type: json
+                data: |-
+                  {
+                    "message": "Hola, me gustaría unirme a este grupo de entrenamiento."
+                  }
+              auth:
+                type: bearer
+                token: '{{token_contestant}}'
+            settings:
+              encodeUrl: true
+              timeout: 0
+              followRedirects: true
+              maxRedirects: 5
+            docs: |
+              Happy path: solicitud con mensaje opcional.
+              Respuesta esperada: 201 Created con { id, groupId, status: "PENDING", message: "Hola...", createdAt }
+
+              Pasos:
+              1. Usa un grupo REQUEST diferente al de seq 1 (o cancela la solicitud anterior con Cancel My Request)
+              2. Reemplaza :groupId
+              3. Ejecuta con token_contestant
+          - info:
+              name: Request Join - Grupo no encontrado
+              type: http
+              seq: 3
+            http:
+              method: POST
+              url: '{{baseUrl}}/groups/:groupId/requests'
+              params:
+                - name: groupId
+                  value: 00000000-0000-0000-0000-000000000099
+                  type: path
+              auth:
+                type: bearer
+                token: '{{token_contestant}}'
+            settings:
+              encodeUrl: true
+              timeout: 0
+              followRedirects: true
+              maxRedirects: 5
+            docs: |
+              Error 404 GROUP_NOT_FOUND: el groupId no corresponde a ningún grupo.
+              Respuesta esperada: 404 Not Found con { error: "GROUP_NOT_FOUND" }
+
+              El UUID ...0099 es un ID ficticio que no existe en la base de datos.
+          - info:
+              name: Request Join - Política no REQUEST
+              type: http
+              seq: 4
+            http:
+              method: POST
+              url: '{{baseUrl}}/groups/:groupId/requests'
+              params:
+                - name: groupId
+                  value: 00000000-0000-0000-0000-000000000000
+                  type: path
+              auth:
+                type: bearer
+                token: '{{token_contestant}}'
+            settings:
+              encodeUrl: true
+              timeout: 0
+              followRedirects: true
+              maxRedirects: 5
+            docs: |
+              Error 400 INVALID_JOIN_POLICY: el grupo no acepta solicitudes (joinMode OPEN o INVITE).
+              Respuesta esperada: 400 Bad Request con { error: "INVALID_JOIN_POLICY" }
+
+              Pasos:
+              1. Usa el ID de un grupo OPEN (creado con "Create Group")
+              2. Reemplaza :groupId
+              3. Ejecuta con token_contestant
+          - info:
+              name: Request Join - Ya soy miembro
+              type: http
+              seq: 5
+            http:
+              method: POST
+              url: '{{baseUrl}}/groups/:groupId/requests'
+              params:
+                - name: groupId
+                  value: 00000000-0000-0000-0000-000000000000
+                  type: path
+              auth:
+                type: bearer
+                token: '{{token_contestant}}'
+            settings:
+              encodeUrl: true
+              timeout: 0
+              followRedirects: true
+              maxRedirects: 5
+            docs: |
+              Error 409 ALREADY_MEMBER: el usuario ya es miembro del grupo.
+              Respuesta esperada: 409 Conflict con { error: "ALREADY_MEMBER" }
+
+              Pasos:
+              1. Aprueba primero la solicitud del contestant (ver "Approve Request" seq 17)
+              2. Usa el mismo groupId e intenta enviar otra solicitud
+          - info:
+              name: Request Join - Ya tengo solicitud pendiente
+              type: http
+              seq: 6
+            http:
+              method: POST
+              url: '{{baseUrl}}/groups/:groupId/requests'
+              params:
+                - name: groupId
+                  value: 00000000-0000-0000-0000-000000000000
+                  type: path
+              auth:
+                type: bearer
+                token: '{{token_contestant}}'
+            settings:
+              encodeUrl: true
+              timeout: 0
+              followRedirects: true
+              maxRedirects: 5
+            docs: |
+              Error 409 REQUEST_ALREADY_PENDING: ya existe una solicitud PENDING para este grupo.
+              Respuesta esperada: 409 Conflict con { error: "REQUEST_ALREADY_PENDING" }
+
+              Pasos:
+              1. Ejecuta primero "Request Join" (seq 1) para crear la solicitud
+              2. Ejecuta esta petición con el mismo groupId sin cancelar la anterior
+          - info:
+              name: Request Join - Sin autenticación
+              type: http
+              seq: 7
+            http:
+              method: POST
+              url: '{{baseUrl}}/groups/:groupId/requests'
+              params:
+                - name: groupId
+                  value: 00000000-0000-0000-0000-000000000000
+                  type: path
+            settings:
+              encodeUrl: true
+              timeout: 0
+              followRedirects: true
+              maxRedirects: 5
+            docs: |
+              Error 401: no se envía token de autenticación.
+              Respuesta esperada: 401 Unauthorized
+          - info:
+              name: Get My Request
+              type: http
+              seq: 8
+            http:
+              method: GET
+              url: '{{baseUrl}}/groups/:groupId/requests/me'
+              params:
+                - name: groupId
+                  value: 00000000-0000-0000-0000-000000000000
+                  type: path
+              auth:
+                type: bearer
+                token: '{{token_contestant}}'
+            settings:
+              encodeUrl: true
+              timeout: 0
+              followRedirects: true
+              maxRedirects: 5
+            docs: |
+              Happy path: retorna la solicitud pendiente del usuario para el grupo.
+              Respuesta esperada: 200 OK con { id, groupId, status: "PENDING", message, createdAt }
+
+              Pasos:
+              1. Ejecuta primero "Request Join" (seq 1) para crear la solicitud
+              2. Usa el mismo groupId
+              3. Ejecuta con token_contestant
+          - info:
+              name: Get My Request - No encontrada
+              type: http
+              seq: 9
+            http:
+              method: GET
+              url: '{{baseUrl}}/groups/:groupId/requests/me'
+              params:
+                - name: groupId
+                  value: 00000000-0000-0000-0000-000000000000
+                  type: path
+              auth:
+                type: bearer
+                token: '{{token_contestant}}'
+            settings:
+              encodeUrl: true
+              timeout: 0
+              followRedirects: true
+              maxRedirects: 5
+            docs: |
+              Error 404 REQUEST_NOT_FOUND: el usuario nunca envió solicitud a este grupo (o ya la canceló).
+              Respuesta esperada: 404 Not Found con { error: "REQUEST_NOT_FOUND" }
+
+              Pasos:
+              1. Usa el ID de un grupo REQUEST al que el contestant NO envió solicitud
+          - info:
+              name: Cancel My Request
+              type: http
+              seq: 10
+            http:
+              method: DELETE
+              url: '{{baseUrl}}/groups/:groupId/requests/me'
+              params:
+                - name: groupId
+                  value: 00000000-0000-0000-0000-000000000000
+                  type: path
+              auth:
+                type: bearer
+                token: '{{token_contestant}}'
+            settings:
+              encodeUrl: true
+              timeout: 0
+              followRedirects: true
+              maxRedirects: 5
+            docs: |
+              Happy path: cancela la solicitud PENDING del usuario.
+              Respuesta esperada: 204 No Content (cuerpo vacío)
+
+              Pasos:
+              1. Ejecuta primero "Request Join" (seq 1) para crear la solicitud
+              2. Usa el mismo groupId
+              3. Ejecuta con token_contestant
+          - info:
+              name: Cancel My Request - Ya procesada
+              type: http
+              seq: 11
+            http:
+              method: DELETE
+              url: '{{baseUrl}}/groups/:groupId/requests/me'
+              params:
+                - name: groupId
+                  value: 00000000-0000-0000-0000-000000000000
+                  type: path
+              auth:
+                type: bearer
+                token: '{{token_contestant}}'
+            settings:
+              encodeUrl: true
+              timeout: 0
+              followRedirects: true
+              maxRedirects: 5
+            docs: |
+              Error 400 REQUEST_ALREADY_PROCESSED: la solicitud ya fue aprobada o rechazada, no se puede cancelar.
+              Respuesta esperada: 400 Bad Request con { error: "REQUEST_ALREADY_PROCESSED" }
+
+              Pasos:
+              1. Ejecuta "Approve Request" (seq 17) para procesar la solicitud
+              2. Intenta cancelarla con este endpoint usando el mismo groupId
+          - info:
+              name: Cancel My Request - No encontrada
+              type: http
+              seq: 12
+            http:
+              method: DELETE
+              url: '{{baseUrl}}/groups/:groupId/requests/me'
+              params:
+                - name: groupId
+                  value: 00000000-0000-0000-0000-000000000000
+                  type: path
+              auth:
+                type: bearer
+                token: '{{token_contestant}}'
+            settings:
+              encodeUrl: true
+              timeout: 0
+              followRedirects: true
+              maxRedirects: 5
+            docs: |
+              Error 404 REQUEST_NOT_FOUND: el usuario no tiene ninguna solicitud activa para este grupo.
+              Respuesta esperada: 404 Not Found con { error: "REQUEST_NOT_FOUND" }
+
+              Pasos:
+              1. Usa el ID de un grupo al que el contestant nunca envió solicitud
+          - info:
+              name: List Join Requests
+              type: http
+              seq: 13
+            http:
+              method: GET
+              url: '{{baseUrl}}/groups/:groupId/requests'
+              params:
+                - name: groupId
+                  value: 00000000-0000-0000-0000-000000000000
+                  type: path
+                - name: page
+                  value: '1'
+                  type: query
+                - name: limit
+                  value: '20'
+                  type: query
+                - name: status
+                  value: PENDING
+                  type: query
+                  disabled: true
+              auth:
+                type: bearer
+                token: '{{token}}'
+            settings:
+              encodeUrl: true
+              timeout: 0
+              followRedirects: true
+              maxRedirects: 5
+            docs: |
+              Happy path: el lead lista las solicitudes PENDING de su grupo (por defecto muestra PENDING).
+              Respuesta esperada: 200 OK con { requests: [...], pagination: { totalCount, currentPage, totalPages, itemsPerPage, hasNextPage, hasPrevPage } }
+
+              Pasos:
+              1. Usa el groupId del grupo REQUEST creado con token (lead)
+              2. Asegúrate de que haya al menos una solicitud PENDING (ejecuta "Request Join" seq 1)
+              3. Ejecuta con token (lead)
+              El id de cada solicitud sirve para los tests de Approve/Reject.
+          - info:
+              name: List Join Requests - Aprobadas
+              type: http
+              seq: 14
+            http:
+              method: GET
+              url: '{{baseUrl}}/groups/:groupId/requests'
+              params:
+                - name: groupId
+                  value: 00000000-0000-0000-0000-000000000000
+                  type: path
+                - name: status
+                  value: APPROVED
+                  type: query
+              auth:
+                type: bearer
+                token: '{{token}}'
+            settings:
+              encodeUrl: true
+              timeout: 0
+              followRedirects: true
+              maxRedirects: 5
+            docs: |
+              Filtro por status APPROVED: lista solicitudes ya aprobadas.
+              Respuesta esperada: 200 OK con lista (puede estar vacía si no hay aprobadas aún)
+
+              Pasos:
+              1. Ejecuta "Approve Request" (seq 17) primero para tener al menos una aprobada
+              2. Usa el mismo groupId
+              3. Ejecuta con token (lead)
+          - info:
+              name: List Join Requests - Prohibido
+              type: http
+              seq: 15
+            http:
+              method: GET
+              url: '{{baseUrl}}/groups/:groupId/requests'
+              params:
+                - name: groupId
+                  value: 00000000-0000-0000-0000-000000000000
+                  type: path
+              auth:
+                type: bearer
+                token: '{{token_contestant}}'
+            settings:
+              encodeUrl: true
+              timeout: 0
+              followRedirects: true
+              maxRedirects: 5
+            docs: |
+              Error 403 INSUFFICIENT_PERMISSIONS: el contestant no tiene permisos para listar solicitudes.
+              Respuesta esperada: 403 Forbidden con { error: "INSUFFICIENT_PERMISSIONS" }
+
+              Solo los leads y admins pueden ver la lista de solicitudes del grupo.
+          - info:
+              name: List Join Requests - Status inválido
+              type: http
+              seq: 16
+            http:
+              method: GET
+              url: '{{baseUrl}}/groups/:groupId/requests'
+              params:
+                - name: groupId
+                  value: 00000000-0000-0000-0000-000000000000
+                  type: path
+                - name: status
+                  value: INVALID
+                  type: query
+              auth:
+                type: bearer
+                token: '{{token}}'
+            settings:
+              encodeUrl: true
+              timeout: 0
+              followRedirects: true
+              maxRedirects: 5
+            docs: |
+              Error 400: el valor de status no es válido (debe ser PENDING, APPROVED o REJECTED).
+              Respuesta esperada: 400 Bad Request con error de validación
+          - info:
+              name: Approve Request
+              type: http
+              seq: 17
+            http:
+              method: PATCH
+              url: '{{baseUrl}}/groups/:groupId/requests/:requestId'
+              params:
+                - name: groupId
+                  value: 00000000-0000-0000-0000-000000000000
+                  type: path
+                - name: requestId
+                  value: 00000000-0000-0000-0000-000000000000
+                  type: path
+              body:
+                type: json
+                data: |-
+                  {
+                    "status": "APPROVED"
+                  }
+              auth:
+                type: bearer
+                token: '{{token}}'
+            settings:
+              encodeUrl: true
+              timeout: 0
+              followRedirects: true
+              maxRedirects: 5
+            docs: |
+              Happy path: el lead aprueba una solicitud PENDING.
+              Respuesta esperada: 200 OK con { id, groupId, status: "APPROVED", ... }
+              El contestant queda como MEMBER del grupo (verificar con GET /users/me/groups).
+
+              Pasos:
+              1. Ejecuta "Request Join" (seq 1) para crear la solicitud
+              2. Ejecuta "List Join Requests" (seq 13) y copia el id de la solicitud
+              3. Reemplaza :groupId y :requestId
+              4. Ejecuta con token (lead)
+          - info:
+              name: Reject Request
+              type: http
+              seq: 18
+            http:
+              method: PATCH
+              url: '{{baseUrl}}/groups/:groupId/requests/:requestId'
+              params:
+                - name: groupId
+                  value: 00000000-0000-0000-0000-000000000000
+                  type: path
+                - name: requestId
+                  value: 00000000-0000-0000-0000-000000000000
+                  type: path
+              body:
+                type: json
+                data: |-
+                  {
+                    "status": "REJECTED"
+                  }
+              auth:
+                type: bearer
+                token: '{{token}}'
+            settings:
+              encodeUrl: true
+              timeout: 0
+              followRedirects: true
+              maxRedirects: 5
+            docs: |
+              Happy path: el lead rechaza una solicitud PENDING.
+              Respuesta esperada: 200 OK con { id, groupId, status: "REJECTED", ... }
+              El contestant NO se convierte en miembro.
+
+              Pasos:
+              1. Crea una nueva solicitud con "Request Join - Con Mensaje" (seq 2)
+              2. Obtén el requestId con "List Join Requests" (seq 13)
+              3. Reemplaza :groupId y :requestId
+              4. Ejecuta con token (lead)
+          - info:
+              name: Update Request - No encontrada
+              type: http
+              seq: 19
+            http:
+              method: PATCH
+              url: '{{baseUrl}}/groups/:groupId/requests/:requestId'
+              params:
+                - name: groupId
+                  value: 00000000-0000-0000-0000-000000000000
+                  type: path
+                - name: requestId
+                  value: 00000000-0000-0000-0000-000000000099
+                  type: path
+              body:
+                type: json
+                data: |-
+                  {
+                    "status": "APPROVED"
+                  }
+              auth:
+                type: bearer
+                token: '{{token}}'
+            settings:
+              encodeUrl: true
+              timeout: 0
+              followRedirects: true
+              maxRedirects: 5
+            docs: |
+              Error 404 REQUEST_NOT_FOUND: el requestId no corresponde a ninguna solicitud.
+              Respuesta esperada: 404 Not Found con { error: "REQUEST_NOT_FOUND" }
+
+              El UUID ...0099 es un ID ficticio que no existe en la base de datos.
+          - info:
+              name: Update Request - Ya procesada
+              type: http
+              seq: 20
+            http:
+              method: PATCH
+              url: '{{baseUrl}}/groups/:groupId/requests/:requestId'
+              params:
+                - name: groupId
+                  value: 00000000-0000-0000-0000-000000000000
+                  type: path
+                - name: requestId
+                  value: 00000000-0000-0000-0000-000000000000
+                  type: path
+              body:
+                type: json
+                data: |-
+                  {
+                    "status": "APPROVED"
+                  }
+              auth:
+                type: bearer
+                token: '{{token}}'
+            settings:
+              encodeUrl: true
+              timeout: 0
+              followRedirects: true
+              maxRedirects: 5
+            docs: |
+              Error 400 REQUEST_ALREADY_PROCESSED: la solicitud ya fue aprobada o rechazada.
+              Respuesta esperada: 400 Bad Request con { error: "REQUEST_ALREADY_PROCESSED" }
+
+              Pasos:
+              1. Ejecuta "Approve Request" (seq 17) para procesar la solicitud
+              2. Intenta aprobarla de nuevo con el mismo requestId
+          - info:
+              name: Update Request - Prohibido
+              type: http
+              seq: 21
+            http:
+              method: PATCH
+              url: '{{baseUrl}}/groups/:groupId/requests/:requestId'
+              params:
+                - name: groupId
+                  value: 00000000-0000-0000-0000-000000000000
+                  type: path
+                - name: requestId
+                  value: 00000000-0000-0000-0000-000000000000
+                  type: path
+              body:
+                type: json
+                data: |-
+                  {
+                    "status": "APPROVED"
+                  }
+              auth:
+                type: bearer
+                token: '{{token_contestant}}'
+            settings:
+              encodeUrl: true
+              timeout: 0
+              followRedirects: true
+              maxRedirects: 5
+            docs: |
+              Error 403 INSUFFICIENT_PERMISSIONS: el contestant no puede aprobar ni rechazar solicitudes.
+              Respuesta esperada: 403 Forbidden con { error: "INSUFFICIENT_PERMISSIONS" }
+
+              Solo los leads y admins pueden gestionar solicitudes.
+          - info:
+              name: Update Request - Status inválido
+              type: http
+              seq: 22
+            http:
+              method: PATCH
+              url: '{{baseUrl}}/groups/:groupId/requests/:requestId'
+              params:
+                - name: groupId
+                  value: 00000000-0000-0000-0000-000000000000
+                  type: path
+                - name: requestId
+                  value: 00000000-0000-0000-0000-000000000000
+                  type: path
+              body:
+                type: json
+                data: |-
+                  {
+                    "status": "PENDING"
+                  }
+              auth:
+                type: bearer
+                token: '{{token}}'
+            settings:
+              encodeUrl: true
+              timeout: 0
+              followRedirects: true
+              maxRedirects: 5
+            docs: |
+              Error 400: el status debe ser APPROVED o REJECTED, no se acepta PENDING ni otros valores.
+              Respuesta esperada: 400 Bad Request con error de validación
+      - info:
+          name: invitations
+          type: folder
+        items:
+          - info:
+              name: Generate Invite
+              type: http
+              seq: 1
+            http:
+              method: POST
+              url: '{{baseUrl}}/groups/:groupId/invitations'
+              params:
+                - name: groupId
+                  value: 00000000-0000-0000-0000-000000000000
+                  type: path
+              auth:
+                type: bearer
+                token: '{{token}}'
+            settings:
+              encodeUrl: true
+              timeout: 0
+              followRedirects: true
+              maxRedirects: 5
+            docs: |
+              Happy path: un Lead o Admin genera un token JWT de invitación (72h) para un grupo INVITE.
+              Respuesta esperada: 201 Created con { "token": "<jwt>" }
+
+              Pasos:
+              1. Crea un grupo con joinMode INVITE (usar "Create Group - Private", seq 5).
+              2. Copia el ID del grupo creado y reemplaza :groupId.
+              3. Ejecuta con token (Coach/Admin que es Lead del grupo).
+              4. Guarda el token retornado para usar en "Accept Invite" (seq 4 y 5).
+          - info:
+              name: Generate Invite - No INVITE policy
+              type: http
+              seq: 2
+            http:
+              method: POST
+              url: '{{baseUrl}}/groups/:groupId/invitations'
+              params:
+                - name: groupId
+                  value: 00000000-0000-0000-0000-000000000000
+                  type: path
+              auth:
+                type: bearer
+                token: '{{token}}'
+            settings:
+              encodeUrl: true
+              timeout: 0
+              followRedirects: true
+              maxRedirects: 5
+            docs: |
+              Error 403 INSUFFICIENT_PERMISSIONS: el grupo no usa joinMode INVITE.
+              Respuesta esperada: 403 Forbidden con { error: "INSUFFICIENT_PERMISSIONS" }
+
+              Pasos:
+              1. Usa el ID de un grupo OPEN o REQUEST.
+              2. Reemplaza :groupId.
+              3. Ejecuta con token (Lead o Admin).
+          - info:
+              name: Generate Invite - No es Lead
+              type: http
+              seq: 3
+            http:
+              method: POST
+              url: '{{baseUrl}}/groups/:groupId/invitations'
+              params:
+                - name: groupId
+                  value: 00000000-0000-0000-0000-000000000000
+                  type: path
+              auth:
+                type: bearer
+                token: '{{token_contestant}}'
+            settings:
+              encodeUrl: true
+              timeout: 0
+              followRedirects: true
+              maxRedirects: 5
+            docs: |
+              Error 403 INSUFFICIENT_PERMISSIONS: el usuario no es Lead ni Admin del grupo.
+              Respuesta esperada: 403 Forbidden con { error: "INSUFFICIENT_PERMISSIONS" }
+
+              Pasos:
+              1. Usa el ID del grupo INVITE creado en seq 1.
+              2. Reemplaza :groupId.
+              3. Ejecuta con token_contestant (no es Lead del grupo).
+          - info:
+              name: Accept Invite
+              type: http
+              seq: 4
+            http:
+              method: POST
+              url: '{{baseUrl}}/groups/:groupId/invitations/accept'
+              params:
+                - name: groupId
+                  value: 00000000-0000-0000-0000-000000000000
+                  type: path
+              body:
+                type: json
+                data: |-
+                  {
+                    "token": "<pegar jwt generado en seq 1>"
+                  }
+              auth:
+                type: bearer
+                token: '{{token_contestant}}'
+            settings:
+              encodeUrl: true
+              timeout: 0
+              followRedirects: true
+              maxRedirects: 5
+            docs: |
+              Happy path: un contestant acepta una invitación válida y se une al grupo.
+              Respuesta esperada: 201 Created con { "role": "MEMBER", "joinedAt": "..." }
+
+              Pasos:
+              1. Ejecuta primero "Generate Invite" (seq 1) para obtener el token JWT.
+              2. Reemplaza el valor de "token" en el body con el JWT obtenido.
+              3. Reemplaza :groupId con el mismo ID del grupo INVITE.
+              4. Ejecuta con token_contestant (distinto al usuario que generó la invitación).
+          - info:
+              name: Accept Invite - Ya es miembro
+              type: http
+              seq: 5
+            http:
+              method: POST
+              url: '{{baseUrl}}/groups/:groupId/invitations/accept'
+              params:
+                - name: groupId
+                  value: 00000000-0000-0000-0000-000000000000
+                  type: path
+              body:
+                type: json
+                data: |-
+                  {
+                    "token": "<mismo jwt de seq 1>"
+                  }
+              auth:
+                type: bearer
+                token: '{{token_contestant}}'
+            settings:
+              encodeUrl: true
+              timeout: 0
+              followRedirects: true
+              maxRedirects: 5
+            docs: |
+              Error 409 ALREADY_MEMBER: el usuario ya pertenece al grupo.
+              Respuesta esperada: 409 Conflict con { error: "ALREADY_MEMBER" }
+
+              Pasos:
+              1. Ejecuta primero "Accept Invite" (seq 4) para unirse al grupo.
+              2. Vuelve a ejecutar esta petición con el mismo token y token_contestant.
+          - info:
+              name: Accept Invite - Token inválido
+              type: http
+              seq: 6
+            http:
+              method: POST
+              url: '{{baseUrl}}/groups/:groupId/invitations/accept'
+              params:
+                - name: groupId
+                  value: 00000000-0000-0000-0000-000000000000
+                  type: path
+              body:
+                type: json
+                data: |-
+                  {
+                    "token": "invalid.token.here"
+                  }
+              auth:
+                type: bearer
+                token: '{{token_contestant}}'
+            settings:
+              encodeUrl: true
+              timeout: 0
+              followRedirects: true
+              maxRedirects: 5
+            docs: |
+              Error 400 INVALID_INVITE_TOKEN: el token no es un JWT válido firmado por el servidor.
+              Respuesta esperada: 400 Bad Request con { error: "INVALID_INVITE_TOKEN" }
+
+              Envía cualquier string que no sea un JWT válido como valor de "token".
   - info:
       name: Materials
       type: folder
@@ -1033,6 +1885,75 @@ items:
           timeout: 0
           followRedirects: true
           maxRedirects: 5
+      - info:
+          name: List Materials
+          type: http
+          seq: 3
+        http:
+          method: GET
+          url: '{{baseUrl}}/groups/:groupId/materials'
+          params:
+            - name: groupId
+              value: 00000000-0000-0000-0000-000000000000
+              type: path
+            - name: page
+              value: '1'
+              type: query
+            - name: limit
+              value: '20'
+              type: query
+            - name: pinned
+              value: 'true'
+              type: query
+              disabled: true
+            - name: tags
+              value: grafos,intro
+              type: query
+              disabled: true
+          auth:
+            type: bearer
+            token: '{{token}}'
+        settings:
+          encodeUrl: true
+          timeout: 0
+          followRedirects: true
+          maxRedirects: 5
+        docs: |
+          Lista los materiales de un grupo con paginación y filtros opcionales.
+          Respuesta esperada: 200 OK con { materials: [...], pagination: { totalCount, currentPage, totalPages, itemsPerPage } }
+
+          Filtros opcionales:
+          - pinned=true/false: filtra por materiales fijados
+          - tags=grafos,intro: filtra por tags (separados por coma)
+      - info:
+          name: Get Material
+          type: http
+          seq: 4
+        http:
+          method: GET
+          url: '{{baseUrl}}/groups/:groupId/materials/:materialId'
+          params:
+            - name: groupId
+              value: 00000000-0000-0000-0000-000000000000
+              type: path
+            - name: materialId
+              value: 00000000-0000-0000-0000-000000000000
+              type: path
+          auth:
+            type: bearer
+            token: '{{token}}'
+        settings:
+          encodeUrl: true
+          timeout: 0
+          followRedirects: true
+          maxRedirects: 5
+        docs: |
+          Obtiene un material específico por su ID dentro de un grupo.
+          Respuesta esperada: 200 OK con { id, groupId, title, content, tags, status, pinned, pinnedAt, author, createdAt, updatedAt, publishedAt }
+
+          Errores posibles:
+          - 404 MATERIAL_NOT_FOUND: el materialId no existe en el grupo
+          - 401: sin autenticación
 bundled: true
 extensions:
   bruno:

@@ -15,6 +15,7 @@ import (
 
 	domainGroup "github.com/training-judge-center/backend/internal/domain/group"
 	"github.com/training-judge-center/backend/internal/domain/shared"
+	infraPostgres "github.com/training-judge-center/backend/internal/infrastructure/postgres"
 	"github.com/training-judge-center/backend/pkg/apperror"
 )
 
@@ -35,7 +36,7 @@ func (r *GroupRepository) Save(ctx context.Context, g *domainGroup.Group) error 
 			$1, $2, $3, $4, $5, $6, $7, $8, $9
 		)
 	`
-	_, err := r.db.Exec(ctx, query,
+	_, err := infraPostgres.GetQuerier(ctx, r.db).Exec(ctx, query,
 		g.ID(),
 		g.Name().Value(),
 		g.Description(),

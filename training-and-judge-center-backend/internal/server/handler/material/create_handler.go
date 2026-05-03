@@ -9,6 +9,17 @@ import (
 	"github.com/training-judge-center/backend/pkg/apperror"
 )
 
+// @Summary      Create material
+// @Tags         materials
+// @Accept       json
+// @Produce      json
+// @Security     BearerAuth
+// @Param        groupId path string true "Group ID"
+// @Param        body body createMaterialRequest true "Material data"
+// @Success      201 {object} materialResponse
+// @Failure      400 {object} apperror.AppError
+// @Failure      401 {object} apperror.AppError
+// @Router       /groups/{groupId}/materials [post]
 func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
 	currentUser, ok := h.requireCurrentUser(w, r)
 	if !ok {

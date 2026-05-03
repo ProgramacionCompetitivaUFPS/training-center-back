@@ -22,6 +22,18 @@ type updateProblemRequest struct {
 	Accessibility *string               `json:"accessibility"`
 }
 
+// @Summary      Update problem
+// @Tags         problems
+// @Accept       json
+// @Produce      json
+// @Security     BearerAuth
+// @Param        slug path string true "Problem slug"
+// @Param        body body updateProblemRequest true "Fields to update"
+// @Success      200 {object} getProblemResponse
+// @Failure      400 {object} apperror.AppError
+// @Failure      401 {object} apperror.AppError
+// @Failure      404 {object} apperror.AppError
+// @Router       /problems/p/{slug} [put]
 func (h *Handler) Update(w http.ResponseWriter, r *http.Request) {
 	claims := middleware.GetClaims(r.Context())
 	if claims == nil {

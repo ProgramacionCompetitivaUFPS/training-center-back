@@ -85,6 +85,27 @@ type addMemberResp struct {
 	JoinMethod string  `json:"joinMethod"`
 }
 
+type requesterResp struct {
+	UserID   string `json:"userId"`
+	Nickname string `json:"nickname"`
+	Name     string `json:"name"`
+	Email    string `json:"email"`
+}
+
+type joinRequestResp struct {
+	ID        string         `json:"id"`
+	GroupID   string         `json:"groupId"`
+	Requester *requesterResp `json:"requester,omitempty"`
+	Status    string         `json:"status"`
+	Message   *string        `json:"message,omitempty"`
+	CreatedAt string         `json:"createdAt"`
+}
+
+type listRequestsResponse struct {
+	Requests   []joinRequestResp `json:"requests"`
+	Pagination paginationResp    `json:"pagination"`
+}
+
 func buildPagination(total, page, totalPages, limit int) paginationResp {
 	return paginationResp{
 		TotalCount:   total,

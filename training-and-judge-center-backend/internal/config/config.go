@@ -4,6 +4,7 @@ import (
 	"log/slog"
 	"os"
 	"strconv"
+	"strings"
 
 	"github.com/joho/godotenv"
 )
@@ -28,6 +29,7 @@ type Config struct {
 	SMTPPassword       string
 	SMTPFrom           string
 	RedisURL           string
+	AllowedOrigins     []string
 }
 
 func Load() *Config {
@@ -52,6 +54,7 @@ func Load() *Config {
 		SMTPPassword:       getEnv("SMTP_PASSWORD", ""),
 		SMTPFrom:           getEnv("SMTP_FROM", "noreply@trainingcenter.com"),
 		RedisURL:           getEnv("REDIS_URL", "localhost:6379"),
+		AllowedOrigins:     getEnvAsSlice("ALLOWED_ORIGINS", "http://localhost:5173"),
 	}
 }
 
@@ -78,4 +81,16 @@ func getEnvAsInt(key string, fallback int) int {
 		}
 	}
 	return fallback
+}
+
+func getEnvAsSlice(key, fallback string) []string {
+	value := os.Getenv(key)
+	if value == "" {
+		value = fallback
+	}
+	parts := strings.Split(value, ",")
+	for i, p := range parts {
+		parts[i] = strings.TrimSpace(p)
+	}
+	return parts
 }

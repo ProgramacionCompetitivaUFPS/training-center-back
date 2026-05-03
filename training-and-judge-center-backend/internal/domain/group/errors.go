@@ -26,4 +26,10 @@ const (
 	ErrCodeCannotRemoveAdminFromGlobal = "CANNOT_REMOVE_ADMIN_FROM_GLOBAL_GROUP"
 	ErrCodeCannotLeaveGlobal           = "CANNOT_LEAVE_GLOBAL_GROUP"
 	ErrCodeCannotLeaveAsLastLead       = "CANNOT_LEAVE_AS_LAST_LEAD"
+
+	ErrCodeRequestAlreadyProcessed = "REQUEST_ALREADY_PROCESSED"
+	ErrCodeRequestAlreadyPending   = "REQUEST_ALREADY_PENDING"
+	ErrCodeRequestNotFound         = "REQUEST_NOT_FOUND"
+	ErrCodeInvalidInviteToken      = "INVALID_INVITE_TOKEN"
+	ErrCodeExpiredInviteToken      = "EXPIRED_INVITE_TOKEN"
 )

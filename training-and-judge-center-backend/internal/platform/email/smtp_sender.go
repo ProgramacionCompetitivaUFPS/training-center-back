@@ -37,7 +37,10 @@ func (s *SMTPSender) Send(ctx context.Context, msg notification.EmailMessage) er
 
 	safeSubject := mime.QEncoding.Encode("utf-8", strings.ReplaceAll(msg.Subject, "\r\n", " "))
 
-	auth := smtp.PlainAuth("", s.username, s.password, s.host)
+	var auth smtp.Auth
+	if s.username != "" || s.password != "" {
+		auth = smtp.PlainAuth("", s.username, s.password, s.host)
+	}
 
 	raw := []byte("To: " + toAddr.String() + "\r\n" +
 		"From: " + s.from + "\r\n" +

@@ -23,11 +23,13 @@ type CreateGroupResult struct {
 }
 
 type CreateGroupUseCase struct {
-	repo domainGroup.Repository
+	repo       domainGroup.Repository
+	memberRepo domainGroup.MemberRepository
+	txManager  TransactionManager
 }
 
-func NewCreateGroupUseCase(repo domainGroup.Repository) *CreateGroupUseCase {
-	return &CreateGroupUseCase{repo: repo}
+func NewCreateGroupUseCase(repo domainGroup.Repository, memberRepo domainGroup.MemberRepository, txManager TransactionManager) *CreateGroupUseCase {
+	return &CreateGroupUseCase{repo: repo, memberRepo: memberRepo, txManager: txManager}
 }
 
 func (uc *CreateGroupUseCase) Execute(ctx context.Context, input CreateGroupInput) (*CreateGroupResult, error) {
@@ -68,22 +70,24 @@ func (uc *CreateGroupUseCase) Execute(ctx context.Context, input CreateGroupInpu
 	}
 
 	newID := uuid.New().String()
-	g, err := domainGroup.NewGroup(
-		newID,
-		groupName,
-		input.Description,
-		visibility,
-		joinPolicy,
-		shared.RestoreUserID(input.CurrentUser.ID),
-		nil,
-	)
+	creatorID := shared.RestoreUserID(input.CurrentUser.ID)
+	g, err := domainGroup.NewGroup(newID, groupName, input.Description, visibility, joinPolicy, creatorID, nil)
 	if err != nil {
 		return nil, err
 	}
 
-	if err := uc.repo.Save(ctx, g); err != nil {
-		slog.ErrorContext(ctx, "failed to save new group", "error", err, "group_id", newID)
-		return nil, apperror.NewInternal()
+	if err := uc.txManager.WithTx(ctx, func(ctx context.Context) error {
+		if err := uc.repo.Save(ctx, g); err != nil {
+			slog.ErrorContext(ctx, "failed to save new group", "error", err, "group_id", newID)
+			return apperror.NewInternal()
+		}
+		lead, err := domainGroup.NewGroupMember(uuid.New().String(), newID, creatorID, domainGroup.MemberRoleLead, &creatorID, domainGroup.JoinMethodDirectAdd, nil)
+		if err != nil {
+			return err
+		}
+		return uc.memberRepo.Save(ctx, lead)
+	}); err != nil {
+		return nil, err
 	}
 
 	return &CreateGroupResult{Group: g}, nil

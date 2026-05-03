@@ -124,6 +124,89 @@ func currentUser(id, role string) shared.CurrentUser {
 	return shared.CurrentUser{ID: id, Role: role}
 }
 
+type fakeJoinRequestRepo struct {
+	requests      []*domainGroup.JoinRequest
+	savedRequests []*domainGroup.JoinRequest
+	deletedIDs    []string
+	saveErr       error
+	findErr       error
+}
+
+func (f *fakeJoinRequestRepo) Save(_ context.Context, r *domainGroup.JoinRequest) error {
+	if f.saveErr != nil {
+		return f.saveErr
+	}
+	for i, existing := range f.savedRequests {
+		if existing.ID() == r.ID() {
+			f.savedRequests[i] = r
+			return nil
+		}
+	}
+	f.savedRequests = append(f.savedRequests, r)
+	return nil
+}
+
+func (f *fakeJoinRequestRepo) FindByID(_ context.Context, id string) (*domainGroup.JoinRequest, error) {
+	if f.findErr != nil {
+		return nil, f.findErr
+	}
+	for _, r := range f.requests {
+		if r.ID() == id {
+			return r, nil
+		}
+	}
+	return nil, nil
+}
+
+func (f *fakeJoinRequestRepo) FindByGroupAndUser(_ context.Context, groupID string, userID shared.UserID) (*domainGroup.JoinRequest, error) {
+	if f.findErr != nil {
+		return nil, f.findErr
+	}
+	var latest *domainGroup.JoinRequest
+	for _, r := range f.requests {
+		if r.GroupID() == groupID && r.RequesterUserID().Value() == userID.Value() {
+			if r.IsPending() {
+				return r, nil
+			}
+			if latest == nil {
+				latest = r
+			}
+		}
+	}
+	return latest, nil
+}
+
+func (f *fakeJoinRequestRepo) FindByGroup(_ context.Context, groupID string, filters domainGroup.JoinRequestFilters) ([]*domainGroup.JoinRequest, int, error) {
+	var out []*domainGroup.JoinRequest
+	for _, r := range f.requests {
+		if r.GroupID() != groupID {
+			continue
+		}
+		if filters.Status != nil && r.Status() != *filters.Status {
+			continue
+		}
+		out = append(out, r)
+	}
+	return out, len(out), nil
+}
+
+func (f *fakeJoinRequestRepo) Delete(_ context.Context, id string) error {
+	f.deletedIDs = append(f.deletedIDs, id)
+	return nil
+}
+
+func mustJoinRequest(t *testing.T, id, groupID, userID string) *domainGroup.JoinRequest {
+	t.Helper()
+	req, err := domainGroup.NewJoinRequest(
+		id, groupID, shared.RestoreUserID(userID), nil,
+		func() time.Time { return time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC) },
+	)
+	if err != nil {
+		t.Fatalf("NewJoinRequest: %v", err)
+	}
+	return req
+}
+
 // --- tests ---
 
 func TestListGroups_PageValidation(t *testing.T) {

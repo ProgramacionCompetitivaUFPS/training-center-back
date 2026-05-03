@@ -49,7 +49,12 @@ func NewPassword(raw string) (Password, error) {
 	return Password{hash: string(hashed)}, nil
 }
 
+const SystemNoLoginHash = "$SYSTEM_NO_LOGIN$"
+
 func NewPasswordFromHash(hash string) (Password, error) {
+	if hash == SystemNoLoginHash {
+		return Password{hash: hash}, nil
+	}
 	if !strings.HasPrefix(hash, "$2") {
 		return Password{}, fmt.Errorf("invalid bcrypt hash format")
 	}

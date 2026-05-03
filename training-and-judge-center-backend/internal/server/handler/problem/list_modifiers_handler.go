@@ -10,6 +10,15 @@ import (
 	"github.com/training-judge-center/backend/pkg/apperror"
 )
 
+// @Summary      List problem modifiers
+// @Tags         problems
+// @Produce      json
+// @Security     BearerAuth
+// @Param        slug path string true "Problem slug"
+// @Success      200 {object} listModifiersResponse
+// @Failure      401 {object} apperror.AppError
+// @Failure      404 {object} apperror.AppError
+// @Router       /problems/p/{slug}/modifiers [get]
 func (h *Handler) ListModifiers(w http.ResponseWriter, r *http.Request) {
 	claims := middleware.GetClaims(r.Context())
 	if claims == nil {

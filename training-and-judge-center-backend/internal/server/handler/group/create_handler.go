@@ -30,6 +30,16 @@ type groupResponse struct {
 	UpdatedAt   string  `json:"updatedAt"`
 }
 
+// @Summary      Create group
+// @Tags         groups
+// @Accept       json
+// @Produce      json
+// @Security     BearerAuth
+// @Param        body body createGroupRequest true "Group data"
+// @Success      201 {object} groupResponse
+// @Failure      400 {object} apperror.AppError
+// @Failure      401 {object} apperror.AppError
+// @Router       /groups [post]
 func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
 	claims := middleware.GetClaims(r.Context())
 	if claims == nil {

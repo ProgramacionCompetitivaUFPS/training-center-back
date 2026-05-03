@@ -12,6 +12,19 @@ import (
 	"github.com/training-judge-center/backend/pkg/apperror"
 )
 
+// @Summary      List problems
+// @Tags         problems
+// @Produce      json
+// @Security     BearerAuth
+// @Param        page query int false "Page number"
+// @Param        limit query int false "Items per page"
+// @Param        tags query string false "Comma-separated tags"
+// @Param        accessibility query string false "Filter by accessibility"
+// @Param        status query string false "Filter by status"
+// @Param        author query string false "Filter by author nickname"
+// @Success      200 {object} listProblemsResponse
+// @Failure      401 {object} apperror.AppError
+// @Router       /problems [get]
 func (h *Handler) ListProblems(w http.ResponseWriter, r *http.Request) {
 	claims := middleware.GetClaims(r.Context())
 	if claims == nil {
