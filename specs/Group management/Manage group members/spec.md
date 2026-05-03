@@ -52,8 +52,18 @@ As a Lead, I want to add users as members directly by providing their nicknames 
 6. **Scenario**: Non-lead attempts to add member
 
    * **Given** requesting user is not lead of the group
+   * **And** requesting user is not Admin
    * **When** they try to add a member
    * **Then** system rejects with 403 (`INSUFFICIENT_PERMISSIONS`)
+
+7. **Scenario**: Admin adds member to any group without being a lead
+
+   * **Given** requesting user has system role `ADMIN`
+   * **And** target nickname exists and is not already a member
+   * **When** admin adds user by nickname with any valid role
+   * **Then** membership is created immediately
+   * **And** Admin does not need to be registered as lead in `group_members`
+   * **And** `added_by` is set to the Admin's user ID
 
 ---
 
@@ -213,6 +223,7 @@ As a Group Member, I want to leave a group voluntarily so that I can stop partic
 * **FR-M-011**: System MUST validate nickname existence before membership operations.
 * **FR-M-012**: System MUST enforce that global group membership cannot be modified.
 * **FR-M-013**: System MUST handle concurrent membership changes safely using transactions.
+* **FR-M-021**: System MUST allow Admin users to add members to any group without requiring Admin to be a lead of that group. Admin has implicit authority over all groups.
 * **FR-M-014**: System MUST ensure audit logs capture actor, target, action, timestamp, and reason for critical operations only.
 * **FR-M-015**: System MUST ensure only Coaches and Admins can be assigned Lead role.
 * **FR-M-016**: System MUST ensure global group membership is immutable - users cannot be added/removed manually.
