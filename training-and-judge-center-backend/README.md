@@ -24,7 +24,7 @@ Deberías ver `training-center-db` y `training-center-api` en estado `Up`.
 ### Detener los servicios
 
 ```bash
-docker-compose --env-file .env.example down
+docker-compose --env-file .env down
 ```
 
 Para eliminar también los datos de PostgreSQL:
