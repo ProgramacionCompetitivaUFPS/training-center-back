@@ -14,11 +14,6 @@ func AccumulateFieldErrors(err error, fieldErrs *[]FieldError) error {
 	return NewInternal()
 }
 
-const (
-	ErrCodeCannotSelfDeactivate  = "CANNOT_SELF_DEACTIVATE"
-	ErrCodeCannotDeactivateAdmin = "CANNOT_DEACTIVATE_ADMIN"
-)
-
 func NewValidation(details []FieldError) *AppError {
 	return &AppError{
 		Kind:    KindValidation,

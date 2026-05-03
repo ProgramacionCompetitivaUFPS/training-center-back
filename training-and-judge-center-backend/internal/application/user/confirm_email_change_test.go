@@ -151,9 +151,9 @@ func TestConfirmEmailChange_DuplicateEmailAtConfirmation(t *testing.T) {
 		return activeUser, nil
 	}
 	// While the request was pending, someone else registered the new email.
-	// The DB constraint fires on Update and returns ErrEmailConflict.
+	// The DB constraint fires on Update and returns a conflict apperror.
 	userRepo.updateFn = func(_ context.Context, _ *domain.User) error {
-		return domain.ErrEmailConflict
+		return apperror.NewConflict(domain.ErrCodeEmailConflict, "email already in use")
 	}
 
 	mockEmail, _ := domain.NewEmail("stolen@example.com")
@@ -177,8 +177,8 @@ func TestConfirmEmailChange_DuplicateEmailAtConfirmation(t *testing.T) {
 	}
 
 	appErr, ok := err.(*apperror.AppError)
-	if !ok || appErr.Code != "EMAIL_ALREADY_EXISTS" {
-		t.Errorf("expected EMAIL_ALREADY_EXISTS error, got %v", err)
+	if !ok || appErr.Code != domain.ErrCodeEmailConflict {
+		t.Errorf("expected code %q, got %v", domain.ErrCodeEmailConflict, err)
 	}
 }
 
@@ -256,7 +256,7 @@ func TestConfirmEmailChange_TxFailure(t *testing.T) {
 
 	tx := &mockTransactionManager{
 		withTxFn: func(_ context.Context, _ func(context.Context) error) error {
-			return errors.New("tx error")
+			return apperror.NewInternal()
 		},
 	}
 

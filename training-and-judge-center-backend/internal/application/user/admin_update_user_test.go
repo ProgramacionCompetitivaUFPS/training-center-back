@@ -158,7 +158,7 @@ func TestAdminUpdateUser_EmailAlreadyExists(t *testing.T) {
 		return targetUser, nil
 	}
 	repo.updateFn = func(_ context.Context, _ *domain.User) error {
-		return domain.ErrEmailConflict
+		return apperror.NewConflict(domain.ErrCodeEmailConflict, "email already in use")
 	}
 	uc := NewAdminUpdateUserUseCase(repo)
 
@@ -175,8 +175,8 @@ func TestAdminUpdateUser_EmailAlreadyExists(t *testing.T) {
 	if !ok {
 		t.Fatalf("expected *apperror.AppError, got %T", err)
 	}
-	if appErr.Code != "EMAIL_ALREADY_EXISTS" {
-		t.Errorf("expected code EMAIL_ALREADY_EXISTS, got %q", appErr.Code)
+	if appErr.Code != domain.ErrCodeEmailConflict {
+		t.Errorf("expected code %q, got %q", domain.ErrCodeEmailConflict, appErr.Code)
 	}
 }
 
@@ -212,7 +212,7 @@ func TestAdminUpdateUser_RepositoryUpdateError(t *testing.T) {
 		return targetUser, nil
 	}
 	repo.updateFn = func(_ context.Context, _ *domain.User) error {
-		return errors.New("db update failed")
+		return apperror.NewInternal()
 	}
 	uc := NewAdminUpdateUserUseCase(repo)
 
@@ -318,7 +318,7 @@ func TestAdminUpdateUser_NicknameConflict(t *testing.T) {
 		return targetUser, nil
 	}
 	repo.updateFn = func(_ context.Context, _ *domain.User) error {
-		return domain.ErrNicknameConflict
+		return apperror.NewConflict(domain.ErrCodeNicknameConflict, "nickname already in use")
 	}
 	uc := NewAdminUpdateUserUseCase(repo)
 
@@ -335,8 +335,8 @@ func TestAdminUpdateUser_NicknameConflict(t *testing.T) {
 	if !ok {
 		t.Fatalf("expected *apperror.AppError, got %T", err)
 	}
-	if appErr.Code != "NICKNAME_ALREADY_EXISTS" {
-		t.Errorf("expected NICKNAME_ALREADY_EXISTS, got %q", appErr.Code)
+	if appErr.Code != domain.ErrCodeNicknameConflict {
+		t.Errorf("expected code %q, got %q", domain.ErrCodeNicknameConflict, appErr.Code)
 	}
 }
 

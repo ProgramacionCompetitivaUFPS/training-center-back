@@ -2,7 +2,6 @@ package user
 
 import (
 	"context"
-	"errors"
 	"log/slog"
 
 	"github.com/training-judge-center/backend/internal/domain/shared"
@@ -125,14 +124,7 @@ func (uc *AdminUpdateUserUseCase) Execute(ctx context.Context, input AdminUpdate
 	}
 
 	if err := uc.repo.Update(ctx, foundUser); err != nil {
-		if errors.Is(err, user.ErrNicknameConflict) {
-			return UserDTO{}, apperror.NewConflict("NICKNAME_ALREADY_EXISTS", "The nickname is already in use")
-		}
-		if errors.Is(err, user.ErrEmailConflict) {
-			return UserDTO{}, apperror.NewConflict("EMAIL_ALREADY_EXISTS", "The email is already in use")
-		}
-		slog.Error("failed to persist admin user update", "user_id", foundUser.ID(), "error", err)
-		return UserDTO{}, apperror.NewInternal()
+		return UserDTO{}, err
 	}
 
 	return userToDTO(foundUser), nil

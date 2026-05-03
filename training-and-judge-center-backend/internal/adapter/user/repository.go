@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 	"strings"
 	"time"
 
@@ -11,6 +12,7 @@ import (
 	"github.com/jackc/pgx/v5/pgconn"
 	infraPostgres "github.com/training-judge-center/backend/internal/adapter/postgres"
 	domainUser "github.com/training-judge-center/backend/internal/domain/user"
+	"github.com/training-judge-center/backend/pkg/apperror"
 )
 
 type UserRepository struct {
@@ -45,12 +47,13 @@ func (r *UserRepository) Save(ctx context.Context, u *domainUser.User) error {
 		if errors.As(err, &pgErr) && pgErr.Code == "23505" {
 			switch pgErr.ConstraintName {
 			case "users_email_key":
-				return domainUser.ErrEmailConflict
+				return apperror.NewConflict(domainUser.ErrCodeEmailConflict, "email already in use")
 			case "users_nickname_key":
-				return domainUser.ErrNicknameConflict
+				return apperror.NewConflict(domainUser.ErrCodeNicknameConflict, "nickname already in use")
 			}
 		}
-		return fmt.Errorf("failed to save user: %w", err)
+		slog.ErrorContext(ctx, "failed to save user", "error", err)
+		return apperror.NewInternal()
 	}
 
 	return nil
@@ -89,12 +92,13 @@ func (r *UserRepository) Update(ctx context.Context, u *domainUser.User) error {
 		if errors.As(err, &pgErr) && pgErr.Code == "23505" {
 			switch pgErr.ConstraintName {
 			case "users_nickname_key":
-				return domainUser.ErrNicknameConflict
+				return apperror.NewConflict(domainUser.ErrCodeNicknameConflict, "nickname already in use")
 			case "users_email_key":
-				return domainUser.ErrEmailConflict
+				return apperror.NewConflict(domainUser.ErrCodeEmailConflict, "email already in use")
 			}
 		}
-		return fmt.Errorf("failed to update user: %w", err)
+		slog.ErrorContext(ctx, "failed to update user", "error", err)
+		return apperror.NewInternal()
 	}
 
 	return nil

@@ -2,7 +2,6 @@ package user
 
 import (
 	"context"
-	"errors"
 	"testing"
 
 	"github.com/training-judge-center/backend/internal/domain/shared"
@@ -146,7 +145,7 @@ func TestUpdateUser_NicknameAlreadyExists(t *testing.T) {
 		return activeUser, nil
 	}
 	repo.updateFn = func(_ context.Context, _ *domain.User) error {
-		return domain.ErrNicknameConflict
+		return apperror.NewConflict(domain.ErrCodeNicknameConflict, "nickname already in use")
 	}
 	uc := NewUpdateUserUseCase(repo)
 
@@ -162,8 +161,8 @@ func TestUpdateUser_NicknameAlreadyExists(t *testing.T) {
 	if !ok {
 		t.Fatalf("expected *apperror.AppError, got %T", err)
 	}
-	if appErr.Code != "NICKNAME_ALREADY_EXISTS" {
-		t.Errorf("expected code NICKNAME_ALREADY_EXISTS, got %q", appErr.Code)
+	if appErr.Code != domain.ErrCodeNicknameConflict {
+		t.Errorf("expected code %q, got %q", domain.ErrCodeNicknameConflict, appErr.Code)
 	}
 }
 
@@ -194,7 +193,7 @@ func TestUpdateUser_RepositoryUpdateError(t *testing.T) {
 		return activeUser, nil
 	}
 	repo.updateFn = func(_ context.Context, _ *domain.User) error {
-		return errors.New("db connection lost")
+		return apperror.NewInternal()
 	}
 	uc := NewUpdateUserUseCase(repo)
 

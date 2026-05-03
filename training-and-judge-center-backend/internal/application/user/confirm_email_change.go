@@ -2,7 +2,6 @@ package user
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"log/slog"
 	"time"
@@ -82,11 +81,7 @@ func (uc *ConfirmEmailChangeUseCase) Execute(ctx context.Context, input ConfirmE
 		}
 		return nil
 	}); err != nil {
-		if errors.Is(err, user.ErrEmailConflict) {
-			return nil, apperror.NewConflict("EMAIL_ALREADY_EXISTS", "The email address is already in use")
-		}
-		slog.Error("failed to commit email change transaction", "user_id", input.UserID, "error", err)
-		return nil, apperror.NewInternal()
+		return nil, err
 	}
 
 	if err := uc.emailSender.Send(ctx, shared.EmailMessage{

@@ -2,7 +2,6 @@ package user
 
 import (
 	"context"
-	"errors"
 	"testing"
 
 	domain "github.com/training-judge-center/backend/internal/domain/user"
@@ -80,7 +79,7 @@ func TestCreateUser_ValidationErrors(t *testing.T) {
 func TestCreateUser_EmailAlreadyExists(t *testing.T) {
 	repo := newNoConflictRepo()
 	repo.saveFn = func(_ context.Context, _ *domain.User) error {
-		return domain.ErrEmailConflict
+		return apperror.NewConflict(domain.ErrCodeEmailConflict, "email already in use")
 	}
 	uc := NewCreateUserUseCase(repo)
 
@@ -93,15 +92,15 @@ func TestCreateUser_EmailAlreadyExists(t *testing.T) {
 	if !ok {
 		t.Fatalf("expected *apperror.AppError, got %T", err)
 	}
-	if appErr.Code != "EMAIL_ALREADY_EXISTS" {
-		t.Errorf("expected code EMAIL_ALREADY_EXISTS, got %q", appErr.Code)
+	if appErr.Code != domain.ErrCodeEmailConflict {
+		t.Errorf("expected code %q, got %q", domain.ErrCodeEmailConflict, appErr.Code)
 	}
 }
 
 func TestCreateUser_NicknameAlreadyExists(t *testing.T) {
 	repo := newNoConflictRepo()
 	repo.saveFn = func(_ context.Context, _ *domain.User) error {
-		return domain.ErrNicknameConflict
+		return apperror.NewConflict(domain.ErrCodeNicknameConflict, "nickname already in use")
 	}
 	uc := NewCreateUserUseCase(repo)
 
@@ -114,15 +113,15 @@ func TestCreateUser_NicknameAlreadyExists(t *testing.T) {
 	if !ok {
 		t.Fatalf("expected *apperror.AppError, got %T", err)
 	}
-	if appErr.Code != "NICKNAME_ALREADY_EXISTS" {
-		t.Errorf("expected code NICKNAME_ALREADY_EXISTS, got %q", appErr.Code)
+	if appErr.Code != domain.ErrCodeNicknameConflict {
+		t.Errorf("expected code %q, got %q", domain.ErrCodeNicknameConflict, appErr.Code)
 	}
 }
 
 func TestCreateUser_RepositorySaveError(t *testing.T) {
 	repo := newNoConflictRepo()
 	repo.saveFn = func(_ context.Context, _ *domain.User) error {
-		return errors.New("db connection lost")
+		return apperror.NewInternal()
 	}
 	uc := NewCreateUserUseCase(repo)
 
