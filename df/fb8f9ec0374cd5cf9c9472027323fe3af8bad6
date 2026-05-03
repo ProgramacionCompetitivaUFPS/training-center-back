@@ -1,0 +1,23 @@
+training-and-judge-center-backend/cmd/migrate/migrations/011_add_materials_fk_constraints.sql
+  831f15ef5516fb16 1-11
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.3.4",
+  "base_commit_sha": "dffb8f9ec0374cd5cf9c9472027323fe3af8bad6",
+  "prompts": {
+    "831f15ef5516fb16": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "36a70d75-40b8-4345-9ccd-b51a58845635",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "AlexaVJ",
+      "messages": [],
+      "total_additions": 11,
+      "total_deletions": 0,
+      "accepted_lines": 945,
+      "overriden_lines": 0
+    }
+  }
+}
