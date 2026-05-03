@@ -89,8 +89,8 @@ func TestAcceptInvite_PolicyChangedReturns403(t *testing.T) {
 	if !ok || ae.Code != domainGroup.ErrCodeInsufficientPermissions {
 		t.Fatalf("expected INSUFFICIENT_PERMISSIONS, got %v", err)
 	}
-	if ae.StatusCode != 403 {
-		t.Errorf("expected HTTP 403, got %d", ae.StatusCode)
+	if ae.Kind != apperror.KindForbidden {
+		t.Errorf("expected kind FORBIDDEN, got %s", ae.Kind)
 	}
 }
 
@@ -115,8 +115,8 @@ func TestAcceptInvite_AlreadyMemberReturns409(t *testing.T) {
 	if !ok || ae.Code != domainGroup.ErrCodeAlreadyMember {
 		t.Fatalf("expected ALREADY_MEMBER, got %v", err)
 	}
-	if ae.StatusCode != 409 {
-		t.Errorf("expected HTTP 409, got %d", ae.StatusCode)
+	if ae.Kind != apperror.KindConflict {
+		t.Errorf("expected kind CONFLICT, got %s", ae.Kind)
 	}
 }
 

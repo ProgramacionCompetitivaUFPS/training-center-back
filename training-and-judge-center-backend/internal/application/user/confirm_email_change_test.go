@@ -3,7 +3,6 @@ package user
 import (
 	"context"
 	"errors"
-	"net/http"
 	"testing"
 	"time"
 
@@ -105,8 +104,8 @@ func TestConfirmEmailChange_InvalidCode(t *testing.T) {
 	if !ok || appErr.Code != "INVALID_CODE" {
 		t.Errorf("expected INVALID_CODE error, got %v", err)
 	}
-	if appErr.StatusCode != http.StatusBadRequest {
-		t.Errorf("expected status 400, got %d", appErr.StatusCode)
+	if appErr.Kind != apperror.KindBadRequest {
+		t.Errorf("expected kind BAD_REQUEST, got %s", appErr.Kind)
 	}
 }
 

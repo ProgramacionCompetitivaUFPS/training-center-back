@@ -164,8 +164,8 @@ func TestConfirmDeactivation_ExpiredCode_UpdateFails_ReturnsInternal(t *testing.
 		t.Fatal("expected error, got nil")
 	}
 	appErr, ok := err.(*apperror.AppError)
-	if !ok || appErr.StatusCode != 500 {
-		t.Errorf("expected internal error (500), got %v", err)
+	if !ok || appErr.Kind != apperror.KindInternal {
+		t.Errorf("expected kind INTERNAL, got %v", err)
 	}
 }
 
@@ -195,8 +195,8 @@ func TestConfirmDeactivation_InvalidCode_UpdateFails_ReturnsInternal(t *testing.
 		t.Fatal("expected error, got nil")
 	}
 	appErr, ok := err.(*apperror.AppError)
-	if !ok || appErr.StatusCode != 500 {
-		t.Errorf("expected internal error (500), got %v", err)
+	if !ok || appErr.Kind != apperror.KindInternal {
+		t.Errorf("expected kind INTERNAL, got %v", err)
 	}
 }
 
@@ -226,8 +226,8 @@ func TestConfirmDeactivation_BlockedState_UpdateFails_ReturnsInternal(t *testing
 		t.Fatal("expected error, got nil")
 	}
 	appErr, ok := err.(*apperror.AppError)
-	if !ok || appErr.StatusCode != 500 {
-		t.Errorf("expected internal error (500), got %v", err)
+	if !ok || appErr.Kind != apperror.KindInternal {
+		t.Errorf("expected kind INTERNAL, got %v", err)
 	}
 }
 
@@ -347,8 +347,8 @@ func TestConfirmDeactivation_BlockExpired_UpdateFails_ReturnsInternal(t *testing
 		t.Fatal("expected error, got nil")
 	}
 	appErr, ok := err.(*apperror.AppError)
-	if !ok || appErr.StatusCode != 500 {
-		t.Errorf("expected internal error (500), got %v", err)
+	if !ok || appErr.Kind != apperror.KindInternal {
+		t.Errorf("expected kind INTERNAL, got %v", err)
 	}
 }
 

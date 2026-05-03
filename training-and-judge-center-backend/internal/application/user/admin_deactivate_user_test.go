@@ -3,7 +3,6 @@ package user
 import (
 	"context"
 	"errors"
-	"net/http"
 	"testing"
 	"time"
 
@@ -66,8 +65,8 @@ func TestAdminDeactivateUser_SelfDeactivation(t *testing.T) {
 		t.Errorf("expected ErrCannotSelfDeactivate, got %v", err)
 	}
 	appErr := err.(*apperror.AppError)
-	if appErr.StatusCode != http.StatusForbidden {
-		t.Errorf("expected status 403, got %d", appErr.StatusCode)
+	if appErr.Kind != apperror.KindForbidden {
+		t.Errorf("expected kind FORBIDDEN, got %s", appErr.Kind)
 	}
 }
 
@@ -101,8 +100,8 @@ func TestAdminDeactivateUser_CannotDeactivateAdmin(t *testing.T) {
 		t.Errorf("expected ErrCannotDeactivateAdmin, got %v", err)
 	}
 	appErr := err.(*apperror.AppError)
-	if appErr.StatusCode != http.StatusForbidden {
-		t.Errorf("expected status 403, got %d", appErr.StatusCode)
+	if appErr.Kind != apperror.KindForbidden {
+		t.Errorf("expected kind FORBIDDEN, got %s", appErr.Kind)
 	}
 }
 

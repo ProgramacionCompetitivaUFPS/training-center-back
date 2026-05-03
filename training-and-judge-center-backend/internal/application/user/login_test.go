@@ -3,7 +3,6 @@ package user
 import (
 	"context"
 	"errors"
-	"net/http"
 	"strings"
 	"testing"
 	"time"
@@ -126,8 +125,8 @@ func TestLogin_InvalidEmailFormat(t *testing.T) {
 	if appErr.Code != "INVALID_CREDENTIALS" {
 		t.Errorf("expected code INVALID_CREDENTIALS, got %q", appErr.Code)
 	}
-	if appErr.StatusCode != http.StatusUnauthorized {
-		t.Errorf("expected status 401, got %d", appErr.StatusCode)
+	if appErr.Kind != apperror.KindUnauthorized {
+		t.Errorf("expected kind UNAUTHORIZED, got %s", appErr.Kind)
 	}
 }
 
@@ -179,8 +178,8 @@ func TestLogin_DeactivatedAccount(t *testing.T) {
 	if appErr.Code != "ACCOUNT_DEACTIVATED" {
 		t.Errorf("expected code ACCOUNT_DEACTIVATED, got %q", appErr.Code)
 	}
-	if appErr.StatusCode != http.StatusForbidden {
-		t.Errorf("expected status 403, got %d", appErr.StatusCode)
+	if appErr.Kind != apperror.KindForbidden {
+		t.Errorf("expected kind FORBIDDEN, got %s", appErr.Kind)
 	}
 }
 

@@ -3,7 +3,6 @@ package user
 import (
 	"context"
 	"errors"
-	"net/http"
 	"testing"
 
 	"github.com/training-judge-center/backend/internal/domain/shared"
@@ -89,8 +88,8 @@ func TestListUsers_InvalidRole(t *testing.T) {
 	if appErr.Code != "VALIDATION_ERROR" {
 		t.Errorf("expected code VALIDATION_ERROR, got %q", appErr.Code)
 	}
-	if appErr.StatusCode != http.StatusBadRequest {
-		t.Errorf("expected status 400, got %d", appErr.StatusCode)
+	if appErr.Kind != apperror.KindValidation {
+		t.Errorf("expected kind VALIDATION, got %s", appErr.Kind)
 	}
 }
 

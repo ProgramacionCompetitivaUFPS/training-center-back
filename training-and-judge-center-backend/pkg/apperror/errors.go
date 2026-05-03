@@ -1,9 +1,6 @@
 package apperror
 
-import (
-	"errors"
-	"net/http"
-)
+import "errors"
 
 func AccumulateFieldErrors(err error, fieldErrs *[]FieldError) error {
 	if err == nil {
@@ -24,66 +21,66 @@ const (
 
 func NewValidation(details []FieldError) *AppError {
 	return &AppError{
-		Code:       ErrCodeValidationError,
-		Message:    "Invalid request data",
-		Details:    details,
-		StatusCode: http.StatusBadRequest,
+		Kind:    KindValidation,
+		Code:    ErrCodeValidationError,
+		Message: "Invalid request data",
+		Details: details,
 	}
 }
 
 func NewBadRequest(code, message string) *AppError {
 	return &AppError{
-		Code:       code,
-		Message:    message,
-		StatusCode: http.StatusBadRequest,
+		Kind:    KindBadRequest,
+		Code:    code,
+		Message: message,
 	}
 }
 
 func NewConflict(code, message string) *AppError {
 	return &AppError{
-		Code:       code,
-		Message:    message,
-		StatusCode: http.StatusConflict,
+		Kind:    KindConflict,
+		Code:    code,
+		Message: message,
 	}
 }
 
 func NewNotFound(code, message string) *AppError {
 	return &AppError{
-		Code:       code,
-		Message:    message,
-		StatusCode: http.StatusNotFound,
+		Kind:    KindNotFound,
+		Code:    code,
+		Message: message,
 	}
 }
 
 func NewUnauthorized(code, message string) *AppError {
 	return &AppError{
-		Code:       code,
-		Message:    message,
-		StatusCode: http.StatusUnauthorized,
+		Kind:    KindUnauthorized,
+		Code:    code,
+		Message: message,
 	}
 }
 
 func NewForbidden(code, message string) *AppError {
 	return &AppError{
-		Code:       code,
-		Message:    message,
-		StatusCode: http.StatusForbidden,
+		Kind:    KindForbidden,
+		Code:    code,
+		Message: message,
 	}
 }
 
 func NewInternal() *AppError {
 	return &AppError{
-		Code:       ErrCodeInternalError,
-		Message:    "An unexpected error occurred",
-		StatusCode: http.StatusInternalServerError,
+		Kind:    KindInternal,
+		Code:    ErrCodeInternalError,
+		Message: "An unexpected error occurred",
 	}
 }
 
 func NewServiceUnavailable(code, message string) *AppError {
 	return &AppError{
-		Code:       code,
-		Message:    message,
-		StatusCode: http.StatusServiceUnavailable,
+		Kind:    KindServiceUnavailable,
+		Code:    code,
+		Message: message,
 	}
 }
 
@@ -95,9 +92,9 @@ func NewTooManyRequests(code, message string, retryAfter int) *AppError {
 		message = "Too many requests. Please try again later"
 	}
 	return &AppError{
+		Kind:       KindTooManyRequests,
 		Code:       code,
 		Message:    message,
-		StatusCode: http.StatusTooManyRequests,
 		RetryAfter: retryAfter,
 	}
 }
