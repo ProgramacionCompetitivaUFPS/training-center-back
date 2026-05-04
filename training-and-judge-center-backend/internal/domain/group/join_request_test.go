@@ -1,15 +1,16 @@
-package group
+package group_test
 
 import (
 	"testing"
 
+	"github.com/training-judge-center/backend/internal/domain/group"
 	"github.com/training-judge-center/backend/internal/domain/shared"
 	"github.com/training-judge-center/backend/pkg/apperror"
 )
 
-func validJoinRequest(t *testing.T) *JoinRequest {
+func validJoinRequest(t *testing.T) *group.JoinRequest {
 	t.Helper()
-	req, err := NewJoinRequest("id-1", "g-1", shared.RestoreUserID("user-1"), nil, nil)
+	req, err := group.NewJoinRequest("id-1", "g-1", shared.RestoreUserID("user-1"), nil, nil)
 	if err != nil {
 		t.Fatalf("NewJoinRequest: %v", err)
 	}
@@ -17,21 +18,21 @@ func validJoinRequest(t *testing.T) *JoinRequest {
 }
 
 func TestNewJoinRequest_EmptyID(t *testing.T) {
-	_, err := NewJoinRequest("", "g-1", shared.RestoreUserID("user-1"), nil, nil)
+	_, err := group.NewJoinRequest("", "g-1", shared.RestoreUserID("user-1"), nil, nil)
 	if err == nil {
 		t.Fatal("expected error for empty id")
 	}
 }
 
 func TestNewJoinRequest_EmptyGroupID(t *testing.T) {
-	_, err := NewJoinRequest("id-1", "", shared.RestoreUserID("user-1"), nil, nil)
+	_, err := group.NewJoinRequest("id-1", "", shared.RestoreUserID("user-1"), nil, nil)
 	if err == nil {
 		t.Fatal("expected error for empty groupID")
 	}
 }
 
 func TestNewJoinRequest_EmptyRequesterUserID(t *testing.T) {
-	_, err := NewJoinRequest("id-1", "g-1", shared.RestoreUserID(""), nil, nil)
+	_, err := group.NewJoinRequest("id-1", "g-1", shared.RestoreUserID(""), nil, nil)
 	if err == nil {
 		t.Fatal("expected error for empty requesterUserID")
 	}
@@ -39,7 +40,7 @@ func TestNewJoinRequest_EmptyRequesterUserID(t *testing.T) {
 
 func TestNewJoinRequest_StartsAsPending(t *testing.T) {
 	req := validJoinRequest(t)
-	if req.Status() != JoinRequestStatusPending {
+	if req.Status() != group.JoinRequestStatusPending {
 		t.Errorf("expected PENDING, got %s", req.Status())
 	}
 }
@@ -49,7 +50,7 @@ func TestApprove_PendingBecomesApproved(t *testing.T) {
 	if err := req.Approve(); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if req.Status() != JoinRequestStatusApproved {
+	if req.Status() != group.JoinRequestStatusApproved {
 		t.Errorf("expected APPROVED, got %s", req.Status())
 	}
 }
@@ -63,7 +64,7 @@ func TestApprove_AlreadyApprovedReturnsError(t *testing.T) {
 		t.Fatal("expected error when approving already-approved request")
 	}
 	ae, ok := err.(*apperror.AppError)
-	if !ok || ae.Code != ErrCodeRequestAlreadyProcessed {
+	if !ok || ae.Code != group.ErrCodeRequestAlreadyProcessed {
 		t.Errorf("expected REQUEST_ALREADY_PROCESSED, got %v", err)
 	}
 }
@@ -77,7 +78,7 @@ func TestApprove_RejectedReturnsError(t *testing.T) {
 		t.Fatal("expected error when approving rejected request")
 	}
 	ae, ok := err.(*apperror.AppError)
-	if !ok || ae.Code != ErrCodeRequestAlreadyProcessed {
+	if !ok || ae.Code != group.ErrCodeRequestAlreadyProcessed {
 		t.Errorf("expected REQUEST_ALREADY_PROCESSED, got %v", err)
 	}
 }
@@ -87,7 +88,7 @@ func TestReject_PendingBecomesRejected(t *testing.T) {
 	if err := req.Reject(); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if req.Status() != JoinRequestStatusRejected {
+	if req.Status() != group.JoinRequestStatusRejected {
 		t.Errorf("expected REJECTED, got %s", req.Status())
 	}
 }
@@ -101,7 +102,7 @@ func TestReject_AlreadyRejectedReturnsError(t *testing.T) {
 		t.Fatal("expected error when rejecting already-rejected request")
 	}
 	ae, ok := err.(*apperror.AppError)
-	if !ok || ae.Code != ErrCodeRequestAlreadyProcessed {
+	if !ok || ae.Code != group.ErrCodeRequestAlreadyProcessed {
 		t.Errorf("expected REQUEST_ALREADY_PROCESSED, got %v", err)
 	}
 }
@@ -115,21 +116,21 @@ func TestReject_ApprovedReturnsError(t *testing.T) {
 		t.Fatal("expected error when rejecting approved request")
 	}
 	ae, ok := err.(*apperror.AppError)
-	if !ok || ae.Code != ErrCodeRequestAlreadyProcessed {
+	if !ok || ae.Code != group.ErrCodeRequestAlreadyProcessed {
 		t.Errorf("expected REQUEST_ALREADY_PROCESSED, got %v", err)
 	}
 }
 
 func TestNewJoinRequestStatus_ValidValues(t *testing.T) {
 	for _, s := range []string{"PENDING", "APPROVED", "REJECTED"} {
-		if _, err := NewJoinRequestStatus(s); err != nil {
+		if _, err := group.NewJoinRequestStatus(s); err != nil {
 			t.Errorf("unexpected error for valid status %q: %v", s, err)
 		}
 	}
 }
 
 func TestNewJoinRequestStatus_InvalidValue(t *testing.T) {
-	_, err := NewJoinRequestStatus("INVALID")
+	_, err := group.NewJoinRequestStatus("INVALID")
 	if err == nil {
 		t.Fatal("expected error for invalid status")
 	}

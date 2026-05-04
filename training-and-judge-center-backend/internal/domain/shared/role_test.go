@@ -1,21 +1,25 @@
-package shared
+package shared_test
 
-import "testing"
+import (
+	"testing"
+
+	"github.com/training-judge-center/backend/internal/domain/shared"
+)
 
 func TestNewRole_Valid(t *testing.T) {
 	tests := []struct {
 		name     string
 		input    string
-		expected Role
+		expected shared.Role
 	}{
-		{"admin role", "ADMIN", RoleAdmin},
-		{"coach role", "COACH", RoleCoach},
-		{"contestant role", "CONTESTANT", RoleContestant},
+		{"admin role", "ADMIN", shared.RoleAdmin},
+		{"coach role", "COACH", shared.RoleCoach},
+		{"contestant role", "CONTESTANT", shared.RoleContestant},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			role, err := NewRole(tt.input)
+			role, err := shared.NewRole(tt.input)
 			if err != nil {
 				t.Fatalf("expected no error, got %v", err)
 			}
@@ -39,7 +43,7 @@ func TestNewRole_Invalid(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			_, err := NewRole(tt.input)
+			_, err := shared.NewRole(tt.input)
 			if err == nil {
 				t.Errorf("expected error for input %q, got nil", tt.input)
 			}
@@ -48,17 +52,16 @@ func TestNewRole_Invalid(t *testing.T) {
 }
 
 func TestRole_IsValid(t *testing.T) {
+	var zeroRole shared.Role
 	tests := []struct {
 		name     string
-		role     Role
+		role     shared.Role
 		expected bool
 	}{
-		{"valid admin", RoleAdmin, true},
-		{"valid coach", RoleCoach, true},
-		{"valid contestant", RoleContestant, true},
-		{"arbitrary cast bypass", Role{value: "SUPERUSER"}, false},
-		{"empty role", Role{value: ""}, false},
-		{"lowercase bypass", Role{value: "admin"}, false},
+		{"valid admin", shared.RoleAdmin, true},
+		{"valid coach", shared.RoleCoach, true},
+		{"valid contestant", shared.RoleContestant, true},
+		{"zero value", zeroRole, false},
 	}
 
 	for _, tt := range tests {

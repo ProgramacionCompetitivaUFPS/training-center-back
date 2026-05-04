@@ -1,29 +1,31 @@
-package user
+package user_test
 
 import (
 	"testing"
 	"time"
+
+	"github.com/training-judge-center/backend/internal/domain/user"
 )
 
 func TestEmailChangeRequest_MarkAsUsed(t *testing.T) {
 	now := time.Now()
 
-	newReq := func(status RequestStatus) *EmailChangeRequest {
-		email, _ := NewEmail("new@example.com")
-		return RestoreEmailChangeRequest(
+	newReq := func(status user.RequestStatus) *user.EmailChangeRequest {
+		email, _ := user.NewEmail("new@example.com")
+		return user.RestoreEmailChangeRequest(
 			"req-id", "user-id", email, "code123",
 			status, now.Add(time.Hour), now, nil,
 		)
 	}
 
 	tests := []struct {
-		name      string
-		status    RequestStatus
-		wantErr   bool
+		name    string
+		status  user.RequestStatus
+		wantErr bool
 	}{
-		{"pending transitions to used", StatusPending, false},
-		{"used returns error", StatusUsed, true},
-		{"expired returns error", StatusExpired, true},
+		{"pending transitions to used", user.StatusPending, false},
+		{"used returns error", user.StatusUsed, true},
+		{"expired returns error", user.StatusExpired, true},
 	}
 
 	for _, tt := range tests {
@@ -36,7 +38,7 @@ func TestEmailChangeRequest_MarkAsUsed(t *testing.T) {
 			if !tt.wantErr && err != nil {
 				t.Errorf("expected no error, got %v", err)
 			}
-			if !tt.wantErr && req.Status() != StatusUsed {
+			if !tt.wantErr && req.Status() != user.StatusUsed {
 				t.Errorf("expected status USED, got %q", req.Status())
 			}
 		})

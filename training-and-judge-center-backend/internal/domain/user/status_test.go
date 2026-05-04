@@ -1,20 +1,24 @@
-package user
+package user_test
 
-import "testing"
+import (
+	"testing"
+
+	"github.com/training-judge-center/backend/internal/domain/user"
+)
 
 func TestNewStatus_Valid(t *testing.T) {
 	tests := []struct {
 		name     string
 		input    string
-		expected Status
+		expected user.Status
 	}{
-		{"active status", "ACTIVE", StatusActive},
-		{"deactivated status", "DEACTIVATED", StatusDeactivated},
+		{"active status", "ACTIVE", user.StatusActive},
+		{"deactivated status", "DEACTIVATED", user.StatusDeactivated},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			status, err := NewStatus(tt.input)
+			status, err := user.NewStatus(tt.input)
 			if err != nil {
 				t.Fatalf("expected no error, got %v", err)
 			}
@@ -38,7 +42,7 @@ func TestNewStatus_Invalid(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			_, err := NewStatus(tt.input)
+			_, err := user.NewStatus(tt.input)
 			if err == nil {
 				t.Errorf("expected error for input %q, got nil", tt.input)
 			}
@@ -47,16 +51,15 @@ func TestNewStatus_Invalid(t *testing.T) {
 }
 
 func TestStatus_IsValid(t *testing.T) {
+	var zeroStatus user.Status
 	tests := []struct {
 		name     string
-		status   Status
+		status   user.Status
 		expected bool
 	}{
-		{"valid active", StatusActive, true},
-		{"valid deactivated", StatusDeactivated, true},
-		{"arbitrary cast bypass", Status{value: "SUSPENDED"}, false},
-		{"empty status", Status{value: ""}, false},
-		{"lowercase bypass", Status{value: "active"}, false},
+		{"valid active", user.StatusActive, true},
+		{"valid deactivated", user.StatusDeactivated, true},
+		{"zero value", zeroStatus, false},
 	}
 
 	for _, tt := range tests {

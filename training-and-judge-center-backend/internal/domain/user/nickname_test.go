@@ -1,9 +1,10 @@
-package user
+package user_test
 
 import (
 	"testing"
 
 	"github.com/google/uuid"
+	"github.com/training-judge-center/backend/internal/domain/user"
 )
 
 func TestNewNickname_Valid(t *testing.T) {
@@ -26,7 +27,7 @@ func TestNewNickname_Valid(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			nick, err := NewNickname(tt.input)
+			nick, err := user.NewNickname(tt.input)
 			if err != nil {
 				t.Fatalf("expected no error, got %v", err)
 			}
@@ -59,7 +60,7 @@ func TestNewNickname_Invalid(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			_, err := NewNickname(tt.input)
+			_, err := user.NewNickname(tt.input)
 			if err == nil {
 				t.Fatal("expected error, got nil")
 			}
@@ -69,7 +70,7 @@ func TestNewNickname_Invalid(t *testing.T) {
 
 func TestNewNickname_AnonymousFormat(t *testing.T) {
 	raw := "user_anonimo_" + uuid.New().String()[:10]
-	_, err := NewNickname(raw)
+	_, err := user.NewNickname(raw)
 	if err != nil {
 		t.Errorf("anonymous nickname format %q must be valid, got: %v", raw, err)
 	}

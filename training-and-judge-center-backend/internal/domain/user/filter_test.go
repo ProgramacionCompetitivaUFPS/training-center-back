@@ -1,6 +1,10 @@
-package user
+package user_test
 
-import "testing"
+import (
+	"testing"
+
+	"github.com/training-judge-center/backend/internal/domain/user"
+)
 
 func TestNewUserFilter_ValidPageAndLimit(t *testing.T) {
 	tests := []struct {
@@ -16,7 +20,7 @@ func TestNewUserFilter_ValidPageAndLimit(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			_, err := NewUserFilter(nil, nil, "", "", "", SearchByAll, "", SortByCreatedAt, SortOrderDesc, tt.page, tt.limit)
+			_, err := user.NewUserFilter(nil, nil, "", "", "", user.SearchByAll, "", user.SortByCreatedAt, user.SortOrderDesc, tt.page, tt.limit)
 			if err != nil {
 				t.Errorf("expected no error for page=%d limit=%d, got %v", tt.page, tt.limit, err)
 			}
@@ -36,7 +40,7 @@ func TestNewUserFilter_InvalidPage(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			_, err := NewUserFilter(nil, nil, "", "", "", SearchByAll, "", SortByCreatedAt, SortOrderDesc, tt.page, 20)
+			_, err := user.NewUserFilter(nil, nil, "", "", "", user.SearchByAll, "", user.SortByCreatedAt, user.SortOrderDesc, tt.page, 20)
 			if err == nil {
 				t.Errorf("expected error for page=%d, got nil", tt.page)
 			}
@@ -57,7 +61,7 @@ func TestNewUserFilter_InvalidLimit(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			_, err := NewUserFilter(nil, nil, "", "", "", SearchByAll, "", SortByCreatedAt, SortOrderDesc, 1, tt.limit)
+			_, err := user.NewUserFilter(nil, nil, "", "", "", user.SearchByAll, "", user.SortByCreatedAt, user.SortOrderDesc, 1, tt.limit)
 			if err == nil {
 				t.Errorf("expected error for limit=%d, got nil", tt.limit)
 			}
@@ -69,18 +73,18 @@ func TestNewSortField_Valid(t *testing.T) {
 	tests := []struct {
 		name     string
 		input    string
-		expected SortField
+		expected user.SortField
 	}{
-		{"createdAt", "createdAt", SortByCreatedAt},
-		{"name", "name", SortByName},
-		{"nickname", "nickname", SortByNickname},
-		{"email", "email", SortByEmail},
-		{"deactivatedAt", "deactivatedAt", SortByDeactivatedAt},
+		{"createdAt", "createdAt", user.SortByCreatedAt},
+		{"name", "name", user.SortByName},
+		{"nickname", "nickname", user.SortByNickname},
+		{"email", "email", user.SortByEmail},
+		{"deactivatedAt", "deactivatedAt", user.SortByDeactivatedAt},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := NewSortField(tt.input)
+			got, err := user.NewSortField(tt.input)
 			if err != nil {
 				t.Fatalf("expected no error, got %v", err)
 			}
@@ -105,7 +109,7 @@ func TestNewSortField_Invalid(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			_, err := NewSortField(tt.input)
+			_, err := user.NewSortField(tt.input)
 			if err == nil {
 				t.Errorf("expected error for input %q, got nil", tt.input)
 			}
@@ -117,18 +121,18 @@ func TestNewSortOrder_Valid(t *testing.T) {
 	tests := []struct {
 		name     string
 		input    string
-		expected SortOrder
+		expected user.SortOrder
 	}{
-		{"lowercase asc", "asc", SortOrderAsc},
-		{"lowercase desc", "desc", SortOrderDesc},
-		{"uppercase ASC", "ASC", SortOrderAsc},
-		{"uppercase DESC", "DESC", SortOrderDesc},
-		{"mixed case Asc", "Asc", SortOrderAsc},
+		{"lowercase asc", "asc", user.SortOrderAsc},
+		{"lowercase desc", "desc", user.SortOrderDesc},
+		{"uppercase ASC", "ASC", user.SortOrderAsc},
+		{"uppercase DESC", "DESC", user.SortOrderDesc},
+		{"mixed case Asc", "Asc", user.SortOrderAsc},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := NewSortOrder(tt.input)
+			got, err := user.NewSortOrder(tt.input)
 			if err != nil {
 				t.Fatalf("expected no error, got %v", err)
 			}
@@ -152,7 +156,7 @@ func TestNewSortOrder_Invalid(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			_, err := NewSortOrder(tt.input)
+			_, err := user.NewSortOrder(tt.input)
 			if err == nil {
 				t.Errorf("expected error for input %q, got nil", tt.input)
 			}
@@ -164,18 +168,18 @@ func TestNewSearchField_Valid(t *testing.T) {
 	tests := []struct {
 		name     string
 		input    string
-		expected SearchField
+		expected user.SearchField
 	}{
-		{"name", "name", SearchByName},
-		{"nickname", "nickname", SearchByNickname},
-		{"email", "email", SearchByEmail},
-		{"institution", "institution", SearchByInstitution},
-		{"all", "all", SearchByAll},
+		{"name", "name", user.SearchByName},
+		{"nickname", "nickname", user.SearchByNickname},
+		{"email", "email", user.SearchByEmail},
+		{"institution", "institution", user.SearchByInstitution},
+		{"all", "all", user.SearchByAll},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := NewSearchField(tt.input)
+			got, err := user.NewSearchField(tt.input)
 			if err != nil {
 				t.Fatalf("expected no error, got %v", err)
 			}
@@ -200,7 +204,7 @@ func TestNewSearchField_Invalid(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			_, err := NewSearchField(tt.input)
+			_, err := user.NewSearchField(tt.input)
 			if err == nil {
 				t.Errorf("expected error for input %q, got nil", tt.input)
 			}

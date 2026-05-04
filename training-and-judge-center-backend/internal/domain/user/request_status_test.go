@@ -1,20 +1,24 @@
-package user
+package user_test
 
-import "testing"
+import (
+	"testing"
+
+	"github.com/training-judge-center/backend/internal/domain/user"
+)
 
 func TestNewRequestStatus_Valid(t *testing.T) {
 	tests := []struct {
 		input    string
-		expected RequestStatus
+		expected user.RequestStatus
 	}{
-		{"PENDING", StatusPending},
-		{"USED", StatusUsed},
-		{"EXPIRED", StatusExpired},
+		{"PENDING", user.StatusPending},
+		{"USED", user.StatusUsed},
+		{"EXPIRED", user.StatusExpired},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.input, func(t *testing.T) {
-			got, err := NewRequestStatus(tt.input)
+			got, err := user.NewRequestStatus(tt.input)
 			if err != nil {
 				t.Fatalf("expected no error, got %v", err)
 			}
@@ -38,7 +42,7 @@ func TestNewRequestStatus_Invalid(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			_, err := NewRequestStatus(tt.input)
+			_, err := user.NewRequestStatus(tt.input)
 			if err == nil {
 				t.Errorf("expected error for input %q, got nil", tt.input)
 			}
