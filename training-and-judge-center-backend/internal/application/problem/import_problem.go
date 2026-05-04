@@ -1,4 +1,4 @@
-package problem
+﻿package problem
 
 import (
 	"context"
@@ -11,6 +11,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/training-judge-center/backend/internal/domain/problem"
 	"github.com/training-judge-center/backend/internal/domain/shared"
+	appshared "github.com/training-judge-center/backend/internal/application/shared"
 	"github.com/training-judge-center/backend/pkg/apperror"
 	"golang.org/x/sync/errgroup"
 )
@@ -18,7 +19,7 @@ import (
 type ImportProblemInput struct {
 	Slug        string
 	ZipData     []byte
-	CurrentUser shared.CurrentUser
+	CurrentUser appshared.CurrentUser
 }
 
 type ImportProblemResult struct {

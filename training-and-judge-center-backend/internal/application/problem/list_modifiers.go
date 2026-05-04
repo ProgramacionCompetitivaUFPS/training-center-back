@@ -1,16 +1,17 @@
-package problem
+﻿package problem
 
 import (
 	"context"
 
 	"github.com/training-judge-center/backend/internal/domain/problem"
 	"github.com/training-judge-center/backend/internal/domain/shared"
+	appshared "github.com/training-judge-center/backend/internal/application/shared"
 	"github.com/training-judge-center/backend/pkg/apperror"
 )
 
 type ListModifiersInput struct {
 	Slug        string
-	CurrentUser shared.CurrentUser
+	CurrentUser appshared.CurrentUser
 }
 
 type ListModifiersUseCase struct {
