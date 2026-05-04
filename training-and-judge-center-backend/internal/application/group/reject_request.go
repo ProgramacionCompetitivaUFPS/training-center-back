@@ -1,11 +1,11 @@
-package group
+﻿package group
 
 import (
 	"context"
 	"log/slog"
 
 	domainGroup "github.com/training-judge-center/backend/internal/domain/group"
-	"github.com/training-judge-center/backend/internal/domain/shared"
+	"github.com/training-judge-center/backend/internal/application/shared"
 	"github.com/training-judge-center/backend/pkg/apperror"
 )
 

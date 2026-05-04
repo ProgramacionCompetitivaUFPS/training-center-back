@@ -1,4 +1,4 @@
-package material
+﻿package material
 
 import (
 	"context"
@@ -7,11 +7,12 @@ import (
 	"github.com/google/uuid"
 	domainMaterial "github.com/training-judge-center/backend/internal/domain/material"
 	"github.com/training-judge-center/backend/internal/domain/shared"
+	appshared "github.com/training-judge-center/backend/internal/application/shared"
 	"github.com/training-judge-center/backend/pkg/apperror"
 )
 
 type CreateMaterialInput struct {
-	CurrentUser shared.CurrentUser
+	CurrentUser appshared.CurrentUser
 	GroupID     string
 	Title       string
 	Content     *string

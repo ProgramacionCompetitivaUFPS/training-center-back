@@ -1,4 +1,4 @@
-package group
+﻿package group
 
 import (
 	"net/http"
@@ -6,7 +6,7 @@ import (
 	"github.com/training-judge-center/backend/internal/adapter/http/handler"
 	"github.com/training-judge-center/backend/internal/adapter/http/middleware"
 	appGroup "github.com/training-judge-center/backend/internal/application/group"
-	"github.com/training-judge-center/backend/internal/domain/shared"
+	"github.com/training-judge-center/backend/internal/application/shared"
 	"github.com/training-judge-center/backend/pkg/apperror"
 )
 

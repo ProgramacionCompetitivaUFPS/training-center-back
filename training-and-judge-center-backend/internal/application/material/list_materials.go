@@ -1,4 +1,4 @@
-package material
+﻿package material
 
 import (
 	"context"
@@ -6,7 +6,7 @@ import (
 	"log/slog"
 
 	domainMaterial "github.com/training-judge-center/backend/internal/domain/material"
-	"github.com/training-judge-center/backend/internal/domain/shared"
+	"github.com/training-judge-center/backend/internal/application/shared"
 	"github.com/training-judge-center/backend/pkg/apperror"
 )
 

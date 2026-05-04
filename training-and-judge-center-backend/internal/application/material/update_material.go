@@ -1,4 +1,4 @@
-package material
+﻿package material
 
 import (
 	"context"
@@ -6,11 +6,12 @@ import (
 
 	domainMaterial "github.com/training-judge-center/backend/internal/domain/material"
 	"github.com/training-judge-center/backend/internal/domain/shared"
+	appshared "github.com/training-judge-center/backend/internal/application/shared"
 	"github.com/training-judge-center/backend/pkg/apperror"
 )
 
 type UpdateMaterialInput struct {
-	CurrentUser shared.CurrentUser
+	CurrentUser appshared.CurrentUser
 	// GroupID scopes the operation: the material must belong to this group.
 	// A material whose GroupID differs from this value is treated as not found.
 	GroupID     string

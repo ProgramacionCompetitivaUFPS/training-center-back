@@ -1,4 +1,4 @@
-package problem
+﻿package problem
 
 import (
 	"io"
@@ -8,7 +8,7 @@ import (
 	"github.com/training-judge-center/backend/internal/adapter/http/handler"
 	"github.com/training-judge-center/backend/internal/adapter/http/middleware"
 	appProblem "github.com/training-judge-center/backend/internal/application/problem"
-	"github.com/training-judge-center/backend/internal/domain/shared"
+	"github.com/training-judge-center/backend/internal/application/shared"
 	"github.com/training-judge-center/backend/pkg/apperror"
 )
 

@@ -1,4 +1,4 @@
-package group
+﻿package group
 
 import (
 	"context"
@@ -7,6 +7,7 @@ import (
 
 	domainGroup "github.com/training-judge-center/backend/internal/domain/group"
 	"github.com/training-judge-center/backend/internal/domain/shared"
+	appshared "github.com/training-judge-center/backend/internal/application/shared"
 	"github.com/training-judge-center/backend/pkg/apperror"
 )
 
@@ -120,8 +121,8 @@ func mustGroup(t *testing.T, id, name string, visibility domainGroup.Visibility,
 	return g
 }
 
-func currentUser(id string, role shared.Role) shared.CurrentUser {
-	return shared.CurrentUser{ID: id, Role: role}
+func currentUser(id string, role shared.Role) appshared.CurrentUser {
+	return appshared.CurrentUser{ID: id, Role: role}
 }
 
 type fakeJoinRequestRepo struct {

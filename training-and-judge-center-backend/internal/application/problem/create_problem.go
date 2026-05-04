@@ -1,4 +1,4 @@
-package problem
+﻿package problem
 
 import (
 	"context"
@@ -8,6 +8,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/training-judge-center/backend/internal/domain/problem"
 	"github.com/training-judge-center/backend/internal/domain/shared"
+	appshared "github.com/training-judge-center/backend/internal/application/shared"
 	"github.com/training-judge-center/backend/pkg/apperror"
 )
 
@@ -25,7 +26,7 @@ type CreateProblemInput struct {
 	MemoryLimit   *int
 	LangOverrides []LanguageOverrideInput
 	Tags          []string
-	CurrentUser   shared.CurrentUser
+	CurrentUser   appshared.CurrentUser
 }
 
 type CreateProblemResult struct {

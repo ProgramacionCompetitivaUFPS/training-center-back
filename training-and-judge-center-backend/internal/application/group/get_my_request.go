@@ -1,16 +1,17 @@
-package group
+﻿package group
 
 import (
 	"context"
 
 	domainGroup "github.com/training-judge-center/backend/internal/domain/group"
 	"github.com/training-judge-center/backend/internal/domain/shared"
+	appshared "github.com/training-judge-center/backend/internal/application/shared"
 	"github.com/training-judge-center/backend/pkg/apperror"
 )
 
 type GetMyRequestInput struct {
 	GroupID     string
-	CurrentUser shared.CurrentUser
+	CurrentUser appshared.CurrentUser
 }
 
 type GetMyRequestOutput struct {

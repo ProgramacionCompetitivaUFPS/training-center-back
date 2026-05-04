@@ -1,4 +1,4 @@
-package problem
+﻿package problem
 
 import (
 	"context"
@@ -6,6 +6,7 @@ import (
 
 	"github.com/training-judge-center/backend/internal/domain/problem"
 	"github.com/training-judge-center/backend/internal/domain/shared"
+	appshared "github.com/training-judge-center/backend/internal/application/shared"
 	"github.com/training-judge-center/backend/pkg/apperror"
 )
 
@@ -18,7 +19,7 @@ type UpdateProblemInput struct {
 	LangOverrides []LanguageOverrideInput
 	Tags          []string
 	Accessibility *string
-	CurrentUser   shared.CurrentUser
+	CurrentUser   appshared.CurrentUser
 }
 
 type UpdateProblemResult struct {

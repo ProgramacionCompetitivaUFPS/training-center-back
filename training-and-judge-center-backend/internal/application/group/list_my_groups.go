@@ -1,4 +1,4 @@
-package group
+﻿package group
 
 import (
 	"context"
@@ -8,11 +8,12 @@ import (
 
 	domainGroup "github.com/training-judge-center/backend/internal/domain/group"
 	"github.com/training-judge-center/backend/internal/domain/shared"
+	appshared "github.com/training-judge-center/backend/internal/application/shared"
 	"github.com/training-judge-center/backend/pkg/apperror"
 )
 
 type ListMyGroupsInput struct {
-	CurrentUser shared.CurrentUser
+	CurrentUser appshared.CurrentUser
 	Role        *string
 	Search      string
 	SortBy      string

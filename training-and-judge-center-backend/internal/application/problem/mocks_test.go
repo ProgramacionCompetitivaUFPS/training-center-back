@@ -1,4 +1,4 @@
-package problem
+﻿package problem
 
 import (
 	"context"
@@ -6,6 +6,7 @@ import (
 
 	domainProblem "github.com/training-judge-center/backend/internal/domain/problem"
 	"github.com/training-judge-center/backend/internal/domain/shared"
+	appshared "github.com/training-judge-center/backend/internal/application/shared"
 )
 
 var testNow = time.Date(2024, 1, 15, 10, 0, 0, 0, time.UTC)
@@ -138,9 +139,9 @@ func newDefaultSettings() *domainProblem.PlatformSettings {
 
 // ── CurrentUser helpers ──────────────────────────────────────────────────────
 
-func asCoach(id string) shared.CurrentUser      { return shared.CurrentUser{ID: id, Role: shared.RoleCoach} }
-func asAdmin(id string) shared.CurrentUser      { return shared.CurrentUser{ID: id, Role: shared.RoleAdmin} }
-func asContestant(id string) shared.CurrentUser { return shared.CurrentUser{ID: id, Role: shared.RoleContestant} }
+func asCoach(id string) appshared.CurrentUser      { return appshared.CurrentUser{ID: id, Role: shared.RoleCoach} }
+func asAdmin(id string) appshared.CurrentUser      { return appshared.CurrentUser{ID: id, Role: shared.RoleAdmin} }
+func asContestant(id string) appshared.CurrentUser { return appshared.CurrentUser{ID: id, Role: shared.RoleContestant} }
 
 // ── Problem fixtures ─────────────────────────────────────────────────────────
 
