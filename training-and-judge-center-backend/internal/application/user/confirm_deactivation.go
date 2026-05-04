@@ -6,7 +6,6 @@ import (
 	"log/slog"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/training-judge-center/backend/internal/application/shared"
 	"github.com/training-judge-center/backend/internal/domain/user"
 	"github.com/training-judge-center/backend/pkg/apperror"
@@ -77,7 +76,7 @@ func (uc *ConfirmDeactivationUseCase) Execute(ctx context.Context, input Confirm
 	}
 	if req.IsBlocked() {
 		// Block period has expired — invalidate the request entirely; user must start a new one
-		req.MarkAsExpired()
+		req.MarkAsExpired(now)
 		if err := uc.deactRepo.Update(ctx, req); err != nil {
 			slog.Error("failed to mark expired deactivation request", "user_id", input.UserID, "error", err)
 			return apperror.NewInternal()
@@ -87,7 +86,7 @@ func (uc *ConfirmDeactivationUseCase) Execute(ctx context.Context, input Confirm
 
 	// Code expiration validation
 	if req.IsExpired(now) {
-		req.MarkAsExpired()
+		req.MarkAsExpired(now)
 		if err := uc.deactRepo.Update(ctx, req); err != nil {
 			slog.Error("failed to mark expired deactivation request", "user_id", input.UserID, "error", err)
 			return apperror.NewInternal()
@@ -97,7 +96,7 @@ func (uc *ConfirmDeactivationUseCase) Execute(ctx context.Context, input Confirm
 
 	// Code match validation
 	if subtle.ConstantTimeCompare([]byte(req.VerificationCode()), []byte(input.Code)) != 1 {
-		req.RegisterFailure()
+		req.RegisterFailure(now)
 
 		if req.IsBlocked() {
 			if err := uc.deactRepo.Update(ctx, req); err != nil {
@@ -125,7 +124,7 @@ func (uc *ConfirmDeactivationUseCase) Execute(ctx context.Context, input Confirm
 		return apperror.NewInternal()
 	}
 
-	req.Confirm()
+	req.Confirm(now)
 
 	if err := uc.txManager.WithTx(ctx, func(txCtx context.Context) error {
 		if err := uc.userRepo.Update(txCtx, foundUser); err != nil {
@@ -146,7 +145,7 @@ func (uc *ConfirmDeactivationUseCase) Execute(ctx context.Context, input Confirm
 		sessionErr = ErrSessionsNotInvalidated
 	}
 
-	auditLog := user.RestoreDeactivationAuditLog(uuid.NewString(), foundUser.ID(), originalEmailStr, originalNicknameStr, now, input.IP, input.UserAgent)
+	auditLog := user.NewDeactivationAuditLog(foundUser.ID(), originalEmailStr, originalNicknameStr, now, input.IP, input.UserAgent)
 	if err := uc.auditRepo.Save(ctx, auditLog); err != nil {
 		slog.Error("failed to save deactivation audit log", "user_id", foundUser.ID(), "error", err)
 	}

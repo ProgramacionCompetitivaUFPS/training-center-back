@@ -6,7 +6,6 @@ import (
 	"log/slog"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/training-judge-center/backend/internal/application/shared"
 	"github.com/training-judge-center/backend/internal/domain/user"
 	"github.com/training-judge-center/backend/pkg/apperror"
@@ -80,7 +79,7 @@ func (uc *RequestPasswordRecoveryUseCase) Execute(ctx context.Context, input Req
 		return apperror.NewInternal()
 	}
 
-	req, err := user.NewPasswordRecoveryRequest(uuid.NewString(), foundUser.ID(), code, now)
+	req, err := user.NewPasswordRecoveryRequest(foundUser.ID(), code, now)
 	if err != nil {
 		slog.Error("failed to build password recovery request", "user_id", foundUser.ID(), "error", err)
 		return apperror.NewInternal()

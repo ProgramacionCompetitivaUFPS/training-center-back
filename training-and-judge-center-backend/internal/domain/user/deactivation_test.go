@@ -99,7 +99,7 @@ func TestRegisterFailure(t *testing.T) {
 			before := time.Now()
 			req := newRequest(tt.initialAttempts)
 
-			req.RegisterFailure()
+			req.RegisterFailure(before)
 
 			if req.Attempts() != tt.initialAttempts+1 {
 				t.Errorf("attempts: got %d, want %d", req.Attempts(), tt.initialAttempts+1)

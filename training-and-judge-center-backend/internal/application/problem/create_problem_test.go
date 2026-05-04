@@ -2,7 +2,6 @@ package problem
 
 import (
 	"context"
-	"errors"
 	"testing"
 
 	domainProblem "github.com/training-judge-center/backend/internal/domain/problem"
@@ -135,8 +134,8 @@ func TestCreateProblem_InvalidTag(t *testing.T) {
 
 func TestCreateProblem_SlugAlreadyExists(t *testing.T) {
 	repo := &mockProblemRepository{
-		saveFn: func(_ context.Context, p *domainProblem.Problem) error {
-			return &domainProblem.ErrSlugAlreadyExists{Slug: p.Slug().String()}
+		saveFn: func(_ context.Context, _ *domainProblem.Problem) error {
+			return apperror.NewConflict(domainProblem.ErrCodeSlugAlreadyExists, "slug already in use")
 		},
 	}
 	uc := NewCreateProblemUseCase(repo, newDefaultSettings())
@@ -150,15 +149,15 @@ func TestCreateProblem_SlugAlreadyExists(t *testing.T) {
 	if !ok {
 		t.Fatalf("expected *apperror.AppError, got %T", err)
 	}
-	if appErr.Code != ErrCodeProblemSlugAlreadyExists {
-		t.Errorf("expected %q, got %q", ErrCodeProblemSlugAlreadyExists, appErr.Code)
+	if appErr.Code != domainProblem.ErrCodeSlugAlreadyExists {
+		t.Errorf("expected %q, got %q", domainProblem.ErrCodeSlugAlreadyExists, appErr.Code)
 	}
 }
 
 func TestCreateProblem_RepositoryError(t *testing.T) {
 	repo := &mockProblemRepository{
 		saveFn: func(_ context.Context, _ *domainProblem.Problem) error {
-			return errors.New("db connection lost")
+			return apperror.NewInternal()
 		},
 	}
 	uc := NewCreateProblemUseCase(repo, newDefaultSettings())

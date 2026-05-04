@@ -67,7 +67,7 @@ func (uc *ImportProblemUseCase) Execute(ctx context.Context, input ImportProblem
 		return nil, apperror.NewInternal()
 	}
 	if exists {
-		return nil, apperror.NewConflict(ErrCodeProblemSlugAlreadyExists, "A problem with slug '"+slug.String()+"' already exists")
+		return nil, apperror.NewConflict(problem.ErrCodeSlugAlreadyExists, "A problem with slug '"+slug.String()+"' already exists")
 	}
 
 	pkg, err := uc.packageParser.ParsePackageZip(input.ZipData)
