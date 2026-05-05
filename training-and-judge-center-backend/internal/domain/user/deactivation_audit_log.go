@@ -3,7 +3,7 @@ package user
 import (
 	"time"
 
-	"github.com/google/uuid"
+	"github.com/training-judge-center/backend/pkg/apperror"
 )
 
 type DeactivationAuditLog struct {
@@ -16,16 +16,19 @@ type DeactivationAuditLog struct {
 	userAgent        *string
 }
 
-func NewDeactivationAuditLog(userID, originalEmail, originalNickname string, occurredAt time.Time, ip, userAgent *string) *DeactivationAuditLog {
+func NewDeactivationAuditLog(id, userID, originalEmail, originalNickname string, occurredAt time.Time, ip, userAgent *string) (*DeactivationAuditLog, error) {
+	if id == "" {
+		return nil, apperror.NewInternal()
+	}
 	return &DeactivationAuditLog{
-		id:               uuid.New().String(),
+		id:               id,
 		userID:           userID,
 		originalEmail:    originalEmail,
 		originalNickname: originalNickname,
 		occurredAt:       occurredAt,
 		ip:               ip,
 		userAgent:        userAgent,
-	}
+	}, nil
 }
 
 func RestoreDeactivationAuditLog(id, userID, originalEmail, originalNickname string, occurredAt time.Time, ip, userAgent *string) *DeactivationAuditLog {

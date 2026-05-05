@@ -8,6 +8,7 @@ import (
 	"math/big"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/training-judge-center/backend/internal/application/shared"
 	"github.com/training-judge-center/backend/internal/domain/user"
 	"github.com/training-judge-center/backend/pkg/apperror"
@@ -83,7 +84,8 @@ func (uc *RequestEmailChangeUseCase) Execute(ctx context.Context, input RequestE
 
 	now := time.Now()
 
-	req, err := user.NewEmailChangeRequest(input.UserID, parsedNewEmail, code, now)
+	newID := uuid.New().String()
+	req, err := user.NewEmailChangeRequest(newID, input.UserID, parsedNewEmail, code, now)
 	if err != nil {
 		slog.Error("failed to build email change request", "user_id", input.UserID, "error", err)
 		return apperror.NewInternal()

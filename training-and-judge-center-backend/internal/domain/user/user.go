@@ -4,7 +4,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/training-judge-center/backend/internal/domain/shared"
 	"github.com/training-judge-center/backend/pkg/apperror"
 )
@@ -40,7 +39,10 @@ func (u *User) CreatedAt() time.Time         { return u.createdAt }
 func (u *User) UpdatedAt() *time.Time        { return u.updatedAt }
 func (u *User) DeactivatedAt() *time.Time    { return u.deactivatedAt }
 
-func NewUser(email Email, password Password, name string, nickname Nickname, country, city, institution string) (*User, error) {
+func NewUser(id string, now time.Time, email Email, password Password, name string, nickname Nickname, country, city, institution string) (*User, error) {
+	if id == "" {
+		return nil, apperror.NewInternal()
+	}
 	var fieldErrs []apperror.FieldError
 	if strings.TrimSpace(name) == "" {
 		fieldErrs = append(fieldErrs, apperror.FieldError{Field: "name", Message: "name is required"})
@@ -59,7 +61,7 @@ func NewUser(email Email, password Password, name string, nickname Nickname, cou
 	}
 
 	return &User{
-		id:          uuid.New().String(),
+		id:          id,
 		email:       &email,
 		password:    password,
 		name:        name,
@@ -69,7 +71,7 @@ func NewUser(email Email, password Password, name string, nickname Nickname, cou
 		institution: institution,
 		role:        shared.RoleContestant,
 		status:      StatusActive,
-		createdAt:   time.Now(),
+		createdAt:   now,
 	}, nil
 }
 
@@ -154,20 +156,20 @@ func (u *User) UpdateEmail(newEmail Email) error {
 	return nil
 }
 
-func (u *User) Deactivate() error {
+func (u *User) Deactivate(anonymousSuffix string, now time.Time) error {
 	if u.status == StatusDeactivated {
 		return apperror.NewConflict(ErrCodeAlreadyDeactivated, "user is already deactivated")
 	}
-	anonymousNickname, err := NewNickname("user_anonimo_" + uuid.New().String()[:10])
+	anonymousNickname, err := NewNickname("user_anonimo_" + anonymousSuffix)
 	if err != nil {
 		return apperror.NewInternal()
 	}
-	now := time.Now()
+	t := now.UTC()
 	u.nickname = anonymousNickname
 	u.email = nil
 	u.status = StatusDeactivated
-	u.deactivatedAt = &now
-	u.updatedAt = &now
+	u.deactivatedAt = &t
+	u.updatedAt = &t
 	return nil
 }
 

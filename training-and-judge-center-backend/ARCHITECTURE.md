@@ -527,84 +527,87 @@ En la práctica, la mayoría de los helpers de la capa de aplicación no reciben
 
 ---
 
-### D10 — El tiempo en aggregates: `now time.Time` como parámetro
+### D10 — El dominio no tiene efectos de lado ni fuentes de no determinismo
 
-`time.Now()` es I/O — lee el reloj del sistema. El dominio es lógica pura: no hace I/O. Ningún archivo de `domain/` llama `time.Now()` directamente ni almacena una función que lo llame.
+El dominio es lógica pura: dadas las mismas entradas, produce siempre las mismas salidas. Cualquier fuente de no determinismo — el reloj, un generador de UUIDs, números aleatorios, lecturas de entorno, llamadas de red — es I/O. El dominio no hace I/O.
 
-**Regla:** todo constructor o método de dominio que necesita la hora actual recibe `now time.Time` como parámetro explícito. El use case llama `time.Now()` una sola vez y lo pasa hacia adentro. El dominio solo recibe datos y los procesa.
+**Regla general:** si un constructor o método de dominio necesita un valor que no puede calcular desde sus argumentos de manera determinista, ese valor se recibe como parámetro desde `application/`. El dominio recibe datos; la capa de aplicación hace el I/O.
+
+| Fuente de no determinismo | Solución en el dominio | Quién genera el valor |
+|---|---|---|
+| Hora actual (`time.Now()`) | Parámetro `now time.Time` | Use case |
+| ID de entidad (`uuid.New()`) | Parámetro `id string` | Use case |
+| Número aleatorio (`rand.*`) | Parámetro del tipo apropiado | Use case |
+| Variable de entorno (`os.Getenv`) | Parámetro de configuración | Composition root |
+
+**Patrón para constructores:** reciben `id string` como primer parámetro y `now time.Time` cuando necesitan un timestamp de creación. El constructor valida `id == ""` con `apperror.NewInternal()` si retorna error.
 
 ```go
-// ✅ — el aggregate no sabe qué hora es; recibe la hora como dato
-func NewGroup(id string, name GroupName, ..., now time.Time) (*Group, error) {
-    if id == "" {
+// ✅ — el aggregate recibe id y now como datos
+func NewEmailChangeRequest(id, userID string, newEmail Email, code string, now time.Time) (*EmailChangeRequest, error) {
+    if id == "" || userID == "" {
         return nil, apperror.NewInternal()
     }
-    return &Group{
+    return &EmailChangeRequest{
         id:        id,
-        name:      name,
+        expiresAt: now.UTC().Add(15 * time.Minute),
         createdAt: now.UTC(),
-        updatedAt: now.UTC(),
-        ...
     }, nil
 }
 
+// ❌ — el aggregate genera I/O directamente
+func NewEmailChangeRequest(userID string, ...) (*EmailChangeRequest, error) {
+    return &EmailChangeRequest{
+        id:        uuid.New().String(),  // no determinista
+        createdAt: time.Now(),           // no determinista
+    }, nil
+}
+```
+
+**Patrón para métodos de mutación:** los métodos que actualizan timestamps también reciben `now time.Time` en lugar de llamar `time.Now()`.
+
+```go
+// ✅ — el método recibe now como dato
 func (g *Group) UpdateMetadata(name *GroupName, description **string, now time.Time) {
     if name != nil { g.name = *name }
-    if description != nil { g.description = *description }
     g.updatedAt = now.UTC()
 }
 
-// ✅ — Restore* recibe los timestamps exactos desde la DB; no necesita now
-func RestoreGroup(id string, ..., createdAt, updatedAt time.Time) *Group {
-    return &Group{id: id, createdAt: createdAt, updatedAt: updatedAt, ...}
+// ❌ — el método hace I/O directamente
+func (g *Group) UpdateMetadata(name *GroupName, description **string) {
+    g.updatedAt = time.Now()  // ← I/O dentro del hexágono
 }
 ```
+
+En la capa de aplicación — toda la I/O se concentra en un solo lugar:
 
 ```go
-// ❌ — time.Now() desde el dominio: efecto secundario oculto
-func NewGroup(...) (*Group, error) {
-    now := time.Now()   // ← I/O dentro del hexágono
-    return &Group{createdAt: now, ...}, nil
-}
-
-// ❌ — clock almacenado: el aggregate sigue conteniendo I/O
-type Group struct {
-    clock func() time.Time  // ← dependencia de infraestructura almacenada
-}
-func (g *Group) UpdateMetadata(...) {
-    g.updatedAt = g.clock()  // ← sigue siendo I/O, aunque esté abstraído
+// ✅ — application/ hace toda la I/O de una vez
+func (uc *RequestEmailChangeUseCase) Execute(ctx context.Context, in RequestEmailChangeInput) error {
+    newID := uuid.New().String()   // I/O: UUID
+    now   := time.Now()            // I/O: reloj
+    req, err := user.NewEmailChangeRequest(newID, in.UserID, parsedEmail, code, now)
+    ...
 }
 ```
 
-**Por qué `now time.Time` es más fuerte que clock injection:**
-
-Clock injection resuelve el problema de testabilidad pero no el de pureza: el aggregate almacena una función que llama I/O. Con `now time.Time`, el aggregate no tiene ningún vínculo con el exterior — es una función matemática. Mismos inputs, mismo resultado, siempre. No necesita `WithClock`, no tiene estado extra, no necesita inicialización especial en tests.
-
-**En la capa de aplicación** — el use case obtiene `now` una sola vez:
+En tests — el resultado es completamente determinista:
 
 ```go
-// ✅ — la capa de aplicación hace el I/O, el dominio recibe el dato
-func (uc *UpdateGroupUseCase) Execute(ctx context.Context, in UpdateGroupInput) error {
-    g, _ := uc.repo.FindByID(ctx, in.GroupID)
-    now := time.Now()           // ← único lugar donde vive time.Now()
-    g.UpdateMetadata(&name, nil, now)
-    return uc.repo.Update(ctx, g)
+// ✅ — el test controla exactamente qué ID y qué hora se usan
+var (
+    testID  = "test-req-001"
+    testNow = time.Date(2024, 1, 15, 12, 0, 0, 0, time.UTC)
+)
+
+func TestNewEmailChangeRequest_SetsExpiry(t *testing.T) {
+    req, err := user.NewEmailChangeRequest(testID, "user-1", email, "code", testNow)
+    require.NoError(t, err)
+    assert.Equal(t, testNow.UTC().Add(15*time.Minute), req.ExpiresAt())  // ← determinista
 }
 ```
 
-**En tests** — no se necesita `WithClock` ni ninguna infraestructura especial:
-
-```go
-// ✅ — se pasa cualquier time.Time directamente
-var testNow = time.Date(2024, 1, 15, 12, 0, 0, 0, time.UTC)
-
-func TestUpdateMetadata_UpdatesName(t *testing.T) {
-    g, _ := group.NewGroup("id-1", name, nil, visibility, joinPolicy, createdBy, testNow)
-    newName, _ := group.NewGroupName("new name")
-    g.UpdateMetadata(&newName, nil, testNow.Add(time.Hour))
-    // g.UpdatedAt() == testNow.Add(time.Hour) ← determinista
-}
-```
+**No existe excepción.** Si la lógica de negocio requiere un valor no determinista, ese valor se genera en `application/` y se pasa al constructor o método. `User.Deactivate()` recibe el sufijo del nickname anónimo como parámetro — el test puede verificar exactamente qué nickname quedó registrado.
 
 ---
 

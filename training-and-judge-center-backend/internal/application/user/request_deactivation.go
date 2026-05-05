@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/training-judge-center/backend/internal/application/shared"
 	domainShared "github.com/training-judge-center/backend/internal/domain/shared"
 	"github.com/training-judge-center/backend/internal/domain/user"
@@ -62,7 +63,12 @@ func (uc *RequestDeactivationUseCase) Execute(ctx context.Context, input Request
 		return apperror.NewInternal()
 	}
 
-	req := user.NewDeactivationRequest(foundUser.ID(), code, now)
+	newID := uuid.New().String()
+	req, err := user.NewDeactivationRequest(newID, foundUser.ID(), code, now)
+	if err != nil {
+		slog.ErrorContext(ctx, "failed to build deactivation request", "user_id", foundUser.ID(), "error", err)
+		return apperror.NewInternal()
+	}
 
 	if err := uc.deactRepo.Save(ctx, req); err != nil {
 		slog.Error("failed to save deactivation request", "user_id", foundUser.ID(), "error", err)

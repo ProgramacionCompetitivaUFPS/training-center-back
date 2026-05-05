@@ -5,6 +5,7 @@ import (
 	"log/slog"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/training-judge-center/backend/internal/domain/shared"
 	"github.com/training-judge-center/backend/internal/domain/user"
 	"github.com/training-judge-center/backend/pkg/apperror"
@@ -50,7 +51,9 @@ func (uc *AdminDeactivateUserUseCase) Execute(ctx context.Context, input AdminDe
 		return nil
 	}
 
-	if err := foundUser.Deactivate(); err != nil {
+	now := time.Now()
+	anonSuffix := uuid.New().String()[:10]
+	if err := foundUser.Deactivate(anonSuffix, now); err != nil {
 		slog.Error("failed to deactivate user domain object", "user_id", foundUser.ID(), "error", err)
 		return apperror.NewInternal()
 	}
@@ -59,7 +62,6 @@ func (uc *AdminDeactivateUserUseCase) Execute(ctx context.Context, input AdminDe
 	// write never happens and the caller receives an error with clean state.
 	// If DB write fails after this point, the user loses their active session
 	// but is not officially deactivated — a minor inconsistency, not a security risk.
-	now := time.Now()
 	if err := uc.sessionInvalidator.InvalidateAllUserSessions(ctx, foundUser.ID(), now); err != nil {
 		slog.Error("failed to invalidate sessions during admin deactivation", "user_id", foundUser.ID(), "error", err)
 		return apperror.NewInternal()
