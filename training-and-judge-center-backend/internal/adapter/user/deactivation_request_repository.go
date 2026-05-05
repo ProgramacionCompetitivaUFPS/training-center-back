@@ -32,7 +32,7 @@ func (r *DeactivationRequestRepository) Save(ctx context.Context, req *domainUse
 		req.ExpiresAt(),
 		req.Attempts(),
 		req.BlockedUntil(),
-		string(req.Status()),
+		req.Status().String(),
 		req.CreatedAt(),
 		req.UpdatedAt(),
 	)
@@ -56,7 +56,7 @@ func (r *DeactivationRequestRepository) FindPendingByUserID(ctx context.Context,
 	var blockedUntil *time.Time
 	var status string
 
-	err := r.querier.QueryRow(ctx, query, userID, string(domainUser.DeactivationStatusPending), string(domainUser.DeactivationStatusBlocked)).Scan(
+	err := r.querier.QueryRow(ctx, query, userID, domainUser.DeactivationStatusPending.String(), domainUser.DeactivationStatusBlocked.String()).Scan(
 		&id,
 		&returnedUserID,
 		&verificationCode,
@@ -75,7 +75,7 @@ func (r *DeactivationRequestRepository) FindPendingByUserID(ctx context.Context,
 		return nil, fmt.Errorf("failed to find pending deactivation request: %w", err)
 	}
 
-	req := domainUser.RestoreDeactivationRequest(id, returnedUserID, verificationCode, expiresAt, attempts, blockedUntil, domainUser.DeactivationStatus(status), createdAt, updatedAt)
+	req := domainUser.RestoreDeactivationRequest(id, returnedUserID, verificationCode, expiresAt, attempts, blockedUntil, domainUser.RestoreDeactivationStatus(status), createdAt, updatedAt)
 	return req, nil
 }
 
@@ -110,7 +110,7 @@ func (r *DeactivationRequestRepository) FindByID(ctx context.Context, id string)
 		return nil, fmt.Errorf("failed to find deactivation request by id: %w", err)
 	}
 
-	req := domainUser.RestoreDeactivationRequest(returnedID, returnedUserID, verificationCode, expiresAt, attempts, blockedUntil, domainUser.DeactivationStatus(status), createdAt, updatedAt)
+	req := domainUser.RestoreDeactivationRequest(returnedID, returnedUserID, verificationCode, expiresAt, attempts, blockedUntil, domainUser.RestoreDeactivationStatus(status), createdAt, updatedAt)
 	return req, nil
 }
 
@@ -126,7 +126,7 @@ func (r *DeactivationRequestRepository) Update(ctx context.Context, req *domainU
 		req.ExpiresAt(),
 		req.Attempts(),
 		req.BlockedUntil(),
-		string(req.Status()),
+		req.Status().String(),
 		req.UpdatedAt(),
 		req.ID(),
 	)
@@ -145,7 +145,7 @@ func (r *DeactivationRequestRepository) InvalidatePendingByUserID(ctx context.Co
 
 	querier := infraPostgres.GetQuerier(ctx, r.querier)
 	_, err := querier.Exec(ctx, query,
-		string(domainUser.DeactivationStatusExpired), now, userID, string(domainUser.DeactivationStatusPending), string(domainUser.DeactivationStatusBlocked))
+		domainUser.DeactivationStatusExpired.String(), now, userID, domainUser.DeactivationStatusPending.String(), domainUser.DeactivationStatusBlocked.String())
 
 	if err != nil {
 		return fmt.Errorf("failed to invalidate prior deactivation requests: %w", err)

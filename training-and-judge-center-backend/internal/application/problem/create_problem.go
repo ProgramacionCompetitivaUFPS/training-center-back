@@ -2,13 +2,11 @@
 
 import (
 	"context"
-	"errors"
-	"log/slog"
 
 	"github.com/google/uuid"
+	appshared "github.com/training-judge-center/backend/internal/application/shared"
 	"github.com/training-judge-center/backend/internal/domain/problem"
 	"github.com/training-judge-center/backend/internal/domain/shared"
-	appshared "github.com/training-judge-center/backend/internal/application/shared"
 	"github.com/training-judge-center/backend/pkg/apperror"
 )
 
@@ -160,12 +158,7 @@ func (usecase *CreateProblemUseCase) Execute(ctx context.Context, input CreatePr
 	)
 
 	if err := usecase.repo.Save(ctx, newProblem); err != nil {
-		var slugErr *problem.ErrSlugAlreadyExists
-		if errors.As(err, &slugErr) {
-			return nil, apperror.NewConflict(ErrCodeProblemSlugAlreadyExists, "A problem with slug '"+slugErr.Slug+"' already exists")
-		}
-		slog.ErrorContext(ctx, "failed to save new problem", "error", err, "slug", slug.String())
-		return nil, apperror.NewInternal()
+		return nil, err
 	}
 
 	return &CreateProblemResult{Problem: newProblem}, nil

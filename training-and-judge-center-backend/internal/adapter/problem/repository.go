@@ -126,7 +126,7 @@ func (r *ProblemRepository) Save(ctx context.Context, p *domainProblem.Problem) 
 	if err != nil {
 		var pgErr *pgconn.PgError
 		if errors.As(err, &pgErr) && pgErr.Code == "23505" && pgErr.ConstraintName == "problems_slug_key" {
-			return &domainProblem.ErrSlugAlreadyExists{Slug: slug}
+			return apperror.NewConflict(domainProblem.ErrCodeSlugAlreadyExists, "slug '"+slug+"' already in use")
 		}
 		slog.ErrorContext(ctx, "Database error in Save", "error", err, "problem_id", p.ID(), "slug", slug)
 		return apperror.NewInternal()

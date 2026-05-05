@@ -1,0 +1,139 @@
+package user
+
+import (
+	"time"
+
+	"github.com/google/uuid"
+	"github.com/training-judge-center/backend/pkg/apperror"
+)
+
+type DeactivationStatus struct{ value string }
+
+const (
+	deactivationStatusPending   = "PENDING"
+	deactivationStatusConfirmed = "CONFIRMED"
+	deactivationStatusExpired   = "EXPIRED"
+	deactivationStatusBlocked   = "BLOCKED"
+)
+
+var (
+	DeactivationStatusPending   = DeactivationStatus{value: deactivationStatusPending}
+	DeactivationStatusConfirmed = DeactivationStatus{value: deactivationStatusConfirmed}
+	DeactivationStatusExpired   = DeactivationStatus{value: deactivationStatusExpired}
+	DeactivationStatusBlocked   = DeactivationStatus{value: deactivationStatusBlocked}
+)
+
+func NewDeactivationStatus(raw string) (DeactivationStatus, error) {
+	switch raw {
+	case deactivationStatusPending, deactivationStatusConfirmed,
+		deactivationStatusExpired, deactivationStatusBlocked:
+		return DeactivationStatus{value: raw}, nil
+	default:
+		return DeactivationStatus{}, apperror.NewValidation([]apperror.FieldError{
+			{Field: "status", Message: "invalid deactivation status: " + raw},
+		})
+	}
+}
+
+func RestoreDeactivationStatus(raw string) DeactivationStatus {
+	return DeactivationStatus{value: raw}
+}
+
+func (s DeactivationStatus) String() string { return s.value }
+
+const (
+	MaxDeactivationAttempts   = 5
+	DeactivationBlockDuration = time.Hour
+)
+
+type DeactivationRequest struct {
+	id               string
+	userID           string
+	verificationCode string
+	expiresAt        time.Time
+	attempts         int
+	blockedUntil     *time.Time
+	status           DeactivationStatus
+	createdAt        time.Time
+	updatedAt        time.Time
+}
+
+func NewDeactivationRequest(userID, verificationCode string, now time.Time) *DeactivationRequest {
+	return &DeactivationRequest{
+		id:               uuid.New().String(),
+		userID:           userID,
+		verificationCode: verificationCode,
+		expiresAt:        now.Add(15 * time.Minute),
+		attempts:         0,
+		status:           DeactivationStatusPending,
+		createdAt:        now,
+		updatedAt:        now,
+	}
+}
+
+func RestoreDeactivationRequest(id, userID, verificationCode string, expiresAt time.Time, attempts int, blockedUntil *time.Time, status DeactivationStatus, createdAt, updatedAt time.Time) *DeactivationRequest {
+	if status == DeactivationStatusBlocked && blockedUntil == nil {
+		status = DeactivationStatusExpired
+	}
+	return &DeactivationRequest{
+		id:               id,
+		userID:           userID,
+		verificationCode: verificationCode,
+		expiresAt:        expiresAt,
+		attempts:         attempts,
+		blockedUntil:     blockedUntil,
+		status:           status,
+		createdAt:        createdAt,
+		updatedAt:        updatedAt,
+	}
+}
+
+func (r *DeactivationRequest) ID() string               { return r.id }
+func (r *DeactivationRequest) UserID() string           { return r.userID }
+func (r *DeactivationRequest) VerificationCode() string { return r.verificationCode }
+func (r *DeactivationRequest) ExpiresAt() time.Time     { return r.expiresAt }
+func (r *DeactivationRequest) Attempts() int            { return r.attempts }
+func (r *DeactivationRequest) BlockedUntil() *time.Time {
+	if r.blockedUntil == nil {
+		return nil
+	}
+	t := *r.blockedUntil
+	return &t
+}
+func (r *DeactivationRequest) Status() DeactivationStatus { return r.status }
+func (r *DeactivationRequest) CreatedAt() time.Time       { return r.createdAt }
+func (r *DeactivationRequest) UpdatedAt() time.Time       { return r.updatedAt }
+
+func (r *DeactivationRequest) MarkAsExpired(now time.Time) {
+	r.status = DeactivationStatusExpired
+	r.updatedAt = now
+}
+
+func (r *DeactivationRequest) RegisterFailure(now time.Time) {
+	r.attempts++
+	r.updatedAt = now
+	if r.attempts >= MaxDeactivationAttempts {
+		r.status = DeactivationStatusBlocked
+		blockedUntil := now.Add(DeactivationBlockDuration)
+		r.blockedUntil = &blockedUntil
+	}
+}
+
+func (r *DeactivationRequest) IsBlocked() bool {
+	return r.status == DeactivationStatusBlocked
+}
+
+func (r *DeactivationRequest) IsCurrentlyBlocked(now time.Time) bool {
+	return r.status == DeactivationStatusBlocked &&
+		r.blockedUntil != nil &&
+		now.Before(*r.blockedUntil)
+}
+
+func (r *DeactivationRequest) IsExpired(now time.Time) bool {
+	return now.After(r.expiresAt) || r.status == DeactivationStatusExpired
+}
+
+func (r *DeactivationRequest) Confirm(now time.Time) {
+	r.status = DeactivationStatusConfirmed
+	r.updatedAt = now
+}

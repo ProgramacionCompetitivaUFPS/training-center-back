@@ -3,6 +3,7 @@ package user
 import (
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/training-judge-center/backend/pkg/apperror"
 )
 
@@ -16,12 +17,12 @@ type PasswordRecoveryRequest struct {
 	updatedAt *time.Time
 }
 
-func NewPasswordRecoveryRequest(id, userID, code string, now time.Time) (*PasswordRecoveryRequest, error) {
-	if id == "" || userID == "" || code == "" {
+func NewPasswordRecoveryRequest(userID, code string, now time.Time) (*PasswordRecoveryRequest, error) {
+	if userID == "" || code == "" {
 		return nil, apperror.NewInternal()
 	}
 	return &PasswordRecoveryRequest{
-		id:        id,
+		id:        uuid.New().String(),
 		userID:    userID,
 		code:      code,
 		status:    StatusPending,

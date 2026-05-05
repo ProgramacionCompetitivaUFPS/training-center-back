@@ -1,6 +1,7 @@
 package problem
 
 const (
+	ErrCodeSlugAlreadyExists     = "SLUG_ALREADY_EXISTS"
 	ErrCodeSlugTooShort          = "SLUG_TOO_SHORT"
 	ErrCodeSlugTooLong           = "SLUG_TOO_LONG"
 	ErrCodeSlugInvalidFormat     = "INVALID_SLUG_FORMAT"
