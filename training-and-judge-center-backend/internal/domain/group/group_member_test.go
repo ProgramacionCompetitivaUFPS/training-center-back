@@ -13,7 +13,7 @@ func testUserID() shared.UserID { return shared.RestoreUserID("user-abc") }
 
 func newMember(t *testing.T, id, groupID string, role group.MemberRole) *group.GroupMember {
 	t.Helper()
-	m, err := group.NewGroupMember(id, groupID, testUserID(), role, nil)
+	m, err := group.NewGroupMember(id, groupID, testUserID(), role, time.Now())
 	if err != nil {
 		t.Fatalf("NewGroupMember: %v", err)
 	}
@@ -22,8 +22,7 @@ func newMember(t *testing.T, id, groupID string, role group.MemberRole) *group.G
 
 func TestNewGroupMember_Valid(t *testing.T) {
 	fixed := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
-	m, err := group.NewGroupMember("m-1", "g-1", testUserID(), group.MemberRoleMember,
-		func() time.Time { return fixed })
+	m, err := group.NewGroupMember("m-1", "g-1", testUserID(), group.MemberRoleMember, fixed)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -48,14 +47,14 @@ func TestNewGroupMember_Valid(t *testing.T) {
 }
 
 func TestNewGroupMember_EmptyID(t *testing.T) {
-	_, err := group.NewGroupMember("", "g-1", testUserID(), group.MemberRoleMember, nil)
+	_, err := group.NewGroupMember("", "g-1", testUserID(), group.MemberRoleMember, time.Now())
 	if err == nil {
 		t.Fatal("expected error for empty id, got nil")
 	}
 }
 
 func TestNewGroupMember_EmptyGroupID(t *testing.T) {
-	_, err := group.NewGroupMember("m-1", "", testUserID(), group.MemberRoleMember, nil)
+	_, err := group.NewGroupMember("m-1", "", testUserID(), group.MemberRoleMember, time.Now())
 	if err == nil {
 		t.Fatal("expected error for empty groupID, got nil")
 	}
@@ -63,7 +62,7 @@ func TestNewGroupMember_EmptyGroupID(t *testing.T) {
 
 func TestNewGroupMember_EmptyUserID(t *testing.T) {
 	zeroUser := shared.RestoreUserID("")
-	_, err := group.NewGroupMember("m-1", "g-1", zeroUser, group.MemberRoleMember, nil)
+	_, err := group.NewGroupMember("m-1", "g-1", zeroUser, group.MemberRoleMember, time.Now())
 	if err == nil {
 		t.Fatal("expected error for zero-value userID, got nil")
 	}

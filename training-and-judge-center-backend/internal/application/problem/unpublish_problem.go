@@ -3,6 +3,7 @@
 import (
 	"context"
 	"log/slog"
+	"time"
 
 	"github.com/training-judge-center/backend/internal/domain/problem"
 	"github.com/training-judge-center/backend/internal/domain/shared"
@@ -40,7 +41,7 @@ func (uc *UnpublishProblemUseCase) Execute(ctx context.Context, in UnpublishProb
 		return nil, apperror.NewForbidden(apperror.ErrCodeForbidden, "Only the problem author, Admin, or assigned modifiers can unpublish this problem")
 	}
 
-	if err := p.Unpublish(); err != nil {
+	if err := p.Unpublish(time.Now()); err != nil {
 		return nil, err
 	}
 

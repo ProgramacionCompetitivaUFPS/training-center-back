@@ -3,6 +3,7 @@
 import (
 	"context"
 	"log/slog"
+	"time"
 
 	"github.com/training-judge-center/backend/internal/domain/problem"
 	"github.com/training-judge-center/backend/internal/domain/shared"
@@ -179,10 +180,11 @@ func (uc *UpdateProblemUseCase) Execute(ctx context.Context, input UpdateProblem
 		return nil, apperror.NewValidation(fieldErrs)
 	}
 
-	p.UpdateMetadata(title, statementPtr, timeLimit, memoryLimit, validOverrides, tags)
+	now := time.Now()
+	p.UpdateMetadata(title, statementPtr, timeLimit, memoryLimit, validOverrides, tags, now)
 
 	if accessibility != nil {
-		p.UpdateAccessibility(*accessibility)
+		p.UpdateAccessibility(*accessibility, now)
 	}
 
 	if err := uc.repo.Save(ctx, p); err != nil {

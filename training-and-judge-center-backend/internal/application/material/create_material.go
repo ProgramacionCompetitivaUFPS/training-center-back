@@ -3,6 +3,7 @@
 import (
 	"context"
 	"log/slog"
+	"time"
 
 	"github.com/google/uuid"
 	domainMaterial "github.com/training-judge-center/backend/internal/domain/material"
@@ -99,7 +100,7 @@ func (uc *CreateMaterial) Execute(ctx context.Context, in CreateMaterialInput) (
 		title,
 		content,
 		tags,
-		nil,
+		time.Now(),
 	)
 	if err != nil {
 		slog.ErrorContext(ctx, "unexpected error constructing material", "error", err, "group_id", in.GroupID)

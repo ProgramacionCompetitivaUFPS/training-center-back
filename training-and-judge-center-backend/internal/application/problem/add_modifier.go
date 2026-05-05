@@ -3,6 +3,7 @@
 import (
 	"context"
 	"log/slog"
+	"time"
 
 	"github.com/training-judge-center/backend/internal/domain/problem"
 	"github.com/training-judge-center/backend/internal/domain/shared"
@@ -60,7 +61,7 @@ func (uc *AddModifierUseCase) Execute(ctx context.Context, input AddModifierInpu
 		return struct{}{}, err
 	}
 
-	if err := p.AddModifier(modifierID); err != nil {
+	if err := p.AddModifier(modifierID, time.Now()); err != nil {
 		return struct{}{}, err
 	}
 

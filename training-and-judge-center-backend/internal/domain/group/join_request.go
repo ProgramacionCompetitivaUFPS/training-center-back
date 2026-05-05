@@ -16,7 +16,7 @@ type JoinRequest struct {
 	createdAt       time.Time
 }
 
-func NewJoinRequest(id, groupID string, requesterUserID shared.UserID, message *string, clock func() time.Time) (*JoinRequest, error) {
+func NewJoinRequest(id, groupID string, requesterUserID shared.UserID, message *string, now time.Time) (*JoinRequest, error) {
 	if id == "" {
 		return nil, apperror.NewInternal()
 	}
@@ -26,16 +26,13 @@ func NewJoinRequest(id, groupID string, requesterUserID shared.UserID, message *
 	if requesterUserID.Value() == "" {
 		return nil, apperror.NewInternal()
 	}
-	if clock == nil {
-		clock = time.Now
-	}
 	return &JoinRequest{
 		id:              id,
 		groupID:         groupID,
 		requesterUserID: requesterUserID,
 		message:         message,
 		status:          JoinRequestStatusPending,
-		createdAt:       clock().UTC(),
+		createdAt:       now.UTC(),
 	}, nil
 }
 

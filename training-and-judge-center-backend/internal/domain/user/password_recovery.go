@@ -21,13 +21,14 @@ func NewPasswordRecoveryRequest(userID, code string, now time.Time) (*PasswordRe
 	if userID == "" || code == "" {
 		return nil, apperror.NewInternal()
 	}
+	t := now.UTC()
 	return &PasswordRecoveryRequest{
 		id:        uuid.New().String(),
 		userID:    userID,
 		code:      code,
 		status:    StatusPending,
-		expiresAt: now.Add(15 * time.Minute),
-		createdAt: now,
+		expiresAt: t.Add(15 * time.Minute),
+		createdAt: t,
 	}, nil
 }
 
@@ -60,7 +61,8 @@ func (r *PasswordRecoveryRequest) MarkAsUsed(now time.Time) error {
 		return apperror.NewConflict(ErrCodePasswordRecoveryNotPending, "password recovery request is not pending")
 	}
 	r.status = StatusUsed
-	r.updatedAt = &now
+	t := now.UTC()
+	r.updatedAt = &t
 	return nil
 }
 

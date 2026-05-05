@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/google/uuid"
 	"golang.org/x/sync/errgroup"
@@ -84,19 +85,20 @@ func (uc *UploadProblemFilesUseCase) Execute(ctx context.Context, input UploadPr
 		return nil, apperror.NewForbidden(apperror.ErrCodeForbidden, "Only the problem author, Admin, or assigned modifiers can update this problem")
 	}
 
+	now := time.Now()
 	var action fileAction
 	var handleErr error
 
 	fileType := strings.ToLower(input.FileType)
 	switch fileType {
 	case FileTypeTestCases:
-		action, handleErr = uc.handleTestCases(ctx, p, input)
+		action, handleErr = uc.handleTestCases(ctx, p, input, now)
 	case FileTypeSolution:
-		action, handleErr = uc.handleSolution(ctx, p, input)
+		action, handleErr = uc.handleSolution(ctx, p, input, now)
 	case FileTypeChecker:
-		action, handleErr = uc.handleChecker(ctx, p, input)
+		action, handleErr = uc.handleChecker(ctx, p, input, now)
 	case FileTypeValidator:
-		action, handleErr = uc.handleValidator(ctx, p, input)
+		action, handleErr = uc.handleValidator(ctx, p, input, now)
 	default:
 		slog.WarnContext(ctx, "invalid file type provided", "file_type", input.FileType, "slug", p.Slug().String())
 		return nil, apperror.NewBadRequest(ErrCodeProblemInvalidFileType, "Invalid file type. Allowed: testCases, solution, checker, validator")
@@ -141,7 +143,7 @@ func (uc *UploadProblemFilesUseCase) cleanupPrefix(ctx context.Context, prefix s
 	}
 }
 
-func (uc *UploadProblemFilesUseCase) handleTestCases(ctx context.Context, p *problem.Problem, input UploadProblemFilesInput) (fileAction, error) {
+func (uc *UploadProblemFilesUseCase) handleTestCases(ctx context.Context, p *problem.Problem, input UploadProblemFilesInput, now time.Time) (fileAction, error) {
 	sampleFiles, err := uc.zipParser.ParseTestCasesZip(input.FileData)
 	if err != nil {
 		return fileAction{}, err
@@ -186,11 +188,11 @@ func (uc *UploadProblemFilesUseCase) handleTestCases(ctx context.Context, p *pro
 		action.cleanupPrefix = *p.TestCasesKey()
 	}
 
-	p.SetTestCases(basePath)
+	p.SetTestCases(basePath, now)
 	return action, nil
 }
 
-func (uc *UploadProblemFilesUseCase) handleSolution(ctx context.Context, p *problem.Problem, input UploadProblemFilesInput) (fileAction, error) {
+func (uc *UploadProblemFilesUseCase) handleSolution(ctx context.Context, p *problem.Problem, input UploadProblemFilesInput, now time.Time) (fileAction, error) {
 	if input.FileName == "" {
 		return fileAction{}, apperror.NewValidation([]apperror.FieldError{
 			{Field: "fileName", Message: "Filename is required"},
@@ -216,19 +218,19 @@ func (uc *UploadProblemFilesUseCase) handleSolution(ctx context.Context, p *prob
 
 	action := fileAction{rollbackFiles: []string{fileKey}}
 
-	if old := p.AddSolution(solutionObj); old != nil && old.FileKey() != fileKey {
+	if old := p.AddSolution(solutionObj, now); old != nil && old.FileKey() != fileKey {
 		action.cleanupFiles = []string{old.FileKey()}
 	}
 
 	return action, nil
 }
 
-func (uc *UploadProblemFilesUseCase) handleChecker(ctx context.Context, p *problem.Problem, input UploadProblemFilesInput) (fileAction, error) {
-	return uc.handleVerifier(ctx, p, input, FileTypeChecker, p.Checker, p.SetChecker)
+func (uc *UploadProblemFilesUseCase) handleChecker(ctx context.Context, p *problem.Problem, input UploadProblemFilesInput, now time.Time) (fileAction, error) {
+	return uc.handleVerifier(ctx, p, input, FileTypeChecker, p.Checker, func(f problem.JudgingFile) { p.SetChecker(f, now) }, now)
 }
 
-func (uc *UploadProblemFilesUseCase) handleValidator(ctx context.Context, p *problem.Problem, input UploadProblemFilesInput) (fileAction, error) {
-	return uc.handleVerifier(ctx, p, input, FileTypeValidator, p.Validator, p.SetValidator)
+func (uc *UploadProblemFilesUseCase) handleValidator(ctx context.Context, p *problem.Problem, input UploadProblemFilesInput, now time.Time) (fileAction, error) {
+	return uc.handleVerifier(ctx, p, input, FileTypeValidator, p.Validator, func(f problem.JudgingFile) { p.SetValidator(f, now) }, now)
 }
 
 func (uc *UploadProblemFilesUseCase) handleVerifier(
@@ -238,6 +240,7 @@ func (uc *UploadProblemFilesUseCase) handleVerifier(
 	fileType string,
 	getVerifier func() *problem.JudgingFile,
 	setVerifier func(problem.JudgingFile),
+	now time.Time,
 ) (fileAction, error) {
 	if input.FileName == "" {
 		return fileAction{}, apperror.NewValidation([]apperror.FieldError{

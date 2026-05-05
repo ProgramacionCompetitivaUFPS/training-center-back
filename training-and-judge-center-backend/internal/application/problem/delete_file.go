@@ -4,6 +4,7 @@ import (
 	"context"
 	"log/slog"
 	"strings"
+	"time"
 
 	"github.com/training-judge-center/backend/internal/domain/problem"
 	"github.com/training-judge-center/backend/internal/domain/shared"
@@ -55,6 +56,7 @@ func (usecase *DeleteProblemFileUseCase) Execute(ctx context.Context, input Dele
 	var storageKeyToDelete string
 	var deleteByPrefix bool
 
+	now := time.Now()
 	fileType := strings.ToLower(input.FileType)
 	switch fileType {
 	case FileTypeTestCases:
@@ -66,7 +68,7 @@ func (usecase *DeleteProblemFileUseCase) Execute(ctx context.Context, input Dele
 		}
 		storageKeyToDelete = *foundProblem.TestCasesKey()
 		deleteByPrefix = true
-		foundProblem.RemoveTestCases()
+		foundProblem.RemoveTestCases(now)
 
 	case FileTypeSolution:
 		if input.FileName == "" {
@@ -76,7 +78,7 @@ func (usecase *DeleteProblemFileUseCase) Execute(ctx context.Context, input Dele
 		for _, solution := range foundProblem.Solutions() {
 			if solution.Filename() == input.FileName {
 				storageKeyToDelete = solution.FileKey()
-				foundProblem.RemoveSolution(solution.Filename())
+				foundProblem.RemoveSolution(solution.Filename(), now)
 				found = true
 				break
 			}
@@ -93,7 +95,7 @@ func (usecase *DeleteProblemFileUseCase) Execute(ctx context.Context, input Dele
 			return struct{}{}, apperror.NewNotFound(ErrCodeProblemFileNotFound, "This problem has no checker to delete")
 		}
 		storageKeyToDelete = foundProblem.Checker().FileKey()
-		foundProblem.RemoveChecker()
+		foundProblem.RemoveChecker(now)
 
 	case FileTypeValidator:
 		if input.FileName != "" {
@@ -103,7 +105,7 @@ func (usecase *DeleteProblemFileUseCase) Execute(ctx context.Context, input Dele
 			return struct{}{}, apperror.NewNotFound(ErrCodeProblemFileNotFound, "This problem has no validator to delete")
 		}
 		storageKeyToDelete = foundProblem.Validator().FileKey()
-		foundProblem.RemoveValidator()
+		foundProblem.RemoveValidator(now)
 
 	default:
 		slog.WarnContext(ctx, "invalid file type provided for deletion", "file_type", input.FileType, "slug", foundProblem.Slug().String())

@@ -3,6 +3,7 @@
 import (
 	"context"
 	"log/slog"
+	"time"
 
 	domainMaterial "github.com/training-judge-center/backend/internal/domain/material"
 	"github.com/training-judge-center/backend/internal/domain/shared"
@@ -61,7 +62,7 @@ func (uc *PublishMaterial) Execute(ctx context.Context, in PublishMaterialInput)
 
 	// Idempotent: already-published materials return 200 with current state.
 	if !m.Status().IsPublished() {
-		if err := m.Publish(); err != nil {
+		if err := m.Publish(time.Now()); err != nil {
 			return nil, err
 		}
 		if err := uc.repo.Save(ctx, m); err != nil {

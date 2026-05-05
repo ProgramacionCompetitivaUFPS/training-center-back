@@ -43,7 +43,7 @@ adapter/ratelimit/ ← driven adapter: rate limiting (transversal)
 
 ## Conventions summary
 
-### Domain — §4 (D1–D9)
+### Domain — §4 (D1–D10)
 
 - One file per concept: `user.go`, `email.go`, `status.go`, `repository.go`, `errors.go`
 - `New*()` validates and returns `apperror` on failure; `Restore*()` bypasses validation — no error return, no `New*` calls inside
@@ -51,6 +51,7 @@ adapter/ratelimit/ ← driven adapter: rate limiting (transversal)
 - `errors.go` — string constants only (`ErrCodeEmailConflict = "EMAIL_CONFLICT"`); no sentinel `var ErrX = errors.New(...)`
 - Repository ports: primary aggregate → `repository.go`; secondary aggregates → `<aggregate>_repository.go`
 - Tests: `package <domain>_test`; table tests for value objects, individual functions for aggregates
+- Constructors/methods needing current time receive `now time.Time`; `time.Now()` is called once in the use case, never inside domain code (D10)
 
 ### Application — §5 (A1–A10)
 

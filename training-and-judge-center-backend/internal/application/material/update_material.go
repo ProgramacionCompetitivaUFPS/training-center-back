@@ -3,6 +3,7 @@
 import (
 	"context"
 	"log/slog"
+	"time"
 
 	domainMaterial "github.com/training-judge-center/backend/internal/domain/material"
 	"github.com/training-judge-center/backend/internal/domain/shared"
@@ -102,7 +103,7 @@ func (uc *UpdateMaterial) Execute(ctx context.Context, in UpdateMaterialInput) (
 		return nil, apperror.NewValidation(fieldErrs)
 	}
 
-	m.UpdateMetadata(title, content, tags)
+	m.UpdateMetadata(title, content, tags, time.Now())
 
 	if err := uc.repo.Save(ctx, m); err != nil {
 		slog.ErrorContext(ctx, "failed to save updated material", "error", err, "material_id", in.MaterialID)

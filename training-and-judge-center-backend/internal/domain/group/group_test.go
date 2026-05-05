@@ -24,7 +24,7 @@ func testCreator() shared.UserID {
 
 func TestNewGroup_Valid(t *testing.T) {
 	name := newGroupName(t, "Algorithms 2025")
-	g, err := group.NewGroup("g-1", name, nil, group.VisibilityVisible, group.JoinPolicyRequest, testCreator(), nil)
+	g, err := group.NewGroup("g-1", name, nil, group.VisibilityVisible, group.JoinPolicyRequest, testCreator(), time.Now())
 	if err != nil {
 		t.Fatalf("NewGroup unexpected error: %v", err)
 	}
@@ -45,11 +45,10 @@ func TestNewGroup_Valid(t *testing.T) {
 	}
 }
 
-func TestNewGroup_ClockInjection(t *testing.T) {
+func TestNewGroup_TimestampIsStored(t *testing.T) {
 	fixed := time.Date(2026, 1, 1, 12, 0, 0, 0, time.UTC)
 	name := newGroupName(t, "Timed Group")
-	g, err := group.NewGroup("g-clock", name, nil, group.VisibilityVisible, group.JoinPolicyOpen, testCreator(),
-		func() time.Time { return fixed })
+	g, err := group.NewGroup("g-clock", name, nil, group.VisibilityVisible, group.JoinPolicyOpen, testCreator(), fixed)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -63,7 +62,7 @@ func TestNewGroup_ClockInjection(t *testing.T) {
 
 func TestNewGroup_EmptyID(t *testing.T) {
 	name := newGroupName(t, "No ID Group")
-	_, err := group.NewGroup("", name, nil, group.VisibilityVisible, group.JoinPolicyOpen, testCreator(), nil)
+	_, err := group.NewGroup("", name, nil, group.VisibilityVisible, group.JoinPolicyOpen, testCreator(), time.Now())
 	if err == nil {
 		t.Fatal("NewGroup with empty id expected error, got nil")
 	}
@@ -79,7 +78,7 @@ func TestNewGroup_EmptyID(t *testing.T) {
 func TestNewGroup_WithDescription(t *testing.T) {
 	name := newGroupName(t, "My Group")
 	desc := "A great group"
-	g, err := group.NewGroup("g-1", name, &desc, group.VisibilityVisible, group.JoinPolicyOpen, testCreator(), nil)
+	g, err := group.NewGroup("g-1", name, &desc, group.VisibilityVisible, group.JoinPolicyOpen, testCreator(), time.Now())
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -98,7 +97,7 @@ func TestNewGroup_InvalidPolicyCombination(t *testing.T) {
 		{group.VisibilityNotVisible, group.JoinPolicyRequest},
 	}
 	for _, tc := range cases {
-		_, err := group.NewGroup("g-1", name, nil, tc.visibility, tc.joinPolicy, testCreator(), nil)
+		_, err := group.NewGroup("g-1", name, nil, tc.visibility, tc.joinPolicy, testCreator(), time.Now())
 		if err == nil {
 			t.Errorf("NewGroup(%v, %v) expected INVALID_POLICY_COMBINATION error, got nil", tc.visibility, tc.joinPolicy)
 		}
@@ -107,7 +106,7 @@ func TestNewGroup_InvalidPolicyCombination(t *testing.T) {
 
 func TestNewGroup_ValidNotVisibleInvite(t *testing.T) {
 	name := newGroupName(t, "Secret Group")
-	_, err := group.NewGroup("g-1", name, nil, group.VisibilityNotVisible, group.JoinPolicyInvite, testCreator(), nil)
+	_, err := group.NewGroup("g-1", name, nil, group.VisibilityNotVisible, group.JoinPolicyInvite, testCreator(), time.Now())
 	if err != nil {
 		t.Errorf("NewGroup(NOT_VISIBLE, INVITE) unexpected error: %v", err)
 	}
@@ -115,7 +114,7 @@ func TestNewGroup_ValidNotVisibleInvite(t *testing.T) {
 
 func TestGroup_CanBeDeleted(t *testing.T) {
 	name := newGroupName(t, "Regular Group")
-	g, _ := group.NewGroup("g-1", name, nil, group.VisibilityVisible, group.JoinPolicyOpen, testCreator(), nil)
+	g, _ := group.NewGroup("g-1", name, nil, group.VisibilityVisible, group.JoinPolicyOpen, testCreator(), time.Now())
 	if !g.CanBeDeleted() {
 		t.Error("regular group should be deletable")
 	}
@@ -129,14 +128,13 @@ func TestGroup_CanBeDeleted(t *testing.T) {
 
 func TestGroup_UpdateMetadata(t *testing.T) {
 	name := newGroupName(t, "Original Name")
-	g, _ := group.NewGroup("g-1", name, nil, group.VisibilityVisible, group.JoinPolicyRequest, testCreator(), nil)
+	g, _ := group.NewGroup("g-1", name, nil, group.VisibilityVisible, group.JoinPolicyRequest, testCreator(), time.Now())
 	fixedTime := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
-	g.WithClock(func() time.Time { return fixedTime })
 
 	newName := newGroupName(t, "Updated Name")
 	desc := "New description"
 	descPtr := &desc
-	g.UpdateMetadata(&newName, &descPtr)
+	g.UpdateMetadata(&newName, &descPtr, fixedTime)
 
 	if g.Name().Value() != "Updated Name" {
 		t.Errorf("Name() = %q, want %q", g.Name().Value(), "Updated Name")
@@ -152,10 +150,10 @@ func TestGroup_UpdateMetadata(t *testing.T) {
 func TestGroup_UpdateMetadata_PartialUpdate(t *testing.T) {
 	name := newGroupName(t, "My Group")
 	desc := "original desc"
-	g, _ := group.NewGroup("g-1", name, &desc, group.VisibilityVisible, group.JoinPolicyOpen, testCreator(), nil)
+	g, _ := group.NewGroup("g-1", name, &desc, group.VisibilityVisible, group.JoinPolicyOpen, testCreator(), time.Now())
 
 	newName := newGroupName(t, "New Name")
-	g.UpdateMetadata(&newName, nil) // nil **string = no tocar description
+	g.UpdateMetadata(&newName, nil, time.Now()) // nil **string = no tocar description
 
 	if g.Name().Value() != "New Name" {
 		t.Errorf("Name should be updated")
@@ -168,10 +166,10 @@ func TestGroup_UpdateMetadata_PartialUpdate(t *testing.T) {
 func TestGroup_UpdateMetadata_ClearDescription(t *testing.T) {
 	name := newGroupName(t, "My Group")
 	desc := "will be cleared"
-	g, _ := group.NewGroup("g-1", name, &desc, group.VisibilityVisible, group.JoinPolicyOpen, testCreator(), nil)
+	g, _ := group.NewGroup("g-1", name, &desc, group.VisibilityVisible, group.JoinPolicyOpen, testCreator(), time.Now())
 
 	var nilStr *string
-	g.UpdateMetadata(nil, &nilStr) // &nilStr = limpiar description
+	g.UpdateMetadata(nil, &nilStr, time.Now()) // &nilStr = limpiar description
 
 	if g.Description() != nil {
 		t.Errorf("Description should be nil after clearing, got %q", *g.Description())
@@ -180,13 +178,12 @@ func TestGroup_UpdateMetadata_ClearDescription(t *testing.T) {
 
 func TestGroup_UpdatePolicies_NilNilNoOp(t *testing.T) {
 	name := newGroupName(t, "My Group")
-	g, _ := group.NewGroup("g-1", name, nil, group.VisibilityVisible, group.JoinPolicyOpen, testCreator(), nil)
+	g, _ := group.NewGroup("g-1", name, nil, group.VisibilityVisible, group.JoinPolicyOpen, testCreator(), time.Now())
 	before := g.UpdatedAt()
 
 	fixed := before.Add(time.Hour)
-	g.WithClock(func() time.Time { return fixed })
 
-	if err := g.UpdatePolicies(nil, nil); err != nil {
+	if err := g.UpdatePolicies(nil, nil, fixed); err != nil {
 		t.Fatalf("UpdatePolicies(nil, nil) unexpected error: %v", err)
 	}
 	if !g.UpdatedAt().Equal(before) {
@@ -196,11 +193,11 @@ func TestGroup_UpdatePolicies_NilNilNoOp(t *testing.T) {
 
 func TestGroup_UpdatePolicies_InvalidCombination(t *testing.T) {
 	name := newGroupName(t, "My Group")
-	g, _ := group.NewGroup("g-1", name, nil, group.VisibilityVisible, group.JoinPolicyOpen, testCreator(), nil)
+	g, _ := group.NewGroup("g-1", name, nil, group.VisibilityVisible, group.JoinPolicyOpen, testCreator(), time.Now())
 
 	notVisible := group.VisibilityNotVisible
 	open := group.JoinPolicyOpen
-	err := g.UpdatePolicies(&notVisible, &open)
+	err := g.UpdatePolicies(&notVisible, &open, time.Now())
 	if err == nil {
 		t.Error("UpdatePolicies(NOT_VISIBLE, OPEN) expected error, got nil")
 	}
@@ -208,10 +205,10 @@ func TestGroup_UpdatePolicies_InvalidCombination(t *testing.T) {
 
 func TestGroup_UpdatePolicies_ValidChangeJoinPolicy(t *testing.T) {
 	name := newGroupName(t, "My Group")
-	g, _ := group.NewGroup("g-1", name, nil, group.VisibilityVisible, group.JoinPolicyOpen, testCreator(), nil)
+	g, _ := group.NewGroup("g-1", name, nil, group.VisibilityVisible, group.JoinPolicyOpen, testCreator(), time.Now())
 
 	invite := group.JoinPolicyInvite
-	err := g.UpdatePolicies(nil, &invite)
+	err := g.UpdatePolicies(nil, &invite, time.Now())
 	if err != nil {
 		t.Errorf("UpdatePolicies(nil, INVITE) unexpected error: %v", err)
 	}
@@ -222,11 +219,11 @@ func TestGroup_UpdatePolicies_ValidChangeJoinPolicy(t *testing.T) {
 
 func TestGroup_UpdatePolicies_ValidChangeVisibility(t *testing.T) {
 	name := newGroupName(t, "My Group")
-	g, _ := group.NewGroup("g-1", name, nil, group.VisibilityVisible, group.JoinPolicyOpen, testCreator(), nil)
+	g, _ := group.NewGroup("g-1", name, nil, group.VisibilityVisible, group.JoinPolicyOpen, testCreator(), time.Now())
 
 	notVisible := group.VisibilityNotVisible
 	invite := group.JoinPolicyInvite
-	err := g.UpdatePolicies(&notVisible, &invite)
+	err := g.UpdatePolicies(&notVisible, &invite, time.Now())
 	if err != nil {
 		t.Errorf("UpdatePolicies(NOT_VISIBLE, INVITE) unexpected error: %v", err)
 	}

@@ -27,14 +27,6 @@ type Problem struct {
 	judgingUpdatedAt *time.Time
 	createdAt        time.Time
 	updatedAt        time.Time
-	clock            func() time.Time
-}
-
-func (p *Problem) now() time.Time { return p.clock().UTC() }
-
-func (p *Problem) WithClock(fn func() time.Time) *Problem {
-	p.clock = fn
-	return p
 }
 
 func (p *Problem) ID() string                        { return p.id }
@@ -67,10 +59,13 @@ func NewProblem(
 	langOverrides []LanguageOverride,
 	tags Tags,
 	authorID shared.UserID,
-) *Problem {
-	now := time.Now().UTC()
+	now time.Time,
+) (*Problem, error) {
+	if id == "" {
+		return nil, apperror.NewInternal()
+	}
+	t := now.UTC()
 	return &Problem{
-		clock:         time.Now,
 		id:            id,
 		slug:          slug,
 		title:         title,
@@ -84,9 +79,9 @@ func NewProblem(
 		authorID:      authorID,
 		modifierIDs:   []shared.UserID{},
 		solutions:     []JudgingFile{},
-		createdAt:     now,
-		updatedAt:     now,
-	}
+		createdAt:     t,
+		updatedAt:     t,
+	}, nil
 }
 
 func (p *Problem) UpdateMetadata(
@@ -96,6 +91,7 @@ func (p *Problem) UpdateMetadata(
 	memoryLimit *MemoryLimit,
 	langOverrides []LanguageOverride,
 	tags *Tags,
+	now time.Time,
 ) {
 	if title != nil {
 		p.title = *title
@@ -117,7 +113,7 @@ func (p *Problem) UpdateMetadata(
 	if tags != nil {
 		p.tags = *tags
 	}
-	p.updatedAt = p.now()
+	p.updatedAt = now.UTC()
 }
 
 func (p *Problem) CanBeEditedBy(userID shared.UserID, isAdmin bool) bool {
@@ -132,23 +128,23 @@ func (p *Problem) CanBeEditedBy(userID shared.UserID, isAdmin bool) bool {
 	return false
 }
 
-func (p *Problem) Unpublish() error {
+func (p *Problem) Unpublish(now time.Time) error {
 	if !p.status.IsPublished() {
 		return apperror.NewConflict(ErrCodeAlreadyDraft, "Problem is already unpublished")
 	}
 	p.status = NewStatusDraft()
-	p.updatedAt = p.now()
+	p.updatedAt = now.UTC()
 	return nil
 }
 
-func (p *Problem) UpdateAccessibility(acc Accessibility) {
+func (p *Problem) UpdateAccessibility(acc Accessibility, now time.Time) {
 	p.accessibility = acc
-	p.updatedAt = p.now()
+	p.updatedAt = now.UTC()
 }
 
 const MaxModifiers = 20
 
-func (p *Problem) AddModifier(userID shared.UserID) error {
+func (p *Problem) AddModifier(userID shared.UserID, now time.Time) error {
 	if len(p.modifierIDs) >= MaxModifiers {
 		return apperror.NewBadRequest(ErrCodeTooManyModifiers, "Maximum number of modifiers reached")
 	}
@@ -158,11 +154,11 @@ func (p *Problem) AddModifier(userID shared.UserID) error {
 		}
 	}
 	p.modifierIDs = append(p.modifierIDs, userID)
-	p.updatedAt = p.now()
+	p.updatedAt = now.UTC()
 	return nil
 }
 
-func (p *Problem) RemoveModifier(userID shared.UserID) error {
+func (p *Problem) RemoveModifier(userID shared.UserID, now time.Time) error {
 	found := false
 	newModifiers := make([]shared.UserID, 0, len(p.modifierIDs))
 	for _, id := range p.modifierIDs {
@@ -176,41 +172,41 @@ func (p *Problem) RemoveModifier(userID shared.UserID) error {
 		return apperror.NewNotFound(ErrCodeModifierNotFound, "User is not a modifier of this problem")
 	}
 	p.modifierIDs = newModifiers
-	p.updatedAt = p.now()
+	p.updatedAt = now.UTC()
 	return nil
 }
 
-func (p *Problem) touchJudgingUpdatedAt() {
-	now := p.now()
-	p.judgingUpdatedAt = &now
-	p.updatedAt = now
+func (p *Problem) touchJudgingUpdatedAt(now time.Time) {
+	t := now.UTC()
+	p.judgingUpdatedAt = &t
+	p.updatedAt = t
 }
 
-func (p *Problem) SetTestCases(fileKey string) {
+func (p *Problem) SetTestCases(fileKey string, now time.Time) {
 	p.testCasesKey = &fileKey
-	p.touchJudgingUpdatedAt()
+	p.touchJudgingUpdatedAt(now)
 }
 
-func (p *Problem) RemoveTestCases() {
+func (p *Problem) RemoveTestCases(now time.Time) {
 	p.testCasesKey = nil
-	p.touchJudgingUpdatedAt()
+	p.touchJudgingUpdatedAt(now)
 }
 
-func (p *Problem) AddSolution(solution JudgingFile) *JudgingFile {
+func (p *Problem) AddSolution(solution JudgingFile, now time.Time) *JudgingFile {
 	for i, sol := range p.solutions {
 		if sol.Filename() == solution.Filename() {
 			old := sol
 			p.solutions[i] = solution
-			p.updatedAt = p.now()
+			p.updatedAt = now.UTC()
 			return &old
 		}
 	}
 	p.solutions = append(p.solutions, solution)
-	p.updatedAt = p.now()
+	p.updatedAt = now.UTC()
 	return nil
 }
 
-func (p *Problem) RemoveSolution(filename string) {
+func (p *Problem) RemoveSolution(filename string, now time.Time) {
 	newSolutions := make([]JudgingFile, 0, len(p.solutions))
 	for _, sol := range p.solutions {
 		if sol.Filename() != filename {
@@ -218,27 +214,27 @@ func (p *Problem) RemoveSolution(filename string) {
 		}
 	}
 	p.solutions = newSolutions
-	p.updatedAt = p.now()
+	p.updatedAt = now.UTC()
 }
 
-func (p *Problem) SetChecker(checker JudgingFile) {
+func (p *Problem) SetChecker(checker JudgingFile, now time.Time) {
 	p.checker = &checker
-	p.touchJudgingUpdatedAt()
+	p.touchJudgingUpdatedAt(now)
 }
 
-func (p *Problem) RemoveChecker() {
+func (p *Problem) RemoveChecker(now time.Time) {
 	p.checker = nil
-	p.touchJudgingUpdatedAt()
+	p.touchJudgingUpdatedAt(now)
 }
 
-func (p *Problem) SetValidator(validator JudgingFile) {
+func (p *Problem) SetValidator(validator JudgingFile, now time.Time) {
 	p.validator = &validator
-	p.touchJudgingUpdatedAt()
+	p.touchJudgingUpdatedAt(now)
 }
 
-func (p *Problem) RemoveValidator() {
+func (p *Problem) RemoveValidator(now time.Time) {
 	p.validator = nil
-	p.touchJudgingUpdatedAt()
+	p.touchJudgingUpdatedAt(now)
 }
 
 func RestoreProblem(
@@ -285,7 +281,6 @@ func RestoreProblem(
 	}
 
 	return &Problem{
-		clock:            time.Now,
 		id:               id,
 		slug:             RestoreSlug(slug),
 		title:            RestoreTitle(title),

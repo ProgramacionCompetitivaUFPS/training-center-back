@@ -22,14 +22,15 @@ func NewEmailChangeRequest(userID string, newEmail Email, code string, now time.
 	if userID == "" || code == "" {
 		return nil, apperror.NewInternal()
 	}
+	t := now.UTC()
 	return &EmailChangeRequest{
 		id:        uuid.New().String(),
 		userID:    userID,
 		newEmail:  newEmail,
 		code:      code,
 		status:    StatusPending,
-		expiresAt: now.Add(15 * time.Minute),
-		createdAt: now,
+		expiresAt: t.Add(15 * time.Minute),
+		createdAt: t,
 	}, nil
 }
 
@@ -64,7 +65,8 @@ func (r *EmailChangeRequest) MarkAsUsed(now time.Time) error {
 		return apperror.NewConflict(ErrCodeEmailChangeNotPending, "email change request is not pending")
 	}
 	r.status = StatusUsed
-	r.updatedAt = &now
+	t := now.UTC()
+	r.updatedAt = &t
 	return nil
 }
 
