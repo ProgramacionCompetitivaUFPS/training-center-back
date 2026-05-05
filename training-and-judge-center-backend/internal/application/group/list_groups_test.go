@@ -112,9 +112,8 @@ func mustGroup(t *testing.T, id, name string, visibility domainGroup.Visibility,
 	if err != nil {
 		t.Fatalf("NewGroupName: %v", err)
 	}
-	g, err := domainGroup.NewGroup(id, gn, nil, visibility, joinPolicy, shared.RestoreUserID("creator-id"), func() time.Time {
-		return time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
-	})
+	g, err := domainGroup.NewGroup(id, gn, nil, visibility, joinPolicy, shared.RestoreUserID("creator-id"),
+		time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC))
 	if err != nil {
 		t.Fatalf("NewGroup: %v", err)
 	}
@@ -206,7 +205,7 @@ func mustJoinRequest(t *testing.T, id, groupID, userID string) *domainGroup.Join
 	t.Helper()
 	req, err := domainGroup.NewJoinRequest(
 		id, groupID, shared.RestoreUserID(userID), nil,
-		func() time.Time { return time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC) },
+		time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC),
 	)
 	if err != nil {
 		t.Fatalf("NewJoinRequest: %v", err)
@@ -264,7 +263,7 @@ func TestListGroups_EnrichesWithMemberCountAndRole(t *testing.T) {
 	g := mustGroup(t, "g1", "Club Programming", domainGroup.VisibilityVisible, domainGroup.JoinPolicyOpen)
 
 	userID := shared.RestoreUserID("u1")
-	gm, _ := domainGroup.NewGroupMember("m1", "g1", userID, domainGroup.MemberRoleLead, func() time.Time { return time.Now() })
+	gm, _ := domainGroup.NewGroupMember("m1", "g1", userID, domainGroup.MemberRoleLead, time.Now())
 
 	repo := &fakeRepo{groups: []*domainGroup.Group{g}, total: 1}
 	memberRepo := &fakeMemberRepo{

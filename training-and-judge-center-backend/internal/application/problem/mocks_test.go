@@ -11,8 +11,6 @@ import (
 
 var testNow = time.Date(2024, 1, 15, 10, 0, 0, 0, time.UTC)
 
-func fixedClock() time.Time { return testNow }
-
 // ── Repository mock ──────────────────────────────────────────────────────────
 
 type mockProblemRepository struct {
@@ -164,7 +162,7 @@ func newDraftProblem() *domainProblem.Problem {
 		nil, []domainProblem.JudgingFile{},
 		nil, nil, nil,
 		testNow, testNow,
-	).WithClock(fixedClock)
+	)
 }
 
 func newPublishedProblem() *domainProblem.Problem {
@@ -178,7 +176,7 @@ func newPublishedProblem() *domainProblem.Problem {
 		nil, []domainProblem.JudgingFile{},
 		nil, nil, nil,
 		testNow, testNow,
-	).WithClock(fixedClock)
+	)
 }
 
 func newDraftProblemWithModifier() *domainProblem.Problem {
@@ -192,7 +190,7 @@ func newDraftProblemWithModifier() *domainProblem.Problem {
 		nil, []domainProblem.JudgingFile{},
 		nil, nil, nil,
 		testNow, testNow,
-	).WithClock(fixedClock)
+	)
 }
 
 func newPublishedProblemWithModifier() *domainProblem.Problem {
@@ -206,7 +204,7 @@ func newPublishedProblemWithModifier() *domainProblem.Problem {
 		nil, []domainProblem.JudgingFile{},
 		nil, nil, nil,
 		testNow, testNow,
-	).WithClock(fixedClock)
+	)
 }
 
 func repoWith(p *domainProblem.Problem) *mockProblemRepository {

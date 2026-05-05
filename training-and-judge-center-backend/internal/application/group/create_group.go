@@ -3,6 +3,7 @@
 import (
 	"context"
 	"log/slog"
+	"time"
 
 	"github.com/google/uuid"
 	domainGroup "github.com/training-judge-center/backend/internal/domain/group"
@@ -70,9 +71,10 @@ func (uc *CreateGroupUseCase) Execute(ctx context.Context, input CreateGroupInpu
 		return nil, apperror.NewConflict(domainGroup.ErrCodeNameAlreadyExists, "A group with this name already exists")
 	}
 
+	now := time.Now()
 	newID := uuid.New().String()
 	creatorID := shared.RestoreUserID(input.CurrentUser.ID)
-	g, err := domainGroup.NewGroup(newID, groupName, input.Description, visibility, joinPolicy, creatorID, nil)
+	g, err := domainGroup.NewGroup(newID, groupName, input.Description, visibility, joinPolicy, creatorID, now)
 	if err != nil {
 		return nil, err
 	}
@@ -82,7 +84,7 @@ func (uc *CreateGroupUseCase) Execute(ctx context.Context, input CreateGroupInpu
 			slog.ErrorContext(ctx, "failed to save new group", "error", err, "group_id", newID)
 			return apperror.NewInternal()
 		}
-		lead, err := domainGroup.NewGroupMember(uuid.New().String(), newID, creatorID, domainGroup.MemberRoleLead, nil)
+		lead, err := domainGroup.NewGroupMember(uuid.New().String(), newID, creatorID, domainGroup.MemberRoleLead, now)
 		if err != nil {
 			return err
 		}

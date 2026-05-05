@@ -527,6 +527,87 @@ En la práctica, la mayoría de los helpers de la capa de aplicación no reciben
 
 ---
 
+### D10 — El tiempo en aggregates: `now time.Time` como parámetro
+
+`time.Now()` es I/O — lee el reloj del sistema. El dominio es lógica pura: no hace I/O. Ningún archivo de `domain/` llama `time.Now()` directamente ni almacena una función que lo llame.
+
+**Regla:** todo constructor o método de dominio que necesita la hora actual recibe `now time.Time` como parámetro explícito. El use case llama `time.Now()` una sola vez y lo pasa hacia adentro. El dominio solo recibe datos y los procesa.
+
+```go
+// ✅ — el aggregate no sabe qué hora es; recibe la hora como dato
+func NewGroup(id string, name GroupName, ..., now time.Time) (*Group, error) {
+    if id == "" {
+        return nil, apperror.NewInternal()
+    }
+    return &Group{
+        id:        id,
+        name:      name,
+        createdAt: now.UTC(),
+        updatedAt: now.UTC(),
+        ...
+    }, nil
+}
+
+func (g *Group) UpdateMetadata(name *GroupName, description **string, now time.Time) {
+    if name != nil { g.name = *name }
+    if description != nil { g.description = *description }
+    g.updatedAt = now.UTC()
+}
+
+// ✅ — Restore* recibe los timestamps exactos desde la DB; no necesita now
+func RestoreGroup(id string, ..., createdAt, updatedAt time.Time) *Group {
+    return &Group{id: id, createdAt: createdAt, updatedAt: updatedAt, ...}
+}
+```
+
+```go
+// ❌ — time.Now() desde el dominio: efecto secundario oculto
+func NewGroup(...) (*Group, error) {
+    now := time.Now()   // ← I/O dentro del hexágono
+    return &Group{createdAt: now, ...}, nil
+}
+
+// ❌ — clock almacenado: el aggregate sigue conteniendo I/O
+type Group struct {
+    clock func() time.Time  // ← dependencia de infraestructura almacenada
+}
+func (g *Group) UpdateMetadata(...) {
+    g.updatedAt = g.clock()  // ← sigue siendo I/O, aunque esté abstraído
+}
+```
+
+**Por qué `now time.Time` es más fuerte que clock injection:**
+
+Clock injection resuelve el problema de testabilidad pero no el de pureza: el aggregate almacena una función que llama I/O. Con `now time.Time`, el aggregate no tiene ningún vínculo con el exterior — es una función matemática. Mismos inputs, mismo resultado, siempre. No necesita `WithClock`, no tiene estado extra, no necesita inicialización especial en tests.
+
+**En la capa de aplicación** — el use case obtiene `now` una sola vez:
+
+```go
+// ✅ — la capa de aplicación hace el I/O, el dominio recibe el dato
+func (uc *UpdateGroupUseCase) Execute(ctx context.Context, in UpdateGroupInput) error {
+    g, _ := uc.repo.FindByID(ctx, in.GroupID)
+    now := time.Now()           // ← único lugar donde vive time.Now()
+    g.UpdateMetadata(&name, nil, now)
+    return uc.repo.Update(ctx, g)
+}
+```
+
+**En tests** — no se necesita `WithClock` ni ninguna infraestructura especial:
+
+```go
+// ✅ — se pasa cualquier time.Time directamente
+var testNow = time.Date(2024, 1, 15, 12, 0, 0, 0, time.UTC)
+
+func TestUpdateMetadata_UpdatesName(t *testing.T) {
+    g, _ := group.NewGroup("id-1", name, nil, visibility, joinPolicy, createdBy, testNow)
+    newName, _ := group.NewGroupName("new name")
+    g.UpdateMetadata(&newName, nil, testNow.Add(time.Hour))
+    // g.UpdatedAt() == testNow.Add(time.Hour) ← determinista
+}
+```
+
+---
+
 ## 5. Application layer conventions
 
 ### A1 — Use case structs carry the `UseCase` suffix

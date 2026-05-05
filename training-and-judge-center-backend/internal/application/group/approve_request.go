@@ -3,6 +3,7 @@
 import (
 	"context"
 	"log/slog"
+	"time"
 
 	"github.com/google/uuid"
 	domainGroup "github.com/training-judge-center/backend/internal/domain/group"
@@ -65,7 +66,7 @@ func (uc *ApproveRequestUseCase) Execute(ctx context.Context, input ApproveReque
 			return apperror.NewInternal()
 		}
 
-		newMember, err := domainGroup.NewGroupMember(uuid.New().String(), input.GroupID, req.RequesterUserID(), domainGroup.MemberRoleMember, nil)
+		newMember, err := domainGroup.NewGroupMember(uuid.New().String(), input.GroupID, req.RequesterUserID(), domainGroup.MemberRoleMember, time.Now())
 		if err != nil {
 			return err
 		}

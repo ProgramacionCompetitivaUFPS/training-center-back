@@ -23,10 +23,7 @@ type Material struct {
 	// It is never cleared once set, even if the material is unpublished.
 	// A non-nil publishedAt means "has ever been published", not "is currently published".
 	publishedAt *time.Time
-	clock       func() time.Time
 }
-
-func (m *Material) now() time.Time { return m.clock().UTC() }
 
 func (m *Material) ID() string              { return m.id }
 func (m *Material) Title() Title            { return m.title }
@@ -41,15 +38,13 @@ func (m *Material) CreatedAt() time.Time    { return m.createdAt }
 func (m *Material) UpdatedAt() time.Time    { return m.updatedAt }
 func (m *Material) PublishedAt() *time.Time { return m.publishedAt }
 
-// NewMaterial constructs a validated Material. Pass a non-nil clock for deterministic
-// timestamps in tests; nil defaults to time.Now.
 func NewMaterial(
 	id, groupID string,
 	authorID shared.UserID,
 	title Title,
 	content Content,
 	tags Tags,
-	clock func() time.Time,
+	now time.Time,
 ) (*Material, error) {
 	if id == "" {
 		return nil, apperror.NewBadRequest("INVALID_MATERIAL_ID", "material id cannot be empty")
@@ -60,12 +55,8 @@ func NewMaterial(
 	if authorID.Value() == "" {
 		return nil, apperror.NewBadRequest("INVALID_AUTHOR_ID", "material author id cannot be empty")
 	}
-	if clock == nil {
-		clock = time.Now
-	}
-	now := clock().UTC()
+	t := now.UTC()
 	return &Material{
-		clock:     clock,
 		id:        id,
 		title:     title,
 		content:   content,
@@ -74,14 +65,9 @@ func NewMaterial(
 		pinned:    false,
 		groupID:   groupID,
 		authorID:  authorID,
-		createdAt: now,
-		updatedAt: now,
+		createdAt: t,
+		updatedAt: t,
 	}, nil
-}
-
-func (m *Material) WithClock(fn func() time.Time) *Material {
-	m.clock = fn
-	return m
 }
 
 func RestoreMaterial(
@@ -96,7 +82,6 @@ func RestoreMaterial(
 	publishedAt *time.Time,
 ) *Material {
 	return &Material{
-		clock:       time.Now,
 		id:          id,
 		title:       RestoreTitle(title),
 		content:     RestoreContent(content),
@@ -112,14 +97,14 @@ func RestoreMaterial(
 	}
 }
 
-func (m *Material) Publish() error {
+func (m *Material) Publish(now time.Time) error {
 	if m.status.IsPublished() {
 		return apperror.NewConflict(ErrCodeAlreadyPublished, "material is already published")
 	}
-	now := m.now()
+	t := now.UTC()
 	m.status = NewStatusPublished()
-	m.publishedAt = &now
-	m.updatedAt = now
+	m.publishedAt = &t
+	m.updatedAt = t
 	return nil
 }
 
@@ -127,41 +112,41 @@ func (m *Material) Publish() error {
 // first-publish timestamp — (status=DRAFT, publishedAt!=nil) is a valid state
 // meaning "was published at least once". List queries must filter by status,
 // not by publishedAt, to determine visibility.
-func (m *Material) Unpublish() error {
+func (m *Material) Unpublish(now time.Time) error {
 	if m.status.IsDraft() {
 		return apperror.NewConflict(ErrCodeAlreadyDraft, "material is already unpublished")
 	}
 	m.status = NewStatusDraft()
 	m.pinned = false
 	m.pinnedAt = nil
-	m.updatedAt = m.now()
+	m.updatedAt = now.UTC()
 	return nil
 }
 
-func (m *Material) Pin() error {
+func (m *Material) Pin(now time.Time) error {
 	if m.status.IsDraft() {
 		return apperror.NewBadRequest(ErrCodeCannotPinDraft, "cannot pin a draft material, publish it first")
 	}
 	if m.pinned {
 		return nil
 	}
-	now := m.now()
+	t := now.UTC()
 	m.pinned = true
-	m.pinnedAt = &now
-	m.updatedAt = now
+	m.pinnedAt = &t
+	m.updatedAt = t
 	return nil
 }
 
-func (m *Material) Unpin() {
+func (m *Material) Unpin(now time.Time) {
 	if !m.pinned {
 		return
 	}
 	m.pinned = false
 	m.pinnedAt = nil
-	m.updatedAt = m.now()
+	m.updatedAt = now.UTC()
 }
 
-func (m *Material) UpdateMetadata(title *Title, content *Content, tags *Tags) {
+func (m *Material) UpdateMetadata(title *Title, content *Content, tags *Tags, now time.Time) {
 	if title != nil {
 		m.title = *title
 	}
@@ -171,7 +156,7 @@ func (m *Material) UpdateMetadata(title *Title, content *Content, tags *Tags) {
 	if tags != nil {
 		m.tags = *tags
 	}
-	m.updatedAt = m.now()
+	m.updatedAt = now.UTC()
 }
 
 // Edit rights are tied to authorship, not current group membership — a user

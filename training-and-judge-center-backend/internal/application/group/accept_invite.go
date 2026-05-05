@@ -2,6 +2,7 @@
 
 import (
 	"context"
+	"time"
 
 	"github.com/google/uuid"
 	domainGroup "github.com/training-judge-center/backend/internal/domain/group"
@@ -67,7 +68,7 @@ func (uc *AcceptInviteUseCase) Execute(ctx context.Context, input AcceptInviteIn
 		return nil, apperror.NewConflict(domainGroup.ErrCodeAlreadyMember, "you are already a member of this group")
 	}
 
-	member, err := domainGroup.NewGroupMember(uuid.New().String(), claims.GroupID, userID, domainGroup.MemberRoleMember, nil)
+	member, err := domainGroup.NewGroupMember(uuid.New().String(), claims.GroupID, userID, domainGroup.MemberRoleMember, time.Now())
 	if err != nil {
 		return nil, err
 	}

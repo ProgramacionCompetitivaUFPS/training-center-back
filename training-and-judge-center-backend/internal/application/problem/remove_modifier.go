@@ -3,6 +3,7 @@
 import (
 	"context"
 	"log/slog"
+	"time"
 
 	"github.com/training-judge-center/backend/internal/domain/problem"
 	"github.com/training-judge-center/backend/internal/domain/shared"
@@ -47,7 +48,7 @@ func (uc *RemoveModifierUseCase) Execute(ctx context.Context, input RemoveModifi
 		return struct{}{}, err
 	}
 
-	if err := p.RemoveModifier(modifierID); err != nil {
+	if err := p.RemoveModifier(modifierID, time.Now()); err != nil {
 		return struct{}{}, err
 	}
 

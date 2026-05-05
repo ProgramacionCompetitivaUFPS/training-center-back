@@ -3,6 +3,7 @@
 import (
 	"context"
 	"log/slog"
+	"time"
 
 	"github.com/training-judge-center/backend/internal/domain/problem"
 	"github.com/training-judge-center/backend/internal/domain/shared"
@@ -46,7 +47,7 @@ func (uc *ChangeAccessibilityUseCase) Execute(ctx context.Context, in ChangeAcce
 		return nil, apperror.NewForbidden(apperror.ErrCodeForbidden, "Only the problem author, Admin, or assigned modifiers can change this problem's accessibility")
 	}
 
-	p.UpdateAccessibility(newAcc)
+	p.UpdateAccessibility(newAcc, time.Now())
 
 	if err := uc.repo.Save(ctx, p); err != nil {
 		slog.ErrorContext(ctx, "failed to save problem after accessibility change", "error", err, "slug", p.Slug().String())

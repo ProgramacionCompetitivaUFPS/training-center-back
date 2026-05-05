@@ -3,6 +3,7 @@
 import (
 	"context"
 	"log/slog"
+	"time"
 
 	"github.com/google/uuid"
 	domainGroup "github.com/training-judge-center/backend/internal/domain/group"
@@ -70,7 +71,7 @@ func (uc *RequestJoinUseCase) Execute(ctx context.Context, input RequestJoinInpu
 		return nil, apperror.NewConflict(domainGroup.ErrCodeRequestAlreadyPending, "you already have a pending request for this group")
 	}
 
-	req, err := domainGroup.NewJoinRequest(uuid.New().String(), g.ID(), callerID, input.Message, nil)
+	req, err := domainGroup.NewJoinRequest(uuid.New().String(), g.ID(), callerID, input.Message, time.Now())
 	if err != nil {
 		return nil, err
 	}

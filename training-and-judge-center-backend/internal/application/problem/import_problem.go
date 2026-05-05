@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/training-judge-center/backend/internal/domain/problem"
@@ -130,8 +131,9 @@ func (uc *ImportProblemUseCase) Execute(ctx context.Context, input ImportProblem
 		}
 	}
 
+	now := time.Now()
 	newID := uuid.New().String()
-	newProblem := problem.NewProblem(
+	newProblem, err := problem.NewProblem(
 		newID,
 		slug,
 		title,
@@ -141,7 +143,11 @@ func (uc *ImportProblemUseCase) Execute(ctx context.Context, input ImportProblem
 		nil,
 		problem.Tags{},
 		shared.RestoreUserID(input.CurrentUser.ID),
+		now,
 	)
+	if err != nil {
+		return nil, err
+	}
 
 	if pkg.ZipData != nil {
 		uploadInstanceID := uuid.New().String()
@@ -175,7 +181,7 @@ func (uc *ImportProblemUseCase) Execute(ctx context.Context, input ImportProblem
 			return nil, err
 		}
 
-		newProblem.SetTestCases(basePath)
+		newProblem.SetTestCases(basePath, now)
 	}
 
 	for _, sol := range pkg.Solutions {
@@ -196,17 +202,17 @@ func (uc *ImportProblemUseCase) Execute(ctx context.Context, input ImportProblem
 			return nil, apperror.NewInternal()
 		}
 		uploadedKeys = append(uploadedKeys, fileKey)
-		newProblem.AddSolution(solutionObj)
+		newProblem.AddSolution(solutionObj, now)
 	}
 
 	if pkg.Checker != nil {
-		if err := uc.uploadVerifier(ctx, slug.String(), FileTypeChecker, pkg.Checker, newProblem, &uploadedKeys, cleanup); err != nil {
+		if err := uc.uploadVerifier(ctx, slug.String(), FileTypeChecker, pkg.Checker, newProblem, &uploadedKeys, cleanup, now); err != nil {
 			return nil, err
 		}
 	}
 
 	if pkg.Validator != nil {
-		if err := uc.uploadVerifier(ctx, slug.String(), FileTypeValidator, pkg.Validator, newProblem, &uploadedKeys, cleanup); err != nil {
+		if err := uc.uploadVerifier(ctx, slug.String(), FileTypeValidator, pkg.Validator, newProblem, &uploadedKeys, cleanup, now); err != nil {
 			return nil, err
 		}
 	}
@@ -238,6 +244,7 @@ func (uc *ImportProblemUseCase) uploadVerifier(
 	p *problem.Problem,
 	uploadedKeys *[]string,
 	cleanup func(),
+	now time.Time,
 ) error {
 	cleanName := filepath.Base(f.Path)
 	ext := strings.ToLower(filepath.Ext(cleanName))
@@ -262,9 +269,9 @@ func (uc *ImportProblemUseCase) uploadVerifier(
 
 	switch fileType {
 	case FileTypeChecker:
-		p.SetChecker(verifierObj)
+		p.SetChecker(verifierObj, now)
 	case FileTypeValidator:
-		p.SetValidator(verifierObj)
+		p.SetValidator(verifierObj, now)
 	}
 	return nil
 }

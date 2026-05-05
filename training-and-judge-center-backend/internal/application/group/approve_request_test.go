@@ -16,13 +16,13 @@ func newApproveUC(memberRepo *fakeMemberRepo, reqRepo *fakeJoinRequestRepo) *App
 
 func leadMemberRepo(groupID, userID string) *fakeMemberRepo {
 	uid := shared.RestoreUserID(userID)
-	lead, _ := domainGroup.NewGroupMember("m-lead", groupID, uid, domainGroup.MemberRoleLead, nil)
+	lead, _ := domainGroup.NewGroupMember("m-lead", groupID, uid, domainGroup.MemberRoleLead, time.Now())
 	return &fakeMemberRepo{memberships: map[string]*domainGroup.GroupMember{keyOf(groupID, uid): lead}}
 }
 
 func pendingRequest(id, groupID, requesterID string) *domainGroup.JoinRequest {
 	req, _ := domainGroup.NewJoinRequest(id, groupID, shared.RestoreUserID(requesterID), nil,
-		func() time.Time { return time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC) })
+		time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC))
 	return req
 }
 
@@ -137,7 +137,7 @@ func TestApproveRequest_AlreadyMemberReturns409(t *testing.T) {
 	reqRepo := &fakeJoinRequestRepo{requests: []*domainGroup.JoinRequest{req}}
 
 	requesterUID := shared.RestoreUserID("requester-id")
-	existingMember, _ := domainGroup.NewGroupMember("m-existing", "g1", requesterUID, domainGroup.MemberRoleMember, nil)
+	existingMember, _ := domainGroup.NewGroupMember("m-existing", "g1", requesterUID, domainGroup.MemberRoleMember, time.Now())
 
 	memberRepo := leadMemberRepo("g1", "lead-id")
 	memberRepo.memberships[keyOf("g1", requesterUID)] = existingMember

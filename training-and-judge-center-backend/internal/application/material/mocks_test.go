@@ -13,8 +13,6 @@ import (
 
 var testNow = time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
 
-func fixedClock() time.Time { return testNow }
-
 // ── Repository mock ──────────────────────────────────────────────────────────
 
 type mockMaterialRepository struct {
@@ -185,7 +183,7 @@ func newTestMaterial() *domainMaterial.Material {
 		testNow,
 		testNow,
 		nil,
-	).WithClock(fixedClock)
+	)
 }
 
 func newPublishedMaterial() *domainMaterial.Material {
@@ -203,7 +201,7 @@ func newPublishedMaterial() *domainMaterial.Material {
 		testNow,
 		testNow,
 		&now,
-	).WithClock(fixedClock)
+	)
 }
 
 func newPinnedMaterial() *domainMaterial.Material {
@@ -221,7 +219,7 @@ func newPinnedMaterial() *domainMaterial.Material {
 		testNow,
 		testNow,
 		&now,
-	).WithClock(fixedClock)
+	)
 }
 
 func repoWith(m *domainMaterial.Material) *mockMaterialRepository {

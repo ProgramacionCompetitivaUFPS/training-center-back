@@ -2,6 +2,7 @@
 
 import (
 	"context"
+	"time"
 
 	"github.com/google/uuid"
 	appshared "github.com/training-judge-center/backend/internal/application/shared"
@@ -145,7 +146,7 @@ func (usecase *CreateProblemUseCase) Execute(ctx context.Context, input CreatePr
 	}
 
 	newID := uuid.New().String()
-	newProblem := problem.NewProblem(
+	newProblem, err := problem.NewProblem(
 		newID,
 		slug,
 		title,
@@ -155,7 +156,11 @@ func (usecase *CreateProblemUseCase) Execute(ctx context.Context, input CreatePr
 		validOverrides,
 		tags,
 		shared.RestoreUserID(input.CurrentUser.ID),
+		time.Now(),
 	)
+	if err != nil {
+		return nil, err
+	}
 
 	if err := usecase.repo.Save(ctx, newProblem); err != nil {
 		return nil, err

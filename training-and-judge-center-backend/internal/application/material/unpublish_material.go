@@ -3,6 +3,7 @@
 import (
 	"context"
 	"log/slog"
+	"time"
 
 	domainMaterial "github.com/training-judge-center/backend/internal/domain/material"
 	"github.com/training-judge-center/backend/internal/domain/shared"
@@ -59,7 +60,7 @@ func (uc *UnpublishMaterial) Execute(ctx context.Context, in UnpublishMaterialIn
 
 	// Idempotent: already-draft materials return 200 with current state.
 	if !m.Status().IsDraft() {
-		if err := m.Unpublish(); err != nil {
+		if err := m.Unpublish(time.Now()); err != nil {
 			return nil, err
 		}
 		if err := uc.repo.Save(ctx, m); err != nil {

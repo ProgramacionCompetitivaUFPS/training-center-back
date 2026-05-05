@@ -59,15 +59,16 @@ type DeactivationRequest struct {
 }
 
 func NewDeactivationRequest(userID, verificationCode string, now time.Time) *DeactivationRequest {
+	t := now.UTC()
 	return &DeactivationRequest{
 		id:               uuid.New().String(),
 		userID:           userID,
 		verificationCode: verificationCode,
-		expiresAt:        now.Add(15 * time.Minute),
+		expiresAt:        t.Add(15 * time.Minute),
 		attempts:         0,
 		status:           DeactivationStatusPending,
-		createdAt:        now,
-		updatedAt:        now,
+		createdAt:        t,
+		updatedAt:        t,
 	}
 }
 
@@ -106,15 +107,16 @@ func (r *DeactivationRequest) UpdatedAt() time.Time       { return r.updatedAt }
 
 func (r *DeactivationRequest) MarkAsExpired(now time.Time) {
 	r.status = DeactivationStatusExpired
-	r.updatedAt = now
+	r.updatedAt = now.UTC()
 }
 
 func (r *DeactivationRequest) RegisterFailure(now time.Time) {
+	t := now.UTC()
 	r.attempts++
-	r.updatedAt = now
+	r.updatedAt = t
 	if r.attempts >= MaxDeactivationAttempts {
 		r.status = DeactivationStatusBlocked
-		blockedUntil := now.Add(DeactivationBlockDuration)
+		blockedUntil := t.Add(DeactivationBlockDuration)
 		r.blockedUntil = &blockedUntil
 	}
 }
@@ -135,5 +137,5 @@ func (r *DeactivationRequest) IsExpired(now time.Time) bool {
 
 func (r *DeactivationRequest) Confirm(now time.Time) {
 	r.status = DeactivationStatusConfirmed
-	r.updatedAt = now
+	r.updatedAt = now.UTC()
 }
