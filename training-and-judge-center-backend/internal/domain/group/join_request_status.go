@@ -2,17 +2,23 @@ package group
 
 import "github.com/training-judge-center/backend/pkg/apperror"
 
+const (
+	joinRequestStatusPending  = "PENDING"
+	joinRequestStatusApproved = "APPROVED"
+	joinRequestStatusRejected = "REJECTED"
+)
+
 type JoinRequestStatus struct{ value string }
 
 var (
-	JoinRequestStatusPending  = JoinRequestStatus{value: "PENDING"}
-	JoinRequestStatusApproved = JoinRequestStatus{value: "APPROVED"}
-	JoinRequestStatusRejected = JoinRequestStatus{value: "REJECTED"}
+	JoinRequestStatusPending  = JoinRequestStatus{value: joinRequestStatusPending}
+	JoinRequestStatusApproved = JoinRequestStatus{value: joinRequestStatusApproved}
+	JoinRequestStatusRejected = JoinRequestStatus{value: joinRequestStatusRejected}
 )
 
 func NewJoinRequestStatus(s string) (JoinRequestStatus, error) {
 	switch s {
-	case "PENDING", "APPROVED", "REJECTED":
+	case joinRequestStatusPending, joinRequestStatusApproved, joinRequestStatusRejected:
 		return JoinRequestStatus{value: s}, nil
 	}
 	return JoinRequestStatus{}, apperror.NewValidation([]apperror.FieldError{

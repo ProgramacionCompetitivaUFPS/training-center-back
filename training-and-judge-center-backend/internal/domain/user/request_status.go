@@ -2,17 +2,23 @@ package user
 
 import "github.com/training-judge-center/backend/pkg/apperror"
 
+const (
+	requestStatusPending = "PENDING"
+	requestStatusUsed    = "USED"
+	requestStatusExpired = "EXPIRED"
+)
+
 type RequestStatus struct{ value string }
 
 var (
-	StatusPending = RequestStatus{value: "PENDING"}
-	StatusUsed    = RequestStatus{value: "USED"}
-	StatusExpired = RequestStatus{value: "EXPIRED"}
+	StatusPending = RequestStatus{value: requestStatusPending}
+	StatusUsed    = RequestStatus{value: requestStatusUsed}
+	StatusExpired = RequestStatus{value: requestStatusExpired}
 )
 
 func NewRequestStatus(s string) (RequestStatus, error) {
 	switch s {
-	case "PENDING", "USED", "EXPIRED":
+	case requestStatusPending, requestStatusUsed, requestStatusExpired:
 		return RequestStatus{value: s}, nil
 	}
 	return RequestStatus{}, apperror.NewValidation([]apperror.FieldError{

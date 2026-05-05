@@ -2,17 +2,23 @@ package group
 
 import "github.com/training-judge-center/backend/pkg/apperror"
 
+const (
+	joinPolicyInvite  = "INVITE"
+	joinPolicyRequest = "REQUEST"
+	joinPolicyOpen    = "OPEN"
+)
+
 type JoinPolicy struct{ value string }
 
 var (
-	JoinPolicyInvite  = JoinPolicy{value: "INVITE"}
-	JoinPolicyRequest = JoinPolicy{value: "REQUEST"}
-	JoinPolicyOpen    = JoinPolicy{value: "OPEN"}
+	JoinPolicyInvite  = JoinPolicy{value: joinPolicyInvite}
+	JoinPolicyRequest = JoinPolicy{value: joinPolicyRequest}
+	JoinPolicyOpen    = JoinPolicy{value: joinPolicyOpen}
 )
 
 func NewJoinPolicy(s string) (JoinPolicy, error) {
 	switch s {
-	case "INVITE", "REQUEST", "OPEN":
+	case joinPolicyInvite, joinPolicyRequest, joinPolicyOpen:
 		return JoinPolicy{value: s}, nil
 	}
 	return JoinPolicy{}, apperror.NewValidation([]apperror.FieldError{
