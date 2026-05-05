@@ -62,7 +62,7 @@ func (uc *RequestDeactivationUseCase) Execute(ctx context.Context, input Request
 		return apperror.NewInternal()
 	}
 
-	req := user.NewDeactivationRequest(foundUser.ID(), code, now.Add(15*time.Minute))
+	req := user.NewDeactivationRequest(foundUser.ID(), code, now)
 
 	if err := uc.deactRepo.Save(ctx, req); err != nil {
 		slog.Error("failed to save deactivation request", "user_id", foundUser.ID(), "error", err)

@@ -58,13 +58,12 @@ type DeactivationRequest struct {
 	updatedAt        time.Time
 }
 
-func NewDeactivationRequest(userID, verificationCode string, expiresAt time.Time) *DeactivationRequest {
-	now := time.Now()
+func NewDeactivationRequest(userID, verificationCode string, now time.Time) *DeactivationRequest {
 	return &DeactivationRequest{
 		id:               uuid.New().String(),
 		userID:           userID,
 		verificationCode: verificationCode,
-		expiresAt:        expiresAt,
+		expiresAt:        now.Add(15 * time.Minute),
 		attempts:         0,
 		status:           DeactivationStatusPending,
 		createdAt:        now,
