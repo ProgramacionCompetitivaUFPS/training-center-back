@@ -1,11 +1,11 @@
 package contest
 
-type Status string
+type Status struct{ value string }
 
-const (
-	StatusScheduled Status = "SCHEDULED"
-	StatusActive    Status = "ACTIVE"
-	StatusFinished  Status = "FINISHED"
+var (
+	StatusScheduled = Status{value: "SCHEDULED"}
+	StatusActive    = Status{value: "ACTIVE"}
+	StatusFinished  = Status{value: "FINISHED"}
 )
 
-func (s Status) String() string { return string(s) }
+func (s Status) String() string { return s.value }
