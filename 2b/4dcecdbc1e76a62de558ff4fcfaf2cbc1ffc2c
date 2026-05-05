@@ -1,0 +1,47 @@
+training-and-judge-center-backend/internal/domain/user/deactivation_request.go
+  c49b8dc7a5695ecf 60-63,66,74
+training-and-judge-center-backend/internal/domain/user/deactivation_audit_log.go
+  c49b8dc7a5695ecf 6,19-22,24,31
+training-and-judge-center-backend/internal/application/user/request_deactivation.go
+  c49b8dc7a5695ecf 9,66-71
+training-and-judge-center-backend/internal/application/user/create_user.go
+  c49b8dc7a5695ecf 6,8,66-68
+training-and-judge-center-backend/internal/application/user/admin_deactivate_user.go
+  c49b8dc7a5695ecf 8,54-56
+training-and-judge-center-backend/internal/application/user/request_email_change.go
+  c49b8dc7a5695ecf 11,87-88
+training-and-judge-center-backend/internal/domain/user/email_change.go
+  c49b8dc7a5695ecf 20-21,26
+training-and-judge-center-backend/internal/domain/user/user.go
+  c49b8dc7a5695ecf 42-45,64,74,159,163,167,171-172
+training-and-judge-center-backend/ARCHITECTURE.md
+  c49b8dc7a5695ecf 530,532,534-543,546-548,551,553,558-563,567-568,570-573,576-578,582,585-590,594,597-606,610
+training-and-judge-center-backend/internal/application/user/request_password_recovery.go
+  c49b8dc7a5695ecf 9,83-84
+training-and-judge-center-backend/internal/application/user/login_test.go
+  c49b8dc7a5695ecf 155
+training-and-judge-center-backend/internal/application/user/confirm_deactivation.go
+  c49b8dc7a5695ecf 9,123-124,150-155
+training-and-judge-center-backend/internal/domain/user/password_recovery.go
+  c49b8dc7a5695ecf 19-20,25
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.3.4",
+  "base_commit_sha": "2b4dcecdbc1e76a62de558ff4fcfaf2cbc1ffc2c",
+  "prompts": {
+    "c49b8dc7a5695ecf": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "540d1029-fbc9-4a89-94fd-02efa3d727a9",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "AlexaVJ",
+      "messages": [],
+      "total_additions": 166,
+      "total_deletions": 3477,
+      "accepted_lines": 166,
+      "overriden_lines": 0
+    }
+  }
+}
