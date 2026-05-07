@@ -1,0 +1,132 @@
+training-and-judge-center-backend/internal/domain/group/join_request_test.go
+  s_5b92e7df34171e::t_f07bd22b6224f1 13
+  s_5b92e7df34171e::t_e4c5fec7ef86b7 28
+  s_5b92e7df34171e::t_3c2f5cc858d4f3 21
+  s_5b92e7df34171e::t_cfeda390045e32 35
+training-and-judge-center-backend/internal/application/user/mocks_test.go
+  s_5b92e7df34171e::t_1690a4480e8709 139
+  s_5b92e7df34171e::t_b971e488e32cc1 164,166
+training-and-judge-center-backend/internal/adapter/http/handler/user/update_email_handler.go
+  s_20624790c09ed7::t_4a30af18098638 66-67,74
+training-and-judge-center-backend/internal/application/user/request_email_change_test.go
+  s_20624790c09ed7::t_88a8e315a1ec20 38,66,89,110,148
+training-and-judge-center-backend/internal/domain/group/group_test.go
+  s_5b92e7df34171e::t_5dd91dd5e6e14f 171,174
+  s_5b92e7df34171e::t_e730fcdfed093d 224,228
+  s_5b92e7df34171e::t_92ef3eb7885a07 29
+  s_5b92e7df34171e::t_670d8cb6ee0083 111
+  s_5b92e7df34171e::t_d8151191375dab 67
+  s_5b92e7df34171e::t_be0b14cea64406 119,125
+  s_5b92e7df34171e::t_094da6e25329a4 12-13
+  s_5b92e7df34171e::t_429e680f872bf1 133
+  s_5b92e7df34171e::t_1b93d59a664a68 155,158
+  s_5b92e7df34171e::t_4401dd603b0a83 183
+  s_5b92e7df34171e::t_9c530bbb5611aa 198,202
+  s_5b92e7df34171e::t_0f29d0dbf93244 102
+  s_5b92e7df34171e::t_1dde951f057b6b 83
+  s_5b92e7df34171e::t_094d96abbc8515 210,213
+training-and-judge-center-backend/internal/application/problem/create_problem.go
+  s_5b92e7df34171e::t_03511092e91847 160
+  s_5b92e7df34171e::t_465f160c079658 149
+training-and-judge-center-backend/internal/application/problem/unpublish_problem.go
+  s_5b92e7df34171e::t_9b7274c4b209e0 44-45
+training-and-judge-center-backend/internal/application/group/accept_invite.go
+  s_5b92e7df34171e::t_31abdf991b9ff0 71-73
+training-and-judge-center-backend/internal/application/material/create_material.go
+  s_5b92e7df34171e::t_7ecdd0f1e40eae 96-97,99,105
+training-and-judge-center-backend/internal/domain/user/deactivation_test.go
+  s_5b92e7df34171e::t_39cb6b30d171a6 13,16
+  s_5b92e7df34171e::t_2ecdc689053a9e 99
+  s_5b92e7df34171e::t_eb3d03e9f6c836 74,77
+  s_5b92e7df34171e::t_0b7fd184cb6d49 111,120
+  s_5b92e7df34171e::t_e4fddfcc5fa318 34,40,55,58,60
+training-and-judge-center-backend/internal/application/problem/change_accessibility.go
+  s_5b92e7df34171e::t_186e9fd353bf04 50-51
+training-and-judge-center-backend/internal/application/group/approve_request.go
+  s_5b92e7df34171e::t_91acf632c56e6d 69-71
+training-and-judge-center-backend/internal/application/group/join_group.go
+  s_5b92e7df34171e::t_3f0676e64690b1 59-61
+training-and-judge-center-backend/internal/application/material/unpublish_material.go
+  s_5b92e7df34171e::t_d3f76ce35c94ab 63-64
+training-and-judge-center-backend/internal/domain/user/email_change_test.go
+  s_5b92e7df34171e::t_f350bce7b2b4c4 10,12,17
+  s_5b92e7df34171e::t_7ceb98c2a8ff20 34
+training-and-judge-center-backend/internal/application/group/request_join_test.go
+  s_5b92e7df34171e::t_94df422dd06527 67
+training-and-judge-center-backend/internal/application/material/publish_material.go
+  s_5b92e7df34171e::t_d29aaa84c4db60 65-66
+training-and-judge-center-backend/internal/application/group/get_group_test.go
+  s_5b92e7df34171e::t_0a41734936dadf 60,105,148
+training-and-judge-center-backend/internal/application/problem/add_modifier.go
+  s_5b92e7df34171e::t_7dde0b13907036 64-65
+training-and-judge-center-backend/internal/adapter/user/email_change_repository.go
+  s_5b92e7df34171e::t_3bce47dfaf66d8 139,148
+training-and-judge-center-backend/internal/domain/user/password_recovery_test.go
+  s_5b92e7df34171e::t_ab4342f43cc5c2 31
+  s_5b92e7df34171e::t_b0510dc362330e 14
+training-and-judge-center-backend/internal/application/group/join_group_test.go
+  s_5b92e7df34171e::t_426f4b31c3ad01 85
+training-and-judge-center-backend/internal/application/material/update_material.go
+  s_5b92e7df34171e::t_28a7ba67071e4d 106-107
+training-and-judge-center-backend/internal/application/group/create_group.go
+  s_5b92e7df34171e::t_172920e3aadfdf 87-88
+training-and-judge-center-backend/internal/application/material/pin_material.go
+  s_5b92e7df34171e::t_a7482b86bc1085 78-79
+training-and-judge-center-backend/internal/application/user/request_email_change.go
+  s_20624790c09ed7::t_8e89a3d27de9a1 52,55,61,64,68,73,82,88,95,100,109,112
+  s_20624790c09ed7::t_8838b56ac56412 23-26
+  s_20624790c09ed7::t_2b03e755ad7796 48
+  s_5b92e7df34171e::t_a067e72f7783fa 78-80
+training-and-judge-center-backend/internal/application/group/list_groups_test.go
+  s_5b92e7df34171e::t_f18c65e344aedd 109-110
+  s_5b92e7df34171e::t_1c7c44e51a4ef4 268
+training-and-judge-center-backend/internal/application/group/accept_invite_test.go
+  s_5b92e7df34171e::t_36f5e94f0ec664 99
+training-and-judge-center-backend/internal/application/group/request_join.go
+  s_5b92e7df34171e::t_8ae2a073c8d79e 74-76
+training-and-judge-center-backend/internal/application/user/request_password_recovery.go
+  s_5b92e7df34171e::t_59c721676474e7 101
+training-and-judge-center-backend/internal/application/material/unpin_material.go
+  s_5b92e7df34171e::t_c0e20d04932bab 78-79
+training-and-judge-center-backend/internal/domain/group/group_member_test.go
+  s_5b92e7df34171e::t_3100d2d70e7109 50
+  s_5b92e7df34171e::t_e89bef07f27b80 65
+  s_5b92e7df34171e::t_d617a49052f8c3 16
+  s_5b92e7df34171e::t_2bbd4a85551ad1 57
+training-and-judge-center-backend/internal/application/problem/remove_modifier.go
+  s_5b92e7df34171e::t_537aaaf1f096ed 51-52
+training-and-judge-center-backend/internal/domain/user/email_change_repository.go
+  s_5b92e7df34171e::t_3c2cdf924b442b 3-6,12
+training-and-judge-center-backend/internal/domain/material/material_test.go
+  s_5b92e7df34171e::t_584405387417d8 13-14
+  s_5b92e7df34171e::t_acab7fb55fbd57 27,40,55,59,70,82,85,89,102,107,117,121,134,145,157,160,164,173,186,204
+training-and-judge-center-backend/internal/adapter/http/handler/user/mocks_test.go
+  s_5b92e7df34171e::t_b489a1167d2b3b 28
+training-and-judge-center-backend/internal/application/group/approve_request_test.go
+  s_5b92e7df34171e::t_3ff87c20044e8b 19
+  s_5b92e7df34171e::t_48da1007ce265b 140
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.1",
+  "base_commit_sha": "845a1daec7b9c93945abf1e80dd6df8e529d2e4e",
+  "prompts": {},
+  "sessions": {
+    "s_20624790c09ed7": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "2434f8b3-9f5e-4290-b64a-8c76a580a1b3",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "AlexaVJ <alexandra19vela@gmail.com>"
+    },
+    "s_5b92e7df34171e": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "a664df22-93bd-4fdb-8edd-982fa900e067",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "AlexaVJ <alexandra19vela@gmail.com>"
+    }
+  }
+}
