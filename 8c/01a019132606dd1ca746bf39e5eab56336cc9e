@@ -1,0 +1,30 @@
+training-and-judge-center-backend/REVIEW_domain_user.md
+  s_7e7efacd57315e::t_403c5fb9f81846 1,3,5-6,10-21,25,27,29,32-34,36,38,40-42,44-45,48-51,53-57,60,64,66,68-71,73,75-77,80,82,84-90,92,94,96-102,106,108,110-116,118,120-125,127,129,131-133,135,137-138,141,145-156,160,162-164,166-171,173
+  s_3469e193070e7a::t_8651c749f1726b 2,4,7-9,22-24,26,28,30-31,35,37,39,43,46-47,52,58-59,61-63,65,67,72,74,78-79,81,83,91,93,95,103-105,107,109,117,119,126,128,130,134,136,139-140,142-144,157-159,161,165,172
+training-and-judge-center-backend/internal/domain/user/deactivation_status.go
+  s_7e7efacd57315e::t_214543a82ee2bd 1-37
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.1",
+  "base_commit_sha": "8c01a019132606dd1ca746bf39e5eab56336cc9e",
+  "prompts": {},
+  "sessions": {
+    "s_3469e193070e7a": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "5c96eec1-1ab0-454c-bc4d-788a1c643b73",
+        "model": "claude-haiku-4-5-20251001"
+      },
+      "human_author": "AlexaVJ <alexandra19vela@gmail.com>"
+    },
+    "s_7e7efacd57315e": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "54d9d198-6404-49dd-860c-5917873c6969",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "AlexaVJ <alexandra19vela@gmail.com>"
+    }
+  }
+}
