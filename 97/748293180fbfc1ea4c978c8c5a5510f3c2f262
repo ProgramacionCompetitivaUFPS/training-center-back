@@ -1,0 +1,25 @@
+training-and-judge-center-backend/internal/domain/group/visibility_test.go
+  s_2ade7d368be233::t_5ff30f4d1c53db 33,38-42,45-55,57
+training-and-judge-center-backend/internal/domain/group/group_name_test.go
+  s_2ade7d368be233::t_795ace55be2894 11,15-18,21-29
+training-and-judge-center-backend/internal/domain/group/member_role_test.go
+  s_2ade7d368be233::t_3cba13382da199 11,16-20,23-33,35
+training-and-judge-center-backend/internal/domain/group/join_policy_test.go
+  s_2ade7d368be233::t_b76ed637e67d6f 11,16-21,24-34,36
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.1",
+  "base_commit_sha": "97748293180fbfc1ea4c978c8c5a5510f3c2f262",
+  "prompts": {},
+  "sessions": {
+    "s_2ade7d368be233": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "a448cdfc-a76e-483b-a64c-ca6dcaa4183f",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "AlexaVJ <alexandra19vela@gmail.com>"
+    }
+  }
+}
