@@ -35,45 +35,24 @@ func TestNewPassword_Compare(t *testing.T) {
 	}
 }
 
-func TestNewPassword_TooShort(t *testing.T) {
-	_, err := user.NewPassword("Sh1!")
-	if err == nil {
-		t.Fatal("expected error for short password, got nil")
+func TestNewPassword_Invalid(t *testing.T) {
+	tests := []struct {
+		name  string
+		input string
+	}{
+		{"too short", "Sh1!"},
+		{"too long (73 bytes)", "A1!" + strings.Repeat("a", 70)},
+		{"missing uppercase", "secret1!"},
+		{"missing digit", "Secret!!"},
+		{"missing special char", "Secret12"},
 	}
-}
-
-func TestNewPassword_TooLong(t *testing.T) {
-	long := make([]byte, 73)
-	for i := range long {
-		long[i] = 'a'
-	}
-	long[0] = 'A'
-	long[1] = '1'
-	long[2] = '!'
-	_, err := user.NewPassword(string(long))
-	if err == nil {
-		t.Fatal("expected error for 73-char password, got nil")
-	}
-}
-
-func TestNewPassword_MissingUppercase(t *testing.T) {
-	_, err := user.NewPassword("secret1!")
-	if err == nil {
-		t.Fatal("expected error for missing uppercase, got nil")
-	}
-}
-
-func TestNewPassword_MissingDigit(t *testing.T) {
-	_, err := user.NewPassword("Secret!!")
-	if err == nil {
-		t.Fatal("expected error for missing digit, got nil")
-	}
-}
-
-func TestNewPassword_MissingSpecialChar(t *testing.T) {
-	_, err := user.NewPassword("Secret12")
-	if err == nil {
-		t.Fatal("expected error for missing special char, got nil")
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, err := user.NewPassword(tt.input)
+			if err == nil {
+				t.Fatalf("input %q: expected error, got nil", tt.input)
+			}
+		})
 	}
 }
 
