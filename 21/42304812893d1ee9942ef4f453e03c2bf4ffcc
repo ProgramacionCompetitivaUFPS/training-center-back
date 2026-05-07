@@ -1,0 +1,19 @@
+training-and-judge-center-backend/ARCHITECTURE.md
+  s_2ade7d368be233::t_91dd9f79567d3e 528-549
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.1",
+  "base_commit_sha": "2142304812893d1ee9942ef4f453e03c2bf4ffcc",
+  "prompts": {},
+  "sessions": {
+    "s_2ade7d368be233": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "a448cdfc-a76e-483b-a64c-ca6dcaa4183f",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "AlexaVJ <alexandra19vela@gmail.com>"
+    }
+  }
+}
