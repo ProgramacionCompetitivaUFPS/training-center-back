@@ -99,7 +99,7 @@ func (uc *AdminUpdateUserUseCase) Execute(ctx context.Context, input AdminUpdate
 		newEmail, err := user.NewEmail(*input.Email)
 		if err != nil {
 			fieldErrors = append(fieldErrors, apperror.FieldError{Field: "email", Message: err.Error()})
-		} else if foundUser.Email() == nil || newEmail.String() != foundUser.Email().String() {
+		} else if newEmail.String() != foundUser.Email().String() {
 			emailToUpdate = &newEmail
 		}
 	}

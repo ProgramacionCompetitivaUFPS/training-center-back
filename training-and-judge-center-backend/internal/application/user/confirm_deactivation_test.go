@@ -37,8 +37,8 @@ func TestConfirmDeactivation_Success(t *testing.T) {
 		if u.Status() != domain.StatusDeactivated {
 			t.Errorf("expected DEACTIVATED status, got %s", u.Status())
 		}
-		if u.Email() != nil {
-			t.Errorf("expected Email to be nil, got %v", u.Email())
+		if u.Email().String() != "" {
+			t.Errorf("expected Email to be empty after deactivation, got %v", u.Email())
 		}
 		return nil
 	}
