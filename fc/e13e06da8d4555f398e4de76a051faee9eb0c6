@@ -1,0 +1,21 @@
+training-and-judge-center-backend/internal/domain/problem/language_limit.go
+  s_13e6f75315cf29::t_46cc646c14fa0b 14,17,20
+training-and-judge-center-backend/internal/domain/problem/platform_settings.go
+  s_13e6f75315cf29::t_6874c795c0f796 35,38,41,44,47,50,53,56,61,70,76
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.1",
+  "base_commit_sha": "fce13e06da8d4555f398e4de76a051faee9eb0c6",
+  "prompts": {},
+  "sessions": {
+    "s_13e6f75315cf29": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "1f9a47c3-af0b-41b4-a2cd-7d040d2ce734",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "AlexaVJ <alexandra19vela@gmail.com>"
+    }
+  }
+}
