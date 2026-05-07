@@ -116,7 +116,13 @@ func (s PlatformSettings) LanguageLimit(language string) (LanguageLimit, bool) {
 	return l, ok
 }
 
-func (s PlatformSettings) AllowedTags() map[string]struct{} { return s.allowedTags }
+func (s PlatformSettings) AllowedTags() map[string]struct{} {
+	cp := make(map[string]struct{}, len(s.allowedTags))
+	for k, v := range s.allowedTags {
+		cp[k] = v
+	}
+	return cp
+}
 
 func (s PlatformSettings) UploadMaxConcurrency() int  { return s.uploadMaxConcurrency }
 func (s PlatformSettings) MaxFileCountSample() int    { return s.maxFileCountSample }

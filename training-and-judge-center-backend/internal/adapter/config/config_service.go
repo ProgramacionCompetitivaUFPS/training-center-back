@@ -46,7 +46,7 @@ func NewPlatformSettings(cfg *config.VirtualObject) (problem.PlatformSettings, e
 }
 
 func defaultIfZero(v, d int) int {
-	if v <= 0 {
+	if v == 0 {
 		return d
 	}
 	return v
