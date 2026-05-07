@@ -7,8 +7,6 @@ import (
 	"github.com/training-judge-center/backend/internal/domain/user"
 )
 
-var testNow = time.Date(2024, 1, 15, 12, 0, 0, 0, time.UTC)
-
 func TestEmailChangeRequest_MarkAsUsed(t *testing.T) {
 	newReq := func(status user.RequestStatus) *user.EmailChangeRequest {
 		email, _ := user.NewEmail("new@example.com")
