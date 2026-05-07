@@ -47,7 +47,8 @@ func (uc *ChangeAccessibilityUseCase) Execute(ctx context.Context, in ChangeAcce
 		return nil, apperror.NewForbidden(apperror.ErrCodeForbidden, "Only the problem author, Admin, or assigned modifiers can change this problem's accessibility")
 	}
 
-	p.UpdateAccessibility(newAcc, time.Now())
+	now := time.Now()
+	p.UpdateAccessibility(newAcc, now)
 
 	if err := uc.repo.Save(ctx, p); err != nil {
 		slog.ErrorContext(ctx, "failed to save problem after accessibility change", "error", err, "slug", p.Slug().String())

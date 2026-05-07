@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"testing"
-	"time"
 
 	domainGroup "github.com/training-judge-center/backend/internal/domain/group"
 	"github.com/training-judge-center/backend/internal/domain/shared"
@@ -58,7 +57,7 @@ func TestGetGroup_EmptyGroupIDReturnsValidationError(t *testing.T) {
 func TestGetGroup_UserProviderErrorReturnsInternal(t *testing.T) {
 	g := visibleGroup(t)
 	uidLead := shared.RestoreUserID("lead1")
-	lead, _ := domainGroup.NewGroupMember("m1", "g1", uidLead, domainGroup.MemberRoleLead, time.Now())
+	lead, _ := domainGroup.NewGroupMember("m1", "g1", uidLead, domainGroup.MemberRoleLead, testNow)
 
 	repo := &fakeRepo{groups: []*domainGroup.Group{g}}
 	memberRepo := &fakeMemberRepo{
@@ -103,7 +102,7 @@ func TestGetGroup_NotVisibleHiddenFromStranger(t *testing.T) {
 func TestGetGroup_NotVisibleReturnedToMember(t *testing.T) {
 	g := notVisibleGroup(t)
 	uid := shared.RestoreUserID("member")
-	gm, _ := domainGroup.NewGroupMember("m1", "g1", uid, domainGroup.MemberRoleMember, time.Now())
+	gm, _ := domainGroup.NewGroupMember("m1", "g1", uid, domainGroup.MemberRoleMember, testNow)
 
 	repo := &fakeRepo{groups: []*domainGroup.Group{g}}
 	memberRepo := &fakeMemberRepo{
@@ -146,7 +145,7 @@ func TestGetGroup_AdminSeesNotVisible(t *testing.T) {
 func TestGetGroup_LeadsPopulated(t *testing.T) {
 	g := visibleGroup(t)
 	uidLead := shared.RestoreUserID("lead1")
-	lead, _ := domainGroup.NewGroupMember("m1", "g1", uidLead, domainGroup.MemberRoleLead, time.Now())
+	lead, _ := domainGroup.NewGroupMember("m1", "g1", uidLead, domainGroup.MemberRoleLead, testNow)
 
 	repo := &fakeRepo{groups: []*domainGroup.Group{g}}
 	memberRepo := &fakeMemberRepo{

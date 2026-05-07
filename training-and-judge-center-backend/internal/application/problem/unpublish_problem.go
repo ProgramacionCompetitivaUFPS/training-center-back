@@ -41,7 +41,8 @@ func (uc *UnpublishProblemUseCase) Execute(ctx context.Context, in UnpublishProb
 		return nil, apperror.NewForbidden(apperror.ErrCodeForbidden, "Only the problem author, Admin, or assigned modifiers can unpublish this problem")
 	}
 
-	if err := p.Unpublish(time.Now()); err != nil {
+	now := time.Now()
+	if err := p.Unpublish(now); err != nil {
 		return nil, err
 	}
 

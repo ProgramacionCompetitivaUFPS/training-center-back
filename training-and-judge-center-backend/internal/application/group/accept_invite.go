@@ -68,7 +68,9 @@ func (uc *AcceptInviteUseCase) Execute(ctx context.Context, input AcceptInviteIn
 		return nil, apperror.NewConflict(domainGroup.ErrCodeAlreadyMember, "you are already a member of this group")
 	}
 
-	member, err := domainGroup.NewGroupMember(uuid.New().String(), claims.GroupID, userID, domainGroup.MemberRoleMember, time.Now())
+	now := time.Now()
+	newMemberID := uuid.New().String()
+	member, err := domainGroup.NewGroupMember(newMemberID, claims.GroupID, userID, domainGroup.MemberRoleMember, now)
 	if err != nil {
 		return nil, err
 	}

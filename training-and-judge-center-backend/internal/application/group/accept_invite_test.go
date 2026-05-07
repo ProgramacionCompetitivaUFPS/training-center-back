@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"testing"
-	"time"
 
 	domainGroup "github.com/training-judge-center/backend/internal/domain/group"
 	"github.com/training-judge-center/backend/internal/domain/shared"
@@ -97,7 +96,7 @@ func TestAcceptInvite_PolicyChangedReturns403(t *testing.T) {
 func TestAcceptInvite_AlreadyMemberReturns409(t *testing.T) {
 	g := inviteGroup(t)
 	userID := shared.RestoreUserID("u1")
-	existing := domainGroup.RestoreGroupMember("m1", "g1", userID, domainGroup.MemberRoleMember, time.Now())
+	existing := domainGroup.RestoreGroupMember("m1", "g1", userID, domainGroup.MemberRoleMember, testNow)
 	memberRepo := &fakeMemberRepo{
 		memberships: map[string]*domainGroup.GroupMember{
 			keyOf("g1", userID): existing,

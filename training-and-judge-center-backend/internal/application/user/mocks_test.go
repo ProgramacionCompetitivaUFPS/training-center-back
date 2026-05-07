@@ -136,7 +136,7 @@ type mockEmailChangeRepo struct {
 	saveFn                func(ctx context.Context, req *domain.EmailChangeRequest) error
 	findByIDFn            func(ctx context.Context, id string) (*domain.EmailChangeRequest, error)
 	findByCodeAndUserIDFn func(ctx context.Context, code string, userID string) (*domain.EmailChangeRequest, error)
-	invalidatePendingFn   func(ctx context.Context, userID string) error
+	invalidatePendingFn   func(ctx context.Context, userID string, now time.Time) error
 	updateFn              func(ctx context.Context, req *domain.EmailChangeRequest) error
 }
 
@@ -161,9 +161,9 @@ func (m *mockEmailChangeRepo) FindByCodeAndUserID(ctx context.Context, code stri
 	return nil, nil
 }
 
-func (m *mockEmailChangeRepo) InvalidatePendingByUserID(ctx context.Context, userID string) error {
+func (m *mockEmailChangeRepo) InvalidatePendingByUserID(ctx context.Context, userID string, now time.Time) error {
 	if m.invalidatePendingFn != nil {
-		return m.invalidatePendingFn(ctx, userID)
+		return m.invalidatePendingFn(ctx, userID, now)
 	}
 	return nil
 }

@@ -60,7 +60,8 @@ func (uc *UnpublishMaterial) Execute(ctx context.Context, in UnpublishMaterialIn
 
 	// Idempotent: already-draft materials return 200 with current state.
 	if !m.Status().IsDraft() {
-		if err := m.Unpublish(time.Now()); err != nil {
+		now := time.Now()
+		if err := m.Unpublish(now); err != nil {
 			return nil, err
 		}
 		if err := uc.repo.Save(ctx, m); err != nil {

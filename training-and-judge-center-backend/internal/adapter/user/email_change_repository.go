@@ -136,7 +136,7 @@ func (r *EmailChangeRepository) FindByCodeAndUserID(ctx context.Context, code st
 	return req, nil
 }
 
-func (r *EmailChangeRepository) InvalidatePendingByUserID(ctx context.Context, userID string) error {
+func (r *EmailChangeRepository) InvalidatePendingByUserID(ctx context.Context, userID string, now time.Time) error {
 	query := `
 		UPDATE email_change_requests
 		SET status = $1, updated_at = $2
@@ -145,7 +145,7 @@ func (r *EmailChangeRepository) InvalidatePendingByUserID(ctx context.Context, u
 	querier := infraPostgres.GetQuerier(ctx, r.querier)
 	_, err := querier.Exec(ctx, query,
 		domainUser.StatusExpired.String(),
-		time.Now(),
+		now,
 		userID,
 		domainUser.StatusPending.String(),
 	)

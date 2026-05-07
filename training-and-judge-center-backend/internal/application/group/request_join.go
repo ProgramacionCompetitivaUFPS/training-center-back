@@ -71,7 +71,9 @@ func (uc *RequestJoinUseCase) Execute(ctx context.Context, input RequestJoinInpu
 		return nil, apperror.NewConflict(domainGroup.ErrCodeRequestAlreadyPending, "you already have a pending request for this group")
 	}
 
-	req, err := domainGroup.NewJoinRequest(uuid.New().String(), g.ID(), callerID, input.Message, time.Now())
+	now := time.Now()
+	newReqID := uuid.New().String()
+	req, err := domainGroup.NewJoinRequest(newReqID, g.ID(), callerID, input.Message, now)
 	if err != nil {
 		return nil, err
 	}

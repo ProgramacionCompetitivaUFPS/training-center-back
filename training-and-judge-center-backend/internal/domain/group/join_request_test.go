@@ -2,7 +2,6 @@ package group_test
 
 import (
 	"testing"
-	"time"
 
 	"github.com/training-judge-center/backend/internal/domain/group"
 	"github.com/training-judge-center/backend/internal/domain/shared"
@@ -11,7 +10,7 @@ import (
 
 func validJoinRequest(t *testing.T) *group.JoinRequest {
 	t.Helper()
-	req, err := group.NewJoinRequest("id-1", "g-1", shared.RestoreUserID("user-1"), nil, time.Now())
+	req, err := group.NewJoinRequest("id-1", "g-1", shared.RestoreUserID("user-1"), nil, testNow)
 	if err != nil {
 		t.Fatalf("NewJoinRequest: %v", err)
 	}
@@ -19,21 +18,21 @@ func validJoinRequest(t *testing.T) *group.JoinRequest {
 }
 
 func TestNewJoinRequest_EmptyID(t *testing.T) {
-	_, err := group.NewJoinRequest("", "g-1", shared.RestoreUserID("user-1"), nil, time.Now())
+	_, err := group.NewJoinRequest("", "g-1", shared.RestoreUserID("user-1"), nil, testNow)
 	if err == nil {
 		t.Fatal("expected error for empty id")
 	}
 }
 
 func TestNewJoinRequest_EmptyGroupID(t *testing.T) {
-	_, err := group.NewJoinRequest("id-1", "", shared.RestoreUserID("user-1"), nil, time.Now())
+	_, err := group.NewJoinRequest("id-1", "", shared.RestoreUserID("user-1"), nil, testNow)
 	if err == nil {
 		t.Fatal("expected error for empty groupID")
 	}
 }
 
 func TestNewJoinRequest_EmptyRequesterUserID(t *testing.T) {
-	_, err := group.NewJoinRequest("id-1", "g-1", shared.RestoreUserID(""), nil, time.Now())
+	_, err := group.NewJoinRequest("id-1", "g-1", shared.RestoreUserID(""), nil, testNow)
 	if err == nil {
 		t.Fatal("expected error for empty requesterUserID")
 	}

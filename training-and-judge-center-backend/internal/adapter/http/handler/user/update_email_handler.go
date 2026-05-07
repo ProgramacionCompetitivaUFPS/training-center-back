@@ -63,14 +63,15 @@ func (h *UserHandler) RequestEmailChange(w http.ResponseWriter, r *http.Request)
 		NewEmail: body.NewEmail,
 	}
 
-	if err := h.requestEmailChange.Execute(ctx, input); err != nil {
+	output, err := h.requestEmailChange.Execute(ctx, input)
+	if err != nil {
 		handler.WriteError(w, err)
 		return
 	}
 
 	handler.WriteJSON(w, http.StatusOK, map[string]interface{}{
 		"message":   "Verification code sent to the new email address",
-		"expiresAt": time.Now().Add(15 * time.Minute).Format(time.RFC3339),
+		"expiresAt": output.ExpiresAt.Format(time.RFC3339),
 	})
 }
 

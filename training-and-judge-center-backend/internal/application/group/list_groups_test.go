@@ -106,6 +106,8 @@ func (f *fakeMemberRepo) BulkStats(ctx context.Context, groupIDs []string, viewe
 
 // --- helpers ---
 
+var testNow = time.Date(2024, 1, 15, 12, 0, 0, 0, time.UTC)
+
 func mustGroup(t *testing.T, id, name string, visibility domainGroup.Visibility, joinPolicy domainGroup.JoinPolicy) *domainGroup.Group {
 	t.Helper()
 	gn, err := domainGroup.NewGroupName(name)
@@ -263,7 +265,7 @@ func TestListGroups_EnrichesWithMemberCountAndRole(t *testing.T) {
 	g := mustGroup(t, "g1", "Club Programming", domainGroup.VisibilityVisible, domainGroup.JoinPolicyOpen)
 
 	userID := shared.RestoreUserID("u1")
-	gm, _ := domainGroup.NewGroupMember("m1", "g1", userID, domainGroup.MemberRoleLead, time.Now())
+	gm, _ := domainGroup.NewGroupMember("m1", "g1", userID, domainGroup.MemberRoleLead, testNow)
 
 	repo := &fakeRepo{groups: []*domainGroup.Group{g}, total: 1}
 	memberRepo := &fakeMemberRepo{

@@ -75,7 +75,8 @@ func (uc *UnpinMaterial) Execute(ctx context.Context, in UnpinMaterialInput) (*U
 
 	// Idempotent: already-unpinned materials return 200 with current state.
 	if m.Pinned() {
-		m.Unpin(time.Now())
+		now := time.Now()
+		m.Unpin(now)
 		if err := uc.repo.Save(ctx, m); err != nil {
 			slog.ErrorContext(ctx, "failed to save unpinned material", "error", err, "material_id", in.MaterialID)
 			return nil, apperror.NewInternal()

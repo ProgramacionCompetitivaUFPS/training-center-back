@@ -25,7 +25,7 @@ func (m *mockHandlerEmailChangeRepo) FindByCodeAndUserID(ctx context.Context, co
 	}
 	return nil, nil
 }
-func (m *mockHandlerEmailChangeRepo) InvalidatePendingByUserID(_ context.Context, _ string) error {
+func (m *mockHandlerEmailChangeRepo) InvalidatePendingByUserID(_ context.Context, _ string, _ time.Time) error {
 	return nil
 }
 func (m *mockHandlerEmailChangeRepo) Update(_ context.Context, _ *domainuser.EmailChangeRequest) error {

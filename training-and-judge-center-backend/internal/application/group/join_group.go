@@ -56,7 +56,9 @@ func (uc *JoinGroupUseCase) Execute(ctx context.Context, input JoinGroupInput) (
 		return nil, apperror.NewConflict(domainGroup.ErrCodeAlreadyMember, "You are already a member of this group")
 	}
 
-	member, err := domainGroup.NewGroupMember(uuid.New().String(), input.GroupID, userID, domainGroup.MemberRoleMember, time.Now())
+	now := time.Now()
+	newMemberID := uuid.New().String()
+	member, err := domainGroup.NewGroupMember(newMemberID, input.GroupID, userID, domainGroup.MemberRoleMember, now)
 	if err != nil {
 		return nil, err
 	}

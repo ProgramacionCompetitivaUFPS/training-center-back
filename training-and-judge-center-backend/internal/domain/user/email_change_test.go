@@ -7,14 +7,14 @@ import (
 	"github.com/training-judge-center/backend/internal/domain/user"
 )
 
-func TestEmailChangeRequest_MarkAsUsed(t *testing.T) {
-	now := time.Now()
+var testNow = time.Date(2024, 1, 15, 12, 0, 0, 0, time.UTC)
 
+func TestEmailChangeRequest_MarkAsUsed(t *testing.T) {
 	newReq := func(status user.RequestStatus) *user.EmailChangeRequest {
 		email, _ := user.NewEmail("new@example.com")
 		return user.RestoreEmailChangeRequest(
 			"req-id", "user-id", email, "code123",
-			status, now.Add(time.Hour), now, nil,
+			status, testNow.Add(time.Hour), testNow, nil,
 		)
 	}
 
@@ -31,7 +31,7 @@ func TestEmailChangeRequest_MarkAsUsed(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			req := newReq(tt.status)
-			err := req.MarkAsUsed(now)
+			err := req.MarkAsUsed(testNow)
 			if tt.wantErr && err == nil {
 				t.Error("expected error, got nil")
 			}
