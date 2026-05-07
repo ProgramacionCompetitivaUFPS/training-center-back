@@ -41,6 +41,19 @@ func TestNewSolutionFile(t *testing.T) {
 	}
 }
 
+func TestRestoreJudgingFile_PreservesFields(t *testing.T) {
+	f := problem.RestoreJudgingFile("sol.cpp", "key-1", "cpp20")
+	if f.Filename() != "sol.cpp" {
+		t.Errorf("Filename(): got %q, want sol.cpp", f.Filename())
+	}
+	if f.FileKey() != "key-1" {
+		t.Errorf("FileKey(): got %q, want key-1", f.FileKey())
+	}
+	if f.Language() != "cpp20" {
+		t.Errorf("Language(): got %q, want cpp20", f.Language())
+	}
+}
+
 func TestNewVerifierFile(t *testing.T) {
 	tests := []struct {
 		name    string

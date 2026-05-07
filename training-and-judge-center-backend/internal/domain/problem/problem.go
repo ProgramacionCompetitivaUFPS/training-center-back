@@ -128,6 +128,15 @@ func (p *Problem) CanBeEditedBy(userID shared.UserID, isAdmin bool) bool {
 	return false
 }
 
+func (p *Problem) Publish(now time.Time) error {
+	if p.status.IsPublished() {
+		return apperror.NewConflict(ErrCodeAlreadyPublished, "Problem is already published")
+	}
+	p.status = NewStatusPublished()
+	p.updatedAt = now.UTC()
+	return nil
+}
+
 func (p *Problem) Unpublish(now time.Time) error {
 	if !p.status.IsPublished() {
 		return apperror.NewConflict(ErrCodeAlreadyDraft, "Problem is already unpublished")
@@ -142,10 +151,10 @@ func (p *Problem) UpdateAccessibility(acc Accessibility, now time.Time) {
 	p.updatedAt = now.UTC()
 }
 
-const MaxModifiers = 20
+const maxModifiers = 20
 
 func (p *Problem) AddModifier(userID shared.UserID, now time.Time) error {
-	if len(p.modifierIDs) >= MaxModifiers {
+	if len(p.modifierIDs) >= maxModifiers {
 		return apperror.NewBadRequest(ErrCodeTooManyModifiers, "Maximum number of modifiers reached")
 	}
 	for _, id := range p.modifierIDs {
@@ -197,24 +206,24 @@ func (p *Problem) AddSolution(solution JudgingFile, now time.Time) *JudgingFile 
 		if sol.Filename() == solution.Filename() {
 			old := sol
 			p.solutions[i] = solution
-			p.updatedAt = now.UTC()
+			p.touchJudgingUpdatedAt(now)
 			return &old
 		}
 	}
 	p.solutions = append(p.solutions, solution)
-	p.updatedAt = now.UTC()
+	p.touchJudgingUpdatedAt(now)
 	return nil
 }
 
-func (p *Problem) RemoveSolution(filename string, now time.Time) {
-	newSolutions := make([]JudgingFile, 0, len(p.solutions))
-	for _, sol := range p.solutions {
-		if sol.Filename() != filename {
-			newSolutions = append(newSolutions, sol)
+func (p *Problem) RemoveSolution(filename string, now time.Time) error {
+	for i, sol := range p.solutions {
+		if sol.Filename() == filename {
+			p.solutions = append(p.solutions[:i], p.solutions[i+1:]...)
+			p.touchJudgingUpdatedAt(now)
+			return nil
 		}
 	}
-	p.solutions = newSolutions
-	p.updatedAt = now.UTC()
+	return apperror.NewNotFound(ErrCodeSolutionNotFound, "Solution not found")
 }
 
 func (p *Problem) SetChecker(checker JudgingFile, now time.Time) {
