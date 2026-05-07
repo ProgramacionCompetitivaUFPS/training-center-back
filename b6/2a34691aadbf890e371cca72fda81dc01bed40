@@ -1,0 +1,36 @@
+training-and-judge-center-backend/internal/application/user/confirm_email_change.go
+  s_50868420aa2755::t_cdade3c9331817 60-61,67,71
+training-and-judge-center-backend/internal/application/user/admin_update_user.go
+  s_50868420aa2755::t_2521ca6ccfc15f 6
+  s_50868420aa2755::t_cf506261967577 122-123
+training-and-judge-center-backend/internal/application/user/update_password.go
+  s_50868420aa2755::t_0b6a6e6bb04931 80-81
+training-and-judge-center-backend/internal/application/user/reset_password.go
+  s_50868420aa2755::t_8efde92b1fa359 80
+training-and-judge-center-backend/internal/application/user/update_user.go
+  s_50868420aa2755::t_90ca181ffc4fcc 97-98
+  s_50868420aa2755::t_545604e074881b 6
+training-and-judge-center-backend/internal/domain/user/user.go
+  s_50868420aa2755::t_1bfc8d0453cb8e 112-113
+  s_50868420aa2755::t_8feb28b1ebf6c7 149,154-155
+  s_50868420aa2755::t_22590e10270a4c 78
+  s_50868420aa2755::t_e4c246dd78376c 139,144-145
+  s_50868420aa2755::t_79327ca80346f5 125
+  s_50868420aa2755::t_86dcdcad7ee083 117
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.1",
+  "base_commit_sha": "b62a34691aadbf890e371cca72fda81dc01bed40",
+  "prompts": {},
+  "sessions": {
+    "s_50868420aa2755": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "73329ea5-1c84-49bf-bffe-42340e89c011",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "AlexaVJ <alexandra19vela@gmail.com>"
+    }
+  }
+}
