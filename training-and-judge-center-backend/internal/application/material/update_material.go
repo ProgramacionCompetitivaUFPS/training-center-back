@@ -77,25 +77,27 @@ func (uc *UpdateMaterial) Execute(ctx context.Context, in UpdateMaterialInput) (
 		}
 	}
 
-	var content *domainMaterial.Content
+	var content **domainMaterial.Content
 	if in.Content != nil {
 		c, cErr := domainMaterial.NewContent(*in.Content)
 		if err := apperror.AccumulateFieldErrors(cErr, &fieldErrs); err != nil {
 			return nil, err
 		}
 		if cErr == nil {
-			content = &c
+			ptr := &c
+			content = &ptr
 		}
 	}
 
-	var tags *domainMaterial.Tags
+	var tags **domainMaterial.Tags
 	if in.Tags != nil {
 		t, tErr := domainMaterial.NewTags(*in.Tags)
 		if err := apperror.AccumulateFieldErrors(tErr, &fieldErrs); err != nil {
 			return nil, err
 		}
 		if tErr == nil {
-			tags = &t
+			ptr := &t
+			tags = &ptr
 		}
 	}
 

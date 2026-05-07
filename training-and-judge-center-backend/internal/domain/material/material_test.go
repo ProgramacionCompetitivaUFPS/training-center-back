@@ -178,13 +178,12 @@ func TestUnpin(t *testing.T) {
 
 func TestUpdateMetadata(t *testing.T) {
 	m := newTestMaterial()
-
 	newTitle, _ := material.NewTitle("Updated Title")
 	newContent, _ := material.NewContent("Updated content")
 	newTags, _ := material.NewTags([]string{"tag1", "tag2"})
-
-	m.UpdateMetadata(&newTitle, &newContent, &newTags, testNow)
-
+	contentPtr := &newContent
+	tagsPtr := &newTags
+	m.UpdateMetadata(&newTitle, &contentPtr, &tagsPtr, testNow)
 	if m.Title().String() != "Updated Title" {
 		t.Errorf("expected updated title, got %q", m.Title().String())
 	}
@@ -199,15 +198,39 @@ func TestUpdateMetadata(t *testing.T) {
 func TestUpdateMetadata_PartialUpdate(t *testing.T) {
 	m := newTestMaterial()
 	originalContent := m.Content().String()
-
 	newTitle, _ := material.NewTitle("Only Title Updated")
 	m.UpdateMetadata(&newTitle, nil, nil, testNow)
-
 	if m.Title().String() != "Only Title Updated" {
 		t.Errorf("expected updated title, got %q", m.Title().String())
 	}
 	if m.Content().String() != originalContent {
 		t.Error("content should remain unchanged")
+	}
+}
+
+func TestUpdateMetadata_ClearContent(t *testing.T) {
+	m := newTestMaterial()
+	initial, _ := material.NewContent("some content")
+	initialPtr := &initial
+	m.UpdateMetadata(nil, &initialPtr, nil, testNow)
+	empty := material.NewEmptyContent()
+	emptyPtr := &empty
+	m.UpdateMetadata(nil, &emptyPtr, nil, testNow)
+	if m.Content().String() != "" {
+		t.Errorf("expected empty content after clearing, got %q", m.Content().String())
+	}
+}
+
+func TestUpdateMetadata_ClearTags(t *testing.T) {
+	m := newTestMaterial()
+	tags, _ := material.NewTags([]string{"initial-tag"})
+	tagsPtr := &tags
+	m.UpdateMetadata(nil, nil, &tagsPtr, testNow)
+	emptyTags, _ := material.NewTags([]string{})
+	emptyTagsPtr := &emptyTags
+	m.UpdateMetadata(nil, nil, &emptyTagsPtr, testNow)
+	if len(m.Tags().Values()) != 0 {
+		t.Errorf("expected empty tags after clearing, got %v", m.Tags().Values())
 	}
 }
 

@@ -140,15 +140,15 @@ func (m *Material) Unpin(now time.Time) {
 	m.updatedAt = now.UTC()
 }
 
-func (m *Material) UpdateMetadata(title *Title, content *Content, tags *Tags, now time.Time) {
+func (m *Material) UpdateMetadata(title *Title, content **Content, tags **Tags, now time.Time) {
 	if title != nil {
 		m.title = *title
 	}
 	if content != nil {
-		m.content = *content
+		m.content = **content
 	}
 	if tags != nil {
-		m.tags = *tags
+		m.tags = **tags
 	}
 	m.updatedAt = now.UTC()
 }
