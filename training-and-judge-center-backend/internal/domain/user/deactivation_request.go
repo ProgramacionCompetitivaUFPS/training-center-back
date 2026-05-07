@@ -66,7 +66,7 @@ func NewDeactivationRequest(id, userID, verificationCode string, now time.Time) 
 		id:               id,
 		userID:           userID,
 		verificationCode: verificationCode,
-		expiresAt:        t.Add(15 * time.Minute),
+		expiresAt:        t.Add(RequestExpiryDuration),
 		attempts:         0,
 		status:           DeactivationStatusPending,
 		createdAt:        t,

@@ -26,7 +26,7 @@ func NewPasswordRecoveryRequest(id, userID, code string, now time.Time) (*Passwo
 		userID:    userID,
 		code:      code,
 		status:    StatusPending,
-		expiresAt: t.Add(15 * time.Minute),
+		expiresAt: t.Add(RequestExpiryDuration),
 		createdAt: t,
 	}, nil
 }

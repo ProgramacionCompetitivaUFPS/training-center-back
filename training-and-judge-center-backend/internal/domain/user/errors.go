@@ -1,5 +1,7 @@
 package user
 
+import "time"
+
 const (
 	ErrCodeEmailConflict              = "EMAIL_CONFLICT"
 	ErrCodeNicknameConflict           = "NICKNAME_CONFLICT"
@@ -10,5 +12,7 @@ const (
 	ErrCodeAlreadyDeactivated         = "ALREADY_DEACTIVATED"
 	ErrCodeCannotUpdateDeactivated    = "CANNOT_UPDATE_DEACTIVATED"
 	ErrCodeCannotAssignAdminRole      = "CANNOT_ASSIGN_ADMIN_ROLE"
+
+	RequestExpiryDuration = 15 * time.Minute
 )
 

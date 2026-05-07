@@ -28,7 +28,7 @@ func NewEmailChangeRequest(id, userID string, newEmail Email, code string, now t
 		newEmail:  newEmail,
 		code:      code,
 		status:    StatusPending,
-		expiresAt: t.Add(15 * time.Minute),
+		expiresAt: t.Add(RequestExpiryDuration),
 		createdAt: t,
 	}, nil
 }
