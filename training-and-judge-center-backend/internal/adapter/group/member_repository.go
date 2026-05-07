@@ -12,6 +12,7 @@ import (
 	infraPostgres "github.com/training-judge-center/backend/internal/adapter/postgres"
 	"golang.org/x/sync/errgroup"
 
+	appGroup "github.com/training-judge-center/backend/internal/application/group"
 	domainGroup "github.com/training-judge-center/backend/internal/domain/group"
 	"github.com/training-judge-center/backend/internal/domain/shared"
 	"github.com/training-judge-center/backend/pkg/apperror"
@@ -37,7 +38,7 @@ func (r *MemberRepository) Save(ctx context.Context, m *domainGroup.GroupMember)
 		if errors.As(err, &pgErr) && pgErr.Code == "23505" && pgErr.ConstraintName == "group_members_group_id_user_id_key" {
 			slog.WarnContext(ctx, "MemberRepository.Save: unique constraint hit (possible TOCTOU race)",
 				"group_id", m.GroupID(), "user_id", m.UserID().Value(), "constraint", pgErr.ConstraintName)
-			return apperror.NewConflict(domainGroup.ErrCodeAlreadyMember, "You are already a member of this group")
+			return apperror.NewConflict(appGroup.ErrCodeAlreadyMember, "You are already a member of this group")
 		}
 		slog.ErrorContext(ctx, "MemberRepository.Save failed", "error", err)
 		return apperror.NewInternal()

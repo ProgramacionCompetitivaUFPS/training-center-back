@@ -44,7 +44,7 @@ func (uc *JoinGroupUseCase) Execute(ctx context.Context, input JoinGroupInput) (
 
 	// Policy check precedes membership check: a non-OPEN group returns 403 regardless of the caller's membership status.
 	if g.JoinPolicy() != domainGroup.JoinPolicyOpen {
-		return nil, apperror.NewForbidden(domainGroup.ErrCodeInsufficientPermissions, "This group does not allow direct joining")
+		return nil, apperror.NewForbidden(ErrCodeInsufficientPermissions, "This group does not allow direct joining")
 	}
 
 	userID := shared.RestoreUserID(input.CurrentUser.ID)
@@ -53,7 +53,7 @@ func (uc *JoinGroupUseCase) Execute(ctx context.Context, input JoinGroupInput) (
 		return nil, err
 	}
 	if existing != nil {
-		return nil, apperror.NewConflict(domainGroup.ErrCodeAlreadyMember, "You are already a member of this group")
+		return nil, apperror.NewConflict(ErrCodeAlreadyMember, "You are already a member of this group")
 	}
 
 	now := time.Now()

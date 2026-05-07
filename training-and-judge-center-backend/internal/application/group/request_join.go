@@ -50,7 +50,7 @@ func (uc *RequestJoinUseCase) Execute(ctx context.Context, input RequestJoinInpu
 	}
 
 	if g.JoinPolicy() != domainGroup.JoinPolicyRequest {
-		return nil, apperror.NewBadRequest(domainGroup.ErrCodeInvalidJoinPolicy, "this group does not accept join requests")
+		return nil, apperror.NewBadRequest(ErrCodeInvalidJoinPolicy, "this group does not accept join requests")
 	}
 
 	callerID := shared.RestoreUserID(input.CurrentUser.ID)
@@ -60,7 +60,7 @@ func (uc *RequestJoinUseCase) Execute(ctx context.Context, input RequestJoinInpu
 		return nil, err
 	}
 	if member != nil {
-		return nil, apperror.NewConflict(domainGroup.ErrCodeAlreadyMember, "you are already a member of this group")
+		return nil, apperror.NewConflict(ErrCodeAlreadyMember, "you are already a member of this group")
 	}
 
 	existing, err := uc.joinRequestRepo.FindByGroupAndUser(ctx, g.ID(), callerID)
@@ -68,7 +68,7 @@ func (uc *RequestJoinUseCase) Execute(ctx context.Context, input RequestJoinInpu
 		return nil, err
 	}
 	if existing != nil && existing.IsPending() {
-		return nil, apperror.NewConflict(domainGroup.ErrCodeRequestAlreadyPending, "you already have a pending request for this group")
+		return nil, apperror.NewConflict(ErrCodeRequestAlreadyPending, "you already have a pending request for this group")
 	}
 
 	now := time.Now()

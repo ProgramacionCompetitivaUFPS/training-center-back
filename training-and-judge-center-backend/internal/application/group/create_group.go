@@ -37,7 +37,7 @@ func NewCreateGroupUseCase(repo domainGroup.Repository, memberRepo domainGroup.M
 func (uc *CreateGroupUseCase) Execute(ctx context.Context, input CreateGroupInput) (*CreateGroupResult, error) {
 	if input.CurrentUser.Role != shared.RoleCoach && !input.CurrentUser.IsAdmin() {
 		return nil, apperror.NewForbidden(
-			domainGroup.ErrCodeInsufficientPermissions,
+			ErrCodeInsufficientPermissions,
 			"Only Admin and Coach users can create groups",
 		)
 	}

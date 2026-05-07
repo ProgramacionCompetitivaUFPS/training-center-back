@@ -56,7 +56,7 @@ func (uc *AcceptInviteUseCase) Execute(ctx context.Context, input AcceptInviteIn
 	}
 
 	if g.JoinPolicy() != domainGroup.JoinPolicyInvite {
-		return nil, apperror.NewForbidden(domainGroup.ErrCodeInsufficientPermissions, "this group no longer accepts invitations")
+		return nil, apperror.NewForbidden(ErrCodeInsufficientPermissions, "this group no longer accepts invitations")
 	}
 
 	userID := shared.RestoreUserID(input.CurrentUser.ID)
@@ -65,7 +65,7 @@ func (uc *AcceptInviteUseCase) Execute(ctx context.Context, input AcceptInviteIn
 		return nil, err
 	}
 	if existing != nil {
-		return nil, apperror.NewConflict(domainGroup.ErrCodeAlreadyMember, "you are already a member of this group")
+		return nil, apperror.NewConflict(ErrCodeAlreadyMember, "you are already a member of this group")
 	}
 
 	now := time.Now()

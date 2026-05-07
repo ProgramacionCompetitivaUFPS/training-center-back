@@ -77,7 +77,7 @@ func TestGenerateInvite_OpenPolicyReturns403(t *testing.T) {
 	})
 
 	ae, ok := err.(*apperror.AppError)
-	if !ok || ae.Code != domainGroup.ErrCodeInsufficientPermissions {
+	if !ok || ae.Code != ErrCodeInsufficientPermissions {
 		t.Fatalf("expected INSUFFICIENT_PERMISSIONS, got %v", err)
 	}
 	if ae.Kind != apperror.KindForbidden {
@@ -99,7 +99,7 @@ func TestGenerateInvite_CallerNotLeadReturns403(t *testing.T) {
 	})
 
 	ae, ok := err.(*apperror.AppError)
-	if !ok || ae.Code != domainGroup.ErrCodeInsufficientPermissions {
+	if !ok || ae.Code != ErrCodeInsufficientPermissions {
 		t.Fatalf("expected INSUFFICIENT_PERMISSIONS, got %v", err)
 	}
 	if ae.Kind != apperror.KindForbidden {
@@ -166,7 +166,7 @@ func TestGenerateInvite_AdminOnOpenGroupReturns403ForPolicy(t *testing.T) {
 	})
 
 	ae, ok := err.(*apperror.AppError)
-	if !ok || ae.Code != domainGroup.ErrCodeInsufficientPermissions {
+	if !ok || ae.Code != ErrCodeInsufficientPermissions {
 		t.Fatalf("expected INSUFFICIENT_PERMISSIONS for wrong policy, got %v", err)
 	}
 	if ae.Kind != apperror.KindForbidden {

@@ -28,7 +28,7 @@ func TestAcceptInvite_EmptyTokenReturnsValidationError(t *testing.T) {
 }
 
 func TestAcceptInvite_InvalidTokenPropagatesError(t *testing.T) {
-	invalidErr := apperror.NewBadRequest(domainGroup.ErrCodeInvalidInviteToken, "invalid invitation token")
+	invalidErr := apperror.NewBadRequest(ErrCodeInvalidInviteToken, "invalid invitation token")
 	svc := &fakeInvitationSvc{validateErr: invalidErr}
 	uc := NewAcceptInviteUseCase(&fakeRepo{}, &fakeMemberRepo{}, svc)
 
@@ -38,13 +38,13 @@ func TestAcceptInvite_InvalidTokenPropagatesError(t *testing.T) {
 	})
 
 	ae, ok := err.(*apperror.AppError)
-	if !ok || ae.Code != domainGroup.ErrCodeInvalidInviteToken {
+	if !ok || ae.Code != ErrCodeInvalidInviteToken {
 		t.Fatalf("expected INVALID_INVITE_TOKEN, got %v", err)
 	}
 }
 
 func TestAcceptInvite_ExpiredTokenPropagatesError(t *testing.T) {
-	expiredErr := apperror.NewBadRequest(domainGroup.ErrCodeExpiredInviteToken, "invitation link has expired")
+	expiredErr := apperror.NewBadRequest(ErrCodeExpiredInviteToken, "invitation link has expired")
 	svc := &fakeInvitationSvc{validateErr: expiredErr}
 	uc := NewAcceptInviteUseCase(&fakeRepo{}, &fakeMemberRepo{}, svc)
 
@@ -54,7 +54,7 @@ func TestAcceptInvite_ExpiredTokenPropagatesError(t *testing.T) {
 	})
 
 	ae, ok := err.(*apperror.AppError)
-	if !ok || ae.Code != domainGroup.ErrCodeExpiredInviteToken {
+	if !ok || ae.Code != ErrCodeExpiredInviteToken {
 		t.Fatalf("expected EXPIRED_INVITE_TOKEN, got %v", err)
 	}
 }
@@ -85,7 +85,7 @@ func TestAcceptInvite_PolicyChangedReturns403(t *testing.T) {
 	})
 
 	ae, ok := err.(*apperror.AppError)
-	if !ok || ae.Code != domainGroup.ErrCodeInsufficientPermissions {
+	if !ok || ae.Code != ErrCodeInsufficientPermissions {
 		t.Fatalf("expected INSUFFICIENT_PERMISSIONS, got %v", err)
 	}
 	if ae.Kind != apperror.KindForbidden {
@@ -111,7 +111,7 @@ func TestAcceptInvite_AlreadyMemberReturns409(t *testing.T) {
 	})
 
 	ae, ok := err.(*apperror.AppError)
-	if !ok || ae.Code != domainGroup.ErrCodeAlreadyMember {
+	if !ok || ae.Code != ErrCodeAlreadyMember {
 		t.Fatalf("expected ALREADY_MEMBER, got %v", err)
 	}
 	if ae.Kind != apperror.KindConflict {

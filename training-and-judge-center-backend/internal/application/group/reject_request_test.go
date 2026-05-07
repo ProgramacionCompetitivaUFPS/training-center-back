@@ -24,7 +24,7 @@ func TestRejectRequest_NonLeadReturns403(t *testing.T) {
 		CurrentUser: currentUser("nobody", shared.RoleContestant),
 	})
 	ae, ok := err.(*apperror.AppError)
-	if !ok || ae.Code != domainGroup.ErrCodeInsufficientPermissions {
+	if !ok || ae.Code != ErrCodeInsufficientPermissions {
 		t.Fatalf("expected INSUFFICIENT_PERMISSIONS, got %v", err)
 	}
 }

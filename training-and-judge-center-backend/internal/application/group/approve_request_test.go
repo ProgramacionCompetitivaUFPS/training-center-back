@@ -37,7 +37,7 @@ func TestApproveRequest_NonLeadReturns403(t *testing.T) {
 		CurrentUser: currentUser("not-lead", shared.RoleContestant),
 	})
 	ae, ok := err.(*apperror.AppError)
-	if !ok || ae.Code != domainGroup.ErrCodeInsufficientPermissions {
+	if !ok || ae.Code != ErrCodeInsufficientPermissions {
 		t.Fatalf("expected INSUFFICIENT_PERMISSIONS, got %v", err)
 	}
 }
@@ -150,7 +150,7 @@ func TestApproveRequest_AlreadyMemberReturns409(t *testing.T) {
 		CurrentUser: currentUser("lead-id", shared.RoleContestant),
 	})
 	ae, ok := err.(*apperror.AppError)
-	if !ok || ae.Code != domainGroup.ErrCodeAlreadyMember {
+	if !ok || ae.Code != ErrCodeAlreadyMember {
 		t.Fatalf("expected ALREADY_MEMBER, got %v", err)
 	}
 	if len(reqRepo.savedRequests) != 0 {

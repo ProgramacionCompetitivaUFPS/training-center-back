@@ -18,7 +18,7 @@ func requireLeadOrAdmin(ctx context.Context, memberRepo domainGroup.MemberReposi
 		return err
 	}
 	if member == nil || !member.IsLead() {
-		return apperror.NewForbidden(domainGroup.ErrCodeInsufficientPermissions, "only leads can manage join requests")
+		return apperror.NewForbidden(ErrCodeInsufficientPermissions, "only leads can manage join requests")
 	}
 	return nil
 }

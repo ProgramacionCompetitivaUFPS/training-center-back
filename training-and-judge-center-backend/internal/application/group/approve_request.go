@@ -58,7 +58,7 @@ func (uc *ApproveRequestUseCase) Execute(ctx context.Context, input ApproveReque
 			return err
 		}
 		if existing != nil {
-			return apperror.NewConflict(domainGroup.ErrCodeAlreadyMember, "user is already a member of this group")
+			return apperror.NewConflict(ErrCodeAlreadyMember, "user is already a member of this group")
 		}
 
 		if err := uc.joinRequestRepo.Save(ctx, req); err != nil {
