@@ -1,0 +1,23 @@
+training-and-judge-center-backend/internal/application/material/update_material.go
+  s_2ade7d368be233::t_72f2343b0d28bf 80,87-88,92,99-100
+training-and-judge-center-backend/internal/domain/material/material_test.go
+  s_2ade7d368be233::t_f91d74001d8963 184-186,211-233
+training-and-judge-center-backend/internal/domain/material/material.go
+  s_2ade7d368be233::t_caee3ab6ff875a 143,148,151
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.1",
+  "base_commit_sha": "6574fd627016e7c35e8ba66f3b379dbfe244dbc1",
+  "prompts": {},
+  "sessions": {
+    "s_2ade7d368be233": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "a448cdfc-a76e-483b-a64c-ca6dcaa4183f",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "AlexaVJ <alexandra19vela@gmail.com>"
+    }
+  }
+}
