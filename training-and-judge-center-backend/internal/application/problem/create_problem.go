@@ -34,10 +34,10 @@ type CreateProblemResult struct {
 
 type CreateProblemUseCase struct {
 	repo             problem.Repository
-	platformSettings *problem.PlatformSettings
+	platformSettings problem.PlatformSettings
 }
 
-func NewCreateProblemUseCase(repo problem.Repository, platformSettings *problem.PlatformSettings) *CreateProblemUseCase {
+func NewCreateProblemUseCase(repo problem.Repository, platformSettings problem.PlatformSettings) *CreateProblemUseCase {
 	return &CreateProblemUseCase{
 		repo:             repo,
 		platformSettings: platformSettings,
@@ -66,7 +66,7 @@ func (usecase *CreateProblemUseCase) Execute(ctx context.Context, input CreatePr
 		return nil, err
 	}
 
-	globalMaxTime, globalMaxMemory := usecase.platformSettings.GetGlobalLimits()
+	globalMaxTime, globalMaxMemory := usecase.platformSettings.GlobalLimits()
 
 	var timeLimit *problem.TimeLimit
 	if input.TimeLimit != nil {
@@ -117,7 +117,11 @@ func (usecase *CreateProblemUseCase) Execute(ctx context.Context, input CreatePr
 		}
 		seenLangs[override.Language] = struct{}{}
 
-		langLimit := usecase.platformSettings.GetLanguageLimit(override.Language)
+		ll, hasLL := usecase.platformSettings.LanguageLimit(override.Language)
+		var langLimit *problem.LanguageLimit
+		if hasLL {
+			langLimit = &ll
+		}
 		langOverride, loErr := problem.NewLanguageOverride(
 			override.Language,
 			override.TimeLimit,
@@ -135,7 +139,7 @@ func (usecase *CreateProblemUseCase) Execute(ctx context.Context, input CreatePr
 		validOverrides = append(validOverrides, langOverride)
 	}
 
-	allowedTags := usecase.platformSettings.GetAllowedTags()
+	allowedTags := usecase.platformSettings.AllowedTags()
 	tags, err := problem.NewTags(input.Tags, allowedTags)
 	if err := apperror.AccumulateFieldErrors(err, &fieldErrs); err != nil {
 		return nil, err

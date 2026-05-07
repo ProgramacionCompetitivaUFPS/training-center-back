@@ -29,10 +29,10 @@ type UpdateProblemResult struct {
 
 type UpdateProblemUseCase struct {
 	repo             problem.Repository
-	platformSettings *problem.PlatformSettings
+	platformSettings problem.PlatformSettings
 }
 
-func NewUpdateProblemUseCase(repo problem.Repository, platformSettings *problem.PlatformSettings) *UpdateProblemUseCase {
+func NewUpdateProblemUseCase(repo problem.Repository, platformSettings problem.PlatformSettings) *UpdateProblemUseCase {
 	return &UpdateProblemUseCase{
 		repo:             repo,
 		platformSettings: platformSettings,
@@ -71,7 +71,7 @@ func (uc *UpdateProblemUseCase) Execute(ctx context.Context, input UpdateProblem
 		}
 	}
 
-	globalMaxTime, globalMaxMemory := uc.platformSettings.GetGlobalLimits()
+	globalMaxTime, globalMaxMemory := uc.platformSettings.GlobalLimits()
 
 	var timeLimit *problem.TimeLimit
 	if input.TimeLimit != nil {
@@ -123,7 +123,11 @@ func (uc *UpdateProblemUseCase) Execute(ctx context.Context, input UpdateProblem
 			}
 			seenLangs[override.Language] = struct{}{}
 
-			langLimit := uc.platformSettings.GetLanguageLimit(override.Language)
+			ll, hasLL := uc.platformSettings.LanguageLimit(override.Language)
+			var langLimit *problem.LanguageLimit
+			if hasLL {
+				langLimit = &ll
+			}
 			langOverride, loErr := problem.NewLanguageOverride(
 				override.Language,
 				override.TimeLimit,
@@ -144,7 +148,7 @@ func (uc *UpdateProblemUseCase) Execute(ctx context.Context, input UpdateProblem
 
 	var tags *problem.Tags
 	if input.Tags != nil {
-		allowedTags := uc.platformSettings.GetAllowedTags()
+		allowedTags := uc.platformSettings.AllowedTags()
 		t, tagsErr := problem.NewTags(input.Tags, allowedTags)
 		if err := apperror.AccumulateFieldErrors(tagsErr, &fieldErrs); err != nil {
 			return nil, err

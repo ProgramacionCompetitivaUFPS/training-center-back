@@ -35,14 +35,14 @@ type ImportProblemUseCase struct {
 	repo             problem.Repository
 	storage          ProblemFileRepository
 	packageParser    ICPCPackageParser
-	platformSettings *problem.PlatformSettings
+	platformSettings problem.PlatformSettings
 }
 
 func NewImportProblemUseCase(
 	repo problem.Repository,
 	storage ProblemFileRepository,
 	packageParser ICPCPackageParser,
-	platformSettings *problem.PlatformSettings,
+	platformSettings problem.PlatformSettings,
 ) *ImportProblemUseCase {
 	return &ImportProblemUseCase{
 		repo:             repo,
@@ -88,7 +88,7 @@ func (uc *ImportProblemUseCase) Execute(ctx context.Context, input ImportProblem
 		}
 	}
 
-	globalMaxTime, globalMaxMemory := uc.platformSettings.GetGlobalLimits()
+	globalMaxTime, globalMaxMemory := uc.platformSettings.GlobalLimits()
 
 	var timeLimit *problem.TimeLimit
 	if pkg.TimeLimitMs != nil {
@@ -162,7 +162,7 @@ func (uc *ImportProblemUseCase) Execute(ctx context.Context, input ImportProblem
 		uploadedKeys = append(uploadedKeys, zipKey)
 
 		g, gCtx := errgroup.WithContext(ctx)
-		g.SetLimit(uc.platformSettings.GetUploadMaxConcurrency())
+		g.SetLimit(uc.platformSettings.UploadMaxConcurrency())
 
 		for _, file := range pkg.SampleFiles {
 			file := file
@@ -186,7 +186,7 @@ func (uc *ImportProblemUseCase) Execute(ctx context.Context, input ImportProblem
 
 	for _, sol := range pkg.Solutions {
 		cleanName := filepath.Base(sol.Path)
-		lang, ok := uc.platformSettings.GetLanguageByExtension(strings.ToLower(filepath.Ext(cleanName)))
+		lang, ok := uc.platformSettings.LanguageByExtension(strings.ToLower(filepath.Ext(cleanName)))
 		if !ok {
 			continue
 		}
@@ -248,7 +248,7 @@ func (uc *ImportProblemUseCase) uploadVerifier(
 ) error {
 	cleanName := filepath.Base(f.Path)
 	ext := strings.ToLower(filepath.Ext(cleanName))
-	lang, ok := uc.platformSettings.GetLanguageByExtension(ext)
+	lang, ok := uc.platformSettings.LanguageByExtension(ext)
 	if !ok {
 		return apperror.NewBadRequest(ErrCodeProblemUnsupportedFileExt, fmt.Sprintf("Unsupported %s file extension: %s", fileType, ext))
 	}

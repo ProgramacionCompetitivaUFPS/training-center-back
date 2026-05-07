@@ -10,11 +10,11 @@ func TestNewLanguageOverride(t *testing.T) {
 	globalMaxTime := 3000
 	globalMaxMemory := 512
 
-	cppLimit := &problem.LanguageLimit{
-		Language:       "cpp20",
-		MaxTimeLimit:   1000,
-		MaxMemoryLimit: 256,
+	cppLimitVal, err := problem.NewLanguageLimit("cpp20", 1000, 256)
+	if err != nil {
+		t.Fatal(err)
 	}
+	cppLimit := &cppLimitVal
 
 	timePtr := func(v int) *int { return &v }
 

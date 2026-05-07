@@ -119,20 +119,24 @@ func (m *mockFileStorage) DeleteFilesWithPrefix(ctx context.Context, prefix stri
 
 // ── PlatformSettings default ─────────────────────────────────────────────────
 
-func newDefaultSettings() *domainProblem.PlatformSettings {
-	return &domainProblem.PlatformSettings{
-		GlobalMaxTimeLimit:    10000,
-		GlobalMaxMemoryLimit:  512,
-		SupportedLanguages:    map[string]struct{}{"cpp": {}},
-		LanguageExtensions:    map[string]string{".cpp": "cpp"},
-		AllowedTags:           map[string]struct{}{"dp": {}, "graphs": {}, "implementation": {}},
-		UploadMaxConcurrency:  4,
-		MaxFileCountSample:    10,
-		MaxFileSizeDefaultMB:  10,
-		MaxFileSizeTestCaseMB: 50,
-		MaxFileCountTestCase:  100,
-		LanguageLimits:        map[string]*domainProblem.LanguageLimit{},
+func newDefaultSettings() domainProblem.PlatformSettings {
+	s, err := domainProblem.NewPlatformSettings(
+		10000,
+		512,
+		map[string]domainProblem.LanguageLimit{},
+		map[string]struct{}{"cpp": {}},
+		map[string]string{".cpp": "cpp"},
+		map[string]struct{}{"dp": {}, "graphs": {}, "implementation": {}},
+		4,
+		10,
+		50,
+		100,
+		10,
+	)
+	if err != nil {
+		panic(err)
 	}
+	return s
 }
 
 // ── CurrentUser helpers ──────────────────────────────────────────────────────

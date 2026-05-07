@@ -75,7 +75,11 @@ func main() {
 
 	// Problem repositories & settings
 	problemRepo := problem.NewProblemRepository(dbPool)
-	settingsProvider := platformConfig.NewPlatformSettings(cfg.VirtualObject)
+	settingsProvider, err := platformConfig.NewPlatformSettings(cfg.VirtualObject)
+	if err != nil {
+		slog.Error("invalid platform settings in config", "error", err)
+		os.Exit(1)
+	}
 
 	// File Storage
 	var fileStorage appProblem.ProblemFileRepository
@@ -104,10 +108,10 @@ func main() {
 	}
 
 	icpcParser := problem.NewICPCParser(
-		settingsProvider.GetMaxFileSizeTestCaseMB(),
-		settingsProvider.GetMaxFileSizeDefaultMB(),
-		settingsProvider.GetMaxFileCountTestCase(),
-		settingsProvider.GetMaxFileCountSample(),
+		settingsProvider.MaxFileSizeTestCaseMB(),
+		settingsProvider.MaxFileSizeDefaultMB(),
+		settingsProvider.MaxFileCountTestCase(),
+		settingsProvider.MaxFileCountSample(),
 		cfg.VirtualObject.LanguageExtensions,
 	)
 	zipParserAdapter := problem.NewICPCParserAdapter(icpcParser)
