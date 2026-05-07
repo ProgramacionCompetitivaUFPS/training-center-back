@@ -1,0 +1,21 @@
+training-and-judge-center-backend/internal/domain/user/request_expiry.go
+  s_fd9d65a6fdd13c::t_467ae6c8368a6e 1-5
+training-and-judge-center-backend/internal/domain/user/password_test.go
+  s_fd9d65a6fdd13c::t_3c3f1674a65adf 38-55
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.1",
+  "base_commit_sha": "45b322a28caa309ac3c57f4f6f7c8758713ff7cd",
+  "prompts": {},
+  "sessions": {
+    "s_fd9d65a6fdd13c": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "1015062e-8b31-4745-a143-a6f7b213cfb5",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "AlexaVJ <alexandra19vela@gmail.com>"
+    }
+  }
+}
