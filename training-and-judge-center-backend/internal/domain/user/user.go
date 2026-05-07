@@ -75,7 +75,7 @@ func NewUser(id string, now time.Time, email Email, password Password, name stri
 	}, nil
 }
 
-func (u *User) Update(name *string, nickname *Nickname, institution *string, city *string, country *string) error {
+func (u *User) Update(name *string, nickname *Nickname, institution *string, city *string, country *string, now time.Time) error {
 	var fieldErrs []apperror.FieldError
 	if name != nil && strings.TrimSpace(*name) == "" {
 		fieldErrs = append(fieldErrs, apperror.FieldError{Field: "name", Message: "name cannot be empty"})
@@ -109,12 +109,12 @@ func (u *User) Update(name *string, nickname *Nickname, institution *string, cit
 		u.country = *country
 	}
 
-	now := time.Now()
-	u.updatedAt = &now
+	t := now.UTC()
+	u.updatedAt = &t
 	return nil
 }
 
-func (u *User) AdminUpdate(name *string, nickname *Nickname, institution *string, city *string, country *string, email *Email, role *shared.Role) error {
+func (u *User) AdminUpdate(name *string, nickname *Nickname, institution *string, city *string, country *string, email *Email, role *shared.Role, now time.Time) error {
 	if role != nil && !role.IsValid() {
 		return apperror.NewValidation([]apperror.FieldError{{Field: "role", Message: "invalid role"}})
 	}
@@ -122,7 +122,7 @@ func (u *User) AdminUpdate(name *string, nickname *Nickname, institution *string
 		return apperror.NewConflict(ErrCodeCannotAssignAdminRole, "role ADMIN cannot be assigned through standard update")
 	}
 
-	if err := u.Update(name, nickname, institution, city, country); err != nil {
+	if err := u.Update(name, nickname, institution, city, country, now); err != nil {
 		return err
 	}
 
@@ -136,23 +136,23 @@ func (u *User) AdminUpdate(name *string, nickname *Nickname, institution *string
 	return nil
 }
 
-func (u *User) UpdatePassword(newPassword Password) error {
+func (u *User) UpdatePassword(newPassword Password, now time.Time) error {
 	if u.status == StatusDeactivated {
 		return apperror.NewConflict(ErrCodeCannotUpdateDeactivated, "cannot update password of a deactivated user")
 	}
 	u.password = newPassword
-	now := time.Now()
-	u.updatedAt = &now
+	t := now.UTC()
+	u.updatedAt = &t
 	return nil
 }
 
-func (u *User) UpdateEmail(newEmail Email) error {
+func (u *User) UpdateEmail(newEmail Email, now time.Time) error {
 	if u.status == StatusDeactivated {
 		return apperror.NewConflict(ErrCodeCannotUpdateDeactivated, "cannot update email of a deactivated user")
 	}
 	u.email = &newEmail
-	now := time.Now()
-	u.updatedAt = &now
+	t := now.UTC()
+	u.updatedAt = &t
 	return nil
 }
 

@@ -3,6 +3,7 @@ package user
 import (
 	"context"
 	"log/slog"
+	"time"
 
 	"github.com/training-judge-center/backend/internal/domain/user"
 	"github.com/training-judge-center/backend/pkg/apperror"
@@ -93,7 +94,8 @@ func (uc *UpdateUserUseCase) Execute(ctx context.Context, input UpdateUserInput)
 		return UserDTO{}, apperror.NewValidation(fieldErrors)
 	}
 
-	if err := foundUser.Update(nameToUpdate, nicknameToUpdate, institutionToUpdate, cityToUpdate, countryToUpdate); err != nil {
+	now := time.Now()
+	if err := foundUser.Update(nameToUpdate, nicknameToUpdate, institutionToUpdate, cityToUpdate, countryToUpdate, now); err != nil {
 		slog.Error("failed to apply update to user domain object", "user_id", foundUser.ID(), "error", err)
 		return UserDTO{}, apperror.NewInternal()
 	}

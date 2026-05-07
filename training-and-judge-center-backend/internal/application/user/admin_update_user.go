@@ -3,6 +3,7 @@ package user
 import (
 	"context"
 	"log/slog"
+	"time"
 
 	"github.com/training-judge-center/backend/internal/domain/shared"
 	"github.com/training-judge-center/backend/internal/domain/user"
@@ -118,7 +119,8 @@ func (uc *AdminUpdateUserUseCase) Execute(ctx context.Context, input AdminUpdate
 		return UserDTO{}, apperror.NewValidation(fieldErrors)
 	}
 
-	if err := foundUser.AdminUpdate(nameToUpdate, nicknameToUpdate, institutionToUpdate, cityToUpdate, countryToUpdate, emailToUpdate, roleToUpdate); err != nil {
+	now := time.Now()
+	if err := foundUser.AdminUpdate(nameToUpdate, nicknameToUpdate, institutionToUpdate, cityToUpdate, countryToUpdate, emailToUpdate, roleToUpdate, now); err != nil {
 		slog.Error("failed to apply admin update to user domain object", "user_id", foundUser.ID(), "error", err)
 		return UserDTO{}, apperror.NewInternal()
 	}
