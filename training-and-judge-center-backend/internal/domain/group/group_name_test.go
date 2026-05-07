@@ -8,22 +8,25 @@ import (
 
 func TestNewGroupName_Valid(t *testing.T) {
 	cases := []struct {
+		name    string
 		input   string
 		wantVal string
 	}{
-		{"Algorithms 2025", "Algorithms 2025"},
-		{"  trimmed  ", "trimmed"},
-		{"A", "A"},
-		{"Global Contest", "Global Contest"},
+		{"algorithms 2025", "Algorithms 2025", "Algorithms 2025"},
+		{"trims whitespace", "  trimmed  ", "trimmed"},
+		{"single char", "A", "A"},
+		{"global contest", "Global Contest", "Global Contest"},
 	}
 	for _, tc := range cases {
-		n, err := group.NewGroupName(tc.input)
-		if err != nil {
-			t.Errorf("NewGroupName(%q) unexpected error: %v", tc.input, err)
-		}
-		if n.Value() != tc.wantVal {
-			t.Errorf("Value() = %q, want %q", n.Value(), tc.wantVal)
-		}
+		t.Run(tc.name, func(t *testing.T) {
+			n, err := group.NewGroupName(tc.input)
+			if err != nil {
+				t.Errorf("NewGroupName(%q) unexpected error: %v", tc.input, err)
+			}
+			if n.Value() != tc.wantVal {
+				t.Errorf("Value() = %q, want %q", n.Value(), tc.wantVal)
+			}
+		})
 	}
 }
 
