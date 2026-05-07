@@ -33,7 +33,7 @@ func (h *Handler) Import(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	maxUploadBytes := int64(h.settings.GetMaxFileSizeTestCaseMB()) << 20
+	maxUploadBytes := int64(h.settings.MaxFileSizeTestCaseMB()) << 20
 	if err := r.ParseMultipartForm(maxUploadBytes); err != nil {
 		handler.WriteJSON(w, http.StatusRequestEntityTooLarge, apperror.AppError{
 			Code:    apperror.ErrCodePayloadTooLarge,

@@ -1,54 +1,83 @@
 package problem
 
-type LanguageLimit struct {
-	Language       string
-	MaxTimeLimit   int
-	MaxMemoryLimit int
-}
+import "github.com/training-judge-center/backend/pkg/apperror"
 
 type PlatformSettings struct {
-	GlobalMaxTimeLimit    int
-	GlobalMaxMemoryLimit  int
-	LanguageLimits        map[string]*LanguageLimit
-	SupportedLanguages    map[string]struct{}
-	LanguageExtensions    map[string]string
-	AllowedTags           map[string]struct{}
-	UploadMaxConcurrency  int
-	MaxFileCountSample    int
-	MaxFileSizeTestCaseMB int
-	MaxFileCountTestCase  int
-	MaxFileSizeDefaultMB  int
+	globalMaxTimeLimit    int
+	globalMaxMemoryLimit  int
+	languageLimits        map[string]LanguageLimit
+	supportedLanguages    map[string]struct{}
+	languageExtensions    map[string]string
+	allowedTags           map[string]struct{}
+	uploadMaxConcurrency  int
+	maxFileCountSample    int
+	maxFileSizeTestCaseMB int
+	maxFileCountTestCase  int
+	maxFileSizeDefaultMB  int
 }
 
-func (s *PlatformSettings) IsLanguageSupported(language string) bool {
-	_, ok := s.SupportedLanguages[language]
+func NewPlatformSettings(
+	globalMaxTimeLimit int,
+	globalMaxMemoryLimit int,
+	languageLimits map[string]LanguageLimit,
+	supportedLanguages map[string]struct{},
+	languageExtensions map[string]string,
+	allowedTags map[string]struct{},
+	uploadMaxConcurrency int,
+	maxFileCountSample int,
+	maxFileSizeTestCaseMB int,
+	maxFileCountTestCase int,
+	maxFileSizeDefaultMB int,
+) (PlatformSettings, error) {
+	if globalMaxTimeLimit <= 0 || globalMaxMemoryLimit <= 0 ||
+		uploadMaxConcurrency <= 0 || maxFileCountSample <= 0 ||
+		maxFileSizeTestCaseMB <= 0 || maxFileCountTestCase <= 0 ||
+		maxFileSizeDefaultMB <= 0 {
+		return PlatformSettings{}, apperror.NewInternal()
+	}
+	return PlatformSettings{
+		globalMaxTimeLimit:    globalMaxTimeLimit,
+		globalMaxMemoryLimit:  globalMaxMemoryLimit,
+		languageLimits:        languageLimits,
+		supportedLanguages:    supportedLanguages,
+		languageExtensions:    languageExtensions,
+		allowedTags:           allowedTags,
+		uploadMaxConcurrency:  uploadMaxConcurrency,
+		maxFileCountSample:    maxFileCountSample,
+		maxFileSizeTestCaseMB: maxFileSizeTestCaseMB,
+		maxFileCountTestCase:  maxFileCountTestCase,
+		maxFileSizeDefaultMB:  maxFileSizeDefaultMB,
+	}, nil
+}
+
+func (s PlatformSettings) GlobalLimits() (int, int) {
+	return s.globalMaxTimeLimit, s.globalMaxMemoryLimit
+}
+
+func (s PlatformSettings) IsLanguageSupported(language string) bool {
+	_, ok := s.supportedLanguages[language]
 	return ok
 }
 
-func (s *PlatformSettings) GetLanguageByExtension(ext string) (string, bool) {
-	lang, ok := s.LanguageExtensions[ext]
+func (s PlatformSettings) LanguageByExtension(ext string) (string, bool) {
+	lang, ok := s.languageExtensions[ext]
 	return lang, ok
 }
 
-func (s *PlatformSettings) GetUploadMaxConcurrency() int  { return s.UploadMaxConcurrency }
-func (s *PlatformSettings) GetMaxFileCountSample() int    { return s.MaxFileCountSample }
-func (s *PlatformSettings) GetMaxFileSizeDefaultMB() int  { return s.MaxFileSizeDefaultMB }
-func (s *PlatformSettings) GetMaxFileSizeTestCaseMB() int { return s.MaxFileSizeTestCaseMB }
-func (s *PlatformSettings) GetMaxFileCountTestCase() int  { return s.MaxFileCountTestCase }
-
-func (s *PlatformSettings) GetGlobalLimits() (int, int) {
-	return s.GlobalMaxTimeLimit, s.GlobalMaxMemoryLimit
+func (s PlatformSettings) LanguageLimit(language string) (LanguageLimit, bool) {
+	l, ok := s.languageLimits[language]
+	return l, ok
 }
 
-func (s *PlatformSettings) GetLanguageLimit(language string) *LanguageLimit {
-	return s.LanguageLimits[language]
-}
+func (s PlatformSettings) AllowedTags() map[string]struct{} { return s.allowedTags }
 
-func (s *PlatformSettings) IsValidTag(tag string) bool {
-	_, ok := s.AllowedTags[tag]
+func (s PlatformSettings) UploadMaxConcurrency() int  { return s.uploadMaxConcurrency }
+func (s PlatformSettings) MaxFileCountSample() int    { return s.maxFileCountSample }
+func (s PlatformSettings) MaxFileSizeDefaultMB() int  { return s.maxFileSizeDefaultMB }
+func (s PlatformSettings) MaxFileSizeTestCaseMB() int { return s.maxFileSizeTestCaseMB }
+func (s PlatformSettings) MaxFileCountTestCase() int  { return s.maxFileCountTestCase }
+
+func (s PlatformSettings) IsValidTag(tag string) bool {
+	_, ok := s.allowedTags[tag]
 	return ok
-}
-
-func (s *PlatformSettings) GetAllowedTags() map[string]struct{} {
-	return s.AllowedTags
 }

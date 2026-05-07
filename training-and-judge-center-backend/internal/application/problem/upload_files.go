@@ -49,14 +49,14 @@ type UploadProblemFilesUseCase struct {
 	repo      problem.Repository
 	storage   ProblemFileRepository
 	zipParser ZipParser
-	settings  *problem.PlatformSettings
+	settings  problem.PlatformSettings
 }
 
 func NewUploadProblemFilesUseCase(
 	repo problem.Repository,
 	storage ProblemFileRepository,
 	zipParser ZipParser,
-	settings *problem.PlatformSettings,
+	settings problem.PlatformSettings,
 ) *UploadProblemFilesUseCase {
 	return &UploadProblemFilesUseCase{
 		repo:      repo,
@@ -165,7 +165,7 @@ func (uc *UploadProblemFilesUseCase) handleTestCases(ctx context.Context, p *pro
 	}
 
 	g, gCtx := errgroup.WithContext(ctx)
-	g.SetLimit(uc.settings.GetUploadMaxConcurrency())
+	g.SetLimit(uc.settings.UploadMaxConcurrency())
 
 	for _, file := range sampleFiles {
 		file := file
@@ -280,7 +280,7 @@ func (uc *UploadProblemFilesUseCase) handleVerifier(
 
 func (uc *UploadProblemFilesUseCase) getLanguageForFile(cleanName, fileType string) (string, error) {
 	ext := strings.ToLower(filepath.Ext(cleanName))
-	lang, ok := uc.settings.GetLanguageByExtension(ext)
+	lang, ok := uc.settings.LanguageByExtension(ext)
 	if !ok {
 		msg := fmt.Sprintf("Unsupported %s file type", fileType)
 		return "", apperror.NewValidation([]apperror.FieldError{

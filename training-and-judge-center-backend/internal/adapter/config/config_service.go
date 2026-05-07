@@ -3,26 +3,21 @@ package config
 import (
 	"github.com/training-judge-center/backend/internal/config"
 	"github.com/training-judge-center/backend/internal/domain/problem"
+	"github.com/training-judge-center/backend/pkg/apperror"
 )
 
-func NewPlatformSettings(cfg *config.VirtualObject) *problem.PlatformSettings {
+func NewPlatformSettings(cfg *config.VirtualObject) (problem.PlatformSettings, error) {
 	if cfg == nil {
-		return &problem.PlatformSettings{
-			LanguageLimits:     make(map[string]*problem.LanguageLimit),
-			SupportedLanguages: make(map[string]struct{}),
-			LanguageExtensions: make(map[string]string),
-			AllowedTags:        make(map[string]struct{}),
-		}
+		return problem.PlatformSettings{}, apperror.NewInternal()
 	}
 
-	langs := make(map[string]*problem.LanguageLimit, len(cfg.LanguageOverrides))
+	langs := make(map[string]problem.LanguageLimit, len(cfg.LanguageOverrides))
 	for _, l := range cfg.LanguageOverrides {
-		l := l
-		langs[l.Language] = &problem.LanguageLimit{
-			Language:       l.Language,
-			MaxTimeLimit:   l.MaxTimeLimit,
-			MaxMemoryLimit: l.MaxMemoryLimit,
+		ll, err := problem.NewLanguageLimit(l.Language, l.MaxTimeLimit, l.MaxMemoryLimit)
+		if err != nil {
+			return problem.PlatformSettings{}, err
 		}
+		langs[l.Language] = ll
 	}
 
 	tagsMap := make(map[string]struct{}, len(cfg.Tags))
@@ -35,19 +30,19 @@ func NewPlatformSettings(cfg *config.VirtualObject) *problem.PlatformSettings {
 		supportedMap[l] = struct{}{}
 	}
 
-	return &problem.PlatformSettings{
-		GlobalMaxTimeLimit:    cfg.MaxTimeLimitGlobal,
-		GlobalMaxMemoryLimit:  cfg.MaxMemoryLimitGlobal,
-		LanguageLimits:        langs,
-		SupportedLanguages:    supportedMap,
-		LanguageExtensions:    cfg.LanguageExtensions,
-		AllowedTags:           tagsMap,
-		UploadMaxConcurrency:  defaultIfZero(cfg.UploadMaxConcurrency, 10),
-		MaxFileCountSample:    defaultIfZero(cfg.MaxFileCountSample, 10),
-		MaxFileSizeTestCaseMB: defaultIfZero(cfg.MaxFileSizeTestCaseMB, 200),
-		MaxFileCountTestCase:  defaultIfZero(cfg.MaxFileCountTestCase, 10000),
-		MaxFileSizeDefaultMB:  defaultIfZero(cfg.MaxFileSizeDefaultMB, 10),
-	}
+	return problem.NewPlatformSettings(
+		cfg.MaxTimeLimitGlobal,
+		cfg.MaxMemoryLimitGlobal,
+		langs,
+		supportedMap,
+		cfg.LanguageExtensions,
+		tagsMap,
+		defaultIfZero(cfg.UploadMaxConcurrency, 10),
+		defaultIfZero(cfg.MaxFileCountSample, 10),
+		defaultIfZero(cfg.MaxFileSizeTestCaseMB, 200),
+		defaultIfZero(cfg.MaxFileCountTestCase, 10000),
+		defaultIfZero(cfg.MaxFileSizeDefaultMB, 10),
+	)
 }
 
 func defaultIfZero(v, d int) int {
