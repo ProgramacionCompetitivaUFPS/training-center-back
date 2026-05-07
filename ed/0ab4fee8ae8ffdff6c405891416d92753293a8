@@ -1,0 +1,19 @@
+training-and-judge-center-backend/internal/domain/user/common_test.go
+  s_2ade7d368be233::t_c9c65646f42ae6 1-22
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.1",
+  "base_commit_sha": "ed0ab4fee8ae8ffdff6c405891416d92753293a8",
+  "prompts": {},
+  "sessions": {
+    "s_2ade7d368be233": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "a448cdfc-a76e-483b-a64c-ca6dcaa4183f",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "AlexaVJ <alexandra19vela@gmail.com>"
+    }
+  }
+}
