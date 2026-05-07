@@ -525,6 +525,28 @@ func newGroupName(t *testing.T, s string) group.GroupName {
 
 En la práctica, la mayoría de los helpers de la capa de aplicación no reciben `*testing.T` — retornan valores y usan `panic` si fallan (`newTestMaterial`, `repoWith`). La regla aplica cuando el helper sí recibe `*testing.T` y llama `t.Fatalf` o `t.Errorf` internamente.
 
+**`common_test.go` para helpers compartidos entre archivos.** Cuando un paquete de dominio tiene dos o más archivos de test que comparten variables o funciones (ej: `testNow`, constructores de fixtures, `assertValidationField`), esas definiciones van en `common_test.go`. Cada archivo de test individual define únicamente sus helpers propios.
+
+```go
+// internal/domain/user/common_test.go
+package user_test
+
+import (
+    "testing"
+    "time"
+    "github.com/training-judge-center/backend/internal/domain/user"
+)
+
+var testNow = time.Date(2024, 1, 15, 12, 0, 0, 0, time.UTC)
+
+func makeTestUser(t *testing.T) *user.User {
+    t.Helper()
+    // ...
+}
+```
+
+**Cuándo aplica:** solo cuando dos o más archivos de test usan la misma variable/función. Si `testNow` solo existe en un archivo y ningún otro lo usa, no hace falta `common_test.go`.
+
 ---
 
 ### D10 — El dominio no tiene efectos de lado ni fuentes de no determinismo
