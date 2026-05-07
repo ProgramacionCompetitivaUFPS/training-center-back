@@ -46,14 +46,8 @@ func NewMaterial(
 	tags Tags,
 	now time.Time,
 ) (*Material, error) {
-	if id == "" {
-		return nil, apperror.NewBadRequest("INVALID_MATERIAL_ID", "material id cannot be empty")
-	}
-	if groupID == "" {
-		return nil, apperror.NewBadRequest("INVALID_GROUP_ID", "group id cannot be empty")
-	}
-	if authorID.Value() == "" {
-		return nil, apperror.NewBadRequest("INVALID_AUTHOR_ID", "material author id cannot be empty")
+	if id == "" || groupID == "" || authorID.Value() == "" {
+		return nil, apperror.NewInternal()
 	}
 	t := now.UTC()
 	return &Material{
