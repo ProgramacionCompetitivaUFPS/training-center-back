@@ -1,0 +1,76 @@
+training-and-judge-center-backend/internal/domain/group/errors.go
+  s_2ade7d368be233::t_1ec7d2df690ada 4-8
+training-and-judge-center-backend/internal/application/group/create_group_test.go
+  s_2ade7d368be233::t_a1941ddde72e78 40
+training-and-judge-center-backend/internal/application/group/errors.go
+  s_2ade7d368be233::t_4094383a840510 1-10
+training-and-judge-center-backend/internal/application/group/request_join_test.go
+  s_2ade7d368be233::t_d0b20d4b9d1b28 96
+  s_2ade7d368be233::t_0eca98f0637b96 59
+  s_2ade7d368be233::t_02802119ceb477 78
+training-and-judge-center-backend/internal/application/group/permissions.go
+  s_2ade7d368be233::t_151be8ca8017cf 21
+training-and-judge-center-backend/internal/application/group/reject_request_test.go
+  s_2ade7d368be233::t_d01df027f46e9f 27
+training-and-judge-center-backend/internal/application/group/accept_invite.go
+  s_2ade7d368be233::t_421269540cbd89 68
+  s_2ade7d368be233::t_3e9f8d5d28511a 59
+training-and-judge-center-backend/internal/adapter/group/member_repository.go
+  s_2ade7d368be233::t_08b2987f2a54fd 15
+  s_2ade7d368be233::t_3dd7e37135b4cb 41
+training-and-judge-center-backend/internal/application/group/approve_request.go
+  s_2ade7d368be233::t_7b09e1e6b18dba 61
+training-and-judge-center-backend/internal/adapter/group/join_request_repository.go
+  s_2ade7d368be233::t_c352734520262a 15
+  s_2ade7d368be233::t_625a401e1da07d 47
+training-and-judge-center-backend/internal/application/group/join_group.go
+  s_2ade7d368be233::t_8333a7056599a1 47
+  s_2ade7d368be233::t_41b2010afd4caf 56
+training-and-judge-center-backend/internal/application/group/approve_request_test.go
+  s_2ade7d368be233::t_154baff44ca7b8 40
+  s_2ade7d368be233::t_602d235d88c881 153
+training-and-judge-center-backend/internal/application/group/accept_invite_test.go
+  s_2ade7d368be233::t_3a967dec0e27cf 57
+  s_2ade7d368be233::t_75a532b5276413 31
+  s_2ade7d368be233::t_7ff1ef981aba9e 88
+  s_2ade7d368be233::t_7839f7e351888e 114
+  s_2ade7d368be233::t_123bbaabd8faaa 41
+  s_2ade7d368be233::t_3615ad681a39ac 47
+training-and-judge-center-backend/internal/application/group/request_join.go
+  s_2ade7d368be233::t_106da7117fdbdb 53
+  s_2ade7d368be233::t_09cd0e57d4a857 63
+  s_2ade7d368be233::t_e9516864a9da09 71
+training-and-judge-center-backend/internal/adapter/auth/invitation_jwt.go
+  s_2ade7d368be233::t_6f61a560b4d852 59,61
+  s_2ade7d368be233::t_84494a619e22db 66,70
+training-and-judge-center-backend/internal/application/group/generate_invite.go
+  s_2ade7d368be233::t_b62951b69d0739 55
+training-and-judge-center-backend/internal/application/group/list_join_requests_test.go
+  s_2ade7d368be233::t_00037ce960d527 24
+training-and-judge-center-backend/internal/adapter/auth/invitation_jwt_test.go
+  s_2ade7d368be233::t_15e74ba4f30f20 76
+  s_2ade7d368be233::t_b5912876c8d142 8
+training-and-judge-center-backend/internal/application/group/generate_invite_test.go
+  s_2ade7d368be233::t_d14e0cae57ce67 80,102,169
+training-and-judge-center-backend/internal/application/group/create_group.go
+  s_2ade7d368be233::t_f44222d7d20d33 40
+training-and-judge-center-backend/internal/application/group/join_group_test.go
+  s_2ade7d368be233::t_971672ef6a7e20 59,77
+  s_2ade7d368be233::t_1654c018929e4d 99
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.1",
+  "base_commit_sha": "a74bf6edaa3afb2d0f66995617b142f3738e1445",
+  "prompts": {},
+  "sessions": {
+    "s_2ade7d368be233": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "a448cdfc-a76e-483b-a64c-ca6dcaa4183f",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "AlexaVJ <alexandra19vela@gmail.com>"
+    }
+  }
+}
