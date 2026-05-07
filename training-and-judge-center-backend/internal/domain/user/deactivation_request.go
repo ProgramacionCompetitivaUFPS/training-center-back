@@ -3,7 +3,6 @@ package user
 import (
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/training-judge-center/backend/pkg/apperror"
 )
 
@@ -58,10 +57,13 @@ type DeactivationRequest struct {
 	updatedAt        time.Time
 }
 
-func NewDeactivationRequest(userID, verificationCode string, now time.Time) *DeactivationRequest {
+func NewDeactivationRequest(id, userID, verificationCode string, now time.Time) (*DeactivationRequest, error) {
+	if id == "" {
+		return nil, apperror.NewInternal()
+	}
 	t := now.UTC()
 	return &DeactivationRequest{
-		id:               uuid.New().String(),
+		id:               id,
 		userID:           userID,
 		verificationCode: verificationCode,
 		expiresAt:        t.Add(15 * time.Minute),
@@ -69,7 +71,7 @@ func NewDeactivationRequest(userID, verificationCode string, now time.Time) *Dea
 		status:           DeactivationStatusPending,
 		createdAt:        t,
 		updatedAt:        t,
-	}
+	}, nil
 }
 
 func RestoreDeactivationRequest(id, userID, verificationCode string, expiresAt time.Time, attempts int, blockedUntil *time.Time, status DeactivationStatus, createdAt, updatedAt time.Time) *DeactivationRequest {

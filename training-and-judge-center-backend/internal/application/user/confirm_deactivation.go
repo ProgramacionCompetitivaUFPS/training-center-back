@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/training-judge-center/backend/internal/application/shared"
 	"github.com/training-judge-center/backend/internal/domain/user"
 	"github.com/training-judge-center/backend/pkg/apperror"
@@ -119,7 +120,8 @@ func (uc *ConfirmDeactivationUseCase) Execute(ctx context.Context, input Confirm
 	}
 	originalNicknameStr := foundUser.Nickname().String()
 
-	if err := foundUser.Deactivate(); err != nil {
+	anonSuffix := uuid.New().String()[:10]
+	if err := foundUser.Deactivate(anonSuffix, now); err != nil {
 		slog.Error("failed to deactivate user domain object during confirmation", "user_id", input.UserID, "error", err)
 		return apperror.NewInternal()
 	}
@@ -145,7 +147,12 @@ func (uc *ConfirmDeactivationUseCase) Execute(ctx context.Context, input Confirm
 		sessionErr = ErrSessionsNotInvalidated
 	}
 
-	auditLog := user.NewDeactivationAuditLog(foundUser.ID(), originalEmailStr, originalNicknameStr, now, input.IP, input.UserAgent)
+	auditLogID := uuid.New().String()
+	auditLog, err := user.NewDeactivationAuditLog(auditLogID, foundUser.ID(), originalEmailStr, originalNicknameStr, now, input.IP, input.UserAgent)
+	if err != nil {
+		slog.ErrorContext(ctx, "failed to build deactivation audit log", "user_id", foundUser.ID(), "error", err)
+		return apperror.NewInternal()
+	}
 	if err := uc.auditRepo.Save(ctx, auditLog); err != nil {
 		slog.Error("failed to save deactivation audit log", "user_id", foundUser.ID(), "error", err)
 	}

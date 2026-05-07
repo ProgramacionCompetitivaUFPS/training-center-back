@@ -93,14 +93,16 @@ func (uc *CreateMaterial) Execute(ctx context.Context, in CreateMaterialInput) (
 		return nil, apperror.NewValidation(fieldErrs)
 	}
 
+	newID := uuid.New().String()
+	now := time.Now()
 	m, err := domainMaterial.NewMaterial(
-		uuid.New().String(),
+		newID,
 		in.GroupID,
 		shared.RestoreUserID(in.CurrentUser.ID),
 		title,
 		content,
 		tags,
-		time.Now(),
+		now,
 	)
 	if err != nil {
 		slog.ErrorContext(ctx, "unexpected error constructing material", "error", err, "group_id", in.GroupID)

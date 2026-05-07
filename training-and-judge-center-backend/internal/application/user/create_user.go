@@ -3,7 +3,9 @@ package user
 import (
 	"context"
 	"log/slog"
+	"time"
 
+	"github.com/google/uuid"
 	"github.com/training-judge-center/backend/internal/domain/user"
 	"github.com/training-judge-center/backend/pkg/apperror"
 )
@@ -61,7 +63,9 @@ func (uc *CreateUserUseCase) Execute(ctx context.Context, input CreateUserInput)
 		return UserDTO{}, apperror.NewValidation(fieldErrors)
 	}
 
-	newUser, err := user.NewUser(email, password, input.Name, nickname, input.Country, input.City, input.Institution)
+	newID := uuid.New().String()
+	now := time.Now()
+	newUser, err := user.NewUser(newID, now, email, password, input.Name, nickname, input.Country, input.City, input.Institution)
 	if err != nil {
 		slog.Error("failed to build new user domain object", "error", err)
 		return UserDTO{}, apperror.NewInternal()

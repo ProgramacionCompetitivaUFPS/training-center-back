@@ -84,7 +84,8 @@ func (uc *CreateGroupUseCase) Execute(ctx context.Context, input CreateGroupInpu
 			slog.ErrorContext(ctx, "failed to save new group", "error", err, "group_id", newID)
 			return apperror.NewInternal()
 		}
-		lead, err := domainGroup.NewGroupMember(uuid.New().String(), newID, creatorID, domainGroup.MemberRoleLead, now)
+		newLeadMemberID := uuid.New().String()
+		lead, err := domainGroup.NewGroupMember(newLeadMemberID, newID, creatorID, domainGroup.MemberRoleLead, now)
 		if err != nil {
 			return err
 		}

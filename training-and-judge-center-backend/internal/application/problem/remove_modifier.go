@@ -48,7 +48,8 @@ func (uc *RemoveModifierUseCase) Execute(ctx context.Context, input RemoveModifi
 		return struct{}{}, err
 	}
 
-	if err := p.RemoveModifier(modifierID, time.Now()); err != nil {
+	now := time.Now()
+	if err := p.RemoveModifier(modifierID, now); err != nil {
 		return struct{}{}, err
 	}
 

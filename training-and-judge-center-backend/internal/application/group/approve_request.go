@@ -66,7 +66,9 @@ func (uc *ApproveRequestUseCase) Execute(ctx context.Context, input ApproveReque
 			return apperror.NewInternal()
 		}
 
-		newMember, err := domainGroup.NewGroupMember(uuid.New().String(), input.GroupID, req.RequesterUserID(), domainGroup.MemberRoleMember, time.Now())
+		now := time.Now()
+		newMemberID := uuid.New().String()
+		newMember, err := domainGroup.NewGroupMember(newMemberID, input.GroupID, req.RequesterUserID(), domainGroup.MemberRoleMember, now)
 		if err != nil {
 			return err
 		}

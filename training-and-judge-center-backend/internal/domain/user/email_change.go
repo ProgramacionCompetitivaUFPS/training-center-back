@@ -3,7 +3,6 @@ package user
 import (
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/training-judge-center/backend/pkg/apperror"
 )
 
@@ -18,13 +17,13 @@ type EmailChangeRequest struct {
 	updatedAt *time.Time
 }
 
-func NewEmailChangeRequest(userID string, newEmail Email, code string, now time.Time) (*EmailChangeRequest, error) {
-	if userID == "" || code == "" {
+func NewEmailChangeRequest(id, userID string, newEmail Email, code string, now time.Time) (*EmailChangeRequest, error) {
+	if id == "" || userID == "" || code == "" {
 		return nil, apperror.NewInternal()
 	}
 	t := now.UTC()
 	return &EmailChangeRequest{
-		id:        uuid.New().String(),
+		id:        id,
 		userID:    userID,
 		newEmail:  newEmail,
 		code:      code,

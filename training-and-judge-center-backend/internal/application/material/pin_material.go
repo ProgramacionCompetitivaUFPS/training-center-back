@@ -75,7 +75,8 @@ func (uc *PinMaterial) Execute(ctx context.Context, in PinMaterialInput) (*PinMa
 
 	// Idempotent: already-pinned materials return 200 with current state.
 	if !m.Pinned() {
-		if err := m.Pin(time.Now()); err != nil {
+		now := time.Now()
+		if err := m.Pin(now); err != nil {
 			return nil, err
 		}
 		if err := uc.repo.Save(ctx, m); err != nil {

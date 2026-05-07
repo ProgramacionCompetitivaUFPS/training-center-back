@@ -61,7 +61,8 @@ func (uc *AddModifierUseCase) Execute(ctx context.Context, input AddModifierInpu
 		return struct{}{}, err
 	}
 
-	if err := p.AddModifier(modifierID, time.Now()); err != nil {
+	now := time.Now()
+	if err := p.AddModifier(modifierID, now); err != nil {
 		return struct{}{}, err
 	}
 

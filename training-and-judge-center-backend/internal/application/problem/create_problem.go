@@ -146,6 +146,7 @@ func (usecase *CreateProblemUseCase) Execute(ctx context.Context, input CreatePr
 	}
 
 	newID := uuid.New().String()
+	now := time.Now()
 	newProblem, err := problem.NewProblem(
 		newID,
 		slug,
@@ -156,7 +157,7 @@ func (usecase *CreateProblemUseCase) Execute(ctx context.Context, input CreatePr
 		validOverrides,
 		tags,
 		shared.RestoreUserID(input.CurrentUser.ID),
-		time.Now(),
+		now,
 	)
 	if err != nil {
 		return nil, err

@@ -103,7 +103,8 @@ func (uc *UpdateMaterial) Execute(ctx context.Context, in UpdateMaterialInput) (
 		return nil, apperror.NewValidation(fieldErrs)
 	}
 
-	m.UpdateMetadata(title, content, tags, time.Now())
+	now := time.Now()
+	m.UpdateMetadata(title, content, tags, now)
 
 	if err := uc.repo.Save(ctx, m); err != nil {
 		slog.ErrorContext(ctx, "failed to save updated material", "error", err, "material_id", in.MaterialID)

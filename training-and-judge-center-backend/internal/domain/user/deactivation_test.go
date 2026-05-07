@@ -10,10 +10,10 @@ import (
 func TestRestoreDeactivationRequest_BlockedWithNilBlockedUntil(t *testing.T) {
 	req := user.RestoreDeactivationRequest(
 		"req-id", "user-id", "123456",
-		time.Now().Add(time.Hour),
+		testNow.Add(time.Hour),
 		5, nil,
 		user.DeactivationStatusBlocked,
-		time.Now(), time.Now(),
+		testNow, testNow,
 	)
 
 	if req.Status() != user.DeactivationStatusExpired {
@@ -22,8 +22,6 @@ func TestRestoreDeactivationRequest_BlockedWithNilBlockedUntil(t *testing.T) {
 }
 
 func TestIsCurrentlyBlocked(t *testing.T) {
-	now := time.Now()
-
 	tests := []struct {
 		name         string
 		status       user.DeactivationStatus
@@ -33,13 +31,13 @@ func TestIsCurrentlyBlocked(t *testing.T) {
 		{
 			name:         "blocked and within period",
 			status:       user.DeactivationStatusBlocked,
-			blockedUntil: ptr(now.Add(30 * time.Minute)),
+			blockedUntil: ptr(testNow.Add(30 * time.Minute)),
 			expected:     true,
 		},
 		{
 			name:         "blocked but period expired",
 			status:       user.DeactivationStatusBlocked,
-			blockedUntil: ptr(now.Add(-1 * time.Minute)),
+			blockedUntil: ptr(testNow.Add(-1 * time.Minute)),
 			expected:     false,
 		},
 		{
@@ -54,12 +52,12 @@ func TestIsCurrentlyBlocked(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			req := user.RestoreDeactivationRequest(
 				"req-id", "user-id", "123456",
-				now.Add(time.Hour),
+				testNow.Add(time.Hour),
 				0, tt.blockedUntil,
 				tt.status,
-				now, now,
+				testNow, testNow,
 			)
-			got := req.IsCurrentlyBlocked(now)
+			got := req.IsCurrentlyBlocked(testNow)
 			if got != tt.expected {
 				t.Errorf("IsCurrentlyBlocked: got %v, want %v", got, tt.expected)
 			}
@@ -73,10 +71,10 @@ func TestRegisterFailure(t *testing.T) {
 	newRequest := func(attempts int) *user.DeactivationRequest {
 		return user.RestoreDeactivationRequest(
 			"req-id", "user-id", "123456",
-			time.Now().Add(time.Hour),
+			testNow.Add(time.Hour),
 			attempts, nil,
 			user.DeactivationStatusPending,
-			time.Now(), time.Now(),
+			testNow, testNow,
 		)
 	}
 
@@ -96,10 +94,9 @@ func TestRegisterFailure(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			before := time.Now()
 			req := newRequest(tt.initialAttempts)
 
-			req.RegisterFailure(before)
+			req.RegisterFailure(testNow)
 
 			if req.Attempts() != tt.initialAttempts+1 {
 				t.Errorf("attempts: got %d, want %d", req.Attempts(), tt.initialAttempts+1)
@@ -111,7 +108,7 @@ func TestRegisterFailure(t *testing.T) {
 				if req.BlockedUntil() == nil {
 					t.Fatal("blockedUntil: got nil, want non-nil")
 				}
-				expectedBlockedUntil := before.Add(user.DeactivationBlockDuration)
+				expectedBlockedUntil := testNow.Add(user.DeactivationBlockDuration)
 				if req.BlockedUntil().Before(expectedBlockedUntil) {
 					t.Errorf("blockedUntil %v is earlier than expected %v", req.BlockedUntil(), expectedBlockedUntil)
 				}
@@ -120,7 +117,7 @@ func TestRegisterFailure(t *testing.T) {
 					t.Errorf("blockedUntil: got %v, want nil", req.BlockedUntil())
 				}
 			}
-			if req.UpdatedAt().Before(before) {
+			if req.UpdatedAt().Before(testNow) {
 				t.Errorf("updatedAt %v was not refreshed", req.UpdatedAt())
 			}
 		})

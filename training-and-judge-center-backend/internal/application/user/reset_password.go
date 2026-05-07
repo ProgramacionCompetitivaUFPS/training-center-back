@@ -77,7 +77,7 @@ func (uc *ResetPasswordUseCase) Execute(ctx context.Context, input ResetPassword
 		})
 	}
 
-	if err := foundUser.UpdatePassword(newPassword); err != nil {
+	if err := foundUser.UpdatePassword(newPassword, now); err != nil {
 		slog.Error("failed to update password on user domain object", "user_id", foundUser.ID(), "error", err)
 		return apperror.NewInternal()
 	}

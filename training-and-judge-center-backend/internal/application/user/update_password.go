@@ -77,7 +77,8 @@ func (uc *UpdatePasswordUseCase) Execute(ctx context.Context, input UpdatePasswo
 		})
 	}
 
-	if err := foundUser.UpdatePassword(newPassword); err != nil {
+	now := time.Now()
+	if err := foundUser.UpdatePassword(newPassword, now); err != nil {
 		slog.Error("failed to update password on user domain object", "user_id", foundUser.ID(), "error", err)
 		return apperror.NewInternal()
 	}
@@ -93,7 +94,6 @@ func (uc *UpdatePasswordUseCase) Execute(ctx context.Context, input UpdatePasswo
 		// Don't fail the operation; the password was already saved.
 	}
 
-	now := time.Now()
 	if err := uc.sessionInvalidator.InvalidateAllUserSessions(ctx, foundUser.ID(), now); err != nil {
 		slog.Error("failed to invalidate sessions after password update", "user_id", foundUser.ID(), "error", err)
 		return ErrSessionsNotInvalidated

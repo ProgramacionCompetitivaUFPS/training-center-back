@@ -57,17 +57,18 @@ func (uc *ConfirmEmailChangeUseCase) Execute(ctx context.Context, input ConfirmE
 		return nil, apperror.NewBadRequest("INVALID_CODE", "The verification code is invalid or has expired")
 	}
 
-	if req.Status() != user.StatusPending || req.IsExpired(time.Now()) {
+	now := time.Now()
+	if req.Status() != user.StatusPending || req.IsExpired(now) {
 		return nil, apperror.NewBadRequest("INVALID_CODE", "The verification code is invalid or has expired")
 	}
 
 	oldEmail := u.Email().String()
 	newEmailVal := req.NewEmail()
-	if err := u.UpdateEmail(newEmailVal); err != nil {
+	if err := u.UpdateEmail(newEmailVal, now); err != nil {
 		slog.Error("failed to update email on user domain object", "user_id", input.UserID, "error", err)
 		return nil, apperror.NewInternal()
 	}
-	if err := req.MarkAsUsed(time.Now()); err != nil {
+	if err := req.MarkAsUsed(now); err != nil {
 		slog.Error("failed to mark email change request as used", "user_id", input.UserID, "error", err)
 		return nil, apperror.NewInternal()
 	}

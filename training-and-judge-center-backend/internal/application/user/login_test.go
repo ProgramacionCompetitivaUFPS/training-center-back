@@ -152,7 +152,7 @@ func TestLogin_UserNotFound(t *testing.T) {
 func TestLogin_DeactivatedAccount(t *testing.T) {
 	repo, tokenSvc := newLoginDeps()
 	deactivatedUser := newActiveUser()
-	deactivatedUser.Deactivate()
+	deactivatedUser.Deactivate("test_suffix", time.Now())
 	repo.findByEmailFn = func(_ context.Context, _ domain.Email) (*domain.User, error) {
 		return deactivatedUser, nil
 	}

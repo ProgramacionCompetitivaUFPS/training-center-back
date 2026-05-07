@@ -35,7 +35,7 @@ func TestRequestEmailChange_Success(t *testing.T) {
 
 	uc := NewRequestEmailChangeUseCase(userRepo, emailChangeRepo, mockEmail, &mockRateLimiter{})
 
-	err := uc.Execute(context.Background(), RequestEmailChangeInput{
+	_, err := uc.Execute(context.Background(), RequestEmailChangeInput{
 		UserID:   "user-1",
 		Password: "Secret1!",
 		NewEmail: "newemail@example.com",
@@ -63,7 +63,7 @@ func TestRequestEmailChange_WrongPassword(t *testing.T) {
 	mockEmail := &mockEmailSender{}
 	uc := NewRequestEmailChangeUseCase(userRepo, emailChangeRepo, mockEmail, &mockRateLimiter{})
 
-	err := uc.Execute(context.Background(), RequestEmailChangeInput{
+	_, err := uc.Execute(context.Background(), RequestEmailChangeInput{
 		UserID:   "user-1",
 		Password: "WrongPassword!",
 		NewEmail: "newemail@example.com",
@@ -86,7 +86,7 @@ func TestRequestEmailChange_UserNotFound(t *testing.T) {
 	}
 
 	uc := NewRequestEmailChangeUseCase(userRepo, &mockEmailChangeRepo{}, &mockEmailSender{}, &mockRateLimiter{})
-	err := uc.Execute(context.Background(), RequestEmailChangeInput{
+	_, err := uc.Execute(context.Background(), RequestEmailChangeInput{
 		UserID:   "ghost",
 		Password: "Secret1!",
 		NewEmail: "new@example.com",
@@ -107,7 +107,7 @@ func TestRequestEmailChange_InvalidNewEmail(t *testing.T) {
 	userRepo.findByIDFn = func(_ context.Context, _ string) (*domain.User, error) { return activeUser, nil }
 
 	uc := NewRequestEmailChangeUseCase(userRepo, &mockEmailChangeRepo{}, &mockEmailSender{}, &mockRateLimiter{})
-	err := uc.Execute(context.Background(), RequestEmailChangeInput{
+	_, err := uc.Execute(context.Background(), RequestEmailChangeInput{
 		UserID:   "user-1",
 		Password: "Secret1!",
 		NewEmail: "not-an-email",
@@ -145,7 +145,7 @@ func TestRequestEmailChange_EmailDeliveryFails(t *testing.T) {
 
 	uc := NewRequestEmailChangeUseCase(userRepo, emailChangeRepo, mockEmail, &mockRateLimiter{})
 
-	err := uc.Execute(context.Background(), RequestEmailChangeInput{
+	_, err := uc.Execute(context.Background(), RequestEmailChangeInput{
 		UserID:   "user-1",
 		Password: "Secret1!",
 		NewEmail: "newemail@example.com",

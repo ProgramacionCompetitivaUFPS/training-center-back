@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/training-judge-center/backend/internal/application/shared"
 	"github.com/training-judge-center/backend/internal/domain/user"
 	"github.com/training-judge-center/backend/pkg/apperror"
@@ -79,7 +80,8 @@ func (uc *RequestPasswordRecoveryUseCase) Execute(ctx context.Context, input Req
 		return apperror.NewInternal()
 	}
 
-	req, err := user.NewPasswordRecoveryRequest(foundUser.ID(), code, now)
+	newID := uuid.New().String()
+	req, err := user.NewPasswordRecoveryRequest(newID, foundUser.ID(), code, now)
 	if err != nil {
 		slog.Error("failed to build password recovery request", "user_id", foundUser.ID(), "error", err)
 		return apperror.NewInternal()
@@ -96,7 +98,7 @@ func (uc *RequestPasswordRecoveryUseCase) Execute(ctx context.Context, input Req
 		Body:    fmt.Sprintf("Your password recovery code is: %s\nThis code will expire in 15 minutes.", code),
 	}); err != nil {
 		slog.Error("failed to send password recovery email", "user_id", foundUser.ID(), "error", err)
-		if invalidateErr := uc.recoveryRepo.InvalidatePendingByUserID(ctx, foundUser.ID(), time.Now()); invalidateErr != nil {
+		if invalidateErr := uc.recoveryRepo.InvalidatePendingByUserID(ctx, foundUser.ID(), now); invalidateErr != nil {
 			slog.Error("failed to invalidate undelivered recovery code", "user_id", foundUser.ID(), "error", invalidateErr)
 		}
 	}
