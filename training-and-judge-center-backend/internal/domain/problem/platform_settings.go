@@ -29,11 +29,58 @@ func NewPlatformSettings(
 	maxFileCountTestCase int,
 	maxFileSizeDefaultMB int,
 ) (PlatformSettings, error) {
-	if globalMaxTimeLimit <= 0 || globalMaxMemoryLimit <= 0 ||
-		uploadMaxConcurrency <= 0 || maxFileCountSample <= 0 ||
-		maxFileSizeTestCaseMB <= 0 || maxFileCountTestCase <= 0 ||
-		maxFileSizeDefaultMB <= 0 {
-		return PlatformSettings{}, apperror.NewInternal()
+	var fieldErrs []apperror.FieldError
+
+	if globalMaxTimeLimit <= 0 {
+		fieldErrs = append(fieldErrs, apperror.FieldError{Field: "globalMaxTimeLimit", Message: ErrCodeInvalidTimeLimit})
+	}
+	if globalMaxMemoryLimit <= 0 {
+		fieldErrs = append(fieldErrs, apperror.FieldError{Field: "globalMaxMemoryLimit", Message: ErrCodeInvalidMemoryLimit})
+	}
+	if uploadMaxConcurrency <= 0 {
+		fieldErrs = append(fieldErrs, apperror.FieldError{Field: "uploadMaxConcurrency", Message: ErrCodeInvalidUploadConcurrency})
+	}
+	if maxFileCountSample <= 0 {
+		fieldErrs = append(fieldErrs, apperror.FieldError{Field: "maxFileCountSample", Message: ErrCodeInvalidFileCount})
+	}
+	if maxFileSizeTestCaseMB <= 0 {
+		fieldErrs = append(fieldErrs, apperror.FieldError{Field: "maxFileSizeTestCaseMB", Message: ErrCodeInvalidFileSize})
+	}
+	if maxFileCountTestCase <= 0 {
+		fieldErrs = append(fieldErrs, apperror.FieldError{Field: "maxFileCountTestCase", Message: ErrCodeInvalidFileCount})
+	}
+	if maxFileSizeDefaultMB <= 0 {
+		fieldErrs = append(fieldErrs, apperror.FieldError{Field: "maxFileSizeDefaultMB", Message: ErrCodeInvalidFileSize})
+	}
+	if len(supportedLanguages) == 0 {
+		fieldErrs = append(fieldErrs, apperror.FieldError{Field: "supportedLanguages", Message: ErrCodeNoSupportedLanguages})
+	}
+
+	// cross-field: default file size must not exceed test case file size
+	if maxFileSizeDefaultMB > 0 && maxFileSizeTestCaseMB > 0 && maxFileSizeDefaultMB > maxFileSizeTestCaseMB {
+		fieldErrs = append(fieldErrs, apperror.FieldError{Field: "maxFileSizeDefaultMB", Message: ErrCodeFileSizeDefaultExceedsTestCase})
+	}
+
+	// cross-field: per-language limits must not exceed globals
+	if globalMaxTimeLimit > 0 || globalMaxMemoryLimit > 0 {
+		for lang, ll := range languageLimits {
+			if globalMaxTimeLimit > 0 && ll.MaxTimeLimit() > globalMaxTimeLimit {
+				fieldErrs = append(fieldErrs, apperror.FieldError{
+					Field:   "languageLimits." + lang + ".maxTimeLimit",
+					Message: ErrCodeLanguageLimitExceedsGlobal,
+				})
+			}
+			if globalMaxMemoryLimit > 0 && ll.MaxMemoryLimit() > globalMaxMemoryLimit {
+				fieldErrs = append(fieldErrs, apperror.FieldError{
+					Field:   "languageLimits." + lang + ".maxMemoryLimit",
+					Message: ErrCodeLanguageLimitExceedsGlobal,
+				})
+			}
+		}
+	}
+
+	if len(fieldErrs) > 0 {
+		return PlatformSettings{}, apperror.NewValidation(fieldErrs)
 	}
 	return PlatformSettings{
 		globalMaxTimeLimit:    globalMaxTimeLimit,
