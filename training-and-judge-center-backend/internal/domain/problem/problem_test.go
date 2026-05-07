@@ -112,7 +112,7 @@ func TestAddModifier_DuplicateUser_ReturnsConflict(t *testing.T) {
 }
 
 func TestAddModifier_ExceedsMaxModifiers_ReturnsBadRequest(t *testing.T) {
-	modifiers := make([]shared.UserID, problem.MaxModifiers)
+	modifiers := make([]shared.UserID, 20)
 	for i := range modifiers {
 		modifiers[i] = shared.RestoreUserID(fmt.Sprintf("mod-%02d", i))
 	}
@@ -187,6 +187,31 @@ func TestCanBeEditedBy(t *testing.T) {
 	}
 }
 
+func TestPublish_AlreadyPublished_ReturnsError(t *testing.T) {
+	p := newPublishedProblem()
+
+	err := p.Publish(testNow.Add(time.Hour))
+	if err == nil {
+		t.Error("expected error for publishing an already published problem, got nil")
+	}
+}
+
+func TestPublish_Draft_TransitionsToPublished(t *testing.T) {
+	p := newDraftProblem()
+	later := testNow.Add(time.Hour)
+
+	err := p.Publish(later)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if p.Status().String() != "PUBLISHED" {
+		t.Errorf("status: got %q, want PUBLISHED", p.Status().String())
+	}
+	if !p.UpdatedAt().Equal(later.UTC()) {
+		t.Errorf("updatedAt not refreshed: got %v, want %v", p.UpdatedAt(), later.UTC())
+	}
+}
+
 func TestUnpublish_AlreadyDraft_ReturnsError(t *testing.T) {
 	p := newDraftProblem()
 
@@ -243,8 +268,9 @@ func TestRemoveTestCases_ClearsKey(t *testing.T) {
 func TestAddSolution_NewFile_Appends(t *testing.T) {
 	p := newDraftProblem()
 	sol := problem.RestoreJudgingFile("sol.cpp", "key-1", "cpp20")
+	later := testNow.Add(time.Hour)
 
-	replaced := p.AddSolution(sol, testNow.Add(time.Hour))
+	replaced := p.AddSolution(sol, later)
 
 	if replaced != nil {
 		t.Errorf("AddSolution: expected nil for new file, got non-nil")
@@ -252,15 +278,22 @@ func TestAddSolution_NewFile_Appends(t *testing.T) {
 	if len(p.Solutions()) != 1 {
 		t.Errorf("solutions: got %d, want 1", len(p.Solutions()))
 	}
+	if p.JudgingUpdatedAt() == nil {
+		t.Error("JudgingUpdatedAt: got nil, want non-nil")
+	}
+	if !p.UpdatedAt().Equal(later.UTC()) {
+		t.Errorf("updatedAt not refreshed: got %v, want %v", p.UpdatedAt(), later.UTC())
+	}
 }
 
 func TestAddSolution_DuplicateFilename_Replaces(t *testing.T) {
 	p := newDraftProblem()
 	original := problem.RestoreJudgingFile("sol.cpp", "key-1", "cpp20")
 	updated := problem.RestoreJudgingFile("sol.cpp", "key-2", "cpp20")
+	later := testNow.Add(time.Hour)
 
 	p.AddSolution(original, testNow)
-	replaced := p.AddSolution(updated, testNow.Add(time.Hour))
+	replaced := p.AddSolution(updated, later)
 
 	if replaced == nil {
 		t.Fatal("AddSolution: expected replaced file, got nil")
@@ -274,17 +307,38 @@ func TestAddSolution_DuplicateFilename_Replaces(t *testing.T) {
 	if p.Solutions()[0].FileKey() != "key-2" {
 		t.Errorf("updated key: got %q, want key-2", p.Solutions()[0].FileKey())
 	}
+	if p.JudgingUpdatedAt() == nil {
+		t.Error("JudgingUpdatedAt: got nil, want non-nil")
+	}
 }
 
 func TestRemoveSolution_RemovesMatchingFile(t *testing.T) {
 	p := newDraftProblem()
 	sol := problem.RestoreJudgingFile("sol.cpp", "key-1", "cpp20")
 	p.AddSolution(sol, testNow)
+	later := testNow.Add(time.Hour)
 
-	p.RemoveSolution("sol.cpp", testNow.Add(time.Hour))
-
+	err := p.RemoveSolution("sol.cpp", later)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
 	if len(p.Solutions()) != 0 {
 		t.Errorf("solutions: got %d, want 0", len(p.Solutions()))
+	}
+	if p.JudgingUpdatedAt() == nil {
+		t.Error("JudgingUpdatedAt: got nil, want non-nil")
+	}
+	if !p.UpdatedAt().Equal(later.UTC()) {
+		t.Errorf("updatedAt not refreshed: got %v, want %v", p.UpdatedAt(), later.UTC())
+	}
+}
+
+func TestRemoveSolution_NotFound_ReturnsNotFound(t *testing.T) {
+	p := newDraftProblem()
+
+	err := p.RemoveSolution("nonexistent.cpp", testNow.Add(time.Hour))
+	if err == nil {
+		t.Error("expected error for absent solution, got nil")
 	}
 }
 
@@ -321,5 +375,83 @@ func TestUpdateAccessibility_SetsAccessibility(t *testing.T) {
 
 	if p.Accessibility().String() != "PUBLIC" {
 		t.Errorf("accessibility: got %q, want PUBLIC", p.Accessibility().String())
+	}
+}
+
+func TestSetChecker_SetsCheckerAndUpdatesTimestamps(t *testing.T) {
+	p := newDraftProblem()
+	checker := problem.RestoreJudgingFile("checker.cpp", "key-c", "cpp20")
+	later := testNow.Add(time.Hour)
+
+	p.SetChecker(checker, later)
+
+	if p.Checker() == nil {
+		t.Fatal("Checker: got nil, want non-nil")
+	}
+	if p.Checker().FileKey() != "key-c" {
+		t.Errorf("Checker.FileKey(): got %q, want key-c", p.Checker().FileKey())
+	}
+	if p.JudgingUpdatedAt() == nil {
+		t.Error("JudgingUpdatedAt: got nil, want non-nil")
+	}
+	if !p.UpdatedAt().Equal(later.UTC()) {
+		t.Errorf("updatedAt not refreshed: got %v, want %v", p.UpdatedAt(), later.UTC())
+	}
+}
+
+func TestRemoveChecker_ClearsCheckerAndUpdatesTimestamps(t *testing.T) {
+	p := newDraftProblem()
+	p.SetChecker(problem.RestoreJudgingFile("checker.cpp", "key-c", "cpp20"), testNow)
+	later := testNow.Add(time.Hour)
+
+	p.RemoveChecker(later)
+
+	if p.Checker() != nil {
+		t.Error("Checker: expected nil after removal, got non-nil")
+	}
+	if p.JudgingUpdatedAt() == nil {
+		t.Error("JudgingUpdatedAt: got nil, want non-nil")
+	}
+	if !p.UpdatedAt().Equal(later.UTC()) {
+		t.Errorf("updatedAt not refreshed: got %v, want %v", p.UpdatedAt(), later.UTC())
+	}
+}
+
+func TestSetValidator_SetsValidatorAndUpdatesTimestamps(t *testing.T) {
+	p := newDraftProblem()
+	validator := problem.RestoreJudgingFile("validator.cpp", "key-v", "cpp20")
+	later := testNow.Add(time.Hour)
+
+	p.SetValidator(validator, later)
+
+	if p.Validator() == nil {
+		t.Fatal("Validator: got nil, want non-nil")
+	}
+	if p.Validator().FileKey() != "key-v" {
+		t.Errorf("Validator.FileKey(): got %q, want key-v", p.Validator().FileKey())
+	}
+	if p.JudgingUpdatedAt() == nil {
+		t.Error("JudgingUpdatedAt: got nil, want non-nil")
+	}
+	if !p.UpdatedAt().Equal(later.UTC()) {
+		t.Errorf("updatedAt not refreshed: got %v, want %v", p.UpdatedAt(), later.UTC())
+	}
+}
+
+func TestRemoveValidator_ClearsValidatorAndUpdatesTimestamps(t *testing.T) {
+	p := newDraftProblem()
+	p.SetValidator(problem.RestoreJudgingFile("validator.cpp", "key-v", "cpp20"), testNow)
+	later := testNow.Add(time.Hour)
+
+	p.RemoveValidator(later)
+
+	if p.Validator() != nil {
+		t.Error("Validator: expected nil after removal, got non-nil")
+	}
+	if p.JudgingUpdatedAt() == nil {
+		t.Error("JudgingUpdatedAt: got nil, want non-nil")
+	}
+	if !p.UpdatedAt().Equal(later.UTC()) {
+		t.Errorf("updatedAt not refreshed: got %v, want %v", p.UpdatedAt(), later.UTC())
 	}
 }

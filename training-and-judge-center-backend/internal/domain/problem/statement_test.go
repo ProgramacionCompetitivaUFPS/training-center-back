@@ -7,6 +7,21 @@ import (
 	"github.com/training-judge-center/backend/internal/domain/problem"
 )
 
+func TestNewStatement_Value_ReturnsCopy(t *testing.T) {
+	s := "hello"
+	stmt, err := problem.NewStatement(&s)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	got := stmt.Value()
+	if got == &s {
+		t.Error("Value() returned the original pointer, expected a defensive copy")
+	}
+	if *got != s {
+		t.Errorf("Value(): got %q, want %q", *got, s)
+	}
+}
+
 func TestNewStatement(t *testing.T) {
 	atLimit := strings.Repeat("a", 150_000)
 	overLimit := strings.Repeat("a", 150_001)

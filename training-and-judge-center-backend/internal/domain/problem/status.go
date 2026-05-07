@@ -35,7 +35,7 @@ func (s Status) String() string {
 }
 
 func (s Status) IsPublished() bool {
-	return s.value == "PUBLISHED"
+	return s.value == statusPublished
 }
 
 func RestoreStatus(value string) Status {

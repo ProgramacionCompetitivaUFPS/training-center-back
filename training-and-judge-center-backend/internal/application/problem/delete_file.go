@@ -78,7 +78,9 @@ func (usecase *DeleteProblemFileUseCase) Execute(ctx context.Context, input Dele
 		for _, solution := range foundProblem.Solutions() {
 			if solution.Filename() == input.FileName {
 				storageKeyToDelete = solution.FileKey()
-				foundProblem.RemoveSolution(solution.Filename(), now)
+				if err := foundProblem.RemoveSolution(solution.Filename(), now); err != nil {
+					return struct{}{}, err
+				}
 				found = true
 				break
 			}
