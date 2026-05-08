@@ -27,7 +27,7 @@ func NewEmailChangeRequest(id, userID string, newEmail Email, code string, now t
 		userID:    userID,
 		newEmail:  newEmail,
 		code:      code,
-		status:    StatusPending,
+		status:    RequestStatusPending,
 		expiresAt: t.Add(RequestExpiryDuration),
 		createdAt: t,
 	}, nil
@@ -56,14 +56,14 @@ func (r *EmailChangeRequest) CreatedAt() time.Time      { return r.createdAt }
 func (r *EmailChangeRequest) UpdatedAt() *time.Time     { return r.updatedAt }
 
 func (r *EmailChangeRequest) IsExpired(now time.Time) bool {
-	return now.After(r.expiresAt) || r.status == StatusExpired
+	return now.After(r.expiresAt) || r.status == RequestStatusExpired
 }
 
 func (r *EmailChangeRequest) MarkAsUsed(now time.Time) error {
-	if r.status != StatusPending {
+	if r.status != RequestStatusPending {
 		return apperror.NewConflict(ErrCodeEmailChangeNotPending, "email change request is not pending")
 	}
-	r.status = StatusUsed
+	r.status = RequestStatusUsed
 	t := now.UTC()
 	r.updatedAt = &t
 	return nil

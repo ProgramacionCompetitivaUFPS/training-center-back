@@ -20,10 +20,10 @@ func TestResetPassword_Success(t *testing.T) {
 
 	recoveryRepo := &mockPasswordRecoveryRepo{
 		findPendingByUserIDFn: func(ctx context.Context, userID string) (*domain.PasswordRecoveryRequest, error) {
-			return domain.RestorePasswordRecoveryRequest("req-1", "user-1", "123456", domain.StatusPending, time.Now().Add(10 * time.Minute), time.Time{}, nil), nil
+			return domain.RestorePasswordRecoveryRequest("req-1", "user-1", "123456", domain.RequestStatusPending, time.Now().Add(10 * time.Minute), time.Time{}, nil), nil
 		},
 		updateFn: func(ctx context.Context, req *domain.PasswordRecoveryRequest) error {
-			if req.Status() != domain.StatusUsed {
+			if req.Status() != domain.RequestStatusUsed {
 				t.Errorf("expected status to be USED")
 			}
 			return nil
@@ -66,7 +66,7 @@ func TestResetPassword_InvalidCode(t *testing.T) {
 
 	recoveryRepo := &mockPasswordRecoveryRepo{
 		findPendingByUserIDFn: func(ctx context.Context, userID string) (*domain.PasswordRecoveryRequest, error) {
-			return domain.RestorePasswordRecoveryRequest("req-1", "user-1", "654321", domain.StatusPending, time.Now().Add(10*time.Minute), time.Time{}, nil), nil
+			return domain.RestorePasswordRecoveryRequest("req-1", "user-1", "654321", domain.RequestStatusPending, time.Now().Add(10*time.Minute), time.Time{}, nil), nil
 		},
 	}
 
@@ -126,7 +126,7 @@ func TestResetPassword_ExpiredRequest(t *testing.T) {
 	recoveryRepo := &mockPasswordRecoveryRepo{
 		findPendingByUserIDFn: func(_ context.Context, _ string) (*domain.PasswordRecoveryRequest, error) {
 			// Request exists in DB but its window has already elapsed
-			return domain.RestorePasswordRecoveryRequest("req-1", "user-1", "123456", domain.StatusPending, time.Now().Add(-1*time.Minute), time.Time{}, nil), nil
+			return domain.RestorePasswordRecoveryRequest("req-1", "user-1", "123456", domain.RequestStatusPending, time.Now().Add(-1*time.Minute), time.Time{}, nil), nil
 		},
 	}
 
@@ -156,7 +156,7 @@ func TestResetPassword_WeakPassword(t *testing.T) {
 
 	recoveryRepo := &mockPasswordRecoveryRepo{
 		findPendingByUserIDFn: func(_ context.Context, _ string) (*domain.PasswordRecoveryRequest, error) {
-			return domain.RestorePasswordRecoveryRequest("req-1", "user-1", "123456", domain.StatusPending, time.Now().Add(10*time.Minute), time.Time{}, nil), nil
+			return domain.RestorePasswordRecoveryRequest("req-1", "user-1", "123456", domain.RequestStatusPending, time.Now().Add(10*time.Minute), time.Time{}, nil), nil
 		},
 	}
 
@@ -232,7 +232,7 @@ func TestResetPassword_TxFailure(t *testing.T) {
 
 	recoveryRepo := &mockPasswordRecoveryRepo{
 		findPendingByUserIDFn: func(_ context.Context, _ string) (*domain.PasswordRecoveryRequest, error) {
-			return domain.RestorePasswordRecoveryRequest("req-1", "user-1", "123456", domain.StatusPending, time.Now().Add(10*time.Minute), time.Time{}, nil), nil
+			return domain.RestorePasswordRecoveryRequest("req-1", "user-1", "123456", domain.RequestStatusPending, time.Now().Add(10*time.Minute), time.Time{}, nil), nil
 		},
 	}
 
@@ -267,7 +267,7 @@ func TestResetPassword_SessionInvalidationFailure(t *testing.T) {
 
 	recoveryRepo := &mockPasswordRecoveryRepo{
 		findPendingByUserIDFn: func(_ context.Context, _ string) (*domain.PasswordRecoveryRequest, error) {
-			return domain.RestorePasswordRecoveryRequest("req-1", "user-1", "123456", domain.StatusPending, time.Now().Add(10*time.Minute), time.Time{}, nil), nil
+			return domain.RestorePasswordRecoveryRequest("req-1", "user-1", "123456", domain.RequestStatusPending, time.Now().Add(10*time.Minute), time.Time{}, nil), nil
 		},
 		updateFn: func(_ context.Context, _ *domain.PasswordRecoveryRequest) error { return nil },
 	}

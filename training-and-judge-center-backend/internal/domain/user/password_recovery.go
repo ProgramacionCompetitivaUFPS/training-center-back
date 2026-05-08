@@ -25,7 +25,7 @@ func NewPasswordRecoveryRequest(id, userID, code string, now time.Time) (*Passwo
 		id:        id,
 		userID:    userID,
 		code:      code,
-		status:    StatusPending,
+		status:    RequestStatusPending,
 		expiresAt: t.Add(RequestExpiryDuration),
 		createdAt: t,
 	}, nil
@@ -52,14 +52,14 @@ func (r *PasswordRecoveryRequest) CreatedAt() time.Time  { return r.createdAt }
 func (r *PasswordRecoveryRequest) UpdatedAt() *time.Time { return r.updatedAt }
 
 func (r *PasswordRecoveryRequest) IsExpired(now time.Time) bool {
-	return now.After(r.expiresAt) || r.status == StatusExpired
+	return now.After(r.expiresAt) || r.status == RequestStatusExpired
 }
 
 func (r *PasswordRecoveryRequest) MarkAsUsed(now time.Time) error {
-	if r.status != StatusPending {
+	if r.status != RequestStatusPending {
 		return apperror.NewConflict(ErrCodePasswordRecoveryNotPending, "password recovery request is not pending")
 	}
-	r.status = StatusUsed
+	r.status = RequestStatusUsed
 	t := now.UTC()
 	r.updatedAt = &t
 	return nil

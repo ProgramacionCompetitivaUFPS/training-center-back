@@ -144,10 +144,10 @@ func (r *EmailChangeRepository) InvalidatePendingByUserID(ctx context.Context, u
 
 	querier := infraPostgres.GetQuerier(ctx, r.querier)
 	_, err := querier.Exec(ctx, query,
-		domainUser.StatusExpired.String(),
+		domainUser.RequestStatusExpired.String(),
 		now,
 		userID,
-		domainUser.StatusPending.String(),
+		domainUser.RequestStatusPending.String(),
 	)
 	if err != nil {
 		return fmt.Errorf("failed to invalidate pending email change requests: %w", err)
