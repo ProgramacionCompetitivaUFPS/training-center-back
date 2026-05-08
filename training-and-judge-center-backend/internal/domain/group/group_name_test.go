@@ -21,7 +21,7 @@ func TestNewGroupName_Valid(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			n, err := group.NewGroupName(tc.input)
 			if err != nil {
-				t.Errorf("NewGroupName(%q) unexpected error: %v", tc.input, err)
+				t.Fatalf("NewGroupName(%q) unexpected error: %v", tc.input, err)
 			}
 			if n.Value() != tc.wantVal {
 				t.Errorf("Value() = %q, want %q", n.Value(), tc.wantVal)
@@ -79,7 +79,7 @@ func TestNewGroupName_MultibyteValid(t *testing.T) {
 	name := "算法竞赛训练营算法竞"
 	n, err := group.NewGroupName(name)
 	if err != nil {
-		t.Errorf("NewGroupName with 10 CJK chars unexpected error: %v", err)
+		t.Fatalf("NewGroupName with 10 CJK chars unexpected error: %v", err)
 	}
 	if n.Value() != name {
 		t.Errorf("Value() = %q, want %q", n.Value(), name)
