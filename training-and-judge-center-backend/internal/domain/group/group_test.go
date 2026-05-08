@@ -9,8 +9,6 @@ import (
 	"github.com/training-judge-center/backend/pkg/apperror"
 )
 
-var testNow = time.Date(2024, 1, 15, 12, 0, 0, 0, time.UTC)
-
 func newGroupName(t *testing.T, s string) group.GroupName {
 	t.Helper()
 	n, err := group.NewGroupName(s)

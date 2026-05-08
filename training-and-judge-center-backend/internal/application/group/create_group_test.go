@@ -37,7 +37,7 @@ func TestCreateGroup_NonAdminNonCoachReturns403(t *testing.T) {
 		CurrentUser: currentUser("u1", shared.RoleContestant),
 	})
 	ae, ok := err.(*apperror.AppError)
-	if !ok || ae.Code != domainGroup.ErrCodeInsufficientPermissions {
+	if !ok || ae.Code != ErrCodeInsufficientPermissions {
 		t.Fatalf("expected INSUFFICIENT_PERMISSIONS, got %v", err)
 	}
 }

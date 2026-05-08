@@ -6,40 +6,6 @@ import (
 	"github.com/training-judge-center/backend/pkg/apperror"
 )
 
-type DeactivationStatus struct{ value string }
-
-const (
-	deactivationStatusPending   = "PENDING"
-	deactivationStatusConfirmed = "CONFIRMED"
-	deactivationStatusExpired   = "EXPIRED"
-	deactivationStatusBlocked   = "BLOCKED"
-)
-
-var (
-	DeactivationStatusPending   = DeactivationStatus{value: deactivationStatusPending}
-	DeactivationStatusConfirmed = DeactivationStatus{value: deactivationStatusConfirmed}
-	DeactivationStatusExpired   = DeactivationStatus{value: deactivationStatusExpired}
-	DeactivationStatusBlocked   = DeactivationStatus{value: deactivationStatusBlocked}
-)
-
-func NewDeactivationStatus(raw string) (DeactivationStatus, error) {
-	switch raw {
-	case deactivationStatusPending, deactivationStatusConfirmed,
-		deactivationStatusExpired, deactivationStatusBlocked:
-		return DeactivationStatus{value: raw}, nil
-	default:
-		return DeactivationStatus{}, apperror.NewValidation([]apperror.FieldError{
-			{Field: "status", Message: "invalid deactivation status: " + raw},
-		})
-	}
-}
-
-func RestoreDeactivationStatus(raw string) DeactivationStatus {
-	return DeactivationStatus{value: raw}
-}
-
-func (s DeactivationStatus) String() string { return s.value }
-
 const (
 	MaxDeactivationAttempts   = 5
 	DeactivationBlockDuration = time.Hour
@@ -66,7 +32,7 @@ func NewDeactivationRequest(id, userID, verificationCode string, now time.Time) 
 		id:               id,
 		userID:           userID,
 		verificationCode: verificationCode,
-		expiresAt:        t.Add(15 * time.Minute),
+		expiresAt:        t.Add(RequestExpiryDuration),
 		attempts:         0,
 		status:           DeactivationStatusPending,
 		createdAt:        t,

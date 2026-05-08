@@ -525,6 +525,28 @@ func newGroupName(t *testing.T, s string) group.GroupName {
 
 En la práctica, la mayoría de los helpers de la capa de aplicación no reciben `*testing.T` — retornan valores y usan `panic` si fallan (`newTestMaterial`, `repoWith`). La regla aplica cuando el helper sí recibe `*testing.T` y llama `t.Fatalf` o `t.Errorf` internamente.
 
+**`common_test.go` para helpers compartidos entre archivos.** Cuando un paquete de dominio tiene dos o más archivos de test que comparten variables o funciones (ej: `testNow`, constructores de fixtures, `assertValidationField`), esas definiciones van en `common_test.go`. Cada archivo de test individual define únicamente sus helpers propios.
+
+```go
+// internal/domain/user/common_test.go
+package user_test
+
+import (
+    "testing"
+    "time"
+    "github.com/training-judge-center/backend/internal/domain/user"
+)
+
+var testNow = time.Date(2024, 1, 15, 12, 0, 0, 0, time.UTC)
+
+func makeTestUser(t *testing.T) *user.User {
+    t.Helper()
+    // ...
+}
+```
+
+**Cuándo aplica:** solo cuando dos o más archivos de test usan la misma variable/función. Si `testNow` solo existe en un archivo y ningún otro lo usa, no hace falta `common_test.go`.
+
 ---
 
 ### D10 — El dominio no tiene efectos de lado ni fuentes de no determinismo
@@ -607,7 +629,19 @@ func TestNewEmailChangeRequest_SetsExpiry(t *testing.T) {
 }
 ```
 
-**No existe excepción.** Si la lógica de negocio requiere un valor no determinista, ese valor se genera en `application/` y se pasa al constructor o método. `User.Deactivate()` recibe el sufijo del nickname anónimo como parámetro — el test puede verificar exactamente qué nickname quedó registrado.
+**No existe excepción** para valores cuyo resultado importa al dominio o a los tests. Si la lógica de negocio requiere un valor no determinista, ese valor se genera en `application/` y se pasa al constructor o método. `User.Deactivate()` recibe el sufijo del nickname anónimo como parámetro — el test puede verificar exactamente qué nickname quedó registrado.
+
+**Excepción documentada: `Password` y bcrypt**
+
+`NewPassword` llama `bcrypt.GenerateFromPassword` internamente, que usa `crypto/rand` para generar una salt. Esta es la única excepción aceptada a D10, por tres razones:
+
+1. **La salt no afecta ninguna regla de negocio.** Ninguna lógica de dominio ramifica sobre el valor específico del hash. A diferencia de `time.Now()` o `uuid.New()`, el valor que genera bcrypt nunca entra en comparaciones ni decisiones del dominio.
+
+2. **El invariante del VO es "contraseña hasheada".** La invariante de `Password` no es "string con complejidad" sino "representación segura de una contraseña válida". Separar validación de hashing rompe la encapsulación y crea una API frágil donde el caller puede olvidar hashear.
+
+3. **`Compare` es determinista.** `bcrypt.CompareHashAndPassword` dado el mismo hash almacenado y el mismo raw siempre retorna el mismo resultado — no hay no determinismo observable en las lecturas.
+
+La regla D10 aplica cuando el valor generado importa para la lógica de negocio o los tests. Cuando la no determinidad es un detalle de implementación de seguridad sin impacto en ningún resultado observable, el dominio puede retenerla.
 
 ---
 

@@ -24,8 +24,5 @@ func NewVisibility(s string) (Visibility, error) {
 	})
 }
 
-func NewVisibilityVisible() Visibility    { return Visibility{value: visibilityVisible} }
-func NewVisibilityNotVisible() Visibility { return Visibility{value: visibilityNotVisible} }
-
 func RestoreVisibility(s string) Visibility { return Visibility{value: s} }
 func (v Visibility) String() string         { return v.value }

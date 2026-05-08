@@ -10,7 +10,7 @@ import (
 
 type User struct {
 	id            string
-	email         *Email
+	email         Email
 	password      Password
 	name          string
 	nickname      Nickname
@@ -26,7 +26,7 @@ type User struct {
 
 // Accessors
 func (u *User) ID() string                   { return u.id }
-func (u *User) Email() *Email                { return u.email }
+func (u *User) Email() Email                 { return u.email }
 func (u *User) Password() Password           { return u.password }
 func (u *User) Name() string                 { return u.name }
 func (u *User) Nickname() Nickname           { return u.nickname }
@@ -62,7 +62,7 @@ func NewUser(id string, now time.Time, email Email, password Password, name stri
 
 	return &User{
 		id:          id,
-		email:       &email,
+		email:       email,
 		password:    password,
 		name:        name,
 		nickname:    nickname,
@@ -127,7 +127,7 @@ func (u *User) AdminUpdate(name *string, nickname *Nickname, institution *string
 	}
 
 	if email != nil {
-		u.email = email
+		u.email = *email
 	}
 	if role != nil {
 		u.role = *role
@@ -150,7 +150,7 @@ func (u *User) UpdateEmail(newEmail Email, now time.Time) error {
 	if u.status == StatusDeactivated {
 		return apperror.NewConflict(ErrCodeCannotUpdateDeactivated, "cannot update email of a deactivated user")
 	}
-	u.email = &newEmail
+	u.email = newEmail
 	t := now.UTC()
 	u.updatedAt = &t
 	return nil
@@ -166,7 +166,7 @@ func (u *User) Deactivate(anonymousSuffix string, now time.Time) error {
 	}
 	t := now.UTC()
 	u.nickname = anonymousNickname
-	u.email = nil
+	u.email = Email{}
 	u.status = StatusDeactivated
 	u.deactivatedAt = &t
 	u.updatedAt = &t
@@ -204,8 +204,7 @@ func RestoreUser(
 	}
 
 	if emailStr != nil {
-		email := RestoreEmail(*emailStr)
-		u.email = &email
+		u.email = RestoreEmail(*emailStr)
 	}
 
 	return u

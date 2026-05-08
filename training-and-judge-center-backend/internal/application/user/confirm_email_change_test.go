@@ -28,7 +28,7 @@ func TestConfirmEmailChange_Success(t *testing.T) {
 	}
 
 	mockEmail, _ := domain.NewEmail("newemail@example.com")
-	req := domain.RestoreEmailChangeRequest("req-1", "user-1", mockEmail, "123456", domain.StatusPending, time.Now().Add(10 * time.Minute), time.Time{}, nil)
+	req := domain.RestoreEmailChangeRequest("req-1", "user-1", mockEmail, "123456", domain.RequestStatusPending, time.Now().Add(10 * time.Minute), time.Time{}, nil)
 
 	emailChangeRepo := &mockEmailChangeRepo{
 		findByCodeAndUserIDFn: func(ctx context.Context, code string, userID string) (*domain.EmailChangeRequest, error) {
@@ -38,7 +38,7 @@ func TestConfirmEmailChange_Success(t *testing.T) {
 			return nil, nil
 		},
 		updateFn: func(ctx context.Context, r *domain.EmailChangeRequest) error {
-			if r.Status() != domain.StatusUsed {
+			if r.Status() != domain.RequestStatusUsed {
 				t.Errorf("expected request status to be set to USED, got %s", r.Status())
 			}
 			return nil
@@ -117,7 +117,7 @@ func TestConfirmEmailChange_ExpiredCode(t *testing.T) {
 	}
 
 	mockEmail, _ := domain.NewEmail("newemail@example.com")
-	req := domain.RestoreEmailChangeRequest("req-1", "user-1", mockEmail, "123456", domain.StatusPending, time.Now().Add(-10 * time.Minute), time.Time{}, nil) // EXPIRED!
+	req := domain.RestoreEmailChangeRequest("req-1", "user-1", mockEmail, "123456", domain.RequestStatusPending, time.Now().Add(-10 * time.Minute), time.Time{}, nil) // EXPIRED!
 
 	emailChangeRepo := &mockEmailChangeRepo{
 		findByCodeAndUserIDFn: func(ctx context.Context, code string, userID string) (*domain.EmailChangeRequest, error) {
@@ -157,7 +157,7 @@ func TestConfirmEmailChange_DuplicateEmailAtConfirmation(t *testing.T) {
 	}
 
 	mockEmail, _ := domain.NewEmail("stolen@example.com")
-	req := domain.RestoreEmailChangeRequest("req-1", "user-1", mockEmail, "123456", domain.StatusPending, time.Now().Add(10*time.Minute), time.Time{}, nil)
+	req := domain.RestoreEmailChangeRequest("req-1", "user-1", mockEmail, "123456", domain.RequestStatusPending, time.Now().Add(10*time.Minute), time.Time{}, nil)
 
 	emailChangeRepo := &mockEmailChangeRepo{
 		findByCodeAndUserIDFn: func(ctx context.Context, code string, userID string) (*domain.EmailChangeRequest, error) {
@@ -247,7 +247,7 @@ func TestConfirmEmailChange_TxFailure(t *testing.T) {
 	userRepo.findByIDFn = func(_ context.Context, _ string) (*domain.User, error) { return activeUser, nil }
 
 	mockEmail, _ := domain.NewEmail("new@example.com")
-	req := domain.RestoreEmailChangeRequest("req-1", "user-1", mockEmail, "123456", domain.StatusPending, time.Now().Add(10*time.Minute), time.Time{}, nil)
+	req := domain.RestoreEmailChangeRequest("req-1", "user-1", mockEmail, "123456", domain.RequestStatusPending, time.Now().Add(10*time.Minute), time.Time{}, nil)
 	emailChangeRepo := &mockEmailChangeRepo{
 		findByCodeAndUserIDFn: func(_ context.Context, _ string, _ string) (*domain.EmailChangeRequest, error) {
 			return req, nil

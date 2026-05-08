@@ -42,8 +42,8 @@ func TestAdminDeactivateUser_Success(t *testing.T) {
 	if target.Status() != domain.StatusDeactivated {
 		t.Errorf("expected status DEACTIVATED, got %s", target.Status())
 	}
-	if target.Email() != nil {
-		t.Errorf("expected email to be nil after deactivation, got %v", target.Email())
+	if target.Email().String() != "" {
+		t.Errorf("expected email to be empty after deactivation, got %v", target.Email())
 	}
 	if target.DeactivatedAt() == nil {
 		t.Error("expected deactivatedAt to be set")

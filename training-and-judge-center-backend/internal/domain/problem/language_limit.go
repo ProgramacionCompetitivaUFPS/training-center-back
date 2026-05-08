@@ -11,13 +11,13 @@ type LanguageLimit struct {
 func NewLanguageLimit(language string, maxTime, maxMemory int) (LanguageLimit, error) {
 	var fieldErrs []apperror.FieldError
 	if language == "" {
-		fieldErrs = append(fieldErrs, apperror.FieldError{Field: "language", Message: ErrCodeInvalidLanguage})
+		fieldErrs = append(fieldErrs, apperror.FieldError{Field: "language", Message: "Language is required"})
 	}
 	if maxTime <= 0 {
-		fieldErrs = append(fieldErrs, apperror.FieldError{Field: "maxTimeLimit", Message: ErrCodeInvalidTimeLimit})
+		fieldErrs = append(fieldErrs, apperror.FieldError{Field: "maxTimeLimit", Message: "Max time limit must be positive"})
 	}
 	if maxMemory <= 0 {
-		fieldErrs = append(fieldErrs, apperror.FieldError{Field: "maxMemoryLimit", Message: ErrCodeInvalidMemoryLimit})
+		fieldErrs = append(fieldErrs, apperror.FieldError{Field: "maxMemoryLimit", Message: "Max memory limit must be positive"})
 	}
 	if len(fieldErrs) > 0 {
 		return LanguageLimit{}, apperror.NewValidation(fieldErrs)

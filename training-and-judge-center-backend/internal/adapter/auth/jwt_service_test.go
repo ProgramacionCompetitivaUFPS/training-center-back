@@ -83,8 +83,8 @@ func TestValidateToken_ValidToken(t *testing.T) {
 	if claims.UserID != u.ID() {
 		t.Errorf("UserID: got %q, want %q", claims.UserID, u.ID())
 	}
-	if claims.Email != *u.Email() {
-		t.Errorf("Email: got %v, want %v", claims.Email, *u.Email())
+	if claims.Email != u.Email() {
+		t.Errorf("Email: got %v, want %v", claims.Email, u.Email())
 	}
 	if claims.Role != u.Role() {
 		t.Errorf("Role: got %q, want %q", claims.Role, u.Role())

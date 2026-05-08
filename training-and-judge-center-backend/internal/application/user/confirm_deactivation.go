@@ -114,10 +114,7 @@ func (uc *ConfirmDeactivationUseCase) Execute(ctx context.Context, input Confirm
 		return apperror.NewBadRequest("INVALID_CODE", "The confirmation code is invalid")
 	}
 
-	originalEmailStr := ""
-	if foundUser.Email() != nil {
-		originalEmailStr = foundUser.Email().String()
-	}
+	originalEmailStr := foundUser.Email().String()
 	originalNicknameStr := foundUser.Nickname().String()
 
 	anonSuffix := uuid.New().String()[:10]

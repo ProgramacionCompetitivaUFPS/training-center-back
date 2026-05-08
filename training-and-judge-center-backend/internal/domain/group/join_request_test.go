@@ -121,17 +121,3 @@ func TestReject_ApprovedReturnsError(t *testing.T) {
 	}
 }
 
-func TestNewJoinRequestStatus_ValidValues(t *testing.T) {
-	for _, s := range []string{"PENDING", "APPROVED", "REJECTED"} {
-		if _, err := group.NewJoinRequestStatus(s); err != nil {
-			t.Errorf("unexpected error for valid status %q: %v", s, err)
-		}
-	}
-}
-
-func TestNewJoinRequestStatus_InvalidValue(t *testing.T) {
-	_, err := group.NewJoinRequestStatus("INVALID")
-	if err == nil {
-		t.Fatal("expected error for invalid status")
-	}
-}

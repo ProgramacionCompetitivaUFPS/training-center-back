@@ -25,7 +25,7 @@ func pendingRecoveryRequest(userID, code string) *domainuser.PasswordRecoveryReq
 		"req-001",
 		userID,
 		code,
-		domainuser.StatusPending,
+		domainuser.RequestStatusPending,
 		time.Now().Add(time.Hour),
 		time.Now(),
 		nil,

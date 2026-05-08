@@ -56,7 +56,7 @@ func TestJoinGroup_InvitePolicyReturns403(t *testing.T) {
 	})
 
 	ae, ok := err.(*apperror.AppError)
-	if !ok || ae.Code != domainGroup.ErrCodeInsufficientPermissions {
+	if !ok || ae.Code != ErrCodeInsufficientPermissions {
 		t.Fatalf("expected INSUFFICIENT_PERMISSIONS, got %v", err)
 	}
 	if ae.Kind != apperror.KindForbidden {
@@ -74,7 +74,7 @@ func TestJoinGroup_RequestPolicyReturns403(t *testing.T) {
 	})
 
 	ae, ok := err.(*apperror.AppError)
-	if !ok || ae.Code != domainGroup.ErrCodeInsufficientPermissions {
+	if !ok || ae.Code != ErrCodeInsufficientPermissions {
 		t.Fatalf("expected INSUFFICIENT_PERMISSIONS, got %v", err)
 	}
 }
@@ -96,7 +96,7 @@ func TestJoinGroup_AlreadyMemberReturns409(t *testing.T) {
 	})
 
 	ae, ok := err.(*apperror.AppError)
-	if !ok || ae.Code != domainGroup.ErrCodeAlreadyMember {
+	if !ok || ae.Code != ErrCodeAlreadyMember {
 		t.Fatalf("expected ALREADY_MEMBER, got %v", err)
 	}
 	if ae.Kind != apperror.KindConflict {

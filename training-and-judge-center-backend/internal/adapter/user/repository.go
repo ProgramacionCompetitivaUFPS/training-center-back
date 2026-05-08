@@ -68,8 +68,8 @@ func (r *UserRepository) Update(ctx context.Context, u *domainUser.User) error {
 		WHERE id = $12`
 
 	var emailVal interface{}
-	if u.Email() != nil {
-		emailVal = u.Email().String()
+	if emailStr := u.Email().String(); emailStr != "" {
+		emailVal = emailStr
 	}
 
 	querier := infraPostgres.GetQuerier(ctx, r.querier)

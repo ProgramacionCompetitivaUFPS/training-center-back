@@ -11,9 +11,9 @@ const (
 type RequestStatus struct{ value string }
 
 var (
-	StatusPending = RequestStatus{value: requestStatusPending}
-	StatusUsed    = RequestStatus{value: requestStatusUsed}
-	StatusExpired = RequestStatus{value: requestStatusExpired}
+	RequestStatusPending = RequestStatus{value: requestStatusPending}
+	RequestStatusUsed    = RequestStatus{value: requestStatusUsed}
+	RequestStatusExpired = RequestStatus{value: requestStatusExpired}
 )
 
 func NewRequestStatus(s string) (RequestStatus, error) {

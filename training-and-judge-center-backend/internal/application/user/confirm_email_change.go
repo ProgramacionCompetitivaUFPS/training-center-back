@@ -58,7 +58,7 @@ func (uc *ConfirmEmailChangeUseCase) Execute(ctx context.Context, input ConfirmE
 	}
 
 	now := time.Now()
-	if req.Status() != user.StatusPending || req.IsExpired(now) {
+	if req.Status() != user.RequestStatusPending || req.IsExpired(now) {
 		return nil, apperror.NewBadRequest("INVALID_CODE", "The verification code is invalid or has expired")
 	}
 

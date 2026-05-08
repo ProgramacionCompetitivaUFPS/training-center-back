@@ -32,33 +32,33 @@ func NewPlatformSettings(
 	var fieldErrs []apperror.FieldError
 
 	if globalMaxTimeLimit <= 0 {
-		fieldErrs = append(fieldErrs, apperror.FieldError{Field: "globalMaxTimeLimit", Message: ErrCodeInvalidTimeLimit})
+		fieldErrs = append(fieldErrs, apperror.FieldError{Field: "globalMaxTimeLimit", Message: "Global max time limit must be positive"})
 	}
 	if globalMaxMemoryLimit <= 0 {
-		fieldErrs = append(fieldErrs, apperror.FieldError{Field: "globalMaxMemoryLimit", Message: ErrCodeInvalidMemoryLimit})
+		fieldErrs = append(fieldErrs, apperror.FieldError{Field: "globalMaxMemoryLimit", Message: "Global max memory limit must be positive"})
 	}
 	if uploadMaxConcurrency <= 0 {
-		fieldErrs = append(fieldErrs, apperror.FieldError{Field: "uploadMaxConcurrency", Message: ErrCodeInvalidUploadConcurrency})
+		fieldErrs = append(fieldErrs, apperror.FieldError{Field: "uploadMaxConcurrency", Message: "Upload max concurrency must be positive"})
 	}
 	if maxFileCountSample <= 0 {
-		fieldErrs = append(fieldErrs, apperror.FieldError{Field: "maxFileCountSample", Message: ErrCodeInvalidFileCount})
+		fieldErrs = append(fieldErrs, apperror.FieldError{Field: "maxFileCountSample", Message: "Max file count for samples must be positive"})
 	}
 	if maxFileSizeTestCaseMB <= 0 {
-		fieldErrs = append(fieldErrs, apperror.FieldError{Field: "maxFileSizeTestCaseMB", Message: ErrCodeInvalidFileSize})
+		fieldErrs = append(fieldErrs, apperror.FieldError{Field: "maxFileSizeTestCaseMB", Message: "Max file size for test cases must be positive"})
 	}
 	if maxFileCountTestCase <= 0 {
-		fieldErrs = append(fieldErrs, apperror.FieldError{Field: "maxFileCountTestCase", Message: ErrCodeInvalidFileCount})
+		fieldErrs = append(fieldErrs, apperror.FieldError{Field: "maxFileCountTestCase", Message: "Max file count for test cases must be positive"})
 	}
 	if maxFileSizeDefaultMB <= 0 {
-		fieldErrs = append(fieldErrs, apperror.FieldError{Field: "maxFileSizeDefaultMB", Message: ErrCodeInvalidFileSize})
+		fieldErrs = append(fieldErrs, apperror.FieldError{Field: "maxFileSizeDefaultMB", Message: "Default max file size must be positive"})
 	}
 	if len(supportedLanguages) == 0 {
-		fieldErrs = append(fieldErrs, apperror.FieldError{Field: "supportedLanguages", Message: ErrCodeNoSupportedLanguages})
+		fieldErrs = append(fieldErrs, apperror.FieldError{Field: "supportedLanguages", Message: "At least one supported language is required"})
 	}
 
 	// cross-field: default file size must not exceed test case file size
 	if maxFileSizeDefaultMB > 0 && maxFileSizeTestCaseMB > 0 && maxFileSizeDefaultMB > maxFileSizeTestCaseMB {
-		fieldErrs = append(fieldErrs, apperror.FieldError{Field: "maxFileSizeDefaultMB", Message: ErrCodeFileSizeDefaultExceedsTestCase})
+		fieldErrs = append(fieldErrs, apperror.FieldError{Field: "maxFileSizeDefaultMB", Message: "Default file size limit cannot exceed test case file size limit"})
 	}
 
 	// cross-field: per-language limits must not exceed globals
@@ -67,13 +67,13 @@ func NewPlatformSettings(
 			if globalMaxTimeLimit > 0 && ll.MaxTimeLimit() > globalMaxTimeLimit {
 				fieldErrs = append(fieldErrs, apperror.FieldError{
 					Field:   "languageLimits." + lang + ".maxTimeLimit",
-					Message: ErrCodeLanguageLimitExceedsGlobal,
+					Message: "Language time limit exceeds global maximum",
 				})
 			}
 			if globalMaxMemoryLimit > 0 && ll.MaxMemoryLimit() > globalMaxMemoryLimit {
 				fieldErrs = append(fieldErrs, apperror.FieldError{
 					Field:   "languageLimits." + lang + ".maxMemoryLimit",
-					Message: ErrCodeLanguageLimitExceedsGlobal,
+					Message: "Language memory limit exceeds global maximum",
 				})
 			}
 		}

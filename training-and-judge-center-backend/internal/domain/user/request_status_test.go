@@ -11,9 +11,9 @@ func TestNewRequestStatus_Valid(t *testing.T) {
 		input    string
 		expected user.RequestStatus
 	}{
-		{"PENDING", user.StatusPending},
-		{"USED", user.StatusUsed},
-		{"EXPIRED", user.StatusExpired},
+		{"PENDING", user.RequestStatusPending},
+		{"USED", user.RequestStatusUsed},
+		{"EXPIRED", user.RequestStatusExpired},
 	}
 
 	for _, tt := range tests {
