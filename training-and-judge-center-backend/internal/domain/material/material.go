@@ -144,10 +144,10 @@ func (m *Material) UpdateMetadata(title *Title, content **Content, tags **Tags, 
 	if title != nil {
 		m.title = *title
 	}
-	if content != nil {
+	if content != nil && *content != nil {
 		m.content = **content
 	}
-	if tags != nil {
+	if tags != nil && *tags != nil {
 		m.tags = **tags
 	}
 	m.updatedAt = now.UTC()
