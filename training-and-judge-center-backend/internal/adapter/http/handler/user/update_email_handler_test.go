@@ -52,7 +52,7 @@ func pendingEmailChangeRequest(id, userID, code string) *domainuser.EmailChangeR
 		userID,
 		newEmail,
 		code,
-		domainuser.StatusPending,
+		domainuser.RequestStatusPending,
 		time.Now().Add(time.Hour),
 		time.Now(),
 		nil,
