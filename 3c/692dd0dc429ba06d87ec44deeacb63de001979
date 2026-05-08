@@ -1,0 +1,47 @@
+training-and-judge-center-backend/internal/domain/user/request_status_test.go
+  s_fd9d65a6fdd13c::t_b97361cee60776 16
+  s_fd9d65a6fdd13c::t_b9f677894c75a4 14
+  s_fd9d65a6fdd13c::t_8476847606f2ff 15
+training-and-judge-center-backend/internal/domain/user/request_status.go
+  s_fd9d65a6fdd13c::t_1fb3cd2af48701 14-16
+training-and-judge-center-backend/internal/application/user/reset_password_test.go
+  s_fd9d65a6fdd13c::t_619bdf56520a28 23,26,69,129,159,235,270
+training-and-judge-center-backend/internal/domain/user/password_recovery_test.go
+  s_fd9d65a6fdd13c::t_7fb3c209cc795e 25
+  s_fd9d65a6fdd13c::t_942d10148aad20 24,38
+  s_fd9d65a6fdd13c::t_13fa42f69d7a0e 23
+training-and-judge-center-backend/internal/domain/user/password_recovery.go
+  s_fd9d65a6fdd13c::t_d4a61841057343 28,55,59,62
+training-and-judge-center-backend/internal/adapter/user/password_recovery_repository.go
+  s_fd9d65a6fdd13c::t_b34fff9332590b 107
+  s_fd9d65a6fdd13c::t_321a9adf5c30cb 139
+training-and-judge-center-backend/internal/application/user/confirm_email_change.go
+  s_fd9d65a6fdd13c::t_2b08166c50ad48 61
+training-and-judge-center-backend/internal/domain/user/email_change.go
+  s_fd9d65a6fdd13c::t_d4a61841057343 30,59,63,66
+training-and-judge-center-backend/internal/application/user/confirm_email_change_test.go
+  s_fd9d65a6fdd13c::t_619bdf56520a28 31,41,120,160,250
+training-and-judge-center-backend/internal/domain/user/email_change_test.go
+  s_fd9d65a6fdd13c::t_c3865187b30398 24
+  s_fd9d65a6fdd13c::t_015d4e5e3ebaef 25,39
+  s_fd9d65a6fdd13c::t_906792f7e153cd 26
+training-and-judge-center-backend/internal/adapter/user/email_change_repository.go
+  s_fd9d65a6fdd13c::t_34546c9d1f5fad 147
+  s_fd9d65a6fdd13c::t_a61782b4f336f4 150
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.1",
+  "base_commit_sha": "3c692dd0dc429ba06d87ec44deeacb63de001979",
+  "prompts": {},
+  "sessions": {
+    "s_fd9d65a6fdd13c": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "1015062e-8b31-4745-a143-a6f7b213cfb5",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "AlexaVJ <alexandra19vela@gmail.com>"
+    }
+  }
+}
