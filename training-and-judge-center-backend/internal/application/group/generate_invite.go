@@ -52,7 +52,7 @@ func (uc *GenerateInviteUseCase) Execute(ctx context.Context, input GenerateInvi
 	}
 
 	if g.JoinPolicy() != domainGroup.JoinPolicyInvite {
-		return nil, apperror.NewForbidden(ErrCodeInsufficientPermissions, "this group does not use invite mode")
+		return nil, apperror.NewBadRequest(ErrCodeInvalidJoinPolicy, "this group does not use invite mode")
 	}
 
 	token, err := uc.invitationSvc.GenerateInviteToken(input.GroupID, input.CurrentUser.ID)
