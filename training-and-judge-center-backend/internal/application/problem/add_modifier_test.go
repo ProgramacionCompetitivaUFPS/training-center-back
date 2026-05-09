@@ -15,7 +15,7 @@ func TestAddModifier_Success_Author(t *testing.T) {
 	repo := repoWith(newDraftProblem())
 	uc := NewAddModifierUseCase(repo, &mockUserProvider{})
 
-	_, err := uc.Execute(context.Background(), AddModifierInput{
+	err := uc.Execute(context.Background(), AddModifierInput{
 		Slug:        testSlug,
 		UserID:      newModifierID,
 		CurrentUser: asCoach(authorID),
@@ -29,7 +29,7 @@ func TestAddModifier_Success_Admin(t *testing.T) {
 	repo := repoWith(newDraftProblem())
 	uc := NewAddModifierUseCase(repo, &mockUserProvider{})
 
-	_, err := uc.Execute(context.Background(), AddModifierInput{
+	err := uc.Execute(context.Background(), AddModifierInput{
 		Slug:        testSlug,
 		UserID:      newModifierID,
 		CurrentUser: asAdmin(strangerID),
@@ -43,7 +43,7 @@ func TestAddModifier_Forbidden_Stranger(t *testing.T) {
 	repo := repoWith(newDraftProblem())
 	uc := NewAddModifierUseCase(repo, &mockUserProvider{})
 
-	_, err := uc.Execute(context.Background(), AddModifierInput{
+	err := uc.Execute(context.Background(), AddModifierInput{
 		Slug:        testSlug,
 		UserID:      newModifierID,
 		CurrentUser: asContestant(strangerID),
@@ -70,7 +70,7 @@ func TestAddModifier_UserNotFound(t *testing.T) {
 	}
 	uc := NewAddModifierUseCase(repo, provider)
 
-	_, err := uc.Execute(context.Background(), AddModifierInput{
+	err := uc.Execute(context.Background(), AddModifierInput{
 		Slug:        testSlug,
 		UserID:      "nonexistent-user-id-x",
 		CurrentUser: asCoach(authorID),
@@ -92,7 +92,7 @@ func TestAddModifier_UserAlreadyModifier(t *testing.T) {
 	repo := repoWith(newDraftProblemWithModifier()) // modifierID already in list
 	uc := NewAddModifierUseCase(repo, &mockUserProvider{})
 
-	_, err := uc.Execute(context.Background(), AddModifierInput{
+	err := uc.Execute(context.Background(), AddModifierInput{
 		Slug:        testSlug,
 		UserID:      modifierID, // already a modifier
 		CurrentUser: asCoach(authorID),
@@ -119,7 +119,7 @@ func TestAddModifier_UserProviderError(t *testing.T) {
 	}
 	uc := NewAddModifierUseCase(repo, provider)
 
-	_, err := uc.Execute(context.Background(), AddModifierInput{
+	err := uc.Execute(context.Background(), AddModifierInput{
 		Slug:        testSlug,
 		UserID:      newModifierID,
 		CurrentUser: asCoach(authorID),
@@ -141,7 +141,7 @@ func TestAddModifier_InvalidUserID(t *testing.T) {
 	repo := repoWith(newDraftProblem())
 	uc := NewAddModifierUseCase(repo, &mockUserProvider{})
 
-	_, err := uc.Execute(context.Background(), AddModifierInput{
+	err := uc.Execute(context.Background(), AddModifierInput{
 		Slug:        testSlug,
 		UserID:      "", // empty ID should fail NewUserID validation
 		CurrentUser: asCoach(authorID),

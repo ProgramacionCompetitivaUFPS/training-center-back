@@ -40,7 +40,7 @@ func (h *Handler) AddModifier(w http.ResponseWriter, r *http.Request) {
 
 	currentUser := shared.CurrentUser{ID: claims.UserID, Role: claims.Role}
 
-	_, err := h.addModifierUC.Execute(r.Context(), appProblem.AddModifierInput{
+	err := h.addModifierUC.Execute(r.Context(), appProblem.AddModifierInput{
 		Slug:        slug,
 		UserID:      body.UserID,
 		CurrentUser: currentUser,

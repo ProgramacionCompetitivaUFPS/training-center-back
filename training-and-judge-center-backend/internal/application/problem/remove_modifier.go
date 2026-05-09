@@ -25,38 +25,38 @@ func NewRemoveModifierUseCase(repo problem.Repository) *RemoveModifierUseCase {
 	return &RemoveModifierUseCase{repo: repo}
 }
 
-func (uc *RemoveModifierUseCase) Execute(ctx context.Context, input RemoveModifierInput) (struct{}, error) {
+func (uc *RemoveModifierUseCase) Execute(ctx context.Context, input RemoveModifierInput) error {
 	slug, err := problem.NewSlug(input.Slug)
 	if err != nil {
-		return struct{}{}, err
+		return err
 	}
 
 	p, err := uc.repo.FindBySlug(ctx, slug)
 	if err != nil {
-		return struct{}{}, err
+		return err
 	}
 
 	isAuthor := p.AuthorID() == shared.RestoreUserID(input.CurrentUser.ID)
 	isAdmin := input.CurrentUser.IsAdmin()
 
 	if !isAuthor && !isAdmin {
-		return struct{}{}, apperror.NewForbidden(apperror.ErrCodeForbidden, "Only the author or Admin can remove modifiers")
+		return apperror.NewForbidden(apperror.ErrCodeForbidden, "Only the author or Admin can remove modifiers")
 	}
 
 	modifierID, err := shared.NewUserID(input.UserID)
 	if err != nil {
-		return struct{}{}, err
+		return err
 	}
 
 	now := time.Now()
 	if err := p.RemoveModifier(modifierID, now); err != nil {
-		return struct{}{}, err
+		return err
 	}
 
 	if err := uc.repo.Save(ctx, p); err != nil {
 		slog.ErrorContext(ctx, "failed to save problem after removing modifier", "error", err, "slug", p.Slug().String())
-		return struct{}{}, apperror.NewInternal()
+		return apperror.NewInternal()
 	}
 
-	return struct{}{}, nil
+	return nil
 }

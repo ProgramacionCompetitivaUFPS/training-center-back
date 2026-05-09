@@ -36,7 +36,7 @@ func (h *Handler) RemoveModifier(w http.ResponseWriter, r *http.Request) {
 
 	currentUser := shared.CurrentUser{ID: claims.UserID, Role: claims.Role}
 
-	_, err := h.removeModifierUC.Execute(r.Context(), appProblem.RemoveModifierInput{
+	err := h.removeModifierUC.Execute(r.Context(), appProblem.RemoveModifierInput{
 		Slug:        slug,
 		UserID:      userID,
 		CurrentUser: currentUser,

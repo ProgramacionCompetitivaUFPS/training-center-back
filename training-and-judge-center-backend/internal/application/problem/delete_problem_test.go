@@ -12,7 +12,7 @@ func TestDeleteProblem_Success_Author(t *testing.T) {
 	repo := repoWith(newDraftProblem())
 	uc := NewDeleteProblemUseCase(repo, &mockFileStorage{})
 
-	_, err := uc.Execute(context.Background(), DeleteProblemInput{
+	err := uc.Execute(context.Background(), DeleteProblemInput{
 		Slug:        testSlug,
 		ConfirmSlug: testSlug,
 		CurrentUser: asCoach(authorID),
@@ -26,7 +26,7 @@ func TestDeleteProblem_Success_Admin(t *testing.T) {
 	repo := repoWith(newDraftProblem())
 	uc := NewDeleteProblemUseCase(repo, &mockFileStorage{})
 
-	_, err := uc.Execute(context.Background(), DeleteProblemInput{
+	err := uc.Execute(context.Background(), DeleteProblemInput{
 		Slug:        testSlug,
 		ConfirmSlug: testSlug,
 		CurrentUser: asAdmin(strangerID),
@@ -40,7 +40,7 @@ func TestDeleteProblem_Forbidden_Stranger(t *testing.T) {
 	repo := repoWith(newDraftProblem())
 	uc := NewDeleteProblemUseCase(repo, &mockFileStorage{})
 
-	_, err := uc.Execute(context.Background(), DeleteProblemInput{
+	err := uc.Execute(context.Background(), DeleteProblemInput{
 		Slug:        testSlug,
 		ConfirmSlug: testSlug,
 		CurrentUser: asContestant(strangerID),
@@ -62,7 +62,7 @@ func TestDeleteProblem_ConfirmSlugMismatch(t *testing.T) {
 	repo := repoWith(newDraftProblem())
 	uc := NewDeleteProblemUseCase(repo, &mockFileStorage{})
 
-	_, err := uc.Execute(context.Background(), DeleteProblemInput{
+	err := uc.Execute(context.Background(), DeleteProblemInput{
 		Slug:        testSlug,
 		ConfirmSlug: "wrong-slug",
 		CurrentUser: asCoach(authorID),
@@ -84,7 +84,7 @@ func TestDeleteProblem_EmptyConfirmSlug(t *testing.T) {
 	repo := repoWith(newDraftProblem())
 	uc := NewDeleteProblemUseCase(repo, &mockFileStorage{})
 
-	_, err := uc.Execute(context.Background(), DeleteProblemInput{
+	err := uc.Execute(context.Background(), DeleteProblemInput{
 		Slug:        testSlug,
 		ConfirmSlug: "", // empty
 		CurrentUser: asCoach(authorID),
@@ -110,7 +110,7 @@ func TestDeleteProblem_NotFound(t *testing.T) {
 	}
 	uc := NewDeleteProblemUseCase(repo, &mockFileStorage{})
 
-	_, err := uc.Execute(context.Background(), DeleteProblemInput{
+	err := uc.Execute(context.Background(), DeleteProblemInput{
 		Slug:        testSlug,
 		ConfirmSlug: testSlug,
 		CurrentUser: asCoach(authorID),

@@ -34,23 +34,23 @@ func NewDeleteProblemFileUseCase(
 	}
 }
 
-func (usecase *DeleteProblemFileUseCase) Execute(ctx context.Context, input DeleteProblemFileInput) (struct{}, error) {
+func (usecase *DeleteProblemFileUseCase) Execute(ctx context.Context, input DeleteProblemFileInput) error {
 	slug, err := problem.NewSlug(input.Slug)
 	if err != nil {
-		return struct{}{}, err
+		return err
 	}
 
 	foundProblem, err := usecase.repo.FindBySlug(ctx, slug)
 	if err != nil {
-		return struct{}{}, err
+		return err
 	}
 
 	if foundProblem.Status().IsPublished() {
-		return struct{}{}, apperror.NewBadRequest(ErrCodeProblemIsPublished, "Cannot delete files from a published problem. Unpublish first.")
+		return apperror.NewBadRequest(ErrCodeProblemIsPublished, "Cannot delete files from a published problem. Unpublish first.")
 	}
 
 	if !foundProblem.CanBeEditedBy(shared.RestoreUserID(input.CurrentUser.ID), input.CurrentUser.IsAdmin()) {
-		return struct{}{}, apperror.NewForbidden(apperror.ErrCodeForbidden, "Only the problem author, Admin, or assigned modifiers can update this problem")
+		return apperror.NewForbidden(apperror.ErrCodeForbidden, "Only the problem author, Admin, or assigned modifiers can update this problem")
 	}
 
 	var storageKeyToDelete string
@@ -61,10 +61,10 @@ func (usecase *DeleteProblemFileUseCase) Execute(ctx context.Context, input Dele
 	switch fileType {
 	case FileTypeTestCases:
 		if input.FileName != "" {
-			return struct{}{}, apperror.NewBadRequest(apperror.ErrCodeBadRequest, "fileName is not applicable for testCases deletion")
+			return apperror.NewBadRequest(apperror.ErrCodeBadRequest, "fileName is not applicable for testCases deletion")
 		}
 		if foundProblem.TestCasesKey() == nil {
-			return struct{}{}, apperror.NewNotFound(ErrCodeProblemFileNotFound, "This problem has no test cases to delete")
+			return apperror.NewNotFound(ErrCodeProblemFileNotFound, "This problem has no test cases to delete")
 		}
 		storageKeyToDelete = *foundProblem.TestCasesKey()
 		deleteByPrefix = true
@@ -72,64 +72,64 @@ func (usecase *DeleteProblemFileUseCase) Execute(ctx context.Context, input Dele
 
 	case FileTypeSolution:
 		if input.FileName == "" {
-			return struct{}{}, apperror.NewBadRequest(ErrCodeProblemMissingFilename, "fileName is required to delete a solution")
+			return apperror.NewBadRequest(ErrCodeProblemMissingFilename, "fileName is required to delete a solution")
 		}
 		found := false
 		for _, solution := range foundProblem.Solutions() {
 			if solution.Filename() == input.FileName {
 				storageKeyToDelete = solution.FileKey()
 				if err := foundProblem.RemoveSolution(solution.Filename(), now); err != nil {
-					return struct{}{}, err
+					return err
 				}
 				found = true
 				break
 			}
 		}
 		if !found {
-			return struct{}{}, apperror.NewNotFound(ErrCodeProblemFileNotFound, "Solution not found")
+			return apperror.NewNotFound(ErrCodeProblemFileNotFound, "Solution not found")
 		}
 
 	case FileTypeChecker:
 		if input.FileName != "" {
-			return struct{}{}, apperror.NewBadRequest(apperror.ErrCodeBadRequest, "fileName is not applicable for checker deletion")
+			return apperror.NewBadRequest(apperror.ErrCodeBadRequest, "fileName is not applicable for checker deletion")
 		}
 		if foundProblem.Checker() == nil {
-			return struct{}{}, apperror.NewNotFound(ErrCodeProblemFileNotFound, "This problem has no checker to delete")
+			return apperror.NewNotFound(ErrCodeProblemFileNotFound, "This problem has no checker to delete")
 		}
 		storageKeyToDelete = foundProblem.Checker().FileKey()
 		foundProblem.RemoveChecker(now)
 
 	case FileTypeValidator:
 		if input.FileName != "" {
-			return struct{}{}, apperror.NewBadRequest(apperror.ErrCodeBadRequest, "fileName is not applicable for validator deletion")
+			return apperror.NewBadRequest(apperror.ErrCodeBadRequest, "fileName is not applicable for validator deletion")
 		}
 		if foundProblem.Validator() == nil {
-			return struct{}{}, apperror.NewNotFound(ErrCodeProblemFileNotFound, "This problem has no validator to delete")
+			return apperror.NewNotFound(ErrCodeProblemFileNotFound, "This problem has no validator to delete")
 		}
 		storageKeyToDelete = foundProblem.Validator().FileKey()
 		foundProblem.RemoveValidator(now)
 
 	default:
 		slog.WarnContext(ctx, "invalid file type provided for deletion", "file_type", input.FileType, "slug", foundProblem.Slug().String())
-		return struct{}{}, apperror.NewBadRequest(ErrCodeProblemInvalidFileType, "Invalid file type. Allowed: testCases, solution, checker, validator")
+		return apperror.NewBadRequest(ErrCodeProblemInvalidFileType, "Invalid file type. Allowed: testCases, solution, checker, validator")
 	}
 
 	if deleteByPrefix {
 		if err := usecase.fileStorage.DeleteFilesWithPrefix(ctx, storageKeyToDelete); err != nil {
 			slog.ErrorContext(ctx, "failed to delete files from storage", "prefix", storageKeyToDelete, "error", err)
-			return struct{}{}, apperror.NewInternal()
+			return apperror.NewInternal()
 		}
 	} else {
 		if err := usecase.fileStorage.DeleteFile(ctx, storageKeyToDelete); err != nil {
 			slog.ErrorContext(ctx, "failed to delete file from storage", "key", storageKeyToDelete, "error", err)
-			return struct{}{}, apperror.NewInternal()
+			return apperror.NewInternal()
 		}
 	}
 
 	if err := usecase.repo.Save(ctx, foundProblem); err != nil {
 		slog.ErrorContext(ctx, "failed to save problem after file deletion", "error", err, "slug", foundProblem.Slug().String())
-		return struct{}{}, apperror.NewInternal()
+		return apperror.NewInternal()
 	}
 
-	return struct{}{}, nil
+	return nil
 }
