@@ -55,7 +55,7 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	result, err := h.loginUseCase.Execute(r.Context(), appuser.LoginInput{
+	out, err := h.loginUseCase.Execute(r.Context(), appuser.LoginInput{
 		Email:    req.Email,
 		Password: req.Password,
 	})
@@ -65,20 +65,20 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var email string
-	if result.User.Email != nil {
-		email = *result.User.Email
+	if out.User.Email != nil {
+		email = *out.User.Email
 	}
 	respondJSON(w, http.StatusOK, loginResponse{
-		Token: result.Token,
+		Token: out.Token,
 		User: userResponse{
 			Email:       email,
-			Name:        result.User.Name,
-			Nickname:    result.User.Nickname,
-			Country:     result.User.Country,
-			City:        result.User.City,
-			Institution: result.User.Institution,
-			Role:        result.User.Role,
-			CreatedAt:   result.User.CreatedAt.Format("2006-01-02T15:04:05Z"),
+			Name:        out.User.Name,
+			Nickname:    out.User.Nickname,
+			Country:     out.User.Country,
+			City:        out.User.City,
+			Institution: out.User.Institution,
+			Role:        out.User.Role,
+			CreatedAt:   out.User.CreatedAt.Format("2006-01-02T15:04:05Z"),
 		},
 	})
 }

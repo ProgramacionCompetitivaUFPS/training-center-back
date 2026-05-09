@@ -691,6 +691,8 @@ Execute(ctx context.Context, in XxxInput) error
 
 **Naming:** `<Operation>Input` / `<Operation>Output` — simétrico y sin carga semántica extra. `Result` (patrón de programación funcional) y `Response` (vocabulario HTTP) están prohibidos.
 
+**Variable local en handlers:** el retorno de `Execute` se asigna siempre a `out` — nunca `result`, `res`, ni `data`.
+
 **Cuatro patrones a eliminar:**
 
 | Patrón actual | Problema | Corrección |
