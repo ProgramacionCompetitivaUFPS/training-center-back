@@ -15,11 +15,6 @@ type GetProblemInput struct {
 	CurrentUser appshared.CurrentUser
 }
 
-type ModifierDisplay struct {
-	Nickname string
-	Name     string
-}
-
 type FilesAvailability struct {
 	TestCases bool
 	Solutions []SolutionInfo

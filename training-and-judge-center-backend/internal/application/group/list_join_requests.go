@@ -22,6 +22,11 @@ type ListJoinRequestsInput struct {
 	CurrentUser appshared.CurrentUser
 }
 
+type JoinRequestDetail struct {
+	Request *domainGroup.JoinRequest
+	Display *UserDisplay
+}
+
 type ListJoinRequestsOutput struct {
 	Requests   []JoinRequestDetail
 	Total      int
