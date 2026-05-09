@@ -23,12 +23,8 @@ type ImportProblemInput struct {
 	CurrentUser appshared.CurrentUser
 }
 
-type ImportProblemResult struct {
-	Problem         *problem.Problem
-	TestCasesLoaded bool
-	CheckerLoaded   bool
-	ValidatorLoaded bool
-	SolutionsLoaded []string
+type ImportProblemOutput struct {
+	Problem ProblemDTO
 }
 
 type ImportProblemUseCase struct {
@@ -52,7 +48,7 @@ func NewImportProblemUseCase(
 	}
 }
 
-func (uc *ImportProblemUseCase) Execute(ctx context.Context, input ImportProblemInput) (*ImportProblemResult, error) {
+func (uc *ImportProblemUseCase) Execute(ctx context.Context, input ImportProblemInput) (*ImportProblemOutput, error) {
 	if input.CurrentUser.Role != shared.RoleCoach && !input.CurrentUser.IsAdmin() {
 		return nil, apperror.NewForbidden(apperror.ErrCodeForbidden, "Only Coach and Admin users can import problems")
 	}
@@ -223,18 +219,7 @@ func (uc *ImportProblemUseCase) Execute(ctx context.Context, input ImportProblem
 		return nil, apperror.NewInternal()
 	}
 
-	solutionsLoaded := make([]string, 0, len(newProblem.Solutions()))
-	for _, sol := range newProblem.Solutions() {
-		solutionsLoaded = append(solutionsLoaded, sol.Filename())
-	}
-
-	return &ImportProblemResult{
-		Problem:         newProblem,
-		TestCasesLoaded: newProblem.TestCasesKey() != nil,
-		CheckerLoaded:   newProblem.Checker() != nil,
-		ValidatorLoaded: newProblem.Validator() != nil,
-		SolutionsLoaded: solutionsLoaded,
-	}, nil
+	return &ImportProblemOutput{Problem: problemToDTO(newProblem)}, nil
 }
 
 func (uc *ImportProblemUseCase) uploadVerifier(

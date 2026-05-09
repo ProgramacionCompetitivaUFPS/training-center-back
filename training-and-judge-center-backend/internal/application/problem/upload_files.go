@@ -32,11 +32,11 @@ type UploadProblemFilesInput struct {
 	CurrentUser appshared.CurrentUser
 }
 
-type UploadProblemFilesResult struct {
+type UploadProblemFilesOutput struct {
 	Message  string
 	FileType string
 	FileName string
-	Problem  *problem.Problem
+	Problem  ProblemDTO
 }
 
 type fileAction struct {
@@ -66,7 +66,7 @@ func NewUploadProblemFilesUseCase(
 	}
 }
 
-func (uc *UploadProblemFilesUseCase) Execute(ctx context.Context, input UploadProblemFilesInput) (*UploadProblemFilesResult, error) {
+func (uc *UploadProblemFilesUseCase) Execute(ctx context.Context, input UploadProblemFilesInput) (*UploadProblemFilesOutput, error) {
 	slug, err := problem.NewSlug(input.Slug)
 	if err != nil {
 		return nil, err
@@ -118,11 +118,11 @@ func (uc *UploadProblemFilesUseCase) Execute(ctx context.Context, input UploadPr
 	uc.cleanupFiles(ctx, action.cleanupFiles)
 	uc.cleanupPrefix(ctx, action.cleanupPrefix)
 
-	return &UploadProblemFilesResult{
+	return &UploadProblemFilesOutput{
 		Message:  "File uploaded successfully",
 		FileType: input.FileType,
 		FileName: input.FileName,
-		Problem:  p,
+		Problem:  problemToDTO(p),
 	}, nil
 }
 

@@ -22,8 +22,8 @@ func TestUpdateProblem_Success_Author(t *testing.T) {
 	if err != nil {
 		t.Fatalf("author should be able to update own draft, got: %v", err)
 	}
-	if result.Problem.Title().String() != newTitle {
-		t.Errorf("expected title %q, got %q", newTitle, result.Problem.Title().String())
+	if result.Problem.Title != newTitle {
+		t.Errorf("expected title %q, got %q", newTitle, result.Problem.Title)
 	}
 }
 

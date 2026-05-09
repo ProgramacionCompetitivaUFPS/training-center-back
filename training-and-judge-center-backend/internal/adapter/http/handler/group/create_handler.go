@@ -73,16 +73,15 @@ func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	g := result.Group
 	handler.WriteJSON(w, http.StatusCreated, groupResponse{
-		ID:          g.ID(),
-		Name:        g.Name().Value(),
-		Description: g.Description(),
-		JoinPolicy:  g.JoinPolicy().String(),
-		Visibility:  g.Visibility().String(),
-		IsDefault:   g.IsDefault(),
-		CreatedBy:   g.CreatedBy().Value(),
-		CreatedAt:   g.CreatedAt().Format("2006-01-02T15:04:05Z"),
-		UpdatedAt:   g.UpdatedAt().Format("2006-01-02T15:04:05Z"),
+		ID:          result.ID,
+		Name:        result.Name,
+		Description: result.Description,
+		JoinPolicy:  result.JoinPolicy,
+		Visibility:  result.Visibility,
+		IsDefault:   result.IsDefault,
+		CreatedBy:   result.CreatedBy,
+		CreatedAt:   result.CreatedAt.Format("2006-01-02T15:04:05Z"),
+		UpdatedAt:   result.UpdatedAt.Format("2006-01-02T15:04:05Z"),
 	})
 }

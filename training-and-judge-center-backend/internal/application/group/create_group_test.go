@@ -50,16 +50,16 @@ func TestCreateGroup_ValidCoachCreatesGroup(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if out.Group.Name().Value() != "Algorithms Club" {
-		t.Errorf("Name = %q, want %q", out.Group.Name().Value(), "Algorithms Club")
+	if out.Name != "Algorithms Club" {
+		t.Errorf("Name = %q, want %q", out.Name, "Algorithms Club")
 	}
-	if out.Group.JoinPolicy() != domainGroup.JoinPolicyOpen {
-		t.Errorf("JoinPolicy = %v, want OPEN", out.Group.JoinPolicy())
+	if out.JoinPolicy != "OPEN" {
+		t.Errorf("JoinPolicy = %q, want OPEN", out.JoinPolicy)
 	}
-	if out.Group.Visibility() != domainGroup.VisibilityVisible {
-		t.Errorf("Visibility = %v, want VISIBLE", out.Group.Visibility())
+	if out.Visibility != "VISIBLE" {
+		t.Errorf("Visibility = %q, want VISIBLE", out.Visibility)
 	}
-	if out.Group.ID() == "" {
+	if out.ID == "" {
 		t.Error("expected non-empty group ID")
 	}
 }
@@ -72,8 +72,8 @@ func TestCreateGroup_ValidAdminCreatesGroup(t *testing.T) {
 	if err != nil {
 		t.Fatalf("admin should be able to create groups, got: %v", err)
 	}
-	if out.Group == nil {
-		t.Error("expected non-nil group")
+	if out.ID == "" {
+		t.Error("expected non-empty group ID")
 	}
 }
 
