@@ -29,9 +29,13 @@ func NewAdminUpdateUserUseCase(repo user.Repository) *AdminUpdateUserUseCase {
 	return &AdminUpdateUserUseCase{repo: repo}
 }
 
-func (uc *AdminUpdateUserUseCase) Execute(ctx context.Context, input AdminUpdateUserInput) (UserDTO, error) {
+type AdminUpdateUserOutput struct {
+	User UserDTO
+}
+
+func (uc *AdminUpdateUserUseCase) Execute(ctx context.Context, input AdminUpdateUserInput) (*AdminUpdateUserOutput, error) {
 	if input.Name == nil && input.Nickname == nil && input.Institution == nil && input.City == nil && input.Country == nil && input.Email == nil && input.Role == nil {
-		return UserDTO{}, apperror.NewValidation([]apperror.FieldError{
+		return nil,apperror.NewValidation([]apperror.FieldError{
 			{Field: "body", Message: "At least one updatable field must be provided"},
 		})
 	}
@@ -39,10 +43,10 @@ func (uc *AdminUpdateUserUseCase) Execute(ctx context.Context, input AdminUpdate
 	foundUser, err := uc.repo.FindByID(ctx, input.TargetID)
 	if err != nil {
 		slog.Error("failed to find user by id during admin update", "target_id", input.TargetID, "error", err)
-		return UserDTO{}, apperror.NewInternal()
+		return nil,apperror.NewInternal()
 	}
 	if foundUser == nil {
-		return UserDTO{}, apperror.NewNotFound("NOT_FOUND", "User not found")
+		return nil,apperror.NewNotFound("NOT_FOUND", "User not found")
 	}
 
 	var fieldErrors []apperror.FieldError
@@ -116,18 +120,18 @@ func (uc *AdminUpdateUserUseCase) Execute(ctx context.Context, input AdminUpdate
 	}
 
 	if len(fieldErrors) > 0 {
-		return UserDTO{}, apperror.NewValidation(fieldErrors)
+		return nil,apperror.NewValidation(fieldErrors)
 	}
 
 	now := time.Now()
 	if err := foundUser.AdminUpdate(nameToUpdate, nicknameToUpdate, institutionToUpdate, cityToUpdate, countryToUpdate, emailToUpdate, roleToUpdate, now); err != nil {
 		slog.Error("failed to apply admin update to user domain object", "user_id", foundUser.ID(), "error", err)
-		return UserDTO{}, apperror.NewInternal()
+		return nil,apperror.NewInternal()
 	}
 
 	if err := uc.repo.Update(ctx, foundUser); err != nil {
-		return UserDTO{}, err
+		return nil,err
 	}
 
-	return userToDTO(foundUser), nil
+	return &AdminUpdateUserOutput{User: userToDTO(foundUser)}, nil
 }

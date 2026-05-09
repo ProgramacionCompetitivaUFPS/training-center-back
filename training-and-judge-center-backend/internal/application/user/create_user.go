@@ -29,7 +29,11 @@ func NewCreateUserUseCase(repo user.Repository) *CreateUserUseCase {
 	return &CreateUserUseCase{repo: repo}
 }
 
-func (uc *CreateUserUseCase) Execute(ctx context.Context, input CreateUserInput) (UserDTO, error) {
+type CreateUserOutput struct {
+	User UserDTO
+}
+
+func (uc *CreateUserUseCase) Execute(ctx context.Context, input CreateUserInput) (*CreateUserOutput, error) {
 	var fieldErrors []apperror.FieldError
 
 	email, err := user.NewEmail(input.Email)
@@ -61,7 +65,7 @@ func (uc *CreateUserUseCase) Execute(ctx context.Context, input CreateUserInput)
 	}
 
 	if len(fieldErrors) > 0 {
-		return UserDTO{}, apperror.NewValidation(fieldErrors)
+		return nil,apperror.NewValidation(fieldErrors)
 	}
 
 	newID := uuid.New().String()
@@ -69,12 +73,12 @@ func (uc *CreateUserUseCase) Execute(ctx context.Context, input CreateUserInput)
 	newUser, err := user.NewUser(newID, now, email, password, input.Name, nickname, input.Country, input.City, input.Institution)
 	if err != nil {
 		slog.Error("failed to build new user domain object", "error", err)
-		return UserDTO{}, apperror.NewInternal()
+		return nil,apperror.NewInternal()
 	}
 
 	if err := uc.repo.Save(ctx, newUser); err != nil {
-		return UserDTO{}, err
+		return nil,err
 	}
 
-	return userToDTO(newUser), nil
+	return &CreateUserOutput{User: userToDTO(newUser)}, nil
 }

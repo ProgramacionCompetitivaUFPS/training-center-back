@@ -31,16 +31,16 @@ func TestUpdateUser_Success_AllFields(t *testing.T) {
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
-	if result.Name != "Updated Name" {
-		t.Errorf("expected name %q, got %q", "Updated Name", result.Name)
+	if result.User.Name != "Updated Name" {
+		t.Errorf("expected name %q, got %q", "Updated Name", result.User.Name)
 	}
-	if result.Nickname != "updatednick" {
-		t.Errorf("expected nickname %q, got %q", "updatednick", result.Nickname)
+	if result.User.Nickname != "updatednick" {
+		t.Errorf("expected nickname %q, got %q", "updatednick", result.User.Nickname)
 	}
-	if result.Institution != "New University" {
-		t.Errorf("expected institution %q, got %q", "New University", result.Institution)
+	if result.User.Institution != "New University" {
+		t.Errorf("expected institution %q, got %q", "New University", result.User.Institution)
 	}
-	if result.UpdatedAt == nil {
+	if result.User.UpdatedAt == nil {
 		t.Error("expected updatedAt to be set")
 	}
 }
@@ -63,11 +63,11 @@ func TestUpdateUser_Success_PartialUpdate(t *testing.T) {
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
-	if result.Name != "Only Name Changed" {
-		t.Errorf("expected name %q, got %q", "Only Name Changed", result.Name)
+	if result.User.Name != "Only Name Changed" {
+		t.Errorf("expected name %q, got %q", "Only Name Changed", result.User.Name)
 	}
-	if result.Nickname != "user-1" {
-		t.Errorf("expected original nickname %q, got %q", "user-1", result.Nickname)
+	if result.User.Nickname != "user-1" {
+		t.Errorf("expected original nickname %q, got %q", "user-1", result.User.Nickname)
 	}
 }
 
@@ -181,8 +181,8 @@ func TestUpdateUser_SameNicknameNoConflict(t *testing.T) {
 	if err != nil {
 		t.Fatalf("expected no error when nickname unchanged, got %v", err)
 	}
-	if result.Nickname != "user-1" {
-		t.Errorf("expected nickname %q, got %q", "user-1", result.Nickname)
+	if result.User.Nickname != "user-1" {
+		t.Errorf("expected nickname %q, got %q", "user-1", result.User.Nickname)
 	}
 }
 
@@ -229,8 +229,8 @@ func TestUpdateUser_NicknameLowercased(t *testing.T) {
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
-	if result.Nickname != "mynewnick" {
-		t.Errorf("expected nickname to be lowercased %q, got %q", "mynewnick", result.Nickname)
+	if result.User.Nickname != "mynewnick" {
+		t.Errorf("expected nickname to be lowercased %q, got %q", "mynewnick", result.User.Nickname)
 	}
 }
 
@@ -250,11 +250,11 @@ func TestUpdateUser_Success_CityAndCountry(t *testing.T) {
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
-	if result.City != "Quito" {
-		t.Errorf("expected city %q, got %q", "Quito", result.City)
+	if result.User.City != "Quito" {
+		t.Errorf("expected city %q, got %q", "Quito", result.User.City)
 	}
-	if result.Country != "Ecuador" {
-		t.Errorf("expected country %q, got %q", "Ecuador", result.Country)
+	if result.User.Country != "Ecuador" {
+		t.Errorf("expected country %q, got %q", "Ecuador", result.User.Country)
 	}
 }
 

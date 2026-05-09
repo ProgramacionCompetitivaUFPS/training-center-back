@@ -38,19 +38,19 @@ func TestAdminUpdateUser_Success_AllFields(t *testing.T) {
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
-	if result.Name != "Updated Name" {
-		t.Errorf("expected name %q, got %q", "Updated Name", result.Name)
+	if result.User.Name != "Updated Name" {
+		t.Errorf("expected name %q, got %q", "Updated Name", result.User.Name)
 	}
-	if result.Nickname != "updatednick" {
-		t.Errorf("expected nickname %q, got %q", "updatednick", result.Nickname)
+	if result.User.Nickname != "updatednick" {
+		t.Errorf("expected nickname %q, got %q", "updatednick", result.User.Nickname)
 	}
-	if result.Email == nil || *result.Email != "updated@example.com" {
-		t.Errorf("expected email %q, got %v", "updated@example.com", result.Email)
+	if result.User.Email == nil || *result.User.Email != "updated@example.com" {
+		t.Errorf("expected email %q, got %v", "updated@example.com", result.User.Email)
 	}
-	if result.Role != "COACH" {
-		t.Errorf("expected role %q, got %q", "COACH", result.Role)
+	if result.User.Role != "COACH" {
+		t.Errorf("expected role %q, got %q", "COACH", result.User.Role)
 	}
-	if result.UpdatedAt == nil {
+	if result.User.UpdatedAt == nil {
 		t.Error("expected updatedAt to be set")
 	}
 }
@@ -71,11 +71,11 @@ func TestAdminUpdateUser_Success_PartialUpdate(t *testing.T) {
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
-	if result.Name != "Only Name" {
-		t.Errorf("expected name %q, got %q", "Only Name", result.Name)
+	if result.User.Name != "Only Name" {
+		t.Errorf("expected name %q, got %q", "Only Name", result.User.Name)
 	}
-	if result.Role != "CONTESTANT" {
-		t.Errorf("expected role unchanged, got %q", result.Role)
+	if result.User.Role != "CONTESTANT" {
+		t.Errorf("expected role unchanged, got %q", result.User.Role)
 	}
 }
 
@@ -279,11 +279,11 @@ func TestAdminUpdateUser_Success_CityAndCountry(t *testing.T) {
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
-	if result.City != "Guayaquil" {
-		t.Errorf("expected city %q, got %q", "Guayaquil", result.City)
+	if result.User.City != "Guayaquil" {
+		t.Errorf("expected city %q, got %q", "Guayaquil", result.User.City)
 	}
-	if result.Country != "Ecuador" {
-		t.Errorf("expected country %q, got %q", "Ecuador", result.Country)
+	if result.User.Country != "Ecuador" {
+		t.Errorf("expected country %q, got %q", "Ecuador", result.User.Country)
 	}
 }
 

@@ -26,9 +26,13 @@ func NewUpdateUserUseCase(repo user.Repository) *UpdateUserUseCase {
 	return &UpdateUserUseCase{repo: repo}
 }
 
-func (uc *UpdateUserUseCase) Execute(ctx context.Context, input UpdateUserInput) (UserDTO, error) {
+type UpdateUserOutput struct {
+	User UserDTO
+}
+
+func (uc *UpdateUserUseCase) Execute(ctx context.Context, input UpdateUserInput) (*UpdateUserOutput, error) {
 	if input.Name == nil && input.Nickname == nil && input.Institution == nil && input.City == nil && input.Country == nil {
-		return UserDTO{}, apperror.NewValidation([]apperror.FieldError{
+		return nil,apperror.NewValidation([]apperror.FieldError{
 			{Field: "body", Message: "At least one updatable field must be provided"},
 		})
 	}
@@ -36,10 +40,10 @@ func (uc *UpdateUserUseCase) Execute(ctx context.Context, input UpdateUserInput)
 	foundUser, err := uc.repo.FindByID(ctx, input.UserID)
 	if err != nil {
 		slog.Error("failed to find user by id during update", "user_id", input.UserID, "error", err)
-		return UserDTO{}, apperror.NewInternal()
+		return nil,apperror.NewInternal()
 	}
 	if foundUser == nil {
-		return UserDTO{}, apperror.NewNotFound("NOT_FOUND", "User not found")
+		return nil,apperror.NewNotFound("NOT_FOUND", "User not found")
 	}
 
 	var fieldErrors []apperror.FieldError
@@ -91,18 +95,18 @@ func (uc *UpdateUserUseCase) Execute(ctx context.Context, input UpdateUserInput)
 	}
 
 	if len(fieldErrors) > 0 {
-		return UserDTO{}, apperror.NewValidation(fieldErrors)
+		return nil,apperror.NewValidation(fieldErrors)
 	}
 
 	now := time.Now()
 	if err := foundUser.Update(nameToUpdate, nicknameToUpdate, institutionToUpdate, cityToUpdate, countryToUpdate, now); err != nil {
 		slog.Error("failed to apply update to user domain object", "user_id", foundUser.ID(), "error", err)
-		return UserDTO{}, apperror.NewInternal()
+		return nil,apperror.NewInternal()
 	}
 
 	if err := uc.repo.Update(ctx, foundUser); err != nil {
-		return UserDTO{}, err
+		return nil,err
 	}
 
-	return userToDTO(foundUser), nil
+	return &UpdateUserOutput{User: userToDTO(foundUser)}, nil
 }

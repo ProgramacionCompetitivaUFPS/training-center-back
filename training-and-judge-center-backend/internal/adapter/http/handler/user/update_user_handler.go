@@ -60,19 +60,19 @@ func (h *UserHandler) UpdateProfile(w http.ResponseWriter, r *http.Request) {
 	}
 
 	resp := fullUserResponse{
-		Name:        result.Name,
-		Nickname:    result.Nickname,
-		Country:     result.Country,
-		City:        result.City,
-		Institution: result.Institution,
-		Role:        result.Role,
-		CreatedAt:   result.CreatedAt.Format("2006-01-02T15:04:05Z"),
+		Name:        result.User.Name,
+		Nickname:    result.User.Nickname,
+		Country:     result.User.Country,
+		City:        result.User.City,
+		Institution: result.User.Institution,
+		Role:        result.User.Role,
+		CreatedAt:   result.User.CreatedAt.Format("2006-01-02T15:04:05Z"),
 	}
-	if result.Email != nil {
-		resp.Email = *result.Email
+	if result.User.Email != nil {
+		resp.Email = *result.User.Email
 	}
-	if result.UpdatedAt != nil {
-		resp.UpdatedAt = result.UpdatedAt.Format("2006-01-02T15:04:05Z")
+	if result.User.UpdatedAt != nil {
+		resp.UpdatedAt = result.User.UpdatedAt.Format("2006-01-02T15:04:05Z")
 	}
 
 	handler.WriteJSON(w, http.StatusOK, resp)
