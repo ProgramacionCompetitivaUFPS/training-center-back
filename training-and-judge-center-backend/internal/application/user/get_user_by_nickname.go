@@ -36,11 +36,8 @@ func (uc *GetUserByNicknameUseCase) Execute(ctx context.Context, in GetUserByNic
 		slog.ErrorContext(ctx, "failed to find user profile by nickname", "nickname", in.Nickname, "error", err)
 		return nil, apperror.NewInternal()
 	}
-	if targetUser == nil {
-		return nil, apperror.NewNotFound("NOT_FOUND", "User not found")
-	}
-
-	if targetUser.Status() == domain.StatusDeactivated {
+	
+	if targetUser == nil || targetUser.Status() == domain.StatusDeactivated {
 		return nil, apperror.NewNotFound("NOT_FOUND", "User not found")
 	}
 
