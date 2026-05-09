@@ -6,7 +6,7 @@ import (
 	"log/slog"
 
 	domainMaterial "github.com/training-judge-center/backend/internal/domain/material"
-	"github.com/training-judge-center/backend/internal/application/shared"
+	appshared "github.com/training-judge-center/backend/internal/application/shared"
 	"github.com/training-judge-center/backend/pkg/apperror"
 )
 
@@ -17,7 +17,7 @@ const (
 )
 
 type ListMaterialsInput struct {
-	CurrentUser shared.CurrentUser
+	CurrentUser appshared.CurrentUser
 	GroupID     string
 	Pinned      *bool
 	Tags        []string

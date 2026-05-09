@@ -9,7 +9,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/training-judge-center/backend/internal/application/shared"
+	appshared "github.com/training-judge-center/backend/internal/application/shared"
 	"github.com/training-judge-center/backend/internal/domain/user"
 	"github.com/training-judge-center/backend/pkg/apperror"
 )
@@ -27,15 +27,15 @@ type RequestEmailChangeOutput struct {
 type RequestEmailChangeUseCase struct {
 	userRepo        user.Repository
 	emailChangeRepo user.EmailChangeRepository
-	emailSender     shared.EmailSender
-	rateLimiter     shared.RateLimiter
+	emailSender     appshared.EmailSender
+	rateLimiter     appshared.RateLimiter
 }
 
 func NewRequestEmailChangeUseCase(
 	userRepo user.Repository,
 	emailChangeRepo user.EmailChangeRepository,
-	emailSender shared.EmailSender,
-	rateLimiter shared.RateLimiter,
+	emailSender appshared.EmailSender,
+	rateLimiter appshared.RateLimiter,
 ) *RequestEmailChangeUseCase {
 	return &RequestEmailChangeUseCase{
 		userRepo:        userRepo,
@@ -100,7 +100,7 @@ func (uc *RequestEmailChangeUseCase) Execute(ctx context.Context, input RequestE
 		return nil, apperror.NewInternal()
 	}
 
-	if err := uc.emailSender.Send(ctx, shared.EmailMessage{
+	if err := uc.emailSender.Send(ctx, appshared.EmailMessage{
 		To:      input.NewEmail,
 		Subject: "Verify your new email address",
 		Body:    fmt.Sprintf("Your email verification code is: %s. It will expire in 15 minutes.", code),

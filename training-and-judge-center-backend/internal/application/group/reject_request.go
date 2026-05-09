@@ -5,14 +5,14 @@ import (
 	"log/slog"
 
 	domainGroup "github.com/training-judge-center/backend/internal/domain/group"
-	"github.com/training-judge-center/backend/internal/application/shared"
+	appshared "github.com/training-judge-center/backend/internal/application/shared"
 	"github.com/training-judge-center/backend/pkg/apperror"
 )
 
 type RejectRequestInput struct {
 	GroupID     string
 	RequestID   string
-	CurrentUser shared.CurrentUser
+	CurrentUser appshared.CurrentUser
 }
 
 type RejectRequestOutput struct {

@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/training-judge-center/backend/internal/application/shared"
+	appshared "github.com/training-judge-center/backend/internal/application/shared"
 	domainShared "github.com/training-judge-center/backend/internal/domain/shared"
 	domain "github.com/training-judge-center/backend/internal/domain/user"
 	"github.com/training-judge-center/backend/pkg/apperror"
@@ -77,7 +77,7 @@ func TestRequestPasswordRecovery_Success(t *testing.T) {
 
 	emailSent := false
 	mockEmail := &mockEmailSender{
-		sendFn: func(ctx context.Context, msg shared.EmailMessage) error {
+		sendFn: func(ctx context.Context, msg appshared.EmailMessage) error {
 			emailSent = true
 			if msg.To != "user-1@example.com" {
 				t.Errorf("expected user@example.com, got %s", msg.To)
@@ -106,7 +106,7 @@ func TestRequestPasswordRecovery_AmbiguousResponseWhenNotFound(t *testing.T) {
 	recoveryRepo := &mockPasswordRecoveryRepo{} // shouldn't be called
 	emailSent := false
 	mockEmail := &mockEmailSender{
-		sendFn: func(ctx context.Context, msg shared.EmailMessage) error {
+		sendFn: func(ctx context.Context, msg appshared.EmailMessage) error {
 			emailSent = true
 			return nil
 		},
@@ -156,7 +156,7 @@ func TestRequestPasswordRecovery_EmailSendFailNoError(t *testing.T) {
 	}
 
 	mockEmail := &mockEmailSender{
-		sendFn: func(ctx context.Context, msg shared.EmailMessage) error {
+		sendFn: func(ctx context.Context, msg appshared.EmailMessage) error {
 			return apperror.NewInternal()
 		},
 	}
@@ -188,7 +188,7 @@ func TestRequestPasswordRecovery_EmailSendFail_InvalidatesOrphanedCode(t *testin
 	}
 
 	mockEmail := &mockEmailSender{
-		sendFn: func(ctx context.Context, msg shared.EmailMessage) error {
+		sendFn: func(ctx context.Context, msg appshared.EmailMessage) error {
 			return apperror.NewInternal()
 		},
 	}

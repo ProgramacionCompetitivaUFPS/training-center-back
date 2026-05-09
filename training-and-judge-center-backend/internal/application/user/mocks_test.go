@@ -4,7 +4,7 @@ import (
 	"context"
 	"time"
 
-	appShared "github.com/training-judge-center/backend/internal/application/shared"
+	appshared "github.com/training-judge-center/backend/internal/application/shared"
 	"github.com/training-judge-center/backend/internal/domain/shared"
 	domain "github.com/training-judge-center/backend/internal/domain/user"
 )
@@ -31,10 +31,10 @@ func (m *mockRateLimiter) Reset(ctx context.Context, key string) error {
 }
 
 type mockEmailSender struct {
-	sendFn func(ctx context.Context, msg appShared.EmailMessage) error
+	sendFn func(ctx context.Context, msg appshared.EmailMessage) error
 }
 
-func (m *mockEmailSender) Send(ctx context.Context, msg appShared.EmailMessage) error {
+func (m *mockEmailSender) Send(ctx context.Context, msg appshared.EmailMessage) error {
 	if m.sendFn != nil {
 		return m.sendFn(ctx, msg)
 	}
