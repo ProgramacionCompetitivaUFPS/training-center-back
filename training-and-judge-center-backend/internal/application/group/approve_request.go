@@ -18,7 +18,7 @@ type ApproveRequestInput struct {
 }
 
 type ApproveRequestOutput struct {
-	Request *domainGroup.JoinRequest
+	Request JoinRequestDTO
 }
 
 type ApproveRequestUseCase struct {
@@ -77,6 +77,6 @@ func (uc *ApproveRequestUseCase) Execute(ctx context.Context, input ApproveReque
 		return nil, err
 	}
 
-	return &ApproveRequestOutput{Request: req}, nil
+	return &ApproveRequestOutput{Request: joinRequestToDTO(req)}, nil
 }
 

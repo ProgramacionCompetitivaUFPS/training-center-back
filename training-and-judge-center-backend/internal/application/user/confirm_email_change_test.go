@@ -63,8 +63,8 @@ func TestConfirmEmailChange_Success(t *testing.T) {
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
-	if newEmail.String() != "newemail@example.com" {
-		t.Errorf("expected returned email to be newemail@example.com, got %s", newEmail.String())
+	if newEmail.Email != "newemail@example.com" {
+		t.Errorf("expected returned email to be newemail@example.com, got %s", newEmail.Email)
 	}
 	if emailsSent != 2 {
 		t.Errorf("expected 2 emails to be sent, got %d", emailsSent)

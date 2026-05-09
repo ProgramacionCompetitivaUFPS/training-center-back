@@ -11,12 +11,6 @@ import (
 	"github.com/training-judge-center/backend/pkg/apperror"
 )
 
-type LanguageOverrideInput struct {
-	Language    string
-	TimeLimit   *int
-	MemoryLimit *int
-}
-
 type CreateProblemInput struct {
 	Slug          string
 	Title         string

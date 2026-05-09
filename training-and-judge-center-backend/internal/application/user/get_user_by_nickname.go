@@ -15,6 +15,11 @@ type GetUserByNicknameInput struct {
 	Nickname      string
 }
 
+type GetUserByNicknameOutput struct {
+	User          UserDTO
+	IsFullProfile bool
+}
+
 type GetUserByNicknameUseCase struct {
 	repo domain.Repository
 }
@@ -23,7 +28,7 @@ func NewGetUserByNicknameUseCase(repo domain.Repository) *GetUserByNicknameUseCa
 	return &GetUserByNicknameUseCase{repo: repo}
 }
 
-func (uc *GetUserByNicknameUseCase) Execute(ctx context.Context, in GetUserByNicknameInput) (*UserProfileOutput, error) {
+func (uc *GetUserByNicknameUseCase) Execute(ctx context.Context, in GetUserByNicknameInput) (*GetUserByNicknameOutput, error) {
 	parsedNickname, err := domain.NewNickname(in.Nickname)
 	if err != nil {
 		return nil, apperror.NewValidation([]apperror.FieldError{
@@ -43,7 +48,7 @@ func (uc *GetUserByNicknameUseCase) Execute(ctx context.Context, in GetUserByNic
 
 	isSelf := targetUser.ID() == in.RequesterID
 	if isSelf {
-		return &UserProfileOutput{User: userToDTO(targetUser), IsFullProfile: true}, nil
+		return &GetUserByNicknameOutput{User: userToDTO(targetUser), IsFullProfile: true}, nil
 	}
 
 	isRequesterAdmin := in.RequesterRole == shared.RoleAdmin
@@ -52,5 +57,5 @@ func (uc *GetUserByNicknameUseCase) Execute(ctx context.Context, in GetUserByNic
 		return nil, apperror.NewForbidden("ADMIN_PROFILE_RESTRICTED", "Admin profiles are not accessible to non-admin users")
 	}
 
-	return &UserProfileOutput{User: userToDTO(targetUser), IsFullProfile: isRequesterAdmin}, nil
+	return &GetUserByNicknameOutput{User: userToDTO(targetUser), IsFullProfile: isRequesterAdmin}, nil
 }

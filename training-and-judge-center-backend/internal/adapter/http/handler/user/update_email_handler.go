@@ -126,7 +126,7 @@ func (h *UserHandler) ConfirmEmailChange(w http.ResponseWriter, r *http.Request)
 		Code:   body.Code,
 	}
 
-	newEmail, err := h.confirmEmailChange.Execute(ctx, input)
+	out, err := h.confirmEmailChange.Execute(ctx, input)
 	if err != nil {
 		handler.WriteError(w, err)
 		return
@@ -134,6 +134,6 @@ func (h *UserHandler) ConfirmEmailChange(w http.ResponseWriter, r *http.Request)
 
 	handler.WriteJSON(w, http.StatusOK, map[string]interface{}{
 		"message": "Email updated successfully",
-		"email":   newEmail.String(),
+		"email":   out.Email,
 	})
 }

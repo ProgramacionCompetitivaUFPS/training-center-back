@@ -23,9 +23,9 @@ type ListMyGroupsInput struct {
 }
 
 type MyGroupItem struct {
-	Group       *domainGroup.Group
+	Group       GroupDTO
 	MemberCount int
-	MyRole      domainGroup.MemberRole
+	MyRole      string
 	JoinedAt    time.Time
 }
 
@@ -115,9 +115,9 @@ func (uc *ListMyGroupsUseCase) Execute(ctx context.Context, in ListMyGroupsInput
 			continue
 		}
 		items = append(items, MyGroupItem{
-			Group:       g,
+			Group:       groupToDTO(g),
 			MemberCount: s.Count,
-			MyRole:      s.Role,
+			MyRole:      s.Role.String(),
 			JoinedAt:    s.JoinedAt,
 		})
 	}

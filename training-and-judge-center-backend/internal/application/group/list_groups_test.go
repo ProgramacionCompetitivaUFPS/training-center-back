@@ -288,7 +288,7 @@ func TestListGroups_EnrichesWithMemberCountAndRole(t *testing.T) {
 	if out.Groups[0].MemberCount != 10 {
 		t.Errorf("expected memberCount=10, got %d", out.Groups[0].MemberCount)
 	}
-	if out.Groups[0].UserRole != domainGroup.MemberRoleLead {
+	if out.Groups[0].UserRole != domainGroup.MemberRoleLead.String() {
 		t.Errorf("expected role=LEAD, got %v", out.Groups[0].UserRole)
 	}
 }

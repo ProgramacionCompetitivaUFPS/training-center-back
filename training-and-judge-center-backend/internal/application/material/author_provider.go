@@ -2,8 +2,6 @@ package material
 
 import "context"
 
-// AuthorDisplay is the single author type used both as the port return DTO
-// and as the use-case output DTO — no separate AuthorData needed.
 type AuthorDisplay struct {
 	Nickname string
 	Name     string

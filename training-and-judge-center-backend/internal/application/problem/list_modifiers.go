@@ -14,6 +14,10 @@ type ListModifiersInput struct {
 	CurrentUser appshared.CurrentUser
 }
 
+type ListModifiersOutput struct {
+	Nicknames []string
+}
+
 type ListModifiersUseCase struct {
 	repo problem.Repository
 }
@@ -22,7 +26,7 @@ func NewListModifiersUseCase(repo problem.Repository) *ListModifiersUseCase {
 	return &ListModifiersUseCase{repo: repo}
 }
 
-func (uc *ListModifiersUseCase) Execute(ctx context.Context, input ListModifiersInput) ([]string, error) {
+func (uc *ListModifiersUseCase) Execute(ctx context.Context, input ListModifiersInput) (*ListModifiersOutput, error) {
 	slug, err := problem.NewSlug(input.Slug)
 	if err != nil {
 		return nil, err
@@ -37,9 +41,9 @@ func (uc *ListModifiersUseCase) Execute(ctx context.Context, input ListModifiers
 		return nil, apperror.NewForbidden(apperror.ErrCodeForbidden, "Only the problem author, Admin, or assigned modifiers can view modifiers")
 	}
 
-	modifiers := make([]string, len(p.ModifierIDs()))
+	nicknames := make([]string, len(p.ModifierIDs()))
 	for i, id := range p.ModifierIDs() {
-		modifiers[i] = id.Value()
+		nicknames[i] = id.Value()
 	}
-	return modifiers, nil
+	return &ListModifiersOutput{Nicknames: nicknames}, nil
 }

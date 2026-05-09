@@ -119,7 +119,9 @@ func (uc *UpdateMaterialUseCase) Execute(ctx context.Context, in UpdateMaterialI
 		slog.ErrorContext(ctx, "failed to resolve author display", "error", err, "author_id", m.AuthorID().Value())
 		return nil, apperror.NewInternal()
 	}
-	data.Author = displays[m.AuthorID().Value()]
+	if disp := displays[m.AuthorID().Value()]; disp != nil {
+		data.Author = &AuthorDTO{Nickname: disp.Nickname, Name: disp.Name}
+	}
 
 	return &UpdateMaterialOutput{Material: data}, nil
 }

@@ -42,8 +42,8 @@ func TestRejectRequest_AdminCanRejectWithoutMembership(t *testing.T) {
 	if err != nil {
 		t.Fatalf("admin should be able to reject, got: %v", err)
 	}
-	if out.Request.Status() != domainGroup.JoinRequestStatusRejected {
-		t.Errorf("expected REJECTED, got %s", out.Request.Status())
+	if out.Request.Status != domainGroup.JoinRequestStatusRejected.String() {
+		t.Errorf("expected REJECTED, got %s", out.Request.Status)
 	}
 }
 
@@ -91,8 +91,8 @@ func TestRejectRequest_SuccessUpdatesStatus(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if out.Request.Status() != domainGroup.JoinRequestStatusRejected {
-		t.Errorf("expected REJECTED, got %s", out.Request.Status())
+	if out.Request.Status != domainGroup.JoinRequestStatusRejected.String() {
+		t.Errorf("expected REJECTED, got %s", out.Request.Status)
 	}
 	if len(reqRepo.savedRequests) == 0 {
 		t.Error("expected request to be saved")

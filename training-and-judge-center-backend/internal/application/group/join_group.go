@@ -18,7 +18,7 @@ type JoinGroupInput struct {
 }
 
 type JoinGroupOutput struct {
-	Member *domainGroup.GroupMember
+	Member MemberDTO
 }
 
 type JoinGroupUseCase struct {
@@ -67,5 +67,5 @@ func (uc *JoinGroupUseCase) Execute(ctx context.Context, input JoinGroupInput) (
 		return nil, err
 	}
 
-	return &JoinGroupOutput{Member: member}, nil
+	return &JoinGroupOutput{Member: memberToDTO(member)}, nil
 }

@@ -34,7 +34,7 @@ func (h *Handler) ListModifiers(w http.ResponseWriter, r *http.Request) {
 
 	currentUser := shared.CurrentUser{ID: claims.UserID, Role: claims.Role}
 
-	modifiers, err := h.listModifiersUC.Execute(r.Context(), appProblem.ListModifiersInput{
+	out, err := h.listModifiersUC.Execute(r.Context(), appProblem.ListModifiersInput{
 		Slug:        slug,
 		CurrentUser: currentUser,
 	})
@@ -43,5 +43,5 @@ func (h *Handler) ListModifiers(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	handler.WriteJSON(w, http.StatusOK, map[string]interface{}{"modifiers": modifiers})
+	handler.WriteJSON(w, http.StatusOK, map[string]interface{}{"modifiers": out.Nicknames})
 }

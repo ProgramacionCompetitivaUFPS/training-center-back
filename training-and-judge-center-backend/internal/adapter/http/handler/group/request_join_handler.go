@@ -8,7 +8,6 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/training-judge-center/backend/internal/adapter/http/handler"
 	appGroup "github.com/training-judge-center/backend/internal/application/group"
-	domainGroup "github.com/training-judge-center/backend/internal/domain/group"
 	"github.com/training-judge-center/backend/pkg/apperror"
 )
 
@@ -59,17 +58,17 @@ func (h *Handler) RequestJoin(w http.ResponseWriter, r *http.Request) {
 	handler.WriteJSON(w, http.StatusCreated, buildJoinRequestResp(out.Request, nil))
 }
 
-func buildJoinRequestResp(req *domainGroup.JoinRequest, display *appGroup.UserDisplay) joinRequestResp {
+func buildJoinRequestResp(req appGroup.JoinRequestDTO, display *appGroup.UserDisplay) joinRequestResp {
 	resp := joinRequestResp{
-		ID:        req.ID(),
-		GroupID:   req.GroupID(),
-		Status:    req.Status().String(),
-		Message:   req.Message(),
-		CreatedAt: req.CreatedAt().Format("2006-01-02T15:04:05Z"),
+		ID:        req.ID,
+		GroupID:   req.GroupID,
+		Status:    req.Status,
+		Message:   req.Message,
+		CreatedAt: req.CreatedAt.Format("2006-01-02T15:04:05Z"),
 	}
 	if display != nil {
 		resp.Requester = &requesterResp{
-			UserID:   req.RequesterUserID().Value(),
+			UserID:   req.RequesterUserID,
 			Nickname: display.Nickname,
 			Name:     display.Name,
 			Email:    display.Email,

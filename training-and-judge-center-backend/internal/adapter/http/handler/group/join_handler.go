@@ -39,7 +39,7 @@ func (h *Handler) Join(w http.ResponseWriter, r *http.Request) {
 
 	m := out.Member
 	handler.WriteJSON(w, http.StatusCreated, joinGroupResponse{
-		Role:     m.Role().String(),
-		JoinedAt: m.JoinedAt().Format(timeutil.RFC3339UTC),
+		Role:     m.Role,
+		JoinedAt: m.JoinedAt.Format(timeutil.RFC3339UTC),
 	})
 }

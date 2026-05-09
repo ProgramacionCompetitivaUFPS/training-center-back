@@ -19,7 +19,7 @@ type RequestJoinInput struct {
 }
 
 type RequestJoinOutput struct {
-	Request *domainGroup.JoinRequest
+	Request JoinRequestDTO
 }
 
 type RequestJoinUseCase struct {
@@ -83,5 +83,5 @@ func (uc *RequestJoinUseCase) Execute(ctx context.Context, input RequestJoinInpu
 		return nil, apperror.NewInternal()
 	}
 
-	return &RequestJoinOutput{Request: req}, nil
+	return &RequestJoinOutput{Request: joinRequestToDTO(req)}, nil
 }

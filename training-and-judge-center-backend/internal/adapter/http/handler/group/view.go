@@ -45,22 +45,22 @@ func (h *Handler) GetGroup(w http.ResponseWriter, r *http.Request) {
 	}
 	um := userMembershipResp{
 		IsMember: out.Membership.Role != nil,
-		Role:     memberRoleToStringPtr(out.Membership.Role),
+		Role:     out.Membership.Role,
 		JoinedAt: joinedAt,
 	}
 
 	resp := getGroupResponse{
-		ID:             g.ID(),
-		Name:           g.Name().String(),
-		Description:    g.Description(),
-		Visibility:     g.Visibility().String(),
-		JoinPolicy:     g.JoinPolicy().String(),
-		IsGlobal:       g.IsDefault(),
+		ID:             g.ID,
+		Name:           g.Name,
+		Description:    g.Description,
+		Visibility:     g.Visibility,
+		JoinPolicy:     g.JoinPolicy,
+		IsGlobal:       g.IsDefault,
 		Statistics:     statisticsResp{MemberCount: out.Statistics.MemberCount, LeadCount: out.Statistics.LeadCount},
 		Leads:          leads,
 		UserMembership: um,
-		CreatedAt:      g.CreatedAt().Format(timeutil.RFC3339UTC),
-		UpdatedAt:      g.UpdatedAt().Format(timeutil.RFC3339UTC),
+		CreatedAt:      g.CreatedAt.Format(timeutil.RFC3339UTC),
+		UpdatedAt:      g.UpdatedAt.Format(timeutil.RFC3339UTC),
 	}
 
 	handler.WriteJSON(w, http.StatusOK, resp)

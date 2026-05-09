@@ -6,6 +6,17 @@ import (
 	"github.com/training-judge-center/backend/internal/domain/problem"
 )
 
+type ModifierDisplay struct {
+	Nickname string
+	Name     string
+}
+
+type LanguageOverrideInput struct {
+	Language    string
+	TimeLimit   *int
+	MemoryLimit *int
+}
+
 type LangOverrideDTO struct {
 	Language    string
 	TimeLimit   *int

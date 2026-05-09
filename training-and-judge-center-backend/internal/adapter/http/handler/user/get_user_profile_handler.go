@@ -52,7 +52,7 @@ func (h *UserHandler) GetMyProfile(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	handler.WriteJSON(w, http.StatusOK, buildFullResponse(out))
+	handler.WriteJSON(w, http.StatusOK, buildFullResponse(out.User))
 }
 
 // @Summary      Get user by nickname
@@ -87,7 +87,7 @@ func (h *UserHandler) GetByNickname(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if out.IsFullProfile {
-		handler.WriteJSON(w, http.StatusOK, buildFullResponse(out))
+		handler.WriteJSON(w, http.StatusOK, buildFullResponse(out.User))
 	} else {
 		handler.WriteJSON(w, http.StatusOK, publicUserResponse{
 			Name:        out.User.Name,
@@ -99,21 +99,21 @@ func (h *UserHandler) GetByNickname(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func buildFullResponse(out *appuser.UserProfileOutput) fullUserResponse {
+func buildFullResponse(u appuser.UserDTO) fullUserResponse {
 	resp := fullUserResponse{
-		Name:        out.User.Name,
-		Nickname:    out.User.Nickname,
-		Country:     out.User.Country,
-		City:        out.User.City,
-		Institution: out.User.Institution,
-		Role:        out.User.Role,
-		CreatedAt:   out.User.CreatedAt.Format("2006-01-02T15:04:05Z"),
+		Name:        u.Name,
+		Nickname:    u.Nickname,
+		Country:     u.Country,
+		City:        u.City,
+		Institution: u.Institution,
+		Role:        u.Role,
+		CreatedAt:   u.CreatedAt.Format("2006-01-02T15:04:05Z"),
 	}
-	if out.User.Email != nil {
-		resp.Email = *out.User.Email
+	if u.Email != nil {
+		resp.Email = *u.Email
 	}
-	if out.User.UpdatedAt != nil {
-		resp.UpdatedAt = out.User.UpdatedAt.Format("2006-01-02T15:04:05Z")
+	if u.UpdatedAt != nil {
+		resp.UpdatedAt = u.UpdatedAt.Format("2006-01-02T15:04:05Z")
 	}
 	return resp
 }

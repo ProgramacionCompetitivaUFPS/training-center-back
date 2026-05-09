@@ -15,7 +15,7 @@ type GetMyRequestInput struct {
 }
 
 type GetMyRequestOutput struct {
-	Request *domainGroup.JoinRequest
+	Request JoinRequestDTO
 }
 
 type GetMyRequestUseCase struct {
@@ -37,5 +37,5 @@ func (uc *GetMyRequestUseCase) Execute(ctx context.Context, input GetMyRequestIn
 		return nil, apperror.NewNotFound(domainGroup.ErrCodeRequestNotFound, "you have not requested to join this group")
 	}
 
-	return &GetMyRequestOutput{Request: req}, nil
+	return &GetMyRequestOutput{Request: joinRequestToDTO(req)}, nil
 }

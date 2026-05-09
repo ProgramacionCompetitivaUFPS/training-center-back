@@ -2,7 +2,6 @@ package user
 
 import (
 	"encoding/json"
-	"errors"
 	"net/http"
 
 	"github.com/training-judge-center/backend/internal/adapter/http/handler"
@@ -44,17 +43,17 @@ func (h *UserHandler) UpdatePassword(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	err := h.updatePassword.Execute(r.Context(), appuser.UpdatePasswordInput{
+	out, err := h.updatePassword.Execute(r.Context(), appuser.UpdatePasswordInput{
 		UserID:          claims.UserID,
 		CurrentPassword: req.CurrentPassword,
 		NewPassword:     req.NewPassword,
 	})
-	if err != nil && !errors.Is(err, appuser.ErrSessionsNotInvalidated) {
+	if err != nil {
 		handler.WriteError(w, err)
 		return
 	}
 
-	if errors.Is(err, appuser.ErrSessionsNotInvalidated) {
+	if !out.SessionsInvalidated {
 		handler.WriteJSON(w, http.StatusOK, map[string]string{
 			"code":    "SESSIONS_NOT_INVALIDATED",
 			"message": "Your password was changed successfully. We couldn't close your other active sessions — to close them, please change your password again.",

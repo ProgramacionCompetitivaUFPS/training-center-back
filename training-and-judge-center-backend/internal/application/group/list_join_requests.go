@@ -22,6 +22,11 @@ type ListJoinRequestsInput struct {
 	CurrentUser appshared.CurrentUser
 }
 
+type JoinRequestDetail struct {
+	Request JoinRequestDTO
+	Display *UserDisplay
+}
+
 type ListJoinRequestsOutput struct {
 	Requests   []JoinRequestDetail
 	Total      int
@@ -101,7 +106,7 @@ func (uc *ListJoinRequestsUseCase) Execute(ctx context.Context, input ListJoinRe
 			slog.ErrorContext(ctx, "user display not found for join request", "user_id", r.RequesterUserID().Value())
 			d = &UserDisplay{Nickname: "unknown"}
 		}
-		details = append(details, JoinRequestDetail{Request: r, Display: d})
+		details = append(details, JoinRequestDetail{Request: joinRequestToDTO(r), Display: d})
 	}
 
 	return &ListJoinRequestsOutput{

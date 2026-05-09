@@ -16,7 +16,7 @@ type RejectRequestInput struct {
 }
 
 type RejectRequestOutput struct {
-	Request *domainGroup.JoinRequest
+	Request JoinRequestDTO
 }
 
 type RejectRequestUseCase struct {
@@ -53,5 +53,5 @@ func (uc *RejectRequestUseCase) Execute(ctx context.Context, input RejectRequest
 		return nil, apperror.NewInternal()
 	}
 
-	return &RejectRequestOutput{Request: req}, nil
+	return &RejectRequestOutput{Request: joinRequestToDTO(req)}, nil
 }

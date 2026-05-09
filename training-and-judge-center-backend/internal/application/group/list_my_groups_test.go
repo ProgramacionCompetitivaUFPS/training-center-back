@@ -98,7 +98,7 @@ func TestListMyGroups_EnrichesEachResult(t *testing.T) {
 	if len(out.Groups) != 1 {
 		t.Fatalf("expected 1 group, got %d", len(out.Groups))
 	}
-	if out.Groups[0].MyRole != domainGroup.MemberRoleLead {
+	if out.Groups[0].MyRole != domainGroup.MemberRoleLead.String() {
 		t.Errorf("expected LEAD, got %v", out.Groups[0].MyRole)
 	}
 	if out.Groups[0].MemberCount != 3 {

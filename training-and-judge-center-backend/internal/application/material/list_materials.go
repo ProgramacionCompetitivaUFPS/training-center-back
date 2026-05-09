@@ -104,7 +104,9 @@ func (uc *ListMaterialsUseCase) Execute(ctx context.Context, in ListMaterialsInp
 	items := make([]MaterialData, 0, len(materials))
 	for _, m := range materials {
 		d := toMaterialData(m)
-		d.Author = displays[m.AuthorID().Value()]
+		if disp := displays[m.AuthorID().Value()]; disp != nil {
+			d.Author = &AuthorDTO{Nickname: disp.Nickname, Name: disp.Name}
+		}
 		items = append(items, d)
 	}
 

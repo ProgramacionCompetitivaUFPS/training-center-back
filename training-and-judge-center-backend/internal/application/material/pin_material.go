@@ -90,7 +90,9 @@ func (uc *PinMaterialUseCase) Execute(ctx context.Context, in PinMaterialInput) 
 	if err != nil {
 		slog.WarnContext(ctx, "failed to resolve author display, returning without author info", "error", err, "author_id", m.AuthorID().Value())
 	} else {
-		data.Author = displays[m.AuthorID().Value()]
+		if disp := displays[m.AuthorID().Value()]; disp != nil {
+			data.Author = &AuthorDTO{Nickname: disp.Nickname, Name: disp.Name}
+		}
 	}
 
 	return &PinMaterialOutput{Material: data}, nil

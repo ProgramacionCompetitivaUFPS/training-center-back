@@ -39,45 +39,34 @@ func (h *Handler) GetProblem(w http.ResponseWriter, r *http.Request) {
 	}
 
 	p := out.Problem
-	overrides := make([]langOverrideResp, 0, len(p.LangOverrides()))
-	for _, lo := range p.LangOverrides() {
+	overrides := make([]langOverrideResp, 0, len(p.LangOverrides))
+	for _, lo := range p.LangOverrides {
 		overrides = append(overrides, langOverrideResp{
-			Language:    lo.Language(),
-			TimeLimit:   lo.TimeLimit(),
-			MemoryLimit: lo.MemoryLimit(),
+			Language:    lo.Language,
+			TimeLimit:   lo.TimeLimit,
+			MemoryLimit: lo.MemoryLimit,
 		})
 	}
 
-	var tl *int
-	if p.TimeLimit() != nil {
-		v := p.TimeLimit().Milliseconds()
-		tl = &v
-	}
-	var ml *int
-	if p.MemoryLimit() != nil {
-		v := p.MemoryLimit().Megabytes()
-		ml = &v
-	}
-
 	var judgingUpdatedAt *string
-	if p.JudgingUpdatedAt() != nil {
-		s := p.JudgingUpdatedAt().Format("2006-01-02T15:04:05Z")
+	if p.JudgingUpdatedAt != nil {
+		s := p.JudgingUpdatedAt.Format("2006-01-02T15:04:05Z")
 		judgingUpdatedAt = &s
 	}
 
 	resp := getProblemResponse{
-		Slug:                    p.Slug().String(),
-		Title:                   p.Title().String(),
-		Statement:               p.Statement().Value(),
-		TimeLimit:               tl,
-		MemoryLimit:             ml,
+		Slug:                    p.Slug,
+		Title:                   p.Title,
+		Statement:               p.Statement,
+		TimeLimit:               p.TimeLimit,
+		MemoryLimit:             p.MemoryLimit,
 		LangOverrides:           overrides,
-		Tags:                    p.Tags().Values(),
-		Status:                  p.Status().String(),
-		Accessibility:           p.Accessibility().String(),
+		Tags:                    p.Tags,
+		Status:                  p.Status,
+		Accessibility:           p.Accessibility,
 		Author:                  authorResp{Nickname: out.Author.Nickname, Name: out.Author.Name},
-		CreatedAt:               p.CreatedAt().Format("2006-01-02T15:04:05Z"),
-		UpdatedAt:               p.UpdatedAt().Format("2006-01-02T15:04:05Z"),
+		CreatedAt:               p.CreatedAt.Format("2006-01-02T15:04:05Z"),
+		UpdatedAt:               p.UpdatedAt.Format("2006-01-02T15:04:05Z"),
 		ProblemJudgingUpdatedAt: judgingUpdatedAt,
 	}
 

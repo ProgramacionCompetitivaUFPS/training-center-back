@@ -113,11 +113,11 @@ func TestRequestJoin_SuccessCreatesRequest(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if out.Request.GroupID() != "g1" {
-		t.Errorf("expected GroupID=g1, got %s", out.Request.GroupID())
+	if out.Request.GroupID != "g1" {
+		t.Errorf("expected GroupID=g1, got %s", out.Request.GroupID)
 	}
-	if out.Request.Status() != domainGroup.JoinRequestStatusPending {
-		t.Errorf("expected status PENDING, got %s", out.Request.Status())
+	if out.Request.Status != domainGroup.JoinRequestStatusPending.String() {
+		t.Errorf("expected status PENDING, got %s", out.Request.Status)
 	}
 	if len(reqRepo.savedRequests) != 1 {
 		t.Errorf("expected 1 saved request, got %d", len(reqRepo.savedRequests))
