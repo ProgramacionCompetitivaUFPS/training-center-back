@@ -24,7 +24,11 @@ func NewUnpublishProblemUseCase(repo problem.Repository) *UnpublishProblemUseCas
 	return &UnpublishProblemUseCase{repo: repo}
 }
 
-func (uc *UnpublishProblemUseCase) Execute(ctx context.Context, in UnpublishProblemInput) (*problem.Problem, error) {
+type UnpublishProblemOutput struct {
+	Problem ProblemDTO
+}
+
+func (uc *UnpublishProblemUseCase) Execute(ctx context.Context, in UnpublishProblemInput) (*UnpublishProblemOutput, error) {
 	slug, err := problem.NewSlug(in.Slug)
 	if err != nil {
 		return nil, err
@@ -51,5 +55,5 @@ func (uc *UnpublishProblemUseCase) Execute(ctx context.Context, in UnpublishProb
 		return nil, apperror.NewInternal()
 	}
 
-	return p, nil
+	return &UnpublishProblemOutput{Problem: problemToDTO(p)}, nil
 }

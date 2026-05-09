@@ -51,7 +51,7 @@ func (h *Handler) ChangeAccessibility(w http.ResponseWriter, r *http.Request) {
 
 	currentUser := shared.CurrentUser{ID: claims.UserID, Role: claims.Role}
 
-	p, err := h.changeAccessibilityUC.Execute(r.Context(), appProblem.ChangeAccessibilityInput{
+	out, err := h.changeAccessibilityUC.Execute(r.Context(), appProblem.ChangeAccessibilityInput{
 		Slug:          slug,
 		Accessibility: req.Accessibility,
 		CurrentUser:   currentUser,
@@ -62,9 +62,9 @@ func (h *Handler) ChangeAccessibility(w http.ResponseWriter, r *http.Request) {
 	}
 
 	handler.WriteJSON(w, http.StatusOK, changeAccessibilityResponse{
-		Slug:          p.Slug().String(),
-		Accessibility: p.Accessibility().String(),
-		Status:        p.Status().String(),
-		Message:       fmt.Sprintf("Problem accessibility changed to %s", p.Accessibility().String()),
+		Slug:          out.Problem.Slug,
+		Accessibility: out.Problem.Accessibility,
+		Status:        out.Problem.Status,
+		Message:       fmt.Sprintf("Problem accessibility changed to %s", out.Problem.Accessibility),
 	})
 }

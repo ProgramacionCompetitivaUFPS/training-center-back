@@ -25,7 +25,11 @@ func NewChangeAccessibilityUseCase(repo problem.Repository) *ChangeAccessibility
 	return &ChangeAccessibilityUseCase{repo: repo}
 }
 
-func (uc *ChangeAccessibilityUseCase) Execute(ctx context.Context, in ChangeAccessibilityInput) (*problem.Problem, error) {
+type ChangeAccessibilityOutput struct {
+	Problem ProblemDTO
+}
+
+func (uc *ChangeAccessibilityUseCase) Execute(ctx context.Context, in ChangeAccessibilityInput) (*ChangeAccessibilityOutput, error) {
 	newAcc, err := problem.NewAccessibility(in.Accessibility)
 	if err != nil {
 		return nil, err
@@ -55,5 +59,5 @@ func (uc *ChangeAccessibilityUseCase) Execute(ctx context.Context, in ChangeAcce
 		return nil, apperror.NewInternal()
 	}
 
-	return p, nil
+	return &ChangeAccessibilityOutput{Problem: problemToDTO(p)}, nil
 }
