@@ -50,6 +50,9 @@ func TestAdminUpdateUser_Success_AllFields(t *testing.T) {
 	if result.User.Role != "COACH" {
 		t.Errorf("expected role %q, got %q", "COACH", result.User.Role)
 	}
+	if result.User.Institution != "New University" {
+		t.Errorf("expected institution %q, got %q", "New University", result.User.Institution)
+	}
 	if result.User.UpdatedAt == nil {
 		t.Error("expected updatedAt to be set")
 	}
