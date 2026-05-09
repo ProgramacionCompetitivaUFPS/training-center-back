@@ -37,20 +37,20 @@ type ListMaterialsOutput struct {
 	Pagination PaginationData
 }
 
-type ListMaterials struct {
+type ListMaterialsUseCase struct {
 	repo            domainMaterial.Repository
 	groupVisibility GroupVisibilityProvider
 	memberProvider  GroupMemberProvider
 	authorProvider  AuthorProvider
 }
 
-func NewListMaterials(
+func NewListMaterialsUseCase(
 	repo domainMaterial.Repository,
 	groupVisibility GroupVisibilityProvider,
 	memberProvider GroupMemberProvider,
 	authorProvider AuthorProvider,
-) *ListMaterials {
-	return &ListMaterials{
+) *ListMaterialsUseCase {
+	return &ListMaterialsUseCase{
 		repo:            repo,
 		groupVisibility: groupVisibility,
 		memberProvider:  memberProvider,
@@ -58,7 +58,7 @@ func NewListMaterials(
 	}
 }
 
-func (uc *ListMaterials) Execute(ctx context.Context, in ListMaterialsInput) (*ListMaterialsOutput, error) {
+func (uc *ListMaterialsUseCase) Execute(ctx context.Context, in ListMaterialsInput) (*ListMaterialsOutput, error) {
 	if in.Page < 1 {
 		return nil, apperror.NewValidation([]apperror.FieldError{
 			{Field: "page", Message: "page must be a positive integer"},
@@ -124,7 +124,7 @@ func (uc *ListMaterials) Execute(ctx context.Context, in ListMaterialsInput) (*L
 	}, nil
 }
 
-func (uc *ListMaterials) buildFilters(ctx context.Context, in ListMaterialsInput) (domainMaterial.ListFilters, error) {
+func (uc *ListMaterialsUseCase) buildFilters(ctx context.Context, in ListMaterialsInput) (domainMaterial.ListFilters, error) {
 	filters := domainMaterial.ListFilters{
 		Tags:   in.Tags,
 		Pinned: in.Pinned,

@@ -9,8 +9,8 @@ import (
 	"github.com/training-judge-center/backend/pkg/apperror"
 )
 
-func newCreateUC(repo *mockMaterialRepository, group *mockGroupProvider, member *mockGroupMemberProvider) *CreateMaterial {
-	return NewCreateMaterial(repo, group, member, stubAuthorProvider())
+func newCreateUC(repo *mockMaterialRepository, group *mockGroupProvider, member *mockGroupMemberProvider) *CreateMaterialUseCase {
+	return NewCreateMaterialUseCase(repo, group, member, stubAuthorProvider())
 }
 
 func TestCreateMaterial_SuccessByLead(t *testing.T) {

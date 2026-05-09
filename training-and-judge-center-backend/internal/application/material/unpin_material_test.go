@@ -9,8 +9,8 @@ import (
 	"github.com/training-judge-center/backend/pkg/apperror"
 )
 
-func newUnpinUC(repo *mockMaterialRepository, group *mockGroupProvider, member *mockGroupMemberProvider) *UnpinMaterial {
-	return NewUnpinMaterial(repo, group, member, stubAuthorProvider())
+func newUnpinUC(repo *mockMaterialRepository, group *mockGroupProvider, member *mockGroupMemberProvider) *UnpinMaterialUseCase {
+	return NewUnpinMaterialUseCase(repo, group, member, stubAuthorProvider())
 }
 
 func TestUnpinMaterial_SuccessByAuthor(t *testing.T) {

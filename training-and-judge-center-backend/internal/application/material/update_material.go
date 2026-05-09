@@ -26,21 +26,21 @@ type UpdateMaterialOutput struct {
 	Material MaterialData
 }
 
-type UpdateMaterial struct {
+type UpdateMaterialUseCase struct {
 	repo           domainMaterial.Repository
 	groupProvider  GroupProvider
 	authorProvider AuthorProvider
 }
 
-func NewUpdateMaterial(
+func NewUpdateMaterialUseCase(
 	repo domainMaterial.Repository,
 	groupProvider GroupProvider,
 	authorProvider AuthorProvider,
-) *UpdateMaterial {
-	return &UpdateMaterial{repo: repo, groupProvider: groupProvider, authorProvider: authorProvider}
+) *UpdateMaterialUseCase {
+	return &UpdateMaterialUseCase{repo: repo, groupProvider: groupProvider, authorProvider: authorProvider}
 }
 
-func (uc *UpdateMaterial) Execute(ctx context.Context, in UpdateMaterialInput) (*UpdateMaterialOutput, error) {
+func (uc *UpdateMaterialUseCase) Execute(ctx context.Context, in UpdateMaterialInput) (*UpdateMaterialOutput, error) {
 	exists, err := uc.groupProvider.Exists(ctx, in.GroupID)
 	if err != nil {
 		slog.ErrorContext(ctx, "failed to check group existence", "error", err, "group_id", in.GroupID)

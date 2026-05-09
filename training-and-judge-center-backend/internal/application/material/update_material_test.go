@@ -9,8 +9,8 @@ import (
 	"github.com/training-judge-center/backend/pkg/apperror"
 )
 
-func newUpdateUC(repo *mockMaterialRepository, group *mockGroupProvider) *UpdateMaterial {
-	return NewUpdateMaterial(repo, group, stubAuthorProvider())
+func newUpdateUC(repo *mockMaterialRepository, group *mockGroupProvider) *UpdateMaterialUseCase {
+	return NewUpdateMaterialUseCase(repo, group, stubAuthorProvider())
 }
 
 func TestUpdateMaterial_SuccessByAuthor(t *testing.T) {

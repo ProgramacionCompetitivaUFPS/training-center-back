@@ -24,20 +24,20 @@ type CreateMaterialOutput struct {
 	Material MaterialData
 }
 
-type CreateMaterial struct {
+type CreateMaterialUseCase struct {
 	repo           domainMaterial.Repository
 	groupProvider  GroupProvider
 	memberProvider GroupMemberProvider
 	authorProvider AuthorProvider
 }
 
-func NewCreateMaterial(
+func NewCreateMaterialUseCase(
 	repo domainMaterial.Repository,
 	groupProvider GroupProvider,
 	memberProvider GroupMemberProvider,
 	authorProvider AuthorProvider,
-) *CreateMaterial {
-	return &CreateMaterial{
+) *CreateMaterialUseCase {
+	return &CreateMaterialUseCase{
 		repo:           repo,
 		groupProvider:  groupProvider,
 		memberProvider: memberProvider,
@@ -45,7 +45,7 @@ func NewCreateMaterial(
 	}
 }
 
-func (uc *CreateMaterial) Execute(ctx context.Context, in CreateMaterialInput) (*CreateMaterialOutput, error) {
+func (uc *CreateMaterialUseCase) Execute(ctx context.Context, in CreateMaterialInput) (*CreateMaterialOutput, error) {
 	exists, err := uc.groupProvider.Exists(ctx, in.GroupID)
 	if err != nil {
 		slog.ErrorContext(ctx, "failed to check group existence", "error", err, "group_id", in.GroupID)

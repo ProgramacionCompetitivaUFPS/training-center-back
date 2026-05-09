@@ -8,8 +8,8 @@ import (
 	"github.com/training-judge-center/backend/pkg/apperror"
 )
 
-func newListUC(repo *mockMaterialRepository, vis *mockGroupVisibilityProvider, mem *mockGroupMemberProvider) *ListMaterials {
-	return NewListMaterials(repo, vis, mem, stubAuthorProvider())
+func newListUC(repo *mockMaterialRepository, vis *mockGroupVisibilityProvider, mem *mockGroupMemberProvider) *ListMaterialsUseCase {
+	return NewListMaterialsUseCase(repo, vis, mem, stubAuthorProvider())
 }
 
 func defaultListInput() ListMaterialsInput {
@@ -212,7 +212,7 @@ func TestListMaterials_LeadCheckError_Returns500(t *testing.T) {
 			return true, nil
 		},
 	}
-	uc := NewListMaterials(&mockMaterialRepository{}, visibleGroup(), mem, stubAuthorProvider())
+	uc := NewListMaterialsUseCase(&mockMaterialRepository{}, visibleGroup(), mem, stubAuthorProvider())
 	_, err := uc.Execute(context.Background(), defaultListInput())
 	assertErrCode(t, err, apperror.ErrCodeInternalError)
 }

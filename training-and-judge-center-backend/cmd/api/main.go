@@ -169,7 +169,8 @@ func main() {
 	// User use cases
 	createUserUC := appuser.NewCreateUserUseCase(userRepo)
 	loginUC := appuser.NewLoginUseCase(userRepo, jwtService)
-	getUserProfileUC := appuser.NewGetUserProfileUseCase(userRepo)
+	getMyProfileUC := appuser.NewGetMyProfileUseCase(userRepo)
+	getUserByNicknameUC := appuser.NewGetUserByNicknameUseCase(userRepo)
 	updateUserUC := appuser.NewUpdateUserUseCase(userRepo)
 	updatePasswordUC := appuser.NewUpdatePasswordUseCase(userRepo, emailSender, sessionInvalidator, redisRateLimiter)
 	adminUpdateUserUC := appuser.NewAdminUpdateUserUseCase(userRepo)
@@ -183,7 +184,7 @@ func main() {
 	confirmDeactUC := appuser.NewConfirmDeactivationUseCase(userRepo, deactRepo, auditRepo, emailSender, sessionInvalidator, txManager)
 
 	// Handlers
-	userHandler := handlerUser.NewUserHandler(createUserUC, getUserProfileUC, updateUserUC, updatePasswordUC, adminUpdateUserUC, adminDeactivateUserUC, listUsersUC, requestEmailChangeUC, confirmEmailChangeUC, requestPasswordRecoveryUC, resetPasswordUC, requestDeactUC, confirmDeactUC)
+	userHandler := handlerUser.NewUserHandler(createUserUC, getMyProfileUC, getUserByNicknameUC, updateUserUC, updatePasswordUC, adminUpdateUserUC, adminDeactivateUserUC, listUsersUC, requestEmailChangeUC, confirmEmailChangeUC, requestPasswordRecoveryUC, resetPasswordUC, requestDeactUC, confirmDeactUC)
 	authHandler := handler.NewAuthHandler(loginUC)
 
 	// Group repositories & platform adapters
@@ -226,15 +227,15 @@ func main() {
 	authorProvider := material.NewAuthorProvider(dbPool)
 
 	// Material use cases
-	createMaterialUC := appMaterial.NewCreateMaterial(materialRepo, groupProvider, groupMemberProvider, authorProvider)
-	updateMaterialUC := appMaterial.NewUpdateMaterial(materialRepo, groupProvider, authorProvider)
-	getMaterialUC := appMaterial.NewGetMaterial(materialRepo, groupProvider, groupMemberProvider, authorProvider)
-	listMaterialsUC := appMaterial.NewListMaterials(materialRepo, groupProvider, groupMemberProvider, authorProvider)
-	publishMaterialUC := appMaterial.NewPublishMaterial(materialRepo, groupProvider, authorProvider)
-	unpublishMaterialUC := appMaterial.NewUnpublishMaterial(materialRepo, groupProvider, authorProvider)
-	pinMaterialUC := appMaterial.NewPinMaterial(materialRepo, groupProvider, groupMemberProvider, authorProvider)
-	unpinMaterialUC := appMaterial.NewUnpinMaterial(materialRepo, groupProvider, groupMemberProvider, authorProvider)
-	deleteMaterialUC := appMaterial.NewDeleteMaterial(materialRepo, groupProvider)
+	createMaterialUC := appMaterial.NewCreateMaterialUseCase(materialRepo, groupProvider, groupMemberProvider, authorProvider)
+	updateMaterialUC := appMaterial.NewUpdateMaterialUseCase(materialRepo, groupProvider, authorProvider)
+	getMaterialUC := appMaterial.NewGetMaterialUseCase(materialRepo, groupProvider, groupMemberProvider, authorProvider)
+	listMaterialsUC := appMaterial.NewListMaterialsUseCase(materialRepo, groupProvider, groupMemberProvider, authorProvider)
+	publishMaterialUC := appMaterial.NewPublishMaterialUseCase(materialRepo, groupProvider, authorProvider)
+	unpublishMaterialUC := appMaterial.NewUnpublishMaterialUseCase(materialRepo, groupProvider, authorProvider)
+	pinMaterialUC := appMaterial.NewPinMaterialUseCase(materialRepo, groupProvider, groupMemberProvider, authorProvider)
+	unpinMaterialUC := appMaterial.NewUnpinMaterialUseCase(materialRepo, groupProvider, groupMemberProvider, authorProvider)
+	deleteMaterialUC := appMaterial.NewDeleteMaterialUseCase(materialRepo, groupProvider)
 
 	materialHandler := handlerMaterial.NewHandler(
 		createMaterialUC, updateMaterialUC, getMaterialUC, listMaterialsUC,

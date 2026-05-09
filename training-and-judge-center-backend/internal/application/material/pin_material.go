@@ -21,20 +21,20 @@ type PinMaterialOutput struct {
 	Material MaterialData
 }
 
-type PinMaterial struct {
+type PinMaterialUseCase struct {
 	repo           domainMaterial.Repository
 	groupProvider  GroupProvider
 	memberProvider GroupMemberProvider
 	authorProvider AuthorProvider
 }
 
-func NewPinMaterial(
+func NewPinMaterialUseCase(
 	repo domainMaterial.Repository,
 	groupProvider GroupProvider,
 	memberProvider GroupMemberProvider,
 	authorProvider AuthorProvider,
-) *PinMaterial {
-	return &PinMaterial{
+) *PinMaterialUseCase {
+	return &PinMaterialUseCase{
 		repo:           repo,
 		groupProvider:  groupProvider,
 		memberProvider: memberProvider,
@@ -42,7 +42,7 @@ func NewPinMaterial(
 	}
 }
 
-func (uc *PinMaterial) Execute(ctx context.Context, in PinMaterialInput) (*PinMaterialOutput, error) {
+func (uc *PinMaterialUseCase) Execute(ctx context.Context, in PinMaterialInput) (*PinMaterialOutput, error) {
 	exists, err := uc.groupProvider.Exists(ctx, in.GroupID)
 	if err != nil {
 		slog.ErrorContext(ctx, "failed to check group existence", "error", err, "group_id", in.GroupID)

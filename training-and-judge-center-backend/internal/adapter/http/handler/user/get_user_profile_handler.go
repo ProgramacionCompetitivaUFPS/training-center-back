@@ -46,7 +46,7 @@ func (h *UserHandler) GetMyProfile(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	result, err := h.getUserProfile.GetMyProfile(r.Context(), claims.UserID)
+	result, err := h.getMyProfile.Execute(r.Context(), appuser.GetMyProfileInput{UserID: claims.UserID})
 	if err != nil {
 		handler.WriteError(w, err)
 		return
@@ -76,7 +76,11 @@ func (h *UserHandler) GetByNickname(w http.ResponseWriter, r *http.Request) {
 
 	nickname := chi.URLParam(r, "nickname")
 
-	result, err := h.getUserProfile.GetUserByNickname(r.Context(), claims.UserID, claims.Role, nickname)
+	result, err := h.getUserByNickname.Execute(r.Context(), appuser.GetUserByNicknameInput{
+		RequesterID:   claims.UserID,
+		RequesterRole: claims.Role,
+		Nickname:      nickname,
+	})
 	if err != nil {
 		handler.WriteError(w, err)
 		return

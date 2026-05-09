@@ -17,16 +17,16 @@ type DeleteMaterialInput struct {
 	MaterialID  string
 }
 
-type DeleteMaterial struct {
+type DeleteMaterialUseCase struct {
 	repo          domainMaterial.Repository
 	groupProvider GroupProvider
 }
 
-func NewDeleteMaterial(repo domainMaterial.Repository, groupProvider GroupProvider) *DeleteMaterial {
-	return &DeleteMaterial{repo: repo, groupProvider: groupProvider}
+func NewDeleteMaterialUseCase(repo domainMaterial.Repository, groupProvider GroupProvider) *DeleteMaterialUseCase {
+	return &DeleteMaterialUseCase{repo: repo, groupProvider: groupProvider}
 }
 
-func (uc *DeleteMaterial) Execute(ctx context.Context, in DeleteMaterialInput) error {
+func (uc *DeleteMaterialUseCase) Execute(ctx context.Context, in DeleteMaterialInput) error {
 	exists, err := uc.groupProvider.Exists(ctx, in.GroupID)
 	if err != nil {
 		slog.ErrorContext(ctx, "failed to check group existence", "error", err, "group_id", in.GroupID)
