@@ -74,14 +74,14 @@ func (h *UserHandler) ListUsers(w http.ResponseWriter, r *http.Request) {
 		Limit:       limit,
 	}
 
-	result, err := h.listUsers.Execute(r.Context(), input)
+	out, err := h.listUsers.Execute(r.Context(), input)
 	if err != nil {
 		handler.WriteError(w, err)
 		return
 	}
 
-	items := make([]listUserItem, 0, len(result.Users))
-	for _, u := range result.Users {
+	items := make([]listUserItem, 0, len(out.Users))
+	for _, u := range out.Users {
 		item := listUserItem{
 			ID:          u.ID,
 			Name:        u.Name,
@@ -108,17 +108,17 @@ func (h *UserHandler) ListUsers(w http.ResponseWriter, r *http.Request) {
 	}
 
 	totalPages := 1
-	if result.Limit > 0 && result.TotalCount > 0 {
-		totalPages = int(math.Ceil(float64(result.TotalCount) / float64(result.Limit)))
+	if out.Limit > 0 && out.TotalCount > 0 {
+		totalPages = int(math.Ceil(float64(out.TotalCount) / float64(out.Limit)))
 	}
 
 	handler.WriteJSON(w, http.StatusOK, listUsersResponse{
 		Users: items,
 		Pagination: paginationMeta{
-			TotalCount:   result.TotalCount,
-			CurrentPage:  result.Page,
+			TotalCount:   out.TotalCount,
+			CurrentPage:  out.Page,
 			TotalPages:   totalPages,
-			ItemsPerPage: result.Limit,
+			ItemsPerPage: out.Limit,
 		},
 	})
 }

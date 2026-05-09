@@ -61,7 +61,7 @@ func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
 
 	currentUser := shared.CurrentUser{ID: claims.UserID, Role: claims.Role}
 
-	result, ucErr := h.createGroup.Execute(r.Context(), appGroup.CreateGroupInput{
+	out, ucErr := h.createGroup.Execute(r.Context(), appGroup.CreateGroupInput{
 		Name:        body.Name,
 		Description: body.Description,
 		JoinMode:    body.JoinMode,
@@ -73,16 +73,15 @@ func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	g := result.Group
 	handler.WriteJSON(w, http.StatusCreated, groupResponse{
-		ID:          g.ID(),
-		Name:        g.Name().Value(),
-		Description: g.Description(),
-		JoinPolicy:  g.JoinPolicy().String(),
-		Visibility:  g.Visibility().String(),
-		IsDefault:   g.IsDefault(),
-		CreatedBy:   g.CreatedBy().Value(),
-		CreatedAt:   g.CreatedAt().Format("2006-01-02T15:04:05Z"),
-		UpdatedAt:   g.UpdatedAt().Format("2006-01-02T15:04:05Z"),
+		ID:          out.ID,
+		Name:        out.Name,
+		Description: out.Description,
+		JoinPolicy:  out.JoinPolicy,
+		Visibility:  out.Visibility,
+		IsDefault:   out.IsDefault,
+		CreatedBy:   out.CreatedBy,
+		CreatedAt:   out.CreatedAt.Format("2006-01-02T15:04:05Z"),
+		UpdatedAt:   out.UpdatedAt.Format("2006-01-02T15:04:05Z"),
 	})
 }

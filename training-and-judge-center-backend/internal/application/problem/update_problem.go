@@ -23,8 +23,8 @@ type UpdateProblemInput struct {
 	CurrentUser   appshared.CurrentUser
 }
 
-type UpdateProblemResult struct {
-	Problem *problem.Problem
+type UpdateProblemOutput struct {
+	Problem ProblemDTO
 }
 
 type UpdateProblemUseCase struct {
@@ -39,7 +39,7 @@ func NewUpdateProblemUseCase(repo problem.Repository, platformSettings problem.P
 	}
 }
 
-func (uc *UpdateProblemUseCase) Execute(ctx context.Context, input UpdateProblemInput) (*UpdateProblemResult, error) {
+func (uc *UpdateProblemUseCase) Execute(ctx context.Context, input UpdateProblemInput) (*UpdateProblemOutput, error) {
 	slug, err := problem.NewSlug(input.Slug)
 	if err != nil {
 		return nil, err
@@ -196,5 +196,5 @@ func (uc *UpdateProblemUseCase) Execute(ctx context.Context, input UpdateProblem
 		return nil, apperror.NewInternal()
 	}
 
-	return &UpdateProblemResult{Problem: p}, nil
+	return &UpdateProblemOutput{Problem: problemToDTO(p)}, nil
 }

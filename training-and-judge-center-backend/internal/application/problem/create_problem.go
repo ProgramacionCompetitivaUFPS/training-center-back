@@ -28,8 +28,8 @@ type CreateProblemInput struct {
 	CurrentUser   appshared.CurrentUser
 }
 
-type CreateProblemResult struct {
-	Problem *problem.Problem
+type CreateProblemOutput struct {
+	Problem ProblemDTO
 }
 
 type CreateProblemUseCase struct {
@@ -44,7 +44,7 @@ func NewCreateProblemUseCase(repo problem.Repository, platformSettings problem.P
 	}
 }
 
-func (usecase *CreateProblemUseCase) Execute(ctx context.Context, input CreateProblemInput) (*CreateProblemResult, error) {
+func (usecase *CreateProblemUseCase) Execute(ctx context.Context, input CreateProblemInput) (*CreateProblemOutput, error) {
 	if input.CurrentUser.Role != shared.RoleCoach && !input.CurrentUser.IsAdmin() {
 		return nil, apperror.NewForbidden(apperror.ErrCodeForbidden, "Only Coach and Admin users can create problems")
 	}
@@ -171,5 +171,5 @@ func (usecase *CreateProblemUseCase) Execute(ctx context.Context, input CreatePr
 		return nil, err
 	}
 
-	return &CreateProblemResult{Problem: newProblem}, nil
+	return &CreateProblemOutput{Problem: problemToDTO(newProblem)}, nil
 }

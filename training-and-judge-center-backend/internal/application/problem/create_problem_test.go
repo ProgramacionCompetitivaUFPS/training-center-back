@@ -24,14 +24,14 @@ func TestCreateProblem_Success_Coach(t *testing.T) {
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
-	if result.Problem.Slug().String() != testSlug {
-		t.Errorf("expected slug %q, got %q", testSlug, result.Problem.Slug().String())
+	if result.Problem.Slug != testSlug {
+		t.Errorf("expected slug %q, got %q", testSlug, result.Problem.Slug)
 	}
-	if result.Problem.Status().String() != "DRAFT" {
-		t.Errorf("expected DRAFT status, got %q", result.Problem.Status().String())
+	if result.Problem.Status != "DRAFT" {
+		t.Errorf("expected DRAFT status, got %q", result.Problem.Status)
 	}
-	if result.Problem.AuthorID().Value() != authorID {
-		t.Errorf("expected authorID %q, got %q", authorID, result.Problem.AuthorID().Value())
+	if result.Problem.AuthorID != authorID {
+		t.Errorf("expected authorID %q, got %q", authorID, result.Problem.AuthorID)
 	}
 }
 

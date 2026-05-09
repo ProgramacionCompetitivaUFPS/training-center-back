@@ -43,7 +43,7 @@ func (h *UserHandler) AdminUpdateUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	result, err := h.adminUpdateUser.Execute(r.Context(), appuser.AdminUpdateUserInput{
+	out, err := h.adminUpdateUser.Execute(r.Context(), appuser.AdminUpdateUserInput{
 		TargetID:    targetID,
 		Name:        req.Name,
 		Nickname:    req.Nickname,
@@ -59,19 +59,19 @@ func (h *UserHandler) AdminUpdateUser(w http.ResponseWriter, r *http.Request) {
 	}
 
 	resp := fullUserResponse{
-		Name:        result.Name,
-		Nickname:    result.Nickname,
-		Institution: result.Institution,
-		City:        result.City,
-		Country:     result.Country,
-		Role:        result.Role,
-		CreatedAt:   result.CreatedAt.Format("2006-01-02T15:04:05Z"),
+		Name:        out.User.Name,
+		Nickname:    out.User.Nickname,
+		Institution: out.User.Institution,
+		City:        out.User.City,
+		Country:     out.User.Country,
+		Role:        out.User.Role,
+		CreatedAt:   out.User.CreatedAt.Format("2006-01-02T15:04:05Z"),
 	}
-	if result.Email != nil {
-		resp.Email = *result.Email
+	if out.User.Email != nil {
+		resp.Email = *out.User.Email
 	}
-	if result.UpdatedAt != nil {
-		resp.UpdatedAt = result.UpdatedAt.Format("2006-01-02T15:04:05Z")
+	if out.User.UpdatedAt != nil {
+		resp.UpdatedAt = out.User.UpdatedAt.Format("2006-01-02T15:04:05Z")
 	}
 
 	handler.WriteJSON(w, http.StatusOK, resp)

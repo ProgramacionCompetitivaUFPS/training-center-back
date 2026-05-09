@@ -46,7 +46,7 @@ func (h *UserHandler) UpdateProfile(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	result, err := h.updateUser.Execute(r.Context(), appuser.UpdateUserInput{
+	out, err := h.updateUser.Execute(r.Context(), appuser.UpdateUserInput{
 		UserID:      claims.UserID,
 		Name:        req.Name,
 		Nickname:    req.Nickname,
@@ -60,19 +60,19 @@ func (h *UserHandler) UpdateProfile(w http.ResponseWriter, r *http.Request) {
 	}
 
 	resp := fullUserResponse{
-		Name:        result.Name,
-		Nickname:    result.Nickname,
-		Country:     result.Country,
-		City:        result.City,
-		Institution: result.Institution,
-		Role:        result.Role,
-		CreatedAt:   result.CreatedAt.Format("2006-01-02T15:04:05Z"),
+		Name:        out.User.Name,
+		Nickname:    out.User.Nickname,
+		Country:     out.User.Country,
+		City:        out.User.City,
+		Institution: out.User.Institution,
+		Role:        out.User.Role,
+		CreatedAt:   out.User.CreatedAt.Format("2006-01-02T15:04:05Z"),
 	}
-	if result.Email != nil {
-		resp.Email = *result.Email
+	if out.User.Email != nil {
+		resp.Email = *out.User.Email
 	}
-	if result.UpdatedAt != nil {
-		resp.UpdatedAt = result.UpdatedAt.Format("2006-01-02T15:04:05Z")
+	if out.User.UpdatedAt != nil {
+		resp.UpdatedAt = out.User.UpdatedAt.Format("2006-01-02T15:04:05Z")
 	}
 
 	handler.WriteJSON(w, http.StatusOK, resp)

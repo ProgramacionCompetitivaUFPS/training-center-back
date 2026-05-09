@@ -20,8 +20,16 @@ type CreateGroupInput struct {
 	CurrentUser appshared.CurrentUser
 }
 
-type CreateGroupResult struct {
-	Group *domainGroup.Group
+type CreateGroupOutput struct {
+	ID          string
+	Name        string
+	Description *string
+	JoinPolicy  string
+	Visibility  string
+	IsDefault   bool
+	CreatedBy   string
+	CreatedAt   time.Time
+	UpdatedAt   time.Time
 }
 
 type CreateGroupUseCase struct {
@@ -34,7 +42,7 @@ func NewCreateGroupUseCase(repo domainGroup.Repository, memberRepo domainGroup.M
 	return &CreateGroupUseCase{repo: repo, memberRepo: memberRepo, txManager: txManager}
 }
 
-func (uc *CreateGroupUseCase) Execute(ctx context.Context, input CreateGroupInput) (*CreateGroupResult, error) {
+func (uc *CreateGroupUseCase) Execute(ctx context.Context, input CreateGroupInput) (*CreateGroupOutput, error) {
 	if input.CurrentUser.Role != shared.RoleCoach && !input.CurrentUser.IsAdmin() {
 		return nil, apperror.NewForbidden(
 			ErrCodeInsufficientPermissions,
@@ -94,5 +102,15 @@ func (uc *CreateGroupUseCase) Execute(ctx context.Context, input CreateGroupInpu
 		return nil, err
 	}
 
-	return &CreateGroupResult{Group: g}, nil
+	return &CreateGroupOutput{
+		ID:          g.ID(),
+		Name:        g.Name().Value(),
+		Description: g.Description(),
+		JoinPolicy:  g.JoinPolicy().String(),
+		Visibility:  g.Visibility().String(),
+		IsDefault:   g.IsDefault(),
+		CreatedBy:   g.CreatedBy().Value(),
+		CreatedAt:   g.CreatedAt(),
+		UpdatedAt:   g.UpdatedAt(),
+	}, nil
 }

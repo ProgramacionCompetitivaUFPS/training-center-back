@@ -35,7 +35,7 @@ func (h *Handler) Unpublish(w http.ResponseWriter, r *http.Request) {
 	slug := r.PathValue("slug")
 	currentUser := shared.CurrentUser{ID: claims.UserID, Role: claims.Role}
 
-	p, err := h.unpublishUC.Execute(r.Context(), appProblem.UnpublishProblemInput{
+	out, err := h.unpublishUC.Execute(r.Context(), appProblem.UnpublishProblemInput{
 		Slug:        slug,
 		CurrentUser: currentUser,
 	})
@@ -45,8 +45,8 @@ func (h *Handler) Unpublish(w http.ResponseWriter, r *http.Request) {
 	}
 
 	handler.WriteJSON(w, http.StatusOK, unpublishResponse{
-		Slug:    p.Slug().String(),
-		Status:  p.Status().String(),
+		Slug:    out.Problem.Slug,
+		Status:  out.Problem.Status,
 		Message: "Problem unpublished successfully. You can now make changes.",
 	})
 }

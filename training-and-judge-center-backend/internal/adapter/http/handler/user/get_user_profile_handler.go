@@ -46,13 +46,13 @@ func (h *UserHandler) GetMyProfile(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	result, err := h.getMyProfile.Execute(r.Context(), appuser.GetMyProfileInput{UserID: claims.UserID})
+	out, err := h.getMyProfile.Execute(r.Context(), appuser.GetMyProfileInput{UserID: claims.UserID})
 	if err != nil {
 		handler.WriteError(w, err)
 		return
 	}
 
-	handler.WriteJSON(w, http.StatusOK, buildFullResponse(result))
+	handler.WriteJSON(w, http.StatusOK, buildFullResponse(out))
 }
 
 // @Summary      Get user by nickname
@@ -76,7 +76,7 @@ func (h *UserHandler) GetByNickname(w http.ResponseWriter, r *http.Request) {
 
 	nickname := chi.URLParam(r, "nickname")
 
-	result, err := h.getUserByNickname.Execute(r.Context(), appuser.GetUserByNicknameInput{
+	out, err := h.getUserByNickname.Execute(r.Context(), appuser.GetUserByNicknameInput{
 		RequesterID:   claims.UserID,
 		RequesterRole: claims.Role,
 		Nickname:      nickname,
@@ -86,34 +86,34 @@ func (h *UserHandler) GetByNickname(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if result.IsFullProfile {
-		handler.WriteJSON(w, http.StatusOK, buildFullResponse(result))
+	if out.IsFullProfile {
+		handler.WriteJSON(w, http.StatusOK, buildFullResponse(out))
 	} else {
 		handler.WriteJSON(w, http.StatusOK, publicUserResponse{
-			Name:        result.User.Name,
-			Nickname:    result.User.Nickname,
-			Institution: result.User.Institution,
-			Role:        result.User.Role,
-			CreatedAt:   result.User.CreatedAt.Format("2006-01-02T15:04:05Z"),
+			Name:        out.User.Name,
+			Nickname:    out.User.Nickname,
+			Institution: out.User.Institution,
+			Role:        out.User.Role,
+			CreatedAt:   out.User.CreatedAt.Format("2006-01-02T15:04:05Z"),
 		})
 	}
 }
 
-func buildFullResponse(result *appuser.UserProfileOutput) fullUserResponse {
+func buildFullResponse(out *appuser.UserProfileOutput) fullUserResponse {
 	resp := fullUserResponse{
-		Name:        result.User.Name,
-		Nickname:    result.User.Nickname,
-		Country:     result.User.Country,
-		City:        result.User.City,
-		Institution: result.User.Institution,
-		Role:        result.User.Role,
-		CreatedAt:   result.User.CreatedAt.Format("2006-01-02T15:04:05Z"),
+		Name:        out.User.Name,
+		Nickname:    out.User.Nickname,
+		Country:     out.User.Country,
+		City:        out.User.City,
+		Institution: out.User.Institution,
+		Role:        out.User.Role,
+		CreatedAt:   out.User.CreatedAt.Format("2006-01-02T15:04:05Z"),
 	}
-	if result.User.Email != nil {
-		resp.Email = *result.User.Email
+	if out.User.Email != nil {
+		resp.Email = *out.User.Email
 	}
-	if result.User.UpdatedAt != nil {
-		resp.UpdatedAt = result.User.UpdatedAt.Format("2006-01-02T15:04:05Z")
+	if out.User.UpdatedAt != nil {
+		resp.UpdatedAt = out.User.UpdatedAt.Format("2006-01-02T15:04:05Z")
 	}
 	return resp
 }

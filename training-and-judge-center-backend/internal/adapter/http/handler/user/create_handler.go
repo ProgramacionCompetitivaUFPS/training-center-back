@@ -48,7 +48,7 @@ func (h *UserHandler) Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	result, err := h.createUser.Execute(r.Context(), appuser.CreateUserInput{
+	out, err := h.createUser.Execute(r.Context(), appuser.CreateUserInput{
 		Email:       req.Email,
 		Password:    req.Password,
 		Name:        req.Name,
@@ -63,17 +63,17 @@ func (h *UserHandler) Create(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var emailStr string
-	if result.Email != nil {
-		emailStr = *result.Email
+	if out.User.Email != nil {
+		emailStr = *out.User.Email
 	}
 	handler.WriteJSON(w, http.StatusCreated, createUserResponse{
 		Email:       emailStr,
-		Name:        result.Name,
-		Nickname:    result.Nickname,
-		Country:     result.Country,
-		City:        result.City,
-		Institution: result.Institution,
-		Role:        result.Role,
-		CreatedAt:   result.CreatedAt.Format("2006-01-02T15:04:05Z"),
+		Name:        out.User.Name,
+		Nickname:    out.User.Nickname,
+		Country:     out.User.Country,
+		City:        out.User.City,
+		Institution: out.User.Institution,
+		Role:        out.User.Role,
+		CreatedAt:   out.User.CreatedAt.Format("2006-01-02T15:04:05Z"),
 	})
 }

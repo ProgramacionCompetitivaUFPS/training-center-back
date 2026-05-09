@@ -691,6 +691,8 @@ Execute(ctx context.Context, in XxxInput) error
 
 **Naming:** `<Operation>Input` / `<Operation>Output` — simétrico y sin carga semántica extra. `Result` (patrón de programación funcional) y `Response` (vocabulario HTTP) están prohibidos.
 
+**Variable local en handlers:** el retorno de `Execute` se asigna siempre a `out` — nunca `result`, `res`, ni `data`.
+
 **Cuatro patrones a eliminar:**
 
 | Patrón actual | Problema | Corrección |
@@ -1505,6 +1507,26 @@ func newHandlerWithUpdatePassword(uc *appuser.UpdatePasswordUseCase) *Handler {
 **Naming:** `mock*` sin prefijos adicionales — igual que A9. No `mockHandler*`, no `stub*`.
 
 **Qué verifican los tests:** el contrato HTTP (status codes, forma del response body) y comportamientos de negocio observables a través de HTTP. No re-testean lógica que ya cubre el test del use case.
+
+---
+
+### Ad12 — Timestamps en responses: `.UTC().Format(time.RFC3339)`
+
+Todo campo `time.Time` serializado a JSON en un handler se formatea así:
+
+```go
+// ✅
+CreatedAt: out.CreatedAt.UTC().Format(time.RFC3339)
+
+// ❌
+CreatedAt: out.CreatedAt.Format("2006-01-02T15:04:05Z")
+```
+
+**Por qué no el literal `"2006-01-02T15:04:05Z"`:** la `Z` al final no es un verbo de formato de Go — es un carácter literal. El resultado siempre tiene `Z` sin importar la timezone real del valor, lo que miente al cliente si el timestamp no es UTC.
+
+**Por qué `.UTC()` explícito:** los timestamps vienen de la base de datos con timezone ya en UTC, pero la conversión explícita es la garantía correcta — no un supuesto implícito sobre el origen del valor.
+
+`time.RFC3339` equivale a `"2006-01-02T15:04:05Z07:00"`, que es el verbo correcto: si el valor está en UTC emite `Z`, si tiene offset lo emite como `+05:00`.
 
 ---
 

@@ -12,15 +12,15 @@ func TestUnpublishProblem_Success_Author(t *testing.T) {
 	repo := repoWith(newPublishedProblem())
 	uc := NewUnpublishProblemUseCase(repo)
 
-	p, err := uc.Execute(context.Background(), UnpublishProblemInput{
+	out, err := uc.Execute(context.Background(), UnpublishProblemInput{
 		Slug:        testSlug,
 		CurrentUser: asCoach(authorID),
 	})
 	if err != nil {
 		t.Fatalf("author should unpublish own problem, got: %v", err)
 	}
-	if p.Status().String() != "DRAFT" {
-		t.Errorf("expected DRAFT after unpublish, got %q", p.Status().String())
+	if out.Problem.Status != "DRAFT" {
+		t.Errorf("expected DRAFT after unpublish, got %q", out.Problem.Status)
 	}
 }
 
