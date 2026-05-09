@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/training-judge-center/backend/internal/application/shared"
+	appshared "github.com/training-judge-center/backend/internal/application/shared"
 	domainShared "github.com/training-judge-center/backend/internal/domain/shared"
 	domain "github.com/training-judge-center/backend/internal/domain/user"
 	"github.com/training-judge-center/backend/pkg/apperror"
@@ -47,7 +47,7 @@ func TestConfirmEmailChange_Success(t *testing.T) {
 
 	emailsSent := 0
 	mockEmailSender := &mockEmailSender{
-		sendFn: func(ctx context.Context, msg shared.EmailMessage) error {
+		sendFn: func(ctx context.Context, msg appshared.EmailMessage) error {
 			emailsSent++
 			return nil
 		},

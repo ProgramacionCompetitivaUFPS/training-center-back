@@ -7,14 +7,14 @@ import (
 
 	"github.com/google/uuid"
 	domainGroup "github.com/training-judge-center/backend/internal/domain/group"
-	"github.com/training-judge-center/backend/internal/application/shared"
+	appshared "github.com/training-judge-center/backend/internal/application/shared"
 	"github.com/training-judge-center/backend/pkg/apperror"
 )
 
 type ApproveRequestInput struct {
 	GroupID     string
 	RequestID   string
-	CurrentUser shared.CurrentUser
+	CurrentUser appshared.CurrentUser
 }
 
 type ApproveRequestOutput struct {
@@ -24,13 +24,13 @@ type ApproveRequestOutput struct {
 type ApproveRequestUseCase struct {
 	memberRepo      domainGroup.MemberRepository
 	joinRequestRepo domainGroup.JoinRequestRepository
-	txManager       TransactionManager
+	txManager       appshared.TransactionManager
 }
 
 func NewApproveRequestUseCase(
 	memberRepo domainGroup.MemberRepository,
 	joinRequestRepo domainGroup.JoinRequestRepository,
-	txManager TransactionManager,
+	txManager appshared.TransactionManager,
 ) *ApproveRequestUseCase {
 	return &ApproveRequestUseCase{memberRepo: memberRepo, joinRequestRepo: joinRequestRepo, txManager: txManager}
 }

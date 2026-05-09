@@ -5,12 +5,12 @@ import (
 	"log/slog"
 
 	domainMaterial "github.com/training-judge-center/backend/internal/domain/material"
-	"github.com/training-judge-center/backend/internal/application/shared"
+	appshared "github.com/training-judge-center/backend/internal/application/shared"
 	"github.com/training-judge-center/backend/pkg/apperror"
 )
 
 type GetMaterialInput struct {
-	CurrentUser shared.CurrentUser
+	CurrentUser appshared.CurrentUser
 	GroupID     string
 	MaterialID  string
 }
@@ -84,7 +84,7 @@ func (uc *GetMaterialUseCase) Execute(ctx context.Context, in GetMaterialInput) 
 	return &GetMaterialOutput{Material: data}, nil
 }
 
-func checkGroupAccess(ctx context.Context, mp GroupMemberProvider, user shared.CurrentUser, groupID string, visibility GroupVisibility) error {
+func checkGroupAccess(ctx context.Context, mp GroupMemberProvider, user appshared.CurrentUser, groupID string, visibility GroupVisibility) error {
 	if visibility == GroupVisibilityVisible || user.IsAdmin() {
 		return nil
 	}

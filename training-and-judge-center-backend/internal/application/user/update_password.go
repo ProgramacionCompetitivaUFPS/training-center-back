@@ -6,7 +6,7 @@ import (
 	"log/slog"
 	"time"
 
-	"github.com/training-judge-center/backend/internal/application/shared"
+	appshared "github.com/training-judge-center/backend/internal/application/shared"
 	"github.com/training-judge-center/backend/internal/domain/user"
 	"github.com/training-judge-center/backend/pkg/apperror"
 )
@@ -24,12 +24,12 @@ type UpdatePasswordInput struct {
 
 type UpdatePasswordUseCase struct {
 	repo               user.Repository
-	emailSender        shared.EmailSender
+	emailSender        appshared.EmailSender
 	sessionInvalidator user.SessionInvalidator
-	rateLimiter        shared.RateLimiter
+	rateLimiter        appshared.RateLimiter
 }
 
-func NewUpdatePasswordUseCase(repo user.Repository, email shared.EmailSender, sessionInvalidator user.SessionInvalidator, rateLimiter shared.RateLimiter) *UpdatePasswordUseCase {
+func NewUpdatePasswordUseCase(repo user.Repository, email appshared.EmailSender, sessionInvalidator user.SessionInvalidator, rateLimiter appshared.RateLimiter) *UpdatePasswordUseCase {
 	return &UpdatePasswordUseCase{
 		repo:               repo,
 		emailSender:        email,
@@ -99,7 +99,7 @@ func (uc *UpdatePasswordUseCase) Execute(ctx context.Context, input UpdatePasswo
 		return ErrSessionsNotInvalidated
 	}
 
-	if err := uc.emailSender.Send(ctx, shared.EmailMessage{
+	if err := uc.emailSender.Send(ctx, appshared.EmailMessage{
 		To:      foundUser.Email().String(),
 		Subject: "Security Alert: Password Changed",
 		Body:    "Your password has been changed successfully. If you did not make this change, please contact support immediately.",

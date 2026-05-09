@@ -6,7 +6,7 @@ import (
 	"log/slog"
 	"time"
 
-	"github.com/training-judge-center/backend/internal/application/shared"
+	appshared "github.com/training-judge-center/backend/internal/application/shared"
 	"github.com/training-judge-center/backend/internal/domain/user"
 	"github.com/training-judge-center/backend/pkg/apperror"
 )
@@ -19,15 +19,15 @@ type ConfirmEmailChangeInput struct {
 type ConfirmEmailChangeUseCase struct {
 	userRepo        user.Repository
 	emailChangeRepo user.EmailChangeRepository
-	emailSender     shared.EmailSender
-	txManager       TransactionManager
+	emailSender     appshared.EmailSender
+	txManager       appshared.TransactionManager
 }
 
 func NewConfirmEmailChangeUseCase(
 	userRepo user.Repository,
 	emailChangeRepo user.EmailChangeRepository,
-	emailSender shared.EmailSender,
-	txManager TransactionManager,
+	emailSender appshared.EmailSender,
+	txManager appshared.TransactionManager,
 ) *ConfirmEmailChangeUseCase {
 	return &ConfirmEmailChangeUseCase{
 		userRepo:        userRepo,
@@ -85,7 +85,7 @@ func (uc *ConfirmEmailChangeUseCase) Execute(ctx context.Context, input ConfirmE
 		return nil, err
 	}
 
-	if err := uc.emailSender.Send(ctx, shared.EmailMessage{
+	if err := uc.emailSender.Send(ctx, appshared.EmailMessage{
 		To:      oldEmail,
 		Subject: "Security Alert: Your Email Was Changed",
 		Body:    "Your account email has been successfully changed to a new one. If you did not make this change, please contact support immediately.",
@@ -93,7 +93,7 @@ func (uc *ConfirmEmailChangeUseCase) Execute(ctx context.Context, input ConfirmE
 		slog.Error("failed to send security alert to old email", "email", oldEmail, "error", err)
 	}
 	
-	if err := uc.emailSender.Send(ctx, shared.EmailMessage{
+	if err := uc.emailSender.Send(ctx, appshared.EmailMessage{
 		To:      req.NewEmail().String(),
 		Subject: "Email successfully updated",
 		Body:    fmt.Sprintf("Hello %s, your email address has been successfully verified and updated on our platform.", u.Name()),

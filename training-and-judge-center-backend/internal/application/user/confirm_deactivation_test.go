@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/training-judge-center/backend/internal/application/shared"
+	appshared "github.com/training-judge-center/backend/internal/application/shared"
 	domainShared "github.com/training-judge-center/backend/internal/domain/shared"
 	domain "github.com/training-judge-center/backend/internal/domain/user"
 	"github.com/training-judge-center/backend/pkg/apperror"
@@ -76,7 +76,7 @@ func TestConfirmDeactivation_Success(t *testing.T) {
 	
 	emailSent := false
 	mockEmail := &mockEmailSender{
-		sendFn: func(ctx context.Context, msg shared.EmailMessage) error {
+		sendFn: func(ctx context.Context, msg appshared.EmailMessage) error {
 			emailSent = true
 			return nil
 		},
@@ -277,7 +277,7 @@ func TestConfirmDeactivation_EmailSendFails_ReturnsNil(t *testing.T) {
 	}
 
 	emailSender := &mockEmailSender{
-		sendFn: func(ctx context.Context, msg shared.EmailMessage) error {
+		sendFn: func(ctx context.Context, msg appshared.EmailMessage) error {
 			return errors.New("smtp timeout")
 		},
 	}
