@@ -27,9 +27,9 @@ type ListGroupsInput struct {
 }
 
 type ListedGroup struct {
-	Group       *domainGroup.Group
+	Group       GroupDTO
 	MemberCount int
-	UserRole    domainGroup.MemberRole // empty string = not a member
+	UserRole    string // empty string = not a member
 }
 
 type ListGroupsOutput struct {
@@ -115,12 +115,12 @@ func (uc *ListGroupsUseCase) Execute(ctx context.Context, in ListGroupsInput) (*
 	items := make([]ListedGroup, 0, len(groups))
 	for _, g := range groups {
 		s := stats[g.ID()]
-		var role domainGroup.MemberRole
+		var role string
 		if s.IsMember {
-			role = s.Role
+			role = s.Role.String()
 		}
 		items = append(items, ListedGroup{
-			Group:       g,
+			Group:       groupToDTO(g),
 			MemberCount: s.Count,
 			UserRole:    role,
 		})

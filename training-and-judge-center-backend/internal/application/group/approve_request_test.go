@@ -55,8 +55,8 @@ func TestApproveRequest_AdminCanApproveWithoutMembership(t *testing.T) {
 	if err != nil {
 		t.Fatalf("admin should be able to approve, got: %v", err)
 	}
-	if out.Request.Status() != domainGroup.JoinRequestStatusApproved {
-		t.Errorf("expected APPROVED, got %s", out.Request.Status())
+	if out.Request.Status != domainGroup.JoinRequestStatusApproved.String() {
+		t.Errorf("expected APPROVED, got %s", out.Request.Status)
 	}
 }
 
@@ -121,8 +121,8 @@ func TestApproveRequest_SuccessCreatesMembership(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if out.Request.Status() != domainGroup.JoinRequestStatusApproved {
-		t.Errorf("expected APPROVED status, got %s", out.Request.Status())
+	if out.Request.Status != domainGroup.JoinRequestStatusApproved.String() {
+		t.Errorf("expected APPROVED status, got %s", out.Request.Status)
 	}
 	if memberRepo.savedMember == nil {
 		t.Error("expected a GroupMember to be saved, but none was")

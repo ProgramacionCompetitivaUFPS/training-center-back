@@ -43,7 +43,7 @@ func TestResetPassword_Success(t *testing.T) {
 
 	uc := NewResetPasswordUseCase(userRepo, recoveryRepo, invalidator, &mockTransactionManager{})
 
-	err := uc.Execute(context.Background(), ResetPasswordInput{
+	_, err := uc.Execute(context.Background(), ResetPasswordInput{
 		Email:       "user-1@example.com",
 		Code:        "123456",
 		NewPassword: "NewSecret123!",
@@ -72,7 +72,7 @@ func TestResetPassword_InvalidCode(t *testing.T) {
 
 	uc := NewResetPasswordUseCase(userRepo, recoveryRepo, &mockSessionInvalidator{}, &mockTransactionManager{})
 
-	err := uc.Execute(context.Background(), ResetPasswordInput{
+	_, err := uc.Execute(context.Background(), ResetPasswordInput{
 		Email:       "user-1@example.com",
 		Code:        "123456",
 		NewPassword: "NewSecret123!",
@@ -101,7 +101,7 @@ func TestResetPassword_NoPendingRequest(t *testing.T) {
 	}
 
 	uc := NewResetPasswordUseCase(userRepo, recoveryRepo, &mockSessionInvalidator{}, &mockTransactionManager{})
-	err := uc.Execute(context.Background(), ResetPasswordInput{
+	_, err := uc.Execute(context.Background(), ResetPasswordInput{
 		Email:       "user-1@example.com",
 		Code:        "123456",
 		NewPassword: "NewSecret123!",
@@ -132,7 +132,7 @@ func TestResetPassword_ExpiredRequest(t *testing.T) {
 
 	uc := NewResetPasswordUseCase(userRepo, recoveryRepo, &mockSessionInvalidator{}, &mockTransactionManager{})
 
-	err := uc.Execute(context.Background(), ResetPasswordInput{
+	_, err := uc.Execute(context.Background(), ResetPasswordInput{
 		Email:       "user-1@example.com",
 		Code:        "123456",
 		NewPassword: "NewSecret123!",
@@ -179,7 +179,7 @@ func TestResetPassword_WeakPassword(t *testing.T) {
 		},
 	)
 
-	err := uc.Execute(context.Background(), ResetPasswordInput{
+	_, err := uc.Execute(context.Background(), ResetPasswordInput{
 		Email:       "user-1@example.com",
 		Code:        "123456",
 		NewPassword: "weak",
@@ -208,7 +208,7 @@ func TestResetPassword_UserNotFound(t *testing.T) {
 
 	uc := NewResetPasswordUseCase(userRepo, &mockPasswordRecoveryRepo{}, &mockSessionInvalidator{}, &mockTransactionManager{})
 
-	err := uc.Execute(context.Background(), ResetPasswordInput{
+	_, err := uc.Execute(context.Background(), ResetPasswordInput{
 		Email:       "ghost@example.com",
 		Code:        "123456",
 		NewPassword: "NewSecret123!",
@@ -243,7 +243,7 @@ func TestResetPassword_TxFailure(t *testing.T) {
 	}
 
 	uc := NewResetPasswordUseCase(userRepo, recoveryRepo, &mockSessionInvalidator{}, tx)
-	err := uc.Execute(context.Background(), ResetPasswordInput{
+	_, err := uc.Execute(context.Background(), ResetPasswordInput{
 		Email:       "user-1@example.com",
 		Code:        "123456",
 		NewPassword: "NewSecret123!",
@@ -279,16 +279,16 @@ func TestResetPassword_SessionInvalidationFailure(t *testing.T) {
 	}
 
 	uc := NewResetPasswordUseCase(userRepo, recoveryRepo, invalidator, &mockTransactionManager{})
-	err := uc.Execute(context.Background(), ResetPasswordInput{
+	out, err := uc.Execute(context.Background(), ResetPasswordInput{
 		Email:       "user-1@example.com",
 		Code:        "123456",
 		NewPassword: "NewSecret123!",
 	})
 
-	if err == nil {
-		t.Fatal("expected error, got nil")
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
 	}
-	if err != ErrSessionsNotInvalidated {
-		t.Errorf("expected ErrSessionsNotInvalidated, got %v", err)
+	if out.SessionsInvalidated {
+		t.Fatal("expected sessions not to be invalidated")
 	}
 }

@@ -2,7 +2,6 @@ package user
 
 import (
 	"encoding/json"
-	"errors"
 	"net/http"
 
 	"github.com/training-judge-center/backend/internal/adapter/http/handler"
@@ -95,13 +94,13 @@ func (h *UserHandler) ConfirmDeactivation(w http.ResponseWriter, r *http.Request
 		UserAgent: &userAgent,
 	}
 
-	err := h.confirmDeactivation.Execute(ctx, input)
-	if err != nil && !errors.Is(err, appuser.ErrSessionsNotInvalidated) {
+	out, err := h.confirmDeactivation.Execute(ctx, input)
+	if err != nil {
 		handler.WriteError(w, err)
 		return
 	}
 
-	if errors.Is(err, appuser.ErrSessionsNotInvalidated) {
+	if !out.SessionsInvalidated {
 		handler.WriteJSON(w, http.StatusOK, map[string]string{
 			"code":    "SESSIONS_NOT_INVALIDATED",
 			"message": "Your account has been deactivated. We couldn't immediately close all active sessions — they will expire naturally.",

@@ -31,12 +31,12 @@ type GroupStatistics struct {
 // UserMembership describes the caller's relationship with a group.
 // Role and JoinedAt are non-nil if and only if the caller is a member.
 type UserMembership struct {
-	Role     *domainGroup.MemberRole
+	Role     *string
 	JoinedAt *time.Time
 }
 
 type GetGroupOutput struct {
-	Group      *domainGroup.Group
+	Group      GroupDTO
 	Statistics GroupStatistics
 	Leads      []LeadDisplay
 	Membership UserMembership
@@ -120,14 +120,14 @@ func (uc *GetGroupUseCase) Execute(ctx context.Context, in GetGroupInput) (*GetG
 
 	var um UserMembership
 	if membership != nil {
-		r := membership.Role()
-		um.Role = &r
+		s := membership.Role().String()
+		um.Role = &s
 		ja := membership.JoinedAt()
 		um.JoinedAt = &ja
 	}
 
 	return &GetGroupOutput{
-		Group:      g,
+		Group:      groupToDTO(g),
 		Statistics: GroupStatistics{MemberCount: memberCount, LeadCount: leadCount},
 		Leads:      leads,
 		Membership: um,

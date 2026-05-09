@@ -22,7 +22,7 @@ func TestUpdatePassword_Success(t *testing.T) {
 	}
 	uc := NewUpdatePasswordUseCase(repo, &mockEmailSender{}, &mockSessionInvalidator{}, &mockRateLimiter{})
 
-	err := uc.Execute(context.Background(), UpdatePasswordInput{
+	_, err := uc.Execute(context.Background(), UpdatePasswordInput{
 		UserID:          "user-1",
 		CurrentPassword: "Secret1!",
 		NewPassword:     "NewSecret2@",
@@ -45,7 +45,7 @@ func TestUpdatePassword_UserNotFound(t *testing.T) {
 	repo := newNoConflictRepo()
 	uc := NewUpdatePasswordUseCase(repo, &mockEmailSender{}, &mockSessionInvalidator{}, &mockRateLimiter{})
 
-	err := uc.Execute(context.Background(), UpdatePasswordInput{
+	_, err := uc.Execute(context.Background(), UpdatePasswordInput{
 		UserID:          "nonexistent",
 		CurrentPassword: "Secret1!",
 		NewPassword:     "NewSecret2@",
@@ -74,7 +74,7 @@ func TestUpdatePassword_WrongCurrentPassword(t *testing.T) {
 	}
 	uc := NewUpdatePasswordUseCase(repo, &mockEmailSender{}, &mockSessionInvalidator{}, &mockRateLimiter{})
 
-	err := uc.Execute(context.Background(), UpdatePasswordInput{
+	_, err := uc.Execute(context.Background(), UpdatePasswordInput{
 		UserID:          "user-1",
 		CurrentPassword: "WrongPassword1!",
 		NewPassword:     "NewSecret2@",
@@ -106,7 +106,7 @@ func TestUpdatePassword_WeakNewPassword(t *testing.T) {
 	}
 	uc := NewUpdatePasswordUseCase(repo, &mockEmailSender{}, &mockSessionInvalidator{}, &mockRateLimiter{})
 
-	err := uc.Execute(context.Background(), UpdatePasswordInput{
+	_, err := uc.Execute(context.Background(), UpdatePasswordInput{
 		UserID:          "user-1",
 		CurrentPassword: "Secret1!",
 		NewPassword:     "short",
@@ -135,7 +135,7 @@ func TestUpdatePassword_SamePassword(t *testing.T) {
 	}
 	uc := NewUpdatePasswordUseCase(repo, &mockEmailSender{}, &mockSessionInvalidator{}, &mockRateLimiter{})
 
-	err := uc.Execute(context.Background(), UpdatePasswordInput{
+	_, err := uc.Execute(context.Background(), UpdatePasswordInput{
 		UserID:          "user-1",
 		CurrentPassword: "Secret1!",
 		NewPassword:     "Secret1!",
@@ -163,7 +163,7 @@ func TestUpdatePassword_RepositoryFindError(t *testing.T) {
 	}
 	uc := NewUpdatePasswordUseCase(repo, &mockEmailSender{}, &mockSessionInvalidator{}, &mockRateLimiter{})
 
-	err := uc.Execute(context.Background(), UpdatePasswordInput{
+	_, err := uc.Execute(context.Background(), UpdatePasswordInput{
 		UserID:          "user-1",
 		CurrentPassword: "Secret1!",
 		NewPassword:     "NewSecret2@",
@@ -192,7 +192,7 @@ func TestUpdatePassword_RepositoryUpdateError(t *testing.T) {
 	}
 	uc := NewUpdatePasswordUseCase(repo, &mockEmailSender{}, &mockSessionInvalidator{}, &mockRateLimiter{})
 
-	err := uc.Execute(context.Background(), UpdatePasswordInput{
+	_, err := uc.Execute(context.Background(), UpdatePasswordInput{
 		UserID:          "user-1",
 		CurrentPassword: "Secret1!",
 		NewPassword:     "NewSecret2@",
@@ -223,14 +223,17 @@ func TestUpdatePassword_SessionInvalidationFails_PasswordAlreadyChanged(t *testi
 	}
 	uc := NewUpdatePasswordUseCase(repo, &mockEmailSender{}, inv, &mockRateLimiter{})
 
-	err := uc.Execute(context.Background(), UpdatePasswordInput{
+	out, err := uc.Execute(context.Background(), UpdatePasswordInput{
 		UserID:          "user-1",
 		CurrentPassword: "Secret1!",
 		NewPassword:     "NewSecret2@",
 	})
 
-	if !errors.Is(err, ErrSessionsNotInvalidated) {
-		t.Fatalf("expected ErrSessionsNotInvalidated, got %v", err)
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+	if out.SessionsInvalidated {
+		t.Fatal("expected sessions not to be invalidated")
 	}
 
 	// Password must have been persisted despite the session invalidation failure.

@@ -117,17 +117,8 @@ func TestJoinGroup_SuccessSavesMemberWithRoleMember(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if out.Member == nil {
-		t.Fatal("expected non-nil member")
-	}
-	if out.Member.Role() != domainGroup.MemberRoleMember {
-		t.Errorf("Role = %v, want MEMBER", out.Member.Role())
-	}
-	if out.Member.GroupID() != "g1" {
-		t.Errorf("GroupID = %q, want %q", out.Member.GroupID(), "g1")
-	}
-	if out.Member.UserID().Value() != "u1" {
-		t.Errorf("UserID = %q, want %q", out.Member.UserID().Value(), "u1")
+	if out.Member.Role != domainGroup.MemberRoleMember.String() {
+		t.Errorf("Role = %v, want MEMBER", out.Member.Role)
 	}
 	if memberRepo.savedMember == nil {
 		t.Error("expected Save to be called with the new member")

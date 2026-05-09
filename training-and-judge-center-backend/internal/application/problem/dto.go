@@ -11,6 +11,12 @@ type ModifierDisplay struct {
 	Name     string
 }
 
+type LanguageOverrideInput struct {
+	Language    string
+	TimeLimit   *int
+	MemoryLimit *int
+}
+
 type LangOverrideDTO struct {
 	Language    string
 	TimeLimit   *int

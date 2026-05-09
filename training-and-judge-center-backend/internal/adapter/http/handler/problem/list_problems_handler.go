@@ -79,14 +79,14 @@ func (h *Handler) ListProblems(w http.ResponseWriter, r *http.Request) {
 	for _, s := range out.Problems {
 		p := s.Problem
 		items = append(items, problemListItemResp{
-			Slug:          p.Slug().String(),
-			Title:         p.Title().String(),
-			Tags:          p.Tags().Values(),
-			Status:        p.Status().String(),
-			Accessibility: p.Accessibility().String(),
+			Slug:          p.Slug,
+			Title:         p.Title,
+			Tags:          p.Tags,
+			Status:        p.Status,
+			Accessibility: p.Accessibility,
 			Author:        authorResp{Nickname: s.Author.Nickname, Name: s.Author.Name},
-			CreatedAt:     p.CreatedAt().Format("2006-01-02T15:04:05Z"),
-			UpdatedAt:     p.UpdatedAt().Format("2006-01-02T15:04:05Z"),
+			CreatedAt:     p.CreatedAt.Format("2006-01-02T15:04:05Z"),
+			UpdatedAt:     p.UpdatedAt.Format("2006-01-02T15:04:05Z"),
 		})
 	}
 

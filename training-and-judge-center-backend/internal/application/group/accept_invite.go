@@ -17,7 +17,7 @@ type AcceptInviteInput struct {
 }
 
 type AcceptInviteOutput struct {
-	Member *domainGroup.GroupMember
+	Member MemberDTO
 }
 
 type AcceptInviteUseCase struct {
@@ -79,5 +79,5 @@ func (uc *AcceptInviteUseCase) Execute(ctx context.Context, input AcceptInviteIn
 		return nil, err
 	}
 
-	return &AcceptInviteOutput{Member: member}, nil
+	return &AcceptInviteOutput{Member: memberToDTO(member)}, nil
 }

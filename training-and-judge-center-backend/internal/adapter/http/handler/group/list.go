@@ -53,15 +53,15 @@ func (h *Handler) ListGroups(w http.ResponseWriter, r *http.Request) {
 	for _, lg := range out.Groups {
 		g := lg.Group
 		items = append(items, groupListItemResp{
-			ID:          g.ID(),
-			Name:        g.Name().String(),
-			Description: g.Description(),
-			Visibility:  g.Visibility().String(),
-			JoinPolicy:  g.JoinPolicy().String(),
-			IsGlobal:    g.IsDefault(),
+			ID:          g.ID,
+			Name:        g.Name,
+			Description: g.Description,
+			Visibility:  g.Visibility,
+			JoinPolicy:  g.JoinPolicy,
+			IsGlobal:    g.IsDefault,
 			MemberCount: lg.MemberCount,
-			UserRole:    memberRoleValueToStringPtr(lg.UserRole),
-			CreatedAt:   g.CreatedAt().Format(timeutil.RFC3339UTC),
+			UserRole:    stringPtrOrNil(lg.UserRole),
+			CreatedAt:   g.CreatedAt.Format(timeutil.RFC3339UTC),
 		})
 	}
 

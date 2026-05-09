@@ -7,7 +7,6 @@ import (
 
 	"github.com/training-judge-center/backend/internal/adapter/http/handler"
 	appGroup "github.com/training-judge-center/backend/internal/application/group"
-	domainGroup "github.com/training-judge-center/backend/internal/domain/group"
 	"github.com/training-judge-center/backend/pkg/apperror"
 )
 
@@ -48,18 +47,3 @@ func writeBadPagination(w http.ResponseWriter, field, msg string) {
 	})
 }
 
-func memberRoleToStringPtr(r *domainGroup.MemberRole) *string {
-	if r == nil {
-		return nil
-	}
-	s := r.String()
-	return &s
-}
-
-func memberRoleValueToStringPtr(r domainGroup.MemberRole) *string {
-	if r == (domainGroup.MemberRole{}) {
-		return nil
-	}
-	s := r.String()
-	return &s
-}

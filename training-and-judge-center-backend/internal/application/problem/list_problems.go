@@ -24,7 +24,7 @@ type ListProblemsInput struct {
 }
 
 type ProblemSummary struct {
-	Problem *problem.Problem
+	Problem ProblemDTO
 	Author  ModifierDisplay
 }
 
@@ -134,7 +134,7 @@ func (uc *ListProblemsUseCase) Execute(ctx context.Context, in ListProblemsInput
 		if d != nil {
 			author = ModifierDisplay{Nickname: d.Nickname, Name: d.Name}
 		}
-		summaries = append(summaries, ProblemSummary{Problem: p, Author: author})
+		summaries = append(summaries, ProblemSummary{Problem: problemToDTO(p), Author: author})
 	}
 
 	totalPages := int(math.Ceil(float64(total) / float64(in.Limit)))

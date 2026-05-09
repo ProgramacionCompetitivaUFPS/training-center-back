@@ -18,8 +18,8 @@ func TestGetProblem_AuthorCanSeeDraft(t *testing.T) {
 	if err != nil {
 		t.Fatalf("author should see own draft, got error: %v", err)
 	}
-	if out.Problem.Slug().String() != testSlug {
-		t.Errorf("unexpected slug: %q", out.Problem.Slug().String())
+	if out.Problem.Slug != testSlug {
+		t.Errorf("unexpected slug: %q", out.Problem.Slug)
 	}
 	if out.Modifiers == nil {
 		t.Error("author should receive modifiers list")

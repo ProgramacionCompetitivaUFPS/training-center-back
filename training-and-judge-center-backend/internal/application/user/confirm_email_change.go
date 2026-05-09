@@ -16,6 +16,10 @@ type ConfirmEmailChangeInput struct {
 	Code   string
 }
 
+type ConfirmEmailChangeOutput struct {
+	Email string
+}
+
 type ConfirmEmailChangeUseCase struct {
 	userRepo        user.Repository
 	emailChangeRepo user.EmailChangeRepository
@@ -37,7 +41,7 @@ func NewConfirmEmailChangeUseCase(
 	}
 }
 
-func (uc *ConfirmEmailChangeUseCase) Execute(ctx context.Context, input ConfirmEmailChangeInput) (*user.Email, error) {
+func (uc *ConfirmEmailChangeUseCase) Execute(ctx context.Context, input ConfirmEmailChangeInput) (*ConfirmEmailChangeOutput, error) {
 	u, err := uc.userRepo.FindByID(ctx, input.UserID)
 	if err != nil {
 		slog.Error("failed to find user during email change confirmation", "user_id", input.UserID, "error", err)
@@ -101,5 +105,5 @@ func (uc *ConfirmEmailChangeUseCase) Execute(ctx context.Context, input ConfirmE
 		slog.Error("failed to send confirmation to new email", "email", req.NewEmail().String(), "error", err)
 	}
 
-	return &newEmailVal, nil
+	return &ConfirmEmailChangeOutput{Email: newEmailVal.String()}, nil
 }

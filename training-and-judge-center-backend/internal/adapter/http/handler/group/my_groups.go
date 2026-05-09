@@ -50,16 +50,16 @@ func (h *Handler) ListMyGroups(w http.ResponseWriter, r *http.Request) {
 	for _, mg := range out.Groups {
 		g := mg.Group
 		items = append(items, myGroupItemResp{
-			ID:          g.ID(),
-			Name:        g.Name().String(),
-			Description: g.Description(),
-			Visibility:  g.Visibility().String(),
-			JoinPolicy:  g.JoinPolicy().String(),
-			IsGlobal:    g.IsDefault(),
-			MyRole:      mg.MyRole.String(),
+			ID:          g.ID,
+			Name:        g.Name,
+			Description: g.Description,
+			Visibility:  g.Visibility,
+			JoinPolicy:  g.JoinPolicy,
+			IsGlobal:    g.IsDefault,
+			MyRole:      mg.MyRole,
 			JoinedAt:    mg.JoinedAt.Format(timeutil.RFC3339UTC),
 			MemberCount: mg.MemberCount,
-			CreatedAt:   g.CreatedAt().Format(timeutil.RFC3339UTC),
+			CreatedAt:   g.CreatedAt.Format(timeutil.RFC3339UTC),
 		})
 	}
 
