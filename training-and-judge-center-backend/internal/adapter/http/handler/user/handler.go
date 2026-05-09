@@ -6,7 +6,8 @@ import (
 
 type UserHandler struct {
 	createUser              *appuser.CreateUserUseCase
-	getUserProfile          *appuser.GetUserProfileUseCase
+	getMyProfile            *appuser.GetMyProfileUseCase
+	getUserByNickname       *appuser.GetUserByNicknameUseCase
 	updateUser              *appuser.UpdateUserUseCase
 	updatePassword          *appuser.UpdatePasswordUseCase
 	adminUpdateUser         *appuser.AdminUpdateUserUseCase
@@ -22,7 +23,8 @@ type UserHandler struct {
 
 func NewUserHandler(
 	createUser *appuser.CreateUserUseCase,
-	getUserProfile *appuser.GetUserProfileUseCase,
+	getMyProfile *appuser.GetMyProfileUseCase,
+	getUserByNickname *appuser.GetUserByNicknameUseCase,
 	updateUser *appuser.UpdateUserUseCase,
 	updatePassword *appuser.UpdatePasswordUseCase,
 	adminUpdateUser *appuser.AdminUpdateUserUseCase,
@@ -37,7 +39,8 @@ func NewUserHandler(
 ) *UserHandler {
 	return &UserHandler{
 		createUser:              createUser,
-		getUserProfile:          getUserProfile,
+		getMyProfile:            getMyProfile,
+		getUserByNickname:       getUserByNickname,
 		updateUser:              updateUser,
 		updatePassword:          updatePassword,
 		adminUpdateUser:         adminUpdateUser,

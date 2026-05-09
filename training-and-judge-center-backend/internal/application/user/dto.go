@@ -6,6 +6,12 @@ import (
 	"github.com/training-judge-center/backend/internal/domain/user"
 )
 
+// UserProfileOutput is the shared output type for use cases that return a user profile.
+type UserProfileOutput struct {
+	User          UserDTO
+	IsFullProfile bool
+}
+
 // UserDTO carries user data to the handler layer without exposing the domain object.
 // Sensitive fields like the password hash are never included.
 type UserDTO struct {

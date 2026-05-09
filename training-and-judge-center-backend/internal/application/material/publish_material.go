@@ -21,21 +21,21 @@ type PublishMaterialOutput struct {
 	Material MaterialData
 }
 
-type PublishMaterial struct {
+type PublishMaterialUseCase struct {
 	repo           domainMaterial.Repository
 	groupProvider  GroupProvider
 	authorProvider AuthorProvider
 }
 
-func NewPublishMaterial(
+func NewPublishMaterialUseCase(
 	repo domainMaterial.Repository,
 	groupProvider GroupProvider,
 	authorProvider AuthorProvider,
-) *PublishMaterial {
-	return &PublishMaterial{repo: repo, groupProvider: groupProvider, authorProvider: authorProvider}
+) *PublishMaterialUseCase {
+	return &PublishMaterialUseCase{repo: repo, groupProvider: groupProvider, authorProvider: authorProvider}
 }
 
-func (uc *PublishMaterial) Execute(ctx context.Context, in PublishMaterialInput) (*PublishMaterialOutput, error) {
+func (uc *PublishMaterialUseCase) Execute(ctx context.Context, in PublishMaterialInput) (*PublishMaterialOutput, error) {
 	exists, err := uc.groupProvider.Exists(ctx, in.GroupID)
 	if err != nil {
 		slog.ErrorContext(ctx, "failed to check group existence", "error", err, "group_id", in.GroupID)

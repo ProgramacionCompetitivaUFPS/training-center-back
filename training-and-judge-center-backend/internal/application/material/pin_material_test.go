@@ -9,8 +9,8 @@ import (
 	"github.com/training-judge-center/backend/pkg/apperror"
 )
 
-func newPinUC(repo *mockMaterialRepository, group *mockGroupProvider, member *mockGroupMemberProvider) *PinMaterial {
-	return NewPinMaterial(repo, group, member, stubAuthorProvider())
+func newPinUC(repo *mockMaterialRepository, group *mockGroupProvider, member *mockGroupMemberProvider) *PinMaterialUseCase {
+	return NewPinMaterialUseCase(repo, group, member, stubAuthorProvider())
 }
 
 func TestPinMaterial_SuccessByAuthor(t *testing.T) {

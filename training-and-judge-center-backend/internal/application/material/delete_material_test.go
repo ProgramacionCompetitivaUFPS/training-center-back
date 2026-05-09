@@ -9,8 +9,8 @@ import (
 	"github.com/training-judge-center/backend/pkg/apperror"
 )
 
-func newDeleteUC(repo *mockMaterialRepository, group *mockGroupProvider) *DeleteMaterial {
-	return NewDeleteMaterial(repo, group)
+func newDeleteUC(repo *mockMaterialRepository, group *mockGroupProvider) *DeleteMaterialUseCase {
+	return NewDeleteMaterialUseCase(repo, group)
 }
 
 func TestDeleteMaterial_SuccessByAuthor(t *testing.T) {

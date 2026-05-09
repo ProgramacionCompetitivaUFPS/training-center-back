@@ -11,27 +11,27 @@ import (
 )
 
 type Handler struct {
-	createUC    *appMaterial.CreateMaterial
-	updateUC    *appMaterial.UpdateMaterial
-	getUC       *appMaterial.GetMaterial
-	listUC      *appMaterial.ListMaterials
-	publishUC   *appMaterial.PublishMaterial
-	unpublishUC *appMaterial.UnpublishMaterial
-	pinUC       *appMaterial.PinMaterial
-	unpinUC     *appMaterial.UnpinMaterial
-	deleteUC    *appMaterial.DeleteMaterial
+	createUC    *appMaterial.CreateMaterialUseCase
+	updateUC    *appMaterial.UpdateMaterialUseCase
+	getUC       *appMaterial.GetMaterialUseCase
+	listUC      *appMaterial.ListMaterialsUseCase
+	publishUC   *appMaterial.PublishMaterialUseCase
+	unpublishUC *appMaterial.UnpublishMaterialUseCase
+	pinUC       *appMaterial.PinMaterialUseCase
+	unpinUC     *appMaterial.UnpinMaterialUseCase
+	deleteUC    *appMaterial.DeleteMaterialUseCase
 }
 
 func NewHandler(
-	createUC *appMaterial.CreateMaterial,
-	updateUC *appMaterial.UpdateMaterial,
-	getUC *appMaterial.GetMaterial,
-	listUC *appMaterial.ListMaterials,
-	publishUC *appMaterial.PublishMaterial,
-	unpublishUC *appMaterial.UnpublishMaterial,
-	pinUC *appMaterial.PinMaterial,
-	unpinUC *appMaterial.UnpinMaterial,
-	deleteUC *appMaterial.DeleteMaterial,
+	createUC *appMaterial.CreateMaterialUseCase,
+	updateUC *appMaterial.UpdateMaterialUseCase,
+	getUC *appMaterial.GetMaterialUseCase,
+	listUC *appMaterial.ListMaterialsUseCase,
+	publishUC *appMaterial.PublishMaterialUseCase,
+	unpublishUC *appMaterial.UnpublishMaterialUseCase,
+	pinUC *appMaterial.PinMaterialUseCase,
+	unpinUC *appMaterial.UnpinMaterialUseCase,
+	deleteUC *appMaterial.DeleteMaterialUseCase,
 ) *Handler {
 	return &Handler{
 		createUC:    createUC,

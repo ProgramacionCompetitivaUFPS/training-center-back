@@ -19,20 +19,20 @@ type GetMaterialOutput struct {
 	Material MaterialData
 }
 
-type GetMaterial struct {
+type GetMaterialUseCase struct {
 	repo               domainMaterial.Repository
 	groupVisibility    GroupVisibilityProvider
 	memberProvider     GroupMemberProvider
 	authorProvider     AuthorProvider
 }
 
-func NewGetMaterial(
+func NewGetMaterialUseCase(
 	repo domainMaterial.Repository,
 	groupVisibility GroupVisibilityProvider,
 	memberProvider GroupMemberProvider,
 	authorProvider AuthorProvider,
-) *GetMaterial {
-	return &GetMaterial{
+) *GetMaterialUseCase {
+	return &GetMaterialUseCase{
 		repo:            repo,
 		groupVisibility: groupVisibility,
 		memberProvider:  memberProvider,
@@ -40,7 +40,7 @@ func NewGetMaterial(
 	}
 }
 
-func (uc *GetMaterial) Execute(ctx context.Context, in GetMaterialInput) (*GetMaterialOutput, error) {
+func (uc *GetMaterialUseCase) Execute(ctx context.Context, in GetMaterialInput) (*GetMaterialOutput, error) {
 	visibility, exists, err := uc.groupVisibility.FindVisibility(ctx, in.GroupID)
 	if err != nil {
 		slog.ErrorContext(ctx, "failed to find group visibility", "error", err, "group_id", in.GroupID)
