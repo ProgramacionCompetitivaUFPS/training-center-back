@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"time"
 
+	"github.com/training-judge-center/backend/internal/application/shared"
 	"github.com/training-judge-center/backend/internal/domain/user"
 	"github.com/training-judge-center/backend/pkg/apperror"
 )
@@ -22,14 +23,14 @@ type ResetPasswordUseCase struct {
 	userRepo           user.Repository
 	recoveryRepo       user.PasswordRecoveryRepository
 	sessionInvalidator user.SessionInvalidator
-	txManager          TransactionManager
+	txManager          shared.TransactionManager
 }
 
 func NewResetPasswordUseCase(
 	userRepo user.Repository,
 	recoveryRepo user.PasswordRecoveryRepository,
 	sessionInvalidator user.SessionInvalidator,
-	txManager TransactionManager,
+	txManager shared.TransactionManager,
 ) *ResetPasswordUseCase {
 	return &ResetPasswordUseCase{
 		userRepo:           userRepo,

@@ -35,10 +35,10 @@ type CreateGroupOutput struct {
 type CreateGroupUseCase struct {
 	repo       domainGroup.Repository
 	memberRepo domainGroup.MemberRepository
-	txManager  TransactionManager
+	txManager  appshared.TransactionManager
 }
 
-func NewCreateGroupUseCase(repo domainGroup.Repository, memberRepo domainGroup.MemberRepository, txManager TransactionManager) *CreateGroupUseCase {
+func NewCreateGroupUseCase(repo domainGroup.Repository, memberRepo domainGroup.MemberRepository, txManager appshared.TransactionManager) *CreateGroupUseCase {
 	return &CreateGroupUseCase{repo: repo, memberRepo: memberRepo, txManager: txManager}
 }
 

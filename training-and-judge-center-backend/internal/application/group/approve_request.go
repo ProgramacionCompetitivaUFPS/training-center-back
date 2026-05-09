@@ -24,13 +24,13 @@ type ApproveRequestOutput struct {
 type ApproveRequestUseCase struct {
 	memberRepo      domainGroup.MemberRepository
 	joinRequestRepo domainGroup.JoinRequestRepository
-	txManager       TransactionManager
+	txManager       shared.TransactionManager
 }
 
 func NewApproveRequestUseCase(
 	memberRepo domainGroup.MemberRepository,
 	joinRequestRepo domainGroup.JoinRequestRepository,
-	txManager TransactionManager,
+	txManager shared.TransactionManager,
 ) *ApproveRequestUseCase {
 	return &ApproveRequestUseCase{memberRepo: memberRepo, joinRequestRepo: joinRequestRepo, txManager: txManager}
 }
