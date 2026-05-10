@@ -237,7 +237,7 @@ func TestCreateMaterial_Forbidden_Returns403(t *testing.T) {
 	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
 		t.Fatalf("could not decode error response: %v (body: %s)", err, w.Body.String())
 	}
-	if resp.Code != appMaterial.ErrCodeInsufficientPerms {
+	if resp.Code != appMaterial.ErrCodeInsufficientPermissions {
 		t.Errorf("expected INSUFFICIENT_PERMISSIONS, got %s", resp.Code)
 	}
 }
@@ -468,7 +468,7 @@ func TestGetMaterial_Forbidden_Returns403(t *testing.T) {
 	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
 		t.Fatalf("could not decode error response: %v (body: %s)", err, w.Body.String())
 	}
-	if resp.Code != appMaterial.ErrCodeInsufficientPerms {
+	if resp.Code != appMaterial.ErrCodeInsufficientPermissions {
 		t.Errorf("expected INSUFFICIENT_PERMISSIONS, got %s", resp.Code)
 	}
 }
