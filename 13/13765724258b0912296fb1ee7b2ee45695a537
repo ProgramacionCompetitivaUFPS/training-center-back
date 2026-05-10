@@ -1,0 +1,24 @@
+training-and-judge-center-backend/internal/application/problem/add_modifier_test.go
+  s_9bb12de784775b::t_e981a0fe8712b8 86-87
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.5",
+  "base_commit_sha": "1313765724258b0912296fb1ee7b2ee45695a537",
+  "prompts": {},
+  "humans": {
+    "h_449cdb19da0522": {
+      "author": "AlexaVJ <alexandra19vela@gmail.com>"
+    }
+  },
+  "sessions": {
+    "s_9bb12de784775b": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "e67fd454-0f32-4672-b007-ae6b0c613265",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "AlexaVJ <alexandra19vela@gmail.com>"
+    }
+  }
+}
