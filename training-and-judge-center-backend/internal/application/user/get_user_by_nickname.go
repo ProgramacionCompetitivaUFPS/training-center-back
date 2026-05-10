@@ -43,7 +43,7 @@ func (uc *GetUserByNicknameUseCase) Execute(ctx context.Context, in GetUserByNic
 	}
 	
 	if targetUser == nil || targetUser.Status() == domain.StatusDeactivated {
-		return nil, apperror.NewNotFound(ErrCodeUserNotFound, "User not found")
+		return nil, apperror.NewNotFound(domain.ErrCodeUserNotFound, "User not found")
 	}
 
 	isSelf := targetUser.ID() == in.RequesterID

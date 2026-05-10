@@ -39,7 +39,7 @@ func (uc *AdminDeactivateUserUseCase) Execute(ctx context.Context, input AdminDe
 		return apperror.NewInternal()
 	}
 	if foundUser == nil {
-		return apperror.NewNotFound(ErrCodeUserNotFound, "User not found")
+		return apperror.NewNotFound(user.ErrCodeUserNotFound, "User not found")
 	}
 
 	if foundUser.Role() == shared.RoleAdmin {

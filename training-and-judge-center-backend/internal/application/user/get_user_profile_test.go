@@ -49,7 +49,7 @@ func TestGetMyProfile_UserNotFound(t *testing.T) {
 	if !ok {
 		t.Fatalf("expected *apperror.AppError, got %T", err)
 	}
-	if appErr.Code != ErrCodeUserNotFound {
+	if appErr.Code != domain.ErrCodeUserNotFound {
 		t.Errorf("expected code NOT_FOUND, got %q", appErr.Code)
 	}
 	if appErr.Kind != apperror.KindNotFound {
@@ -174,7 +174,7 @@ func TestGetByNickname_DeactivatedUser(t *testing.T) {
 	if !ok {
 		t.Fatalf("expected *apperror.AppError, got %T", err)
 	}
-	if appErr.Code != ErrCodeUserNotFound {
+	if appErr.Code != domain.ErrCodeUserNotFound {
 		t.Errorf("expected code NOT_FOUND, got %q", appErr.Code)
 	}
 }
@@ -192,7 +192,7 @@ func TestGetByNickname_UserNotFound(t *testing.T) {
 	if !ok {
 		t.Fatalf("expected *apperror.AppError, got %T", err)
 	}
-	if appErr.Code != ErrCodeUserNotFound {
+	if appErr.Code != domain.ErrCodeUserNotFound {
 		t.Errorf("expected code NOT_FOUND, got %q", appErr.Code)
 	}
 }
@@ -235,7 +235,7 @@ func TestGetByNickname_AdminViewsDeactivated(t *testing.T) {
 	if !ok {
 		t.Fatalf("expected *apperror.AppError, got %T", err)
 	}
-	if appErr.Code != ErrCodeUserNotFound {
+	if appErr.Code != domain.ErrCodeUserNotFound {
 		t.Errorf("expected code NOT_FOUND, got %q (deactivated users return 404 even for admins)", appErr.Code)
 	}
 }

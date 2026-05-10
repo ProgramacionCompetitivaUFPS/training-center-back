@@ -42,7 +42,7 @@ func (uc *RequestDeactivationUseCase) Execute(ctx context.Context, input Request
 		return apperror.NewInternal()
 	}
 	if foundUser == nil || foundUser.Status() == user.StatusDeactivated {
-		return apperror.NewNotFound(ErrCodeUserNotFound, "User not found")
+		return apperror.NewNotFound(user.ErrCodeUserNotFound, "User not found")
 	}
 
 	if foundUser.Role() == domainShared.RoleAdmin {

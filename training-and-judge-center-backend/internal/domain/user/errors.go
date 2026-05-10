@@ -8,5 +8,6 @@ const (
 	ErrCodeAlreadyDeactivated         = "ALREADY_DEACTIVATED"
 	ErrCodeCannotUpdateDeactivated    = "CANNOT_UPDATE_DEACTIVATED"
 	ErrCodeCannotAssignAdminRole      = "CANNOT_ASSIGN_ADMIN_ROLE"
+	ErrCodeUserNotFound               = "USER_NOT_FOUND"
 )
 

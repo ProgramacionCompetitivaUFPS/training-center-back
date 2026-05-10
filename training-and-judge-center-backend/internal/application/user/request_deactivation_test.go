@@ -131,7 +131,7 @@ func TestRequestDeactivation_UserNotFound(t *testing.T) {
 		t.Fatal("expected error, got nil")
 	}
 	appErr, ok := err.(*apperror.AppError)
-	if !ok || appErr.Code != ErrCodeUserNotFound {
+	if !ok || appErr.Code != domain.ErrCodeUserNotFound {
 		t.Errorf("expected NOT_FOUND error, got %v", err)
 	}
 }

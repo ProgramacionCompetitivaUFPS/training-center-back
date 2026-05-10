@@ -53,7 +53,7 @@ func (uc *UpdatePasswordUseCase) Execute(ctx context.Context, input UpdatePasswo
 		return nil, apperror.NewInternal()
 	}
 	if foundUser == nil {
-		return nil, apperror.NewNotFound(ErrCodeUserNotFound, "User not found")
+		return nil, apperror.NewNotFound(user.ErrCodeUserNotFound, "User not found")
 	}
 
 	if !foundUser.Password().Compare(input.CurrentPassword) {

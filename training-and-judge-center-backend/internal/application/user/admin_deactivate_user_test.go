@@ -82,7 +82,7 @@ func TestAdminDeactivateUser_TargetNotFound(t *testing.T) {
 		t.Fatal("expected error, got nil")
 	}
 	appErr := err.(*apperror.AppError)
-	if appErr.Code != ErrCodeUserNotFound {
+	if appErr.Code != domain.ErrCodeUserNotFound {
 		t.Errorf("expected code NOT_FOUND, got %q", appErr.Code)
 	}
 }

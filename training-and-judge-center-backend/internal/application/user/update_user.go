@@ -43,7 +43,7 @@ func (uc *UpdateUserUseCase) Execute(ctx context.Context, input UpdateUserInput)
 		return nil,apperror.NewInternal()
 	}
 	if foundUser == nil {
-		return nil,apperror.NewNotFound(ErrCodeUserNotFound, "User not found")
+		return nil,apperror.NewNotFound(user.ErrCodeUserNotFound, "User not found")
 	}
 
 	var fieldErrors []apperror.FieldError
