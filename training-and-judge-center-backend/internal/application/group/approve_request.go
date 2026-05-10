@@ -52,6 +52,13 @@ func (uc *ApproveRequestUseCase) Execute(ctx context.Context, input ApproveReque
 		return nil, err
 	}
 
+	now := time.Now()
+	newMemberID := uuid.New().String()
+	newMember, err := domainGroup.NewGroupMember(newMemberID, input.GroupID, req.RequesterUserID(), domainGroup.MemberRoleMember, now)
+	if err != nil {
+		return nil, err
+	}
+
 	if err := uc.txManager.WithTx(ctx, func(txCtx context.Context) error {
 		existing, err := uc.memberRepo.FindByGroupAndUser(txCtx, input.GroupID, req.RequesterUserID())
 		if err != nil {
@@ -66,12 +73,6 @@ func (uc *ApproveRequestUseCase) Execute(ctx context.Context, input ApproveReque
 			return apperror.NewInternal()
 		}
 
-		now := time.Now()
-		newMemberID := uuid.New().String()
-		newMember, err := domainGroup.NewGroupMember(newMemberID, input.GroupID, req.RequesterUserID(), domainGroup.MemberRoleMember, now)
-		if err != nil {
-			return err
-		}
 		return uc.memberRepo.Save(txCtx, newMember)
 	}); err != nil {
 		return nil, err
