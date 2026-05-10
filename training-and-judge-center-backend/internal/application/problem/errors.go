@@ -9,4 +9,6 @@ const (
 	ErrCodeProblemDuplicateLanguage   = "PROBLEM_DUPLICATE_LANGUAGE"
 	ErrCodeProblemUnsupportedLanguage = "PROBLEM_UNSUPPORTED_LANGUAGE"
 	ErrCodeUserNotFound               = "USER_NOT_FOUND"
+	ErrCodeInsufficientPermissions    = "INSUFFICIENT_PERMISSIONS"
+	ErrCodeFileNameNotApplicable      = "FILE_NAME_NOT_APPLICABLE"
 )

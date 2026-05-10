@@ -54,7 +54,7 @@ func (uc *DeleteProblemUseCase) Execute(ctx context.Context, in DeleteProblemInp
 	viewerID := shared.RestoreUserID(in.CurrentUser.ID)
 	isAdmin := in.CurrentUser.IsAdmin()
 	if p.AuthorID() != viewerID && !isAdmin {
-		return apperror.NewForbidden(apperror.ErrCodeForbidden, "Only the problem author or Admin can delete this problem")
+		return apperror.NewForbidden(ErrCodeInsufficientPermissions, "Only the problem author or Admin can delete this problem")
 	}
 
 	if err := uc.repo.Delete(ctx, p.ID()); err != nil {

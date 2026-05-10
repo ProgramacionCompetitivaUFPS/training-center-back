@@ -44,7 +44,7 @@ func (uc *AddModifierUseCase) Execute(ctx context.Context, input AddModifierInpu
 	isAdmin := input.CurrentUser.IsAdmin()
 
 	if !isAuthor && !isAdmin {
-		return apperror.NewForbidden(apperror.ErrCodeForbidden, "Only the author or Admin can add modifiers")
+		return apperror.NewForbidden(ErrCodeInsufficientPermissions, "Only the author or Admin can add modifiers")
 	}
 
 	exists, err := uc.userProvider.ExistsByID(ctx, input.UserID)

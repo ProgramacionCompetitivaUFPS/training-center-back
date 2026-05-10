@@ -53,8 +53,8 @@ func TestDeleteProblem_Forbidden_Stranger(t *testing.T) {
 	if !ok {
 		t.Fatalf("expected *apperror.AppError, got %T", err)
 	}
-	if appErr.Code != apperror.ErrCodeForbidden {
-		t.Errorf("expected FORBIDDEN, got %q", appErr.Code)
+	if appErr.Code != ErrCodeInsufficientPermissions {
+		t.Errorf("expected INSUFFICIENT_PERMISSIONS, got %q", appErr.Code)
 	}
 }
 

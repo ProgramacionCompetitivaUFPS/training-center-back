@@ -42,7 +42,7 @@ func (uc *UnpublishProblemUseCase) Execute(ctx context.Context, in UnpublishProb
 	viewerID := shared.RestoreUserID(in.CurrentUser.ID)
 	isAdmin := in.CurrentUser.IsAdmin()
 	if !p.CanBeEditedBy(viewerID, isAdmin) {
-		return nil, apperror.NewForbidden(apperror.ErrCodeForbidden, "Only the problem author, Admin, or assigned modifiers can unpublish this problem")
+		return nil, apperror.NewForbidden(ErrCodeInsufficientPermissions, "Only the problem author, Admin, or assigned modifiers can unpublish this problem")
 	}
 
 	now := time.Now()
