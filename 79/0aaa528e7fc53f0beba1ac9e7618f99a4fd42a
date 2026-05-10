@@ -1,0 +1,56 @@
+training-and-judge-center-backend/internal/application/group/request_join.go
+  s_270a4d5e54f3eb::t_5388d33fb85faa 63
+  s_270a4d5e54f3eb::t_f5f770dcc70e53 71
+training-and-judge-center-backend/internal/adapter/auth/invitation_jwt.go
+  s_270a4d5e54f3eb::t_9f3774821dc2b8 10
+  s_270a4d5e54f3eb::t_f2bceafaf57c7c 60,62,67,71
+training-and-judge-center-backend/internal/application/group/join_group.go
+  s_270a4d5e54f3eb::t_ed6c1a0764d6d1 56
+training-and-judge-center-backend/internal/adapter/auth/invitation_jwt_test.go
+  s_270a4d5e54f3eb::t_091c287a042b94 8
+  s_270a4d5e54f3eb::t_98e6fd318c543b 76
+training-and-judge-center-backend/internal/adapter/group/member_repository.go
+  s_270a4d5e54f3eb::t_410f019d772ad8 40
+training-and-judge-center-backend/internal/application/group/join_group_test.go
+  s_270a4d5e54f3eb::t_cf7c4e07c6f0d1 99
+training-and-judge-center-backend/internal/application/group/request_join_test.go
+  s_270a4d5e54f3eb::t_e0424332221e02 78
+  s_270a4d5e54f3eb::t_7614509af3c59c 96
+training-and-judge-center-backend/internal/application/group/approve_request_test.go
+  s_270a4d5e54f3eb::t_d3fb63f4fbed3c 153
+training-and-judge-center-backend/internal/domain/group/errors.go
+  s_270a4d5e54f3eb::t_8664e03f4073b3 9-12
+training-and-judge-center-backend/internal/application/group/accept_invite.go
+  s_270a4d5e54f3eb::t_4c0f03fab01363 68
+training-and-judge-center-backend/internal/adapter/group/join_request_repository.go
+  s_270a4d5e54f3eb::t_68ab4e907369f0 46
+training-and-judge-center-backend/internal/application/group/approve_request.go
+  s_270a4d5e54f3eb::t_9bc3486f04c658 61
+training-and-judge-center-backend/internal/application/group/accept_invite_test.go
+  s_270a4d5e54f3eb::t_850062600fed78 47
+  s_270a4d5e54f3eb::t_3ad46896df97b5 57
+  s_270a4d5e54f3eb::t_7a95729ea7721c 114
+  s_270a4d5e54f3eb::t_d82c645a08d913 41
+  s_270a4d5e54f3eb::t_4c840634edd174 31
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.5",
+  "base_commit_sha": "790aaa528e7fc53f0beba1ac9e7618f99a4fd42a",
+  "prompts": {},
+  "humans": {
+    "h_449cdb19da0522": {
+      "author": "AlexaVJ <alexandra19vela@gmail.com>"
+    }
+  },
+  "sessions": {
+    "s_270a4d5e54f3eb": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "0881c568-01f7-46d8-9c8c-22e4b473bfc0",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "AlexaVJ <alexandra19vela@gmail.com>"
+    }
+  }
+}
