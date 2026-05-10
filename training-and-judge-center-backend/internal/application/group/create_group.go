@@ -87,9 +87,9 @@ func (uc *CreateGroupUseCase) Execute(ctx context.Context, input CreateGroupInpu
 		return nil, err
 	}
 
-	if err := uc.txManager.WithTx(ctx, func(ctx context.Context) error {
-		if err := uc.repo.Save(ctx, g); err != nil {
-			slog.ErrorContext(ctx, "failed to save new group", "error", err, "group_id", newID)
+	if err := uc.txManager.WithTx(ctx, func(txCtx context.Context) error {
+		if err := uc.repo.Save(txCtx, g); err != nil {
+			slog.ErrorContext(txCtx, "failed to save new group", "error", err, "group_id", newID)
 			return apperror.NewInternal()
 		}
 		newLeadMemberID := uuid.New().String()
@@ -97,7 +97,7 @@ func (uc *CreateGroupUseCase) Execute(ctx context.Context, input CreateGroupInpu
 		if err != nil {
 			return err
 		}
-		return uc.memberRepo.Save(ctx, lead)
+		return uc.memberRepo.Save(txCtx, lead)
 	}); err != nil {
 		return nil, err
 	}
