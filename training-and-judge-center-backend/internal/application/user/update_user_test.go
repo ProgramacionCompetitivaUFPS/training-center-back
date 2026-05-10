@@ -108,7 +108,7 @@ func TestUpdateUser_UserNotFound(t *testing.T) {
 	if !ok {
 		t.Fatalf("expected *apperror.AppError, got %T", err)
 	}
-	if appErr.Code != "NOT_FOUND" {
+	if appErr.Code != ErrCodeUserNotFound {
 		t.Errorf("expected code NOT_FOUND, got %q", appErr.Code)
 	}
 }

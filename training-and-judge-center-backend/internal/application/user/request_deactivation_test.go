@@ -113,7 +113,7 @@ func TestRequestDeactivation_AdminForbidden(t *testing.T) {
 		t.Fatal("expected error, got nil")
 	}
 	appErr, ok := err.(*apperror.AppError)
-	if !ok || appErr.Code != "FORBIDDEN" {
+	if !ok || appErr.Code != ErrCodeForbidden {
 		t.Errorf("expected FORBIDDEN error, got %v", err)
 	}
 }
@@ -131,7 +131,7 @@ func TestRequestDeactivation_UserNotFound(t *testing.T) {
 		t.Fatal("expected error, got nil")
 	}
 	appErr, ok := err.(*apperror.AppError)
-	if !ok || appErr.Code != "NOT_FOUND" {
+	if !ok || appErr.Code != ErrCodeUserNotFound {
 		t.Errorf("expected NOT_FOUND error, got %v", err)
 	}
 }
@@ -218,7 +218,7 @@ func TestRequestDeactivation_EmailDeliveryFailure(t *testing.T) {
 		t.Fatal("expected error, got nil")
 	}
 	appErr, ok := err.(*apperror.AppError)
-	if !ok || appErr.Code != "EMAIL_DELIVERY_FAILED" {
+	if !ok || appErr.Code != ErrCodeEmailDeliveryFailed {
 		t.Errorf("expected EMAIL_DELIVERY_FAILED, got %v", err)
 	}
 }

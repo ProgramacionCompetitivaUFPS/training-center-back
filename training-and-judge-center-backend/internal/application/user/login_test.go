@@ -117,7 +117,7 @@ func TestLogin_InvalidEmailFormat(t *testing.T) {
 	if !ok {
 		t.Fatalf("expected *apperror.AppError, got %T", err)
 	}
-	if appErr.Code != "INVALID_CREDENTIALS" {
+	if appErr.Code != ErrCodeInvalidCredentials {
 		t.Errorf("expected code INVALID_CREDENTIALS, got %q", appErr.Code)
 	}
 	if appErr.Kind != apperror.KindUnauthorized {
@@ -144,7 +144,7 @@ func TestLogin_UserNotFound(t *testing.T) {
 	if !ok {
 		t.Fatalf("expected *apperror.AppError, got %T", err)
 	}
-	if appErr.Code != "INVALID_CREDENTIALS" {
+	if appErr.Code != ErrCodeInvalidCredentials {
 		t.Errorf("expected code INVALID_CREDENTIALS, got %q", appErr.Code)
 	}
 }
@@ -170,7 +170,7 @@ func TestLogin_DeactivatedAccount(t *testing.T) {
 	if !ok {
 		t.Fatalf("expected *apperror.AppError, got %T", err)
 	}
-	if appErr.Code != "ACCOUNT_DEACTIVATED" {
+	if appErr.Code != ErrCodeAccountDeactivated {
 		t.Errorf("expected code ACCOUNT_DEACTIVATED, got %q", appErr.Code)
 	}
 	if appErr.Kind != apperror.KindForbidden {
@@ -198,7 +198,7 @@ func TestLogin_WrongPassword(t *testing.T) {
 	if !ok {
 		t.Fatalf("expected *apperror.AppError, got %T", err)
 	}
-	if appErr.Code != "INVALID_CREDENTIALS" {
+	if appErr.Code != ErrCodeInvalidCredentials {
 		t.Errorf("expected code INVALID_CREDENTIALS, got %q", appErr.Code)
 	}
 }
