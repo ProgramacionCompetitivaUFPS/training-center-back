@@ -1,0 +1,53 @@
+training-and-judge-center-backend/internal/application/user/update_password_test.go
+  s_55c5e6ff981492::t_c88a1f44169577 61
+training-and-judge-center-backend/internal/application/user/errors.go
+  s_55c5e6ff981492::t_57a81b63f78c2a 13
+  s_55c5e6ff981492::t_100c3645d7faf8 4-12,14-16
+training-and-judge-center-backend/internal/application/user/update_user_test.go
+  s_55c5e6ff981492::t_c88a1f44169577 111
+training-and-judge-center-backend/internal/application/user/admin_deactivate_user.go
+  s_55c5e6ff981492::t_c88a1f44169577 42
+training-and-judge-center-backend/internal/application/user/admin_update_user_test.go
+  s_55c5e6ff981492::t_c88a1f44169577 102
+training-and-judge-center-backend/internal/application/user/update_password.go
+  s_55c5e6ff981492::t_c88a1f44169577 56
+training-and-judge-center-backend/internal/application/user/get_my_profile.go
+  s_55c5e6ff981492::t_c88a1f44169577 35
+training-and-judge-center-backend/internal/application/user/admin_update_user.go
+  s_55c5e6ff981492::t_c88a1f44169577 49
+training-and-judge-center-backend/internal/application/user/request_deactivation_test.go
+  s_55c5e6ff981492::t_c88a1f44169577 134
+training-and-judge-center-backend/internal/application/user/get_user_profile_test.go
+  s_55c5e6ff981492::t_c88a1f44169577 52,177,195,238
+training-and-judge-center-backend/internal/application/user/request_deactivation.go
+  s_55c5e6ff981492::t_c88a1f44169577 45
+training-and-judge-center-backend/internal/application/user/update_user.go
+  s_55c5e6ff981492::t_c88a1f44169577 46
+training-and-judge-center-backend/internal/application/user/get_user_by_nickname.go
+  s_55c5e6ff981492::t_c88a1f44169577 46
+training-and-judge-center-backend/internal/domain/user/errors.go
+  s_55c5e6ff981492::t_27d660f53de4be 11
+training-and-judge-center-backend/internal/application/user/admin_deactivate_user_test.go
+  s_55c5e6ff981492::t_c88a1f44169577 85
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.5",
+  "base_commit_sha": "933c97665a0f58ff48906f69f6b799a945731fd7",
+  "prompts": {},
+  "humans": {
+    "h_449cdb19da0522": {
+      "author": "AlexaVJ <alexandra19vela@gmail.com>"
+    }
+  },
+  "sessions": {
+    "s_55c5e6ff981492": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "eebde59b-4c13-4503-9158-264ab5437244",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "AlexaVJ <alexandra19vela@gmail.com>"
+    }
+  }
+}
