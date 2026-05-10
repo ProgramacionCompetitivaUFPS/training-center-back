@@ -48,7 +48,7 @@ func (uc *ConfirmEmailChangeUseCase) Execute(ctx context.Context, input ConfirmE
 		return nil, apperror.NewInternal()
 	}
 	if u == nil {
-		return nil, apperror.NewUnauthorized("INVALID_CREDENTIALS", "Invalid credentials")
+		return nil, apperror.NewUnauthorized(ErrCodeInvalidCredentials, "Invalid credentials")
 	}
 
 	req, err := uc.emailChangeRepo.FindByCodeAndUserID(ctx, input.Code, input.UserID)
@@ -58,12 +58,12 @@ func (uc *ConfirmEmailChangeUseCase) Execute(ctx context.Context, input ConfirmE
 	}
 	
 	if req == nil {
-		return nil, apperror.NewBadRequest("INVALID_CODE", "The verification code is invalid or has expired")
+		return nil, apperror.NewBadRequest(ErrCodeInvalidCode, "The verification code is invalid or has expired")
 	}
 
 	now := time.Now()
 	if req.Status() != user.RequestStatusPending || req.IsExpired(now) {
-		return nil, apperror.NewBadRequest("INVALID_CODE", "The verification code is invalid or has expired")
+		return nil, apperror.NewBadRequest(ErrCodeInvalidCode, "The verification code is invalid or has expired")
 	}
 
 	oldEmail := u.Email().String()

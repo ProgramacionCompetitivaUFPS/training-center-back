@@ -57,7 +57,7 @@ func (uc *ConfirmDeactivationUseCase) Execute(ctx context.Context, input Confirm
 		return nil, apperror.NewInternal()
 	}
 	if foundUser == nil || foundUser.Status() == user.StatusDeactivated {
-		return nil, apperror.NewConflict("ALREADY_DEACTIVATED", "User account is already deactivated or doesn't exist")
+		return nil, apperror.NewConflict(ErrCodeAlreadyDeactivated, "User account is already deactivated or doesn't exist")
 	}
 
 	req, err := uc.deactRepo.FindPendingByUserID(ctx, input.UserID)
@@ -66,7 +66,7 @@ func (uc *ConfirmDeactivationUseCase) Execute(ctx context.Context, input Confirm
 		return nil, apperror.NewInternal()
 	}
 	if req == nil {
-		return nil, apperror.NewNotFound(apperror.ErrCodeNotFound, "No pending deactivation request found")
+		return nil, apperror.NewNotFound(ErrCodeNoPendingRequest, "No pending deactivation request found")
 	}
 
 	now := time.Now()
@@ -77,7 +77,7 @@ func (uc *ConfirmDeactivationUseCase) Execute(ctx context.Context, input Confirm
 		if retryAfter < 0 {
 			retryAfter = 0
 		}
-		return nil, apperror.NewTooManyRequests("MAX_ATTEMPTS_EXCEEDED", "Maximum confirmation attempts exceeded. Please try again later", retryAfter)
+		return nil, apperror.NewTooManyRequests(ErrCodeMaxAttemptsExceeded, "Maximum confirmation attempts exceeded. Please try again later", retryAfter)
 	}
 	if req.IsBlocked() {
 		// Block period has expired — invalidate the request entirely; user must start a new one
@@ -86,7 +86,7 @@ func (uc *ConfirmDeactivationUseCase) Execute(ctx context.Context, input Confirm
 			slog.Error("failed to mark expired deactivation request", "user_id", input.UserID, "error", err)
 			return nil, apperror.NewInternal()
 		}
-		return nil, apperror.NewBadRequest("EXPIRED_CODE", "The confirmation code has expired. Please request a new one")
+		return nil, apperror.NewBadRequest(ErrCodeExpiredCode, "The confirmation code has expired. Please request a new one")
 	}
 
 	// Code expiration validation
@@ -96,7 +96,7 @@ func (uc *ConfirmDeactivationUseCase) Execute(ctx context.Context, input Confirm
 			slog.Error("failed to mark expired deactivation request", "user_id", input.UserID, "error", err)
 			return nil, apperror.NewInternal()
 		}
-		return nil, apperror.NewBadRequest("EXPIRED_CODE", "The confirmation code has expired. Please request a new one")
+		return nil, apperror.NewBadRequest(ErrCodeExpiredCode, "The confirmation code has expired. Please request a new one")
 	}
 
 	// Code match validation
@@ -108,14 +108,14 @@ func (uc *ConfirmDeactivationUseCase) Execute(ctx context.Context, input Confirm
 				slog.Error("failed to persist blocked deactivation request", "user_id", input.UserID, "error", err)
 				return nil, apperror.NewInternal()
 			}
-			return nil, apperror.NewTooManyRequests("MAX_ATTEMPTS_EXCEEDED", "Maximum confirmation attempts exceeded. Please try again later", 3600)
+			return nil, apperror.NewTooManyRequests(ErrCodeMaxAttemptsExceeded, "Maximum confirmation attempts exceeded. Please try again later", 3600)
 		}
 
 		if err := uc.deactRepo.Update(ctx, req); err != nil {
 			slog.Error("failed to persist failed deactivation attempt", "user_id", input.UserID, "error", err)
 			return nil, apperror.NewInternal()
 		}
-		return nil, apperror.NewBadRequest("INVALID_CODE", "The confirmation code is invalid")
+		return nil, apperror.NewBadRequest(ErrCodeInvalidCode, "The confirmation code is invalid")
 	}
 
 	originalEmailStr := foundUser.Email().String()

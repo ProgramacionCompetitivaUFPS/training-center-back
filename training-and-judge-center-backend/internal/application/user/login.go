@@ -42,7 +42,7 @@ func (uc *LoginUseCase) Execute(ctx context.Context, input LoginInput) (*LoginOu
 
 	email, err := user.NewEmail(input.Email)
 	if err != nil {
-		return nil, apperror.NewUnauthorized("INVALID_CREDENTIALS", "Invalid email or password")
+		return nil, apperror.NewUnauthorized(ErrCodeInvalidCredentials, "Invalid email or password")
 	}
 
 	foundUser, err := uc.repo.FindByEmail(ctx, email)
@@ -51,15 +51,15 @@ func (uc *LoginUseCase) Execute(ctx context.Context, input LoginInput) (*LoginOu
 		return nil, apperror.NewInternal()
 	}
 	if foundUser == nil {
-		return nil, apperror.NewUnauthorized("INVALID_CREDENTIALS", "Invalid email or password")
+		return nil, apperror.NewUnauthorized(ErrCodeInvalidCredentials, "Invalid email or password")
 	}
 
 	if foundUser.Status() != user.StatusActive {
-		return nil, apperror.NewForbidden("ACCOUNT_DEACTIVATED", "This account has been deactivated")
+		return nil, apperror.NewForbidden(ErrCodeAccountDeactivated, "This account has been deactivated")
 	}
 
 	if !foundUser.Password().Compare(input.Password) {
-		return nil, apperror.NewUnauthorized("INVALID_CREDENTIALS", "Invalid email or password")
+		return nil, apperror.NewUnauthorized(ErrCodeInvalidCredentials, "Invalid email or password")
 	}
 
 	token, err := uc.tokenService.GenerateToken(foundUser)

@@ -46,7 +46,7 @@ func (uc *AdminUpdateUserUseCase) Execute(ctx context.Context, input AdminUpdate
 		return nil,apperror.NewInternal()
 	}
 	if foundUser == nil {
-		return nil,apperror.NewNotFound("NOT_FOUND", "User not found")
+		return nil,apperror.NewNotFound(ErrCodeUserNotFound, "User not found")
 	}
 
 	var fieldErrors []apperror.FieldError

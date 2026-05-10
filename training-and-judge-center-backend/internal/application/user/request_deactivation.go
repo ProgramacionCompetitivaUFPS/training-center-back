@@ -42,11 +42,11 @@ func (uc *RequestDeactivationUseCase) Execute(ctx context.Context, input Request
 		return apperror.NewInternal()
 	}
 	if foundUser == nil || foundUser.Status() == user.StatusDeactivated {
-		return apperror.NewNotFound("NOT_FOUND", "User not found")
+		return apperror.NewNotFound(ErrCodeUserNotFound, "User not found")
 	}
 
 	if foundUser.Role() == domainShared.RoleAdmin {
-		return apperror.NewForbidden("FORBIDDEN", "Administrators cannot deactivate their own account")
+		return apperror.NewForbidden(ErrCodeForbidden, "Administrators cannot deactivate their own account")
 	}
 
 	now := time.Now()
@@ -81,7 +81,7 @@ func (uc *RequestDeactivationUseCase) Execute(ctx context.Context, input Request
 		Body:    fmt.Sprintf("You requested to deactivate your account.\n\nYour confirmation code is: %s\n\nThis code will expire in 15 minutes. Note: Confirming this code will completely anonymize your account and log you out immediately.", code),
 	}); err != nil {
 		slog.Error("failed to send deactivation code email", "user_id", foundUser.ID(), "error", err)
-		return apperror.NewServiceUnavailable("EMAIL_DELIVERY_FAILED", "Failed to send verification email")
+		return apperror.NewServiceUnavailable(ErrCodeEmailDeliveryFailed, "Failed to send verification email")
 	}
 
 	return nil

@@ -52,7 +52,7 @@ func (uc *RequestEmailChangeUseCase) Execute(ctx context.Context, input RequestE
 		return nil, apperror.NewInternal()
 	}
 	if !allowed {
-		return nil, apperror.NewTooManyRequests("RATE_LIMIT_EXCEEDED", "Too many requests. Please try again later.", 3600)
+		return nil, apperror.NewTooManyRequests(ErrCodeTooManyRequests, "Too many requests. Please try again later.", 3600)
 	}
 
 	u, err := uc.userRepo.FindByID(ctx, input.UserID)
@@ -61,11 +61,11 @@ func (uc *RequestEmailChangeUseCase) Execute(ctx context.Context, input RequestE
 		return nil, apperror.NewInternal()
 	}
 	if u == nil {
-		return nil, apperror.NewUnauthorized("INVALID_CREDENTIALS", "Invalid credentials")
+		return nil, apperror.NewUnauthorized(ErrCodeInvalidCredentials, "Invalid credentials")
 	}
 
 	if !u.Password().Compare(input.Password) {
-		return nil, apperror.NewUnauthorized("INVALID_CREDENTIALS", "Invalid credentials")
+		return nil, apperror.NewUnauthorized(ErrCodeInvalidCredentials, "Invalid credentials")
 	}
 
 	parsedNewEmail, err := user.NewEmail(input.NewEmail)
@@ -106,7 +106,7 @@ func (uc *RequestEmailChangeUseCase) Execute(ctx context.Context, input RequestE
 		Body:    fmt.Sprintf("Your email verification code is: %s. It will expire in 15 minutes.", code),
 	}); err != nil {
 		slog.Error("failed to send verification email", "email", input.NewEmail, "error", err)
-		return nil, apperror.NewServiceUnavailable("EMAIL_DELIVERY_FAILED", "We couldn't deliver the verification code to your email. Please try again later.")
+		return nil, apperror.NewServiceUnavailable(ErrCodeEmailDeliveryFailed, "We couldn't deliver the verification code to your email. Please try again later.")
 	}
 
 	return &RequestEmailChangeOutput{ExpiresAt: req.ExpiresAt()}, nil
