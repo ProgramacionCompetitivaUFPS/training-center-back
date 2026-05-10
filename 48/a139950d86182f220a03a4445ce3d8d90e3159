@@ -1,0 +1,63 @@
+training-and-judge-center-backend/internal/application/user/reset_password_test.go
+  s_9bb12de784775b::t_311069136db474 256
+  s_9bb12de784775b::t_cee605e6647176 85,114,145,221
+  s_9bb12de784775b::t_305262e0c04342 192
+training-and-judge-center-backend/internal/application/user/update_user_test.go
+  s_9bb12de784775b::t_f973909265f668 212
+  s_9bb12de784775b::t_4f3790ea0f65c8 87,136,280,304
+training-and-judge-center-backend/internal/application/user/request_deactivation_test.go
+  s_9bb12de784775b::t_9cf58d100bd74e 152,175,198
+training-and-judge-center-backend/internal/application/user/list_users_test.go
+  s_9bb12de784775b::t_0bd169e6f904e6 88,105,119,133,147
+  s_9bb12de784775b::t_3496f81151f9d8 161
+training-and-judge-center-backend/internal/application/user/login_test.go
+  s_9bb12de784775b::t_f6e245cceb8811 96
+  s_9bb12de784775b::t_ff467dae3d4b86 261,285
+training-and-judge-center-backend/internal/application/user/admin_deactivate_user_test.go
+  s_9bb12de784775b::t_9a5e499c03ea9d 148,176,200
+training-and-judge-center-backend/internal/application/user/confirm_deactivation_test.go
+  s_9bb12de784775b::t_47051324bf2f69 321
+  s_9bb12de784775b::t_9d33d6bb0c6144 136
+  s_9bb12de784775b::t_fe3b93290fd6d0 375,413
+training-and-judge-center-backend/internal/application/user/confirm_email_change_test.go
+  s_9bb12de784775b::t_facca31fae7d0e 104,142
+  s_9bb12de784775b::t_5453f54971f1b6 216,239,270
+  s_9bb12de784775b::t_db3c1631bed5eb 198
+training-and-judge-center-backend/internal/application/user/request_password_recovery_test.go
+  s_9bb12de784775b::t_5f0baf284aa4ce 134
+training-and-judge-center-backend/internal/application/user/create_user_test.go
+  s_9bb12de784775b::t_16cb776adfe391 137
+  s_9bb12de784775b::t_471e07df48a8fb 71
+training-and-judge-center-backend/internal/application/user/update_password_test.go
+  s_9bb12de784775b::t_5749e3c3582686 90,122,151
+  s_9bb12de784775b::t_f2265b602f09c4 179,208
+training-and-judge-center-backend/internal/application/user/request_email_change_test.go
+  s_9bb12de784775b::t_6a2009b5a35cf5 120
+training-and-judge-center-backend/internal/application/user/get_user_profile_test.go
+  s_9bb12de784775b::t_82631a9931f7c6 76
+  s_9bb12de784775b::t_d8b44ef1cbd8bb 213
+training-and-judge-center-backend/internal/application/user/admin_update_user_test.go
+  s_9bb12de784775b::t_6f2b944a939368 206,235
+  s_9bb12de784775b::t_f4f36069603d31 123,149,261,312,365
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.5",
+  "base_commit_sha": "48a139950d86182f220a03a4445ce3d8d90e3159",
+  "prompts": {},
+  "humans": {
+    "h_449cdb19da0522": {
+      "author": "AlexaVJ <alexandra19vela@gmail.com>"
+    }
+  },
+  "sessions": {
+    "s_9bb12de784775b": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "e67fd454-0f32-4672-b007-ae6b0c613265",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "AlexaVJ <alexandra19vela@gmail.com>"
+    }
+  }
+}
