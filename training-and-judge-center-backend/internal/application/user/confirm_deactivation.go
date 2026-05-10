@@ -57,7 +57,7 @@ func (uc *ConfirmDeactivationUseCase) Execute(ctx context.Context, input Confirm
 		return nil, apperror.NewInternal()
 	}
 	if foundUser == nil || foundUser.Status() == user.StatusDeactivated {
-		return nil, apperror.NewConflict(ErrCodeAlreadyDeactivated, "User account is already deactivated or doesn't exist")
+		return nil, apperror.NewConflict(user.ErrCodeAlreadyDeactivated, "User account is already deactivated or doesn't exist")
 	}
 
 	req, err := uc.deactRepo.FindPendingByUserID(ctx, input.UserID)

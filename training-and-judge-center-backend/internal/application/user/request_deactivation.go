@@ -46,7 +46,7 @@ func (uc *RequestDeactivationUseCase) Execute(ctx context.Context, input Request
 	}
 
 	if foundUser.Role() == domainShared.RoleAdmin {
-		return apperror.NewForbidden(ErrCodeForbidden, "Administrators cannot deactivate their own account")
+		return apperror.NewForbidden(ErrCodeAdminCannotRequestDeactivation, "Administrators cannot deactivate their own account")
 	}
 
 	now := time.Now()

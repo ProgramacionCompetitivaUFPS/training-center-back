@@ -113,7 +113,7 @@ func TestRequestDeactivation_AdminForbidden(t *testing.T) {
 		t.Fatal("expected error, got nil")
 	}
 	appErr, ok := err.(*apperror.AppError)
-	if !ok || appErr.Code != ErrCodeForbidden {
+	if !ok || appErr.Code != ErrCodeAdminCannotRequestDeactivation {
 		t.Errorf("expected FORBIDDEN error, got %v", err)
 	}
 }
