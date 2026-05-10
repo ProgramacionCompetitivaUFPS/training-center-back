@@ -65,8 +65,8 @@ func TestAdminDeactivateUser_SelfDeactivation(t *testing.T) {
 	if !ok {
 		t.Fatalf("expected *apperror.AppError, got %T", err)
 	}
-	if appErr.Code != domain.ErrCodeCannotSelfDeactivate {
-		t.Errorf("expected code %q, got %q", domain.ErrCodeCannotSelfDeactivate, appErr.Code)
+	if appErr.Code != ErrCodeCannotSelfDeactivate {
+		t.Errorf("expected code %q, got %q", ErrCodeCannotSelfDeactivate, appErr.Code)
 	}
 	if appErr.Kind != apperror.KindForbidden {
 		t.Errorf("expected kind FORBIDDEN, got %s", appErr.Kind)
@@ -82,7 +82,7 @@ func TestAdminDeactivateUser_TargetNotFound(t *testing.T) {
 		t.Fatal("expected error, got nil")
 	}
 	appErr := err.(*apperror.AppError)
-	if appErr.Code != apperror.ErrCodeNotFound {
+	if appErr.Code != domain.ErrCodeUserNotFound {
 		t.Errorf("expected code NOT_FOUND, got %q", appErr.Code)
 	}
 }
@@ -103,8 +103,8 @@ func TestAdminDeactivateUser_CannotDeactivateAdmin(t *testing.T) {
 	if !ok {
 		t.Fatalf("expected *apperror.AppError, got %T", err)
 	}
-	if appErr.Code != domain.ErrCodeCannotDeactivateAdmin {
-		t.Errorf("expected code %q, got %q", domain.ErrCodeCannotDeactivateAdmin, appErr.Code)
+	if appErr.Code != ErrCodeCannotDeactivateAdmin {
+		t.Errorf("expected code %q, got %q", ErrCodeCannotDeactivateAdmin, appErr.Code)
 	}
 	if appErr.Kind != apperror.KindForbidden {
 		t.Errorf("expected kind FORBIDDEN, got %s", appErr.Kind)
@@ -145,7 +145,7 @@ func TestAdminDeactivateUser_RepositoryFindError(t *testing.T) {
 		t.Fatal("expected error, got nil")
 	}
 	appErr := err.(*apperror.AppError)
-	if appErr.Code != "INTERNAL_ERROR" {
+	if appErr.Code != apperror.ErrCodeInternalError {
 		t.Errorf("expected code INTERNAL_ERROR, got %q", appErr.Code)
 	}
 }
@@ -173,7 +173,7 @@ func TestAdminDeactivateUser_SessionInvalidationError_DoesNotPersist(t *testing.
 		t.Fatal("expected error when session invalidation fails, got nil")
 	}
 	appErr := err.(*apperror.AppError)
-	if appErr.Code != "INTERNAL_ERROR" {
+	if appErr.Code != apperror.ErrCodeInternalError {
 		t.Errorf("expected code INTERNAL_ERROR, got %q", appErr.Code)
 	}
 	if updateCalled {
@@ -197,7 +197,7 @@ func TestAdminDeactivateUser_RepositoryUpdateError(t *testing.T) {
 		t.Fatal("expected error, got nil")
 	}
 	appErr := err.(*apperror.AppError)
-	if appErr.Code != "INTERNAL_ERROR" {
+	if appErr.Code != apperror.ErrCodeInternalError {
 		t.Errorf("expected code INTERNAL_ERROR, got %q", appErr.Code)
 	}
 }

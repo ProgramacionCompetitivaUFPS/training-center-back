@@ -40,7 +40,7 @@ func (uc *RemoveModifierUseCase) Execute(ctx context.Context, input RemoveModifi
 	isAdmin := input.CurrentUser.IsAdmin()
 
 	if !isAuthor && !isAdmin {
-		return apperror.NewForbidden(apperror.ErrCodeForbidden, "Only the author or Admin can remove modifiers")
+		return apperror.NewForbidden(ErrCodeInsufficientPermissions, "Only the author or Admin can remove modifiers")
 	}
 
 	modifierID, err := shared.NewUserID(input.UserID)

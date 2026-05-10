@@ -113,7 +113,7 @@ func TestRequestDeactivation_AdminForbidden(t *testing.T) {
 		t.Fatal("expected error, got nil")
 	}
 	appErr, ok := err.(*apperror.AppError)
-	if !ok || appErr.Code != "FORBIDDEN" {
+	if !ok || appErr.Code != ErrCodeAdminCannotRequestDeactivation {
 		t.Errorf("expected FORBIDDEN error, got %v", err)
 	}
 }
@@ -131,7 +131,7 @@ func TestRequestDeactivation_UserNotFound(t *testing.T) {
 		t.Fatal("expected error, got nil")
 	}
 	appErr, ok := err.(*apperror.AppError)
-	if !ok || appErr.Code != "NOT_FOUND" {
+	if !ok || appErr.Code != domain.ErrCodeUserNotFound {
 		t.Errorf("expected NOT_FOUND error, got %v", err)
 	}
 }
@@ -149,7 +149,7 @@ func TestRequestDeactivation_UserRepoError(t *testing.T) {
 		t.Fatal("expected error, got nil")
 	}
 	appErr, ok := err.(*apperror.AppError)
-	if !ok || appErr.Code != "INTERNAL_ERROR" {
+	if !ok || appErr.Code != apperror.ErrCodeInternalError {
 		t.Errorf("expected INTERNAL_ERROR, got %v", err)
 	}
 }
@@ -172,7 +172,7 @@ func TestRequestDeactivation_InvalidatePendingError(t *testing.T) {
 		t.Fatal("expected error, got nil")
 	}
 	appErr, ok := err.(*apperror.AppError)
-	if !ok || appErr.Code != "INTERNAL_ERROR" {
+	if !ok || appErr.Code != apperror.ErrCodeInternalError {
 		t.Errorf("expected INTERNAL_ERROR, got %v", err)
 	}
 }
@@ -195,7 +195,7 @@ func TestRequestDeactivation_SaveError(t *testing.T) {
 		t.Fatal("expected error, got nil")
 	}
 	appErr, ok := err.(*apperror.AppError)
-	if !ok || appErr.Code != "INTERNAL_ERROR" {
+	if !ok || appErr.Code != apperror.ErrCodeInternalError {
 		t.Errorf("expected INTERNAL_ERROR, got %v", err)
 	}
 }
@@ -218,7 +218,7 @@ func TestRequestDeactivation_EmailDeliveryFailure(t *testing.T) {
 		t.Fatal("expected error, got nil")
 	}
 	appErr, ok := err.(*apperror.AppError)
-	if !ok || appErr.Code != "EMAIL_DELIVERY_FAILED" {
+	if !ok || appErr.Code != ErrCodeEmailDeliveryFailed {
 		t.Errorf("expected EMAIL_DELIVERY_FAILED, got %v", err)
 	}
 }

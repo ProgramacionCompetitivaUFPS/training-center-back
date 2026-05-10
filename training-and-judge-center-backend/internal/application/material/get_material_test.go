@@ -29,7 +29,7 @@ func TestGetMaterial_NotVisibleGroup_NonMember_Returns403(t *testing.T) {
 		GroupID:     testGroupID,
 		MaterialID:  testMaterialID,
 	})
-	assertErrCode(t, err, ErrCodeInsufficientPerms)
+	assertErrCode(t, err, ErrCodeInsufficientPermissions)
 }
 
 func TestGetMaterial_NotVisibleGroup_Admin_CanAccess(t *testing.T) {

@@ -12,7 +12,6 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	infraPostgres "github.com/training-judge-center/backend/internal/adapter/postgres"
 
-	appGroup "github.com/training-judge-center/backend/internal/application/group"
 	domainGroup "github.com/training-judge-center/backend/internal/domain/group"
 	"github.com/training-judge-center/backend/internal/domain/shared"
 	"github.com/training-judge-center/backend/pkg/apperror"
@@ -44,7 +43,7 @@ func (r *JoinRequestRepository) Save(ctx context.Context, req *domainGroup.JoinR
 	if err != nil {
 		var pgErr *pgconn.PgError
 		if errors.As(err, &pgErr) && pgErr.Code == "23505" {
-			return apperror.NewConflict(appGroup.ErrCodeRequestAlreadyPending, "a pending request already exists for this user and group")
+			return apperror.NewConflict(domainGroup.ErrCodeRequestAlreadyPending, "a pending request already exists for this user and group")
 		}
 		slog.ErrorContext(ctx, "JoinRequestRepository.Save failed", "error", err)
 		return apperror.NewInternal()

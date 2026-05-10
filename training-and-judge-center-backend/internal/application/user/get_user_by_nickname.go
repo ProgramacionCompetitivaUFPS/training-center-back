@@ -43,7 +43,7 @@ func (uc *GetUserByNicknameUseCase) Execute(ctx context.Context, in GetUserByNic
 	}
 	
 	if targetUser == nil || targetUser.Status() == domain.StatusDeactivated {
-		return nil, apperror.NewNotFound("NOT_FOUND", "User not found")
+		return nil, apperror.NewNotFound(domain.ErrCodeUserNotFound, "User not found")
 	}
 
 	isSelf := targetUser.ID() == in.RequesterID
@@ -54,7 +54,7 @@ func (uc *GetUserByNicknameUseCase) Execute(ctx context.Context, in GetUserByNic
 	isRequesterAdmin := in.RequesterRole == shared.RoleAdmin
 
 	if !isRequesterAdmin && targetUser.Role() == shared.RoleAdmin {
-		return nil, apperror.NewForbidden("ADMIN_PROFILE_RESTRICTED", "Admin profiles are not accessible to non-admin users")
+		return nil, apperror.NewForbidden(ErrCodeAdminProfileRestricted, "Admin profiles are not accessible to non-admin users")
 	}
 
 	return &GetUserByNicknameOutput{User: userToDTO(targetUser), IsFullProfile: isRequesterAdmin}, nil

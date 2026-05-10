@@ -50,7 +50,7 @@ func (usecase *DeleteProblemFileUseCase) Execute(ctx context.Context, input Dele
 	}
 
 	if !foundProblem.CanBeEditedBy(shared.RestoreUserID(input.CurrentUser.ID), input.CurrentUser.IsAdmin()) {
-		return apperror.NewForbidden(apperror.ErrCodeForbidden, "Only the problem author, Admin, or assigned modifiers can update this problem")
+		return apperror.NewForbidden(ErrCodeInsufficientPermissions, "Only the problem author, Admin, or assigned modifiers can update this problem")
 	}
 
 	var storageKeyToDelete string
@@ -61,7 +61,7 @@ func (usecase *DeleteProblemFileUseCase) Execute(ctx context.Context, input Dele
 	switch fileType {
 	case FileTypeTestCases:
 		if input.FileName != "" {
-			return apperror.NewBadRequest(apperror.ErrCodeBadRequest, "fileName is not applicable for testCases deletion")
+			return apperror.NewBadRequest(ErrCodeFileNameNotApplicable, "fileName is not applicable for testCases deletion")
 		}
 		if foundProblem.TestCasesKey() == nil {
 			return apperror.NewNotFound(ErrCodeProblemFileNotFound, "This problem has no test cases to delete")
@@ -91,7 +91,7 @@ func (usecase *DeleteProblemFileUseCase) Execute(ctx context.Context, input Dele
 
 	case FileTypeChecker:
 		if input.FileName != "" {
-			return apperror.NewBadRequest(apperror.ErrCodeBadRequest, "fileName is not applicable for checker deletion")
+			return apperror.NewBadRequest(ErrCodeFileNameNotApplicable, "fileName is not applicable for checker deletion")
 		}
 		if foundProblem.Checker() == nil {
 			return apperror.NewNotFound(ErrCodeProblemFileNotFound, "This problem has no checker to delete")
@@ -101,7 +101,7 @@ func (usecase *DeleteProblemFileUseCase) Execute(ctx context.Context, input Dele
 
 	case FileTypeValidator:
 		if input.FileName != "" {
-			return apperror.NewBadRequest(apperror.ErrCodeBadRequest, "fileName is not applicable for validator deletion")
+			return apperror.NewBadRequest(ErrCodeFileNameNotApplicable, "fileName is not applicable for validator deletion")
 		}
 		if foundProblem.Validator() == nil {
 			return apperror.NewNotFound(ErrCodeProblemFileNotFound, "This problem has no validator to delete")

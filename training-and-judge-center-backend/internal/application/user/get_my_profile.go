@@ -32,7 +32,7 @@ func (uc *GetMyProfileUseCase) Execute(ctx context.Context, in GetMyProfileInput
 		return nil, apperror.NewInternal()
 	}
 	if foundUser == nil {
-		return nil, apperror.NewNotFound("NOT_FOUND", "User not found")
+		return nil, apperror.NewNotFound(domain.ErrCodeUserNotFound, "User not found")
 	}
 	return &GetMyProfileOutput{User: userToDTO(foundUser), IsFullProfile: true}, nil
 }

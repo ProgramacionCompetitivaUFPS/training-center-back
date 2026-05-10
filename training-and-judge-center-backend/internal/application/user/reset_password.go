@@ -56,7 +56,7 @@ func (uc *ResetPasswordUseCase) Execute(ctx context.Context, input ResetPassword
 		return nil, apperror.NewInternal()
 	}
 	if foundUser == nil || foundUser.Status() == user.StatusDeactivated {
-		return nil, errInvalidRecoveryAttempt
+		return nil, apperror.NewBadRequest(ErrCodeInvalidRecoveryAttempt, "Invalid email or recovery code")
 	}
 
 	req, err := uc.recoveryRepo.FindPendingByUserID(ctx, foundUser.ID())
@@ -65,12 +65,12 @@ func (uc *ResetPasswordUseCase) Execute(ctx context.Context, input ResetPassword
 		return nil, apperror.NewInternal()
 	}
 	if req == nil {
-		return nil, errInvalidRecoveryAttempt
+		return nil, apperror.NewBadRequest(ErrCodeInvalidRecoveryAttempt, "Invalid email or recovery code")
 	}
 
 	now := time.Now()
 	if req.IsExpired(now) || subtle.ConstantTimeCompare([]byte(req.Code()), []byte(input.Code)) != 1 {
-		return nil, errInvalidRecoveryAttempt
+		return nil, apperror.NewBadRequest(ErrCodeInvalidRecoveryAttempt, "Invalid email or recovery code")
 	}
 
 	newPassword, err := user.NewPassword(input.NewPassword)

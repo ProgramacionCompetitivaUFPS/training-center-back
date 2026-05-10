@@ -50,7 +50,7 @@ func NewImportProblemUseCase(
 
 func (uc *ImportProblemUseCase) Execute(ctx context.Context, input ImportProblemInput) (*ImportProblemOutput, error) {
 	if input.CurrentUser.Role != shared.RoleCoach && !input.CurrentUser.IsAdmin() {
-		return nil, apperror.NewForbidden(apperror.ErrCodeForbidden, "Only Coach and Admin users can import problems")
+		return nil, apperror.NewForbidden(ErrCodeInsufficientPermissions, "Only Coach and Admin users can import problems")
 	}
 
 	slug, err := problem.NewSlug(input.Slug)

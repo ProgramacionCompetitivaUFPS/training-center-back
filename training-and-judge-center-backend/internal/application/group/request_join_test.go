@@ -75,7 +75,7 @@ func TestRequestJoin_AlreadyMemberReturns409(t *testing.T) {
 		CurrentUser: currentUser("u1", shared.RoleContestant),
 	})
 	ae, ok := err.(*apperror.AppError)
-	if !ok || ae.Code != ErrCodeAlreadyMember {
+	if !ok || ae.Code != domainGroup.ErrCodeAlreadyMember {
 		t.Fatalf("expected ALREADY_MEMBER, got %v", err)
 	}
 }
@@ -93,7 +93,7 @@ func TestRequestJoin_AlreadyPendingReturns409(t *testing.T) {
 		CurrentUser: currentUser("u1", shared.RoleContestant),
 	})
 	ae, ok := err.(*apperror.AppError)
-	if !ok || ae.Code != ErrCodeRequestAlreadyPending {
+	if !ok || ae.Code != domainGroup.ErrCodeRequestAlreadyPending {
 		t.Fatalf("expected REQUEST_ALREADY_PENDING, got %v", err)
 	}
 }

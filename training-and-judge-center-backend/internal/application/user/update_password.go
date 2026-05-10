@@ -44,7 +44,7 @@ func (uc *UpdatePasswordUseCase) Execute(ctx context.Context, input UpdatePasswo
 		return nil, apperror.NewInternal()
 	}
 	if !allowed {
-		return nil, apperror.NewTooManyRequests("TOO_MANY_REQUESTS", "Too many password update attempts. Please try again in an hour.", 3600)
+		return nil, apperror.NewTooManyRequests(ErrCodeTooManyRequests, "Too many password update attempts. Please try again in an hour.", 3600)
 	}
 
 	foundUser, err := uc.repo.FindByID(ctx, input.UserID)
@@ -53,7 +53,7 @@ func (uc *UpdatePasswordUseCase) Execute(ctx context.Context, input UpdatePasswo
 		return nil, apperror.NewInternal()
 	}
 	if foundUser == nil {
-		return nil, apperror.NewNotFound("NOT_FOUND", "User not found")
+		return nil, apperror.NewNotFound(user.ErrCodeUserNotFound, "User not found")
 	}
 
 	if !foundUser.Password().Compare(input.CurrentPassword) {

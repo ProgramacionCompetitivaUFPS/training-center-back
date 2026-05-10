@@ -70,7 +70,7 @@ func (uc *PinMaterialUseCase) Execute(ctx context.Context, in PinMaterialInput) 
 	}
 
 	if !m.CanModifyPinStateBy(shared.RestoreUserID(in.CurrentUser.ID), in.CurrentUser.IsAdmin(), isGroupLead) {
-		return nil, apperror.NewForbidden(ErrCodeInsufficientPerms, "only the material author, a group lead, or an admin can pin materials")
+		return nil, apperror.NewForbidden(ErrCodeInsufficientPermissions, "only the material author, a group lead, or an admin can pin materials")
 	}
 
 	// Idempotent: already-pinned materials return 200 with current state.

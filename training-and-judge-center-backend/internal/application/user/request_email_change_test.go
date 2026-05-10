@@ -74,7 +74,7 @@ func TestRequestEmailChange_WrongPassword(t *testing.T) {
 	}
 
 	appErr, ok := err.(*apperror.AppError)
-	if !ok || appErr.Code != "INVALID_CREDENTIALS" {
+	if !ok || appErr.Code != ErrCodeInvalidCredentials {
 		t.Errorf("expected INVALID_CREDENTIALS error, got %v", err)
 	}
 }
@@ -96,7 +96,7 @@ func TestRequestEmailChange_UserNotFound(t *testing.T) {
 		t.Fatal("expected error, got nil")
 	}
 	appErr, ok := err.(*apperror.AppError)
-	if !ok || appErr.Code != "INVALID_CREDENTIALS" {
+	if !ok || appErr.Code != ErrCodeInvalidCredentials {
 		t.Errorf("expected INVALID_CREDENTIALS, got %v", err)
 	}
 }
@@ -117,7 +117,7 @@ func TestRequestEmailChange_InvalidNewEmail(t *testing.T) {
 		t.Fatal("expected error, got nil")
 	}
 	appErr, ok := err.(*apperror.AppError)
-	if !ok || appErr.Code != "VALIDATION_ERROR" {
+	if !ok || appErr.Code != apperror.ErrCodeValidationError {
 		t.Errorf("expected VALIDATION_ERROR, got %v", err)
 	}
 	if len(appErr.Details) == 0 || appErr.Details[0].Field != "newEmail" {
@@ -156,7 +156,7 @@ func TestRequestEmailChange_EmailDeliveryFails(t *testing.T) {
 	}
 
 	appErr, ok := err.(*apperror.AppError)
-	if !ok || appErr.Code != "EMAIL_DELIVERY_FAILED" {
+	if !ok || appErr.Code != ErrCodeEmailDeliveryFailed {
 		t.Errorf("expected EMAIL_DELIVERY_FAILED error, got %v", err)
 	}
 	if appErr.Kind != apperror.KindServiceUnavailable {

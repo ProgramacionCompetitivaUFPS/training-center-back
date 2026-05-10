@@ -38,7 +38,7 @@ func (uc *ListModifiersUseCase) Execute(ctx context.Context, input ListModifiers
 	}
 
 	if !p.CanBeEditedBy(shared.RestoreUserID(input.CurrentUser.ID), input.CurrentUser.IsAdmin()) {
-		return nil, apperror.NewForbidden(apperror.ErrCodeForbidden, "Only the problem author, Admin, or assigned modifiers can view modifiers")
+		return nil, apperror.NewForbidden(ErrCodeInsufficientPermissions, "Only the problem author, Admin, or assigned modifiers can view modifiers")
 	}
 
 	nicknames := make([]string, len(p.ModifierIDs()))

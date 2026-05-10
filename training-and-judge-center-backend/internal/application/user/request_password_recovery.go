@@ -44,7 +44,7 @@ func (uc *RequestPasswordRecoveryUseCase) Execute(ctx context.Context, input Req
 		return apperror.NewInternal()
 	}
 	if !allowed {
-		return apperror.NewTooManyRequests("RATE_LIMIT_EXCEEDED", "Too many recovery requests. Please try again later.", 3600)
+		return apperror.NewTooManyRequests(ErrCodeTooManyRequests, "Too many recovery requests. Please try again later.", 3600)
 	}
 
 	emailVO, err := user.NewEmail(input.Email)

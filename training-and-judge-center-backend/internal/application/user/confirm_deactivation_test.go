@@ -133,7 +133,7 @@ func TestConfirmDeactivation_InvalidCode(t *testing.T) {
 		t.Fatal("expected error, got nil")
 	}
 	appErr, ok := err.(*apperror.AppError)
-	if !ok || appErr.Code != "INVALID_CODE" {
+	if !ok || appErr.Code != ErrCodeInvalidCode {
 		t.Errorf("expected INVALID_CODE, got %v", err)
 	}
 }
@@ -318,7 +318,7 @@ func TestConfirmDeactivation_BlockExpired_MarksExpiredAndReturnsError(t *testing
 		t.Fatal("expected error, got nil")
 	}
 	appErr, ok := err.(*apperror.AppError)
-	if !ok || appErr.Code != "EXPIRED_CODE" {
+	if !ok || appErr.Code != ErrCodeExpiredCode {
 		t.Errorf("expected EXPIRED_CODE after block expiry, got %v", err)
 	}
 }
@@ -372,7 +372,7 @@ func TestConfirmDeactivation_ActiveBlock(t *testing.T) {
 		t.Fatal("expected error, got nil")
 	}
 	appErr, ok := err.(*apperror.AppError)
-	if !ok || appErr.Code != "MAX_ATTEMPTS_EXCEEDED" {
+	if !ok || appErr.Code != ErrCodeMaxAttemptsExceeded {
 		t.Errorf("expected MAX_ATTEMPTS_EXCEEDED, got %v", err)
 	}
 }
@@ -410,7 +410,7 @@ func TestConfirmDeactivation_ExceedAttemptsAndBlock(t *testing.T) {
 		t.Fatal("expected error, got nil")
 	}
 	appErr, ok := err.(*apperror.AppError)
-	if !ok || appErr.Code != "MAX_ATTEMPTS_EXCEEDED" {
+	if !ok || appErr.Code != ErrCodeMaxAttemptsExceeded {
 		t.Errorf("expected MAX_ATTEMPTS_EXCEEDED, got %v", err)
 	}
 }

@@ -96,7 +96,7 @@ func TestJoinGroup_AlreadyMemberReturns409(t *testing.T) {
 	})
 
 	ae, ok := err.(*apperror.AppError)
-	if !ok || ae.Code != ErrCodeAlreadyMember {
+	if !ok || ae.Code != domainGroup.ErrCodeAlreadyMember {
 		t.Fatalf("expected ALREADY_MEMBER, got %v", err)
 	}
 	if ae.Kind != apperror.KindConflict {

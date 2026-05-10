@@ -99,7 +99,7 @@ func checkGroupAccess(ctx context.Context, mp GroupMemberProvider, user appshare
 		return apperror.NewInternal()
 	}
 	if !isMember {
-		return apperror.NewForbidden(ErrCodeInsufficientPerms, "you do not have permission to view materials in this group")
+		return apperror.NewForbidden(ErrCodeInsufficientPermissions, "you do not have permission to view materials in this group")
 	}
 	return nil
 }

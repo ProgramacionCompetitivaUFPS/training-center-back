@@ -49,7 +49,7 @@ func TestGetMyProfile_UserNotFound(t *testing.T) {
 	if !ok {
 		t.Fatalf("expected *apperror.AppError, got %T", err)
 	}
-	if appErr.Code != "NOT_FOUND" {
+	if appErr.Code != domain.ErrCodeUserNotFound {
 		t.Errorf("expected code NOT_FOUND, got %q", appErr.Code)
 	}
 	if appErr.Kind != apperror.KindNotFound {
@@ -73,7 +73,7 @@ func TestGetMyProfile_RepositoryError(t *testing.T) {
 	if !ok {
 		t.Fatalf("expected *apperror.AppError, got %T", err)
 	}
-	if appErr.Code != "INTERNAL_ERROR" {
+	if appErr.Code != apperror.ErrCodeInternalError {
 		t.Errorf("expected code INTERNAL_ERROR, got %q", appErr.Code)
 	}
 }
@@ -149,7 +149,7 @@ func TestGetByNickname_NonAdminViewsAdmin(t *testing.T) {
 	if !ok {
 		t.Fatalf("expected *apperror.AppError, got %T", err)
 	}
-	if appErr.Code != "ADMIN_PROFILE_RESTRICTED" {
+	if appErr.Code != ErrCodeAdminProfileRestricted {
 		t.Errorf("expected code ADMIN_PROFILE_RESTRICTED, got %q", appErr.Code)
 	}
 	if appErr.Kind != apperror.KindForbidden {
@@ -174,7 +174,7 @@ func TestGetByNickname_DeactivatedUser(t *testing.T) {
 	if !ok {
 		t.Fatalf("expected *apperror.AppError, got %T", err)
 	}
-	if appErr.Code != "NOT_FOUND" {
+	if appErr.Code != domain.ErrCodeUserNotFound {
 		t.Errorf("expected code NOT_FOUND, got %q", appErr.Code)
 	}
 }
@@ -192,7 +192,7 @@ func TestGetByNickname_UserNotFound(t *testing.T) {
 	if !ok {
 		t.Fatalf("expected *apperror.AppError, got %T", err)
 	}
-	if appErr.Code != "NOT_FOUND" {
+	if appErr.Code != domain.ErrCodeUserNotFound {
 		t.Errorf("expected code NOT_FOUND, got %q", appErr.Code)
 	}
 }
@@ -210,7 +210,7 @@ func TestGetByNickname_InvalidNickname(t *testing.T) {
 	if !ok {
 		t.Fatalf("expected *apperror.AppError, got %T", err)
 	}
-	if appErr.Code != "VALIDATION_ERROR" {
+	if appErr.Code != apperror.ErrCodeValidationError {
 		t.Errorf("expected code VALIDATION_ERROR, got %q", appErr.Code)
 	}
 	if appErr.Kind != apperror.KindValidation {
@@ -235,7 +235,7 @@ func TestGetByNickname_AdminViewsDeactivated(t *testing.T) {
 	if !ok {
 		t.Fatalf("expected *apperror.AppError, got %T", err)
 	}
-	if appErr.Code != "NOT_FOUND" {
+	if appErr.Code != domain.ErrCodeUserNotFound {
 		t.Errorf("expected code NOT_FOUND, got %q (deactivated users return 404 even for admins)", appErr.Code)
 	}
 }

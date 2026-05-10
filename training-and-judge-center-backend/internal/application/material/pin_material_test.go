@@ -152,7 +152,7 @@ func TestPinMaterial_Forbidden_Member(t *testing.T) {
 	})
 
 	var appErr *apperror.AppError
-	if !errors.As(err, &appErr) || appErr.Code != ErrCodeInsufficientPerms {
+	if !errors.As(err, &appErr) || appErr.Code != ErrCodeInsufficientPermissions {
 		t.Errorf("expected INSUFFICIENT_PERMISSIONS, got %v", err)
 	}
 }

@@ -40,7 +40,7 @@ func NewCreateProblemUseCase(repo problem.Repository, platformSettings problem.P
 
 func (usecase *CreateProblemUseCase) Execute(ctx context.Context, input CreateProblemInput) (*CreateProblemOutput, error) {
 	if input.CurrentUser.Role != shared.RoleCoach && !input.CurrentUser.IsAdmin() {
-		return nil, apperror.NewForbidden(apperror.ErrCodeForbidden, "Only Coach and Admin users can create problems")
+		return nil, apperror.NewForbidden(ErrCodeInsufficientPermissions, "Only Coach and Admin users can create problems")
 	}
 
 	slug, err := problem.NewSlug(input.Slug)

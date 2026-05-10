@@ -54,7 +54,7 @@ func (uc *GetProblemUseCase) Execute(ctx context.Context, in GetProblemInput) (*
 	isModifier := p.CanBeEditedBy(viewerID, isAdmin)
 
 	if p.Status().String() == "DRAFT" && !isModifier {
-		return nil, apperror.NewForbidden(apperror.ErrCodeForbidden, "Only the problem author, Admin, or assigned modifiers can view this DRAFT problem")
+		return nil, apperror.NewForbidden(ErrCodeInsufficientPermissions, "Only the problem author, Admin, or assigned modifiers can view this DRAFT problem")
 	}
 
 	authorDisplay, err := uc.userProvider.GetDisplay(ctx, p.AuthorID().Value())
