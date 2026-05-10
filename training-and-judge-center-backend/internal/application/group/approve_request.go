@@ -52,8 +52,8 @@ func (uc *ApproveRequestUseCase) Execute(ctx context.Context, input ApproveReque
 		return nil, err
 	}
 
-	if err := uc.txManager.WithTx(ctx, func(ctx context.Context) error {
-		existing, err := uc.memberRepo.FindByGroupAndUser(ctx, input.GroupID, req.RequesterUserID())
+	if err := uc.txManager.WithTx(ctx, func(txCtx context.Context) error {
+		existing, err := uc.memberRepo.FindByGroupAndUser(txCtx, input.GroupID, req.RequesterUserID())
 		if err != nil {
 			return err
 		}
@@ -61,8 +61,8 @@ func (uc *ApproveRequestUseCase) Execute(ctx context.Context, input ApproveReque
 			return apperror.NewConflict(domainGroup.ErrCodeAlreadyMember, "user is already a member of this group")
 		}
 
-		if err := uc.joinRequestRepo.Save(ctx, req); err != nil {
-			slog.ErrorContext(ctx, "failed to save approved request", "error", err)
+		if err := uc.joinRequestRepo.Save(txCtx, req); err != nil {
+			slog.ErrorContext(txCtx, "failed to save approved request", "error", err)
 			return apperror.NewInternal()
 		}
 
@@ -72,7 +72,7 @@ func (uc *ApproveRequestUseCase) Execute(ctx context.Context, input ApproveReque
 		if err != nil {
 			return err
 		}
-		return uc.memberRepo.Save(ctx, newMember)
+		return uc.memberRepo.Save(txCtx, newMember)
 	}); err != nil {
 		return nil, err
 	}
