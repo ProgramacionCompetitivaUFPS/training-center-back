@@ -1,0 +1,24 @@
+training-and-judge-center-backend/internal/adapter/http/handler/material/handler_test.go
+  s_830f311ffd63c3::t_a3a87d58ac1b62 240,471
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.5",
+  "base_commit_sha": "38226710caf3e2f9d503152b76f45e452d021563",
+  "prompts": {},
+  "humans": {
+    "h_449cdb19da0522": {
+      "author": "AlexaVJ <alexandra19vela@gmail.com>"
+    }
+  },
+  "sessions": {
+    "s_830f311ffd63c3": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "630e26e8-340a-4086-b671-53afcbd3e463",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "AlexaVJ <alexandra19vela@gmail.com>"
+    }
+  }
+}
