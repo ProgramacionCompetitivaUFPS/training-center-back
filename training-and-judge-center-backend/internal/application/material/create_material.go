@@ -62,7 +62,7 @@ func (uc *CreateMaterialUseCase) Execute(ctx context.Context, in CreateMaterialI
 			return nil, apperror.NewInternal()
 		}
 		if !isLead {
-			return nil, apperror.NewForbidden(ErrCodeInsufficientPerms, "only group leads can create materials")
+			return nil, apperror.NewForbidden(ErrCodeInsufficientPermissions, "only group leads can create materials")
 		}
 	}
 
