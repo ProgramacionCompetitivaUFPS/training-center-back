@@ -83,8 +83,8 @@ func TestAddModifier_UserNotFound(t *testing.T) {
 	if !ok {
 		t.Fatalf("expected *apperror.AppError, got %T", err)
 	}
-	if appErr.Code != "USER_NOT_FOUND" {
-		t.Errorf("expected USER_NOT_FOUND, got %q", appErr.Code)
+	if appErr.Code != ErrCodeUserNotFound {
+		t.Errorf("expected %s, got %q", ErrCodeUserNotFound, appErr.Code)
 	}
 }
 
