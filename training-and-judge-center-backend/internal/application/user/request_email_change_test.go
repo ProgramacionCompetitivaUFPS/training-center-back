@@ -117,7 +117,7 @@ func TestRequestEmailChange_InvalidNewEmail(t *testing.T) {
 		t.Fatal("expected error, got nil")
 	}
 	appErr, ok := err.(*apperror.AppError)
-	if !ok || appErr.Code != "VALIDATION_ERROR" {
+	if !ok || appErr.Code != apperror.ErrCodeValidationError {
 		t.Errorf("expected VALIDATION_ERROR, got %v", err)
 	}
 	if len(appErr.Details) == 0 || appErr.Details[0].Field != "newEmail" {

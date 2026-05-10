@@ -120,7 +120,7 @@ func TestAdminUpdateUser_EmptyPayload(t *testing.T) {
 	if !ok {
 		t.Fatalf("expected *apperror.AppError, got %T", err)
 	}
-	if appErr.Code != "VALIDATION_ERROR" {
+	if appErr.Code != apperror.ErrCodeValidationError {
 		t.Errorf("expected code VALIDATION_ERROR, got %q", appErr.Code)
 	}
 }
@@ -146,7 +146,7 @@ func TestAdminUpdateUser_CannotAssignAdminRole(t *testing.T) {
 	if !ok {
 		t.Fatalf("expected *apperror.AppError, got %T", err)
 	}
-	if appErr.Code != "VALIDATION_ERROR" {
+	if appErr.Code != apperror.ErrCodeValidationError {
 		t.Errorf("expected code VALIDATION_ERROR, got %q", appErr.Code)
 	}
 	if len(appErr.Details) == 0 || appErr.Details[0].Message != "Cannot assign ADMIN role through this endpoint" {
@@ -203,7 +203,7 @@ func TestAdminUpdateUser_RepositoryFindError(t *testing.T) {
 	if !ok {
 		t.Fatalf("expected *apperror.AppError, got %T", err)
 	}
-	if appErr.Code != "INTERNAL_ERROR" {
+	if appErr.Code != apperror.ErrCodeInternalError {
 		t.Errorf("expected code INTERNAL_ERROR, got %q", appErr.Code)
 	}
 }
@@ -232,7 +232,7 @@ func TestAdminUpdateUser_RepositoryUpdateError(t *testing.T) {
 	if !ok {
 		t.Fatalf("expected *apperror.AppError, got %T", err)
 	}
-	if appErr.Code != "INTERNAL_ERROR" {
+	if appErr.Code != apperror.ErrCodeInternalError {
 		t.Errorf("expected code INTERNAL_ERROR, got %q", appErr.Code)
 	}
 }
@@ -258,7 +258,7 @@ func TestAdminUpdateUser_InvalidRole(t *testing.T) {
 	if !ok {
 		t.Fatalf("expected *apperror.AppError, got %T", err)
 	}
-	if appErr.Code != "VALIDATION_ERROR" {
+	if appErr.Code != apperror.ErrCodeValidationError {
 		t.Errorf("expected code VALIDATION_ERROR, got %q", appErr.Code)
 	}
 	if len(appErr.Details) == 0 || appErr.Details[0].Field != "role" {
@@ -309,7 +309,7 @@ func TestAdminUpdateUser_EmptyCityValidation(t *testing.T) {
 	if !ok {
 		t.Fatalf("expected *apperror.AppError, got %T", err)
 	}
-	if appErr.Code != "VALIDATION_ERROR" {
+	if appErr.Code != apperror.ErrCodeValidationError {
 		t.Errorf("expected code VALIDATION_ERROR, got %q", appErr.Code)
 	}
 }
@@ -362,7 +362,7 @@ func TestAdminUpdateUser_EmptyCountryValidation(t *testing.T) {
 	if !ok {
 		t.Fatalf("expected *apperror.AppError, got %T", err)
 	}
-	if appErr.Code != "VALIDATION_ERROR" {
+	if appErr.Code != apperror.ErrCodeValidationError {
 		t.Errorf("expected code VALIDATION_ERROR, got %q", appErr.Code)
 	}
 }

@@ -82,7 +82,7 @@ func TestResetPassword_InvalidCode(t *testing.T) {
 		t.Fatal("expected error, got nil")
 	}
 	appErr, ok := err.(*apperror.AppError)
-	if !ok || appErr.Code != "INVALID_RECOVERY_ATTEMPT" {
+	if !ok || appErr.Code != ErrCodeInvalidRecoveryAttempt {
 		t.Errorf("expected INVALID_RECOVERY_ATTEMPT, got %v", err)
 	}
 }
@@ -111,7 +111,7 @@ func TestResetPassword_NoPendingRequest(t *testing.T) {
 		t.Fatal("expected error, got nil")
 	}
 	appErr, ok := err.(*apperror.AppError)
-	if !ok || appErr.Code != "INVALID_RECOVERY_ATTEMPT" {
+	if !ok || appErr.Code != ErrCodeInvalidRecoveryAttempt {
 		t.Errorf("expected INVALID_RECOVERY_ATTEMPT, got %v", err)
 	}
 }
@@ -142,7 +142,7 @@ func TestResetPassword_ExpiredRequest(t *testing.T) {
 		t.Fatal("expected error for expired request, got nil")
 	}
 	appErr, ok := err.(*apperror.AppError)
-	if !ok || appErr.Code != "INVALID_RECOVERY_ATTEMPT" {
+	if !ok || appErr.Code != ErrCodeInvalidRecoveryAttempt {
 		t.Errorf("expected INVALID_RECOVERY_ATTEMPT, got %v", err)
 	}
 }
@@ -189,7 +189,7 @@ func TestResetPassword_WeakPassword(t *testing.T) {
 		t.Fatal("expected validation error for weak password, got nil")
 	}
 	appErr, ok := err.(*apperror.AppError)
-	if !ok || appErr.Code != "VALIDATION_ERROR" {
+	if !ok || appErr.Code != apperror.ErrCodeValidationError {
 		t.Errorf("expected VALIDATION_ERROR, got %v", err)
 	}
 	if txCalled {
@@ -218,7 +218,7 @@ func TestResetPassword_UserNotFound(t *testing.T) {
 		t.Fatal("expected error when user not found, got nil")
 	}
 	appErr, ok := err.(*apperror.AppError)
-	if !ok || appErr.Code != "INVALID_RECOVERY_ATTEMPT" {
+	if !ok || appErr.Code != ErrCodeInvalidRecoveryAttempt {
 		t.Errorf("expected INVALID_RECOVERY_ATTEMPT to avoid information leakage, got %v", err)
 	}
 }
@@ -253,7 +253,7 @@ func TestResetPassword_TxFailure(t *testing.T) {
 		t.Fatal("expected error, got nil")
 	}
 	appErr, ok := err.(*apperror.AppError)
-	if !ok || appErr.Code != "INTERNAL_ERROR" {
+	if !ok || appErr.Code != apperror.ErrCodeInternalError {
 		t.Errorf("expected INTERNAL_ERROR, got %v", err)
 	}
 }

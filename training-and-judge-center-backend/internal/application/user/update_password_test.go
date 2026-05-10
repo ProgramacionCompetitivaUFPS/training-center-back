@@ -87,7 +87,7 @@ func TestUpdatePassword_WrongCurrentPassword(t *testing.T) {
 	if !ok {
 		t.Fatalf("expected *apperror.AppError, got %T", err)
 	}
-	if appErr.Code != "VALIDATION_ERROR" {
+	if appErr.Code != apperror.ErrCodeValidationError {
 		t.Errorf("expected code VALIDATION_ERROR, got %q", appErr.Code)
 	}
 	if appErr.Kind != apperror.KindValidation {
@@ -119,7 +119,7 @@ func TestUpdatePassword_WeakNewPassword(t *testing.T) {
 	if !ok {
 		t.Fatalf("expected *apperror.AppError, got %T", err)
 	}
-	if appErr.Code != "VALIDATION_ERROR" {
+	if appErr.Code != apperror.ErrCodeValidationError {
 		t.Errorf("expected code VALIDATION_ERROR, got %q", appErr.Code)
 	}
 	if len(appErr.Details) == 0 || appErr.Details[0].Field != "newPassword" {
@@ -148,7 +148,7 @@ func TestUpdatePassword_SamePassword(t *testing.T) {
 	if !ok {
 		t.Fatalf("expected *apperror.AppError, got %T", err)
 	}
-	if appErr.Code != "VALIDATION_ERROR" {
+	if appErr.Code != apperror.ErrCodeValidationError {
 		t.Errorf("expected code VALIDATION_ERROR, got %q", appErr.Code)
 	}
 	if len(appErr.Details) == 0 || appErr.Details[0].Message != "New password must be different from current password" {
@@ -176,7 +176,7 @@ func TestUpdatePassword_RepositoryFindError(t *testing.T) {
 	if !ok {
 		t.Fatalf("expected *apperror.AppError, got %T", err)
 	}
-	if appErr.Code != "INTERNAL_ERROR" {
+	if appErr.Code != apperror.ErrCodeInternalError {
 		t.Errorf("expected code INTERNAL_ERROR, got %q", appErr.Code)
 	}
 }
@@ -205,7 +205,7 @@ func TestUpdatePassword_RepositoryUpdateError(t *testing.T) {
 	if !ok {
 		t.Fatalf("expected *apperror.AppError, got %T", err)
 	}
-	if appErr.Code != "INTERNAL_ERROR" {
+	if appErr.Code != apperror.ErrCodeInternalError {
 		t.Errorf("expected code INTERNAL_ERROR, got %q", appErr.Code)
 	}
 }

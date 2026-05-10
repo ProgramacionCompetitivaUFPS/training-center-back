@@ -84,7 +84,7 @@ func TestUpdateUser_NoFieldsProvided(t *testing.T) {
 	if !ok {
 		t.Fatalf("expected *apperror.AppError, got %T", err)
 	}
-	if appErr.Code != "VALIDATION_ERROR" {
+	if appErr.Code != apperror.ErrCodeValidationError {
 		t.Errorf("expected code VALIDATION_ERROR, got %q", appErr.Code)
 	}
 	if appErr.Kind != apperror.KindValidation {
@@ -133,7 +133,7 @@ func TestUpdateUser_EmptyNameValidation(t *testing.T) {
 	if !ok {
 		t.Fatalf("expected *apperror.AppError, got %T", err)
 	}
-	if appErr.Code != "VALIDATION_ERROR" {
+	if appErr.Code != apperror.ErrCodeValidationError {
 		t.Errorf("expected code VALIDATION_ERROR, got %q", appErr.Code)
 	}
 }
@@ -209,7 +209,7 @@ func TestUpdateUser_RepositoryUpdateError(t *testing.T) {
 	if !ok {
 		t.Fatalf("expected *apperror.AppError, got %T", err)
 	}
-	if appErr.Code != "INTERNAL_ERROR" {
+	if appErr.Code != apperror.ErrCodeInternalError {
 		t.Errorf("expected code INTERNAL_ERROR, got %q", appErr.Code)
 	}
 }
@@ -277,7 +277,7 @@ func TestUpdateUser_EmptyCityValidation(t *testing.T) {
 	if !ok {
 		t.Fatalf("expected *apperror.AppError, got %T", err)
 	}
-	if appErr.Code != "VALIDATION_ERROR" {
+	if appErr.Code != apperror.ErrCodeValidationError {
 		t.Errorf("expected code VALIDATION_ERROR, got %q", appErr.Code)
 	}
 }
@@ -301,7 +301,7 @@ func TestUpdateUser_EmptyCountryValidation(t *testing.T) {
 	if !ok {
 		t.Fatalf("expected *apperror.AppError, got %T", err)
 	}
-	if appErr.Code != "VALIDATION_ERROR" {
+	if appErr.Code != apperror.ErrCodeValidationError {
 		t.Errorf("expected code VALIDATION_ERROR, got %q", appErr.Code)
 	}
 }

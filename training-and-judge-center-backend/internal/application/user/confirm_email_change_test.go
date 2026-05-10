@@ -101,7 +101,7 @@ func TestConfirmEmailChange_InvalidCode(t *testing.T) {
 	}
 
 	appErr, ok := err.(*apperror.AppError)
-	if !ok || appErr.Code != "INVALID_CODE" {
+	if !ok || appErr.Code != ErrCodeInvalidCode {
 		t.Errorf("expected INVALID_CODE error, got %v", err)
 	}
 	if appErr.Kind != apperror.KindBadRequest {
@@ -139,7 +139,7 @@ func TestConfirmEmailChange_ExpiredCode(t *testing.T) {
 	}
 
 	appErr, ok := err.(*apperror.AppError)
-	if !ok || appErr.Code != "INVALID_CODE" {
+	if !ok || appErr.Code != ErrCodeInvalidCode {
 		t.Errorf("expected INVALID_CODE error, got %v", err)
 	}
 }
@@ -195,7 +195,7 @@ func TestConfirmEmailChange_UserNotFound(t *testing.T) {
 		t.Fatal("expected error, got nil")
 	}
 	appErr, ok := err.(*apperror.AppError)
-	if !ok || appErr.Code != "INVALID_CREDENTIALS" {
+	if !ok || appErr.Code != ErrCodeInvalidCredentials {
 		t.Errorf("expected INVALID_CREDENTIALS, got %v", err)
 	}
 }
@@ -213,7 +213,7 @@ func TestConfirmEmailChange_UserRepoError(t *testing.T) {
 		t.Fatal("expected error, got nil")
 	}
 	appErr, ok := err.(*apperror.AppError)
-	if !ok || appErr.Code != "INTERNAL_ERROR" {
+	if !ok || appErr.Code != apperror.ErrCodeInternalError {
 		t.Errorf("expected INTERNAL_ERROR, got %v", err)
 	}
 }
@@ -236,7 +236,7 @@ func TestConfirmEmailChange_EmailChangeRepoError(t *testing.T) {
 		t.Fatal("expected error, got nil")
 	}
 	appErr, ok := err.(*apperror.AppError)
-	if !ok || appErr.Code != "INTERNAL_ERROR" {
+	if !ok || appErr.Code != apperror.ErrCodeInternalError {
 		t.Errorf("expected INTERNAL_ERROR, got %v", err)
 	}
 }
@@ -267,7 +267,7 @@ func TestConfirmEmailChange_TxFailure(t *testing.T) {
 		t.Fatal("expected error, got nil")
 	}
 	appErr, ok := err.(*apperror.AppError)
-	if !ok || appErr.Code != "INTERNAL_ERROR" {
+	if !ok || appErr.Code != apperror.ErrCodeInternalError {
 		t.Errorf("expected INTERNAL_ERROR, got %v", err)
 	}
 }

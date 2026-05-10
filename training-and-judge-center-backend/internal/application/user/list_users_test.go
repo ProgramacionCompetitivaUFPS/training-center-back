@@ -85,7 +85,7 @@ func TestListUsers_InvalidRole(t *testing.T) {
 	if !ok {
 		t.Fatalf("expected *apperror.AppError, got %T", err)
 	}
-	if appErr.Code != "VALIDATION_ERROR" {
+	if appErr.Code != apperror.ErrCodeValidationError {
 		t.Errorf("expected code VALIDATION_ERROR, got %q", appErr.Code)
 	}
 	if appErr.Kind != apperror.KindValidation {
@@ -102,7 +102,7 @@ func TestListUsers_InvalidStatus(t *testing.T) {
 		t.Fatal("expected error, got nil")
 	}
 	appErr := err.(*apperror.AppError)
-	if appErr.Code != "VALIDATION_ERROR" {
+	if appErr.Code != apperror.ErrCodeValidationError {
 		t.Errorf("expected VALIDATION_ERROR, got %q", appErr.Code)
 	}
 }
@@ -116,7 +116,7 @@ func TestListUsers_InvalidSort(t *testing.T) {
 		t.Fatal("expected error, got nil")
 	}
 	appErr := err.(*apperror.AppError)
-	if appErr.Code != "VALIDATION_ERROR" {
+	if appErr.Code != apperror.ErrCodeValidationError {
 		t.Errorf("expected VALIDATION_ERROR, got %q", appErr.Code)
 	}
 }
@@ -130,7 +130,7 @@ func TestListUsers_InvalidOrder(t *testing.T) {
 		t.Fatal("expected error, got nil")
 	}
 	appErr := err.(*apperror.AppError)
-	if appErr.Code != "VALIDATION_ERROR" {
+	if appErr.Code != apperror.ErrCodeValidationError {
 		t.Errorf("expected VALIDATION_ERROR, got %q", appErr.Code)
 	}
 }
@@ -144,7 +144,7 @@ func TestListUsers_InvalidSearchField(t *testing.T) {
 		t.Fatal("expected error, got nil")
 	}
 	appErr := err.(*apperror.AppError)
-	if appErr.Code != "VALIDATION_ERROR" {
+	if appErr.Code != apperror.ErrCodeValidationError {
 		t.Errorf("expected VALIDATION_ERROR, got %q", appErr.Code)
 	}
 }
@@ -158,7 +158,7 @@ func TestListUsers_RepositoryError(t *testing.T) {
 		t.Fatal("expected error, got nil")
 	}
 	appErr := err.(*apperror.AppError)
-	if appErr.Code != "INTERNAL_ERROR" {
+	if appErr.Code != apperror.ErrCodeInternalError {
 		t.Errorf("expected INTERNAL_ERROR, got %q", appErr.Code)
 	}
 }

@@ -145,7 +145,7 @@ func TestAdminDeactivateUser_RepositoryFindError(t *testing.T) {
 		t.Fatal("expected error, got nil")
 	}
 	appErr := err.(*apperror.AppError)
-	if appErr.Code != "INTERNAL_ERROR" {
+	if appErr.Code != apperror.ErrCodeInternalError {
 		t.Errorf("expected code INTERNAL_ERROR, got %q", appErr.Code)
 	}
 }
@@ -173,7 +173,7 @@ func TestAdminDeactivateUser_SessionInvalidationError_DoesNotPersist(t *testing.
 		t.Fatal("expected error when session invalidation fails, got nil")
 	}
 	appErr := err.(*apperror.AppError)
-	if appErr.Code != "INTERNAL_ERROR" {
+	if appErr.Code != apperror.ErrCodeInternalError {
 		t.Errorf("expected code INTERNAL_ERROR, got %q", appErr.Code)
 	}
 	if updateCalled {
@@ -197,7 +197,7 @@ func TestAdminDeactivateUser_RepositoryUpdateError(t *testing.T) {
 		t.Fatal("expected error, got nil")
 	}
 	appErr := err.(*apperror.AppError)
-	if appErr.Code != "INTERNAL_ERROR" {
+	if appErr.Code != apperror.ErrCodeInternalError {
 		t.Errorf("expected code INTERNAL_ERROR, got %q", appErr.Code)
 	}
 }

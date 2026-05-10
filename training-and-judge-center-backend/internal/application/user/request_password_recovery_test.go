@@ -131,7 +131,7 @@ func TestRequestPasswordRecovery_InvalidEmail(t *testing.T) {
 		t.Fatal("expected error, got nil")
 	}
 	appErr, ok := err.(*apperror.AppError)
-	if !ok || appErr.Code != "VALIDATION_ERROR" {
+	if !ok || appErr.Code != apperror.ErrCodeValidationError {
 		t.Errorf("expected VALIDATION_ERROR, got %v", err)
 	}
 }

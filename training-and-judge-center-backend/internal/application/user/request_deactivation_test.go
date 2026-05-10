@@ -149,7 +149,7 @@ func TestRequestDeactivation_UserRepoError(t *testing.T) {
 		t.Fatal("expected error, got nil")
 	}
 	appErr, ok := err.(*apperror.AppError)
-	if !ok || appErr.Code != "INTERNAL_ERROR" {
+	if !ok || appErr.Code != apperror.ErrCodeInternalError {
 		t.Errorf("expected INTERNAL_ERROR, got %v", err)
 	}
 }
@@ -172,7 +172,7 @@ func TestRequestDeactivation_InvalidatePendingError(t *testing.T) {
 		t.Fatal("expected error, got nil")
 	}
 	appErr, ok := err.(*apperror.AppError)
-	if !ok || appErr.Code != "INTERNAL_ERROR" {
+	if !ok || appErr.Code != apperror.ErrCodeInternalError {
 		t.Errorf("expected INTERNAL_ERROR, got %v", err)
 	}
 }
@@ -195,7 +195,7 @@ func TestRequestDeactivation_SaveError(t *testing.T) {
 		t.Fatal("expected error, got nil")
 	}
 	appErr, ok := err.(*apperror.AppError)
-	if !ok || appErr.Code != "INTERNAL_ERROR" {
+	if !ok || appErr.Code != apperror.ErrCodeInternalError {
 		t.Errorf("expected INTERNAL_ERROR, got %v", err)
 	}
 }
