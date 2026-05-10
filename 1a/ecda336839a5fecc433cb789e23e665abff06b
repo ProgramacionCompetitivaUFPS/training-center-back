@@ -1,0 +1,41 @@
+training-and-judge-center-backend/internal/application/material/get_material.go
+  s_9bb12de784775b::t_679e82d2acba40 102
+training-and-judge-center-backend/internal/application/material/unpin_material_test.go
+  s_9bb12de784775b::t_ecd08b2ea36394 138
+training-and-judge-center-backend/internal/application/material/create_material.go
+  s_9bb12de784775b::t_3c862e75a9c9b1 65
+training-and-judge-center-backend/internal/application/material/get_material_test.go
+  s_9bb12de784775b::t_68e068a6775a63 32
+training-and-judge-center-backend/internal/application/material/create_material_test.go
+  s_9bb12de784775b::t_c588e2ca6c564f 120,135
+training-and-judge-center-backend/internal/application/material/pin_material_test.go
+  s_9bb12de784775b::t_51df984b94f36c 155
+training-and-judge-center-backend/internal/application/material/errors.go
+  s_9bb12de784775b::t_44b046967eb2d1 5
+training-and-judge-center-backend/internal/application/material/list_materials_test.go
+  s_9bb12de784775b::t_d4e175ea96a1e8 29,39
+  s_9bb12de784775b::t_39cae59ed1a357 54
+training-and-judge-center-backend/internal/application/material/pin_material.go
+  s_9bb12de784775b::t_2f43e36f57010a 73
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.5",
+  "base_commit_sha": "1aecda336839a5fecc433cb789e23e665abff06b",
+  "prompts": {},
+  "humans": {
+    "h_449cdb19da0522": {
+      "author": "AlexaVJ <alexandra19vela@gmail.com>"
+    }
+  },
+  "sessions": {
+    "s_9bb12de784775b": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "e67fd454-0f32-4672-b007-ae6b0c613265",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "AlexaVJ <alexandra19vela@gmail.com>"
+    }
+  }
+}
