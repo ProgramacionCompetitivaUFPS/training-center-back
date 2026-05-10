@@ -5,7 +5,7 @@ import (
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
-	appGroup "github.com/training-judge-center/backend/internal/application/group"
+	domainGroup "github.com/training-judge-center/backend/internal/domain/group"
 	"github.com/training-judge-center/backend/pkg/apperror"
 )
 
@@ -73,7 +73,7 @@ func TestValidateInviteToken_ExpiredToken(t *testing.T) {
 	_, err := svc.ValidateInviteToken(tokenStr)
 
 	ae, ok := err.(*apperror.AppError)
-	if !ok || ae.Code != appGroup.ErrCodeExpiredInviteToken {
+	if !ok || ae.Code != domainGroup.ErrCodeExpiredInviteToken {
 		t.Fatalf("expected EXPIRED_INVITE_TOKEN, got %v", err)
 	}
 }

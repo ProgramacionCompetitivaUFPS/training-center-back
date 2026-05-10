@@ -7,6 +7,7 @@ import (
 
 	"github.com/golang-jwt/jwt/v5"
 	appGroup "github.com/training-judge-center/backend/internal/application/group"
+	domainGroup "github.com/training-judge-center/backend/internal/domain/group"
 	"github.com/training-judge-center/backend/pkg/apperror"
 )
 
@@ -56,18 +57,18 @@ func (s *GroupInvitationJWTService) ValidateInviteToken(tokenString string) (*ap
 	}, jwt.WithIssuer(invitationIssuer))
 	if err != nil {
 		if errors.Is(err, jwt.ErrTokenExpired) {
-			return nil, apperror.NewBadRequest(appGroup.ErrCodeExpiredInviteToken, "invitation link has expired")
+			return nil, apperror.NewBadRequest(domainGroup.ErrCodeExpiredInviteToken, "invitation link has expired")
 		}
-		return nil, apperror.NewBadRequest(appGroup.ErrCodeInvalidInviteToken, "invalid invitation token")
+		return nil, apperror.NewBadRequest(domainGroup.ErrCodeInvalidInviteToken, "invalid invitation token")
 	}
 
 	claims, ok := token.Claims.(*invitationJWTClaims)
 	if !ok || !token.Valid {
-		return nil, apperror.NewBadRequest(appGroup.ErrCodeInvalidInviteToken, "invalid invitation token")
+		return nil, apperror.NewBadRequest(domainGroup.ErrCodeInvalidInviteToken, "invalid invitation token")
 	}
 
 	if claims.GroupID == "" {
-		return nil, apperror.NewBadRequest(appGroup.ErrCodeInvalidInviteToken, "invalid invitation token")
+		return nil, apperror.NewBadRequest(domainGroup.ErrCodeInvalidInviteToken, "invalid invitation token")
 	}
 
 	return &appGroup.InvitationClaims{
