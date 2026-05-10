@@ -1,0 +1,24 @@
+training-and-judge-center-backend/internal/application/group/approve_request.go
+  s_ab4046d63b6980::t_6802a70924ff50 55-61
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.5",
+  "base_commit_sha": "37fa48acde9fd28bbc06302a106f2750acd9d053",
+  "prompts": {},
+  "humans": {
+    "h_449cdb19da0522": {
+      "author": "AlexaVJ <alexandra19vela@gmail.com>"
+    }
+  },
+  "sessions": {
+    "s_ab4046d63b6980": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "7e4b956d-059f-40f6-bc3d-f5d9b3e081c0",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "AlexaVJ <alexandra19vela@gmail.com>"
+    }
+  }
+}
