@@ -79,7 +79,7 @@ func (h *Handler) UploadFiles(w http.ResponseWriter, r *http.Request) {
 
 	fileData, err := io.ReadAll(io.LimitReader(file, limitBytes+1))
 	if err != nil {
-		slog.Error("Failed to read uploaded file", "error", err, "slug", slug)
+		slog.ErrorContext(r.Context(), "Failed to read uploaded file", "error", err, "slug", slug)
 		handler.WriteJSON(r.Context(), w, http.StatusInternalServerError, apperror.NewInternal())
 		return
 	}

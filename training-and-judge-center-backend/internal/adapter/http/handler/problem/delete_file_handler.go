@@ -58,7 +58,7 @@ func (h *Handler) DeleteFile(w http.ResponseWriter, r *http.Request) {
 		if errors.As(ucErr, &appErr) {
 			handler.WriteError(r.Context(), w, appErr)
 		} else {
-			slog.Error("Unexpected error in DeleteFile", "error", ucErr, "slug", slug)
+			slog.ErrorContext(ctx, "Unexpected error in DeleteFile", "error", ucErr, "slug", slug)
 			handler.WriteError(r.Context(), w, apperror.NewInternal())
 		}
 		return
