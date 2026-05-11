@@ -1,0 +1,28 @@
+training-and-judge-center-backend/internal/application/user/request_deactivation.go
+  s_bd1ac695968121::t_ed5d0c62cd630e 41
+  s_bd1ac695968121::t_f795ade6c8257e 83
+  s_bd1ac695968121::t_28ddaf24ce550a 56
+  s_bd1ac695968121::t_4a3446221395ac 74
+  s_bd1ac695968121::t_259a1780420230 62
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.5",
+  "base_commit_sha": "d11bbdbb5ed9a9e7c73ad1fca3dddd4e93f039c2",
+  "prompts": {},
+  "humans": {
+    "h_449cdb19da0522": {
+      "author": "AlexaVJ <alexandra19vela@gmail.com>"
+    }
+  },
+  "sessions": {
+    "s_bd1ac695968121": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "1a46126d-2428-457f-8cfd-ba032733ea8f",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "AlexaVJ <alexandra19vela@gmail.com>"
+    }
+  }
+}
