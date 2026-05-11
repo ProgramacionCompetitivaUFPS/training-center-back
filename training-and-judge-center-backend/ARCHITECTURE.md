@@ -914,7 +914,7 @@ func parseOrder(...) { ... }
 
 ### A8 — Logging siempre con contexto: `slog.XxxContext`
 
-En la capa de aplicación, usar siempre las variantes con contexto de `slog`. Nunca las variantes sin contexto.
+En toda capa con acceso a `ctx` — application, adapters, handlers HTTP — usar siempre las variantes con contexto de `slog`. Nunca las variantes sin contexto. Si una función interna no recibe `ctx`, propagarlo como primer parámetro antes de agregar logging.
 
 ```go
 // ✅
