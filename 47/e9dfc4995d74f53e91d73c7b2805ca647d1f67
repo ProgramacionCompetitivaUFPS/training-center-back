@@ -1,0 +1,25 @@
+training-and-judge-center-backend/internal/application/user/update_user.go
+  s_bd1ac695968121::t_8b7c089f26b49d 42
+  s_bd1ac695968121::t_794cc460d2fd50 103
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.5",
+  "base_commit_sha": "47e9dfc4995d74f53e91d73c7b2805ca647d1f67",
+  "prompts": {},
+  "humans": {
+    "h_449cdb19da0522": {
+      "author": "AlexaVJ <alexandra19vela@gmail.com>"
+    }
+  },
+  "sessions": {
+    "s_bd1ac695968121": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "1a46126d-2428-457f-8cfd-ba032733ea8f",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "AlexaVJ <alexandra19vela@gmail.com>"
+    }
+  }
+}
