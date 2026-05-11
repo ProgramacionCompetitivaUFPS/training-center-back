@@ -1,0 +1,24 @@
+training-and-judge-center-backend/internal/application/user/mocks_test.go
+  s_139baf1b507495::t_7236ad92a389ce 179,182
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.5",
+  "base_commit_sha": "0280bb03db90dfc608a2503ec112db19388dfb95",
+  "prompts": {},
+  "humans": {
+    "h_449cdb19da0522": {
+      "author": "AlexaVJ <alexandra19vela@gmail.com>"
+    }
+  },
+  "sessions": {
+    "s_139baf1b507495": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "d5c07a1d-a3ef-4558-a0dc-816facafa33f",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "AlexaVJ <alexandra19vela@gmail.com>"
+    }
+  }
+}

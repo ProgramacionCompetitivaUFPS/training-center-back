@@ -1,0 +1,26 @@
+training-and-judge-center-backend/internal/application/shared/transaction_manager.go
+  s_139baf1b507495::t_2a8e012901a3ff 6
+training-and-judge-center-backend/internal/adapter/postgres/transaction_manager.go
+  s_139baf1b507495::t_bd3be7fce3126d 25
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.5",
+  "base_commit_sha": "445ba83d2bd84cc108fff0b908ef7ceab3a5500e",
+  "prompts": {},
+  "humans": {
+    "h_449cdb19da0522": {
+      "author": "AlexaVJ <alexandra19vela@gmail.com>"
+    }
+  },
+  "sessions": {
+    "s_139baf1b507495": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "d5c07a1d-a3ef-4558-a0dc-816facafa33f",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "AlexaVJ <alexandra19vela@gmail.com>"
+    }
+  }
+}
