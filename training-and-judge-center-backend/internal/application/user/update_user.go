@@ -39,7 +39,7 @@ func (uc *UpdateUserUseCase) Execute(ctx context.Context, input UpdateUserInput)
 
 	foundUser, err := uc.repo.FindByID(ctx, input.UserID)
 	if err != nil {
-		slog.Error("failed to find user by id during update", "user_id", input.UserID, "error", err)
+		slog.ErrorContext(ctx, "failed to find user by id during update", "user_id", input.UserID, "error", err)
 		return nil,apperror.NewInternal()
 	}
 	if foundUser == nil {
@@ -100,7 +100,7 @@ func (uc *UpdateUserUseCase) Execute(ctx context.Context, input UpdateUserInput)
 
 	now := time.Now()
 	if err := foundUser.Update(nameToUpdate, nicknameToUpdate, institutionToUpdate, cityToUpdate, countryToUpdate, now); err != nil {
-		slog.Error("failed to apply update to user domain object", "user_id", foundUser.ID(), "error", err)
+		slog.ErrorContext(ctx, "failed to apply update to user domain object", "user_id", foundUser.ID(), "error", err)
 		return nil,apperror.NewInternal()
 	}
 
