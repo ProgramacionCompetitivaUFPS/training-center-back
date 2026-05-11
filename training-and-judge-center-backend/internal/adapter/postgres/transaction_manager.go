@@ -22,7 +22,7 @@ func NewPostgresTransactionManager(pool *pgxpool.Pool) *PostgresTransactionManag
 	return &PostgresTransactionManager{pool: pool}
 }
 
-func (tm *PostgresTransactionManager) WithTx(ctx context.Context, fn func(ctx context.Context) error) error {
+func (tm *PostgresTransactionManager) WithTx(ctx context.Context, fn func(txCtx context.Context) error) error {
 	tx, err := tm.pool.Begin(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to begin transaction: %w", err)
