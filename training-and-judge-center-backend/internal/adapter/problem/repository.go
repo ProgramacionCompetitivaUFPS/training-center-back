@@ -145,10 +145,10 @@ func (r *ProblemRepository) FindBySlug(ctx context.Context, slug domainProblem.S
 		WHERE slug = $1
 	`
 	row := r.db.QueryRow(ctx, query, slug.String())
-	return scanProblem(row)
+	return scanProblem(ctx, row)
 }
 
-func scanProblem(row pgx.Row) (*domainProblem.Problem, error) {
+func scanProblem(ctx context.Context, row pgx.Row) (*domainProblem.Problem, error) {
 	var pId, pSlug, pTitle, pStatus, pAccessibility, pAuthorId string
 	var pStatement, pTestCasesKey *string
 	var pTl, pMl *int
@@ -182,28 +182,28 @@ func scanProblem(row pgx.Row) (*domainProblem.Problem, error) {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, apperror.NewNotFound(apperror.ErrCodeNotFound, "problem not found")
 		}
-		slog.Error("Database error in scanProblem", "error", err)
+		slog.ErrorContext(ctx, "Database error in scanProblem", "error", err)
 		return nil, apperror.NewInternal()
 	}
 
 	langOverrides, err := langOverridesFromDB(pLangOverridesJSON)
 	if err != nil {
-		slog.Error("error mapping lang overrides from DB", "error", err, "problem_id", pId)
+		slog.ErrorContext(ctx, "error mapping lang overrides from DB", "error", err, "problem_id", pId)
 		return nil, apperror.NewInternal()
 	}
 	solutions, err := solutionsFromDB(pSolutionsJSON)
 	if err != nil {
-		slog.Error("error mapping field from DB", "error", err, "problem_id", pId)
+		slog.ErrorContext(ctx, "error mapping field from DB", "error", err, "problem_id", pId)
 		return nil, apperror.NewInternal()
 	}
 	checker, err := judgingFileFromDB(pCheckerJSON)
 	if err != nil {
-		slog.Error("error mapping field from DB", "error", err, "problem_id", pId)
+		slog.ErrorContext(ctx, "error mapping field from DB", "error", err, "problem_id", pId)
 		return nil, apperror.NewInternal()
 	}
 	validator, err := judgingFileFromDB(pValidatorJSON)
 	if err != nil {
-		slog.Error("error mapping validator from DB", "error", err, "problem_id", pId)
+		slog.ErrorContext(ctx, "error mapping validator from DB", "error", err, "problem_id", pId)
 		return nil, apperror.NewInternal()
 	}
 
@@ -426,7 +426,7 @@ func (r *ProblemRepository) List(ctx context.Context, filters domainProblem.List
 		}
 		defer rows.Close()
 		for rows.Next() {
-			p, err := scanProblem(rows)
+			p, err := scanProblem(gCtx, rows)
 			if err != nil {
 				return err
 			}
