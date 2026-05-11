@@ -3,5 +3,5 @@ package shared
 import "context"
 
 type TransactionManager interface {
-	WithTx(ctx context.Context, fn func(ctx context.Context) error) error
+	WithTx(ctx context.Context, fn func(txCtx context.Context) error) error
 }
