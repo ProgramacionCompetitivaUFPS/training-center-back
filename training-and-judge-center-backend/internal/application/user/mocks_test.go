@@ -176,10 +176,10 @@ func (m *mockEmailChangeRepo) Update(ctx context.Context, req *domain.EmailChang
 }
 
 type mockTransactionManager struct {
-	withTxFn func(ctx context.Context, fn func(ctx context.Context) error) error
+	withTxFn func(ctx context.Context, fn func(txCtx context.Context) error) error
 }
 
-func (m *mockTransactionManager) WithTx(ctx context.Context, fn func(ctx context.Context) error) error {
+func (m *mockTransactionManager) WithTx(ctx context.Context, fn func(txCtx context.Context) error) error {
 	if m.withTxFn != nil {
 		return m.withTxFn(ctx, fn)
 	}
