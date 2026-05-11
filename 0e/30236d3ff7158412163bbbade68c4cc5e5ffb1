@@ -1,0 +1,26 @@
+training-and-judge-center-backend/internal/adapter/http/handler/problem/delete_file_handler.go
+  s_bd1ac695968121::t_ac3c7b51ab4a74 61
+training-and-judge-center-backend/internal/adapter/http/handler/problem/upload_files_handler.go
+  s_bd1ac695968121::t_a7989a2ebe5202 82
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.5",
+  "base_commit_sha": "0e30236d3ff7158412163bbbade68c4cc5e5ffb1",
+  "prompts": {},
+  "humans": {
+    "h_449cdb19da0522": {
+      "author": "AlexaVJ <alexandra19vela@gmail.com>"
+    }
+  },
+  "sessions": {
+    "s_bd1ac695968121": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "1a46126d-2428-457f-8cfd-ba032733ea8f",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "AlexaVJ <alexandra19vela@gmail.com>"
+    }
+  }
+}
