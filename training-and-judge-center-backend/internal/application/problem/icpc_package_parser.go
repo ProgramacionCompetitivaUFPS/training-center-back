@@ -1,5 +1,7 @@
 package problem
 
+import "context"
+
 type ParsedPackage struct {
 	Title       string
 	TimeLimitMs *int
@@ -13,5 +15,5 @@ type ParsedPackage struct {
 }
 
 type ICPCPackageParser interface {
-	ParsePackageZip(zipData []byte) (*ParsedPackage, error)
+	ParsePackageZip(ctx context.Context, zipData []byte) (*ParsedPackage, error)
 }

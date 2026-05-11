@@ -144,7 +144,7 @@ func (uc *UploadProblemFilesUseCase) cleanupPrefix(ctx context.Context, prefix s
 }
 
 func (uc *UploadProblemFilesUseCase) handleTestCases(ctx context.Context, p *problem.Problem, input UploadProblemFilesInput, now time.Time) (fileAction, error) {
-	sampleFiles, err := uc.zipParser.ParseTestCasesZip(input.FileData)
+	sampleFiles, err := uc.zipParser.ParseTestCasesZip(ctx, input.FileData)
 	if err != nil {
 		return fileAction{}, err
 	}

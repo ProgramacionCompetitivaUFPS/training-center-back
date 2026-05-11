@@ -3,6 +3,7 @@ package problem
 import (
 	"archive/zip"
 	"bytes"
+	"context"
 	"fmt"
 	"io"
 	"log/slog"
@@ -73,7 +74,7 @@ type problemYAML struct {
 	MemoryLimit int     `yaml:"memory_limit"`
 }
 
-func (p *ICPCParser) ParseTestCasesZip(zipData []byte) ([]ExtractedFile, error) {
+func (p *ICPCParser) ParseTestCasesZip(ctx context.Context, zipData []byte) ([]ExtractedFile, error) {
 	pz, err := p.prepareZip(zipData)
 	if err != nil {
 		return nil, err
@@ -88,7 +89,7 @@ func (p *ICPCParser) ParseTestCasesZip(zipData []byte) ([]ExtractedFile, error) 
 		return nil, err
 	}
 
-	validCount, sampleFiles, hasSampleDir, hasSecretDir, err := p.parseTestCases(pz, prefix, true)
+	validCount, sampleFiles, hasSampleDir, hasSecretDir, err := p.parseTestCases(ctx, pz, prefix, true)
 	if err != nil {
 		return nil, err
 	}
@@ -107,7 +108,7 @@ func (p *ICPCParser) ParseTestCasesZip(zipData []byte) ([]ExtractedFile, error) 
 	return sampleFiles, nil
 }
 
-func (p *ICPCParser) ParsePackageZip(zipData []byte) (*ParsedPackage, error) {
+func (p *ICPCParser) ParsePackageZip(ctx context.Context, zipData []byte) (*ParsedPackage, error) {
 	pz, err := p.prepareZip(zipData)
 	if err != nil {
 		return nil, err
@@ -166,7 +167,7 @@ func (p *ICPCParser) ParsePackageZip(zipData []byte) (*ParsedPackage, error) {
 		pkg.Statement = &s
 	}
 
-	validCount, sampleFiles, _, _, err := p.parseTestCases(pz, prefix, false)
+	validCount, sampleFiles, _, _, err := p.parseTestCases(ctx, pz, prefix, false)
 	if err != nil {
 		return nil, err
 	}
@@ -209,6 +210,7 @@ func (p *ICPCParser) ParsePackageZip(zipData []byte) (*ParsedPackage, error) {
 }
 
 func (p *ICPCParser) parseTestCases(
+	ctx context.Context,
 	pz *ParsedZip,
 	prefix string,
 	strict bool,
@@ -266,7 +268,7 @@ func (p *ICPCParser) parseTestCases(
 		cleanPath := filepath.ToSlash(filepath.Clean(f.Name))
 		content, extractErr := p.extractFileContent(f)
 		if extractErr != nil {
-			slog.Error("failed to extract file from ZIP", "error", extractErr, "file", cleanPath)
+			slog.ErrorContext(ctx, "failed to extract file from ZIP", "error", extractErr, "file", cleanPath)
 			return 0, nil, false, false, apperror.NewInternal()
 		}
 		sampleFiles = append(sampleFiles, ExtractedFile{Path: cleanPath, Content: content})

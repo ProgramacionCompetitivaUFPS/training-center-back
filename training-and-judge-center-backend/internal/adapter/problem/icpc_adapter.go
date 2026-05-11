@@ -1,6 +1,8 @@
 package problem
 
 import (
+	"context"
+
 	appProblem "github.com/training-judge-center/backend/internal/application/problem"
 )
 
@@ -14,8 +16,8 @@ func NewICPCParserAdapter(inner *ICPCParser) *ICPCParserAdapter {
 	return &ICPCParserAdapter{inner: inner}
 }
 
-func (a *ICPCParserAdapter) ParseTestCasesZip(zipData []byte) ([]appProblem.ParsedFile, error) {
-	extracted, err := a.inner.ParseTestCasesZip(zipData)
+func (a *ICPCParserAdapter) ParseTestCasesZip(ctx context.Context, zipData []byte) ([]appProblem.ParsedFile, error) {
+	extracted, err := a.inner.ParseTestCasesZip(ctx, zipData)
 	if err != nil {
 		return nil, err
 	}
@@ -36,8 +38,8 @@ func NewICPCPackageParserAdapter(inner *ICPCParser) *ICPCPackageParserAdapter {
 	return &ICPCPackageParserAdapter{inner: inner}
 }
 
-func (a *ICPCPackageParserAdapter) ParsePackageZip(zipData []byte) (*appProblem.ParsedPackage, error) {
-	pkg, err := a.inner.ParsePackageZip(zipData)
+func (a *ICPCPackageParserAdapter) ParsePackageZip(ctx context.Context, zipData []byte) (*appProblem.ParsedPackage, error) {
+	pkg, err := a.inner.ParsePackageZip(ctx, zipData)
 	if err != nil {
 		return nil, err
 	}

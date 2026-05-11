@@ -3,6 +3,7 @@ package problem_test
 import (
 	"archive/zip"
 	"bytes"
+	"context"
 	"strings"
 	"testing"
 
@@ -39,7 +40,7 @@ func TestICPCParser_ValidArchive(t *testing.T) {
 		"data/secret/2.ans": []byte("30"),
 	})
 
-	extracted, err := p.ParseTestCasesZip(zipData)
+	extracted, err := p.ParseTestCasesZip(context.Background(), zipData)
 	if err != nil {
 		if appErr, ok := err.(*apperror.AppError); ok && len(appErr.Details) > 0 {
 			t.Fatalf("expected no error, got detail: %s", appErr.Details[0].Message)
@@ -60,7 +61,7 @@ func TestICPCParser_InvalidExtension(t *testing.T) {
 		"data/sample/1.txt": []byte("3"),
 	})
 
-	_, err := p.ParseTestCasesZip(zipData)
+	_, err := p.ParseTestCasesZip(context.Background(), zipData)
 	if err == nil {
 		t.Fatal("expected error for invalid extension, got nil")
 	}
@@ -83,7 +84,7 @@ func TestICPCParser_PathTraversal(t *testing.T) {
 		"data/sample/../../etc/hosts": []byte("malicious"),
 	})
 
-	_, err := p.ParseTestCasesZip(zipData)
+	_, err := p.ParseTestCasesZip(context.Background(), zipData)
 	if err == nil {
 		t.Fatal("expected error for malicious path, got nil")
 	}
@@ -96,7 +97,7 @@ func TestICPCParser_MissingContentDir(t *testing.T) {
 		"some_other_dir/1.in": []byte("1 2"),
 	})
 
-	_, err := p.ParseTestCasesZip(zipData)
+	_, err := p.ParseTestCasesZip(context.Background(), zipData)
 	if err == nil {
 		t.Fatal("expected error for files outside testcases dirs")
 	}
@@ -110,7 +111,7 @@ func TestICPCParser_TooManySamples(t *testing.T) {
 		"data/sample/2.in": []byte("3"),
 	})
 
-	_, err := p.ParseTestCasesZip(zipData)
+	_, err := p.ParseTestCasesZip(context.Background(), zipData)
 	if err == nil {
 		t.Fatal("expected error for too many samples, got nil")
 	}
