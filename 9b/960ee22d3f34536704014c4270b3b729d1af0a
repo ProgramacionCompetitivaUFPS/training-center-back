@@ -1,0 +1,44 @@
+training-and-judge-center-backend/internal/application/problem/icpc_package_parser.go
+  s_bd1ac695968121::t_0b0031c9d6a422 3-4,18
+training-and-judge-center-backend/internal/application/problem/zip_parser.go
+  s_bd1ac695968121::t_9f653ee42110fa 3-4,11
+training-and-judge-center-backend/internal/application/problem/upload_files.go
+  s_bd1ac695968121::t_8b222cfe3e65bb 147
+training-and-judge-center-backend/internal/application/problem/import_problem.go
+  s_bd1ac695968121::t_699a838a7425a8 70
+training-and-judge-center-backend/internal/adapter/problem/icpc_adapter.go
+  s_bd1ac695968121::t_3bd4caf782edd8 4-5
+  s_bd1ac695968121::t_81ecc5ae30d7e3 19-20
+  s_bd1ac695968121::t_e70b19e18c15c2 41-42
+training-and-judge-center-backend/internal/adapter/problem/icpc_parser.go
+  s_bd1ac695968121::t_677c73f18efe2c 77,92
+  s_bd1ac695968121::t_25fa70bbf10bcb 271
+  s_bd1ac695968121::t_7269f7b675a38e 6
+  s_bd1ac695968121::t_4b09e66525ede8 170
+  s_bd1ac695968121::t_b05e915954115b 213
+  s_bd1ac695968121::t_c50f8d4bb1b3b7 111
+training-and-judge-center-backend/internal/adapter/problem/icpc_parser_test.go
+  s_bd1ac695968121::t_dd8a262b187418 6
+  s_bd1ac695968121::t_b7fda2e501ffb5 43,64,87,100,114
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.5",
+  "base_commit_sha": "9b960ee22d3f34536704014c4270b3b729d1af0a",
+  "prompts": {},
+  "humans": {
+    "h_449cdb19da0522": {
+      "author": "AlexaVJ <alexandra19vela@gmail.com>"
+    }
+  },
+  "sessions": {
+    "s_bd1ac695968121": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "1a46126d-2428-457f-8cfd-ba032733ea8f",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "AlexaVJ <alexandra19vela@gmail.com>"
+    }
+  }
+}
