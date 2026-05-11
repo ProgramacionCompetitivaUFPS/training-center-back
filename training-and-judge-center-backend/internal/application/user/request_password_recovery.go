@@ -40,7 +40,7 @@ func NewRequestPasswordRecoveryUseCase(
 func (uc *RequestPasswordRecoveryUseCase) Execute(ctx context.Context, input RequestPasswordRecoveryInput) error {
 	allowed, err := uc.rateLimiter.Allow(ctx, "password-recovery:"+input.Email, 5, time.Hour)
 	if err != nil {
-		slog.Error("failed to check rate limit for password recovery request", "email", input.Email, "error", err)
+		slog.ErrorContext(ctx, "failed to check rate limit for password recovery request", "email", input.Email, "error", err)
 		return apperror.NewInternal()
 	}
 	if !allowed {
@@ -56,7 +56,7 @@ func (uc *RequestPasswordRecoveryUseCase) Execute(ctx context.Context, input Req
 
 	foundUser, err := uc.userRepo.FindByEmail(ctx, emailVO)
 	if err != nil {
-		slog.Error("failed to find user by email during password recovery request", "error", err)
+		slog.ErrorContext(ctx, "failed to find user by email during password recovery request", "error", err)
 		return apperror.NewInternal()
 	}
 
@@ -70,25 +70,25 @@ func (uc *RequestPasswordRecoveryUseCase) Execute(ctx context.Context, input Req
 
 	// Invalidate previous requests
 	if err := uc.recoveryRepo.InvalidatePendingByUserID(ctx, foundUser.ID(), now); err != nil {
-		slog.Error("failed to invalidate pending recovery requests", "user_id", foundUser.ID(), "error", err)
+		slog.ErrorContext(ctx, "failed to invalidate pending recovery requests", "user_id", foundUser.ID(), "error", err)
 		return apperror.NewInternal()
 	}
 
 	code, err := generateSixDigitCode()
 	if err != nil {
-		slog.Error("failed to generate recovery code", "user_id", foundUser.ID(), "error", err)
+		slog.ErrorContext(ctx, "failed to generate recovery code", "user_id", foundUser.ID(), "error", err)
 		return apperror.NewInternal()
 	}
 
 	newID := uuid.New().String()
 	req, err := user.NewPasswordRecoveryRequest(newID, foundUser.ID(), code, now)
 	if err != nil {
-		slog.Error("failed to build password recovery request", "user_id", foundUser.ID(), "error", err)
+		slog.ErrorContext(ctx, "failed to build password recovery request", "user_id", foundUser.ID(), "error", err)
 		return apperror.NewInternal()
 	}
 
 	if err := uc.recoveryRepo.Save(ctx, req); err != nil {
-		slog.Error("failed to save password recovery request", "user_id", foundUser.ID(), "error", err)
+		slog.ErrorContext(ctx, "failed to save password recovery request", "user_id", foundUser.ID(), "error", err)
 		return apperror.NewInternal()
 	}
 
@@ -97,9 +97,9 @@ func (uc *RequestPasswordRecoveryUseCase) Execute(ctx context.Context, input Req
 		Subject: "Password Recovery Code",
 		Body:    fmt.Sprintf("Your password recovery code is: %s\nThis code will expire in 15 minutes.", code),
 	}); err != nil {
-		slog.Error("failed to send password recovery email", "user_id", foundUser.ID(), "error", err)
+		slog.ErrorContext(ctx, "failed to send password recovery email", "user_id", foundUser.ID(), "error", err)
 		if invalidateErr := uc.recoveryRepo.InvalidatePendingByUserID(ctx, foundUser.ID(), now); invalidateErr != nil {
-			slog.Error("failed to invalidate undelivered recovery code", "user_id", foundUser.ID(), "error", invalidateErr)
+			slog.ErrorContext(ctx, "failed to invalidate undelivered recovery code", "user_id", foundUser.ID(), "error", invalidateErr)
 		}
 	}
 
