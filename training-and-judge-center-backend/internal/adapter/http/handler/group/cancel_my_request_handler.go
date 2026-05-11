@@ -30,7 +30,7 @@ func (h *Handler) CancelMyRequest(w http.ResponseWriter, r *http.Request) {
 		GroupID:     groupID,
 		CurrentUser: *caller,
 	}); err != nil {
-		handler.WriteError(w, err)
+		handler.WriteError(r.Context(), w, err)
 		return
 	}
 

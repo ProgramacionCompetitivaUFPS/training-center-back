@@ -36,7 +36,7 @@ func (h *Handler) AcceptInvite(w http.ResponseWriter, r *http.Request) {
 
 	var body acceptInviteRequest
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-		handler.WriteError(w, apperror.NewBadRequest(apperror.ErrCodeBadRequest, "invalid request body"))
+		handler.WriteError(r.Context(), w, apperror.NewBadRequest(apperror.ErrCodeBadRequest, "invalid request body"))
 		return
 	}
 
@@ -45,12 +45,12 @@ func (h *Handler) AcceptInvite(w http.ResponseWriter, r *http.Request) {
 		CurrentUser: *currentUser,
 	})
 	if err != nil {
-		handler.WriteError(w, err)
+		handler.WriteError(r.Context(), w, err)
 		return
 	}
 
 	m := out.Member
-	handler.WriteJSON(w, http.StatusCreated, joinGroupResponse{
+	handler.WriteJSON(r.Context(), w, http.StatusCreated, joinGroupResponse{
 		Role:     m.Role,
 		JoinedAt: m.JoinedAt.Format(timeutil.RFC3339UTC),
 	})

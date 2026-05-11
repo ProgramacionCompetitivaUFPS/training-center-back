@@ -26,7 +26,7 @@ func (h *UserHandler) ResetPassword(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	var body resetPasswordBody
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-		handler.WriteJSON(w, http.StatusBadRequest, map[string]string{
+		handler.WriteJSON(r.Context(), w, http.StatusBadRequest, map[string]string{
 			"error":   "INVALID_JSON",
 			"message": "Request body must be valid JSON",
 		})
@@ -34,7 +34,7 @@ func (h *UserHandler) ResetPassword(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if body.Email == "" || !digitCodeRegex.MatchString(body.Code) || body.NewPassword == "" {
-		handler.WriteJSON(w, http.StatusBadRequest, map[string]interface{}{
+		handler.WriteJSON(r.Context(), w, http.StatusBadRequest, map[string]interface{}{
 			"error":   "VALIDATION_ERROR",
 			"message": "Invalid request data",
 			"details": []map[string]string{
@@ -52,19 +52,19 @@ func (h *UserHandler) ResetPassword(w http.ResponseWriter, r *http.Request) {
 
 	out, err := h.resetPassword.Execute(ctx, input)
 	if err != nil {
-		handler.WriteError(w, err)
+		handler.WriteError(r.Context(), w, err)
 		return
 	}
 
 	if !out.SessionsInvalidated {
-		handler.WriteJSON(w, http.StatusOK, map[string]string{
+		handler.WriteJSON(r.Context(), w, http.StatusOK, map[string]string{
 			"code":    "SESSIONS_NOT_INVALIDATED",
 			"message": "Your password was reset successfully. We couldn't close your other active sessions — to close them, please change your password again.",
 		})
 		return
 	}
 
-	handler.WriteJSON(w, http.StatusOK, map[string]string{
+	handler.WriteJSON(r.Context(), w, http.StatusOK, map[string]string{
 		"message": "Password has been reset successfully. Please log in with your new password",
 	})
 }

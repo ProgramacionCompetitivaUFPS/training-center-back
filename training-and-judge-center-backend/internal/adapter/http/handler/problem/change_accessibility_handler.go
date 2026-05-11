@@ -37,7 +37,7 @@ type changeAccessibilityResponse struct {
 func (h *Handler) ChangeAccessibility(w http.ResponseWriter, r *http.Request) {
 	claims := middleware.GetClaims(r.Context())
 	if claims == nil {
-		handler.WriteJSON(w, http.StatusUnauthorized, apperror.AppError{Code: apperror.ErrCodeUnauthorized, Message: "Invalid or missing authentication token"})
+		handler.WriteJSON(r.Context(), w, http.StatusUnauthorized, apperror.AppError{Code: apperror.ErrCodeUnauthorized, Message: "Invalid or missing authentication token"})
 		return
 	}
 
@@ -45,7 +45,7 @@ func (h *Handler) ChangeAccessibility(w http.ResponseWriter, r *http.Request) {
 
 	var req changeAccessibilityRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		handler.WriteJSON(w, http.StatusBadRequest, apperror.AppError{Code: apperror.ErrCodeBadRequest, Message: "Invalid request body"})
+		handler.WriteJSON(r.Context(), w, http.StatusBadRequest, apperror.AppError{Code: apperror.ErrCodeBadRequest, Message: "Invalid request body"})
 		return
 	}
 
@@ -57,11 +57,11 @@ func (h *Handler) ChangeAccessibility(w http.ResponseWriter, r *http.Request) {
 		CurrentUser:   currentUser,
 	})
 	if err != nil {
-		handler.WriteError(w, err)
+		handler.WriteError(r.Context(), w, err)
 		return
 	}
 
-	handler.WriteJSON(w, http.StatusOK, changeAccessibilityResponse{
+	handler.WriteJSON(r.Context(), w, http.StatusOK, changeAccessibilityResponse{
 		Slug:          out.Problem.Slug,
 		Accessibility: out.Problem.Accessibility,
 		Status:        out.Problem.Status,

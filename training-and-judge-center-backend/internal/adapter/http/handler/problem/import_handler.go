@@ -26,7 +26,7 @@ import (
 func (h *Handler) Import(w http.ResponseWriter, r *http.Request) {
 	claims := middleware.GetClaims(r.Context())
 	if claims == nil {
-		handler.WriteJSON(w, http.StatusUnauthorized, apperror.AppError{
+		handler.WriteJSON(r.Context(), w, http.StatusUnauthorized, apperror.AppError{
 			Code:    apperror.ErrCodeUnauthorized,
 			Message: "Invalid or missing authentication token",
 		})
@@ -35,7 +35,7 @@ func (h *Handler) Import(w http.ResponseWriter, r *http.Request) {
 
 	maxUploadBytes := int64(h.settings.MaxFileSizeTestCaseMB()) << 20
 	if err := r.ParseMultipartForm(maxUploadBytes); err != nil {
-		handler.WriteJSON(w, http.StatusRequestEntityTooLarge, apperror.AppError{
+		handler.WriteJSON(r.Context(), w, http.StatusRequestEntityTooLarge, apperror.AppError{
 			Code:    apperror.ErrCodePayloadTooLarge,
 			Message: "File exceeds maximum allowed size",
 		})
@@ -44,7 +44,7 @@ func (h *Handler) Import(w http.ResponseWriter, r *http.Request) {
 
 	slug := r.FormValue("slug")
 	if slug == "" {
-		handler.WriteJSON(w, http.StatusBadRequest, apperror.AppError{
+		handler.WriteJSON(r.Context(), w, http.StatusBadRequest, apperror.AppError{
 			Code:    apperror.ErrCodeValidationError,
 			Message: "Missing required form field 'slug'",
 		})
@@ -53,7 +53,7 @@ func (h *Handler) Import(w http.ResponseWriter, r *http.Request) {
 
 	file, _, err := r.FormFile("file")
 	if err != nil {
-		handler.WriteJSON(w, http.StatusBadRequest, apperror.AppError{
+		handler.WriteJSON(r.Context(), w, http.StatusBadRequest, apperror.AppError{
 			Code:    apperror.ErrCodeValidationError,
 			Message: "Missing required form field 'file'",
 		})
@@ -64,11 +64,11 @@ func (h *Handler) Import(w http.ResponseWriter, r *http.Request) {
 	zipData, err := io.ReadAll(io.LimitReader(file, maxUploadBytes+1))
 	if err != nil {
 		slog.ErrorContext(r.Context(), "import: failed to read uploaded file", "error", err)
-		handler.WriteJSON(w, http.StatusInternalServerError, apperror.NewInternal())
+		handler.WriteJSON(r.Context(), w, http.StatusInternalServerError, apperror.NewInternal())
 		return
 	}
 	if int64(len(zipData)) > maxUploadBytes {
-		handler.WriteJSON(w, http.StatusRequestEntityTooLarge, apperror.AppError{
+		handler.WriteJSON(r.Context(), w, http.StatusRequestEntityTooLarge, apperror.AppError{
 			Code:    apperror.ErrCodePayloadTooLarge,
 			Message: "File exceeds maximum allowed size",
 		})
@@ -83,7 +83,7 @@ func (h *Handler) Import(w http.ResponseWriter, r *http.Request) {
 		CurrentUser: currentUser,
 	})
 	if ucErr != nil {
-		handler.WriteError(w, ucErr)
+		handler.WriteError(r.Context(), w, ucErr)
 		return
 	}
 
@@ -92,5 +92,5 @@ func (h *Handler) Import(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		slog.DebugContext(r.Context(), "failed to fetch author display", "error", err, "user_id", p.AuthorID)
 	}
-	handler.WriteJSON(w, http.StatusCreated, buildResponse(p, authorDisplay))
+	handler.WriteJSON(r.Context(), w, http.StatusCreated, buildResponse(p, authorDisplay))
 }

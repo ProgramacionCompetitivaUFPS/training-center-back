@@ -28,7 +28,7 @@ type unpublishResponse struct {
 func (h *Handler) Unpublish(w http.ResponseWriter, r *http.Request) {
 	claims := middleware.GetClaims(r.Context())
 	if claims == nil {
-		handler.WriteJSON(w, http.StatusUnauthorized, apperror.AppError{Code: apperror.ErrCodeUnauthorized, Message: "Invalid or missing authentication token"})
+		handler.WriteJSON(r.Context(), w, http.StatusUnauthorized, apperror.AppError{Code: apperror.ErrCodeUnauthorized, Message: "Invalid or missing authentication token"})
 		return
 	}
 
@@ -40,11 +40,11 @@ func (h *Handler) Unpublish(w http.ResponseWriter, r *http.Request) {
 		CurrentUser: currentUser,
 	})
 	if err != nil {
-		handler.WriteError(w, err)
+		handler.WriteError(r.Context(), w, err)
 		return
 	}
 
-	handler.WriteJSON(w, http.StatusOK, unpublishResponse{
+	handler.WriteJSON(r.Context(), w, http.StatusOK, unpublishResponse{
 		Slug:    out.Problem.Slug,
 		Status:  out.Problem.Status,
 		Message: "Problem unpublished successfully. You can now make changes.",

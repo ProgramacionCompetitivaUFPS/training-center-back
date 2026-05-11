@@ -28,7 +28,7 @@ func (h *Handler) GetGroup(w http.ResponseWriter, r *http.Request) {
 		CurrentUser: *currentUser,
 	})
 	if err != nil {
-		handler.WriteError(w, err)
+		handler.WriteError(r.Context(), w, err)
 		return
 	}
 
@@ -63,5 +63,5 @@ func (h *Handler) GetGroup(w http.ResponseWriter, r *http.Request) {
 		UpdatedAt:      g.UpdatedAt.Format(timeutil.RFC3339UTC),
 	}
 
-	handler.WriteJSON(w, http.StatusOK, resp)
+	handler.WriteJSON(r.Context(), w, http.StatusOK, resp)
 }

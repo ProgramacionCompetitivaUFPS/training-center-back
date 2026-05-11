@@ -27,7 +27,7 @@ func (h *Handler) Get(w http.ResponseWriter, r *http.Request) {
 	groupID := r.PathValue("groupId")
 	materialID := r.PathValue("materialId")
 	if groupID == "" || materialID == "" {
-		handler.WriteError(w, apperror.NewBadRequest(apperror.ErrCodeBadRequest, "groupId and materialId are required"))
+		handler.WriteError(r.Context(), w, apperror.NewBadRequest(apperror.ErrCodeBadRequest, "groupId and materialId are required"))
 		return
 	}
 
@@ -37,9 +37,9 @@ func (h *Handler) Get(w http.ResponseWriter, r *http.Request) {
 		MaterialID:  materialID,
 	})
 	if err != nil {
-		handler.WriteError(w, err)
+		handler.WriteError(r.Context(), w, err)
 		return
 	}
 
-	handler.WriteJSON(w, http.StatusOK, buildResponse(out.Material))
+	handler.WriteJSON(r.Context(), w, http.StatusOK, buildResponse(out.Material))
 }

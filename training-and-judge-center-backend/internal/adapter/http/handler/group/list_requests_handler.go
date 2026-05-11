@@ -31,7 +31,7 @@ func (h *Handler) ListJoinRequests(w http.ResponseWriter, r *http.Request) {
 	groupID := chi.URLParam(r, "groupId")
 	q := r.URL.Query()
 
-	page, limit, ok := parsePaginationParams(q, w)
+	page, limit, ok := parsePaginationParams(r.Context(), q, w)
 	if !ok {
 		return
 	}
@@ -44,7 +44,7 @@ func (h *Handler) ListJoinRequests(w http.ResponseWriter, r *http.Request) {
 		CurrentUser: *caller,
 	})
 	if err != nil {
-		handler.WriteError(w, err)
+		handler.WriteError(r.Context(), w, err)
 		return
 	}
 
@@ -53,7 +53,7 @@ func (h *Handler) ListJoinRequests(w http.ResponseWriter, r *http.Request) {
 		items = append(items, buildJoinRequestResp(detail.Request, detail.Display))
 	}
 
-	handler.WriteJSON(w, http.StatusOK, listRequestsResponse{
+	handler.WriteJSON(r.Context(), w, http.StatusOK, listRequestsResponse{
 		Requests:   items,
 		Pagination: buildPagination(out.Total, page, out.TotalPages, limit),
 	})

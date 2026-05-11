@@ -30,13 +30,13 @@ func (h *Handler) Update(w http.ResponseWriter, r *http.Request) {
 	groupID := r.PathValue("groupId")
 	materialID := r.PathValue("materialId")
 	if groupID == "" || materialID == "" {
-		handler.WriteError(w, apperror.NewBadRequest(apperror.ErrCodeBadRequest, "groupId and materialId are required"))
+		handler.WriteError(r.Context(), w, apperror.NewBadRequest(apperror.ErrCodeBadRequest, "groupId and materialId are required"))
 		return
 	}
 
 	var body updateMaterialRequest
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-		handler.WriteError(w, apperror.NewBadRequest(apperror.ErrCodeValidationError, "Invalid request body"))
+		handler.WriteError(r.Context(), w, apperror.NewBadRequest(apperror.ErrCodeValidationError, "Invalid request body"))
 		return
 	}
 
@@ -49,9 +49,9 @@ func (h *Handler) Update(w http.ResponseWriter, r *http.Request) {
 		Tags:        body.Tags,
 	})
 	if err != nil {
-		handler.WriteError(w, err)
+		handler.WriteError(r.Context(), w, err)
 		return
 	}
 
-	handler.WriteJSON(w, http.StatusOK, buildResponse(out.Material))
+	handler.WriteJSON(r.Context(), w, http.StatusOK, buildResponse(out.Material))
 }

@@ -35,13 +35,13 @@ const (
 func (h *Handler) UploadFiles(w http.ResponseWriter, r *http.Request) {
 	claims := middleware.GetClaims(r.Context())
 	if claims == nil {
-		handler.WriteJSON(w, http.StatusUnauthorized, apperror.AppError{Code: apperror.ErrCodeUnauthorized, Message: "Invalid or missing token"})
+		handler.WriteJSON(r.Context(), w, http.StatusUnauthorized, apperror.AppError{Code: apperror.ErrCodeUnauthorized, Message: "Invalid or missing token"})
 		return
 	}
 
 	slug := r.PathValue("slug")
 	if slug == "" {
-		handler.WriteJSON(w, http.StatusBadRequest, apperror.AppError{Code: apperror.ErrCodeBadRequest, Message: "Problem slug is required"})
+		handler.WriteJSON(r.Context(), w, http.StatusBadRequest, apperror.AppError{Code: apperror.ErrCodeBadRequest, Message: "Problem slug is required"})
 		return
 	}
 
@@ -52,7 +52,7 @@ func (h *Handler) UploadFiles(w http.ResponseWriter, r *http.Request) {
 	maxMemory := maxTestCaseBytes + multipartMemoryPaddingBytes
 	err := r.ParseMultipartForm(maxMemory)
 	if err != nil {
-		handler.WriteJSON(w, http.StatusBadRequest, apperror.AppError{Code: apperror.ErrCodeBadRequest, Message: "Failed to parse multipart form"})
+		handler.WriteJSON(r.Context(), w, http.StatusBadRequest, apperror.AppError{Code: apperror.ErrCodeBadRequest, Message: "Failed to parse multipart form"})
 		return
 	}
 
@@ -62,7 +62,7 @@ func (h *Handler) UploadFiles(w http.ResponseWriter, r *http.Request) {
 	}
 	file, fileHeader, err := r.FormFile("file")
 	if err != nil {
-		handler.WriteJSON(w, http.StatusBadRequest, apperror.AppError{Code: apperror.ErrCodeBadRequest, Message: "File missing in form-data"})
+		handler.WriteJSON(r.Context(), w, http.StatusBadRequest, apperror.AppError{Code: apperror.ErrCodeBadRequest, Message: "File missing in form-data"})
 		return
 	}
 	defer file.Close()
@@ -73,18 +73,18 @@ func (h *Handler) UploadFiles(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if fileHeader.Size > limitBytes {
-		handler.WriteJSON(w, http.StatusRequestEntityTooLarge, apperror.AppError{Code: apperror.ErrCodePayloadTooLarge, Message: "File size exceeds allowed limit"})
+		handler.WriteJSON(r.Context(), w, http.StatusRequestEntityTooLarge, apperror.AppError{Code: apperror.ErrCodePayloadTooLarge, Message: "File size exceeds allowed limit"})
 		return
 	}
 
 	fileData, err := io.ReadAll(io.LimitReader(file, limitBytes+1))
 	if err != nil {
 		slog.Error("Failed to read uploaded file", "error", err, "slug", slug)
-		handler.WriteJSON(w, http.StatusInternalServerError, apperror.NewInternal())
+		handler.WriteJSON(r.Context(), w, http.StatusInternalServerError, apperror.NewInternal())
 		return
 	}
 	if int64(len(fileData)) > limitBytes {
-		handler.WriteJSON(w, http.StatusRequestEntityTooLarge, apperror.AppError{Code: apperror.ErrCodePayloadTooLarge, Message: "File size exceeds allowed limit"})
+		handler.WriteJSON(r.Context(), w, http.StatusRequestEntityTooLarge, apperror.AppError{Code: apperror.ErrCodePayloadTooLarge, Message: "File size exceeds allowed limit"})
 		return
 	}
 
@@ -102,12 +102,12 @@ func (h *Handler) UploadFiles(w http.ResponseWriter, r *http.Request) {
 	})
 
 	if ucErr != nil {
-		handler.WriteError(w, ucErr)
+		handler.WriteError(r.Context(), w, ucErr)
 		return
 	}
 
 	authorDisplay, _ := h.userProvider.GetDisplay(r.Context(), res.Problem.AuthorID)
-	handler.WriteJSON(w, http.StatusOK, map[string]interface{}{
+	handler.WriteJSON(r.Context(), w, http.StatusOK, map[string]interface{}{
 		"message": res.Message,
 		"problem": buildResponse(res.Problem, authorDisplay),
 	})

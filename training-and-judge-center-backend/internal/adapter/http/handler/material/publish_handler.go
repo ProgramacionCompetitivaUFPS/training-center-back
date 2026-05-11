@@ -30,9 +30,9 @@ func (h *Handler) Publish(w http.ResponseWriter, r *http.Request) {
 		MaterialID:  r.PathValue("materialId"),
 	})
 	if err != nil {
-		handler.WriteError(w, err)
+		handler.WriteError(r.Context(), w, err)
 		return
 	}
 
-	handler.WriteJSON(w, http.StatusOK, buildResponse(out.Material))
+	handler.WriteJSON(r.Context(), w, http.StatusOK, buildResponse(out.Material))
 }

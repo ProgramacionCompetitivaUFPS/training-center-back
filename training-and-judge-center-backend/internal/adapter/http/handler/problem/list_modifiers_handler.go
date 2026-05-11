@@ -22,13 +22,13 @@ import (
 func (h *Handler) ListModifiers(w http.ResponseWriter, r *http.Request) {
 	claims := middleware.GetClaims(r.Context())
 	if claims == nil {
-		handler.WriteJSON(w, http.StatusUnauthorized, apperror.AppError{Code: apperror.ErrCodeUnauthorized, Message: "Invalid token"})
+		handler.WriteJSON(r.Context(), w, http.StatusUnauthorized, apperror.AppError{Code: apperror.ErrCodeUnauthorized, Message: "Invalid token"})
 		return
 	}
 
 	slug := r.PathValue("slug")
 	if slug == "" {
-		handler.WriteJSON(w, http.StatusBadRequest, apperror.AppError{Code: apperror.ErrCodeBadRequest, Message: "Slug is required"})
+		handler.WriteJSON(r.Context(), w, http.StatusBadRequest, apperror.AppError{Code: apperror.ErrCodeBadRequest, Message: "Slug is required"})
 		return
 	}
 
@@ -39,9 +39,9 @@ func (h *Handler) ListModifiers(w http.ResponseWriter, r *http.Request) {
 		CurrentUser: currentUser,
 	})
 	if err != nil {
-		handler.WriteError(w, err)
+		handler.WriteError(r.Context(), w, err)
 		return
 	}
 
-	handler.WriteJSON(w, http.StatusOK, map[string]interface{}{"modifiers": out.Nicknames})
+	handler.WriteJSON(r.Context(), w, http.StatusOK, map[string]interface{}{"modifiers": out.Nicknames})
 }

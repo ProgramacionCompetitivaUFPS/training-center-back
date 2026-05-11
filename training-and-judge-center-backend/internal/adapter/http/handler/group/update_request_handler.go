@@ -40,7 +40,7 @@ func (h *Handler) UpdateJoinRequest(w http.ResponseWriter, r *http.Request) {
 
 	var body updateRequestBody
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-		handler.WriteJSON(w, http.StatusBadRequest, apperror.AppError{
+		handler.WriteJSON(r.Context(), w, http.StatusBadRequest, apperror.AppError{
 			Code:    apperror.ErrCodeValidationError,
 			Message: "Invalid request body",
 		})
@@ -55,10 +55,10 @@ func (h *Handler) UpdateJoinRequest(w http.ResponseWriter, r *http.Request) {
 			CurrentUser: *caller,
 		})
 		if err != nil {
-			handler.WriteError(w, err)
+			handler.WriteError(r.Context(), w, err)
 			return
 		}
-		handler.WriteJSON(w, http.StatusOK, buildJoinRequestResp(out.Request, nil))
+		handler.WriteJSON(r.Context(), w, http.StatusOK, buildJoinRequestResp(out.Request, nil))
 
 	case domainGroup.JoinRequestStatusRejected.String():
 		out, err := h.rejectRequest.Execute(r.Context(), appGroup.RejectRequestInput{
@@ -67,13 +67,13 @@ func (h *Handler) UpdateJoinRequest(w http.ResponseWriter, r *http.Request) {
 			CurrentUser: *caller,
 		})
 		if err != nil {
-			handler.WriteError(w, err)
+			handler.WriteError(r.Context(), w, err)
 			return
 		}
-		handler.WriteJSON(w, http.StatusOK, buildJoinRequestResp(out.Request, nil))
+		handler.WriteJSON(r.Context(), w, http.StatusOK, buildJoinRequestResp(out.Request, nil))
 
 	default:
-		handler.WriteJSON(w, http.StatusBadRequest, apperror.AppError{
+		handler.WriteJSON(r.Context(), w, http.StatusBadRequest, apperror.AppError{
 			Code:    apperror.ErrCodeValidationError,
 			Message: "status must be APPROVED or REJECTED",
 			Details: []apperror.FieldError{{Field: "status", Message: "must be APPROVED or REJECTED"}},

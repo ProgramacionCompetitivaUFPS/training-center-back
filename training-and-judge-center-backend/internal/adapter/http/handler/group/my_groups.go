@@ -25,7 +25,7 @@ func (h *Handler) ListMyGroups(w http.ResponseWriter, r *http.Request) {
 	}
 
 	q := r.URL.Query()
-	page, limit, ok := parsePaginationParams(q, w)
+	page, limit, ok := parsePaginationParams(r.Context(), q, w)
 	if !ok {
 		return
 	}
@@ -42,7 +42,7 @@ func (h *Handler) ListMyGroups(w http.ResponseWriter, r *http.Request) {
 
 	out, err := h.listMyGroups.Execute(r.Context(), in)
 	if err != nil {
-		handler.WriteError(w, err)
+		handler.WriteError(r.Context(), w, err)
 		return
 	}
 
@@ -63,7 +63,7 @@ func (h *Handler) ListMyGroups(w http.ResponseWriter, r *http.Request) {
 		})
 	}
 
-	handler.WriteJSON(w, http.StatusOK, listMyGroupsResponse{
+	handler.WriteJSON(r.Context(), w, http.StatusOK, listMyGroupsResponse{
 		Groups:     items,
 		Pagination: buildPagination(out.TotalCount, out.Page, out.TotalPages, out.Limit),
 	})

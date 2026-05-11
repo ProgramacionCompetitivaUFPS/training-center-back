@@ -29,7 +29,7 @@ func (h *Handler) Delete(w http.ResponseWriter, r *http.Request) {
 		MaterialID:  r.PathValue("materialId"),
 	})
 	if err != nil {
-		handler.WriteError(w, err)
+		handler.WriteError(r.Context(), w, err)
 		return
 	}
 

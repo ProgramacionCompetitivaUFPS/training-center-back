@@ -33,12 +33,12 @@ func (h *Handler) Join(w http.ResponseWriter, r *http.Request) {
 		CurrentUser: *currentUser,
 	})
 	if err != nil {
-		handler.WriteError(w, err)
+		handler.WriteError(r.Context(), w, err)
 		return
 	}
 
 	m := out.Member
-	handler.WriteJSON(w, http.StatusCreated, joinGroupResponse{
+	handler.WriteJSON(r.Context(), w, http.StatusCreated, joinGroupResponse{
 		Role:     m.Role,
 		JoinedAt: m.JoinedAt.Format(timeutil.RFC3339UTC),
 	})
