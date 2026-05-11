@@ -48,7 +48,7 @@ func NewAuthHandler(loginUseCase *appuser.LoginUseCase) *AuthHandler {
 func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 	var req loginRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		respondJSON(w, http.StatusBadRequest, map[string]string{
+		respondJSON(r.Context(), w, http.StatusBadRequest, map[string]string{
 			"error":   "INVALID_JSON",
 			"message": "Request body must be valid JSON",
 		})
@@ -60,7 +60,7 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 		Password: req.Password,
 	})
 	if err != nil {
-		respondError(w, err)
+		respondError(r.Context(), w, err)
 		return
 	}
 
@@ -68,7 +68,7 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 	if out.User.Email != nil {
 		email = *out.User.Email
 	}
-	respondJSON(w, http.StatusOK, loginResponse{
+	respondJSON(r.Context(), w, http.StatusOK, loginResponse{
 		Token: out.Token,
 		User: userResponse{
 			Email:       email,

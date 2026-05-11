@@ -23,14 +23,14 @@ import (
 func (h *Handler) RemoveModifier(w http.ResponseWriter, r *http.Request) {
 	claims := middleware.GetClaims(r.Context())
 	if claims == nil {
-		handler.WriteJSON(w, http.StatusUnauthorized, apperror.AppError{Code: apperror.ErrCodeUnauthorized, Message: "Invalid token"})
+		handler.WriteJSON(r.Context(), w, http.StatusUnauthorized, apperror.AppError{Code: apperror.ErrCodeUnauthorized, Message: "Invalid token"})
 		return
 	}
 
 	slug := r.PathValue("slug")
 	userID := r.PathValue("userId")
 	if slug == "" || userID == "" {
-		handler.WriteJSON(w, http.StatusBadRequest, apperror.AppError{Code: apperror.ErrCodeBadRequest, Message: "Slug and userId are required"})
+		handler.WriteJSON(r.Context(), w, http.StatusBadRequest, apperror.AppError{Code: apperror.ErrCodeBadRequest, Message: "Slug and userId are required"})
 		return
 	}
 
@@ -43,7 +43,7 @@ func (h *Handler) RemoveModifier(w http.ResponseWriter, r *http.Request) {
 	})
 
 	if err != nil {
-		handler.WriteError(w, err)
+		handler.WriteError(r.Context(), w, err)
 		return
 	}
 

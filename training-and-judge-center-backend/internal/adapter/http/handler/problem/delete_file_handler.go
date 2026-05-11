@@ -28,7 +28,7 @@ import (
 func (h *Handler) DeleteFile(w http.ResponseWriter, r *http.Request) {
 	claims := middleware.GetClaims(r.Context())
 	if claims == nil {
-		handler.WriteJSON(w, http.StatusUnauthorized, apperror.AppError{Code: apperror.ErrCodeUnauthorized, Message: "Invalid or missing token"})
+		handler.WriteJSON(r.Context(), w, http.StatusUnauthorized, apperror.AppError{Code: apperror.ErrCodeUnauthorized, Message: "Invalid or missing token"})
 		return
 	}
 
@@ -37,7 +37,7 @@ func (h *Handler) DeleteFile(w http.ResponseWriter, r *http.Request) {
 	fileName := r.URL.Query().Get("fileName")
 
 	if slug == "" || fileType == "" {
-		handler.WriteJSON(w, http.StatusBadRequest, apperror.AppError{Code: apperror.ErrCodeBadRequest, Message: "Slug and fileType are required"})
+		handler.WriteJSON(r.Context(), w, http.StatusBadRequest, apperror.AppError{Code: apperror.ErrCodeBadRequest, Message: "Slug and fileType are required"})
 		return
 	}
 
@@ -56,10 +56,10 @@ func (h *Handler) DeleteFile(w http.ResponseWriter, r *http.Request) {
 	if ucErr != nil {
 		var appErr *apperror.AppError
 		if errors.As(ucErr, &appErr) {
-			handler.WriteError(w, appErr)
+			handler.WriteError(r.Context(), w, appErr)
 		} else {
-			slog.Error("Unexpected error in DeleteFile", "error", ucErr, "slug", slug)
-			handler.WriteError(w, apperror.NewInternal())
+			slog.ErrorContext(ctx, "Unexpected error in DeleteFile", "error", ucErr, "slug", slug)
+			handler.WriteError(r.Context(), w, apperror.NewInternal())
 		}
 		return
 	}

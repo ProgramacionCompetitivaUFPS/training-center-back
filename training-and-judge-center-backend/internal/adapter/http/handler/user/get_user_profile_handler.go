@@ -39,7 +39,7 @@ type publicUserResponse struct {
 func (h *UserHandler) GetMyProfile(w http.ResponseWriter, r *http.Request) {
 	claims := middleware.GetClaims(r.Context())
 	if claims == nil {
-		handler.WriteJSON(w, http.StatusUnauthorized, map[string]string{
+		handler.WriteJSON(r.Context(), w, http.StatusUnauthorized, map[string]string{
 			"error":   "UNAUTHORIZED",
 			"message": "Invalid or missing authentication token",
 		})
@@ -48,11 +48,11 @@ func (h *UserHandler) GetMyProfile(w http.ResponseWriter, r *http.Request) {
 
 	out, err := h.getMyProfile.Execute(r.Context(), appuser.GetMyProfileInput{UserID: claims.UserID})
 	if err != nil {
-		handler.WriteError(w, err)
+		handler.WriteError(r.Context(), w, err)
 		return
 	}
 
-	handler.WriteJSON(w, http.StatusOK, buildFullResponse(out.User))
+	handler.WriteJSON(r.Context(), w, http.StatusOK, buildFullResponse(out.User))
 }
 
 // @Summary      Get user by nickname
@@ -67,7 +67,7 @@ func (h *UserHandler) GetMyProfile(w http.ResponseWriter, r *http.Request) {
 func (h *UserHandler) GetByNickname(w http.ResponseWriter, r *http.Request) {
 	claims := middleware.GetClaims(r.Context())
 	if claims == nil {
-		handler.WriteJSON(w, http.StatusUnauthorized, map[string]string{
+		handler.WriteJSON(r.Context(), w, http.StatusUnauthorized, map[string]string{
 			"error":   "UNAUTHORIZED",
 			"message": "Invalid or missing authentication token",
 		})
@@ -82,14 +82,14 @@ func (h *UserHandler) GetByNickname(w http.ResponseWriter, r *http.Request) {
 		Nickname:      nickname,
 	})
 	if err != nil {
-		handler.WriteError(w, err)
+		handler.WriteError(r.Context(), w, err)
 		return
 	}
 
 	if out.IsFullProfile {
-		handler.WriteJSON(w, http.StatusOK, buildFullResponse(out.User))
+		handler.WriteJSON(r.Context(), w, http.StatusOK, buildFullResponse(out.User))
 	} else {
-		handler.WriteJSON(w, http.StatusOK, publicUserResponse{
+		handler.WriteJSON(r.Context(), w, http.StatusOK, publicUserResponse{
 			Name:        out.User.Name,
 			Nickname:    out.User.Nickname,
 			Institution: out.User.Institution,

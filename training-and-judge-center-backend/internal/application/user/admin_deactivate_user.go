@@ -35,7 +35,7 @@ func (uc *AdminDeactivateUserUseCase) Execute(ctx context.Context, input AdminDe
 
 	foundUser, err := uc.repo.FindByID(ctx, input.TargetID)
 	if err != nil {
-		slog.Error("failed to find user by id during admin deactivation", "target_id", input.TargetID, "error", err)
+		slog.ErrorContext(ctx, "failed to find user by id during admin deactivation", "target_id", input.TargetID, "error", err)
 		return apperror.NewInternal()
 	}
 	if foundUser == nil {
@@ -54,7 +54,7 @@ func (uc *AdminDeactivateUserUseCase) Execute(ctx context.Context, input AdminDe
 	now := time.Now()
 	anonSuffix := uuid.New().String()[:10]
 	if err := foundUser.Deactivate(anonSuffix, now); err != nil {
-		slog.Error("failed to deactivate user domain object", "user_id", foundUser.ID(), "error", err)
+		slog.ErrorContext(ctx, "failed to deactivate user domain object", "user_id", foundUser.ID(), "error", err)
 		return apperror.NewInternal()
 	}
 
@@ -63,12 +63,12 @@ func (uc *AdminDeactivateUserUseCase) Execute(ctx context.Context, input AdminDe
 	// If DB write fails after this point, the user loses their active session
 	// but is not officially deactivated — a minor inconsistency, not a security risk.
 	if err := uc.sessionInvalidator.InvalidateAllUserSessions(ctx, foundUser.ID(), now); err != nil {
-		slog.Error("failed to invalidate sessions during admin deactivation", "user_id", foundUser.ID(), "error", err)
+		slog.ErrorContext(ctx, "failed to invalidate sessions during admin deactivation", "user_id", foundUser.ID(), "error", err)
 		return apperror.NewInternal()
 	}
 
 	if err := uc.repo.Update(ctx, foundUser); err != nil {
-		slog.Error("failed to persist user deactivation", "user_id", foundUser.ID(), "error", err)
+		slog.ErrorContext(ctx, "failed to persist user deactivation", "user_id", foundUser.ID(), "error", err)
 		return apperror.NewInternal()
 	}
 

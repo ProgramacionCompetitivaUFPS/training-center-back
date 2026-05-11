@@ -28,13 +28,13 @@ func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
 
 	groupID := r.PathValue("groupId")
 	if groupID == "" {
-		handler.WriteError(w, apperror.NewBadRequest(apperror.ErrCodeBadRequest, "groupId is required"))
+		handler.WriteError(r.Context(), w, apperror.NewBadRequest(apperror.ErrCodeBadRequest, "groupId is required"))
 		return
 	}
 
 	var body createMaterialRequest
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-		handler.WriteError(w, apperror.NewBadRequest(apperror.ErrCodeValidationError, "Invalid request body"))
+		handler.WriteError(r.Context(), w, apperror.NewBadRequest(apperror.ErrCodeValidationError, "Invalid request body"))
 		return
 	}
 
@@ -46,9 +46,9 @@ func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
 		Tags:        body.Tags,
 	})
 	if err != nil {
-		handler.WriteError(w, err)
+		handler.WriteError(r.Context(), w, err)
 		return
 	}
 
-	handler.WriteJSON(w, http.StatusCreated, buildResponse(out.Material))
+	handler.WriteJSON(r.Context(), w, http.StatusCreated, buildResponse(out.Material))
 }

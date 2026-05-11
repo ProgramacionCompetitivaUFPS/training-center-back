@@ -28,13 +28,13 @@ import (
 func (h *Handler) ListProblems(w http.ResponseWriter, r *http.Request) {
 	claims := middleware.GetClaims(r.Context())
 	if claims == nil {
-		handler.WriteJSON(w, http.StatusUnauthorized, apperror.AppError{Code: apperror.ErrCodeUnauthorized, Message: "Invalid or missing authentication token"})
+		handler.WriteJSON(r.Context(), w, http.StatusUnauthorized, apperror.AppError{Code: apperror.ErrCodeUnauthorized, Message: "Invalid or missing authentication token"})
 		return
 	}
 
 	page, err := parseIntParam(r.URL.Query().Get("page"), 1)
 	if err != nil || page < 1 {
-		handler.WriteJSON(w, http.StatusBadRequest, apperror.AppError{
+		handler.WriteJSON(r.Context(), w, http.StatusBadRequest, apperror.AppError{
 			Code:    apperror.ErrCodeValidationError,
 			Message: "Invalid request parameters",
 			Details: []apperror.FieldError{{Field: "page", Message: "Page must be a positive integer"}},
@@ -44,7 +44,7 @@ func (h *Handler) ListProblems(w http.ResponseWriter, r *http.Request) {
 
 	limit, err := parseIntParam(r.URL.Query().Get("limit"), 20)
 	if err != nil || limit < 1 || limit > 100 {
-		handler.WriteJSON(w, http.StatusBadRequest, apperror.AppError{
+		handler.WriteJSON(r.Context(), w, http.StatusBadRequest, apperror.AppError{
 			Code:    apperror.ErrCodeValidationError,
 			Message: "Invalid request parameters",
 			Details: []apperror.FieldError{{Field: "limit", Message: "Limit must be between 1 and 100"}},
@@ -71,7 +71,7 @@ func (h *Handler) ListProblems(w http.ResponseWriter, r *http.Request) {
 
 	out, ucErr := h.listProblemsUC.Execute(r.Context(), in)
 	if ucErr != nil {
-		handler.WriteError(w, ucErr)
+		handler.WriteError(r.Context(), w, ucErr)
 		return
 	}
 
@@ -90,7 +90,7 @@ func (h *Handler) ListProblems(w http.ResponseWriter, r *http.Request) {
 		})
 	}
 
-	handler.WriteJSON(w, http.StatusOK, listProblemsResponse{
+	handler.WriteJSON(r.Context(), w, http.StatusOK, listProblemsResponse{
 		Problems: items,
 		Pagination: paginationResp{
 			TotalCount:   out.TotalCount,

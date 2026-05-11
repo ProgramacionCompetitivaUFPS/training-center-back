@@ -44,7 +44,7 @@ func NewConfirmEmailChangeUseCase(
 func (uc *ConfirmEmailChangeUseCase) Execute(ctx context.Context, input ConfirmEmailChangeInput) (*ConfirmEmailChangeOutput, error) {
 	u, err := uc.userRepo.FindByID(ctx, input.UserID)
 	if err != nil {
-		slog.Error("failed to find user during email change confirmation", "user_id", input.UserID, "error", err)
+		slog.ErrorContext(ctx, "failed to find user during email change confirmation", "user_id", input.UserID, "error", err)
 		return nil, apperror.NewInternal()
 	}
 	if u == nil {
@@ -53,7 +53,7 @@ func (uc *ConfirmEmailChangeUseCase) Execute(ctx context.Context, input ConfirmE
 
 	req, err := uc.emailChangeRepo.FindByCodeAndUserID(ctx, input.Code, input.UserID)
 	if err != nil {
-		slog.Error("failed to find email change request by code", "user_id", input.UserID, "error", err)
+		slog.ErrorContext(ctx, "failed to find email change request by code", "user_id", input.UserID, "error", err)
 		return nil, apperror.NewInternal()
 	}
 	
@@ -69,11 +69,11 @@ func (uc *ConfirmEmailChangeUseCase) Execute(ctx context.Context, input ConfirmE
 	oldEmail := u.Email().String()
 	newEmailVal := req.NewEmail()
 	if err := u.UpdateEmail(newEmailVal, now); err != nil {
-		slog.Error("failed to update email on user domain object", "user_id", input.UserID, "error", err)
+		slog.ErrorContext(ctx, "failed to update email on user domain object", "user_id", input.UserID, "error", err)
 		return nil, apperror.NewInternal()
 	}
 	if err := req.MarkAsUsed(now); err != nil {
-		slog.Error("failed to mark email change request as used", "user_id", input.UserID, "error", err)
+		slog.ErrorContext(ctx, "failed to mark email change request as used", "user_id", input.UserID, "error", err)
 		return nil, apperror.NewInternal()
 	}
 
@@ -94,7 +94,7 @@ func (uc *ConfirmEmailChangeUseCase) Execute(ctx context.Context, input ConfirmE
 		Subject: "Security Alert: Your Email Was Changed",
 		Body:    "Your account email has been successfully changed to a new one. If you did not make this change, please contact support immediately.",
 	}); err != nil {
-		slog.Error("failed to send security alert to old email", "email", oldEmail, "error", err)
+		slog.ErrorContext(ctx, "failed to send security alert to old email", "email", oldEmail, "error", err)
 	}
 	
 	if err := uc.emailSender.Send(ctx, appshared.EmailMessage{
@@ -102,7 +102,7 @@ func (uc *ConfirmEmailChangeUseCase) Execute(ctx context.Context, input ConfirmE
 		Subject: "Email successfully updated",
 		Body:    fmt.Sprintf("Hello %s, your email address has been successfully verified and updated on our platform.", u.Name()),
 	}); err != nil {
-		slog.Error("failed to send confirmation to new email", "email", req.NewEmail().String(), "error", err)
+		slog.ErrorContext(ctx, "failed to send confirmation to new email", "email", req.NewEmail().String(), "error", err)
 	}
 
 	return &ConfirmEmailChangeOutput{Email: newEmailVal.String()}, nil

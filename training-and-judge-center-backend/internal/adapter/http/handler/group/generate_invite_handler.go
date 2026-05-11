@@ -32,9 +32,9 @@ func (h *Handler) GenerateInvite(w http.ResponseWriter, r *http.Request) {
 		CurrentUser: *currentUser,
 	})
 	if err != nil {
-		handler.WriteError(w, err)
+		handler.WriteError(r.Context(), w, err)
 		return
 	}
 
-	handler.WriteJSON(w, http.StatusCreated, generateInviteResponse{Token: out.Token})
+	handler.WriteJSON(r.Context(), w, http.StatusCreated, generateInviteResponse{Token: out.Token})
 }

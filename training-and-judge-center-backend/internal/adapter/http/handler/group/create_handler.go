@@ -43,7 +43,7 @@ type groupResponse struct {
 func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
 	claims := middleware.GetClaims(r.Context())
 	if claims == nil {
-		handler.WriteJSON(w, http.StatusUnauthorized, apperror.AppError{
+		handler.WriteJSON(r.Context(), w, http.StatusUnauthorized, apperror.AppError{
 			Code:    apperror.ErrCodeUnauthorized,
 			Message: "Invalid or missing authentication token",
 		})
@@ -52,7 +52,7 @@ func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
 
 	var body createGroupRequest
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-		handler.WriteJSON(w, http.StatusBadRequest, apperror.AppError{
+		handler.WriteJSON(r.Context(), w, http.StatusBadRequest, apperror.AppError{
 			Code:    apperror.ErrCodeValidationError,
 			Message: "Invalid request body",
 		})
@@ -69,11 +69,11 @@ func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
 		CurrentUser: currentUser,
 	})
 	if ucErr != nil {
-		handler.WriteError(w, ucErr)
+		handler.WriteError(r.Context(), w, ucErr)
 		return
 	}
 
-	handler.WriteJSON(w, http.StatusCreated, groupResponse{
+	handler.WriteJSON(r.Context(), w, http.StatusCreated, groupResponse{
 		ID:          out.ID,
 		Name:        out.Name,
 		Description: out.Description,

@@ -72,7 +72,7 @@ func (uc *CreateUserUseCase) Execute(ctx context.Context, input CreateUserInput)
 	now := time.Now()
 	newUser, err := user.NewUser(newID, now, email, password, input.Name, nickname, input.Country, input.City, input.Institution)
 	if err != nil {
-		slog.Error("failed to build new user domain object", "error", err)
+		slog.ErrorContext(ctx, "failed to build new user domain object", "error", err)
 		return nil,apperror.NewInternal()
 	}
 

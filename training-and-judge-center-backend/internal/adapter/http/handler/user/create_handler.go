@@ -41,7 +41,7 @@ type createUserResponse struct {
 func (h *UserHandler) Create(w http.ResponseWriter, r *http.Request) {
 	var req createUserRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		handler.WriteJSON(w, http.StatusBadRequest, map[string]string{
+		handler.WriteJSON(r.Context(), w, http.StatusBadRequest, map[string]string{
 			"error":   "INVALID_JSON",
 			"message": "Request body must be valid JSON",
 		})
@@ -58,7 +58,7 @@ func (h *UserHandler) Create(w http.ResponseWriter, r *http.Request) {
 		Institution: req.Institution,
 	})
 	if err != nil {
-		handler.WriteError(w, err)
+		handler.WriteError(r.Context(), w, err)
 		return
 	}
 
@@ -66,7 +66,7 @@ func (h *UserHandler) Create(w http.ResponseWriter, r *http.Request) {
 	if out.User.Email != nil {
 		emailStr = *out.User.Email
 	}
-	handler.WriteJSON(w, http.StatusCreated, createUserResponse{
+	handler.WriteJSON(r.Context(), w, http.StatusCreated, createUserResponse{
 		Email:       emailStr,
 		Name:        out.User.Name,
 		Nickname:    out.User.Nickname,

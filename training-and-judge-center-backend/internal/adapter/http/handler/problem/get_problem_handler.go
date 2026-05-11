@@ -22,7 +22,7 @@ import (
 func (h *Handler) GetProblem(w http.ResponseWriter, r *http.Request) {
 	claims := middleware.GetClaims(r.Context())
 	if claims == nil {
-		handler.WriteJSON(w, http.StatusUnauthorized, apperror.AppError{Code: apperror.ErrCodeUnauthorized, Message: "Invalid or missing authentication token"})
+		handler.WriteJSON(r.Context(), w, http.StatusUnauthorized, apperror.AppError{Code: apperror.ErrCodeUnauthorized, Message: "Invalid or missing authentication token"})
 		return
 	}
 
@@ -34,7 +34,7 @@ func (h *Handler) GetProblem(w http.ResponseWriter, r *http.Request) {
 		CurrentUser: currentUser,
 	})
 	if err != nil {
-		handler.WriteError(w, err)
+		handler.WriteError(r.Context(), w, err)
 		return
 	}
 
@@ -91,5 +91,5 @@ func (h *Handler) GetProblem(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	handler.WriteJSON(w, http.StatusOK, resp)
+	handler.WriteJSON(r.Context(), w, http.StatusOK, resp)
 }

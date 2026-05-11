@@ -76,7 +76,7 @@ func (h *UserHandler) ListUsers(w http.ResponseWriter, r *http.Request) {
 
 	out, err := h.listUsers.Execute(r.Context(), input)
 	if err != nil {
-		handler.WriteError(w, err)
+		handler.WriteError(r.Context(), w, err)
 		return
 	}
 
@@ -112,7 +112,7 @@ func (h *UserHandler) ListUsers(w http.ResponseWriter, r *http.Request) {
 		totalPages = int(math.Ceil(float64(out.TotalCount) / float64(out.Limit)))
 	}
 
-	handler.WriteJSON(w, http.StatusOK, listUsersResponse{
+	handler.WriteJSON(r.Context(), w, http.StatusOK, listUsersResponse{
 		Users: items,
 		Pagination: paginationMeta{
 			TotalCount:   out.TotalCount,

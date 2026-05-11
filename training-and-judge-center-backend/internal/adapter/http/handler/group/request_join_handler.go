@@ -38,7 +38,7 @@ func (h *Handler) RequestJoin(w http.ResponseWriter, r *http.Request) {
 
 	var body requestJoinBody
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil && err != io.EOF {
-		handler.WriteJSON(w, http.StatusBadRequest, apperror.AppError{
+		handler.WriteJSON(r.Context(), w, http.StatusBadRequest, apperror.AppError{
 			Code:    apperror.ErrCodeValidationError,
 			Message: "Invalid request body",
 		})
@@ -51,11 +51,11 @@ func (h *Handler) RequestJoin(w http.ResponseWriter, r *http.Request) {
 		CurrentUser: *caller,
 	})
 	if err != nil {
-		handler.WriteError(w, err)
+		handler.WriteError(r.Context(), w, err)
 		return
 	}
 
-	handler.WriteJSON(w, http.StatusCreated, buildJoinRequestResp(out.Request, nil))
+	handler.WriteJSON(r.Context(), w, http.StatusCreated, buildJoinRequestResp(out.Request, nil))
 }
 
 func buildJoinRequestResp(req appGroup.JoinRequestDTO, display *appGroup.UserDisplay) joinRequestResp {

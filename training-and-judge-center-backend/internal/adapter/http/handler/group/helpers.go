@@ -1,6 +1,7 @@
 package group
 
 import (
+	"context"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -24,23 +25,23 @@ func stringPtrOrNil(s string) *string {
 	return &s
 }
 
-func parsePaginationParams(q url.Values, w http.ResponseWriter) (page, limit int, ok bool) {
+func parsePaginationParams(ctx context.Context, q url.Values, w http.ResponseWriter) (page, limit int, ok bool) {
 	var err error
 	page, err = parseIntParam(q.Get("page"), 1)
 	if err != nil {
-		writeBadPagination(w, "page", "page must be a positive integer")
+		writeBadPagination(ctx, w, "page", "page must be a positive integer")
 		return 0, 0, false
 	}
 	limit, err = parseIntParam(q.Get("limit"), appGroup.DefaultPageLimit)
 	if err != nil {
-		writeBadPagination(w, "limit", "limit must be an integer")
+		writeBadPagination(ctx, w, "limit", "limit must be an integer")
 		return 0, 0, false
 	}
 	return page, limit, true
 }
 
-func writeBadPagination(w http.ResponseWriter, field, msg string) {
-	handler.WriteJSON(w, http.StatusBadRequest, apperror.AppError{
+func writeBadPagination(ctx context.Context, w http.ResponseWriter, field, msg string) {
+	handler.WriteJSON(ctx, w, http.StatusBadRequest, apperror.AppError{
 		Code:    apperror.ErrCodeValidationError,
 		Message: "Invalid request parameters",
 		Details: []apperror.FieldError{{Field: field, Message: msg}},

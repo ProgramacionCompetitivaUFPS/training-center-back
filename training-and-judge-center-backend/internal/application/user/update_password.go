@@ -40,7 +40,7 @@ func (uc *UpdatePasswordUseCase) Execute(ctx context.Context, input UpdatePasswo
 	rateKey := "rate_limit:update_password:" + input.UserID
 	allowed, err := uc.rateLimiter.Allow(ctx, rateKey, 5, time.Hour)
 	if err != nil {
-		slog.Error("failed to check rate limit for password update", "user_id", input.UserID, "error", err)
+		slog.ErrorContext(ctx, "failed to check rate limit for password update", "user_id", input.UserID, "error", err)
 		return nil, apperror.NewInternal()
 	}
 	if !allowed {
@@ -49,7 +49,7 @@ func (uc *UpdatePasswordUseCase) Execute(ctx context.Context, input UpdatePasswo
 
 	foundUser, err := uc.repo.FindByID(ctx, input.UserID)
 	if err != nil {
-		slog.Error("failed to find user during password update", "user_id", input.UserID, "error", err)
+		slog.ErrorContext(ctx, "failed to find user during password update", "user_id", input.UserID, "error", err)
 		return nil, apperror.NewInternal()
 	}
 	if foundUser == nil {
@@ -77,24 +77,24 @@ func (uc *UpdatePasswordUseCase) Execute(ctx context.Context, input UpdatePasswo
 
 	now := time.Now()
 	if err := foundUser.UpdatePassword(newPassword, now); err != nil {
-		slog.Error("failed to update password on user domain object", "user_id", foundUser.ID(), "error", err)
+		slog.ErrorContext(ctx, "failed to update password on user domain object", "user_id", foundUser.ID(), "error", err)
 		return nil, apperror.NewInternal()
 	}
 
 	if err := uc.repo.Update(ctx, foundUser); err != nil {
-		slog.Error("failed to persist password update", "user_id", foundUser.ID(), "error", err)
+		slog.ErrorContext(ctx, "failed to persist password update", "user_id", foundUser.ID(), "error", err)
 		return nil, apperror.NewInternal()
 	}
 
 	// Password changed successfully — reset rate limit so the user can make fresh attempts later.
 	if err := uc.rateLimiter.Reset(ctx, rateKey); err != nil {
-		slog.Error("failed to reset rate limit after successful password update", "user_id", foundUser.ID(), "error", err)
+		slog.ErrorContext(ctx, "failed to reset rate limit after successful password update", "user_id", foundUser.ID(), "error", err)
 		// Don't fail the operation; the password was already saved.
 	}
 
 	sessionsInvalidated := true
 	if err := uc.sessionInvalidator.InvalidateAllUserSessions(ctx, foundUser.ID(), now); err != nil {
-		slog.Error("failed to invalidate sessions after password update", "user_id", foundUser.ID(), "error", err)
+		slog.ErrorContext(ctx, "failed to invalidate sessions after password update", "user_id", foundUser.ID(), "error", err)
 		sessionsInvalidated = false
 	}
 
@@ -103,7 +103,7 @@ func (uc *UpdatePasswordUseCase) Execute(ctx context.Context, input UpdatePasswo
 		Subject: "Security Alert: Password Changed",
 		Body:    "Your password has been changed successfully. If you did not make this change, please contact support immediately.",
 	}); err != nil {
-		slog.Error("failed to send password changed email", "user_id", foundUser.ID(), "email", foundUser.Email().String(), "error", err)
+		slog.ErrorContext(ctx, "failed to send password changed email", "user_id", foundUser.ID(), "email", foundUser.Email().String(), "error", err)
 	}
 
 	return &UpdatePasswordOutput{SessionsInvalidated: sessionsInvalidated}, nil

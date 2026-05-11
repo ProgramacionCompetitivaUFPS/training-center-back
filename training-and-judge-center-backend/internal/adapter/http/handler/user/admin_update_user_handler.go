@@ -36,7 +36,7 @@ func (h *UserHandler) AdminUpdateUser(w http.ResponseWriter, r *http.Request) {
 
 	var req adminUpdateUserRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		handler.WriteJSON(w, http.StatusBadRequest, map[string]string{
+		handler.WriteJSON(r.Context(), w, http.StatusBadRequest, map[string]string{
 			"error":   "INVALID_JSON",
 			"message": "Request body must be valid JSON",
 		})
@@ -54,7 +54,7 @@ func (h *UserHandler) AdminUpdateUser(w http.ResponseWriter, r *http.Request) {
 		Role:        req.Role,
 	})
 	if err != nil {
-		handler.WriteError(w, err)
+		handler.WriteError(r.Context(), w, err)
 		return
 	}
 
@@ -74,5 +74,5 @@ func (h *UserHandler) AdminUpdateUser(w http.ResponseWriter, r *http.Request) {
 		resp.UpdatedAt = out.User.UpdatedAt.Format("2006-01-02T15:04:05Z")
 	}
 
-	handler.WriteJSON(w, http.StatusOK, resp)
+	handler.WriteJSON(r.Context(), w, http.StatusOK, resp)
 }

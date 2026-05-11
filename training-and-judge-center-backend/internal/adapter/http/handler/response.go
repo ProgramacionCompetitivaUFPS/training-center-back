@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"log/slog"
@@ -10,21 +11,21 @@ import (
 )
 
 // WriteJSON and WriteError are exported for use by handler/problem subpackage.
-func WriteJSON(w http.ResponseWriter, status int, v any) {
+func WriteJSON(ctx context.Context, w http.ResponseWriter, status int, v any) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
 	if err := json.NewEncoder(w).Encode(v); err != nil {
-		slog.Error("failed to encode JSON response", "error", err, "status", status)
+		slog.ErrorContext(ctx, "failed to encode JSON response", "error", err, "status", status)
 	}
 }
 
-func WriteError(w http.ResponseWriter, err error) {
+func WriteError(ctx context.Context, w http.ResponseWriter, err error) {
 	var appErr *apperror.AppError
 	if !errors.As(err, &appErr) {
-		slog.Error("unexpected internal error in handler", "error", err)
+		slog.ErrorContext(ctx, "unexpected internal error in handler", "error", err)
 		appErr = apperror.NewInternal()
 	}
-	WriteJSON(w, kindToStatus(appErr.Kind), appErr)
+	WriteJSON(ctx, w, kindToStatus(appErr.Kind), appErr)
 }
 
 func kindToStatus(k apperror.Kind) int {
@@ -50,10 +51,10 @@ func kindToStatus(k apperror.Kind) int {
 	}
 }
 
-func respondJSON(w http.ResponseWriter, status int, data any) {
-	WriteJSON(w, status, data)
+func respondJSON(ctx context.Context, w http.ResponseWriter, status int, data any) {
+	WriteJSON(ctx, w, status, data)
 }
 
-func respondError(w http.ResponseWriter, err error) {
-	WriteError(w, err)
+func respondError(ctx context.Context, w http.ResponseWriter, err error) {
+	WriteError(ctx, w, err)
 }

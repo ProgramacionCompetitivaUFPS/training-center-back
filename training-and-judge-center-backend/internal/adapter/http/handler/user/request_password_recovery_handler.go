@@ -25,7 +25,7 @@ func (h *UserHandler) RequestPasswordRecovery(w http.ResponseWriter, r *http.Req
 	ctx := r.Context()
 	var body requestPasswordRecoveryBody
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-		handler.WriteJSON(w, http.StatusBadRequest, map[string]string{
+		handler.WriteJSON(r.Context(), w, http.StatusBadRequest, map[string]string{
 			"error":   "INVALID_JSON",
 			"message": "Request body must be valid JSON",
 		})
@@ -33,7 +33,7 @@ func (h *UserHandler) RequestPasswordRecovery(w http.ResponseWriter, r *http.Req
 	}
 
 	if body.Email == "" {
-		handler.WriteJSON(w, http.StatusBadRequest, map[string]interface{}{
+		handler.WriteJSON(r.Context(), w, http.StatusBadRequest, map[string]interface{}{
 			"error":   "VALIDATION_ERROR",
 			"message": "Invalid request data",
 			"details": []map[string]string{
@@ -44,11 +44,11 @@ func (h *UserHandler) RequestPasswordRecovery(w http.ResponseWriter, r *http.Req
 	}
 
 	if err := h.requestPasswordRecovery.Execute(ctx, appuser.RequestPasswordRecoveryInput{Email: body.Email}); err != nil {
-		handler.WriteError(w, err)
+		handler.WriteError(r.Context(), w, err)
 		return
 	}
 
-	handler.WriteJSON(w, http.StatusOK, map[string]string{
+	handler.WriteJSON(r.Context(), w, http.StatusOK, map[string]string{
 		"message": "If the email is registered, a recovery code has been sent",
 	})
 }

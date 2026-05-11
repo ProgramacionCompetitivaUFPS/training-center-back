@@ -128,13 +128,13 @@ func (uc *ListUsersUseCase) Execute(ctx context.Context, input ListUsersInput) (
 		page, limit,
 	)
 	if err != nil {
-		slog.Error("failed to build user filter", "error", err)
+		slog.ErrorContext(ctx, "failed to build user filter", "error", err)
 		return nil, apperror.NewInternal()
 	}
 
 	users, total, err := uc.repo.FindAll(ctx, builtFilter)
 	if err != nil {
-		slog.Error("failed to list users", "error", err)
+		slog.ErrorContext(ctx, "failed to list users", "error", err)
 		return nil, apperror.NewInternal()
 	}
 

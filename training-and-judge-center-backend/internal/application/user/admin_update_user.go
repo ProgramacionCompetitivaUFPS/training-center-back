@@ -42,7 +42,7 @@ func (uc *AdminUpdateUserUseCase) Execute(ctx context.Context, input AdminUpdate
 
 	foundUser, err := uc.repo.FindByID(ctx, input.TargetID)
 	if err != nil {
-		slog.Error("failed to find user by id during admin update", "target_id", input.TargetID, "error", err)
+		slog.ErrorContext(ctx, "failed to find user by id during admin update", "target_id", input.TargetID, "error", err)
 		return nil,apperror.NewInternal()
 	}
 	if foundUser == nil {
@@ -125,7 +125,7 @@ func (uc *AdminUpdateUserUseCase) Execute(ctx context.Context, input AdminUpdate
 
 	now := time.Now()
 	if err := foundUser.AdminUpdate(nameToUpdate, nicknameToUpdate, institutionToUpdate, cityToUpdate, countryToUpdate, emailToUpdate, roleToUpdate, now); err != nil {
-		slog.Error("failed to apply admin update to user domain object", "user_id", foundUser.ID(), "error", err)
+		slog.ErrorContext(ctx, "failed to apply admin update to user domain object", "user_id", foundUser.ID(), "error", err)
 		return nil,apperror.NewInternal()
 	}
 

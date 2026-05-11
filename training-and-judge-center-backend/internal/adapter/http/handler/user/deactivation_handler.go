@@ -19,7 +19,7 @@ import (
 func (h *UserHandler) RequestDeactivation(w http.ResponseWriter, r *http.Request) {
 	claims := middleware.GetClaims(r.Context())
 	if claims == nil {
-		handler.WriteJSON(w, http.StatusUnauthorized, map[string]string{
+		handler.WriteJSON(r.Context(), w, http.StatusUnauthorized, map[string]string{
 			"error":   "UNAUTHORIZED",
 			"message": "Invalid or missing authentication token",
 		})
@@ -29,11 +29,11 @@ func (h *UserHandler) RequestDeactivation(w http.ResponseWriter, r *http.Request
 	ctx := r.Context()
 
 	if err := h.requestDeactivation.Execute(ctx, appuser.RequestDeactivationInput{UserID: userID}); err != nil {
-		handler.WriteError(w, err)
+		handler.WriteError(r.Context(), w, err)
 		return
 	}
 
-	handler.WriteJSON(w, http.StatusOK, map[string]string{
+	handler.WriteJSON(r.Context(), w, http.StatusOK, map[string]string{
 		"message": "A confirmation code has been sent to your email",
 	})
 }
@@ -55,7 +55,7 @@ type confirmDeactivationBody struct {
 func (h *UserHandler) ConfirmDeactivation(w http.ResponseWriter, r *http.Request) {
 	claims := middleware.GetClaims(r.Context())
 	if claims == nil {
-		handler.WriteJSON(w, http.StatusUnauthorized, map[string]string{
+		handler.WriteJSON(r.Context(), w, http.StatusUnauthorized, map[string]string{
 			"error":   "UNAUTHORIZED",
 			"message": "Invalid or missing authentication token",
 		})
@@ -66,7 +66,7 @@ func (h *UserHandler) ConfirmDeactivation(w http.ResponseWriter, r *http.Request
 
 	var body confirmDeactivationBody
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-		handler.WriteJSON(w, http.StatusBadRequest, map[string]string{
+		handler.WriteJSON(r.Context(), w, http.StatusBadRequest, map[string]string{
 			"error":   "INVALID_JSON",
 			"message": "Request body must be valid JSON",
 		})
@@ -74,7 +74,7 @@ func (h *UserHandler) ConfirmDeactivation(w http.ResponseWriter, r *http.Request
 	}
 
 	if !digitCodeRegex.MatchString(body.Code) {
-		handler.WriteJSON(w, http.StatusBadRequest, map[string]interface{}{
+		handler.WriteJSON(r.Context(), w, http.StatusBadRequest, map[string]interface{}{
 			"error":   "VALIDATION_ERROR",
 			"message": "Invalid request data",
 			"details": []map[string]string{
@@ -96,12 +96,12 @@ func (h *UserHandler) ConfirmDeactivation(w http.ResponseWriter, r *http.Request
 
 	out, err := h.confirmDeactivation.Execute(ctx, input)
 	if err != nil {
-		handler.WriteError(w, err)
+		handler.WriteError(r.Context(), w, err)
 		return
 	}
 
 	if !out.SessionsInvalidated {
-		handler.WriteJSON(w, http.StatusOK, map[string]string{
+		handler.WriteJSON(r.Context(), w, http.StatusOK, map[string]string{
 			"code":    "SESSIONS_NOT_INVALIDATED",
 			"message": "Your account has been deactivated. We couldn't immediately close all active sessions — they will expire naturally.",
 		})

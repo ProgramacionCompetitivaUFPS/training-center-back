@@ -48,7 +48,7 @@ func NewRequestEmailChangeUseCase(
 func (uc *RequestEmailChangeUseCase) Execute(ctx context.Context, input RequestEmailChangeInput) (*RequestEmailChangeOutput, error) {
 	allowed, err := uc.rateLimiter.Allow(ctx, "email-change-request:"+input.UserID, 5, time.Hour)
 	if err != nil {
-		slog.Error("failed to check rate limit for email change request", "user_id", input.UserID, "error", err)
+		slog.ErrorContext(ctx, "failed to check rate limit for email change request", "user_id", input.UserID, "error", err)
 		return nil, apperror.NewInternal()
 	}
 	if !allowed {
@@ -57,7 +57,7 @@ func (uc *RequestEmailChangeUseCase) Execute(ctx context.Context, input RequestE
 
 	u, err := uc.userRepo.FindByID(ctx, input.UserID)
 	if err != nil {
-		slog.Error("failed to find user during email change request", "user_id", input.UserID, "error", err)
+		slog.ErrorContext(ctx, "failed to find user during email change request", "user_id", input.UserID, "error", err)
 		return nil, apperror.NewInternal()
 	}
 	if u == nil {
@@ -78,25 +78,25 @@ func (uc *RequestEmailChangeUseCase) Execute(ctx context.Context, input RequestE
 	now := time.Now()
 
 	if err := uc.emailChangeRepo.InvalidatePendingByUserID(ctx, input.UserID, now); err != nil {
-		slog.Error("failed to invalidate pending email change requests", "user_id", input.UserID, "error", err)
+		slog.ErrorContext(ctx, "failed to invalidate pending email change requests", "user_id", input.UserID, "error", err)
 		return nil, apperror.NewInternal()
 	}
 
 	code, err := generateSixDigitCode()
 	if err != nil {
-		slog.Error("failed to generate email change code", "user_id", input.UserID, "error", err)
+		slog.ErrorContext(ctx, "failed to generate email change code", "user_id", input.UserID, "error", err)
 		return nil, apperror.NewInternal()
 	}
 
 	newID := uuid.New().String()
 	req, err := user.NewEmailChangeRequest(newID, input.UserID, parsedNewEmail, code, now)
 	if err != nil {
-		slog.Error("failed to build email change request", "user_id", input.UserID, "error", err)
+		slog.ErrorContext(ctx, "failed to build email change request", "user_id", input.UserID, "error", err)
 		return nil, apperror.NewInternal()
 	}
 
 	if err := uc.emailChangeRepo.Save(ctx, req); err != nil {
-		slog.Error("failed to save email change request", "user_id", input.UserID, "error", err)
+		slog.ErrorContext(ctx, "failed to save email change request", "user_id", input.UserID, "error", err)
 		return nil, apperror.NewInternal()
 	}
 
@@ -105,7 +105,7 @@ func (uc *RequestEmailChangeUseCase) Execute(ctx context.Context, input RequestE
 		Subject: "Verify your new email address",
 		Body:    fmt.Sprintf("Your email verification code is: %s. It will expire in 15 minutes.", code),
 	}); err != nil {
-		slog.Error("failed to send verification email", "email", input.NewEmail, "error", err)
+		slog.ErrorContext(ctx, "failed to send verification email", "email", input.NewEmail, "error", err)
 		return nil, apperror.NewServiceUnavailable(ErrCodeEmailDeliveryFailed, "We couldn't deliver the verification code to your email. Please try again later.")
 	}
 

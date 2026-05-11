@@ -30,9 +30,9 @@ func (h *Handler) GetMyRequest(w http.ResponseWriter, r *http.Request) {
 		CurrentUser: *caller,
 	})
 	if err != nil {
-		handler.WriteError(w, err)
+		handler.WriteError(r.Context(), w, err)
 		return
 	}
 
-	handler.WriteJSON(w, http.StatusOK, buildJoinRequestResp(out.Request, nil))
+	handler.WriteJSON(r.Context(), w, http.StatusOK, buildJoinRequestResp(out.Request, nil))
 }

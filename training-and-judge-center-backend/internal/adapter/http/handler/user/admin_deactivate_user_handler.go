@@ -21,7 +21,7 @@ import (
 func (h *UserHandler) AdminDeactivateUser(w http.ResponseWriter, r *http.Request) {
 	claims := middleware.GetClaims(r.Context())
 	if claims == nil {
-		handler.WriteJSON(w, http.StatusUnauthorized, map[string]string{
+		handler.WriteJSON(r.Context(), w, http.StatusUnauthorized, map[string]string{
 			"error":   "UNAUTHORIZED",
 			"message": "Invalid or missing authentication token",
 		})
@@ -34,7 +34,7 @@ func (h *UserHandler) AdminDeactivateUser(w http.ResponseWriter, r *http.Request
 		RequesterID: claims.UserID,
 		TargetID:    targetID,
 	}); err != nil {
-		handler.WriteError(w, err)
+		handler.WriteError(r.Context(), w, err)
 		return
 	}
 

@@ -37,19 +37,19 @@ type updateProblemRequest struct {
 func (h *Handler) Update(w http.ResponseWriter, r *http.Request) {
 	claims := middleware.GetClaims(r.Context())
 	if claims == nil {
-		handler.WriteJSON(w, http.StatusUnauthorized, apperror.AppError{Code: apperror.ErrCodeUnauthorized, Message: "Invalid or missing token"})
+		handler.WriteJSON(r.Context(), w, http.StatusUnauthorized, apperror.AppError{Code: apperror.ErrCodeUnauthorized, Message: "Invalid or missing token"})
 		return
 	}
 
 	slug := r.PathValue("slug")
 	if slug == "" {
-		handler.WriteJSON(w, http.StatusBadRequest, apperror.AppError{Code: apperror.ErrCodeBadRequest, Message: "Problem slug is required"})
+		handler.WriteJSON(r.Context(), w, http.StatusBadRequest, apperror.AppError{Code: apperror.ErrCodeBadRequest, Message: "Problem slug is required"})
 		return
 	}
 
 	var body updateProblemRequest
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-		handler.WriteJSON(w, http.StatusBadRequest, apperror.AppError{Code: apperror.ErrCodeValidationError, Message: "Invalid request body"})
+		handler.WriteJSON(r.Context(), w, http.StatusBadRequest, apperror.AppError{Code: apperror.ErrCodeValidationError, Message: "Invalid request body"})
 		return
 	}
 
@@ -73,7 +73,7 @@ func (h *Handler) Update(w http.ResponseWriter, r *http.Request) {
 	})
 
 	if ucErr != nil {
-		handler.WriteError(w, ucErr)
+		handler.WriteError(r.Context(), w, ucErr)
 		return
 	}
 
@@ -82,5 +82,5 @@ func (h *Handler) Update(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		slog.DebugContext(r.Context(), "failed to fetch author display", "error", err, "user_id", p.AuthorID)
 	}
-	handler.WriteJSON(w, http.StatusOK, buildResponse(p, authorDisplay))
+	handler.WriteJSON(r.Context(), w, http.StatusOK, buildResponse(p, authorDisplay))
 }
