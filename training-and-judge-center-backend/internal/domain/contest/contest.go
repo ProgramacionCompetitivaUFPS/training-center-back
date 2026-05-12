@@ -183,14 +183,18 @@ func validateDescription(d *string) error {
 		return nil
 	}
 	if len([]rune(*d)) > MaxDescriptionLength {
-		return apperror.NewBadRequest(ErrCodeDescriptionTooLong, "description cannot exceed 5000 characters")
+		return apperror.NewValidation([]apperror.FieldError{
+			{Field: "description", Message: "description cannot exceed 5000 characters"},
+		})
 	}
 	return nil
 }
 
 func validateFreezeMinutes(v int) error {
 	if v < 0 {
-		return apperror.NewBadRequest(ErrCodeInvalidFreezeMinutes, "freeze minutes cannot be negative")
+		return apperror.NewValidation([]apperror.FieldError{
+			{Field: "freezeMinutes", Message: "freeze minutes cannot be negative"},
+		})
 	}
 	return nil
 }

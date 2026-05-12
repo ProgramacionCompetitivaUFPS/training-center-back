@@ -1,26 +1,24 @@
 package contest_test
 
 import (
-	"errors"
 	"strings"
 	"testing"
 
 	"github.com/training-judge-center/backend/internal/domain/contest"
-	"github.com/training-judge-center/backend/pkg/apperror"
 )
 
 func TestNewContestName(t *testing.T) {
 	cases := []struct {
-		name     string
-		input    string
-		wantErr  bool
-		wantCode string
+		name      string
+		input     string
+		wantErr   bool
+		wantField string
 	}{
 		{"valid name", "Weekly Contest #1", false, ""},
 		{"exactly 200 runes", strings.Repeat("a", 200), false, ""},
-		{"empty string", "", true, contest.ErrCodeInvalidContestName},
-		{"only whitespace", "   ", true, contest.ErrCodeInvalidContestName},
-		{"201 runes", strings.Repeat("a", 201), true, contest.ErrCodeInvalidContestName},
+		{"empty string", "", true, "name"},
+		{"only whitespace", "   ", true, "name"},
+		{"201 runes", strings.Repeat("a", 201), true, "name"},
 		{"trimmed to valid", "  Valid Name  ", false, ""},
 		{"unicode characters", "Concurso Ñoño 2026", false, ""},
 	}
@@ -36,14 +34,8 @@ func TestNewContestName(t *testing.T) {
 				t.Errorf("expected no error, got %v", err)
 				return
 			}
-			if tc.wantCode != "" {
-				var appErr *apperror.AppError
-				if !errors.As(err, &appErr) {
-					t.Fatalf("expected *apperror.AppError, got %T", err)
-				}
-				if appErr.Code != tc.wantCode {
-					t.Errorf("expected code %q, got %q", tc.wantCode, appErr.Code)
-				}
+			if tc.wantField != "" {
+				assertValidationField(t, "NewContestName("+tc.input+")", err, tc.wantField)
 			}
 		})
 	}
@@ -61,16 +53,16 @@ func TestNewContestName_Trimming(t *testing.T) {
 
 func TestNewPenalty(t *testing.T) {
 	cases := []struct {
-		name     string
-		input    int
-		wantErr  bool
-		wantCode string
+		name      string
+		input     int
+		wantErr   bool
+		wantField string
 	}{
 		{"minimum (0)", 0, false, ""},
 		{"default (20)", 20, false, ""},
 		{"maximum (1440)", 1440, false, ""},
-		{"negative", -1, true, contest.ErrCodeInvalidPenalty},
-		{"above maximum", 1441, true, contest.ErrCodeInvalidPenalty},
+		{"negative", -1, true, "penalty"},
+		{"above maximum", 1441, true, "penalty"},
 	}
 
 	for _, tc := range cases {
@@ -84,14 +76,8 @@ func TestNewPenalty(t *testing.T) {
 				t.Errorf("expected no error, got %v", err)
 				return
 			}
-			if tc.wantCode != "" {
-				var appErr *apperror.AppError
-				if !errors.As(err, &appErr) {
-					t.Fatalf("expected *apperror.AppError, got %T", err)
-				}
-				if appErr.Code != tc.wantCode {
-					t.Errorf("expected code %q, got %q", tc.wantCode, appErr.Code)
-				}
+			if tc.wantField != "" {
+				assertValidationField(t, "NewPenalty", err, tc.wantField)
 			}
 		})
 	}

@@ -16,10 +16,14 @@ type ContestName struct {
 func NewContestName(s string) (ContestName, error) {
 	trimmed := strings.TrimSpace(s)
 	if trimmed == "" {
-		return ContestName{}, apperror.NewBadRequest(ErrCodeInvalidContestName, "contest name cannot be empty")
+		return ContestName{}, apperror.NewValidation([]apperror.FieldError{
+			{Field: "name", Message: "contest name cannot be empty"},
+		})
 	}
 	if len([]rune(trimmed)) > MaxContestNameLength {
-		return ContestName{}, apperror.NewBadRequest(ErrCodeInvalidContestName, fmt.Sprintf("contest name cannot exceed %d characters", MaxContestNameLength))
+		return ContestName{}, apperror.NewValidation([]apperror.FieldError{
+			{Field: "name", Message: fmt.Sprintf("contest name cannot exceed %d characters", MaxContestNameLength)},
+		})
 	}
 	return ContestName{value: trimmed}, nil
 }
