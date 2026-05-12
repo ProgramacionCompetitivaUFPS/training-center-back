@@ -17,7 +17,9 @@ type Penalty struct {
 
 func NewPenalty(v int) (Penalty, error) {
 	if v < MinPenalty || v > MaxPenalty {
-		return Penalty{}, apperror.NewBadRequest(ErrCodeInvalidPenalty, fmt.Sprintf("penalty must be between %d and %d minutes", MinPenalty, MaxPenalty))
+		return Penalty{}, apperror.NewValidation([]apperror.FieldError{
+			{Field: "penalty", Message: fmt.Sprintf("penalty must be between %d and %d minutes", MinPenalty, MaxPenalty)},
+		})
 	}
 	return Penalty{value: v}, nil
 }

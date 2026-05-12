@@ -165,16 +165,7 @@ func TestNewContest_DescriptionTooLong(t *testing.T) {
 		shared.RestoreUserID("owner-id"),
 		fixedNow,
 	)
-	if err == nil {
-		t.Fatal("expected error for description too long, got nil")
-	}
-	var appErr *apperror.AppError
-	if !errors.As(err, &appErr) {
-		t.Fatalf("expected *apperror.AppError, got %T", err)
-	}
-	if appErr.Code != contest.ErrCodeDescriptionTooLong {
-		t.Errorf("expected code %q, got %q", contest.ErrCodeDescriptionTooLong, appErr.Code)
-	}
+	assertValidationField(t, "NewContest(descriptionTooLong)", err, "description")
 }
 
 func TestNewContest_NegativeFreezeMinutes(t *testing.T) {
@@ -191,16 +182,7 @@ func TestNewContest_NegativeFreezeMinutes(t *testing.T) {
 		shared.RestoreUserID("owner-id"),
 		fixedNow,
 	)
-	if err == nil {
-		t.Fatal("expected error for negative freezeMinutes, got nil")
-	}
-	var appErr *apperror.AppError
-	if !errors.As(err, &appErr) {
-		t.Fatalf("expected *apperror.AppError, got %T", err)
-	}
-	if appErr.Code != contest.ErrCodeInvalidFreezeMinutes {
-		t.Errorf("expected code %q, got %q", contest.ErrCodeInvalidFreezeMinutes, appErr.Code)
-	}
+	assertValidationField(t, "NewContest(negativeFreezeMinutes)", err, "freezeMinutes")
 }
 
 func TestContest_Status(t *testing.T) {
