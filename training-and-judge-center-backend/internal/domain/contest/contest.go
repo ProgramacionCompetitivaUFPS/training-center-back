@@ -7,10 +7,7 @@ import (
 	"github.com/training-judge-center/backend/pkg/apperror"
 )
 
-const (
-	DefaultFreezeMinutes    = 60
-	MaxDescriptionLength    = 5000
-)
+const MaxDescriptionLength = 5000
 
 type Contest struct {
 	id                string
@@ -27,14 +24,6 @@ type Contest struct {
 	problems          []ContestProblem
 	createdAt         time.Time
 	updatedAt         *time.Time
-	clock             func() time.Time
-}
-
-func (c *Contest) now() time.Time { return c.clock().UTC() }
-
-func (c *Contest) WithClock(fn func() time.Time) *Contest {
-	c.clock = fn
-	return c
 }
 
 func NewContest(
@@ -47,31 +36,23 @@ func NewContest(
 	enablePostContest bool,
 	groupID shared.GroupID,
 	ownerID shared.UserID,
-	clock func() time.Time,
+	now time.Time,
 ) (*Contest, error) {
 	if id == "" {
 		return nil, apperror.NewInternal()
 	}
-	if clock == nil {
-		clock = time.Now
-	}
-	now := clock().UTC()
-
 	if err := validateDescription(description); err != nil {
 		return nil, err
 	}
 	if err := validateFreezeMinutes(freezeMinutes); err != nil {
 		return nil, err
 	}
-	if !startTime.After(now) {
-		return nil, apperror.NewValidation([]apperror.FieldError{
-			{Field: "startTime", Message: "start time must be in the future"},
-		})
+	t := now.UTC()
+	if !startTime.After(t) {
+		return nil, apperror.NewBadRequest(ErrCodeStartTimeInPast, "start time must be in the future")
 	}
 	if !endTime.After(startTime) {
-		return nil, apperror.NewValidation([]apperror.FieldError{
-			{Field: "endTime", Message: "end time must be after start time"},
-		})
+		return nil, apperror.NewBadRequest(ErrCodeInvalidTimeRange, "end time must be after start time")
 	}
 
 	return &Contest{
@@ -87,8 +68,7 @@ func NewContest(
 		groupID:           groupID,
 		ownerID:           ownerID,
 		problems:          []ContestProblem{},
-		createdAt:         now,
-		clock:             clock,
+		createdAt:         t,
 	}, nil
 }
 
@@ -107,6 +87,9 @@ func RestoreContest(
 	createdAt time.Time,
 	updatedAt *time.Time,
 ) *Contest {
+	if problems == nil {
+		problems = []ContestProblem{}
+	}
 	return &Contest{
 		id:                id,
 		name:              name,
@@ -122,13 +105,11 @@ func RestoreContest(
 		problems:          problems,
 		createdAt:         createdAt,
 		updatedAt:         updatedAt,
-		clock:             time.Now,
 	}
 }
 
-// Status computes the contest status based on the current time.
-func (c *Contest) Status() Status {
-	now := c.now()
+// Status computes the contest status based on the provided current time.
+func (c *Contest) Status(now time.Time) Status {
 	if now.Before(c.startTime) {
 		return StatusScheduled
 	}
@@ -144,19 +125,25 @@ func (c *Contest) Duration() int {
 }
 
 // AddProblem appends a problem to the contest. Duplicate problemIDs are silently ignored.
-// The caller is responsible for providing a unique id for the ContestProblem row.
-func (c *Contest) AddProblem(id, problemID string) {
+// Returns apperror.NewInternal() if id or problemID is empty — those are programming errors.
+func (c *Contest) AddProblem(id, problemID string, now time.Time) error {
+	if id == "" || problemID == "" {
+		return apperror.NewInternal()
+	}
 	for _, p := range c.problems {
 		if p.problemID == problemID {
-			return
+			return nil
 		}
 	}
 	order := len(c.problems) + 1
 	c.problems = append(c.problems, newContestProblem(id, problemID, order))
+	t := now.UTC()
+	c.updatedAt = &t
+	return nil
 }
 
 // RemoveProblem removes a problem by problemID. Returns false if not found.
-func (c *Contest) RemoveProblem(problemID string) bool {
+func (c *Contest) RemoveProblem(problemID string, now time.Time) bool {
 	idx := -1
 	for i, p := range c.problems {
 		if p.problemID == problemID {
@@ -168,10 +155,11 @@ func (c *Contest) RemoveProblem(problemID string) bool {
 		return false
 	}
 	c.problems = append(c.problems[:idx], c.problems[idx+1:]...)
-	// Resequence orders
 	for i := range c.problems {
 		c.problems[i].order = i + 1
 	}
+	t := now.UTC()
+	c.updatedAt = &t
 	return true
 }
 
@@ -195,18 +183,14 @@ func validateDescription(d *string) error {
 		return nil
 	}
 	if len([]rune(*d)) > MaxDescriptionLength {
-		return apperror.NewValidation([]apperror.FieldError{
-			{Field: "description", Message: "description cannot exceed 5000 characters"},
-		})
+		return apperror.NewBadRequest(ErrCodeDescriptionTooLong, "description cannot exceed 5000 characters")
 	}
 	return nil
 }
 
 func validateFreezeMinutes(v int) error {
 	if v < 0 {
-		return apperror.NewValidation([]apperror.FieldError{
-			{Field: "freezeMinutes", Message: "freeze minutes cannot be negative"},
-		})
+		return apperror.NewBadRequest(ErrCodeInvalidFreezeMinutes, "freeze minutes cannot be negative")
 	}
 	return nil
 }

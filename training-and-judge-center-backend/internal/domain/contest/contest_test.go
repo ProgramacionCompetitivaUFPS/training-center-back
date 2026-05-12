@@ -1,18 +1,17 @@
 package contest_test
 
 import (
+	"errors"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/training-judge-center/backend/internal/domain/contest"
 	"github.com/training-judge-center/backend/internal/domain/shared"
+	"github.com/training-judge-center/backend/pkg/apperror"
 )
 
-var (
-	fixedNow   = time.Date(2026, 5, 4, 12, 0, 0, 0, time.UTC)
-	fixedClock = func() time.Time { return fixedNow }
-)
+var fixedNow = time.Date(2026, 5, 4, 12, 0, 0, 0, time.UTC)
 
 func mustName(t *testing.T, s string) contest.ContestName {
 	t.Helper()
@@ -32,9 +31,9 @@ func mustPenalty(t *testing.T, v int) contest.Penalty {
 	return p
 }
 
-func validContest(t *testing.T) (*contest.Contest, error) {
+func validContest(t *testing.T) *contest.Contest {
 	t.Helper()
-	return contest.NewContest(
+	c, err := contest.NewContest(
 		"contest-id",
 		mustName(t, "Weekly Contest"),
 		nil,
@@ -45,15 +44,16 @@ func validContest(t *testing.T) (*contest.Contest, error) {
 		false,
 		shared.RestoreGroupID("group-id"),
 		shared.RestoreUserID("owner-id"),
-		fixedClock,
+		fixedNow,
 	)
+	if err != nil {
+		t.Fatalf("validContest: %v", err)
+	}
+	return c
 }
 
 func TestNewContest_Valid(t *testing.T) {
-	c, err := validContest(t)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
+	c := validContest(t)
 	if c.ID() != "contest-id" {
 		t.Errorf("unexpected id: %s", c.ID())
 	}
@@ -76,17 +76,24 @@ func TestNewContest_StartTimeInPast(t *testing.T) {
 		"contest-id",
 		mustName(t, "Weekly Contest"),
 		nil,
-		fixedNow.Add(-time.Hour), // past
+		fixedNow.Add(-time.Hour),
 		fixedNow.Add(4*time.Hour),
 		mustPenalty(t, 20),
 		60,
 		false,
 		shared.RestoreGroupID("group-id"),
 		shared.RestoreUserID("owner-id"),
-		fixedClock,
+		fixedNow,
 	)
 	if err == nil {
 		t.Fatal("expected error for past startTime, got nil")
+	}
+	var appErr *apperror.AppError
+	if !errors.As(err, &appErr) {
+		t.Fatalf("expected *apperror.AppError, got %T", err)
+	}
+	if appErr.Code != contest.ErrCodeStartTimeInPast {
+		t.Errorf("expected code %q, got %q", contest.ErrCodeStartTimeInPast, appErr.Code)
 	}
 }
 
@@ -96,16 +103,23 @@ func TestNewContest_EndBeforeStart(t *testing.T) {
 		mustName(t, "Weekly Contest"),
 		nil,
 		fixedNow.Add(2*time.Hour),
-		fixedNow.Add(time.Hour), // before start
+		fixedNow.Add(time.Hour),
 		mustPenalty(t, 20),
 		60,
 		false,
 		shared.RestoreGroupID("group-id"),
 		shared.RestoreUserID("owner-id"),
-		fixedClock,
+		fixedNow,
 	)
 	if err == nil {
 		t.Fatal("expected error for endTime before startTime, got nil")
+	}
+	var appErr *apperror.AppError
+	if !errors.As(err, &appErr) {
+		t.Fatalf("expected *apperror.AppError, got %T", err)
+	}
+	if appErr.Code != contest.ErrCodeInvalidTimeRange {
+		t.Errorf("expected code %q, got %q", contest.ErrCodeInvalidTimeRange, appErr.Code)
 	}
 }
 
@@ -116,16 +130,23 @@ func TestNewContest_EndEqualStart(t *testing.T) {
 		mustName(t, "Weekly Contest"),
 		nil,
 		start,
-		start, // equal
+		start,
 		mustPenalty(t, 20),
 		60,
 		false,
 		shared.RestoreGroupID("group-id"),
 		shared.RestoreUserID("owner-id"),
-		fixedClock,
+		fixedNow,
 	)
 	if err == nil {
 		t.Fatal("expected error for endTime equal to startTime, got nil")
+	}
+	var appErr *apperror.AppError
+	if !errors.As(err, &appErr) {
+		t.Fatalf("expected *apperror.AppError, got %T", err)
+	}
+	if appErr.Code != contest.ErrCodeInvalidTimeRange {
+		t.Errorf("expected code %q, got %q", contest.ErrCodeInvalidTimeRange, appErr.Code)
 	}
 }
 
@@ -142,10 +163,17 @@ func TestNewContest_DescriptionTooLong(t *testing.T) {
 		false,
 		shared.RestoreGroupID("group-id"),
 		shared.RestoreUserID("owner-id"),
-		fixedClock,
+		fixedNow,
 	)
 	if err == nil {
 		t.Fatal("expected error for description too long, got nil")
+	}
+	var appErr *apperror.AppError
+	if !errors.As(err, &appErr) {
+		t.Fatalf("expected *apperror.AppError, got %T", err)
+	}
+	if appErr.Code != contest.ErrCodeDescriptionTooLong {
+		t.Errorf("expected code %q, got %q", contest.ErrCodeDescriptionTooLong, appErr.Code)
 	}
 }
 
@@ -161,16 +189,40 @@ func TestNewContest_NegativeFreezeMinutes(t *testing.T) {
 		false,
 		shared.RestoreGroupID("group-id"),
 		shared.RestoreUserID("owner-id"),
-		fixedClock,
+		fixedNow,
 	)
 	if err == nil {
 		t.Fatal("expected error for negative freezeMinutes, got nil")
+	}
+	var appErr *apperror.AppError
+	if !errors.As(err, &appErr) {
+		t.Fatalf("expected *apperror.AppError, got %T", err)
+	}
+	if appErr.Code != contest.ErrCodeInvalidFreezeMinutes {
+		t.Errorf("expected code %q, got %q", contest.ErrCodeInvalidFreezeMinutes, appErr.Code)
 	}
 }
 
 func TestContest_Status(t *testing.T) {
 	start := time.Date(2026, 5, 4, 14, 0, 0, 0, time.UTC)
 	end := time.Date(2026, 5, 4, 19, 0, 0, 0, time.UTC)
+
+	c := contest.RestoreContest(
+		"id",
+		mustName(t, "Test"),
+		nil,
+		start,
+		end,
+		mustPenalty(t, 20),
+		60,
+		false,
+		false,
+		shared.RestoreGroupID("g"),
+		shared.RestoreUserID("o"),
+		nil,
+		time.Now(),
+		nil,
+	)
 
 	cases := []struct {
 		name   string
@@ -186,24 +238,7 @@ func TestContest_Status(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			c := contest.RestoreContest(
-				"id",
-				mustName(t, "Test"),
-				nil,
-				start,
-				end,
-				mustPenalty(t, 20),
-				60,
-				false,
-				false,
-				shared.RestoreGroupID("g"),
-				shared.RestoreUserID("o"),
-				nil,
-				time.Now(),
-				nil,
-			)
-			c.WithClock(func() time.Time { return tc.now })
-			if got := c.Status(); got != tc.status {
+			if got := c.Status(tc.now); got != tc.status {
 				t.Errorf("at %v: expected %s, got %s", tc.now, tc.status, got)
 			}
 		})
@@ -211,18 +246,25 @@ func TestContest_Status(t *testing.T) {
 }
 
 func TestContest_Duration(t *testing.T) {
-	c, _ := validContest(t)
+	c := validContest(t)
 	if got := c.Duration(); got != 180 {
 		t.Errorf("expected 180 minutes, got %d", got)
 	}
 }
 
-func TestContest_AddProblem(t *testing.T) {
-	c, _ := validContest(t)
+func mustAddProblem(t *testing.T, c interface{ AddProblem(string, string, time.Time) error }, id, problemID string) {
+	t.Helper()
+	if err := c.AddProblem(id, problemID, fixedNow); err != nil {
+		t.Fatalf("AddProblem(%q, %q): unexpected error: %v", id, problemID, err)
+	}
+}
 
-	c.AddProblem("cp-1", "problem-a")
-	c.AddProblem("cp-2", "problem-b")
-	c.AddProblem("cp-3", "problem-c")
+func TestContest_AddProblem(t *testing.T) {
+	c := validContest(t)
+
+	mustAddProblem(t, c, "cp-1", "problem-a")
+	mustAddProblem(t, c, "cp-2", "problem-b")
+	mustAddProblem(t, c, "cp-3", "problem-c")
 
 	if len(c.Problems()) != 3 {
 		t.Fatalf("expected 3 problems, got %d", len(c.Problems()))
@@ -233,40 +275,118 @@ func TestContest_AddProblem(t *testing.T) {
 }
 
 func TestContest_AddProblem_Deduplication(t *testing.T) {
-	c, _ := validContest(t)
+	c := validContest(t)
 
-	c.AddProblem("cp-1", "problem-a")
-	c.AddProblem("cp-2", "problem-a") // duplicate
+	mustAddProblem(t, c, "cp-1", "problem-a")
+	mustAddProblem(t, c, "cp-2", "problem-a")
 
 	if len(c.Problems()) != 1 {
 		t.Errorf("expected 1 problem after deduplication, got %d", len(c.Problems()))
 	}
 }
 
+func TestContest_AddProblem_EmptyID(t *testing.T) {
+	c := validContest(t)
+	if err := c.AddProblem("", "problem-a", fixedNow); err == nil {
+		t.Error("expected error for empty id, got nil")
+	}
+	if err := c.AddProblem("cp-1", "", fixedNow); err == nil {
+		t.Error("expected error for empty problemID, got nil")
+	}
+	if len(c.Problems()) != 0 {
+		t.Error("no problem should be added on empty-id error")
+	}
+}
+
 func TestContest_RemoveProblem(t *testing.T) {
-	c, _ := validContest(t)
-
-	c.AddProblem("cp-1", "problem-a")
-	c.AddProblem("cp-2", "problem-b")
-	c.AddProblem("cp-3", "problem-c")
-
-	removed := c.RemoveProblem("problem-b")
-	if !removed {
-		t.Fatal("expected RemoveProblem to return true")
+	cases := []struct {
+		name        string
+		remove      string
+		wantOrders  []int
+	}{
+		{"middle element", "problem-b", []int{1, 2}},
+		{"first element", "problem-a", []int{1, 2}},
+		{"last element", "problem-c", []int{1, 2}},
 	}
-	if len(c.Problems()) != 2 {
-		t.Fatalf("expected 2 problems after removal, got %d", len(c.Problems()))
-	}
-	// Orders must be resequenced
-	if c.Problems()[0].Order() != 1 || c.Problems()[1].Order() != 2 {
-		t.Error("orders not resequenced after removal")
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			c := validContest(t)
+			mustAddProblem(t, c, "cp-1", "problem-a")
+			mustAddProblem(t, c, "cp-2", "problem-b")
+			mustAddProblem(t, c, "cp-3", "problem-c")
+
+			removed := c.RemoveProblem(tc.remove, fixedNow)
+			if !removed {
+				t.Fatalf("expected RemoveProblem(%q) to return true", tc.remove)
+			}
+			if len(c.Problems()) != len(tc.wantOrders) {
+				t.Fatalf("expected %d problems, got %d", len(tc.wantOrders), len(c.Problems()))
+			}
+			for i, wantOrder := range tc.wantOrders {
+				if got := c.Problems()[i].Order(); got != wantOrder {
+					t.Errorf("problems[%d].Order() = %d, want %d", i, got, wantOrder)
+				}
+			}
+		})
 	}
 }
 
 func TestContest_RemoveProblem_NotFound(t *testing.T) {
-	c, _ := validContest(t)
-	removed := c.RemoveProblem("non-existent")
+	c := validContest(t)
+	removed := c.RemoveProblem("non-existent", fixedNow)
 	if removed {
 		t.Error("expected RemoveProblem to return false for non-existent problem")
+	}
+}
+
+func TestContest_MutationsUpdateUpdatedAt(t *testing.T) {
+	mutationTime := fixedNow.Add(time.Hour)
+
+	c := validContest(t)
+	if c.UpdatedAt() != nil {
+		t.Fatal("new contest should have nil updatedAt")
+	}
+
+	mustAddProblem(t, c, "cp-1", "problem-a")
+	// mustAddProblem uses fixedNow; call directly with mutationTime to check tracking
+	if err := c.AddProblem("cp-2", "problem-b", mutationTime); err != nil {
+		t.Fatalf("AddProblem: %v", err)
+	}
+	if c.UpdatedAt() == nil || !c.UpdatedAt().Equal(mutationTime.UTC()) {
+		t.Errorf("AddProblem: updatedAt = %v, want %v", c.UpdatedAt(), mutationTime.UTC())
+	}
+
+	removeTime := fixedNow.Add(2 * time.Hour)
+	c.RemoveProblem("problem-b", removeTime)
+	if c.UpdatedAt() == nil || !c.UpdatedAt().Equal(removeTime.UTC()) {
+		t.Errorf("RemoveProblem: updatedAt = %v, want %v", c.UpdatedAt(), removeTime.UTC())
+	}
+}
+
+func TestProblemsNeverNil(t *testing.T) {
+	c := validContest(t)
+	if c.Problems() == nil {
+		t.Error("NewContest: Problems() must not be nil")
+	}
+
+	restored := contest.RestoreContest(
+		"id",
+		mustName(t, "Test"),
+		nil,
+		fixedNow.Add(time.Hour),
+		fixedNow.Add(4*time.Hour),
+		mustPenalty(t, 20),
+		0,
+		false,
+		false,
+		shared.RestoreGroupID("g"),
+		shared.RestoreUserID("o"),
+		nil,
+		fixedNow,
+		nil,
+	)
+	if restored.Problems() == nil {
+		t.Error("RestoreContest: Problems() must not be nil when passed nil")
 	}
 }

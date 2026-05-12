@@ -1,6 +1,10 @@
 package contest
 
-import "context"
+import (
+	"context"
+
+	"github.com/training-judge-center/backend/internal/domain/shared"
+)
 
 type SortField string
 
@@ -18,7 +22,7 @@ const (
 )
 
 type ListFilters struct {
-	GroupID string
+	GroupID shared.GroupID
 	Status  *Status
 	Search  string
 	SortBy  SortField
@@ -28,7 +32,12 @@ type ListFilters struct {
 }
 
 type Repository interface {
-	Save(ctx context.Context, c *Contest) error
+	// Create inserts a new contest. Returns an error if the id already exists.
+	Create(ctx context.Context, c *Contest) error
+	// Update persists changes to an existing contest using c.UpdatedAt() as an
+	// optimistic lock token. Returns ErrCodeContestConflict if another write
+	// landed between the read and this call.
+	Update(ctx context.Context, c *Contest) error
 	FindByID(ctx context.Context, id string) (*Contest, error)
 	Delete(ctx context.Context, id string) error
 	List(ctx context.Context, filters ListFilters) ([]*Contest, int, error)

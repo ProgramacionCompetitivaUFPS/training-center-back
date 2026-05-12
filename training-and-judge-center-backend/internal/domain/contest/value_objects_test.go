@@ -1,25 +1,28 @@
 package contest_test
 
 import (
+	"errors"
 	"strings"
 	"testing"
 
 	"github.com/training-judge-center/backend/internal/domain/contest"
+	"github.com/training-judge-center/backend/pkg/apperror"
 )
 
 func TestNewContestName(t *testing.T) {
 	cases := []struct {
-		name    string
-		input   string
-		wantErr bool
+		name     string
+		input    string
+		wantErr  bool
+		wantCode string
 	}{
-		{"valid name", "Weekly Contest #1", false},
-		{"exactly 200 runes", strings.Repeat("a", 200), false},
-		{"empty string", "", true},
-		{"only whitespace", "   ", true},
-		{"201 runes", strings.Repeat("a", 201), true},
-		{"trimmed to valid", "  Valid Name  ", false},
-		{"unicode characters", "Concurso Ñoño 2026", false},
+		{"valid name", "Weekly Contest #1", false, ""},
+		{"exactly 200 runes", strings.Repeat("a", 200), false, ""},
+		{"empty string", "", true, contest.ErrCodeInvalidContestName},
+		{"only whitespace", "   ", true, contest.ErrCodeInvalidContestName},
+		{"201 runes", strings.Repeat("a", 201), true, contest.ErrCodeInvalidContestName},
+		{"trimmed to valid", "  Valid Name  ", false, ""},
+		{"unicode characters", "Concurso Ñoño 2026", false, ""},
 	}
 
 	for _, tc := range cases {
@@ -27,9 +30,20 @@ func TestNewContestName(t *testing.T) {
 			_, err := contest.NewContestName(tc.input)
 			if tc.wantErr && err == nil {
 				t.Errorf("expected error, got nil")
+				return
 			}
 			if !tc.wantErr && err != nil {
 				t.Errorf("expected no error, got %v", err)
+				return
+			}
+			if tc.wantCode != "" {
+				var appErr *apperror.AppError
+				if !errors.As(err, &appErr) {
+					t.Fatalf("expected *apperror.AppError, got %T", err)
+				}
+				if appErr.Code != tc.wantCode {
+					t.Errorf("expected code %q, got %q", tc.wantCode, appErr.Code)
+				}
 			}
 		})
 	}
@@ -47,15 +61,16 @@ func TestNewContestName_Trimming(t *testing.T) {
 
 func TestNewPenalty(t *testing.T) {
 	cases := []struct {
-		name    string
-		input   int
-		wantErr bool
+		name     string
+		input    int
+		wantErr  bool
+		wantCode string
 	}{
-		{"minimum (0)", 0, false},
-		{"default (20)", 20, false},
-		{"maximum (1440)", 1440, false},
-		{"negative", -1, true},
-		{"above maximum", 1441, true},
+		{"minimum (0)", 0, false, ""},
+		{"default (20)", 20, false, ""},
+		{"maximum (1440)", 1440, false, ""},
+		{"negative", -1, true, contest.ErrCodeInvalidPenalty},
+		{"above maximum", 1441, true, contest.ErrCodeInvalidPenalty},
 	}
 
 	for _, tc := range cases {
@@ -63,9 +78,20 @@ func TestNewPenalty(t *testing.T) {
 			_, err := contest.NewPenalty(tc.input)
 			if tc.wantErr && err == nil {
 				t.Errorf("expected error, got nil")
+				return
 			}
 			if !tc.wantErr && err != nil {
 				t.Errorf("expected no error, got %v", err)
+				return
+			}
+			if tc.wantCode != "" {
+				var appErr *apperror.AppError
+				if !errors.As(err, &appErr) {
+					t.Fatalf("expected *apperror.AppError, got %T", err)
+				}
+				if appErr.Code != tc.wantCode {
+					t.Errorf("expected code %q, got %q", tc.wantCode, appErr.Code)
+				}
 			}
 		})
 	}
@@ -80,6 +106,12 @@ func TestContestProblemLetter(t *testing.T) {
 		{2, "B"},
 		{3, "C"},
 		{26, "Z"},
+		{27, "AA"},
+		{28, "AB"},
+		{52, "AZ"},
+		{53, "BA"},
+		{702, "ZZ"},
+		{703, "AAA"},
 	}
 	for _, tc := range cases {
 		cp := contest.RestoreContestProblem("id", "pid", tc.order)
