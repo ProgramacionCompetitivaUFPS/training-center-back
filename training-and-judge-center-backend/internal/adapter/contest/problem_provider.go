@@ -50,10 +50,8 @@ func (p *ProblemProvider) FindBySlugs(ctx context.Context, slugs []string, calle
 		       (` + adminPos + `::boolean
 		        OR p.accessibility = 'PUBLIC'
 		        OR p.author_id = ` + callerPos + `::uuid
-		        OR EXISTS(
-		            SELECT 1 FROM problem_modifiers pm
-		            WHERE pm.problem_id = p.id AND pm.user_id = ` + callerPos + `::uuid
-		        )) AS can_add
+		        OR ` + callerPos + `::uuid = ANY(p.modifiers_ids)
+		        ) AS can_add
 		FROM problems p
 		WHERE p.slug IN (` + placeholder + `)`
 
