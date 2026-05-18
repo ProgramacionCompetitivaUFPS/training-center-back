@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgxpool"
 	infraPostgres "github.com/training-judge-center/backend/internal/adapter/postgres"
 	domainContest "github.com/training-judge-center/backend/internal/domain/contest"
 	"github.com/training-judge-center/backend/internal/domain/shared"
@@ -18,7 +17,7 @@ type Repository struct {
 	db infraPostgres.Querier
 }
 
-func NewRepository(db *pgxpool.Pool) *Repository {
+func NewRepository(db infraPostgres.Querier) *Repository {
 	return &Repository{db: db}
 }
 

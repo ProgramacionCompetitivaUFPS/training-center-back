@@ -3,6 +3,7 @@ package contest
 import (
 	"encoding/json"
 	"net/http"
+	"time"
 
 	"github.com/training-judge-center/backend/internal/adapter/http/handler"
 	appContest "github.com/training-judge-center/backend/internal/application/contest"
@@ -89,8 +90,8 @@ func toContestResponse(out *appContest.ContestOutput) contestResponse {
 		ID:                out.ID,
 		Name:              out.Name,
 		Description:       out.Description,
-		StartTime:         out.StartTime.UTC().Format("2006-01-02T15:04:05Z"),
-		EndTime:           out.EndTime.UTC().Format("2006-01-02T15:04:05Z"),
+		StartTime:         out.StartTime.UTC().Format(time.RFC3339),
+		EndTime:           out.EndTime.UTC().Format(time.RFC3339),
 		Duration:          out.Duration,
 		Penalty:           out.Penalty,
 		FreezeMinutes:     out.FreezeMinutes,
@@ -101,10 +102,10 @@ func toContestResponse(out *appContest.ContestOutput) contestResponse {
 		Problems:          probs,
 		ProblemCount:      out.ProblemCount,
 		Status:            out.Status,
-		CreatedAt:         out.CreatedAt.UTC().Format("2006-01-02T15:04:05Z"),
+		CreatedAt:         out.CreatedAt.UTC().Format(time.RFC3339),
 	}
 	if out.UpdatedAt != nil {
-		s := out.UpdatedAt.UTC().Format("2006-01-02T15:04:05Z")
+		s := out.UpdatedAt.UTC().Format(time.RFC3339)
 		resp.UpdatedAt = &s
 	}
 	return resp

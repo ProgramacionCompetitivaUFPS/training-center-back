@@ -161,7 +161,7 @@ func (m *mockOwnerProvider) GetDisplay(ctx context.Context, userID string) (*Use
 	return &UserDisplay{Nickname: "coach", Name: "Coach Name"}, nil
 }
 
-func stubOwner() *mockOwnerProvider { return &mockOwnerProvider{} }
+func mockOwner() *mockOwnerProvider { return &mockOwnerProvider{} }
 
 // ── Contest fixture ──────────────────────────────────────────────────────────
 

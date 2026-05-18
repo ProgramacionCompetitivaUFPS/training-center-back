@@ -6,7 +6,6 @@ import (
 	"log/slog"
 
 	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgxpool"
 	infraPostgres "github.com/training-judge-center/backend/internal/adapter/postgres"
 	appContest "github.com/training-judge-center/backend/internal/application/contest"
 	"github.com/training-judge-center/backend/pkg/apperror"
@@ -16,7 +15,7 @@ type OwnerProvider struct {
 	db infraPostgres.Querier
 }
 
-func NewOwnerProvider(db *pgxpool.Pool) *OwnerProvider {
+func NewOwnerProvider(db infraPostgres.Querier) *OwnerProvider {
 	return &OwnerProvider{db: db}
 }
 

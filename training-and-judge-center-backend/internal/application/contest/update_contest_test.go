@@ -16,7 +16,7 @@ func newUpdateContestUseCase(
 	member *mockGroupMemberProvider,
 	problem *mockProblemProvider,
 ) *UpdateContestUseCase {
-	return NewUpdateContestUseCase(repo, group, member, problem, stubOwner())
+	return NewUpdateContestUseCase(repo, group, member, problem, mockOwner())
 }
 
 func validUpdateInput() UpdateContestInput {

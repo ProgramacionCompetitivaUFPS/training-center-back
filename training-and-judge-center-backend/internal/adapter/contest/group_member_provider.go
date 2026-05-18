@@ -4,7 +4,6 @@ import (
 	"context"
 	"log/slog"
 
-	"github.com/jackc/pgx/v5/pgxpool"
 	infraPostgres "github.com/training-judge-center/backend/internal/adapter/postgres"
 	"github.com/training-judge-center/backend/pkg/apperror"
 )
@@ -13,7 +12,7 @@ type GroupMemberProvider struct {
 	db infraPostgres.Querier
 }
 
-func NewGroupMemberProvider(db *pgxpool.Pool) *GroupMemberProvider {
+func NewGroupMemberProvider(db infraPostgres.Querier) *GroupMemberProvider {
 	return &GroupMemberProvider{db: db}
 }
 

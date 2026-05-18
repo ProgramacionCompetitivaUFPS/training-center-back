@@ -15,7 +15,7 @@ func newCreateContestUseCase(
 	member *mockGroupMemberProvider,
 	problem *mockProblemProvider,
 ) *CreateContestUseCase {
-	return NewCreateContestUseCase(repo, group, member, problem, stubOwner())
+	return NewCreateContestUseCase(repo, group, member, problem, mockOwner())
 }
 
 func validCreateInput() CreateContestInput {

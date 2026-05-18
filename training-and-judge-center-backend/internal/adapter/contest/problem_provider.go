@@ -5,7 +5,6 @@ import (
 	"log/slog"
 	"strconv"
 
-	"github.com/jackc/pgx/v5/pgxpool"
 	infraPostgres "github.com/training-judge-center/backend/internal/adapter/postgres"
 	appContest "github.com/training-judge-center/backend/internal/application/contest"
 	"github.com/training-judge-center/backend/pkg/apperror"
@@ -15,7 +14,7 @@ type ProblemProvider struct {
 	db infraPostgres.Querier
 }
 
-func NewProblemProvider(db *pgxpool.Pool) *ProblemProvider {
+func NewProblemProvider(db infraPostgres.Querier) *ProblemProvider {
 	return &ProblemProvider{db: db}
 }
 
