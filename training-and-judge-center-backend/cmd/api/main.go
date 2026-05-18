@@ -19,7 +19,7 @@ import (
 	"github.com/redis/go-redis/v9"
 	"github.com/training-judge-center/backend/internal/adapter/auth"
 	platformConfig "github.com/training-judge-center/backend/internal/adapter/config"
-	contestadapter "github.com/training-judge-center/backend/internal/adapter/contest"
+	adaptercontest "github.com/training-judge-center/backend/internal/adapter/contest"
 	"github.com/training-judge-center/backend/internal/adapter/email"
 	"github.com/training-judge-center/backend/internal/adapter/group"
 	adapterhttp "github.com/training-judge-center/backend/internal/adapter/http"
@@ -247,11 +247,11 @@ func main() {
 	)
 
 	// contest adapters
-	contestRepo            := contestadapter.NewRepository(dbPool)
-	contestGroupProvider   := contestadapter.NewGroupProvider(dbPool)
-	contestMemberProvider  := contestadapter.NewGroupMemberProvider(dbPool)
-	contestProblemProvider := contestadapter.NewProblemProvider(dbPool)
-	contestOwnerProvider   := contestadapter.NewOwnerProvider(dbPool)
+	contestRepo            := adaptercontest.NewRepository(dbPool)
+	contestGroupProvider   := adaptercontest.NewGroupProvider(dbPool)
+	contestMemberProvider  := adaptercontest.NewGroupMemberProvider(dbPool)
+	contestProblemProvider := adaptercontest.NewProblemProvider(dbPool)
+	contestOwnerProvider   := adaptercontest.NewOwnerProvider(dbPool)
 
 	// contest use cases
 	createContestUseCase := appcontest.NewCreateContestUseCase(
