@@ -9,6 +9,20 @@ import (
 	"github.com/training-judge-center/backend/pkg/apperror"
 )
 
+// @Summary      Update contest
+// @Tags         contests
+// @Accept       json
+// @Produce      json
+// @Security     BearerAuth
+// @Param        groupId path string true "Group ID"
+// @Param        contestId path string true "Contest ID"
+// @Param        body body updateContestRequest true "Fields to update"
+// @Success      200 {object} contestResponse
+// @Failure      400 {object} apperror.AppError
+// @Failure      401 {object} apperror.AppError
+// @Failure      403 {object} apperror.AppError
+// @Failure      404 {object} apperror.AppError
+// @Router       /groups/{groupId}/contests/{contestId} [put]
 func (h *Handler) Update(w http.ResponseWriter, r *http.Request) {
 	caller, ok := h.requireCurrentUser(w, r)
 	if !ok {
