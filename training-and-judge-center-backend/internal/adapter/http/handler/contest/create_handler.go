@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"net/http"
 
-	"github.com/go-chi/chi/v5"
 	"github.com/training-judge-center/backend/internal/adapter/http/handler"
 	appContest "github.com/training-judge-center/backend/internal/application/contest"
 	"github.com/training-judge-center/backend/pkg/apperror"
@@ -16,7 +15,7 @@ func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	groupID := chi.URLParam(r, "groupId")
+	groupID := r.PathValue("groupId")
 	if groupID == "" {
 		handler.WriteError(r.Context(), w, apperror.NewBadRequest(apperror.ErrCodeBadRequest, "missing groupId"))
 		return

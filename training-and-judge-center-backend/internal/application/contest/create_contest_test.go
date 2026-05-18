@@ -9,7 +9,7 @@ import (
 	"github.com/training-judge-center/backend/pkg/apperror"
 )
 
-func newCreateUC(
+func newCreateContestUseCase(
 	repo *mockContestRepository,
 	group *mockGroupProvider,
 	member *mockGroupMemberProvider,
@@ -20,7 +20,7 @@ func newCreateUC(
 
 func validCreateInput() CreateContestInput {
 	return CreateContestInput{
-		CurrentUser: asCoach(testCallerID),
+		CurrentUser: asCoach(callerID),
 		GroupID:     testGroupID,
 		Name:        "My Contest",
 		StartTime:   testStart,
@@ -29,7 +29,7 @@ func validCreateInput() CreateContestInput {
 }
 
 func TestCreateContest_SuccessByLead(t *testing.T) {
-	uc := newCreateUC(&mockContestRepository{}, groupFound(), isLead(), noProblemProvider())
+	uc := newCreateContestUseCase(&mockContestRepository{}, groupFound(), isLead(), defaultProblemProvider())
 
 	out, err := uc.Execute(context.Background(), validCreateInput())
 
@@ -48,10 +48,10 @@ func TestCreateContest_SuccessByLead(t *testing.T) {
 }
 
 func TestCreateContest_SuccessByAdmin(t *testing.T) {
-	uc := newCreateUC(&mockContestRepository{}, groupFound(), notLead(), noProblemProvider())
+	uc := newCreateContestUseCase(&mockContestRepository{}, groupFound(), notLead(), defaultProblemProvider())
 
 	in := validCreateInput()
-	in.CurrentUser = asAdmin(testCallerID)
+	in.CurrentUser = asAdmin(callerID)
 
 	out, err := uc.Execute(context.Background(), in)
 
@@ -64,7 +64,7 @@ func TestCreateContest_SuccessByAdmin(t *testing.T) {
 }
 
 func TestCreateContest_SuccessWithProblems(t *testing.T) {
-	uc := newCreateUC(&mockContestRepository{}, groupFound(), isLead(), noProblemProvider())
+	uc := newCreateContestUseCase(&mockContestRepository{}, groupFound(), isLead(), defaultProblemProvider())
 
 	in := validCreateInput()
 	in.Problems = []string{"problem-1", "problem-2"}
@@ -86,7 +86,7 @@ func TestCreateContest_SuccessWithProblems(t *testing.T) {
 }
 
 func TestCreateContest_DeduplicatesProblems(t *testing.T) {
-	uc := newCreateUC(&mockContestRepository{}, groupFound(), isLead(), noProblemProvider())
+	uc := newCreateContestUseCase(&mockContestRepository{}, groupFound(), isLead(), defaultProblemProvider())
 
 	in := validCreateInput()
 	in.Problems = []string{"problem-1", "problem-1", "problem-1"}
@@ -102,7 +102,7 @@ func TestCreateContest_DeduplicatesProblems(t *testing.T) {
 }
 
 func TestCreateContest_GroupNotFound(t *testing.T) {
-	uc := newCreateUC(&mockContestRepository{}, groupNotFound(), isLead(), noProblemProvider())
+	uc := newCreateContestUseCase(&mockContestRepository{}, groupNotFound(), isLead(), defaultProblemProvider())
 
 	_, err := uc.Execute(context.Background(), validCreateInput())
 
@@ -113,7 +113,7 @@ func TestCreateContest_GroupNotFound(t *testing.T) {
 }
 
 func TestCreateContest_ForbiddenIfNotLead(t *testing.T) {
-	uc := newCreateUC(&mockContestRepository{}, groupFound(), notLead(), noProblemProvider())
+	uc := newCreateContestUseCase(&mockContestRepository{}, groupFound(), notLead(), defaultProblemProvider())
 
 	_, err := uc.Execute(context.Background(), validCreateInput())
 
@@ -124,10 +124,10 @@ func TestCreateContest_ForbiddenIfNotLead(t *testing.T) {
 }
 
 func TestCreateContest_ForbiddenIfContestant(t *testing.T) {
-	uc := newCreateUC(&mockContestRepository{}, groupFound(), notLead(), noProblemProvider())
+	uc := newCreateContestUseCase(&mockContestRepository{}, groupFound(), notLead(), defaultProblemProvider())
 
 	in := validCreateInput()
-	in.CurrentUser = asContestant(testCallerID)
+	in.CurrentUser = asContestant(callerID)
 
 	_, err := uc.Execute(context.Background(), in)
 
@@ -138,7 +138,7 @@ func TestCreateContest_ForbiddenIfContestant(t *testing.T) {
 }
 
 func TestCreateContest_StartTimeInPast(t *testing.T) {
-	uc := newCreateUC(&mockContestRepository{}, groupFound(), isLead(), noProblemProvider())
+	uc := newCreateContestUseCase(&mockContestRepository{}, groupFound(), isLead(), defaultProblemProvider())
 
 	in := validCreateInput()
 	past := time.Now().Add(-time.Hour)
@@ -153,7 +153,7 @@ func TestCreateContest_StartTimeInPast(t *testing.T) {
 }
 
 func TestCreateContest_InvalidTimeRange(t *testing.T) {
-	uc := newCreateUC(&mockContestRepository{}, groupFound(), isLead(), noProblemProvider())
+	uc := newCreateContestUseCase(&mockContestRepository{}, groupFound(), isLead(), defaultProblemProvider())
 
 	in := validCreateInput()
 	// Keep startTime valid (future), make endTime before startTime.
@@ -168,7 +168,7 @@ func TestCreateContest_InvalidTimeRange(t *testing.T) {
 }
 
 func TestCreateContest_ValidationErrorEmptyName(t *testing.T) {
-	uc := newCreateUC(&mockContestRepository{}, groupFound(), isLead(), noProblemProvider())
+	uc := newCreateContestUseCase(&mockContestRepository{}, groupFound(), isLead(), defaultProblemProvider())
 
 	in := validCreateInput()
 	in.Name = ""
@@ -187,7 +187,7 @@ func TestCreateContest_ProblemNotFound(t *testing.T) {
 			return map[string]*ProblemInfo{}, nil // empty — slug absent
 		},
 	}
-	uc := newCreateUC(&mockContestRepository{}, groupFound(), isLead(), pp)
+	uc := newCreateContestUseCase(&mockContestRepository{}, groupFound(), isLead(), pp)
 
 	in := validCreateInput()
 	in.Problems = []string{"missing-problem"}
@@ -210,7 +210,7 @@ func TestCreateContest_ProblemNotPublished(t *testing.T) {
 			return result, nil
 		},
 	}
-	uc := newCreateUC(&mockContestRepository{}, groupFound(), isLead(), pp)
+	uc := newCreateContestUseCase(&mockContestRepository{}, groupFound(), isLead(), pp)
 
 	in := validCreateInput()
 	in.Problems = []string{"draft-problem"}
@@ -233,7 +233,7 @@ func TestCreateContest_ProblemAccessDenied(t *testing.T) {
 			return result, nil
 		},
 	}
-	uc := newCreateUC(&mockContestRepository{}, groupFound(), isLead(), pp)
+	uc := newCreateContestUseCase(&mockContestRepository{}, groupFound(), isLead(), pp)
 
 	in := validCreateInput()
 	in.Problems = []string{"private-problem"}
@@ -247,7 +247,7 @@ func TestCreateContest_ProblemAccessDenied(t *testing.T) {
 }
 
 func TestCreateContest_DefaultPenalty(t *testing.T) {
-	uc := newCreateUC(&mockContestRepository{}, groupFound(), isLead(), noProblemProvider())
+	uc := newCreateContestUseCase(&mockContestRepository{}, groupFound(), isLead(), defaultProblemProvider())
 
 	out, err := uc.Execute(context.Background(), validCreateInput())
 
@@ -260,7 +260,7 @@ func TestCreateContest_DefaultPenalty(t *testing.T) {
 }
 
 func TestCreateContest_CustomPenalty(t *testing.T) {
-	uc := newCreateUC(&mockContestRepository{}, groupFound(), isLead(), noProblemProvider())
+	uc := newCreateContestUseCase(&mockContestRepository{}, groupFound(), isLead(), defaultProblemProvider())
 
 	in := validCreateInput()
 	p := 30
@@ -273,5 +273,20 @@ func TestCreateContest_CustomPenalty(t *testing.T) {
 	}
 	if out.Penalty != 30 {
 		t.Errorf("expected penalty 30, got %d", out.Penalty)
+	}
+}
+
+func TestCreateContest_InvalidPenalty(t *testing.T) {
+	uc := newCreateContestUseCase(&mockContestRepository{}, groupFound(), isLead(), defaultProblemProvider())
+
+	in := validCreateInput()
+	p := -1
+	in.Penalty = &p
+
+	_, err := uc.Execute(context.Background(), in)
+
+	var appErr *apperror.AppError
+	if !errors.As(err, &appErr) || appErr.Code != apperror.ErrCodeValidationError {
+		t.Errorf("expected VALIDATION_ERROR for negative penalty, got %v", err)
 	}
 }

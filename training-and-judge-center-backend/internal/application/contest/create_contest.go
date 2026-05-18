@@ -2,7 +2,6 @@ package contest
 
 import (
 	"context"
-	"log/slog"
 	"time"
 
 	"github.com/google/uuid"
@@ -61,9 +60,7 @@ func (uc *CreateContestUseCase) Execute(ctx context.Context, in CreateContestInp
 	if !in.CurrentUser.IsAdmin() {
 		isLead, err := uc.memberProvider.IsLeadOfGroup(ctx, in.CurrentUser.ID, in.GroupID)
 		if err != nil {
-			slog.ErrorContext(ctx, "failed to check group membership", "error", err,
-				"user_id", in.CurrentUser.ID, "group_id", in.GroupID)
-			return nil, apperror.NewInternal()
+			return nil, err
 		}
 		if !isLead {
 			return nil, apperror.NewForbidden(ErrCodeInsufficientPermissions, "only group leads can create contests")
@@ -114,8 +111,7 @@ func (uc *CreateContestUseCase) Execute(ctx context.Context, in CreateContestInp
 		deduped := deduplicateSlugs(in.Problems)
 		infos, err := uc.problemProvider.FindBySlugs(ctx, deduped, in.CurrentUser.ID, in.CurrentUser.IsAdmin())
 		if err != nil {
-			slog.ErrorContext(ctx, "failed to fetch problems by slug", "error", err)
-			return nil, apperror.NewInternal()
+			return nil, err
 		}
 		for _, slug := range deduped {
 			info, ok := infos[slug]
@@ -155,8 +151,7 @@ func (uc *CreateContestUseCase) Execute(ctx context.Context, in CreateContestInp
 
 	for _, pe := range problemEntries {
 		if addErr := c.AddProblem(uuid.New().String(), pe.id, now); addErr != nil {
-			slog.ErrorContext(ctx, "unexpected error adding problem to contest", "error", addErr, "problem_id", pe.id)
-			return nil, apperror.NewInternal()
+			return nil, addErr
 		}
 	}
 
@@ -166,8 +161,7 @@ func (uc *CreateContestUseCase) Execute(ctx context.Context, in CreateContestInp
 
 	owner, err := uc.ownerProvider.GetDisplay(ctx, in.CurrentUser.ID)
 	if err != nil {
-		slog.ErrorContext(ctx, "failed to resolve owner display", "error", err, "user_id", in.CurrentUser.ID)
-		return nil, apperror.NewInternal()
+		return nil, err
 	}
 	if owner == nil {
 		owner = &UserDisplay{}
@@ -196,26 +190,4 @@ func deduplicateSlugs(slugs []string) []string {
 		}
 	}
 	return out
-}
-
-func buildOutput(c *domainContest.Contest, group *GroupInfo, owner *UserDisplay, problems []ProblemDisplay, now time.Time) *ContestOutput {
-	return &ContestOutput{
-		ID:                c.ID(),
-		Name:              c.Name().Value(),
-		Description:       c.Description(),
-		StartTime:         c.StartTime(),
-		EndTime:           c.EndTime(),
-		Duration:          c.Duration(),
-		Penalty:           c.Penalty().Value(),
-		FreezeMinutes:     c.FreezeMinutes(),
-		EnablePostContest: c.EnablePostContest(),
-		Locked:            c.Locked(),
-		Group:             GroupDisplay{ID: group.ID, Name: group.Name},
-		Owner:             *owner,
-		Problems:          problems,
-		ProblemCount:      len(problems),
-		Status:            c.Status(now).String(),
-		CreatedAt:         c.CreatedAt(),
-		UpdatedAt:         c.UpdatedAt(),
-	}
 }

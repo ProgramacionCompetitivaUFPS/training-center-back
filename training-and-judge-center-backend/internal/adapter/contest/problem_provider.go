@@ -3,6 +3,7 @@ package contest
 import (
 	"context"
 	"log/slog"
+	"strconv"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 	infraPostgres "github.com/training-judge-center/backend/internal/adapter/postgres"
@@ -11,7 +12,7 @@ import (
 )
 
 type ProblemProvider struct {
-	db *pgxpool.Pool
+	db infraPostgres.Querier
 }
 
 func NewProblemProvider(db *pgxpool.Pool) *ProblemProvider {
@@ -38,10 +39,10 @@ func (p *ProblemProvider) FindBySlugs(ctx context.Context, slugs []string, calle
 		if i > 0 {
 			placeholder += ","
 		}
-		placeholder += "$" + itoa(i+1)
+		placeholder += "$" + strconv.Itoa(i+1)
 	}
-	callerPos := itoa(len(slugs) + 1)
-	adminPos := itoa(len(slugs) + 2)
+	callerPos := strconv.Itoa(len(slugs) + 1)
+	adminPos := strconv.Itoa(len(slugs) + 2)
 
 	query := `
 		SELECT p.id, p.slug, p.title, p.status,
@@ -100,7 +101,7 @@ func (p *ProblemProvider) FindByIDs(ctx context.Context, ids []string) (map[stri
 		if i > 0 {
 			placeholder += ","
 		}
-		placeholder += "$" + itoa(i+1)
+		placeholder += "$" + strconv.Itoa(i+1)
 	}
 
 	rows, err := q.Query(ctx, `SELECT id, slug, title FROM problems WHERE id IN (`+placeholder+`)`, args...)
@@ -124,21 +125,4 @@ func (p *ProblemProvider) FindByIDs(ctx context.Context, ids []string) (map[stri
 		return nil, apperror.NewInternal()
 	}
 	return result, nil
-}
-
-func itoa(n int) string {
-	const digits = "0123456789"
-	if n < 10 {
-		return string(digits[n])
-	}
-	var buf [20]byte
-	pos := len(buf)
-	for n >= 10 {
-		pos--
-		buf[pos] = digits[n%10]
-		n /= 10
-	}
-	pos--
-	buf[pos] = digits[n]
-	return string(buf[pos:])
 }

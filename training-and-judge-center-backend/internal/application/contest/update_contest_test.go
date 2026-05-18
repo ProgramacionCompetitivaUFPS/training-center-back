@@ -10,7 +10,7 @@ import (
 	"github.com/training-judge-center/backend/pkg/apperror"
 )
 
-func newUpdateUC(
+func newUpdateContestUseCase(
 	repo *mockContestRepository,
 	group *mockGroupProvider,
 	member *mockGroupMemberProvider,
@@ -22,7 +22,7 @@ func newUpdateUC(
 func validUpdateInput() UpdateContestInput {
 	name := "Updated Name"
 	return UpdateContestInput{
-		CurrentUser: asCoach(testCallerID),
+		CurrentUser: asCoach(callerID),
 		GroupID:     testGroupID,
 		ContestID:   testContestID,
 		Name:        &name,
@@ -30,8 +30,8 @@ func validUpdateInput() UpdateContestInput {
 }
 
 func TestUpdateContest_SuccessUpdateName(t *testing.T) {
-	contest := newTestContest(testCallerID)
-	uc := newUpdateUC(repoWith(contest), groupFound(), isLead(), noProblemProvider())
+	contest := newTestContest(callerID)
+	uc := newUpdateContestUseCase(repoWith(contest), groupFound(), isLead(), defaultProblemProvider())
 
 	out, err := uc.Execute(context.Background(), validUpdateInput())
 
@@ -44,11 +44,11 @@ func TestUpdateContest_SuccessUpdateName(t *testing.T) {
 }
 
 func TestUpdateContest_SuccessByAdmin(t *testing.T) {
-	contest := newTestContest(testCallerID)
-	uc := newUpdateUC(repoWith(contest), groupFound(), notLead(), noProblemProvider())
+	contest := newTestContest(callerID)
+	uc := newUpdateContestUseCase(repoWith(contest), groupFound(), notLead(), defaultProblemProvider())
 
 	in := validUpdateInput()
-	in.CurrentUser = asAdmin(testOtherID)
+	in.CurrentUser = asAdmin(otherID)
 
 	out, err := uc.Execute(context.Background(), in)
 
@@ -61,7 +61,7 @@ func TestUpdateContest_SuccessByAdmin(t *testing.T) {
 }
 
 func TestUpdateContest_ContestNotFound(t *testing.T) {
-	uc := newUpdateUC(&mockContestRepository{}, groupFound(), isLead(), noProblemProvider())
+	uc := newUpdateContestUseCase(&mockContestRepository{}, groupFound(), isLead(), defaultProblemProvider())
 
 	_, err := uc.Execute(context.Background(), validUpdateInput())
 
@@ -72,8 +72,8 @@ func TestUpdateContest_ContestNotFound(t *testing.T) {
 }
 
 func TestUpdateContest_ContestBelongsToDifferentGroup(t *testing.T) {
-	contest := newTestContest(testCallerID)
-	uc := newUpdateUC(repoWith(contest), groupFound(), isLead(), noProblemProvider())
+	contest := newTestContest(callerID)
+	uc := newUpdateContestUseCase(repoWith(contest), groupFound(), isLead(), defaultProblemProvider())
 
 	in := validUpdateInput()
 	in.GroupID = "different-group-id"
@@ -87,8 +87,8 @@ func TestUpdateContest_ContestBelongsToDifferentGroup(t *testing.T) {
 }
 
 func TestUpdateContest_ForbiddenIfNotLead(t *testing.T) {
-	contest := newTestContest(testCallerID)
-	uc := newUpdateUC(repoWith(contest), groupFound(), notLead(), noProblemProvider())
+	contest := newTestContest(callerID)
+	uc := newUpdateContestUseCase(repoWith(contest), groupFound(), notLead(), defaultProblemProvider())
 
 	_, err := uc.Execute(context.Background(), validUpdateInput())
 
@@ -99,12 +99,12 @@ func TestUpdateContest_ForbiddenIfNotLead(t *testing.T) {
 }
 
 func TestUpdateContest_LockedContestForbidsNonOwner(t *testing.T) {
-	contest := newTestContest(testOtherID) // owned by testOtherID
+	contest := newTestContest(otherID) // owned by otherID
 	locked := true
 	contest.SetLocked(locked, testNow)
-	uc := newUpdateUC(repoWith(contest), groupFound(), isLead(), noProblemProvider())
+	uc := newUpdateContestUseCase(repoWith(contest), groupFound(), isLead(), defaultProblemProvider())
 
-	// testCallerID is lead but NOT the owner (testOtherID is owner)
+	// callerID is lead but NOT the owner (otherID is owner)
 	_, err := uc.Execute(context.Background(), validUpdateInput())
 
 	var appErr *apperror.AppError
@@ -114,13 +114,13 @@ func TestUpdateContest_LockedContestForbidsNonOwner(t *testing.T) {
 }
 
 func TestUpdateContest_OwnerCanUnlockOwnContest(t *testing.T) {
-	contest := newTestContest(testCallerID) // owned by testCallerID
+	contest := newTestContest(callerID) // owned by callerID
 	contest.SetLocked(true, testNow)
-	uc := newUpdateUC(repoWith(contest), groupFound(), isLead(), noProblemProvider())
+	uc := newUpdateContestUseCase(repoWith(contest), groupFound(), isLead(), defaultProblemProvider())
 
 	locked := false
 	out, err := uc.Execute(context.Background(), UpdateContestInput{
-		CurrentUser: asCoach(testCallerID),
+		CurrentUser: asCoach(callerID),
 		GroupID:     testGroupID,
 		ContestID:   testContestID,
 		Locked:      &locked,
@@ -135,13 +135,13 @@ func TestUpdateContest_OwnerCanUnlockOwnContest(t *testing.T) {
 }
 
 func TestUpdateContest_AdminCanUnlockAnyContest(t *testing.T) {
-	contest := newTestContest(testOtherID) // owned by someone else
+	contest := newTestContest(otherID) // owned by someone else
 	contest.SetLocked(true, testNow)
-	uc := newUpdateUC(repoWith(contest), groupFound(), notLead(), noProblemProvider())
+	uc := newUpdateContestUseCase(repoWith(contest), groupFound(), notLead(), defaultProblemProvider())
 
 	locked := false
 	out, err := uc.Execute(context.Background(), UpdateContestInput{
-		CurrentUser: asAdmin(testCallerID),
+		CurrentUser: asAdmin(callerID),
 		GroupID:     testGroupID,
 		ContestID:   testContestID,
 		Locked:      &locked,
@@ -156,12 +156,12 @@ func TestUpdateContest_AdminCanUnlockAnyContest(t *testing.T) {
 }
 
 func TestUpdateContest_NonOwnerNonAdminCannotLock(t *testing.T) {
-	contest := newTestContest(testOtherID) // owned by testOtherID
-	uc := newUpdateUC(repoWith(contest), groupFound(), isLead(), noProblemProvider())
+	contest := newTestContest(otherID) // owned by otherID
+	uc := newUpdateContestUseCase(repoWith(contest), groupFound(), isLead(), defaultProblemProvider())
 
 	locked := true
 	_, err := uc.Execute(context.Background(), UpdateContestInput{
-		CurrentUser: asCoach(testCallerID), // not owner, not admin
+		CurrentUser: asCoach(callerID), // not owner, not admin
 		GroupID:     testGroupID,
 		ContestID:   testContestID,
 		Locked:      &locked,
@@ -174,11 +174,11 @@ func TestUpdateContest_NonOwnerNonAdminCannotLock(t *testing.T) {
 }
 
 func TestUpdateContest_NoFieldsToUpdate(t *testing.T) {
-	contest := newTestContest(testCallerID)
-	uc := newUpdateUC(repoWith(contest), groupFound(), isLead(), noProblemProvider())
+	contest := newTestContest(callerID)
+	uc := newUpdateContestUseCase(repoWith(contest), groupFound(), isLead(), defaultProblemProvider())
 
 	_, err := uc.Execute(context.Background(), UpdateContestInput{
-		CurrentUser: asCoach(testCallerID),
+		CurrentUser: asCoach(callerID),
 		GroupID:     testGroupID,
 		ContestID:   testContestID,
 		// no fields
@@ -191,12 +191,12 @@ func TestUpdateContest_NoFieldsToUpdate(t *testing.T) {
 }
 
 func TestUpdateContest_StartTimeInPast(t *testing.T) {
-	contest := newTestContest(testCallerID)
-	uc := newUpdateUC(repoWith(contest), groupFound(), isLead(), noProblemProvider())
+	contest := newTestContest(callerID)
+	uc := newUpdateContestUseCase(repoWith(contest), groupFound(), isLead(), defaultProblemProvider())
 
 	past := time.Now().Add(-time.Hour) // genuinely in the past
 	_, err := uc.Execute(context.Background(), UpdateContestInput{
-		CurrentUser: asCoach(testCallerID),
+		CurrentUser: asCoach(callerID),
 		GroupID:     testGroupID,
 		ContestID:   testContestID,
 		StartTime:   &past,
@@ -209,12 +209,12 @@ func TestUpdateContest_StartTimeInPast(t *testing.T) {
 }
 
 func TestUpdateContest_EndTimeInPast(t *testing.T) {
-	contest := newTestContest(testCallerID)
-	uc := newUpdateUC(repoWith(contest), groupFound(), isLead(), noProblemProvider())
+	contest := newTestContest(callerID)
+	uc := newUpdateContestUseCase(repoWith(contest), groupFound(), isLead(), defaultProblemProvider())
 
 	past := time.Now().Add(-time.Minute) // genuinely in the past
 	_, err := uc.Execute(context.Background(), UpdateContestInput{
-		CurrentUser: asCoach(testCallerID),
+		CurrentUser: asCoach(callerID),
 		GroupID:     testGroupID,
 		ContestID:   testContestID,
 		EndTime:     &past,
@@ -227,15 +227,15 @@ func TestUpdateContest_EndTimeInPast(t *testing.T) {
 }
 
 func TestUpdateContest_ReplaceProblems(t *testing.T) {
-	contest := newTestContest(testCallerID)
-	uc := newUpdateUC(repoWith(contest), groupFound(), isLead(), noProblemProvider())
+	contest := newTestContest(callerID)
+	uc := newUpdateContestUseCase(repoWith(contest), groupFound(), isLead(), defaultProblemProvider())
 
 	problems := []ProblemOrderInput{
 		{Slug: "problem-a", Order: 1},
 		{Slug: "problem-b", Order: 2},
 	}
 	out, err := uc.Execute(context.Background(), UpdateContestInput{
-		CurrentUser: asCoach(testCallerID),
+		CurrentUser: asCoach(callerID),
 		GroupID:     testGroupID,
 		ContestID:   testContestID,
 		Problems:    &problems,
@@ -250,7 +250,7 @@ func TestUpdateContest_ReplaceProblems(t *testing.T) {
 }
 
 func TestUpdateContest_ProblemAccessDeniedOnUpdate(t *testing.T) {
-	contest := newTestContest(testCallerID)
+	contest := newTestContest(callerID)
 	pp := &mockProblemProvider{
 		findBySlugsFn: func(_ context.Context, slugs []string, _ string, _ bool) (map[string]*ProblemInfo, error) {
 			result := make(map[string]*ProblemInfo)
@@ -260,11 +260,11 @@ func TestUpdateContest_ProblemAccessDeniedOnUpdate(t *testing.T) {
 			return result, nil
 		},
 	}
-	uc := newUpdateUC(repoWith(contest), groupFound(), isLead(), pp)
+	uc := newUpdateContestUseCase(repoWith(contest), groupFound(), isLead(), pp)
 
 	problems := []ProblemOrderInput{{Slug: "private-problem", Order: 1}}
 	_, err := uc.Execute(context.Background(), UpdateContestInput{
-		CurrentUser: asCoach(testCallerID),
+		CurrentUser: asCoach(callerID),
 		GroupID:     testGroupID,
 		ContestID:   testContestID,
 		Problems:    &problems,
@@ -273,5 +273,70 @@ func TestUpdateContest_ProblemAccessDeniedOnUpdate(t *testing.T) {
 	var appErr *apperror.AppError
 	if !errors.As(err, &appErr) || appErr.Code != ErrCodeProblemAccessDenied {
 		t.Errorf("expected PROBLEM_ACCESS_DENIED, got %v", err)
+	}
+}
+
+func TestUpdateContest_InvalidPenalty(t *testing.T) {
+	contest := newTestContest(callerID)
+	uc := newUpdateContestUseCase(repoWith(contest), groupFound(), isLead(), defaultProblemProvider())
+
+	p := -5
+	_, err := uc.Execute(context.Background(), UpdateContestInput{
+		CurrentUser: asCoach(callerID),
+		GroupID:     testGroupID,
+		ContestID:   testContestID,
+		Penalty:     &p,
+	})
+
+	var appErr *apperror.AppError
+	if !errors.As(err, &appErr) || appErr.Code != apperror.ErrCodeValidationError {
+		t.Errorf("expected VALIDATION_ERROR for negative penalty, got %v", err)
+	}
+}
+
+func TestUpdateContest_ReplaceWithEmptyProblems(t *testing.T) {
+	contest := newTestContest(callerID)
+	uc := newUpdateContestUseCase(repoWith(contest), groupFound(), isLead(), defaultProblemProvider())
+
+	empty := []ProblemOrderInput{}
+	out, err := uc.Execute(context.Background(), UpdateContestInput{
+		CurrentUser: asCoach(callerID),
+		GroupID:     testGroupID,
+		ContestID:   testContestID,
+		Problems:    &empty,
+	})
+
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(out.Problems) != 0 {
+		t.Errorf("expected 0 problems after clearing, got %d", len(out.Problems))
+	}
+	if out.ProblemCount != 0 {
+		t.Errorf("expected problemCount 0, got %d", out.ProblemCount)
+	}
+}
+
+func TestUpdateContest_DeduplicatesProblems(t *testing.T) {
+	contest := newTestContest(callerID)
+	uc := newUpdateContestUseCase(repoWith(contest), groupFound(), isLead(), defaultProblemProvider())
+
+	problems := []ProblemOrderInput{
+		{Slug: "problem-a", Order: 1},
+		{Slug: "problem-a", Order: 2},
+		{Slug: "problem-b", Order: 3},
+	}
+	out, err := uc.Execute(context.Background(), UpdateContestInput{
+		CurrentUser: asCoach(callerID),
+		GroupID:     testGroupID,
+		ContestID:   testContestID,
+		Problems:    &problems,
+	})
+
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(out.Problems) != 2 {
+		t.Errorf("expected 2 deduplicated problems, got %d", len(out.Problems))
 	}
 }

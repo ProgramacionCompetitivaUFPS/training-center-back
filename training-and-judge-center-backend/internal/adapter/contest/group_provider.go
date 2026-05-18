@@ -13,7 +13,7 @@ import (
 )
 
 type GroupProvider struct {
-	db *pgxpool.Pool
+	db infraPostgres.Querier
 }
 
 func NewGroupProvider(db *pgxpool.Pool) *GroupProvider {

@@ -13,7 +13,7 @@ import (
 )
 
 type OwnerProvider struct {
-	db *pgxpool.Pool
+	db infraPostgres.Querier
 }
 
 func NewOwnerProvider(db *pgxpool.Pool) *OwnerProvider {

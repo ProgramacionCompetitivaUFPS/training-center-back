@@ -24,7 +24,7 @@ import (
 	"github.com/training-judge-center/backend/internal/adapter/group"
 	adapterhttp "github.com/training-judge-center/backend/internal/adapter/http"
 	"github.com/training-judge-center/backend/internal/adapter/http/handler"
-	handlerContest "github.com/training-judge-center/backend/internal/adapter/http/handler/contest"
+	handlercontest "github.com/training-judge-center/backend/internal/adapter/http/handler/contest"
 	handlerGroup "github.com/training-judge-center/backend/internal/adapter/http/handler/group"
 	handlerMaterial "github.com/training-judge-center/backend/internal/adapter/http/handler/material"
 	handlerProblem "github.com/training-judge-center/backend/internal/adapter/http/handler/problem"
@@ -35,7 +35,7 @@ import (
 	"github.com/training-judge-center/backend/internal/adapter/ratelimit"
 	"github.com/training-judge-center/backend/internal/adapter/user"
 
-	appContest "github.com/training-judge-center/backend/internal/application/contest"
+	appcontest "github.com/training-judge-center/backend/internal/application/contest"
 	appGroup "github.com/training-judge-center/backend/internal/application/group"
 	appMaterial "github.com/training-judge-center/backend/internal/application/material"
 	appProblem "github.com/training-judge-center/backend/internal/application/problem"
@@ -254,15 +254,15 @@ func main() {
 	contestOwnerProvider   := contestadapter.NewOwnerProvider(dbPool)
 
 	// contest use cases
-	createContestUseCase := appContest.NewCreateContestUseCase(
+	createContestUseCase := appcontest.NewCreateContestUseCase(
 		contestRepo, contestGroupProvider, contestMemberProvider,
 		contestProblemProvider, contestOwnerProvider,
 	)
-	updateContestUseCase := appContest.NewUpdateContestUseCase(
+	updateContestUseCase := appcontest.NewUpdateContestUseCase(
 		contestRepo, contestGroupProvider, contestMemberProvider,
 		contestProblemProvider, contestOwnerProvider,
 	)
-	contestHandler := handlerContest.NewHandler(createContestUseCase, updateContestUseCase)
+	contestHandler := handlercontest.NewHandler(createContestUseCase, updateContestUseCase)
 
 	router := adapterhttp.NewRouter(&adapterhttp.Handlers{
 		Problem:  problemHandler,

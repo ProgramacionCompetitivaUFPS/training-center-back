@@ -6,7 +6,7 @@ import (
 
 	domainContest "github.com/training-judge-center/backend/internal/domain/contest"
 	"github.com/training-judge-center/backend/internal/domain/shared"
-	appshared "github.com/training-judge-center/backend/internal/application/shared"
+	"github.com/training-judge-center/backend/internal/testutil"
 	"github.com/training-judge-center/backend/pkg/apperror"
 )
 
@@ -21,8 +21,8 @@ var (
 )
 
 const (
-	testCallerID  = "aaaaaaaa-0000-0000-0000-000000000001"
-	testOtherID   = "aaaaaaaa-0000-0000-0000-000000000002"
+	callerID      = "aaaaaaaa-0000-0000-0000-000000000001"
+	otherID       = "aaaaaaaa-0000-0000-0000-000000000002"
 	testGroupID   = "bbbbbbbb-0000-0000-0000-000000000001"
 	testContestID = "cccccccc-0000-0000-0000-000000000001"
 	testProblemID = "dddddddd-0000-0000-0000-000000000001"
@@ -30,18 +30,20 @@ const (
 
 // ── CurrentUser helpers ──────────────────────────────────────────────────────
 
-func asAdmin(id string) appshared.CurrentUser      { return appshared.CurrentUser{ID: id, Role: shared.RoleAdmin} }
-func asCoach(id string) appshared.CurrentUser      { return appshared.CurrentUser{ID: id, Role: shared.RoleCoach} }
-func asContestant(id string) appshared.CurrentUser { return appshared.CurrentUser{ID: id, Role: shared.RoleContestant} }
+var (
+	asAdmin      = testutil.AsAdmin
+	asCoach      = testutil.AsCoach
+	asContestant = testutil.AsContestant
+)
 
 // ── Repository mock ──────────────────────────────────────────────────────────
 
 type mockContestRepository struct {
-	createFn  func(ctx context.Context, c *domainContest.Contest) error
-	updateFn  func(ctx context.Context, c *domainContest.Contest) error
+	createFn   func(ctx context.Context, c *domainContest.Contest) error
+	updateFn   func(ctx context.Context, c *domainContest.Contest) error
 	findByIDFn func(ctx context.Context, id string) (*domainContest.Contest, error)
-	deleteFn  func(ctx context.Context, id string) error
-	listFn    func(ctx context.Context, f domainContest.ListFilters) ([]*domainContest.Contest, int, error)
+	deleteFn   func(ctx context.Context, id string) error
+	listFn     func(ctx context.Context, f domainContest.ListFilters) ([]*domainContest.Contest, int, error)
 }
 
 func (m *mockContestRepository) Create(ctx context.Context, c *domainContest.Contest) error {
@@ -88,7 +90,7 @@ func (m *mockGroupProvider) FindByID(ctx context.Context, groupID string) (*Grou
 	return &GroupInfo{ID: groupID, Name: "Test Group"}, nil
 }
 
-func groupFound() *mockGroupProvider  { return &mockGroupProvider{} }
+func groupFound() *mockGroupProvider { return &mockGroupProvider{} }
 func groupNotFound() *mockGroupProvider {
 	return &mockGroupProvider{findByIDFn: func(_ context.Context, _ string) (*GroupInfo, error) {
 		return nil, nil
@@ -144,7 +146,7 @@ func (m *mockProblemProvider) FindByIDs(ctx context.Context, ids []string) (map[
 	return result, nil
 }
 
-func noProblemProvider() *mockProblemProvider { return &mockProblemProvider{} }
+func defaultProblemProvider() *mockProblemProvider { return &mockProblemProvider{} }
 
 // ── OwnerProvider mock ───────────────────────────────────────────────────────
 

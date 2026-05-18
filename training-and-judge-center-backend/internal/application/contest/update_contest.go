@@ -2,7 +2,6 @@ package contest
 
 import (
 	"context"
-	"log/slog"
 	"time"
 
 	"github.com/google/uuid"
@@ -75,9 +74,7 @@ func (uc *UpdateContestUseCase) Execute(ctx context.Context, in UpdateContestInp
 	if !in.CurrentUser.IsAdmin() {
 		isLead, err := uc.memberProvider.IsLeadOfGroup(ctx, in.CurrentUser.ID, in.GroupID)
 		if err != nil {
-			slog.ErrorContext(ctx, "failed to check group membership", "error", err,
-				"user_id", in.CurrentUser.ID, "group_id", in.GroupID)
-			return nil, apperror.NewInternal()
+			return nil, err
 		}
 		if !isLead {
 			return nil, apperror.NewForbidden(ErrCodeInsufficientPermissions, "only group leads can update contests")
@@ -159,8 +156,7 @@ func (uc *UpdateContestUseCase) Execute(ctx context.Context, in UpdateContestInp
 		if len(slugs) > 0 {
 			infos, err := uc.problemProvider.FindBySlugs(ctx, slugs, in.CurrentUser.ID, in.CurrentUser.IsAdmin())
 			if err != nil {
-				slog.ErrorContext(ctx, "failed to fetch problems by slug", "error", err)
-				return nil, apperror.NewInternal()
+				return nil, err
 			}
 			for _, entry := range deduped {
 				info, ok := infos[entry.Slug]
@@ -228,8 +224,7 @@ func (uc *UpdateContestUseCase) Execute(ctx context.Context, in UpdateContestInp
 
 	owner, err := uc.ownerProvider.GetDisplay(ctx, c.OwnerID().Value())
 	if err != nil {
-		slog.ErrorContext(ctx, "failed to resolve owner display", "error", err, "owner_id", c.OwnerID().Value())
-		return nil, apperror.NewInternal()
+		return nil, err
 	}
 	if owner == nil {
 		owner = &UserDisplay{}
@@ -266,8 +261,7 @@ func (uc *UpdateContestUseCase) enrichProblems(ctx context.Context, cps []domain
 	}
 	basics, err := uc.problemProvider.FindByIDs(ctx, ids)
 	if err != nil {
-		slog.ErrorContext(ctx, "failed to enrich contest problems", "error", err)
-		return nil, apperror.NewInternal()
+		return nil, err
 	}
 	displays := make([]ProblemDisplay, 0, len(cps))
 	for _, cp := range cps {

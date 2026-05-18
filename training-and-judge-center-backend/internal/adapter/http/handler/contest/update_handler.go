@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"net/http"
 
-	"github.com/go-chi/chi/v5"
 	"github.com/training-judge-center/backend/internal/adapter/http/handler"
 	appContest "github.com/training-judge-center/backend/internal/application/contest"
 	"github.com/training-judge-center/backend/pkg/apperror"
@@ -16,8 +15,8 @@ func (h *Handler) Update(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	groupID := chi.URLParam(r, "groupId")
-	contestID := chi.URLParam(r, "contestId")
+	groupID := r.PathValue("groupId")
+	contestID := r.PathValue("contestId")
 	if groupID == "" || contestID == "" {
 		handler.WriteError(r.Context(), w, apperror.NewBadRequest(apperror.ErrCodeBadRequest, "missing path parameter"))
 		return
