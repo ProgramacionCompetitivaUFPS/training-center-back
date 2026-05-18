@@ -7,6 +7,7 @@ import (
 	httpSwagger "github.com/swaggo/http-swagger"
 	_ "github.com/training-judge-center/backend/docs"
 	handler2 "github.com/training-judge-center/backend/internal/adapter/http/handler"
+	handlerContest "github.com/training-judge-center/backend/internal/adapter/http/handler/contest"
 	"github.com/training-judge-center/backend/internal/adapter/http/handler/group"
 	handlerMaterial "github.com/training-judge-center/backend/internal/adapter/http/handler/material"
 	"github.com/training-judge-center/backend/internal/adapter/http/handler/problem"
@@ -22,6 +23,7 @@ type Handlers struct {
 	Auth     *handler2.AuthHandler
 	Group    *group.Handler
 	Material *handlerMaterial.Handler
+	Contest  *handlerContest.Handler
 }
 
 type Services struct {
@@ -69,6 +71,11 @@ func NewRouter(h *Handlers, s *Services, allowedOrigins []string) *chi.Mux {
 				r.Get("/me", h.Group.GetMyRequest)
 				r.Delete("/me", h.Group.CancelMyRequest)
 				r.Patch("/{requestId}", h.Group.UpdateJoinRequest)
+			})
+
+			r.Route("/{groupId}/contests", func(r chi.Router) {
+				r.Post("/", h.Contest.Create)
+				r.Put("/{contestId}", h.Contest.Update)
 			})
 
 			r.Route("/{groupId}/materials", func(r chi.Router) {

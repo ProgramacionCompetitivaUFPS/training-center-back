@@ -1,0 +1,221 @@
+package contest
+
+import (
+	"context"
+	"log/slog"
+	"time"
+
+	"github.com/google/uuid"
+	appshared "github.com/training-judge-center/backend/internal/application/shared"
+	domainContest "github.com/training-judge-center/backend/internal/domain/contest"
+	"github.com/training-judge-center/backend/internal/domain/shared"
+	"github.com/training-judge-center/backend/pkg/apperror"
+)
+
+type CreateContestInput struct {
+	CurrentUser       appshared.CurrentUser
+	GroupID           string
+	Name              string
+	Description       *string
+	StartTime         time.Time
+	EndTime           time.Time
+	Penalty           *int
+	FreezeMinutes     *int
+	EnablePostContest bool
+	Problems          []string // slugs; may be empty
+}
+
+type CreateContestUseCase struct {
+	repo            domainContest.Repository
+	groupProvider   GroupProvider
+	memberProvider  GroupMemberProvider
+	problemProvider ProblemProvider
+	ownerProvider   OwnerProvider
+}
+
+func NewCreateContestUseCase(
+	repo domainContest.Repository,
+	groupProvider GroupProvider,
+	memberProvider GroupMemberProvider,
+	problemProvider ProblemProvider,
+	ownerProvider OwnerProvider,
+) *CreateContestUseCase {
+	return &CreateContestUseCase{
+		repo:            repo,
+		groupProvider:   groupProvider,
+		memberProvider:  memberProvider,
+		problemProvider: problemProvider,
+		ownerProvider:   ownerProvider,
+	}
+}
+
+func (uc *CreateContestUseCase) Execute(ctx context.Context, in CreateContestInput) (*ContestOutput, error) {
+	group, err := uc.groupProvider.FindByID(ctx, in.GroupID)
+	if err != nil {
+		return nil, err
+	}
+	if group == nil {
+		return nil, apperror.NewNotFound(ErrCodeGroupNotFound, "group not found")
+	}
+
+	if !in.CurrentUser.IsAdmin() {
+		isLead, err := uc.memberProvider.IsLeadOfGroup(ctx, in.CurrentUser.ID, in.GroupID)
+		if err != nil {
+			slog.ErrorContext(ctx, "failed to check group membership", "error", err,
+				"user_id", in.CurrentUser.ID, "group_id", in.GroupID)
+			return nil, apperror.NewInternal()
+		}
+		if !isLead {
+			return nil, apperror.NewForbidden(ErrCodeInsufficientPermissions, "only group leads can create contests")
+		}
+	}
+
+	var fieldErrs []apperror.FieldError
+
+	name, nameErr := domainContest.NewContestName(in.Name)
+	if err := apperror.AccumulateFieldErrors(nameErr, &fieldErrs); err != nil {
+		return nil, err
+	}
+
+	if in.Description != nil && len([]rune(*in.Description)) > domainContest.MaxDescriptionLength {
+		fieldErrs = append(fieldErrs, apperror.FieldError{
+			Field:   "description",
+			Message: "description cannot exceed 5000 characters",
+		})
+	}
+
+	penaltyVal := 20
+	if in.Penalty != nil {
+		penaltyVal = *in.Penalty
+	}
+	penalty, penaltyErr := domainContest.NewPenalty(penaltyVal)
+	if err := apperror.AccumulateFieldErrors(penaltyErr, &fieldErrs); err != nil {
+		return nil, err
+	}
+
+	if len(fieldErrs) > 0 {
+		return nil, apperror.NewValidation(fieldErrs)
+	}
+
+	freezeMinutes := 0
+	if in.FreezeMinutes != nil {
+		freezeMinutes = *in.FreezeMinutes
+	}
+
+	// Resolve and validate problems.
+	type problemEntry struct {
+		id    string
+		slug  string
+		title string
+	}
+	var problemEntries []problemEntry
+
+	if len(in.Problems) > 0 {
+		deduped := deduplicateSlugs(in.Problems)
+		infos, err := uc.problemProvider.FindBySlugs(ctx, deduped, in.CurrentUser.ID, in.CurrentUser.IsAdmin())
+		if err != nil {
+			slog.ErrorContext(ctx, "failed to fetch problems by slug", "error", err)
+			return nil, apperror.NewInternal()
+		}
+		for _, slug := range deduped {
+			info, ok := infos[slug]
+			if !ok {
+				return nil, apperror.NewNotFound(ErrCodeProblemNotFound, "problem '"+slug+"' not found")
+			}
+			if !info.IsPublished {
+				return nil, apperror.NewBadRequest(ErrCodeProblemNotPublished, "problem '"+slug+"' is not published")
+			}
+			if !info.CanAdd {
+				return nil, apperror.NewForbidden(ErrCodeProblemAccessDenied,
+					"cannot add private problem '"+slug+"' — you are not a modifier")
+			}
+			problemEntries = append(problemEntries, problemEntry{id: info.ID, slug: slug, title: info.Title})
+		}
+	}
+
+	now := time.Now()
+	newID := uuid.New().String()
+
+	c, err := domainContest.NewContest(
+		newID,
+		name,
+		in.Description,
+		in.StartTime,
+		in.EndTime,
+		penalty,
+		freezeMinutes,
+		in.EnablePostContest,
+		shared.RestoreGroupID(in.GroupID),
+		shared.RestoreUserID(in.CurrentUser.ID),
+		now,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	for _, pe := range problemEntries {
+		if addErr := c.AddProblem(uuid.New().String(), pe.id, now); addErr != nil {
+			slog.ErrorContext(ctx, "unexpected error adding problem to contest", "error", addErr, "problem_id", pe.id)
+			return nil, apperror.NewInternal()
+		}
+	}
+
+	if err := uc.repo.Create(ctx, c); err != nil {
+		return nil, err
+	}
+
+	owner, err := uc.ownerProvider.GetDisplay(ctx, in.CurrentUser.ID)
+	if err != nil {
+		slog.ErrorContext(ctx, "failed to resolve owner display", "error", err, "user_id", in.CurrentUser.ID)
+		return nil, apperror.NewInternal()
+	}
+	if owner == nil {
+		owner = &UserDisplay{}
+	}
+
+	// Build problem display from already-resolved entries (order = insertion order).
+	problemDisplays := make([]ProblemDisplay, 0, len(problemEntries))
+	for i, pe := range problemEntries {
+		problemDisplays = append(problemDisplays, ProblemDisplay{
+			Slug:  pe.slug,
+			Title: pe.title,
+			Order: i + 1,
+		})
+	}
+
+	return buildOutput(c, group, owner, problemDisplays, now), nil
+}
+
+func deduplicateSlugs(slugs []string) []string {
+	seen := make(map[string]struct{}, len(slugs))
+	out := make([]string, 0, len(slugs))
+	for _, s := range slugs {
+		if _, ok := seen[s]; !ok {
+			seen[s] = struct{}{}
+			out = append(out, s)
+		}
+	}
+	return out
+}
+
+func buildOutput(c *domainContest.Contest, group *GroupInfo, owner *UserDisplay, problems []ProblemDisplay, now time.Time) *ContestOutput {
+	return &ContestOutput{
+		ID:                c.ID(),
+		Name:              c.Name().Value(),
+		Description:       c.Description(),
+		StartTime:         c.StartTime(),
+		EndTime:           c.EndTime(),
+		Duration:          c.Duration(),
+		Penalty:           c.Penalty().Value(),
+		FreezeMinutes:     c.FreezeMinutes(),
+		EnablePostContest: c.EnablePostContest(),
+		Locked:            c.Locked(),
+		Group:             GroupDisplay{ID: group.ID, Name: group.Name},
+		Owner:             *owner,
+		Problems:          problems,
+		ProblemCount:      len(problems),
+		Status:            c.Status(now).String(),
+		CreatedAt:         c.CreatedAt(),
+		UpdatedAt:         c.UpdatedAt(),
+	}
+}

@@ -1,0 +1,144 @@
+package contest
+
+import (
+	"context"
+	"log/slog"
+
+	"github.com/jackc/pgx/v5/pgxpool"
+	infraPostgres "github.com/training-judge-center/backend/internal/adapter/postgres"
+	appContest "github.com/training-judge-center/backend/internal/application/contest"
+	"github.com/training-judge-center/backend/pkg/apperror"
+)
+
+type ProblemProvider struct {
+	db *pgxpool.Pool
+}
+
+func NewProblemProvider(db *pgxpool.Pool) *ProblemProvider {
+	return &ProblemProvider{db: db}
+}
+
+// FindBySlugs loads problems by slug and resolves CanAdd for the given caller.
+// CanAdd = PUBLIC || isAdmin || (callerID = author_id) || callerID in problem_modifiers.
+func (p *ProblemProvider) FindBySlugs(ctx context.Context, slugs []string, callerID string, isAdmin bool) (map[string]*appContest.ProblemInfo, error) {
+	if len(slugs) == 0 {
+		return map[string]*appContest.ProblemInfo{}, nil
+	}
+	q := infraPostgres.GetQuerier(ctx, p.db)
+
+	// Build slug placeholders: $1, $2, ...
+	args := make([]interface{}, 0, len(slugs)+2)
+	for _, s := range slugs {
+		args = append(args, s)
+	}
+	args = append(args, callerID, isAdmin)
+
+	placeholder := ""
+	for i := range slugs {
+		if i > 0 {
+			placeholder += ","
+		}
+		placeholder += "$" + itoa(i+1)
+	}
+	callerPos := itoa(len(slugs) + 1)
+	adminPos := itoa(len(slugs) + 2)
+
+	query := `
+		SELECT p.id, p.slug, p.title, p.status,
+		       p.accessibility,
+		       (` + adminPos + `::boolean
+		        OR p.accessibility = 'PUBLIC'
+		        OR p.author_id = ` + callerPos + `::uuid
+		        OR EXISTS(
+		            SELECT 1 FROM problem_modifiers pm
+		            WHERE pm.problem_id = p.id AND pm.user_id = ` + callerPos + `::uuid
+		        )) AS can_add
+		FROM problems p
+		WHERE p.slug IN (` + placeholder + `)`
+
+	rows, err := q.Query(ctx, query, args...)
+	if err != nil {
+		slog.ErrorContext(ctx, "FindBySlugs query failed", "error", err)
+		return nil, apperror.NewInternal()
+	}
+	defer rows.Close()
+
+	result := make(map[string]*appContest.ProblemInfo, len(slugs))
+	for rows.Next() {
+		var id, slug, title, status, accessibility string
+		var canAdd bool
+		if err := rows.Scan(&id, &slug, &title, &status, &accessibility, &canAdd); err != nil {
+			slog.ErrorContext(ctx, "failed to scan problem row", "error", err)
+			return nil, apperror.NewInternal()
+		}
+		result[slug] = &appContest.ProblemInfo{
+			ID:          id,
+			Slug:        slug,
+			Title:       title,
+			IsPublished: status == "PUBLISHED",
+			CanAdd:      canAdd,
+		}
+	}
+	if err := rows.Err(); err != nil {
+		slog.ErrorContext(ctx, "FindBySlugs rows error", "error", err)
+		return nil, apperror.NewInternal()
+	}
+	return result, nil
+}
+
+// FindByIDs loads basic problem info (id, slug, title) by problem UUID.
+func (p *ProblemProvider) FindByIDs(ctx context.Context, ids []string) (map[string]*appContest.ProblemBasicInfo, error) {
+	if len(ids) == 0 {
+		return map[string]*appContest.ProblemBasicInfo{}, nil
+	}
+	q := infraPostgres.GetQuerier(ctx, p.db)
+
+	args := make([]interface{}, len(ids))
+	placeholder := ""
+	for i, id := range ids {
+		args[i] = id
+		if i > 0 {
+			placeholder += ","
+		}
+		placeholder += "$" + itoa(i+1)
+	}
+
+	rows, err := q.Query(ctx, `SELECT id, slug, title FROM problems WHERE id IN (`+placeholder+`)`, args...)
+	if err != nil {
+		slog.ErrorContext(ctx, "FindByIDs query failed", "error", err)
+		return nil, apperror.NewInternal()
+	}
+	defer rows.Close()
+
+	result := make(map[string]*appContest.ProblemBasicInfo, len(ids))
+	for rows.Next() {
+		var id, slug, title string
+		if err := rows.Scan(&id, &slug, &title); err != nil {
+			slog.ErrorContext(ctx, "failed to scan problem basic info", "error", err)
+			return nil, apperror.NewInternal()
+		}
+		result[id] = &appContest.ProblemBasicInfo{ID: id, Slug: slug, Title: title}
+	}
+	if err := rows.Err(); err != nil {
+		slog.ErrorContext(ctx, "FindByIDs rows error", "error", err)
+		return nil, apperror.NewInternal()
+	}
+	return result, nil
+}
+
+func itoa(n int) string {
+	const digits = "0123456789"
+	if n < 10 {
+		return string(digits[n])
+	}
+	var buf [20]byte
+	pos := len(buf)
+	for n >= 10 {
+		pos--
+		buf[pos] = digits[n%10]
+		n /= 10
+	}
+	pos--
+	buf[pos] = digits[n]
+	return string(buf[pos:])
+}
