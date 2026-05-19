@@ -21,8 +21,8 @@ func NewGroupProvider(db infraPostgres.Querier) *GroupProvider {
 
 func (p *GroupProvider) FindByID(ctx context.Context, groupID string) (*appContest.GroupInfo, error) {
 	q := infraPostgres.GetQuerier(ctx, p.db)
-	var id, name string
-	err := q.QueryRow(ctx, `SELECT id, name FROM groups WHERE id=$1`, groupID).Scan(&id, &name)
+	var id, name, visibility string
+	err := q.QueryRow(ctx, `SELECT id, name, visibility FROM groups WHERE id=$1`, groupID).Scan(&id, &name, &visibility)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, nil
@@ -30,5 +30,5 @@ func (p *GroupProvider) FindByID(ctx context.Context, groupID string) (*appConte
 		slog.ErrorContext(ctx, "failed to find group for contest", "error", err, "group_id", groupID)
 		return nil, apperror.NewInternal()
 	}
-	return &appContest.GroupInfo{ID: id, Name: name}, nil
+	return &appContest.GroupInfo{ID: id, Name: name, IsVisible: visibility == "VISIBLE"}, nil
 }

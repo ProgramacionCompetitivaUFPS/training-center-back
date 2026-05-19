@@ -30,3 +30,18 @@ func (p *GroupMemberProvider) IsLeadOfGroup(ctx context.Context, userID, groupID
 	}
 	return exists, nil
 }
+
+func (p *GroupMemberProvider) IsMemberOfGroup(ctx context.Context, userID, groupID string) (bool, error) {
+	q := infraPostgres.GetQuerier(ctx, p.db)
+	var exists bool
+	err := q.QueryRow(ctx, `
+		SELECT EXISTS(
+			SELECT 1 FROM group_members
+			WHERE group_id=$1 AND user_id=$2
+		)`, groupID, userID).Scan(&exists)
+	if err != nil {
+		slog.ErrorContext(ctx, "failed to check group membership", "error", err, "user_id", userID, "group_id", groupID)
+		return false, apperror.NewInternal()
+	}
+	return exists, nil
+}

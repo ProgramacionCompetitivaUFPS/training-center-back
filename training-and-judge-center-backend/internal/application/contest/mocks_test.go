@@ -87,10 +87,15 @@ func (m *mockGroupProvider) FindByID(ctx context.Context, groupID string) (*Grou
 	if m.findByIDFn != nil {
 		return m.findByIDFn(ctx, groupID)
 	}
-	return &GroupInfo{ID: groupID, Name: "Test Group"}, nil
+	return &GroupInfo{ID: groupID, Name: "Test Group", IsVisible: true}, nil
 }
 
 func groupFound() *mockGroupProvider { return &mockGroupProvider{} }
+func groupFoundNotVisible() *mockGroupProvider {
+	return &mockGroupProvider{findByIDFn: func(_ context.Context, id string) (*GroupInfo, error) {
+		return &GroupInfo{ID: id, Name: "Hidden Group", IsVisible: false}, nil
+	}}
+}
 func groupNotFound() *mockGroupProvider {
 	return &mockGroupProvider{findByIDFn: func(_ context.Context, _ string) (*GroupInfo, error) {
 		return nil, nil
@@ -100,7 +105,8 @@ func groupNotFound() *mockGroupProvider {
 // ── GroupMemberProvider mock ─────────────────────────────────────────────────
 
 type mockGroupMemberProvider struct {
-	isLeadFn func(ctx context.Context, userID, groupID string) (bool, error)
+	isLeadFn   func(ctx context.Context, userID, groupID string) (bool, error)
+	isMemberFn func(ctx context.Context, userID, groupID string) (bool, error)
 }
 
 func (m *mockGroupMemberProvider) IsLeadOfGroup(ctx context.Context, userID, groupID string) (bool, error) {
@@ -110,18 +116,38 @@ func (m *mockGroupMemberProvider) IsLeadOfGroup(ctx context.Context, userID, gro
 	return false, nil
 }
 
+func (m *mockGroupMemberProvider) IsMemberOfGroup(ctx context.Context, userID, groupID string) (bool, error) {
+	if m.isMemberFn != nil {
+		return m.isMemberFn(ctx, userID, groupID)
+	}
+	return false, nil
+}
+
 func isLead() *mockGroupMemberProvider {
-	return &mockGroupMemberProvider{isLeadFn: func(_ context.Context, _, _ string) (bool, error) { return true, nil }}
+	return &mockGroupMemberProvider{
+		isLeadFn:   func(_ context.Context, _, _ string) (bool, error) { return true, nil },
+		isMemberFn: func(_ context.Context, _, _ string) (bool, error) { return true, nil },
+	}
 }
 func notLead() *mockGroupMemberProvider {
-	return &mockGroupMemberProvider{isLeadFn: func(_ context.Context, _, _ string) (bool, error) { return false, nil }}
+	return &mockGroupMemberProvider{
+		isLeadFn:   func(_ context.Context, _, _ string) (bool, error) { return false, nil },
+		isMemberFn: func(_ context.Context, _, _ string) (bool, error) { return false, nil },
+	}
+}
+func isMemberNotLead() *mockGroupMemberProvider {
+	return &mockGroupMemberProvider{
+		isLeadFn:   func(_ context.Context, _, _ string) (bool, error) { return false, nil },
+		isMemberFn: func(_ context.Context, _, _ string) (bool, error) { return true, nil },
+	}
 }
 
 // ── ProblemProvider mock ─────────────────────────────────────────────────────
 
 type mockProblemProvider struct {
-	findBySlugsFn func(ctx context.Context, slugs []string, callerID string, isAdmin bool) (map[string]*ProblemInfo, error)
-	findByIDsFn   func(ctx context.Context, ids []string) (map[string]*ProblemBasicInfo, error)
+	findBySlugsFn        func(ctx context.Context, slugs []string, callerID string, isAdmin bool) (map[string]*ProblemInfo, error)
+	findByIDsFn          func(ctx context.Context, ids []string) (map[string]*ProblemBasicInfo, error)
+	findByIDsWithLimitsFn func(ctx context.Context, ids []string) (map[string]*ProblemWithLimits, error)
 }
 
 func (m *mockProblemProvider) FindBySlugs(ctx context.Context, slugs []string, callerID string, isAdmin bool) (map[string]*ProblemInfo, error) {
@@ -146,7 +172,41 @@ func (m *mockProblemProvider) FindByIDs(ctx context.Context, ids []string) (map[
 	return result, nil
 }
 
+func (m *mockProblemProvider) FindByIDsWithLimits(ctx context.Context, ids []string) (map[string]*ProblemWithLimits, error) {
+	if m.findByIDsWithLimitsFn != nil {
+		return m.findByIDsWithLimitsFn(ctx, ids)
+	}
+	result := make(map[string]*ProblemWithLimits, len(ids))
+	for _, id := range ids {
+		result[id] = &ProblemWithLimits{ID: id, Slug: "slug-" + id, Title: "title-" + id, TimeLimit: 1000, MemoryLimit: 256}
+	}
+	return result, nil
+}
+
 func defaultProblemProvider() *mockProblemProvider { return &mockProblemProvider{} }
+
+// ── ContestParticipantProvider mock ──────────────────────────────────────────
+
+type mockContestParticipantProvider struct {
+	isRegisteredFn      func(ctx context.Context, contestID, userID string) (bool, error)
+	countParticipantsFn func(ctx context.Context, contestID string) (int, error)
+}
+
+func (m *mockContestParticipantProvider) IsRegistered(ctx context.Context, contestID, userID string) (bool, error) {
+	if m.isRegisteredFn != nil {
+		return m.isRegisteredFn(ctx, contestID, userID)
+	}
+	return false, nil
+}
+
+func (m *mockContestParticipantProvider) CountParticipants(ctx context.Context, contestID string) (int, error) {
+	if m.countParticipantsFn != nil {
+		return m.countParticipantsFn(ctx, contestID)
+	}
+	return 0, nil
+}
+
+func mockParticipants() *mockContestParticipantProvider { return &mockContestParticipantProvider{} }
 
 // ── OwnerProvider mock ───────────────────────────────────────────────────────
 

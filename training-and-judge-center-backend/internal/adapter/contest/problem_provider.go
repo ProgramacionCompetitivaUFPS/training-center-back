@@ -84,6 +84,53 @@ func (p *ProblemProvider) FindBySlugs(ctx context.Context, slugs []string, calle
 	return result, nil
 }
 
+// FindByIDsWithLimits loads problem info including time_limit and memory_limit.
+func (p *ProblemProvider) FindByIDsWithLimits(ctx context.Context, ids []string) (map[string]*appContest.ProblemWithLimits, error) {
+	if len(ids) == 0 {
+		return map[string]*appContest.ProblemWithLimits{}, nil
+	}
+	q := infraPostgres.GetQuerier(ctx, p.db)
+
+	args := make([]interface{}, len(ids))
+	placeholder := ""
+	for i, id := range ids {
+		args[i] = id
+		if i > 0 {
+			placeholder += ","
+		}
+		placeholder += "$" + strconv.Itoa(i+1)
+	}
+
+	rows, err := q.Query(ctx, `SELECT id, slug, title, time_limit, memory_limit FROM problems WHERE id IN (`+placeholder+`)`, args...)
+	if err != nil {
+		slog.ErrorContext(ctx, "FindByIDsWithLimits query failed", "error", err)
+		return nil, apperror.NewInternal()
+	}
+	defer rows.Close()
+
+	result := make(map[string]*appContest.ProblemWithLimits, len(ids))
+	for rows.Next() {
+		var id, slug, title string
+		var timeLimit, memoryLimit int
+		if err := rows.Scan(&id, &slug, &title, &timeLimit, &memoryLimit); err != nil {
+			slog.ErrorContext(ctx, "failed to scan problem with limits", "error", err)
+			return nil, apperror.NewInternal()
+		}
+		result[id] = &appContest.ProblemWithLimits{
+			ID:          id,
+			Slug:        slug,
+			Title:       title,
+			TimeLimit:   timeLimit,
+			MemoryLimit: memoryLimit,
+		}
+	}
+	if err := rows.Err(); err != nil {
+		slog.ErrorContext(ctx, "FindByIDsWithLimits rows error", "error", err)
+		return nil, apperror.NewInternal()
+	}
+	return result, nil
+}
+
 // FindByIDs loads basic problem info (id, slug, title) by problem UUID.
 func (p *ProblemProvider) FindByIDs(ctx context.Context, ids []string) (map[string]*appContest.ProblemBasicInfo, error) {
 	if len(ids) == 0 {

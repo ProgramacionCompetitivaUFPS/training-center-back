@@ -3,8 +3,9 @@ package contest
 import "context"
 
 type GroupInfo struct {
-	ID   string
-	Name string
+	ID        string
+	Name      string
+	IsVisible bool
 }
 
 type GroupProvider interface {

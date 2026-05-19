@@ -17,11 +17,11 @@ func newHandlerWithCreate(uc *appcontest.CreateContestUseCase) *Handler {
 
 func defaultCreateUC() *appcontest.CreateContestUseCase {
 	return appcontest.NewCreateContestUseCase(
-		&stubContestRepo{},
-		&stubGroupProvider{},
-		&stubMemberProvider{isLead: true},
-		&stubProblemProvider{},
-		&stubOwnerProvider{},
+		&mockContestRepo{},
+		&mockGroupProvider{},
+		&mockMemberProvider{isLead: true, isMember: true},
+		&mockProblemProvider{},
+		&mockOwnerProvider{},
 	)
 }
 
@@ -98,11 +98,11 @@ func TestCreateContest_ValidRequest_Returns201(t *testing.T) {
 
 func TestCreateContest_ForbiddenIfNotLead_Returns403(t *testing.T) {
 	uc := appcontest.NewCreateContestUseCase(
-		&stubContestRepo{},
-		&stubGroupProvider{},
-		&stubMemberProvider{isLead: false},
-		&stubProblemProvider{},
-		&stubOwnerProvider{},
+		&mockContestRepo{},
+		&mockGroupProvider{},
+		&mockMemberProvider{isLead: false, isMember: false},
+		&mockProblemProvider{},
+		&mockOwnerProvider{},
 	)
 	h := newHandlerWithCreate(uc)
 

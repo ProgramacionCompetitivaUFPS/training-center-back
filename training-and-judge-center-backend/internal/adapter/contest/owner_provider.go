@@ -30,5 +30,5 @@ func (p *OwnerProvider) GetDisplay(ctx context.Context, userID string) (*appCont
 		slog.ErrorContext(ctx, "failed to get owner display", "error", err, "user_id", userID)
 		return nil, apperror.NewInternal()
 	}
-	return &appContest.UserDisplay{Nickname: nickname, Name: name}, nil
+	return &appContest.UserDisplay{ID: userID, Nickname: nickname, Name: name}, nil
 }

@@ -59,3 +59,4 @@ func buildOutput(c *domainContest.Contest, group *GroupInfo, owner *UserDisplay,
 	}
 }
 
+

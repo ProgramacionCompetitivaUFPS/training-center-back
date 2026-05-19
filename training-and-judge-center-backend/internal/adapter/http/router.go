@@ -75,6 +75,8 @@ func NewRouter(h *Handlers, s *Services, allowedOrigins []string) *chi.Mux {
 
 			r.Route("/{groupId}/contests", func(r chi.Router) {
 				r.Post("/", h.Contest.Create)
+				r.Get("/", h.Contest.List)
+				r.Get("/{contestId}", h.Contest.Get)
 				r.Put("/{contestId}", h.Contest.Update)
 			})
 

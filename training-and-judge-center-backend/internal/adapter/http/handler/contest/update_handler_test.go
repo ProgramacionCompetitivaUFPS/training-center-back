@@ -47,11 +47,11 @@ func (s *stubUpdateRepo) List(_ context.Context, _ domainContest.ListFilters) ([
 func defaultUpdateUC() *appcontest.UpdateContestUseCase {
 	return appcontest.NewUpdateContestUseCase(
 		&stubUpdateRepo{},
-		&stubGroupProvider{},
-		&stubMemberProvider{isLead: true},
-		&stubProblemProvider{},
-		&stubOwnerProvider{},
-		&stubTransactionManager{},
+		&mockGroupProvider{},
+		&mockMemberProvider{isLead: true, isMember: true},
+		&mockProblemProvider{},
+		&mockOwnerProvider{},
+		&mockTransactionManager{},
 	)
 }
 
@@ -128,12 +128,12 @@ func TestUpdateContest_ValidRequest_Returns200(t *testing.T) {
 
 func TestUpdateContest_ContestNotFound_Returns404(t *testing.T) {
 	uc := appcontest.NewUpdateContestUseCase(
-		&stubContestRepo{}, // FindByID returns 404 by default
-		&stubGroupProvider{},
-		&stubMemberProvider{isLead: true},
-		&stubProblemProvider{},
-		&stubOwnerProvider{},
-		&stubTransactionManager{},
+		&mockContestRepo{}, // FindByID returns 404 by default
+		&mockGroupProvider{},
+		&mockMemberProvider{isLead: true, isMember: true},
+		&mockProblemProvider{},
+		&mockOwnerProvider{},
+		&mockTransactionManager{},
 	)
 	h := newHandlerWithUpdate(uc)
 
