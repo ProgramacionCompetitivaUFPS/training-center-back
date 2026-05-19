@@ -163,6 +163,92 @@ func (c *Contest) RemoveProblem(problemID string, now time.Time) bool {
 	return true
 }
 
+// Update applies optional field changes and validates time constraints.
+// Pointer-nil means "do not change". description is **string so the caller can
+// pass nil (no change) vs a pointer to nil (clear the description).
+func (c *Contest) Update(
+	name *ContestName,
+	description **string,
+	startTime, endTime *time.Time,
+	penalty *Penalty,
+	freezeMinutes *int,
+	enablePostContest *bool,
+	now time.Time,
+) error {
+	t := now.UTC()
+
+	effStart := c.startTime
+	effEnd := c.endTime
+	if startTime != nil {
+		if !startTime.UTC().After(t) {
+			return apperror.NewBadRequest(ErrCodeStartTimeInPast, "start time must be in the future")
+		}
+		effStart = startTime.UTC()
+	}
+
+	if endTime != nil {
+		if !endTime.UTC().After(t) {
+			return apperror.NewBadRequest(ErrCodeEndTimeInPast, "end time must be in the future")
+		}
+		effEnd = endTime.UTC()
+	}
+	if (startTime != nil || endTime != nil) && !effEnd.After(effStart) {
+		return apperror.NewBadRequest(ErrCodeInvalidTimeRange, "end time must be after start time")
+	}
+
+	if freezeMinutes != nil {
+		if err := validateFreezeMinutes(*freezeMinutes); err != nil {
+			return err
+		}
+	}
+	if description != nil {
+		if err := validateDescription(*description); err != nil {
+			return err
+		}
+	}
+
+	if name != nil {
+		c.name = *name
+	}
+	if description != nil {
+		c.description = *description
+	}
+	if startTime != nil {
+		c.startTime = startTime.UTC()
+	}
+	if endTime != nil {
+		c.endTime = endTime.UTC()
+	}
+	if penalty != nil {
+		c.penalty = *penalty
+	}
+	if freezeMinutes != nil {
+		c.freezeMinutes = *freezeMinutes
+	}
+	if enablePostContest != nil {
+		c.enablePostContest = *enablePostContest
+	}
+	c.updatedAt = &t
+	return nil
+}
+
+// SetLocked sets the locked flag and touches updatedAt.
+func (c *Contest) SetLocked(locked bool, now time.Time) {
+	c.locked = locked
+	t := now.UTC()
+	c.updatedAt = &t
+}
+
+// SetProblems replaces the entire problem list atomically.
+func (c *Contest) SetProblems(problems []ContestProblem, now time.Time) {
+	if problems == nil {
+		problems = []ContestProblem{}
+	}
+	c.problems = problems
+	t := now.UTC()
+	c.updatedAt = &t
+}
+
 func (c *Contest) ID() string                 { return c.id }
 func (c *Contest) Name() ContestName          { return c.name }
 func (c *Contest) Description() *string       { return c.description }

@@ -19,9 +19,12 @@ import (
 	"github.com/redis/go-redis/v9"
 	"github.com/training-judge-center/backend/internal/adapter/auth"
 	platformConfig "github.com/training-judge-center/backend/internal/adapter/config"
+	adaptercontest "github.com/training-judge-center/backend/internal/adapter/contest"
 	"github.com/training-judge-center/backend/internal/adapter/email"
 	"github.com/training-judge-center/backend/internal/adapter/group"
+	adapterhttp "github.com/training-judge-center/backend/internal/adapter/http"
 	"github.com/training-judge-center/backend/internal/adapter/http/handler"
+	handlercontest "github.com/training-judge-center/backend/internal/adapter/http/handler/contest"
 	handlerGroup "github.com/training-judge-center/backend/internal/adapter/http/handler/group"
 	handlerMaterial "github.com/training-judge-center/backend/internal/adapter/http/handler/material"
 	handlerProblem "github.com/training-judge-center/backend/internal/adapter/http/handler/problem"
@@ -32,12 +35,12 @@ import (
 	"github.com/training-judge-center/backend/internal/adapter/ratelimit"
 	"github.com/training-judge-center/backend/internal/adapter/user"
 
+	appcontest "github.com/training-judge-center/backend/internal/application/contest"
 	appGroup "github.com/training-judge-center/backend/internal/application/group"
 	appMaterial "github.com/training-judge-center/backend/internal/application/material"
 	appProblem "github.com/training-judge-center/backend/internal/application/problem"
 	appuser "github.com/training-judge-center/backend/internal/application/user"
 	"github.com/training-judge-center/backend/internal/config"
-	adapterhttp "github.com/training-judge-center/backend/internal/adapter/http"
 )
 
 func main() {
@@ -243,12 +246,32 @@ func main() {
 		deleteMaterialUC,
 	)
 
+	// contest adapters
+	contestRepo            := adaptercontest.NewRepository(dbPool)
+	contestGroupProvider   := adaptercontest.NewGroupProvider(dbPool)
+	contestMemberProvider  := adaptercontest.NewGroupMemberProvider(dbPool)
+	contestProblemProvider := adaptercontest.NewProblemProvider(dbPool)
+	contestOwnerProvider   := adaptercontest.NewOwnerProvider(dbPool)
+	contestTxManager       := postgres.NewPostgresTransactionManager(dbPool)
+
+	// contest use cases
+	createContestUseCase := appcontest.NewCreateContestUseCase(
+		contestRepo, contestGroupProvider, contestMemberProvider,
+		contestProblemProvider, contestOwnerProvider,
+	)
+	updateContestUseCase := appcontest.NewUpdateContestUseCase(
+		contestRepo, contestGroupProvider, contestMemberProvider,
+		contestProblemProvider, contestOwnerProvider, contestTxManager,
+	)
+	contestHandler := handlercontest.NewHandler(createContestUseCase, updateContestUseCase)
+
 	router := adapterhttp.NewRouter(&adapterhttp.Handlers{
 		Problem:  problemHandler,
 		User:     userHandler,
 		Auth:     authHandler,
 		Group:    groupHandler,
 		Material: materialHandler,
+		Contest:  contestHandler,
 	}, &adapterhttp.Services{
 		TokenService:       jwtService,
 		SessionInvalidator: sessionInvalidator,
