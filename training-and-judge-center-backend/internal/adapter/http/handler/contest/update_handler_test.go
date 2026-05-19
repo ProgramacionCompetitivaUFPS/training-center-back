@@ -51,12 +51,13 @@ func defaultUpdateUC() *appcontest.UpdateContestUseCase {
 		&stubMemberProvider{isLead: true},
 		&stubProblemProvider{},
 		&stubOwnerProvider{},
+		&stubTransactionManager{},
 	)
 }
 
 func TestUpdateContest_Unauthenticated_Returns401(t *testing.T) {
 	h := newHandlerWithUpdate(defaultUpdateUC())
-	r := httptest.NewRequest(http.MethodPatch, "/groups/g1/contests/c1", nil)
+	r := httptest.NewRequest(http.MethodPut, "/groups/g1/contests/c1", nil)
 	r.SetPathValue("groupId", "g1")
 	r.SetPathValue("contestId", "c1")
 	w := httptest.NewRecorder()
@@ -70,7 +71,7 @@ func TestUpdateContest_Unauthenticated_Returns401(t *testing.T) {
 
 func TestUpdateContest_MissingPathParams_Returns400(t *testing.T) {
 	h := newHandlerWithUpdate(defaultUpdateUC())
-	r := authedRequest(http.MethodPatch, "/groups//contests/", nil)
+	r := authedRequest(http.MethodPut, "/groups//contests/", nil)
 	w := httptest.NewRecorder()
 
 	wrapAuth(http.HandlerFunc(h.Update)).ServeHTTP(w, r)
@@ -82,7 +83,7 @@ func TestUpdateContest_MissingPathParams_Returns400(t *testing.T) {
 
 func TestUpdateContest_InvalidBody_Returns400(t *testing.T) {
 	h := newHandlerWithUpdate(defaultUpdateUC())
-	r := authedRequest(http.MethodPatch, "/groups/g1/contests/c1", []byte("not-json"))
+	r := authedRequest(http.MethodPut, "/groups/g1/contests/c1", []byte("not-json"))
 	r.SetPathValue("groupId", "g1")
 	r.SetPathValue("contestId", "c1")
 	w := httptest.NewRecorder()
@@ -106,7 +107,7 @@ func TestUpdateContest_ValidRequest_Returns200(t *testing.T) {
 
 	newName := "Updated Name"
 	body, _ := json.Marshal(map[string]interface{}{"name": newName})
-	r := authedRequest(http.MethodPatch, "/groups/g1/contests/c1", body)
+	r := authedRequest(http.MethodPut, "/groups/g1/contests/c1", body)
 	r.SetPathValue("groupId", "g1")
 	r.SetPathValue("contestId", "c1")
 	w := httptest.NewRecorder()
@@ -132,11 +133,12 @@ func TestUpdateContest_ContestNotFound_Returns404(t *testing.T) {
 		&stubMemberProvider{isLead: true},
 		&stubProblemProvider{},
 		&stubOwnerProvider{},
+		&stubTransactionManager{},
 	)
 	h := newHandlerWithUpdate(uc)
 
 	body, _ := json.Marshal(map[string]interface{}{"name": "x"})
-	r := authedRequest(http.MethodPatch, "/groups/g1/contests/missing", body)
+	r := authedRequest(http.MethodPut, "/groups/g1/contests/missing", body)
 	r.SetPathValue("groupId", "g1")
 	r.SetPathValue("contestId", "missing")
 	w := httptest.NewRecorder()

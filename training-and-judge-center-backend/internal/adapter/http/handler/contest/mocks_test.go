@@ -7,10 +7,10 @@ import (
 	"net/http/httptest"
 
 	appcontest "github.com/training-judge-center/backend/internal/application/contest"
+	"github.com/training-judge-center/backend/internal/adapter/http/middleware"
 	domainContest "github.com/training-judge-center/backend/internal/domain/contest"
 	"github.com/training-judge-center/backend/internal/domain/shared"
 	domainUser "github.com/training-judge-center/backend/internal/domain/user"
-	"github.com/training-judge-center/backend/internal/adapter/http/middleware"
 	"github.com/training-judge-center/backend/pkg/apperror"
 )
 
@@ -93,4 +93,10 @@ type stubOwnerProvider struct{}
 
 func (s *stubOwnerProvider) GetDisplay(_ context.Context, _ string) (*appcontest.UserDisplay, error) {
 	return &appcontest.UserDisplay{Nickname: "coach", Name: "Coach"}, nil
+}
+
+type stubTransactionManager struct{}
+
+func (s *stubTransactionManager) WithTx(_ context.Context, fn func(context.Context) error) error {
+	return fn(context.Background())
 }

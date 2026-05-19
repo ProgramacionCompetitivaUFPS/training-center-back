@@ -178,6 +178,7 @@ func (c *Contest) Update(
 	t := now.UTC()
 
 	effStart := c.startTime
+	effEnd := c.endTime
 	if startTime != nil {
 		if !startTime.UTC().After(t) {
 			return apperror.NewBadRequest(ErrCodeStartTimeInPast, "start time must be in the future")
@@ -189,13 +190,19 @@ func (c *Contest) Update(
 		if !endTime.UTC().After(t) {
 			return apperror.NewBadRequest(ErrCodeEndTimeInPast, "end time must be in the future")
 		}
-		if !endTime.UTC().After(effStart) {
-			return apperror.NewBadRequest(ErrCodeInvalidTimeRange, "end time must be after start time")
-		}
+		effEnd = endTime.UTC()
+	}
+	if (startTime != nil || endTime != nil) && !effEnd.After(effStart) {
+		return apperror.NewBadRequest(ErrCodeInvalidTimeRange, "end time must be after start time")
 	}
 
 	if freezeMinutes != nil {
 		if err := validateFreezeMinutes(*freezeMinutes); err != nil {
+			return err
+		}
+	}
+	if description != nil {
+		if err := validateDescription(*description); err != nil {
 			return err
 		}
 	}

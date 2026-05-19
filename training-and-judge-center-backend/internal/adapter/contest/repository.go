@@ -65,7 +65,7 @@ func (r *Repository) Update(ctx context.Context, c *domainContest.Contest) error
 		return apperror.NewInternal()
 	}
 	if tag.RowsAffected() == 0 {
-		return apperror.NewConflict(domainContest.ErrCodeContestConflict, "contest was modified by another request")
+		return apperror.NewNotFound(domainContest.ErrCodeContestNotFound, "contest not found")
 	}
 
 	// Replace contest_problems: delete all then reinsert.

@@ -58,9 +58,9 @@ func (h *Handler) Update(w http.ResponseWriter, r *http.Request) {
 		Locked:            body.Locked,
 	}
 
-	// description: pass **string so the use case can distinguish no-change vs clear.
-	if body.Description != nil {
-		in.Description = &body.Description
+	// description: three-state — omitted=no-op, null=clear, string=set.
+	if body.Description.Present {
+		in.Description = &body.Description.Value
 	}
 
 	if body.Problems != nil {

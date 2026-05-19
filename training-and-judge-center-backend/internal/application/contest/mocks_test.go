@@ -191,3 +191,16 @@ func repoWith(c *domainContest.Contest) *mockContestRepository {
 		},
 	}
 }
+
+// ── TransactionManager mock ──────────────────────────────────────────────────
+
+type mockTransactionManager struct {
+	withTxFn func(ctx context.Context, fn func(txCtx context.Context) error) error
+}
+
+func (m *mockTransactionManager) WithTx(ctx context.Context, fn func(txCtx context.Context) error) error {
+	if m.withTxFn != nil {
+		return m.withTxFn(ctx, fn)
+	}
+	return fn(ctx)
+}

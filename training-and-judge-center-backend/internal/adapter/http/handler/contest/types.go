@@ -1,6 +1,32 @@
 package contest
 
-import "time"
+import (
+	"encoding/json"
+	"time"
+)
+
+// nullableString distinguishes three JSON states for a string field:
+//   - key omitted  → Present=false
+//   - key: null    → Present=true, Value=nil
+//   - key: "text"  → Present=true, Value=&"text"
+type nullableString struct {
+	Present bool
+	Value   *string
+}
+
+func (n *nullableString) UnmarshalJSON(data []byte) error {
+	n.Present = true
+	if string(data) == "null" {
+		n.Value = nil
+		return nil
+	}
+	var s string
+	if err := json.Unmarshal(data, &s); err != nil {
+		return err
+	}
+	n.Value = &s
+	return nil
+}
 
 // ── Request types ────────────────────────────────────────────────────────────
 
@@ -22,7 +48,7 @@ type problemOrderRequest struct {
 
 type updateContestRequest struct {
 	Name              *string               `json:"name"`
-	Description       *string               `json:"description"`
+	Description       nullableString        `json:"description"`
 	StartTime         *time.Time            `json:"startTime"`
 	EndTime           *time.Time            `json:"endTime"`
 	Penalty           *int                  `json:"penalty"`

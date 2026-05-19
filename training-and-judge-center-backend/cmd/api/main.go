@@ -252,6 +252,7 @@ func main() {
 	contestMemberProvider  := adaptercontest.NewGroupMemberProvider(dbPool)
 	contestProblemProvider := adaptercontest.NewProblemProvider(dbPool)
 	contestOwnerProvider   := adaptercontest.NewOwnerProvider(dbPool)
+	contestTxManager       := postgres.NewPostgresTransactionManager(dbPool)
 
 	// contest use cases
 	createContestUseCase := appcontest.NewCreateContestUseCase(
@@ -260,7 +261,7 @@ func main() {
 	)
 	updateContestUseCase := appcontest.NewUpdateContestUseCase(
 		contestRepo, contestGroupProvider, contestMemberProvider,
-		contestProblemProvider, contestOwnerProvider,
+		contestProblemProvider, contestOwnerProvider, contestTxManager,
 	)
 	contestHandler := handlercontest.NewHandler(createContestUseCase, updateContestUseCase)
 

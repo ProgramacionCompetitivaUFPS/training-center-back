@@ -2,6 +2,7 @@ package contest
 
 import (
 	"context"
+	"log/slog"
 	"time"
 
 	"github.com/google/uuid"
@@ -40,6 +41,7 @@ type UpdateContestUseCase struct {
 	memberProvider  GroupMemberProvider
 	problemProvider ProblemProvider
 	ownerProvider   OwnerProvider
+	txManager       appshared.TransactionManager
 }
 
 func NewUpdateContestUseCase(
@@ -48,6 +50,7 @@ func NewUpdateContestUseCase(
 	memberProvider GroupMemberProvider,
 	problemProvider ProblemProvider,
 	ownerProvider OwnerProvider,
+	txManager appshared.TransactionManager,
 ) *UpdateContestUseCase {
 	return &UpdateContestUseCase{
 		repo:            repo,
@@ -55,6 +58,7 @@ func NewUpdateContestUseCase(
 		memberProvider:  memberProvider,
 		problemProvider: problemProvider,
 		ownerProvider:   ownerProvider,
+		txManager:       txManager,
 	}
 }
 
@@ -210,8 +214,11 @@ func (uc *UpdateContestUseCase) Execute(ctx context.Context, in UpdateContestInp
 		c.SetLocked(*in.Locked, now)
 	}
 
-	if err := uc.repo.Update(ctx, c); err != nil {
-		return nil, err
+	if err := uc.txManager.WithTx(ctx, func(txCtx context.Context) error {
+		return uc.repo.Update(txCtx, c)
+	}); err != nil {
+		slog.ErrorContext(ctx, "failed to persist contest update", "contest_id", c.ID(), "error", err)
+		return nil, apperror.NewInternal()
 	}
 
 	group, err := uc.groupProvider.FindByID(ctx, in.GroupID)
