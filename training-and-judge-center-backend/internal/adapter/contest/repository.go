@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"log/slog"
+	"strconv"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -142,19 +143,53 @@ func (r *Repository) Delete(ctx context.Context, id string) error {
 	return nil
 }
 
+// sortColumn maps domain SortField values to safe SQL column names.
+var sortColumn = map[domainContest.SortField]string{
+	domainContest.SortByName:      "name",
+	domainContest.SortByStartTime: "start_time",
+	domainContest.SortByCreatedAt: "created_at",
+}
+
 func (r *Repository) List(ctx context.Context, filters domainContest.ListFilters) ([]*domainContest.Contest, int, error) {
 	q := infraPostgres.GetQuerier(ctx, r.db)
 
-	rows, err := q.Query(ctx, `
-		SELECT id, name, description, start_time, end_time,
+	// Build WHERE clause.
+	where := "WHERE group_id=$1"
+	args := []interface{}{filters.GroupID.Value()}
+
+	if filters.Status != nil {
+		switch *filters.Status {
+		case domainContest.StatusScheduled:
+			where += " AND start_time > NOW()"
+		case domainContest.StatusActive:
+			where += " AND start_time <= NOW() AND end_time >= NOW()"
+		case domainContest.StatusFinished:
+			where += " AND end_time < NOW()"
+		}
+	}
+
+	// ORDER BY — whitelist prevents injection.
+	col, ok := sortColumn[filters.SortBy]
+	if !ok {
+		col = "start_time"
+	}
+	order := "DESC"
+	if filters.Order == domainContest.OrderAsc {
+		order = "ASC"
+	}
+
+	limitPos := len(args) + 1
+	offsetPos := len(args) + 2
+	args = append(args, filters.Limit, (filters.Page-1)*filters.Limit)
+
+	query := `SELECT id, name, description, start_time, end_time,
 		       penalty, freeze_minutes, enable_post_contest, locked,
 		       group_id, owner_id, created_at, updated_at
-		FROM contests
-		WHERE group_id=$1
-		ORDER BY start_time DESC
-		LIMIT $2 OFFSET $3`,
-		filters.GroupID.Value(), filters.Limit, (filters.Page-1)*filters.Limit,
-	)
+		FROM contests ` + where +
+		` ORDER BY ` + col + ` ` + order +
+		` LIMIT $` + strconv.Itoa(limitPos) + ` OFFSET $` + strconv.Itoa(offsetPos)
+
+	rows, err := q.Query(ctx, query, args...)
 	if err != nil {
 		slog.ErrorContext(ctx, "failed to list contests", "error", err)
 		return nil, 0, apperror.NewInternal()
@@ -201,7 +236,7 @@ func (r *Repository) List(ctx context.Context, filters domainContest.ListFilters
 	}
 
 	var total int
-	if err := q.QueryRow(ctx, `SELECT COUNT(*) FROM contests WHERE group_id=$1`, filters.GroupID.Value()).Scan(&total); err != nil {
+	if err := q.QueryRow(ctx, `SELECT COUNT(*) FROM contests `+where, args[:len(args)-2]...).Scan(&total); err != nil {
 		slog.ErrorContext(ctx, "failed to count contests", "error", err)
 		return nil, 0, apperror.NewInternal()
 	}

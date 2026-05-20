@@ -13,15 +13,21 @@ import (
 type Handler struct {
 	createContest *appContest.CreateContestUseCase
 	updateContest *appContest.UpdateContestUseCase
+	getContest    *appContest.GetContestUseCase
+	listContests  *appContest.ListContestsUseCase
 }
 
 func NewHandler(
 	createContest *appContest.CreateContestUseCase,
 	updateContest *appContest.UpdateContestUseCase,
+	getContest *appContest.GetContestUseCase,
+	listContests *appContest.ListContestsUseCase,
 ) *Handler {
 	return &Handler{
 		createContest: createContest,
 		updateContest: updateContest,
+		getContest:    getContest,
+		listContests:  listContests,
 	}
 }
 

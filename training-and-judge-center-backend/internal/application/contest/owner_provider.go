@@ -3,6 +3,7 @@ package contest
 import "context"
 
 type UserDisplay struct {
+	ID       string
 	Nickname string
 	Name     string
 }

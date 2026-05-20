@@ -39,49 +39,56 @@ func wrapAuth(h http.Handler) http.Handler {
 	return middleware.Auth(&mockTokenSvc{}, nil)(h)
 }
 
-// ── Stub dependencies ────────────────────────────────────────────────────────
+// ── Mock dependencies ────────────────────────────────────────────────────────
 
-type stubContestRepo struct {
+type mockContestRepo struct {
 	createFn func(ctx context.Context, c *domainContest.Contest) error
 }
 
-func (s *stubContestRepo) Create(ctx context.Context, c *domainContest.Contest) error {
+func (s *mockContestRepo) Create(ctx context.Context, c *domainContest.Contest) error {
 	if s.createFn != nil {
 		return s.createFn(ctx, c)
 	}
 	return nil
 }
-func (s *stubContestRepo) Update(_ context.Context, _ *domainContest.Contest) error { return nil }
-func (s *stubContestRepo) FindByID(_ context.Context, _ string) (*domainContest.Contest, error) {
+func (s *mockContestRepo) Update(_ context.Context, _ *domainContest.Contest) error { return nil }
+func (s *mockContestRepo) FindByID(_ context.Context, _ string) (*domainContest.Contest, error) {
 	return nil, apperror.NewNotFound(domainContest.ErrCodeContestNotFound, "not found")
 }
-func (s *stubContestRepo) Delete(_ context.Context, _ string) error { return nil }
-func (s *stubContestRepo) List(_ context.Context, _ domainContest.ListFilters) ([]*domainContest.Contest, int, error) {
+func (s *mockContestRepo) Delete(_ context.Context, _ string) error { return nil }
+func (s *mockContestRepo) List(_ context.Context, _ domainContest.ListFilters) ([]*domainContest.Contest, int, error) {
 	return nil, 0, nil
 }
 
-type stubGroupProvider struct{}
+type mockGroupProvider struct{}
 
-func (s *stubGroupProvider) FindByID(_ context.Context, groupID string) (*appcontest.GroupInfo, error) {
-	return &appcontest.GroupInfo{ID: groupID, Name: "Test Group"}, nil
+func (s *mockGroupProvider) FindByID(_ context.Context, groupID string) (*appcontest.GroupInfo, error) {
+	return &appcontest.GroupInfo{ID: groupID, Name: "Test Group", IsVisible: true}, nil
 }
 
-type stubMemberProvider struct{ isLead bool }
+type mockMemberProvider struct {
+	isLead   bool
+	isMember bool
+}
 
-func (s *stubMemberProvider) IsLeadOfGroup(_ context.Context, _, _ string) (bool, error) {
+func (s *mockMemberProvider) IsLeadOfGroup(_ context.Context, _, _ string) (bool, error) {
 	return s.isLead, nil
 }
 
-type stubProblemProvider struct{}
+func (s *mockMemberProvider) IsMemberOfGroup(_ context.Context, _, _ string) (bool, error) {
+	return s.isMember, nil
+}
 
-func (s *stubProblemProvider) FindBySlugs(_ context.Context, slugs []string, _ string, _ bool) (map[string]*appcontest.ProblemInfo, error) {
+type mockProblemProvider struct{}
+
+func (s *mockProblemProvider) FindBySlugs(_ context.Context, slugs []string, _ string, _ bool) (map[string]*appcontest.ProblemInfo, error) {
 	result := make(map[string]*appcontest.ProblemInfo, len(slugs))
 	for _, sl := range slugs {
 		result[sl] = &appcontest.ProblemInfo{ID: "p1", Slug: sl, Title: sl, IsPublished: true, CanAdd: true}
 	}
 	return result, nil
 }
-func (s *stubProblemProvider) FindByIDs(_ context.Context, ids []string) (map[string]*appcontest.ProblemBasicInfo, error) {
+func (s *mockProblemProvider) FindByIDs(_ context.Context, ids []string) (map[string]*appcontest.ProblemBasicInfo, error) {
 	result := make(map[string]*appcontest.ProblemBasicInfo, len(ids))
 	for _, id := range ids {
 		result[id] = &appcontest.ProblemBasicInfo{ID: id, Slug: "slug", Title: "title"}
@@ -89,14 +96,45 @@ func (s *stubProblemProvider) FindByIDs(_ context.Context, ids []string) (map[st
 	return result, nil
 }
 
-type stubOwnerProvider struct{}
-
-func (s *stubOwnerProvider) GetDisplay(_ context.Context, _ string) (*appcontest.UserDisplay, error) {
-	return &appcontest.UserDisplay{Nickname: "coach", Name: "Coach"}, nil
+func (s *mockProblemProvider) FindByIDsWithLimits(_ context.Context, ids []string) (map[string]*appcontest.ProblemWithLimits, error) {
+	result := make(map[string]*appcontest.ProblemWithLimits, len(ids))
+	for _, id := range ids {
+		result[id] = &appcontest.ProblemWithLimits{ID: id, Slug: "slug", Title: "title", TimeLimit: 1000, MemoryLimit: 256}
+	}
+	return result, nil
 }
 
-type stubTransactionManager struct{}
+type mockContestParticipantProvider struct{}
 
-func (s *stubTransactionManager) WithTx(_ context.Context, fn func(context.Context) error) error {
+func (s *mockContestParticipantProvider) IsRegistered(_ context.Context, _, _ string) (bool, error) {
+	return false, nil
+}
+func (s *mockContestParticipantProvider) CountParticipants(_ context.Context, _ string) (int, error) {
+	return 0, nil
+}
+func (s *mockContestParticipantProvider) CountParticipantsBulk(_ context.Context, contestIDs []string) (map[string]int, error) {
+	result := make(map[string]int, len(contestIDs))
+	for _, id := range contestIDs {
+		result[id] = 0
+	}
+	return result, nil
+}
+func (s *mockContestParticipantProvider) IsRegisteredBulk(_ context.Context, contestIDs []string, _ string) (map[string]bool, error) {
+	result := make(map[string]bool, len(contestIDs))
+	for _, id := range contestIDs {
+		result[id] = false
+	}
+	return result, nil
+}
+
+type mockOwnerProvider struct{}
+
+func (s *mockOwnerProvider) GetDisplay(_ context.Context, userID string) (*appcontest.UserDisplay, error) {
+	return &appcontest.UserDisplay{ID: userID, Nickname: "coach", Name: "Coach"}, nil
+}
+
+type mockTransactionManager struct{}
+
+func (s *mockTransactionManager) WithTx(_ context.Context, fn func(context.Context) error) error {
 	return fn(context.Background())
 }
