@@ -5,6 +5,7 @@ import (
 	"context"
 	"net/http"
 	"net/http/httptest"
+	"time"
 
 	appcontest "github.com/training-judge-center/backend/internal/application/contest"
 	"github.com/training-judge-center/backend/internal/adapter/http/middleware"
@@ -137,4 +138,82 @@ type mockTransactionManager struct{}
 
 func (s *mockTransactionManager) WithTx(_ context.Context, fn func(context.Context) error) error {
 	return fn(context.Background())
+}
+
+// ── RegistrationRepository mock ──────────────────────────────────────────────
+
+type mockRegistrationRepository struct {
+	saveFn                 func(ctx context.Context, r *domainContest.ContestRegistration) error
+	existsByContestAndUser func(ctx context.Context, contestID, userID string) (bool, error)
+}
+
+func (m *mockRegistrationRepository) Save(ctx context.Context, r *domainContest.ContestRegistration) error {
+	if m.saveFn != nil {
+		return m.saveFn(ctx, r)
+	}
+	return nil
+}
+
+func (m *mockRegistrationRepository) ExistsByContestAndUser(ctx context.Context, contestID, userID string) (bool, error) {
+	if m.existsByContestAndUser != nil {
+		return m.existsByContestAndUser(ctx, contestID, userID)
+	}
+	return false, nil
+}
+
+func (m *mockRegistrationRepository) CountByContest(_ context.Context, _ string) (int, error) {
+	return 0, nil
+}
+
+func (m *mockRegistrationRepository) CountByContestBulk(_ context.Context, contestIDs []string) (map[string]int, error) {
+	result := make(map[string]int, len(contestIDs))
+	for _, id := range contestIDs {
+		result[id] = 0
+	}
+	return result, nil
+}
+
+func (m *mockRegistrationRepository) ExistsByUserBulk(_ context.Context, contestIDs []string, _ string) (map[string]bool, error) {
+	result := make(map[string]bool, len(contestIDs))
+	for _, id := range contestIDs {
+		result[id] = false
+	}
+	return result, nil
+}
+
+// ── Contest fixture helpers ───────────────────────────────────────────────────
+
+func scheduledContest() *domainContest.Contest {
+	start := time.Now().Add(24 * time.Hour)
+	end := time.Now().Add(29 * time.Hour)
+	return domainContest.RestoreContest(
+		"c1",
+		domainContest.RestoreContestName("Test Contest"),
+		nil,
+		start, end,
+		domainContest.RestorePenalty(20),
+		0, false, false,
+		shared.RestoreGroupID("g1"),
+		shared.RestoreUserID("u1"),
+		[]domainContest.ContestProblem{},
+		time.Now(),
+		nil,
+	)
+}
+
+func finishedContest() *domainContest.Contest {
+	return domainContest.RestoreContest(
+		"c1",
+		domainContest.RestoreContestName("Finished Contest"),
+		nil,
+		time.Now().Add(-48*time.Hour),
+		time.Now().Add(-24*time.Hour),
+		domainContest.RestorePenalty(20),
+		0, false, false,
+		shared.RestoreGroupID("g1"),
+		shared.RestoreUserID("u1"),
+		[]domainContest.ContestProblem{},
+		time.Now(),
+		nil,
+	)
 }

@@ -138,6 +138,12 @@ type listContestsResponse struct {
 	Pagination pagination        `json:"pagination"`
 }
 
+// ── Register response ────────────────────────────────────────────────────────
+
+type registerResponse struct {
+	RegisteredAt string `json:"registeredAt"`
+}
+
 // ── Create/Update response ───────────────────────────────────────────────────
 
 type contestResponse struct {

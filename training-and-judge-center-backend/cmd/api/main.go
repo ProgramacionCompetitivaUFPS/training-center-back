@@ -252,7 +252,8 @@ func main() {
 	contestMemberProvider      := adaptercontest.NewGroupMemberProvider(dbPool)
 	contestProblemProvider     := adaptercontest.NewProblemProvider(dbPool)
 	contestOwnerProvider       := adaptercontest.NewOwnerProvider(dbPool)
-	contestParticipantProvider := adaptercontest.NewContestParticipantProvider()
+	contestRegistrationRepo    := adaptercontest.NewRegistrationRepository(dbPool)
+	contestParticipantProvider := adaptercontest.NewContestParticipantProvider(dbPool)
 	contestTxManager           := postgres.NewTransactionManager(dbPool)
 
 	// contest use cases
@@ -271,7 +272,10 @@ func main() {
 	listContestsUseCase := appcontest.NewListContestsUseCase(
 		contestRepo, contestGroupProvider, contestMemberProvider, contestParticipantProvider,
 	)
-	contestHandler := handlercontest.NewHandler(createContestUseCase, updateContestUseCase, getContestUseCase, listContestsUseCase)
+	registerToContestUseCase := appcontest.NewRegisterToContestUseCase(
+		contestRepo, contestRegistrationRepo, contestGroupProvider, contestMemberProvider,
+	)
+	contestHandler := handlercontest.NewHandler(createContestUseCase, updateContestUseCase, getContestUseCase, listContestsUseCase, registerToContestUseCase)
 
 	router := adapterhttp.NewRouter(&adapterhttp.Handlers{
 		Problem:  problemHandler,

@@ -218,6 +218,61 @@ func (m *mockContestParticipantProvider) IsRegisteredBulk(ctx context.Context, c
 
 func mockParticipants() *mockContestParticipantProvider { return &mockContestParticipantProvider{} }
 
+// ── RegistrationRepository mock ──────────────────────────────────────────────
+
+type mockRegistrationRepository struct {
+	saveFn                  func(ctx context.Context, r *domainContest.ContestRegistration) error
+	existsByContestAndUser  func(ctx context.Context, contestID, userID string) (bool, error)
+	countByContestFn        func(ctx context.Context, contestID string) (int, error)
+	countByContestBulkFn    func(ctx context.Context, contestIDs []string) (map[string]int, error)
+	existsByUserBulkFn      func(ctx context.Context, contestIDs []string, userID string) (map[string]bool, error)
+}
+
+func (m *mockRegistrationRepository) Save(ctx context.Context, r *domainContest.ContestRegistration) error {
+	if m.saveFn != nil {
+		return m.saveFn(ctx, r)
+	}
+	return nil
+}
+
+func (m *mockRegistrationRepository) ExistsByContestAndUser(ctx context.Context, contestID, userID string) (bool, error) {
+	if m.existsByContestAndUser != nil {
+		return m.existsByContestAndUser(ctx, contestID, userID)
+	}
+	return false, nil
+}
+
+func (m *mockRegistrationRepository) CountByContest(ctx context.Context, contestID string) (int, error) {
+	if m.countByContestFn != nil {
+		return m.countByContestFn(ctx, contestID)
+	}
+	return 0, nil
+}
+
+func (m *mockRegistrationRepository) CountByContestBulk(ctx context.Context, contestIDs []string) (map[string]int, error) {
+	if m.countByContestBulkFn != nil {
+		return m.countByContestBulkFn(ctx, contestIDs)
+	}
+	result := make(map[string]int, len(contestIDs))
+	for _, id := range contestIDs {
+		result[id] = 0
+	}
+	return result, nil
+}
+
+func (m *mockRegistrationRepository) ExistsByUserBulk(ctx context.Context, contestIDs []string, userID string) (map[string]bool, error) {
+	if m.existsByUserBulkFn != nil {
+		return m.existsByUserBulkFn(ctx, contestIDs, userID)
+	}
+	result := make(map[string]bool, len(contestIDs))
+	for _, id := range contestIDs {
+		result[id] = false
+	}
+	return result, nil
+}
+
+func mockRegistrations() *mockRegistrationRepository { return &mockRegistrationRepository{} }
+
 // ── OwnerProvider mock ───────────────────────────────────────────────────────
 
 type mockOwnerProvider struct {
@@ -273,6 +328,25 @@ func newTestContest(ownerID string) *domainContest.Contest {
 		nil,
 		testStart,
 		testEnd,
+		domainContest.RestorePenalty(20),
+		0,
+		false,
+		false,
+		shared.RestoreGroupID(testGroupID),
+		shared.RestoreUserID(ownerID),
+		[]domainContest.ContestProblem{},
+		testNow.Add(-time.Hour),
+		nil,
+	)
+}
+
+func newFinishedContest(ownerID string) *domainContest.Contest {
+	return domainContest.RestoreContest(
+		testContestID,
+		domainContest.RestoreContestName("Finished Contest"),
+		nil,
+		time.Now().Add(-48*time.Hour),
+		time.Now().Add(-24*time.Hour),
 		domainContest.RestorePenalty(20),
 		0,
 		false,

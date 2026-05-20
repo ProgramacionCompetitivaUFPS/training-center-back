@@ -8,4 +8,5 @@ const (
 	ErrCodeProblemAccessDenied     = "PROBLEM_ACCESS_DENIED"
 	ErrCodeProblemNotPublished     = "PROBLEM_NOT_PUBLISHED"
 	ErrCodeProblemNotFound         = "PROBLEM_NOT_FOUND"
+	ErrCodeNotGroupMember          = "NOT_GROUP_MEMBER"
 )
