@@ -23,7 +23,7 @@ type ContestListItem struct {
 	Description       *string
 	StartTime         time.Time
 	EndTime           time.Time
-	Duration          int // in seconds (spec FR-010)
+	Duration          int // seconds; domain Duration() returns minutes, multiplied here
 	Status            string
 	Penalty           int
 	FreezeMinutes     int
@@ -111,16 +111,20 @@ func (uc *ListContestsUseCase) Execute(ctx context.Context, in ListContestsInput
 
 	isAdmin := in.CurrentUser.IsAdmin()
 
-	isMember, err := uc.memberProvider.IsMemberOfGroup(ctx, in.CurrentUser.ID, in.GroupID)
-	if err != nil {
-		return nil, err
-	}
-	if !isMember {
-		isLead, err := uc.memberProvider.IsLeadOfGroup(ctx, in.CurrentUser.ID, in.GroupID)
+	isMember := false
+	if !isAdmin {
+		var err error
+		isMember, err = uc.memberProvider.IsMemberOfGroup(ctx, in.CurrentUser.ID, in.GroupID)
 		if err != nil {
 			return nil, err
 		}
-		isMember = isLead
+		if !isMember {
+			isLead, err := uc.memberProvider.IsLeadOfGroup(ctx, in.CurrentUser.ID, in.GroupID)
+			if err != nil {
+				return nil, err
+			}
+			isMember = isLead
+		}
 	}
 
 	if !group.IsVisible && !isMember && !isAdmin {
@@ -167,17 +171,22 @@ func (uc *ListContestsUseCase) Execute(ctx context.Context, in ListContestsInput
 		return nil, err
 	}
 
+	contestIDs := make([]string, len(contests))
+	for i, c := range contests {
+		contestIDs[i] = c.ID()
+	}
+	participantCounts, err := uc.participantProvider.CountParticipantsBulk(ctx, contestIDs)
+	if err != nil {
+		return nil, err
+	}
+	registeredMap, err := uc.participantProvider.IsRegisteredBulk(ctx, contestIDs, in.CurrentUser.ID)
+	if err != nil {
+		return nil, err
+	}
+
 	now := time.Now()
 	items := make([]ContestListItem, 0, len(contests))
 	for _, c := range contests {
-		participantCount, err := uc.participantProvider.CountParticipants(ctx, c.ID())
-		if err != nil {
-			return nil, err
-		}
-		isRegistered, err := uc.participantProvider.IsRegistered(ctx, c.ID(), in.CurrentUser.ID)
-		if err != nil {
-			return nil, err
-		}
 		items = append(items, ContestListItem{
 			ID:                c.ID(),
 			Name:              c.Name().Value(),
@@ -189,8 +198,8 @@ func (uc *ListContestsUseCase) Execute(ctx context.Context, in ListContestsInput
 			Penalty:           c.Penalty().Value(),
 			FreezeMinutes:     c.FreezeMinutes(),
 			EnablePostContest: c.EnablePostContest(),
-			ParticipantCount:  participantCount,
-			IsRegistered:      isRegistered,
+			ParticipantCount:  participantCounts[c.ID()],
+			IsRegistered:      registeredMap[c.ID()],
 			ProblemCount:      len(c.Problems()),
 		})
 	}

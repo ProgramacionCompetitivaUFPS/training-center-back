@@ -160,6 +160,19 @@ func TestGetContest_MemberCanAccessNotVisibleGroup(t *testing.T) {
 	}
 }
 
+func TestGetContest_NonMemberCanAccessVisibleGroup(t *testing.T) {
+	uc := newGetContestUseCase(repoWith(newTestContest(callerID)), groupFound(), notLead(), defaultProblemProvider(), mockParticipants())
+
+	out, err := uc.Execute(context.Background(), validGetInput())
+
+	if err != nil {
+		t.Fatalf("unexpected error for non-member in visible group: %v", err)
+	}
+	if out == nil {
+		t.Fatal("expected output")
+	}
+}
+
 func TestGetContest_DurationInSeconds(t *testing.T) {
 	uc := newGetContestUseCase(repoWith(newTestContest(callerID)), groupFound(), isMemberNotLead(), defaultProblemProvider(), mockParticipants())
 

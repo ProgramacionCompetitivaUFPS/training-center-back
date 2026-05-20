@@ -112,11 +112,25 @@ func (s *mockContestParticipantProvider) IsRegistered(_ context.Context, _, _ st
 func (s *mockContestParticipantProvider) CountParticipants(_ context.Context, _ string) (int, error) {
 	return 0, nil
 }
+func (s *mockContestParticipantProvider) CountParticipantsBulk(_ context.Context, contestIDs []string) (map[string]int, error) {
+	result := make(map[string]int, len(contestIDs))
+	for _, id := range contestIDs {
+		result[id] = 0
+	}
+	return result, nil
+}
+func (s *mockContestParticipantProvider) IsRegisteredBulk(_ context.Context, contestIDs []string, _ string) (map[string]bool, error) {
+	result := make(map[string]bool, len(contestIDs))
+	for _, id := range contestIDs {
+		result[id] = false
+	}
+	return result, nil
+}
 
 type mockOwnerProvider struct{}
 
-func (s *mockOwnerProvider) GetDisplay(_ context.Context, _ string) (*appcontest.UserDisplay, error) {
-	return &appcontest.UserDisplay{Nickname: "coach", Name: "Coach"}, nil
+func (s *mockOwnerProvider) GetDisplay(_ context.Context, userID string) (*appcontest.UserDisplay, error) {
+	return &appcontest.UserDisplay{ID: userID, Nickname: "coach", Name: "Coach"}, nil
 }
 
 type mockTransactionManager struct{}

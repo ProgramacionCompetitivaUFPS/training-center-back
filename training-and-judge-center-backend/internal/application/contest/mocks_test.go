@@ -188,8 +188,10 @@ func defaultProblemProvider() *mockProblemProvider { return &mockProblemProvider
 // ── ContestParticipantProvider mock ──────────────────────────────────────────
 
 type mockContestParticipantProvider struct {
-	isRegisteredFn      func(ctx context.Context, contestID, userID string) (bool, error)
-	countParticipantsFn func(ctx context.Context, contestID string) (int, error)
+	isRegisteredFn          func(ctx context.Context, contestID, userID string) (bool, error)
+	countParticipantsFn     func(ctx context.Context, contestID string) (int, error)
+	countParticipantsBulkFn func(ctx context.Context, contestIDs []string) (map[string]int, error)
+	isRegisteredBulkFn      func(ctx context.Context, contestIDs []string, userID string) (map[string]bool, error)
 }
 
 func (m *mockContestParticipantProvider) IsRegistered(ctx context.Context, contestID, userID string) (bool, error) {
@@ -206,6 +208,28 @@ func (m *mockContestParticipantProvider) CountParticipants(ctx context.Context, 
 	return 0, nil
 }
 
+func (m *mockContestParticipantProvider) CountParticipantsBulk(ctx context.Context, contestIDs []string) (map[string]int, error) {
+	if m.countParticipantsBulkFn != nil {
+		return m.countParticipantsBulkFn(ctx, contestIDs)
+	}
+	result := make(map[string]int, len(contestIDs))
+	for _, id := range contestIDs {
+		result[id] = 0
+	}
+	return result, nil
+}
+
+func (m *mockContestParticipantProvider) IsRegisteredBulk(ctx context.Context, contestIDs []string, userID string) (map[string]bool, error) {
+	if m.isRegisteredBulkFn != nil {
+		return m.isRegisteredBulkFn(ctx, contestIDs, userID)
+	}
+	result := make(map[string]bool, len(contestIDs))
+	for _, id := range contestIDs {
+		result[id] = false
+	}
+	return result, nil
+}
+
 func mockParticipants() *mockContestParticipantProvider { return &mockContestParticipantProvider{} }
 
 // ── OwnerProvider mock ───────────────────────────────────────────────────────
@@ -218,7 +242,7 @@ func (m *mockOwnerProvider) GetDisplay(ctx context.Context, userID string) (*Use
 	if m.getDisplayFn != nil {
 		return m.getDisplayFn(ctx, userID)
 	}
-	return &UserDisplay{Nickname: "coach", Name: "Coach Name"}, nil
+	return &UserDisplay{ID: userID, Nickname: "coach", Name: "Coach Name"}, nil
 }
 
 func mockOwner() *mockOwnerProvider { return &mockOwnerProvider{} }

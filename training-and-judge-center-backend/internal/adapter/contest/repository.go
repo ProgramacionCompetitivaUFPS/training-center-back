@@ -236,7 +236,7 @@ func (r *Repository) List(ctx context.Context, filters domainContest.ListFilters
 	}
 
 	var total int
-	if err := q.QueryRow(ctx, `SELECT COUNT(*) FROM contests `+where, filters.GroupID.Value()).Scan(&total); err != nil {
+	if err := q.QueryRow(ctx, `SELECT COUNT(*) FROM contests `+where, args[:len(args)-2]...).Scan(&total); err != nil {
 		slog.ErrorContext(ctx, "failed to count contests", "error", err)
 		return nil, 0, apperror.NewInternal()
 	}

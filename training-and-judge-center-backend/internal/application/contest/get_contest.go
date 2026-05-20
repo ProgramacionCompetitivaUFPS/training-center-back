@@ -2,6 +2,7 @@ package contest
 
 import (
 	"context"
+	"log/slog"
 	"time"
 
 	appshared "github.com/training-judge-center/backend/internal/application/shared"
@@ -29,7 +30,7 @@ type GetContestOutput struct {
 	Description       *string
 	StartTime         time.Time
 	EndTime           time.Time
-	Duration          int // in seconds (spec FR-010)
+	Duration          int // seconds; domain Duration() returns minutes, multiplied here
 	Penalty           int
 	FreezeMinutes     int
 	EnablePostContest bool
@@ -137,6 +138,10 @@ func (uc *GetContestUseCase) Execute(ctx context.Context, in GetContestInput) (*
 		for _, cp := range c.Problems() {
 			info, ok := infos[cp.ProblemID()]
 			if !ok {
+				slog.ErrorContext(ctx, "contest references problem not found in problems table",
+					"contest_id", in.ContestID,
+					"problem_id", cp.ProblemID(),
+				)
 				continue
 			}
 			problemDisplays = append(problemDisplays, ProblemDetailDisplay{
@@ -154,7 +159,11 @@ func (uc *GetContestUseCase) Execute(ctx context.Context, in GetContestInput) (*
 		return nil, err
 	}
 	if owner == nil {
-		owner = &UserDisplay{}
+		slog.ErrorContext(ctx, "owner user not found for contest",
+			"contest_id", in.ContestID,
+			"owner_id", c.OwnerID().Value(),
+		)
+		return nil, apperror.NewInternal()
 	}
 
 	var locked *bool
