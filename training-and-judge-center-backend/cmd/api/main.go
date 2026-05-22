@@ -120,7 +120,7 @@ func main() {
 	zipParserAdapter := problem.NewICPCParserAdapter(icpcParser)
 	packageParserAdapter := problem.NewICPCPackageParserAdapter(icpcParser)
 
-	userProvider := problem.NewProblemUserProvider(dbPool)
+	userProvider := problem.NewUserProvider(dbPool)
 
 	// Problem use cases
 	createProblemUseCase := appProblem.NewCreateProblemUseCase(problemRepo, settingsProvider)
