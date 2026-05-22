@@ -191,7 +191,7 @@ func main() {
 	authHandler := handler.NewAuthHandler(loginUC)
 
 	// Group repositories & platform adapters
-	groupRepo := group.NewGroupRepository(dbPool)
+	groupRepo := group.NewRepository(dbPool)
 	groupMemberRepo := group.NewMemberRepository(dbPool)
 	groupUserProvider := group.NewUserProvider(dbPool)
 	groupPrefsReader := group.NewPreferencesReader(dbPool)
