@@ -1,0 +1,22 @@
+training-and-judge-center-backend/cmd/api/main.go
+  s_c0be7c2854cbbc::t_eb0794bb4b7783 167
+training-and-judge-center-backend/internal/adapter/auth/session_invalidator.go
+  s_c0be7c2854cbbc::t_ba9ce617d286be 30
+  s_c0be7c2854cbbc::t_64f15168ae3db4 11,16-17,20
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.0",
+  "base_commit_sha": "859e8cfe1d3b3bac6c60f08b1ccf0a2b03783fa7",
+  "prompts": {},
+  "sessions": {
+    "s_c0be7c2854cbbc": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "f847d351-57e3-42a1-8138-3047ef103684",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "AlexaVJ <alexandra19vela@gmail.com>"
+    }
+  }
+}
