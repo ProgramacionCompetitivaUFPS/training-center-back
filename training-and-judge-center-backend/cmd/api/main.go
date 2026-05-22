@@ -211,7 +211,7 @@ func main() {
 	getMyRequestUseCase := appGroup.NewGetMyRequestUseCase(joinRequestRepo)
 	cancelMyRequestUseCase := appGroup.NewCancelMyRequestUseCase(joinRequestRepo)
 
-	groupInvitationJWTSvc := auth.NewGroupInvitationJWTService(cfg.JWTSecret)
+	groupInvitationJWTSvc := auth.NewInvitationJWTService(cfg.JWTSecret)
 	generateInviteUseCase := appGroup.NewGenerateInviteUseCase(groupRepo, groupMemberRepo, groupInvitationJWTSvc)
 	acceptInviteUseCase := appGroup.NewAcceptInviteUseCase(groupRepo, groupMemberRepo, groupInvitationJWTSvc)
 

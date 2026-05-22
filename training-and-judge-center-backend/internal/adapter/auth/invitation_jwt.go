@@ -22,15 +22,15 @@ type invitationJWTClaims struct {
 	jwt.RegisteredClaims
 }
 
-type GroupInvitationJWTService struct {
+type InvitationJWTService struct {
 	secret []byte
 }
 
-func NewGroupInvitationJWTService(secret string) *GroupInvitationJWTService {
-	return &GroupInvitationJWTService{secret: []byte(secret)}
+func NewInvitationJWTService(secret string) *InvitationJWTService {
+	return &InvitationJWTService{secret: []byte(secret)}
 }
 
-func (s *GroupInvitationJWTService) GenerateInviteToken(groupID, inviterID string) (string, error) {
+func (s *InvitationJWTService) GenerateInviteToken(groupID, inviterID string) (string, error) {
 	claims := invitationJWTClaims{
 		GroupID:   groupID,
 		InviterID: inviterID,
@@ -48,7 +48,7 @@ func (s *GroupInvitationJWTService) GenerateInviteToken(groupID, inviterID strin
 	return signed, nil
 }
 
-func (s *GroupInvitationJWTService) ValidateInviteToken(tokenString string) (*appGroup.InvitationClaims, error) {
+func (s *InvitationJWTService) ValidateInviteToken(tokenString string) (*appGroup.InvitationClaims, error) {
 	token, err := jwt.ParseWithClaims(tokenString, &invitationJWTClaims{}, func(t *jwt.Token) (any, error) {
 		if _, ok := t.Method.(*jwt.SigningMethodHMAC); !ok {
 			return nil, fmt.Errorf("unexpected signing method: %v", t.Header["alg"])

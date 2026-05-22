@@ -10,7 +10,7 @@ import (
 )
 
 func TestGenerateInviteToken_ClaimsPresent(t *testing.T) {
-	svc := NewGroupInvitationJWTService("test-secret")
+	svc := NewInvitationJWTService("test-secret")
 
 	tokenStr, err := svc.GenerateInviteToken("g-123", "u-456")
 	if err != nil {
@@ -39,7 +39,7 @@ func TestGenerateInviteToken_ClaimsPresent(t *testing.T) {
 }
 
 func TestValidateInviteToken_ValidToken(t *testing.T) {
-	svc := NewGroupInvitationJWTService("test-secret")
+	svc := NewInvitationJWTService("test-secret")
 	tokenStr, err := svc.GenerateInviteToken("g-123", "u-456")
 	if err != nil {
 		t.Fatalf("GenerateInviteToken returned unexpected error: %v", err)
@@ -69,7 +69,7 @@ func TestValidateInviteToken_ExpiredToken(t *testing.T) {
 	}
 	tokenStr, _ := jwt.NewWithClaims(jwt.SigningMethodHS256, expired).SignedString(secret)
 
-	svc := NewGroupInvitationJWTService("test-secret")
+	svc := NewInvitationJWTService("test-secret")
 	_, err := svc.ValidateInviteToken(tokenStr)
 
 	ae, ok := err.(*apperror.AppError)
@@ -79,8 +79,8 @@ func TestValidateInviteToken_ExpiredToken(t *testing.T) {
 }
 
 func TestValidateInviteToken_WrongKey(t *testing.T) {
-	generator := NewGroupInvitationJWTService("original-secret")
-	validator := NewGroupInvitationJWTService("different-secret")
+	generator := NewInvitationJWTService("original-secret")
+	validator := NewInvitationJWTService("different-secret")
 	tokenStr, _ := generator.GenerateInviteToken("g-1", "u-1")
 
 	_, err := validator.ValidateInviteToken(tokenStr)
@@ -91,7 +91,7 @@ func TestValidateInviteToken_WrongKey(t *testing.T) {
 }
 
 func TestValidateInviteToken_AlgorithmNone(t *testing.T) {
-	svc := NewGroupInvitationJWTService("test-secret")
+	svc := NewInvitationJWTService("test-secret")
 	noneToken := jwt.NewWithClaims(jwt.SigningMethodNone, jwt.MapClaims{
 		"group_id":   "g-1",
 		"inviter_id": "attacker",
@@ -112,7 +112,7 @@ func TestValidateInviteToken_AlgorithmNone(t *testing.T) {
 }
 
 func TestValidateInviteToken_MalformedToken(t *testing.T) {
-	svc := NewGroupInvitationJWTService("test-secret")
+	svc := NewInvitationJWTService("test-secret")
 
 	_, err := svc.ValidateInviteToken("not.a.token")
 
@@ -136,7 +136,7 @@ func TestValidateInviteToken_SessionTokenRejected(t *testing.T) {
 		t.Fatalf("could not sign session token: %v", err)
 	}
 
-	svc := NewGroupInvitationJWTService("shared-secret")
+	svc := NewInvitationJWTService("shared-secret")
 	_, err = svc.ValidateInviteToken(tokenStr)
 
 	if err == nil {
