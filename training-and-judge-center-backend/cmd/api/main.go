@@ -117,16 +117,16 @@ func main() {
 		settingsProvider.MaxFileCountSample(),
 		cfg.VirtualObject.LanguageExtensions,
 	)
-	zipParserAdapter := problem.NewICPCParserAdapter(icpcParser)
-	packageParserAdapter := problem.NewICPCPackageParserAdapter(icpcParser)
+	zipParser := problem.NewZipParser(icpcParser)
+	packageParser := problem.NewICPCPackageParser(icpcParser)
 
 	userProvider := problem.NewUserProvider(dbPool)
 
 	// Problem use cases
 	createProblemUseCase := appProblem.NewCreateProblemUseCase(problemRepo, settingsProvider)
-	importProblemUseCase := appProblem.NewImportProblemUseCase(problemRepo, fileStorage, packageParserAdapter, settingsProvider)
+	importProblemUseCase := appProblem.NewImportProblemUseCase(problemRepo, fileStorage, packageParser, settingsProvider)
 	updateProblemUseCase := appProblem.NewUpdateProblemUseCase(problemRepo, settingsProvider)
-	uploadProblemFilesUseCase := appProblem.NewUploadProblemFilesUseCase(problemRepo, fileStorage, zipParserAdapter, settingsProvider)
+	uploadProblemFilesUseCase := appProblem.NewUploadProblemFilesUseCase(problemRepo, fileStorage, zipParser, settingsProvider)
 	deleteProblemFileUseCase := appProblem.NewDeleteProblemFileUseCase(problemRepo, fileStorage)
 	addModifierUseCase := appProblem.NewAddModifierUseCase(problemRepo, userProvider)
 	removeModifierUseCase := appProblem.NewRemoveModifierUseCase(problemRepo)
