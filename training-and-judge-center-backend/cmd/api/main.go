@@ -224,7 +224,7 @@ func main() {
 	)
 
 	// Material platform adapters
-	materialRepo := material.NewMaterialRepository(dbPool)
+	materialRepo := material.NewRepository(dbPool)
 	groupProvider := material.NewGroupProvider(dbPool)
 	groupMemberProvider := material.NewGroupMemberProvider(dbPool)
 	authorProvider := material.NewAuthorProvider(dbPool)

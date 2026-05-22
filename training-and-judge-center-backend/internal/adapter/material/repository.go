@@ -17,15 +17,15 @@ import (
 	"github.com/training-judge-center/backend/pkg/apperror"
 )
 
-type MaterialRepository struct {
+type Repository struct {
 	db *pgxpool.Pool
 }
 
-func NewMaterialRepository(db *pgxpool.Pool) *MaterialRepository {
-	return &MaterialRepository{db: db}
+func NewRepository(db *pgxpool.Pool) *Repository {
+	return &Repository{db: db}
 }
 
-func (r *MaterialRepository) Save(ctx context.Context, m *material.Material) error {
+func (r *Repository) Save(ctx context.Context, m *material.Material) error {
 	query := `
 		INSERT INTO materials (
 			id, group_id, author_id, title, content, tags,
@@ -64,7 +64,7 @@ func (r *MaterialRepository) Save(ctx context.Context, m *material.Material) err
 	return nil
 }
 
-func (r *MaterialRepository) FindByID(ctx context.Context, id string) (*material.Material, error) {
+func (r *Repository) FindByID(ctx context.Context, id string) (*material.Material, error) {
 	query := `
 		SELECT id, group_id, author_id, title, content, tags,
 		       status, pinned, pinned_at, created_at, updated_at, published_at
@@ -83,7 +83,7 @@ func (r *MaterialRepository) FindByID(ctx context.Context, id string) (*material
 	return m, nil
 }
 
-func (r *MaterialRepository) List(ctx context.Context, groupID string, filters material.ListFilters) ([]*material.Material, int, error) {
+func (r *Repository) List(ctx context.Context, groupID string, filters material.ListFilters) ([]*material.Material, int, error) {
 	var conds []string
 	var args []any
 	idx := 1
@@ -179,7 +179,7 @@ func (r *MaterialRepository) List(ctx context.Context, groupID string, filters m
 	return result, total, nil
 }
 
-func (r *MaterialRepository) Delete(ctx context.Context, id string) error {
+func (r *Repository) Delete(ctx context.Context, id string) error {
 	tag, err := r.db.Exec(ctx, `DELETE FROM materials WHERE id = $1`, id)
 	if err != nil {
 		slog.ErrorContext(ctx, "database error in Delete", "error", err, "material_id", id)
