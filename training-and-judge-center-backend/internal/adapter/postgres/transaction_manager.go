@@ -14,15 +14,15 @@ type contextKey string
 
 const txContextKey contextKey = "postgres_tx"
 
-type PostgresTransactionManager struct {
+type TransactionManager struct {
 	pool *pgxpool.Pool
 }
 
-func NewPostgresTransactionManager(pool *pgxpool.Pool) *PostgresTransactionManager {
-	return &PostgresTransactionManager{pool: pool}
+func NewTransactionManager(pool *pgxpool.Pool) *TransactionManager {
+	return &TransactionManager{pool: pool}
 }
 
-func (tm *PostgresTransactionManager) WithTx(ctx context.Context, fn func(txCtx context.Context) error) error {
+func (tm *TransactionManager) WithTx(ctx context.Context, fn func(txCtx context.Context) error) error {
 	tx, err := tm.pool.Begin(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to begin transaction: %w", err)
