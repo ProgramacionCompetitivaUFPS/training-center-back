@@ -1,0 +1,23 @@
+training-and-judge-center-backend/internal/adapter/auth/invitation_jwt.go
+  s_d814095e59d218::t_b2196d3bbf24aa 25,29-30,33,51
+training-and-judge-center-backend/internal/adapter/auth/invitation_jwt_test.go
+  s_d814095e59d218::t_f0b638af141151 13,42,72,82-83,94,115,139
+training-and-judge-center-backend/cmd/api/main.go
+  s_d814095e59d218::t_7c9041c6d6f0b6 211
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.0",
+  "base_commit_sha": "382875d959b67977b89c99dca26ca838969f6143",
+  "prompts": {},
+  "sessions": {
+    "s_d814095e59d218": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "c3ad5a18-3b83-4ccb-9f49-d5cbb9a53bca",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "AlexaVJ <alexandra19vela@gmail.com>"
+    }
+  }
+}
