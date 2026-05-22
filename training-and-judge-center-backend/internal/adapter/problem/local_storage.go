@@ -9,26 +9,26 @@ import (
 	appProblem "github.com/training-judge-center/backend/internal/application/problem"
 )
 
-type LocalStorageRepository struct {
+type LocalFileRepository struct {
 	baseDir string
 }
 
-var _ appProblem.ProblemFileRepository = (*LocalStorageRepository)(nil)
+var _ appProblem.ProblemFileRepository = (*LocalFileRepository)(nil)
 
-func NewLocalStorageRepository(baseDir string) (*LocalStorageRepository, error) {
+func NewLocalFileRepository(baseDir string) (*LocalFileRepository, error) {
 	if err := os.MkdirAll(baseDir, 0755); err != nil {
 		return nil, fmt.Errorf("failed to create base directory %s: %w", baseDir, err)
 	}
-	return &LocalStorageRepository{
+	return &LocalFileRepository{
 		baseDir: baseDir,
 	}, nil
 }
 
-func (r *LocalStorageRepository) resolvePath(path string) string {
+func (r *LocalFileRepository) resolvePath(path string) string {
 	return filepath.Join(r.baseDir, path)
 }
 
-func (r *LocalStorageRepository) UploadFile(ctx context.Context, path string, content []byte) error {
+func (r *LocalFileRepository) UploadFile(ctx context.Context, path string, content []byte) error {
 	fullPath := r.resolvePath(path)
 
 	dir := filepath.Dir(fullPath)
@@ -43,7 +43,7 @@ func (r *LocalStorageRepository) UploadFile(ctx context.Context, path string, co
 	return nil
 }
 
-func (r *LocalStorageRepository) DeleteFile(ctx context.Context, path string) error {
+func (r *LocalFileRepository) DeleteFile(ctx context.Context, path string) error {
 	fullPath := r.resolvePath(path)
 
 	if err := os.Remove(fullPath); err != nil {
@@ -56,7 +56,7 @@ func (r *LocalStorageRepository) DeleteFile(ctx context.Context, path string) er
 	return nil
 }
 
-func (r *LocalStorageRepository) DeleteFilesWithPrefix(ctx context.Context, prefix string) error {
+func (r *LocalFileRepository) DeleteFilesWithPrefix(ctx context.Context, prefix string) error {
 	fullPath := r.resolvePath(prefix)
 	if err := os.RemoveAll(fullPath); err != nil && !os.IsNotExist(err) {
 		return fmt.Errorf("failed to remove directory %s: %w", fullPath, err)

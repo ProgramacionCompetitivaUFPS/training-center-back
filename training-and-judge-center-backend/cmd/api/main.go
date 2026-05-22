@@ -101,7 +101,7 @@ func main() {
 		fileStorage = problem.NewGCSFileRepository(gcsClient, cfg.GCSBucket)
 	default:
 		localDir := cfg.StorageLocalDir
-		localRepo, err := problem.NewLocalStorageRepository(localDir)
+		localRepo, err := problem.NewLocalFileRepository(localDir)
 		if err != nil {
 			slog.Error("failed to create local file storage", "error", err)
 			os.Exit(1)
