@@ -1,0 +1,21 @@
+training-and-judge-center-backend/internal/adapter/problem/local_storage.go
+  s_d814095e59d218::t_a48367f43f87dc 12,16,18,22,27,31,46,59
+training-and-judge-center-backend/cmd/api/main.go
+  s_d814095e59d218::t_e4fbf305a8bf9a 101
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.0",
+  "base_commit_sha": "dd5140268d8c0ef5f1c0b684ce1898f713db866f",
+  "prompts": {},
+  "sessions": {
+    "s_d814095e59d218": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "c3ad5a18-3b83-4ccb-9f49-d5cbb9a53bca",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "AlexaVJ <alexandra19vela@gmail.com>"
+    }
+  }
+}
