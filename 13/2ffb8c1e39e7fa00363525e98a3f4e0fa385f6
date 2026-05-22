@@ -1,0 +1,24 @@
+training-and-judge-center-backend/internal/adapter/problem/icpc_adapter.go
+  s_d814095e59d218::t_3d0f419d8b9fd5 9,13,15-16,19
+  s_d814095e59d218::t_bf4d5b4b15c30f 31,35,37-38,41
+training-and-judge-center-backend/cmd/api/main.go
+  s_d814095e59d218::t_521b2ee858f6ca 124
+  s_d814095e59d218::t_731bdcc2fb3c54 117-118
+  s_d814095e59d218::t_498583d5c0d3c0 126
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.0",
+  "base_commit_sha": "132ffb8c1e39e7fa00363525e98a3f4e0fa385f6",
+  "prompts": {},
+  "sessions": {
+    "s_d814095e59d218": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "c3ad5a18-3b83-4ccb-9f49-d5cbb9a53bca",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "AlexaVJ <alexandra19vela@gmail.com>"
+    }
+  }
+}
