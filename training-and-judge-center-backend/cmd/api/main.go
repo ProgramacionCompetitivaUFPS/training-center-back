@@ -77,7 +77,7 @@ func main() {
 	slog.Info("redis connected successfully")
 
 	// Problem repositories & settings
-	problemRepo := problem.NewProblemRepository(dbPool)
+	problemRepo := problem.NewRepository(dbPool)
 	settingsProvider, err := platformConfig.NewPlatformSettings(cfg.VirtualObject)
 	if err != nil {
 		slog.Error("invalid platform settings in config", "error", err)
