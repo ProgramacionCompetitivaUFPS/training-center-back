@@ -98,7 +98,7 @@ func main() {
 			os.Exit(1)
 		}
 		slog.Info("using GCS storage backend", "bucket", cfg.GCSBucket)
-		fileStorage = problem.NewGCSProblemFileRepository(gcsClient, cfg.GCSBucket)
+		fileStorage = problem.NewGCSFileRepository(gcsClient, cfg.GCSBucket)
 	default:
 		localDir := cfg.StorageLocalDir
 		localRepo, err := problem.NewLocalStorageRepository(localDir)
