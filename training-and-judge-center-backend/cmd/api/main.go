@@ -156,7 +156,7 @@ func main() {
 	)
 
 	// User platform adapters
-	userRepo := user.NewUserRepository(dbPool)
+	userRepo := user.NewRepository(dbPool)
 	passwordRecoveryRepo := user.NewPasswordRecoveryRepository(dbPool)
 	emailChangeRepo := user.NewEmailChangeRepository(dbPool)
 	deactRepo := user.NewDeactivationRequestRepository(dbPool)

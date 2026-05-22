@@ -15,15 +15,15 @@ import (
 	"github.com/training-judge-center/backend/pkg/apperror"
 )
 
-type UserRepository struct {
+type Repository struct {
 	querier infraPostgres.Querier
 }
 
-func NewUserRepository(querier infraPostgres.Querier) *UserRepository {
-	return &UserRepository{querier: querier}
+func NewRepository(querier infraPostgres.Querier) *Repository {
+	return &Repository{querier: querier}
 }
 
-func (r *UserRepository) Save(ctx context.Context, u *domainUser.User) error {
+func (r *Repository) Save(ctx context.Context, u *domainUser.User) error {
 	query := `
 		INSERT INTO users (id, email, password, name, nickname, country, city, institution, role, status, created_at)
 		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`
@@ -59,7 +59,7 @@ func (r *UserRepository) Save(ctx context.Context, u *domainUser.User) error {
 	return nil
 }
 
-func (r *UserRepository) Update(ctx context.Context, u *domainUser.User) error {
+func (r *Repository) Update(ctx context.Context, u *domainUser.User) error {
 	query := `
 		UPDATE users
 		SET name = $1, nickname = $2, institution = $3, email = $4, password = $5,
@@ -152,7 +152,7 @@ func scanUser(row pgx.Row) (*domainUser.User, error) {
 	), nil
 }
 
-func (r *UserRepository) FindByEmail(ctx context.Context, email domainUser.Email) (*domainUser.User, error) {
+func (r *Repository) FindByEmail(ctx context.Context, email domainUser.Email) (*domainUser.User, error) {
 	query := `SELECT ` + userColumns + ` FROM users WHERE email = $1`
 
 	u, err := scanUser(r.querier.QueryRow(ctx, query, email.String()))
@@ -162,7 +162,7 @@ func (r *UserRepository) FindByEmail(ctx context.Context, email domainUser.Email
 	return u, nil
 }
 
-func (r *UserRepository) FindByID(ctx context.Context, id string) (*domainUser.User, error) {
+func (r *Repository) FindByID(ctx context.Context, id string) (*domainUser.User, error) {
 	query := `SELECT ` + userColumns + ` FROM users WHERE id = $1`
 
 	u, err := scanUser(r.querier.QueryRow(ctx, query, id))
@@ -172,7 +172,7 @@ func (r *UserRepository) FindByID(ctx context.Context, id string) (*domainUser.U
 	return u, nil
 }
 
-func (r *UserRepository) FindByNickname(ctx context.Context, nickname domainUser.Nickname) (*domainUser.User, error) {
+func (r *Repository) FindByNickname(ctx context.Context, nickname domainUser.Nickname) (*domainUser.User, error) {
 	query := `SELECT ` + userColumns + ` FROM users WHERE LOWER(nickname) = LOWER($1)`
 
 	u, err := scanUser(r.querier.QueryRow(ctx, query, nickname.String()))
@@ -197,7 +197,7 @@ var sortColumnMap = map[domainUser.SortField]string{
 	domainUser.SortByDeactivatedAt: "deactivated_at",
 }
 
-func (r *UserRepository) FindAll(ctx context.Context, filter domainUser.UserFilter) ([]*domainUser.User, int, error) {
+func (r *Repository) FindAll(ctx context.Context, filter domainUser.UserFilter) ([]*domainUser.User, int, error) {
 	args := []interface{}{}
 	conditions := []string{}
 	n := 1
