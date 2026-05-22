@@ -187,7 +187,7 @@ func main() {
 	confirmDeactUC := appuser.NewConfirmDeactivationUseCase(userRepo, deactRepo, auditRepo, emailSender, sessionInvalidator, txManager)
 
 	// Handlers
-	userHandler := handlerUser.NewUserHandler(createUserUC, getMyProfileUC, getUserByNicknameUC, updateUserUC, updatePasswordUC, adminUpdateUserUC, adminDeactivateUserUC, listUsersUC, requestEmailChangeUC, confirmEmailChangeUC, requestPasswordRecoveryUC, resetPasswordUC, requestDeactUC, confirmDeactUC)
+	userHandler := handlerUser.NewHandler(createUserUC, getMyProfileUC, getUserByNicknameUC, updateUserUC, updatePasswordUC, adminUpdateUserUC, adminDeactivateUserUC, listUsersUC, requestEmailChangeUC, confirmEmailChangeUC, requestPasswordRecoveryUC, resetPasswordUC, requestDeactUC, confirmDeactUC)
 	authHandler := handler.NewAuthHandler(loginUC)
 
 	// Group repositories & platform adapters

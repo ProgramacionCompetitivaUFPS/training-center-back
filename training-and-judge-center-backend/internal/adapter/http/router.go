@@ -19,7 +19,7 @@ import (
 
 type Handlers struct {
 	Problem  *problem.Handler
-	User     *handlerUser.UserHandler
+	User     *handlerUser.Handler
 	Auth     *handler2.AuthHandler
 	Group    *group.Handler
 	Material *handlerMaterial.Handler

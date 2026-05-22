@@ -36,7 +36,7 @@ type publicUserResponse struct {
 // @Success      200 {object} fullUserResponse
 // @Failure      401 {object} apperror.AppError
 // @Router       /users/me [get]
-func (h *UserHandler) GetMyProfile(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) GetMyProfile(w http.ResponseWriter, r *http.Request) {
 	claims := middleware.GetClaims(r.Context())
 	if claims == nil {
 		handler.WriteJSON(r.Context(), w, http.StatusUnauthorized, map[string]string{
@@ -64,7 +64,7 @@ func (h *UserHandler) GetMyProfile(w http.ResponseWriter, r *http.Request) {
 // @Failure      401 {object} apperror.AppError
 // @Failure      404 {object} apperror.AppError
 // @Router       /users/{nickname} [get]
-func (h *UserHandler) GetByNickname(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) GetByNickname(w http.ResponseWriter, r *http.Request) {
 	claims := middleware.GetClaims(r.Context())
 	if claims == nil {
 		handler.WriteJSON(r.Context(), w, http.StatusUnauthorized, map[string]string{

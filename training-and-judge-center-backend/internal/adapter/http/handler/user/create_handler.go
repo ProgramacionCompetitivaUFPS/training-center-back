@@ -38,7 +38,7 @@ type createUserResponse struct {
 // @Failure      400 {object} apperror.AppError
 // @Failure      409 {object} apperror.AppError
 // @Router       /users [post]
-func (h *UserHandler) Create(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
 	var req createUserRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		handler.WriteJSON(r.Context(), w, http.StatusBadRequest, map[string]string{

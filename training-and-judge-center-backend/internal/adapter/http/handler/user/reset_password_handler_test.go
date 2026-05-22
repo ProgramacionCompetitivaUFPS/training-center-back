@@ -14,9 +14,9 @@ import (
 	domainuser "github.com/training-judge-center/backend/internal/domain/user"
 )
 
-// newHandlerWithResetPassword builds a UserHandler with only resetPassword wired.
-func newHandlerWithResetPassword(uc *appuser.ResetPasswordUseCase) *UserHandler {
-	return &UserHandler{resetPassword: uc}
+// newHandlerWithResetPassword builds a Handler with only resetPassword wired.
+func newHandlerWithResetPassword(uc *appuser.ResetPasswordUseCase) *Handler {
+	return &Handler{resetPassword: uc}
 }
 
 // pendingRecoveryRequest returns a valid pending PasswordRecoveryRequest for userID with the given code.

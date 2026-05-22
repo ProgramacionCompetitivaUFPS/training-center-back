@@ -15,9 +15,9 @@ import (
 	domainuser "github.com/training-judge-center/backend/internal/domain/user"
 )
 
-// newHandlerWithUpdatePassword builds a UserHandler with only updatePassword wired.
-func newHandlerWithUpdatePassword(uc *appuser.UpdatePasswordUseCase) *UserHandler {
-	return &UserHandler{updatePassword: uc}
+// newHandlerWithUpdatePassword builds a Handler with only updatePassword wired.
+func newHandlerWithUpdatePassword(uc *appuser.UpdatePasswordUseCase) *Handler {
+	return &Handler{updatePassword: uc}
 }
 
 // TestUpdatePassword_Success_Returns204 verifies that when the use case returns nil,

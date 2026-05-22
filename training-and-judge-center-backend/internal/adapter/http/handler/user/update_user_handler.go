@@ -27,7 +27,7 @@ type updateUserRequest struct {
 // @Failure      400 {object} apperror.AppError
 // @Failure      401 {object} apperror.AppError
 // @Router       /users [put]
-func (h *UserHandler) UpdateProfile(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) UpdateProfile(w http.ResponseWriter, r *http.Request) {
 	claims := middleware.GetClaims(r.Context())
 	if claims == nil {
 		handler.WriteJSON(r.Context(), w, http.StatusUnauthorized, map[string]string{

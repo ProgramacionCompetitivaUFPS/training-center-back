@@ -24,7 +24,7 @@ type updatePasswordRequest struct {
 // @Failure      400 {object} apperror.AppError
 // @Failure      401 {object} apperror.AppError
 // @Router       /users/password [put]
-func (h *UserHandler) UpdatePassword(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) UpdatePassword(w http.ResponseWriter, r *http.Request) {
 	claims := middleware.GetClaims(r.Context())
 	if claims == nil {
 		handler.WriteJSON(r.Context(), w, http.StatusUnauthorized, map[string]string{

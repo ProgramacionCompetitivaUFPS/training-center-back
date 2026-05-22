@@ -16,7 +16,7 @@ import (
 // @Success      200 {object} map[string]string
 // @Failure      401 {object} apperror.AppError
 // @Router       /users/deactivation [post]
-func (h *UserHandler) RequestDeactivation(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) RequestDeactivation(w http.ResponseWriter, r *http.Request) {
 	claims := middleware.GetClaims(r.Context())
 	if claims == nil {
 		handler.WriteJSON(r.Context(), w, http.StatusUnauthorized, map[string]string{
@@ -52,7 +52,7 @@ type confirmDeactivationBody struct {
 // @Failure      400 {object} apperror.AppError
 // @Failure      401 {object} apperror.AppError
 // @Router       /users/deactivation/confirm [post]
-func (h *UserHandler) ConfirmDeactivation(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) ConfirmDeactivation(w http.ResponseWriter, r *http.Request) {
 	claims := middleware.GetClaims(r.Context())
 	if claims == nil {
 		handler.WriteJSON(r.Context(), w, http.StatusUnauthorized, map[string]string{

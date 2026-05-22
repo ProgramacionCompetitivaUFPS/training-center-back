@@ -15,11 +15,11 @@ import (
 	domainuser "github.com/training-judge-center/backend/internal/domain/user"
 )
 
-// newHandlerWithConfirmDeactivation builds a UserHandler with only confirmDeactivation
+// newHandlerWithConfirmDeactivation builds a Handler with only confirmDeactivation
 // wired. Other use cases are nil — if a test accidentally reaches them, Go will panic,
 // which is the right signal that the test is exercising the wrong path.
-func newHandlerWithConfirmDeactivation(uc *appuser.ConfirmDeactivationUseCase) *UserHandler {
-	return &UserHandler{confirmDeactivation: uc}
+func newHandlerWithConfirmDeactivation(uc *appuser.ConfirmDeactivationUseCase) *Handler {
+	return &Handler{confirmDeactivation: uc}
 }
 
 // wrapWithAuth wraps h with the Auth middleware configured to always inject claims.
