@@ -167,7 +167,7 @@ func main() {
 	jwtService := auth.NewJWTService(cfg.JWTSecret, cfg.JWTExpirationHours)
 	emailSender := email.NewSMTPSender(cfg.SMTPHost, cfg.SMTPPort, cfg.SMTPUser, cfg.SMTPPassword, cfg.SMTPFrom)
 	redisRateLimiter := ratelimit.NewRedisRateLimiter(redisClient)
-	sessionInvalidator := auth.NewSessionInvalidator(redisClient, time.Duration(cfg.JWTExpirationHours)*time.Hour)
+	sessionInvalidator := auth.NewRedisSessionInvalidator(redisClient, time.Duration(cfg.JWTExpirationHours)*time.Hour)
 
 	// User use cases
 	createUserUC := appuser.NewCreateUserUseCase(userRepo)
