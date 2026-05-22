@@ -1,0 +1,21 @@
+training-and-judge-center-backend/internal/adapter/postgres/transaction_manager.go
+  s_d814095e59d218::t_f2da8436230f0b 17,21-22,25
+training-and-judge-center-backend/cmd/api/main.go
+  s_d814095e59d218::t_384c55f7ae96de 163,196
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.0",
+  "base_commit_sha": "0eb8f0aa37020f9bc34c51f4871220a17b036820",
+  "prompts": {},
+  "sessions": {
+    "s_d814095e59d218": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "c3ad5a18-3b83-4ccb-9f49-d5cbb9a53bca",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "AlexaVJ <alexandra19vela@gmail.com>"
+    }
+  }
+}
