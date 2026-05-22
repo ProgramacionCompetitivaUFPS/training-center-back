@@ -2,9 +2,10 @@ package user
 
 import (
 	"context"
-	"errors"
 	"log/slog"
+	"time"
 
+	"github.com/training-judge-center/backend/internal/domain/shared"
 	"github.com/training-judge-center/backend/internal/domain/user"
 	"github.com/training-judge-center/backend/pkg/apperror"
 )
@@ -21,27 +22,31 @@ type AdminUpdateUserInput struct {
 }
 
 type AdminUpdateUserUseCase struct {
-	repo user.UserRepository
+	repo user.Repository
 }
 
-func NewAdminUpdateUserUseCase(repo user.UserRepository) *AdminUpdateUserUseCase {
+func NewAdminUpdateUserUseCase(repo user.Repository) *AdminUpdateUserUseCase {
 	return &AdminUpdateUserUseCase{repo: repo}
 }
 
-func (uc *AdminUpdateUserUseCase) Execute(ctx context.Context, input AdminUpdateUserInput) (UserDTO, error) {
+type AdminUpdateUserOutput struct {
+	User UserDTO
+}
+
+func (uc *AdminUpdateUserUseCase) Execute(ctx context.Context, input AdminUpdateUserInput) (*AdminUpdateUserOutput, error) {
 	if input.Name == nil && input.Nickname == nil && input.Institution == nil && input.City == nil && input.Country == nil && input.Email == nil && input.Role == nil {
-		return UserDTO{}, apperror.NewValidation([]apperror.FieldError{
+		return nil,apperror.NewValidation([]apperror.FieldError{
 			{Field: "body", Message: "At least one updatable field must be provided"},
 		})
 	}
 
 	foundUser, err := uc.repo.FindByID(ctx, input.TargetID)
 	if err != nil {
-		slog.Error("failed to find user by id during admin update", "target_id", input.TargetID, "error", err)
-		return UserDTO{}, apperror.NewInternal()
+		slog.ErrorContext(ctx, "failed to find user by id during admin update", "target_id", input.TargetID, "error", err)
+		return nil,apperror.NewInternal()
 	}
 	if foundUser == nil {
-		return UserDTO{}, apperror.NewNotFound("NOT_FOUND", "User not found")
+		return nil,apperror.NewNotFound(user.ErrCodeUserNotFound, "User not found")
 	}
 
 	var fieldErrors []apperror.FieldError
@@ -51,7 +56,7 @@ func (uc *AdminUpdateUserUseCase) Execute(ctx context.Context, input AdminUpdate
 	var cityToUpdate *string
 	var countryToUpdate *string
 	var emailToUpdate *user.Email
-	var roleToUpdate *user.Role
+	var roleToUpdate *shared.Role
 
 	if input.Name != nil {
 		if *input.Name == "" {
@@ -98,16 +103,16 @@ func (uc *AdminUpdateUserUseCase) Execute(ctx context.Context, input AdminUpdate
 		newEmail, err := user.NewEmail(*input.Email)
 		if err != nil {
 			fieldErrors = append(fieldErrors, apperror.FieldError{Field: "email", Message: err.Error()})
-		} else if foundUser.Email() == nil || newEmail.String() != foundUser.Email().String() {
+		} else if newEmail.String() != foundUser.Email().String() {
 			emailToUpdate = &newEmail
 		}
 	}
 
 	if input.Role != nil {
-		newRole, err := user.NewRole(*input.Role)
+		newRole, err := shared.NewRole(*input.Role)
 		if err != nil {
 			fieldErrors = append(fieldErrors, apperror.FieldError{Field: "role", Message: "Invalid role value"})
-		} else if newRole == user.RoleAdmin {
+		} else if newRole == shared.RoleAdmin {
 			fieldErrors = append(fieldErrors, apperror.FieldError{Field: "role", Message: "Cannot assign ADMIN role through this endpoint"})
 		} else {
 			roleToUpdate = &newRole
@@ -115,24 +120,18 @@ func (uc *AdminUpdateUserUseCase) Execute(ctx context.Context, input AdminUpdate
 	}
 
 	if len(fieldErrors) > 0 {
-		return UserDTO{}, apperror.NewValidation(fieldErrors)
+		return nil,apperror.NewValidation(fieldErrors)
 	}
 
-	if err := foundUser.AdminUpdate(nameToUpdate, nicknameToUpdate, institutionToUpdate, cityToUpdate, countryToUpdate, emailToUpdate, roleToUpdate); err != nil {
-		slog.Error("failed to apply admin update to user domain object", "user_id", foundUser.ID(), "error", err)
-		return UserDTO{}, apperror.NewInternal()
+	now := time.Now()
+	if err := foundUser.AdminUpdate(nameToUpdate, nicknameToUpdate, institutionToUpdate, cityToUpdate, countryToUpdate, emailToUpdate, roleToUpdate, now); err != nil {
+		slog.ErrorContext(ctx, "failed to apply admin update to user domain object", "user_id", foundUser.ID(), "error", err)
+		return nil,apperror.NewInternal()
 	}
 
 	if err := uc.repo.Update(ctx, foundUser); err != nil {
-		if errors.Is(err, user.ErrNicknameConflict) {
-			return UserDTO{}, apperror.NewConflict("NICKNAME_ALREADY_EXISTS", "The nickname is already in use")
-		}
-		if errors.Is(err, user.ErrEmailConflict) {
-			return UserDTO{}, apperror.NewConflict("EMAIL_ALREADY_EXISTS", "The email is already in use")
-		}
-		slog.Error("failed to persist admin user update", "user_id", foundUser.ID(), "error", err)
-		return UserDTO{}, apperror.NewInternal()
+		return nil,err
 	}
 
-	return userToDTO(foundUser), nil
+	return &AdminUpdateUserOutput{User: userToDTO(foundUser)}, nil
 }

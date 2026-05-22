@@ -3,17 +3,17 @@ package user
 import (
 	"context"
 	"errors"
-	"net/http"
 	"testing"
 
-	"github.com/training-judge-center/backend/internal/domain/notification"
+	appshared "github.com/training-judge-center/backend/internal/application/shared"
+	domainShared "github.com/training-judge-center/backend/internal/domain/shared"
 	domain "github.com/training-judge-center/backend/internal/domain/user"
 	"github.com/training-judge-center/backend/pkg/apperror"
 )
 
 func TestRequestEmailChange_Success(t *testing.T) {
 	userRepo := newNoConflictRepo()
-	activeUser := newUserWithRole("user-1", domain.RoleContestant, domain.StatusActive)
+	activeUser := newUserWithRole("user-1", domainShared.RoleContestant, domain.StatusActive)
 	userRepo.findByIDFn = func(_ context.Context, id string) (*domain.User, error) {
 		if id == "user-1" {
 			return activeUser, nil
@@ -24,7 +24,7 @@ func TestRequestEmailChange_Success(t *testing.T) {
 	
 	emailSent := false
 	mockEmail := &mockEmailSender{
-		sendFn: func(ctx context.Context, msg notification.EmailMessage) error {
+		sendFn: func(ctx context.Context, msg appshared.EmailMessage) error {
 			emailSent = true
 			if msg.To != "newemail@example.com" {
 				t.Errorf("expected email to be sent to newemail@example.com, got %s", msg.To)
@@ -35,7 +35,7 @@ func TestRequestEmailChange_Success(t *testing.T) {
 
 	uc := NewRequestEmailChangeUseCase(userRepo, emailChangeRepo, mockEmail, &mockRateLimiter{})
 
-	err := uc.Execute(context.Background(), RequestEmailChangeInput{
+	_, err := uc.Execute(context.Background(), RequestEmailChangeInput{
 		UserID:   "user-1",
 		Password: "Secret1!",
 		NewEmail: "newemail@example.com",
@@ -51,7 +51,7 @@ func TestRequestEmailChange_Success(t *testing.T) {
 
 func TestRequestEmailChange_WrongPassword(t *testing.T) {
 	userRepo := newNoConflictRepo()
-	activeUser := newUserWithRole("user-1", domain.RoleContestant, domain.StatusActive)
+	activeUser := newUserWithRole("user-1", domainShared.RoleContestant, domain.StatusActive)
 	userRepo.findByIDFn = func(_ context.Context, id string) (*domain.User, error) {
 		if id == "user-1" {
 			return activeUser, nil
@@ -63,7 +63,7 @@ func TestRequestEmailChange_WrongPassword(t *testing.T) {
 	mockEmail := &mockEmailSender{}
 	uc := NewRequestEmailChangeUseCase(userRepo, emailChangeRepo, mockEmail, &mockRateLimiter{})
 
-	err := uc.Execute(context.Background(), RequestEmailChangeInput{
+	_, err := uc.Execute(context.Background(), RequestEmailChangeInput{
 		UserID:   "user-1",
 		Password: "WrongPassword!",
 		NewEmail: "newemail@example.com",
@@ -74,7 +74,7 @@ func TestRequestEmailChange_WrongPassword(t *testing.T) {
 	}
 
 	appErr, ok := err.(*apperror.AppError)
-	if !ok || appErr.Code != "INVALID_CREDENTIALS" {
+	if !ok || appErr.Code != ErrCodeInvalidCredentials {
 		t.Errorf("expected INVALID_CREDENTIALS error, got %v", err)
 	}
 }
@@ -86,7 +86,7 @@ func TestRequestEmailChange_UserNotFound(t *testing.T) {
 	}
 
 	uc := NewRequestEmailChangeUseCase(userRepo, &mockEmailChangeRepo{}, &mockEmailSender{}, &mockRateLimiter{})
-	err := uc.Execute(context.Background(), RequestEmailChangeInput{
+	_, err := uc.Execute(context.Background(), RequestEmailChangeInput{
 		UserID:   "ghost",
 		Password: "Secret1!",
 		NewEmail: "new@example.com",
@@ -96,18 +96,18 @@ func TestRequestEmailChange_UserNotFound(t *testing.T) {
 		t.Fatal("expected error, got nil")
 	}
 	appErr, ok := err.(*apperror.AppError)
-	if !ok || appErr.Code != "INVALID_CREDENTIALS" {
+	if !ok || appErr.Code != ErrCodeInvalidCredentials {
 		t.Errorf("expected INVALID_CREDENTIALS, got %v", err)
 	}
 }
 
 func TestRequestEmailChange_InvalidNewEmail(t *testing.T) {
 	userRepo := newNoConflictRepo()
-	activeUser := newUserWithRole("user-1", domain.RoleContestant, domain.StatusActive)
+	activeUser := newUserWithRole("user-1", domainShared.RoleContestant, domain.StatusActive)
 	userRepo.findByIDFn = func(_ context.Context, _ string) (*domain.User, error) { return activeUser, nil }
 
 	uc := NewRequestEmailChangeUseCase(userRepo, &mockEmailChangeRepo{}, &mockEmailSender{}, &mockRateLimiter{})
-	err := uc.Execute(context.Background(), RequestEmailChangeInput{
+	_, err := uc.Execute(context.Background(), RequestEmailChangeInput{
 		UserID:   "user-1",
 		Password: "Secret1!",
 		NewEmail: "not-an-email",
@@ -117,7 +117,7 @@ func TestRequestEmailChange_InvalidNewEmail(t *testing.T) {
 		t.Fatal("expected error, got nil")
 	}
 	appErr, ok := err.(*apperror.AppError)
-	if !ok || appErr.Code != "VALIDATION_ERROR" {
+	if !ok || appErr.Code != apperror.ErrCodeValidationError {
 		t.Errorf("expected VALIDATION_ERROR, got %v", err)
 	}
 	if len(appErr.Details) == 0 || appErr.Details[0].Field != "newEmail" {
@@ -127,7 +127,7 @@ func TestRequestEmailChange_InvalidNewEmail(t *testing.T) {
 
 func TestRequestEmailChange_EmailDeliveryFails(t *testing.T) {
 	userRepo := newNoConflictRepo()
-	activeUser := newUserWithRole("user-1", domain.RoleContestant, domain.StatusActive)
+	activeUser := newUserWithRole("user-1", domainShared.RoleContestant, domain.StatusActive)
 	userRepo.findByIDFn = func(_ context.Context, id string) (*domain.User, error) {
 		if id == "user-1" {
 			return activeUser, nil
@@ -138,14 +138,14 @@ func TestRequestEmailChange_EmailDeliveryFails(t *testing.T) {
 	
 	// Simulate SMTP failure
 	mockEmail := &mockEmailSender{
-		sendFn: func(ctx context.Context, msg notification.EmailMessage) error {
+		sendFn: func(ctx context.Context, msg appshared.EmailMessage) error {
 			return errors.New("smtp timeout")
 		},
 	}
 
 	uc := NewRequestEmailChangeUseCase(userRepo, emailChangeRepo, mockEmail, &mockRateLimiter{})
 
-	err := uc.Execute(context.Background(), RequestEmailChangeInput{
+	_, err := uc.Execute(context.Background(), RequestEmailChangeInput{
 		UserID:   "user-1",
 		Password: "Secret1!",
 		NewEmail: "newemail@example.com",
@@ -156,10 +156,10 @@ func TestRequestEmailChange_EmailDeliveryFails(t *testing.T) {
 	}
 
 	appErr, ok := err.(*apperror.AppError)
-	if !ok || appErr.Code != "EMAIL_DELIVERY_FAILED" {
+	if !ok || appErr.Code != ErrCodeEmailDeliveryFailed {
 		t.Errorf("expected EMAIL_DELIVERY_FAILED error, got %v", err)
 	}
-	if appErr.StatusCode != http.StatusServiceUnavailable {
-		t.Errorf("expected 503 status code, got %d", appErr.StatusCode)
+	if appErr.Kind != apperror.KindServiceUnavailable {
+		t.Errorf("expected kind SERVICE_UNAVAILABLE, got %s", appErr.Kind)
 	}
 }

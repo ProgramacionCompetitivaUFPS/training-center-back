@@ -3,18 +3,18 @@ package user
 import (
 	"context"
 	"errors"
-	"net/http"
 	"testing"
 	"time"
 
-	"github.com/training-judge-center/backend/internal/domain/notification"
+	appshared "github.com/training-judge-center/backend/internal/application/shared"
+	domainShared "github.com/training-judge-center/backend/internal/domain/shared"
 	domain "github.com/training-judge-center/backend/internal/domain/user"
 	"github.com/training-judge-center/backend/pkg/apperror"
 )
 
 func TestConfirmEmailChange_Success(t *testing.T) {
 	userRepo := newNoConflictRepo()
-	activeUser := newUserWithRole("user-1", domain.RoleContestant, domain.StatusActive)
+	activeUser := newUserWithRole("user-1", domainShared.RoleContestant, domain.StatusActive)
 	userRepo.findByIDFn = func(_ context.Context, id string) (*domain.User, error) {
 		if id == "user-1" {
 			return activeUser, nil
@@ -28,7 +28,7 @@ func TestConfirmEmailChange_Success(t *testing.T) {
 	}
 
 	mockEmail, _ := domain.NewEmail("newemail@example.com")
-	req := domain.RestoreEmailChangeRequest("req-1", "user-1", mockEmail, "123456", domain.StatusPending, time.Now().Add(10 * time.Minute), time.Time{}, nil)
+	req := domain.RestoreEmailChangeRequest("req-1", "user-1", mockEmail, "123456", domain.RequestStatusPending, time.Now().Add(10 * time.Minute), time.Time{}, nil)
 
 	emailChangeRepo := &mockEmailChangeRepo{
 		findByCodeAndUserIDFn: func(ctx context.Context, code string, userID string) (*domain.EmailChangeRequest, error) {
@@ -38,7 +38,7 @@ func TestConfirmEmailChange_Success(t *testing.T) {
 			return nil, nil
 		},
 		updateFn: func(ctx context.Context, r *domain.EmailChangeRequest) error {
-			if r.Status() != domain.StatusUsed {
+			if r.Status() != domain.RequestStatusUsed {
 				t.Errorf("expected request status to be set to USED, got %s", r.Status())
 			}
 			return nil
@@ -47,7 +47,7 @@ func TestConfirmEmailChange_Success(t *testing.T) {
 
 	emailsSent := 0
 	mockEmailSender := &mockEmailSender{
-		sendFn: func(ctx context.Context, msg notification.EmailMessage) error {
+		sendFn: func(ctx context.Context, msg appshared.EmailMessage) error {
 			emailsSent++
 			return nil
 		},
@@ -63,8 +63,8 @@ func TestConfirmEmailChange_Success(t *testing.T) {
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
-	if newEmail.String() != "newemail@example.com" {
-		t.Errorf("expected returned email to be newemail@example.com, got %s", newEmail.String())
+	if newEmail.Email != "newemail@example.com" {
+		t.Errorf("expected returned email to be newemail@example.com, got %s", newEmail.Email)
 	}
 	if emailsSent != 2 {
 		t.Errorf("expected 2 emails to be sent, got %d", emailsSent)
@@ -76,7 +76,7 @@ func TestConfirmEmailChange_Success(t *testing.T) {
 
 func TestConfirmEmailChange_InvalidCode(t *testing.T) {
 	userRepo := newNoConflictRepo()
-	activeUser := newUserWithRole("user-1", domain.RoleContestant, domain.StatusActive)
+	activeUser := newUserWithRole("user-1", domainShared.RoleContestant, domain.StatusActive)
 	userRepo.findByIDFn = func(_ context.Context, id string) (*domain.User, error) {
 		return activeUser, nil
 	}
@@ -101,23 +101,23 @@ func TestConfirmEmailChange_InvalidCode(t *testing.T) {
 	}
 
 	appErr, ok := err.(*apperror.AppError)
-	if !ok || appErr.Code != "INVALID_CODE" {
+	if !ok || appErr.Code != ErrCodeInvalidCode {
 		t.Errorf("expected INVALID_CODE error, got %v", err)
 	}
-	if appErr.StatusCode != http.StatusBadRequest {
-		t.Errorf("expected status 400, got %d", appErr.StatusCode)
+	if appErr.Kind != apperror.KindBadRequest {
+		t.Errorf("expected kind BAD_REQUEST, got %s", appErr.Kind)
 	}
 }
 
 func TestConfirmEmailChange_ExpiredCode(t *testing.T) {
 	userRepo := newNoConflictRepo()
-	activeUser := newUserWithRole("user-1", domain.RoleContestant, domain.StatusActive)
+	activeUser := newUserWithRole("user-1", domainShared.RoleContestant, domain.StatusActive)
 	userRepo.findByIDFn = func(_ context.Context, id string) (*domain.User, error) {
 		return activeUser, nil
 	}
 
 	mockEmail, _ := domain.NewEmail("newemail@example.com")
-	req := domain.RestoreEmailChangeRequest("req-1", "user-1", mockEmail, "123456", domain.StatusPending, time.Now().Add(-10 * time.Minute), time.Time{}, nil) // EXPIRED!
+	req := domain.RestoreEmailChangeRequest("req-1", "user-1", mockEmail, "123456", domain.RequestStatusPending, time.Now().Add(-10 * time.Minute), time.Time{}, nil) // EXPIRED!
 
 	emailChangeRepo := &mockEmailChangeRepo{
 		findByCodeAndUserIDFn: func(ctx context.Context, code string, userID string) (*domain.EmailChangeRequest, error) {
@@ -139,25 +139,25 @@ func TestConfirmEmailChange_ExpiredCode(t *testing.T) {
 	}
 
 	appErr, ok := err.(*apperror.AppError)
-	if !ok || appErr.Code != "INVALID_CODE" {
+	if !ok || appErr.Code != ErrCodeInvalidCode {
 		t.Errorf("expected INVALID_CODE error, got %v", err)
 	}
 }
 
 func TestConfirmEmailChange_DuplicateEmailAtConfirmation(t *testing.T) {
 	userRepo := newNoConflictRepo()
-	activeUser := newUserWithRole("user-1", domain.RoleContestant, domain.StatusActive)
+	activeUser := newUserWithRole("user-1", domainShared.RoleContestant, domain.StatusActive)
 	userRepo.findByIDFn = func(_ context.Context, id string) (*domain.User, error) {
 		return activeUser, nil
 	}
 	// While the request was pending, someone else registered the new email.
-	// The DB constraint fires on Update and returns ErrEmailConflict.
+	// The DB constraint fires on Update and returns a conflict apperror.
 	userRepo.updateFn = func(_ context.Context, _ *domain.User) error {
-		return domain.ErrEmailConflict
+		return apperror.NewConflict(domain.ErrCodeEmailConflict, "email already in use")
 	}
 
 	mockEmail, _ := domain.NewEmail("stolen@example.com")
-	req := domain.RestoreEmailChangeRequest("req-1", "user-1", mockEmail, "123456", domain.StatusPending, time.Now().Add(10*time.Minute), time.Time{}, nil)
+	req := domain.RestoreEmailChangeRequest("req-1", "user-1", mockEmail, "123456", domain.RequestStatusPending, time.Now().Add(10*time.Minute), time.Time{}, nil)
 
 	emailChangeRepo := &mockEmailChangeRepo{
 		findByCodeAndUserIDFn: func(ctx context.Context, code string, userID string) (*domain.EmailChangeRequest, error) {
@@ -177,8 +177,8 @@ func TestConfirmEmailChange_DuplicateEmailAtConfirmation(t *testing.T) {
 	}
 
 	appErr, ok := err.(*apperror.AppError)
-	if !ok || appErr.Code != "EMAIL_ALREADY_EXISTS" {
-		t.Errorf("expected EMAIL_ALREADY_EXISTS error, got %v", err)
+	if !ok || appErr.Code != domain.ErrCodeEmailConflict {
+		t.Errorf("expected code %q, got %v", domain.ErrCodeEmailConflict, err)
 	}
 }
 
@@ -195,7 +195,7 @@ func TestConfirmEmailChange_UserNotFound(t *testing.T) {
 		t.Fatal("expected error, got nil")
 	}
 	appErr, ok := err.(*apperror.AppError)
-	if !ok || appErr.Code != "INVALID_CREDENTIALS" {
+	if !ok || appErr.Code != ErrCodeInvalidCredentials {
 		t.Errorf("expected INVALID_CREDENTIALS, got %v", err)
 	}
 }
@@ -213,14 +213,14 @@ func TestConfirmEmailChange_UserRepoError(t *testing.T) {
 		t.Fatal("expected error, got nil")
 	}
 	appErr, ok := err.(*apperror.AppError)
-	if !ok || appErr.Code != "INTERNAL_ERROR" {
+	if !ok || appErr.Code != apperror.ErrCodeInternalError {
 		t.Errorf("expected INTERNAL_ERROR, got %v", err)
 	}
 }
 
 func TestConfirmEmailChange_EmailChangeRepoError(t *testing.T) {
 	userRepo := newNoConflictRepo()
-	activeUser := newUserWithRole("user-1", domain.RoleContestant, domain.StatusActive)
+	activeUser := newUserWithRole("user-1", domainShared.RoleContestant, domain.StatusActive)
 	userRepo.findByIDFn = func(_ context.Context, _ string) (*domain.User, error) { return activeUser, nil }
 
 	emailChangeRepo := &mockEmailChangeRepo{
@@ -236,18 +236,18 @@ func TestConfirmEmailChange_EmailChangeRepoError(t *testing.T) {
 		t.Fatal("expected error, got nil")
 	}
 	appErr, ok := err.(*apperror.AppError)
-	if !ok || appErr.Code != "INTERNAL_ERROR" {
+	if !ok || appErr.Code != apperror.ErrCodeInternalError {
 		t.Errorf("expected INTERNAL_ERROR, got %v", err)
 	}
 }
 
 func TestConfirmEmailChange_TxFailure(t *testing.T) {
 	userRepo := newNoConflictRepo()
-	activeUser := newUserWithRole("user-1", domain.RoleContestant, domain.StatusActive)
+	activeUser := newUserWithRole("user-1", domainShared.RoleContestant, domain.StatusActive)
 	userRepo.findByIDFn = func(_ context.Context, _ string) (*domain.User, error) { return activeUser, nil }
 
 	mockEmail, _ := domain.NewEmail("new@example.com")
-	req := domain.RestoreEmailChangeRequest("req-1", "user-1", mockEmail, "123456", domain.StatusPending, time.Now().Add(10*time.Minute), time.Time{}, nil)
+	req := domain.RestoreEmailChangeRequest("req-1", "user-1", mockEmail, "123456", domain.RequestStatusPending, time.Now().Add(10*time.Minute), time.Time{}, nil)
 	emailChangeRepo := &mockEmailChangeRepo{
 		findByCodeAndUserIDFn: func(_ context.Context, _ string, _ string) (*domain.EmailChangeRequest, error) {
 			return req, nil
@@ -256,7 +256,7 @@ func TestConfirmEmailChange_TxFailure(t *testing.T) {
 
 	tx := &mockTransactionManager{
 		withTxFn: func(_ context.Context, _ func(context.Context) error) error {
-			return errors.New("tx error")
+			return apperror.NewInternal()
 		},
 	}
 
@@ -267,7 +267,7 @@ func TestConfirmEmailChange_TxFailure(t *testing.T) {
 		t.Fatal("expected error, got nil")
 	}
 	appErr, ok := err.(*apperror.AppError)
-	if !ok || appErr.Code != "INTERNAL_ERROR" {
+	if !ok || appErr.Code != apperror.ErrCodeInternalError {
 		t.Errorf("expected INTERNAL_ERROR, got %v", err)
 	}
 }

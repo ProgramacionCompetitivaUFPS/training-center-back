@@ -1,16 +1,16 @@
-package material
+﻿package material
 
 import (
 	"context"
 	"log/slog"
 
 	domainMaterial "github.com/training-judge-center/backend/internal/domain/material"
-	"github.com/training-judge-center/backend/internal/domain/shared"
+	appshared "github.com/training-judge-center/backend/internal/application/shared"
 	"github.com/training-judge-center/backend/pkg/apperror"
 )
 
 type GetMaterialInput struct {
-	CurrentUser shared.CurrentUser
+	CurrentUser appshared.CurrentUser
 	GroupID     string
 	MaterialID  string
 }
@@ -19,20 +19,20 @@ type GetMaterialOutput struct {
 	Material MaterialData
 }
 
-type GetMaterial struct {
+type GetMaterialUseCase struct {
 	repo               domainMaterial.Repository
 	groupVisibility    GroupVisibilityProvider
 	memberProvider     GroupMemberProvider
 	authorProvider     AuthorProvider
 }
 
-func NewGetMaterial(
+func NewGetMaterialUseCase(
 	repo domainMaterial.Repository,
 	groupVisibility GroupVisibilityProvider,
 	memberProvider GroupMemberProvider,
 	authorProvider AuthorProvider,
-) *GetMaterial {
-	return &GetMaterial{
+) *GetMaterialUseCase {
+	return &GetMaterialUseCase{
 		repo:            repo,
 		groupVisibility: groupVisibility,
 		memberProvider:  memberProvider,
@@ -40,7 +40,7 @@ func NewGetMaterial(
 	}
 }
 
-func (uc *GetMaterial) Execute(ctx context.Context, in GetMaterialInput) (*GetMaterialOutput, error) {
+func (uc *GetMaterialUseCase) Execute(ctx context.Context, in GetMaterialInput) (*GetMaterialOutput, error) {
 	visibility, exists, err := uc.groupVisibility.FindVisibility(ctx, in.GroupID)
 	if err != nil {
 		slog.ErrorContext(ctx, "failed to find group visibility", "error", err, "group_id", in.GroupID)
@@ -79,12 +79,14 @@ func (uc *GetMaterial) Execute(ctx context.Context, in GetMaterialInput) (*GetMa
 		slog.ErrorContext(ctx, "failed to resolve author display", "error", err, "author_id", m.AuthorID().Value())
 		return nil, apperror.NewInternal()
 	}
-	data.Author = displays[m.AuthorID().Value()]
+	if disp := displays[m.AuthorID().Value()]; disp != nil {
+		data.Author = &AuthorDTO{Nickname: disp.Nickname, Name: disp.Name}
+	}
 
 	return &GetMaterialOutput{Material: data}, nil
 }
 
-func checkGroupAccess(ctx context.Context, mp GroupMemberProvider, user shared.CurrentUser, groupID string, visibility GroupVisibility) error {
+func checkGroupAccess(ctx context.Context, mp GroupMemberProvider, user appshared.CurrentUser, groupID string, visibility GroupVisibility) error {
 	if visibility == GroupVisibilityVisible || user.IsAdmin() {
 		return nil
 	}
@@ -97,7 +99,7 @@ func checkGroupAccess(ctx context.Context, mp GroupMemberProvider, user shared.C
 		return apperror.NewInternal()
 	}
 	if !isMember {
-		return apperror.NewForbidden(ErrCodeInsufficientPerms, "you do not have permission to view materials in this group")
+		return apperror.NewForbidden(ErrCodeInsufficientPermissions, "you do not have permission to view materials in this group")
 	}
 	return nil
 }

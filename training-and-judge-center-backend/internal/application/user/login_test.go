@@ -3,11 +3,11 @@ package user
 import (
 	"context"
 	"errors"
-	"net/http"
 	"strings"
 	"testing"
 	"time"
 
+	"github.com/training-judge-center/backend/internal/domain/shared"
 	domain "github.com/training-judge-center/backend/internal/domain/user"
 	"github.com/training-judge-center/backend/pkg/apperror"
 )
@@ -28,8 +28,7 @@ func (m *mockTokenService) ValidateToken(tokenString string) (*domain.TokenClaim
 func newActiveUser() *domain.User {
 	password, _ := domain.NewPassword("Secret1!")
 	emailStr := "test@example.com"
-
-	u, err := domain.RestoreUser(
+	return domain.RestoreUser(
 		"user-uuid-123",
 		&emailStr,
 		password.Hash(),
@@ -38,16 +37,12 @@ func newActiveUser() *domain.User {
 		"Colombia",
 		"Cúcuta",
 		"UFPS",
-		domain.RoleContestant.String(),
+		shared.RoleContestant.String(),
 		domain.StatusActive.String(),
 		time.Now(),
 		nil,
 		nil,
 	)
-	if err != nil {
-		panic("newActiveUser: " + err.Error())
-	}
-	return u
 }
 
 func newLoginDeps() (*mockUserRepository, *mockTokenService) {
@@ -98,7 +93,7 @@ func TestLogin_MissingFields(t *testing.T) {
 	if !ok {
 		t.Fatalf("expected *apperror.AppError, got %T", err)
 	}
-	if appErr.Code != "VALIDATION_ERROR" {
+	if appErr.Code != apperror.ErrCodeValidationError {
 		t.Errorf("expected code VALIDATION_ERROR, got %q", appErr.Code)
 	}
 	if len(appErr.Details) != 2 {
@@ -122,11 +117,11 @@ func TestLogin_InvalidEmailFormat(t *testing.T) {
 	if !ok {
 		t.Fatalf("expected *apperror.AppError, got %T", err)
 	}
-	if appErr.Code != "INVALID_CREDENTIALS" {
+	if appErr.Code != ErrCodeInvalidCredentials {
 		t.Errorf("expected code INVALID_CREDENTIALS, got %q", appErr.Code)
 	}
-	if appErr.StatusCode != http.StatusUnauthorized {
-		t.Errorf("expected status 401, got %d", appErr.StatusCode)
+	if appErr.Kind != apperror.KindUnauthorized {
+		t.Errorf("expected kind UNAUTHORIZED, got %s", appErr.Kind)
 	}
 }
 
@@ -149,7 +144,7 @@ func TestLogin_UserNotFound(t *testing.T) {
 	if !ok {
 		t.Fatalf("expected *apperror.AppError, got %T", err)
 	}
-	if appErr.Code != "INVALID_CREDENTIALS" {
+	if appErr.Code != ErrCodeInvalidCredentials {
 		t.Errorf("expected code INVALID_CREDENTIALS, got %q", appErr.Code)
 	}
 }
@@ -157,7 +152,7 @@ func TestLogin_UserNotFound(t *testing.T) {
 func TestLogin_DeactivatedAccount(t *testing.T) {
 	repo, tokenSvc := newLoginDeps()
 	deactivatedUser := newActiveUser()
-	deactivatedUser.Deactivate()
+	deactivatedUser.Deactivate("test_suffix", time.Now())
 	repo.findByEmailFn = func(_ context.Context, _ domain.Email) (*domain.User, error) {
 		return deactivatedUser, nil
 	}
@@ -175,11 +170,11 @@ func TestLogin_DeactivatedAccount(t *testing.T) {
 	if !ok {
 		t.Fatalf("expected *apperror.AppError, got %T", err)
 	}
-	if appErr.Code != "ACCOUNT_DEACTIVATED" {
+	if appErr.Code != ErrCodeAccountDeactivated {
 		t.Errorf("expected code ACCOUNT_DEACTIVATED, got %q", appErr.Code)
 	}
-	if appErr.StatusCode != http.StatusForbidden {
-		t.Errorf("expected status 403, got %d", appErr.StatusCode)
+	if appErr.Kind != apperror.KindForbidden {
+		t.Errorf("expected kind FORBIDDEN, got %s", appErr.Kind)
 	}
 }
 
@@ -203,7 +198,7 @@ func TestLogin_WrongPassword(t *testing.T) {
 	if !ok {
 		t.Fatalf("expected *apperror.AppError, got %T", err)
 	}
-	if appErr.Code != "INVALID_CREDENTIALS" {
+	if appErr.Code != ErrCodeInvalidCredentials {
 		t.Errorf("expected code INVALID_CREDENTIALS, got %q", appErr.Code)
 	}
 }
@@ -263,7 +258,7 @@ func TestLogin_TokenGenerationError(t *testing.T) {
 	if !ok {
 		t.Fatalf("expected *apperror.AppError, got %T", err)
 	}
-	if appErr.Code != "INTERNAL_ERROR" {
+	if appErr.Code != apperror.ErrCodeInternalError {
 		t.Errorf("expected code INTERNAL_ERROR, got %q", appErr.Code)
 	}
 }
@@ -287,7 +282,7 @@ func TestLogin_RepositoryFindByEmailError(t *testing.T) {
 	if !ok {
 		t.Fatalf("expected *apperror.AppError, got %T", err)
 	}
-	if appErr.Code != "INTERNAL_ERROR" {
+	if appErr.Code != apperror.ErrCodeInternalError {
 		t.Errorf("expected code INTERNAL_ERROR, got %q", appErr.Code)
 	}
 }
@@ -299,7 +294,7 @@ func TestLogin_PasswordAtBcryptBoundary(t *testing.T) {
 		t.Fatalf("setup: %v", err)
 	}
 	emailStr := "boundary@example.com"
-	u, err := domain.RestoreUser(
+	u := domain.RestoreUser(
 		"user-boundary",
 		&emailStr,
 		password.Hash(),
@@ -308,15 +303,12 @@ func TestLogin_PasswordAtBcryptBoundary(t *testing.T) {
 		"Colombia",
 		"Cúcuta",
 		"UFPS",
-		domain.RoleContestant.String(),
+		shared.RoleContestant.String(),
 		domain.StatusActive.String(),
 		time.Now(),
 		nil,
 		nil,
 	)
-	if err != nil {
-		t.Fatalf("setup: %v", err)
-	}
 
 	repo, tokenSvc := newLoginDeps()
 	repo.findByEmailFn = func(_ context.Context, _ domain.Email) (*domain.User, error) {

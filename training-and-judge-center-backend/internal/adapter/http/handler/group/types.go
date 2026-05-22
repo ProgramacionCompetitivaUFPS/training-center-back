@@ -1,0 +1,108 @@
+package group
+
+type paginationResp struct {
+	TotalCount   int  `json:"totalCount"`
+	CurrentPage  int  `json:"currentPage"`
+	TotalPages   int  `json:"totalPages"`
+	ItemsPerPage int  `json:"itemsPerPage"`
+	HasNextPage  bool `json:"hasNextPage"`
+	HasPrevPage  bool `json:"hasPrevPage"`
+}
+
+type groupListItemResp struct {
+	ID          string  `json:"id"`
+	Name        string  `json:"name"`
+	Description *string `json:"description"`
+	Visibility  string  `json:"visibility"`
+	JoinPolicy  string  `json:"joinPolicy"`
+	IsGlobal    bool    `json:"isGlobal"`
+	MemberCount int     `json:"memberCount"`
+	UserRole    *string `json:"userRole"`
+	CreatedAt   string  `json:"createdAt"`
+}
+
+type listGroupsResponse struct {
+	Groups     []groupListItemResp `json:"groups"`
+	Pagination paginationResp      `json:"pagination"`
+}
+
+type leadResp struct {
+	UserID   string `json:"userId"`
+	Nickname string `json:"nickname"`
+	Name     string `json:"name"`
+}
+
+type statisticsResp struct {
+	MemberCount int `json:"memberCount"`
+	LeadCount   int `json:"leadCount"`
+}
+
+type userMembershipResp struct {
+	IsMember bool    `json:"isMember"`
+	Role     *string `json:"role"`
+	JoinedAt *string `json:"joinedAt"`
+}
+
+type getGroupResponse struct {
+	ID             string             `json:"id"`
+	Name           string             `json:"name"`
+	Description    *string            `json:"description"`
+	Visibility     string             `json:"visibility"`
+	JoinPolicy     string             `json:"joinPolicy"`
+	IsGlobal       bool               `json:"isGlobal"`
+	Statistics     statisticsResp     `json:"statistics"`
+	Leads          []leadResp         `json:"leads"`
+	UserMembership userMembershipResp `json:"userMembership"`
+	CreatedAt      string             `json:"createdAt"`
+	UpdatedAt      string             `json:"updatedAt"`
+}
+
+type myGroupItemResp struct {
+	ID          string  `json:"id"`
+	Name        string  `json:"name"`
+	Description *string `json:"description"`
+	Visibility  string  `json:"visibility"`
+	JoinPolicy  string  `json:"joinPolicy"`
+	IsGlobal    bool    `json:"isGlobal"`
+	MyRole      string  `json:"myRole"`
+	JoinedAt    string  `json:"joinedAt"`
+	MemberCount int     `json:"memberCount"`
+	CreatedAt   string  `json:"createdAt"`
+}
+
+type listMyGroupsResponse struct {
+	Groups     []myGroupItemResp `json:"groups"`
+	Pagination paginationResp    `json:"pagination"`
+}
+
+type requesterResp struct {
+	UserID   string `json:"userId"`
+	Nickname string `json:"nickname"`
+	Name     string `json:"name"`
+	Email    string `json:"email"`
+}
+
+type joinRequestResp struct {
+	ID        string         `json:"id"`
+	GroupID   string         `json:"groupId"`
+	Requester *requesterResp `json:"requester,omitempty"`
+	Status    string         `json:"status"`
+	Message   *string        `json:"message,omitempty"`
+	CreatedAt string         `json:"createdAt"`
+}
+
+type listRequestsResponse struct {
+	Requests   []joinRequestResp `json:"requests"`
+	Pagination paginationResp    `json:"pagination"`
+}
+
+func buildPagination(total, page, totalPages, limit int) paginationResp {
+	return paginationResp{
+		TotalCount:   total,
+		CurrentPage:  page,
+		TotalPages:   totalPages,
+		ItemsPerPage: limit,
+		HasNextPage:  page < totalPages,
+		HasPrevPage:  page > 1 && total > 0,
+	}
+}

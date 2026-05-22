@@ -1,11 +1,12 @@
 package user
 
 import (
-	"fmt"
 	"strings"
 	"unicode"
 
 	"golang.org/x/crypto/bcrypt"
+
+	"github.com/training-judge-center/backend/pkg/apperror"
 )
 
 const specialChars = "!@#$%^&*()_+-=[]{}|;:',.<>?/"
@@ -16,7 +17,9 @@ type Password struct {
 
 func NewPassword(raw string) (Password, error) {
 	if len(raw) < 8 || len(raw) > 72 {
-		return Password{}, fmt.Errorf("password must be between 8 and 72 characters")
+		return Password{}, apperror.NewValidation([]apperror.FieldError{
+			{Field: "password", Message: "password must be between 8 and 72 characters"},
+		})
 	}
 
 	var hasUpper, hasDigit, hasSpecial bool
@@ -32,28 +35,33 @@ func NewPassword(raw string) (Password, error) {
 	}
 
 	if !hasUpper {
-		return Password{}, fmt.Errorf("password must contain at least one uppercase letter")
+		return Password{}, apperror.NewValidation([]apperror.FieldError{
+			{Field: "password", Message: "password must contain at least one uppercase letter"},
+		})
 	}
 	if !hasDigit {
-		return Password{}, fmt.Errorf("password must contain at least one digit")
+		return Password{}, apperror.NewValidation([]apperror.FieldError{
+			{Field: "password", Message: "password must contain at least one digit"},
+		})
 	}
 	if !hasSpecial {
-		return Password{}, fmt.Errorf("password must contain at least one special character")
+		return Password{}, apperror.NewValidation([]apperror.FieldError{
+			{Field: "password", Message: "password must contain at least one special character"},
+		})
 	}
 
 	hashed, err := bcrypt.GenerateFromPassword([]byte(raw), bcrypt.DefaultCost)
 	if err != nil {
-		return Password{}, fmt.Errorf("failed to hash password: %w", err)
+		return Password{}, apperror.NewInternal()
 	}
 
 	return Password{hash: string(hashed)}, nil
 }
 
-func NewPasswordFromHash(hash string) (Password, error) {
-	if !strings.HasPrefix(hash, "$2") {
-		return Password{}, fmt.Errorf("invalid bcrypt hash format")
-	}
-	return Password{hash: hash}, nil
+const SystemNoLoginHash = "$SYSTEM_NO_LOGIN$"
+
+func RestorePassword(hash string) Password {
+	return Password{hash: hash}
 }
 
 func (p Password) Hash() string {

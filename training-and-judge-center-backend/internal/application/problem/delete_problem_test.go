@@ -12,7 +12,7 @@ func TestDeleteProblem_Success_Author(t *testing.T) {
 	repo := repoWith(newDraftProblem())
 	uc := NewDeleteProblemUseCase(repo, &mockFileStorage{})
 
-	_, err := uc.Execute(context.Background(), DeleteProblemInput{
+	err := uc.Execute(context.Background(), DeleteProblemInput{
 		Slug:        testSlug,
 		ConfirmSlug: testSlug,
 		CurrentUser: asCoach(authorID),
@@ -26,7 +26,7 @@ func TestDeleteProblem_Success_Admin(t *testing.T) {
 	repo := repoWith(newDraftProblem())
 	uc := NewDeleteProblemUseCase(repo, &mockFileStorage{})
 
-	_, err := uc.Execute(context.Background(), DeleteProblemInput{
+	err := uc.Execute(context.Background(), DeleteProblemInput{
 		Slug:        testSlug,
 		ConfirmSlug: testSlug,
 		CurrentUser: asAdmin(strangerID),
@@ -40,7 +40,7 @@ func TestDeleteProblem_Forbidden_Stranger(t *testing.T) {
 	repo := repoWith(newDraftProblem())
 	uc := NewDeleteProblemUseCase(repo, &mockFileStorage{})
 
-	_, err := uc.Execute(context.Background(), DeleteProblemInput{
+	err := uc.Execute(context.Background(), DeleteProblemInput{
 		Slug:        testSlug,
 		ConfirmSlug: testSlug,
 		CurrentUser: asContestant(strangerID),
@@ -53,8 +53,8 @@ func TestDeleteProblem_Forbidden_Stranger(t *testing.T) {
 	if !ok {
 		t.Fatalf("expected *apperror.AppError, got %T", err)
 	}
-	if appErr.Code != apperror.ErrCodeForbidden {
-		t.Errorf("expected FORBIDDEN, got %q", appErr.Code)
+	if appErr.Code != ErrCodeInsufficientPermissions {
+		t.Errorf("expected INSUFFICIENT_PERMISSIONS, got %q", appErr.Code)
 	}
 }
 
@@ -62,7 +62,7 @@ func TestDeleteProblem_ConfirmSlugMismatch(t *testing.T) {
 	repo := repoWith(newDraftProblem())
 	uc := NewDeleteProblemUseCase(repo, &mockFileStorage{})
 
-	_, err := uc.Execute(context.Background(), DeleteProblemInput{
+	err := uc.Execute(context.Background(), DeleteProblemInput{
 		Slug:        testSlug,
 		ConfirmSlug: "wrong-slug",
 		CurrentUser: asCoach(authorID),
@@ -84,7 +84,7 @@ func TestDeleteProblem_EmptyConfirmSlug(t *testing.T) {
 	repo := repoWith(newDraftProblem())
 	uc := NewDeleteProblemUseCase(repo, &mockFileStorage{})
 
-	_, err := uc.Execute(context.Background(), DeleteProblemInput{
+	err := uc.Execute(context.Background(), DeleteProblemInput{
 		Slug:        testSlug,
 		ConfirmSlug: "", // empty
 		CurrentUser: asCoach(authorID),
@@ -110,7 +110,7 @@ func TestDeleteProblem_NotFound(t *testing.T) {
 	}
 	uc := NewDeleteProblemUseCase(repo, &mockFileStorage{})
 
-	_, err := uc.Execute(context.Background(), DeleteProblemInput{
+	err := uc.Execute(context.Background(), DeleteProblemInput{
 		Slug:        testSlug,
 		ConfirmSlug: testSlug,
 		CurrentUser: asCoach(authorID),

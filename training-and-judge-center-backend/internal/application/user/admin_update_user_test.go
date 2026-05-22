@@ -3,16 +3,16 @@ package user
 import (
 	"context"
 	"errors"
-	"net/http"
 	"testing"
 
+	"github.com/training-judge-center/backend/internal/domain/shared"
 	domain "github.com/training-judge-center/backend/internal/domain/user"
 	"github.com/training-judge-center/backend/pkg/apperror"
 )
 
 func TestAdminUpdateUser_Success_AllFields(t *testing.T) {
 	repo := newNoConflictRepo()
-	targetUser := newUserWithRole("target-1", domain.RoleContestant, domain.StatusActive)
+	targetUser := newUserWithRole("target-1", shared.RoleContestant, domain.StatusActive)
 	repo.findByIDFn = func(_ context.Context, id string) (*domain.User, error) {
 		if id == "target-1" {
 			return targetUser, nil
@@ -38,26 +38,29 @@ func TestAdminUpdateUser_Success_AllFields(t *testing.T) {
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
-	if result.Name != "Updated Name" {
-		t.Errorf("expected name %q, got %q", "Updated Name", result.Name)
+	if result.User.Name != "Updated Name" {
+		t.Errorf("expected name %q, got %q", "Updated Name", result.User.Name)
 	}
-	if result.Nickname != "updatednick" {
-		t.Errorf("expected nickname %q, got %q", "updatednick", result.Nickname)
+	if result.User.Nickname != "updatednick" {
+		t.Errorf("expected nickname %q, got %q", "updatednick", result.User.Nickname)
 	}
-	if result.Email == nil || *result.Email != "updated@example.com" {
-		t.Errorf("expected email %q, got %v", "updated@example.com", result.Email)
+	if result.User.Email == nil || *result.User.Email != "updated@example.com" {
+		t.Errorf("expected email %q, got %v", "updated@example.com", result.User.Email)
 	}
-	if result.Role != "COACH" {
-		t.Errorf("expected role %q, got %q", "COACH", result.Role)
+	if result.User.Role != "COACH" {
+		t.Errorf("expected role %q, got %q", "COACH", result.User.Role)
 	}
-	if result.UpdatedAt == nil {
+	if result.User.Institution != "New University" {
+		t.Errorf("expected institution %q, got %q", "New University", result.User.Institution)
+	}
+	if result.User.UpdatedAt == nil {
 		t.Error("expected updatedAt to be set")
 	}
 }
 
 func TestAdminUpdateUser_Success_PartialUpdate(t *testing.T) {
 	repo := newNoConflictRepo()
-	targetUser := newUserWithRole("target-1", domain.RoleContestant, domain.StatusActive)
+	targetUser := newUserWithRole("target-1", shared.RoleContestant, domain.StatusActive)
 	repo.findByIDFn = func(_ context.Context, _ string) (*domain.User, error) {
 		return targetUser, nil
 	}
@@ -71,11 +74,11 @@ func TestAdminUpdateUser_Success_PartialUpdate(t *testing.T) {
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
-	if result.Name != "Only Name" {
-		t.Errorf("expected name %q, got %q", "Only Name", result.Name)
+	if result.User.Name != "Only Name" {
+		t.Errorf("expected name %q, got %q", "Only Name", result.User.Name)
 	}
-	if result.Role != "CONTESTANT" {
-		t.Errorf("expected role unchanged, got %q", result.Role)
+	if result.User.Role != "CONTESTANT" {
+		t.Errorf("expected role unchanged, got %q", result.User.Role)
 	}
 }
 
@@ -96,11 +99,11 @@ func TestAdminUpdateUser_UserNotFound(t *testing.T) {
 	if !ok {
 		t.Fatalf("expected *apperror.AppError, got %T", err)
 	}
-	if appErr.Code != "NOT_FOUND" {
+	if appErr.Code != domain.ErrCodeUserNotFound {
 		t.Errorf("expected code NOT_FOUND, got %q", appErr.Code)
 	}
-	if appErr.StatusCode != http.StatusNotFound {
-		t.Errorf("expected status 404, got %d", appErr.StatusCode)
+	if appErr.Kind != apperror.KindNotFound {
+		t.Errorf("expected kind NOT_FOUND, got %s", appErr.Kind)
 	}
 }
 
@@ -117,14 +120,14 @@ func TestAdminUpdateUser_EmptyPayload(t *testing.T) {
 	if !ok {
 		t.Fatalf("expected *apperror.AppError, got %T", err)
 	}
-	if appErr.Code != "VALIDATION_ERROR" {
+	if appErr.Code != apperror.ErrCodeValidationError {
 		t.Errorf("expected code VALIDATION_ERROR, got %q", appErr.Code)
 	}
 }
 
 func TestAdminUpdateUser_CannotAssignAdminRole(t *testing.T) {
 	repo := newNoConflictRepo()
-	targetUser := newUserWithRole("target-1", domain.RoleContestant, domain.StatusActive)
+	targetUser := newUserWithRole("target-1", shared.RoleContestant, domain.StatusActive)
 	repo.findByIDFn = func(_ context.Context, _ string) (*domain.User, error) {
 		return targetUser, nil
 	}
@@ -143,7 +146,7 @@ func TestAdminUpdateUser_CannotAssignAdminRole(t *testing.T) {
 	if !ok {
 		t.Fatalf("expected *apperror.AppError, got %T", err)
 	}
-	if appErr.Code != "VALIDATION_ERROR" {
+	if appErr.Code != apperror.ErrCodeValidationError {
 		t.Errorf("expected code VALIDATION_ERROR, got %q", appErr.Code)
 	}
 	if len(appErr.Details) == 0 || appErr.Details[0].Message != "Cannot assign ADMIN role through this endpoint" {
@@ -153,12 +156,12 @@ func TestAdminUpdateUser_CannotAssignAdminRole(t *testing.T) {
 
 func TestAdminUpdateUser_EmailAlreadyExists(t *testing.T) {
 	repo := newNoConflictRepo()
-	targetUser := newUserWithRole("target-1", domain.RoleContestant, domain.StatusActive)
+	targetUser := newUserWithRole("target-1", shared.RoleContestant, domain.StatusActive)
 	repo.findByIDFn = func(_ context.Context, _ string) (*domain.User, error) {
 		return targetUser, nil
 	}
 	repo.updateFn = func(_ context.Context, _ *domain.User) error {
-		return domain.ErrEmailConflict
+		return apperror.NewConflict(domain.ErrCodeEmailConflict, "email already in use")
 	}
 	uc := NewAdminUpdateUserUseCase(repo)
 
@@ -175,8 +178,8 @@ func TestAdminUpdateUser_EmailAlreadyExists(t *testing.T) {
 	if !ok {
 		t.Fatalf("expected *apperror.AppError, got %T", err)
 	}
-	if appErr.Code != "EMAIL_ALREADY_EXISTS" {
-		t.Errorf("expected code EMAIL_ALREADY_EXISTS, got %q", appErr.Code)
+	if appErr.Code != domain.ErrCodeEmailConflict {
+		t.Errorf("expected code %q, got %q", domain.ErrCodeEmailConflict, appErr.Code)
 	}
 }
 
@@ -200,19 +203,19 @@ func TestAdminUpdateUser_RepositoryFindError(t *testing.T) {
 	if !ok {
 		t.Fatalf("expected *apperror.AppError, got %T", err)
 	}
-	if appErr.Code != "INTERNAL_ERROR" {
+	if appErr.Code != apperror.ErrCodeInternalError {
 		t.Errorf("expected code INTERNAL_ERROR, got %q", appErr.Code)
 	}
 }
 
 func TestAdminUpdateUser_RepositoryUpdateError(t *testing.T) {
 	repo := newNoConflictRepo()
-	targetUser := newUserWithRole("target-1", domain.RoleContestant, domain.StatusActive)
+	targetUser := newUserWithRole("target-1", shared.RoleContestant, domain.StatusActive)
 	repo.findByIDFn = func(_ context.Context, _ string) (*domain.User, error) {
 		return targetUser, nil
 	}
 	repo.updateFn = func(_ context.Context, _ *domain.User) error {
-		return errors.New("db update failed")
+		return apperror.NewInternal()
 	}
 	uc := NewAdminUpdateUserUseCase(repo)
 
@@ -229,14 +232,14 @@ func TestAdminUpdateUser_RepositoryUpdateError(t *testing.T) {
 	if !ok {
 		t.Fatalf("expected *apperror.AppError, got %T", err)
 	}
-	if appErr.Code != "INTERNAL_ERROR" {
+	if appErr.Code != apperror.ErrCodeInternalError {
 		t.Errorf("expected code INTERNAL_ERROR, got %q", appErr.Code)
 	}
 }
 
 func TestAdminUpdateUser_InvalidRole(t *testing.T) {
 	repo := newNoConflictRepo()
-	targetUser := newUserWithRole("target-1", domain.RoleContestant, domain.StatusActive)
+	targetUser := newUserWithRole("target-1", shared.RoleContestant, domain.StatusActive)
 	repo.findByIDFn = func(_ context.Context, _ string) (*domain.User, error) {
 		return targetUser, nil
 	}
@@ -255,7 +258,7 @@ func TestAdminUpdateUser_InvalidRole(t *testing.T) {
 	if !ok {
 		t.Fatalf("expected *apperror.AppError, got %T", err)
 	}
-	if appErr.Code != "VALIDATION_ERROR" {
+	if appErr.Code != apperror.ErrCodeValidationError {
 		t.Errorf("expected code VALIDATION_ERROR, got %q", appErr.Code)
 	}
 	if len(appErr.Details) == 0 || appErr.Details[0].Field != "role" {
@@ -265,7 +268,7 @@ func TestAdminUpdateUser_InvalidRole(t *testing.T) {
 
 func TestAdminUpdateUser_Success_CityAndCountry(t *testing.T) {
 	repo := newNoConflictRepo()
-	targetUser := newUserWithRole("target-1", domain.RoleContestant, domain.StatusActive)
+	targetUser := newUserWithRole("target-1", shared.RoleContestant, domain.StatusActive)
 	repo.findByIDFn = func(_ context.Context, _ string) (*domain.User, error) {
 		return targetUser, nil
 	}
@@ -279,17 +282,17 @@ func TestAdminUpdateUser_Success_CityAndCountry(t *testing.T) {
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
-	if result.City != "Guayaquil" {
-		t.Errorf("expected city %q, got %q", "Guayaquil", result.City)
+	if result.User.City != "Guayaquil" {
+		t.Errorf("expected city %q, got %q", "Guayaquil", result.User.City)
 	}
-	if result.Country != "Ecuador" {
-		t.Errorf("expected country %q, got %q", "Ecuador", result.Country)
+	if result.User.Country != "Ecuador" {
+		t.Errorf("expected country %q, got %q", "Ecuador", result.User.Country)
 	}
 }
 
 func TestAdminUpdateUser_EmptyCityValidation(t *testing.T) {
 	repo := newNoConflictRepo()
-	targetUser := newUserWithRole("target-1", domain.RoleContestant, domain.StatusActive)
+	targetUser := newUserWithRole("target-1", shared.RoleContestant, domain.StatusActive)
 	repo.findByIDFn = func(_ context.Context, _ string) (*domain.User, error) {
 		return targetUser, nil
 	}
@@ -306,19 +309,19 @@ func TestAdminUpdateUser_EmptyCityValidation(t *testing.T) {
 	if !ok {
 		t.Fatalf("expected *apperror.AppError, got %T", err)
 	}
-	if appErr.Code != "VALIDATION_ERROR" {
+	if appErr.Code != apperror.ErrCodeValidationError {
 		t.Errorf("expected code VALIDATION_ERROR, got %q", appErr.Code)
 	}
 }
 
 func TestAdminUpdateUser_NicknameConflict(t *testing.T) {
 	repo := newNoConflictRepo()
-	targetUser := newUserWithRole("target-1", domain.RoleContestant, domain.StatusActive)
+	targetUser := newUserWithRole("target-1", shared.RoleContestant, domain.StatusActive)
 	repo.findByIDFn = func(_ context.Context, _ string) (*domain.User, error) {
 		return targetUser, nil
 	}
 	repo.updateFn = func(_ context.Context, _ *domain.User) error {
-		return domain.ErrNicknameConflict
+		return apperror.NewConflict(domain.ErrCodeNicknameConflict, "nickname already in use")
 	}
 	uc := NewAdminUpdateUserUseCase(repo)
 
@@ -335,14 +338,14 @@ func TestAdminUpdateUser_NicknameConflict(t *testing.T) {
 	if !ok {
 		t.Fatalf("expected *apperror.AppError, got %T", err)
 	}
-	if appErr.Code != "NICKNAME_ALREADY_EXISTS" {
-		t.Errorf("expected NICKNAME_ALREADY_EXISTS, got %q", appErr.Code)
+	if appErr.Code != domain.ErrCodeNicknameConflict {
+		t.Errorf("expected code %q, got %q", domain.ErrCodeNicknameConflict, appErr.Code)
 	}
 }
 
 func TestAdminUpdateUser_EmptyCountryValidation(t *testing.T) {
 	repo := newNoConflictRepo()
-	targetUser := newUserWithRole("target-1", domain.RoleContestant, domain.StatusActive)
+	targetUser := newUserWithRole("target-1", shared.RoleContestant, domain.StatusActive)
 	repo.findByIDFn = func(_ context.Context, _ string) (*domain.User, error) {
 		return targetUser, nil
 	}
@@ -359,7 +362,7 @@ func TestAdminUpdateUser_EmptyCountryValidation(t *testing.T) {
 	if !ok {
 		t.Fatalf("expected *apperror.AppError, got %T", err)
 	}
-	if appErr.Code != "VALIDATION_ERROR" {
+	if appErr.Code != apperror.ErrCodeValidationError {
 		t.Errorf("expected code VALIDATION_ERROR, got %q", appErr.Code)
 	}
 }

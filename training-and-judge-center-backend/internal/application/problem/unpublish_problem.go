@@ -1,17 +1,19 @@
-package problem
+﻿package problem
 
 import (
 	"context"
 	"log/slog"
+	"time"
 
 	"github.com/training-judge-center/backend/internal/domain/problem"
 	"github.com/training-judge-center/backend/internal/domain/shared"
+	appshared "github.com/training-judge-center/backend/internal/application/shared"
 	"github.com/training-judge-center/backend/pkg/apperror"
 )
 
 type UnpublishProblemInput struct {
 	Slug        string
-	CurrentUser shared.CurrentUser
+	CurrentUser appshared.CurrentUser
 }
 
 type UnpublishProblemUseCase struct {
@@ -22,7 +24,11 @@ func NewUnpublishProblemUseCase(repo problem.Repository) *UnpublishProblemUseCas
 	return &UnpublishProblemUseCase{repo: repo}
 }
 
-func (uc *UnpublishProblemUseCase) Execute(ctx context.Context, in UnpublishProblemInput) (*problem.Problem, error) {
+type UnpublishProblemOutput struct {
+	Problem ProblemDTO
+}
+
+func (uc *UnpublishProblemUseCase) Execute(ctx context.Context, in UnpublishProblemInput) (*UnpublishProblemOutput, error) {
 	slug, err := problem.NewSlug(in.Slug)
 	if err != nil {
 		return nil, err
@@ -36,10 +42,11 @@ func (uc *UnpublishProblemUseCase) Execute(ctx context.Context, in UnpublishProb
 	viewerID := shared.RestoreUserID(in.CurrentUser.ID)
 	isAdmin := in.CurrentUser.IsAdmin()
 	if !p.CanBeEditedBy(viewerID, isAdmin) {
-		return nil, apperror.NewForbidden(apperror.ErrCodeForbidden, "Only the problem author, Admin, or assigned modifiers can unpublish this problem")
+		return nil, apperror.NewForbidden(ErrCodeInsufficientPermissions, "Only the problem author, Admin, or assigned modifiers can unpublish this problem")
 	}
 
-	if err := p.Unpublish(); err != nil {
+	now := time.Now()
+	if err := p.Unpublish(now); err != nil {
 		return nil, err
 	}
 
@@ -48,5 +55,5 @@ func (uc *UnpublishProblemUseCase) Execute(ctx context.Context, in UnpublishProb
 		return nil, apperror.NewInternal()
 	}
 
-	return p, nil
+	return &UnpublishProblemOutput{Problem: problemToDTO(p)}, nil
 }

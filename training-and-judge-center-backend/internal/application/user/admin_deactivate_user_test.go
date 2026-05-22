@@ -3,17 +3,17 @@ package user
 import (
 	"context"
 	"errors"
-	"net/http"
 	"testing"
 	"time"
 
+	"github.com/training-judge-center/backend/internal/domain/shared"
 	domain "github.com/training-judge-center/backend/internal/domain/user"
 	"github.com/training-judge-center/backend/pkg/apperror"
 )
 
 func TestAdminDeactivateUser_Success(t *testing.T) {
 	repo := newNoConflictRepo()
-	target := newUserWithRole("target-1", domain.RoleContestant, domain.StatusActive)
+	target := newUserWithRole("target-1", shared.RoleContestant, domain.StatusActive)
 	repo.findByIDFn = func(_ context.Context, id string) (*domain.User, error) {
 		if id == "target-1" {
 			return target, nil
@@ -42,8 +42,8 @@ func TestAdminDeactivateUser_Success(t *testing.T) {
 	if target.Status() != domain.StatusDeactivated {
 		t.Errorf("expected status DEACTIVATED, got %s", target.Status())
 	}
-	if target.Email() != nil {
-		t.Errorf("expected email to be nil after deactivation, got %v", target.Email())
+	if target.Email().String() != "" {
+		t.Errorf("expected email to be empty after deactivation, got %v", target.Email())
 	}
 	if target.DeactivatedAt() == nil {
 		t.Error("expected deactivatedAt to be set")
@@ -61,12 +61,15 @@ func TestAdminDeactivateUser_SelfDeactivation(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected error, got nil")
 	}
-	if !errors.Is(err, domain.ErrCannotSelfDeactivate) {
-		t.Errorf("expected ErrCannotSelfDeactivate, got %v", err)
+	appErr, ok := err.(*apperror.AppError)
+	if !ok {
+		t.Fatalf("expected *apperror.AppError, got %T", err)
 	}
-	appErr := err.(*apperror.AppError)
-	if appErr.StatusCode != http.StatusForbidden {
-		t.Errorf("expected status 403, got %d", appErr.StatusCode)
+	if appErr.Code != ErrCodeCannotSelfDeactivate {
+		t.Errorf("expected code %q, got %q", ErrCodeCannotSelfDeactivate, appErr.Code)
+	}
+	if appErr.Kind != apperror.KindForbidden {
+		t.Errorf("expected kind FORBIDDEN, got %s", appErr.Kind)
 	}
 }
 
@@ -79,14 +82,14 @@ func TestAdminDeactivateUser_TargetNotFound(t *testing.T) {
 		t.Fatal("expected error, got nil")
 	}
 	appErr := err.(*apperror.AppError)
-	if appErr.Code != apperror.ErrCodeNotFound {
+	if appErr.Code != domain.ErrCodeUserNotFound {
 		t.Errorf("expected code NOT_FOUND, got %q", appErr.Code)
 	}
 }
 
 func TestAdminDeactivateUser_CannotDeactivateAdmin(t *testing.T) {
 	repo := newNoConflictRepo()
-	adminTarget := newUserWithRole("admin-2", domain.RoleAdmin, domain.StatusActive)
+	adminTarget := newUserWithRole("admin-2", shared.RoleAdmin, domain.StatusActive)
 	repo.findByIDFn = func(_ context.Context, _ string) (*domain.User, error) {
 		return adminTarget, nil
 	}
@@ -96,18 +99,21 @@ func TestAdminDeactivateUser_CannotDeactivateAdmin(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected error, got nil")
 	}
-	if !errors.Is(err, domain.ErrCannotDeactivateAdmin) {
-		t.Errorf("expected ErrCannotDeactivateAdmin, got %v", err)
+	appErr, ok := err.(*apperror.AppError)
+	if !ok {
+		t.Fatalf("expected *apperror.AppError, got %T", err)
 	}
-	appErr := err.(*apperror.AppError)
-	if appErr.StatusCode != http.StatusForbidden {
-		t.Errorf("expected status 403, got %d", appErr.StatusCode)
+	if appErr.Code != ErrCodeCannotDeactivateAdmin {
+		t.Errorf("expected code %q, got %q", ErrCodeCannotDeactivateAdmin, appErr.Code)
+	}
+	if appErr.Kind != apperror.KindForbidden {
+		t.Errorf("expected kind FORBIDDEN, got %s", appErr.Kind)
 	}
 }
 
 func TestAdminDeactivateUser_AlreadyDeactivated_Idempotent(t *testing.T) {
 	repo := newNoConflictRepo()
-	target := newUserWithRole("target-1", domain.RoleContestant, domain.StatusDeactivated)
+	target := newUserWithRole("target-1", shared.RoleContestant, domain.StatusDeactivated)
 	repo.findByIDFn = func(_ context.Context, _ string) (*domain.User, error) {
 		return target, nil
 	}
@@ -139,14 +145,14 @@ func TestAdminDeactivateUser_RepositoryFindError(t *testing.T) {
 		t.Fatal("expected error, got nil")
 	}
 	appErr := err.(*apperror.AppError)
-	if appErr.Code != "INTERNAL_ERROR" {
+	if appErr.Code != apperror.ErrCodeInternalError {
 		t.Errorf("expected code INTERNAL_ERROR, got %q", appErr.Code)
 	}
 }
 
 func TestAdminDeactivateUser_SessionInvalidationError_DoesNotPersist(t *testing.T) {
 	repo := newNoConflictRepo()
-	target := newUserWithRole("target-1", domain.RoleContestant, domain.StatusActive)
+	target := newUserWithRole("target-1", shared.RoleContestant, domain.StatusActive)
 	repo.findByIDFn = func(_ context.Context, _ string) (*domain.User, error) {
 		return target, nil
 	}
@@ -167,7 +173,7 @@ func TestAdminDeactivateUser_SessionInvalidationError_DoesNotPersist(t *testing.
 		t.Fatal("expected error when session invalidation fails, got nil")
 	}
 	appErr := err.(*apperror.AppError)
-	if appErr.Code != "INTERNAL_ERROR" {
+	if appErr.Code != apperror.ErrCodeInternalError {
 		t.Errorf("expected code INTERNAL_ERROR, got %q", appErr.Code)
 	}
 	if updateCalled {
@@ -177,7 +183,7 @@ func TestAdminDeactivateUser_SessionInvalidationError_DoesNotPersist(t *testing.
 
 func TestAdminDeactivateUser_RepositoryUpdateError(t *testing.T) {
 	repo := newNoConflictRepo()
-	target := newUserWithRole("target-1", domain.RoleContestant, domain.StatusActive)
+	target := newUserWithRole("target-1", shared.RoleContestant, domain.StatusActive)
 	repo.findByIDFn = func(_ context.Context, _ string) (*domain.User, error) {
 		return target, nil
 	}
@@ -191,7 +197,7 @@ func TestAdminDeactivateUser_RepositoryUpdateError(t *testing.T) {
 		t.Fatal("expected error, got nil")
 	}
 	appErr := err.(*apperror.AppError)
-	if appErr.Code != "INTERNAL_ERROR" {
+	if appErr.Code != apperror.ErrCodeInternalError {
 		t.Errorf("expected code INTERNAL_ERROR, got %q", appErr.Code)
 	}
 }

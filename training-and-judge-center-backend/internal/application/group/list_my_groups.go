@@ -1,4 +1,4 @@
-package group
+﻿package group
 
 import (
 	"context"
@@ -8,11 +8,12 @@ import (
 
 	domainGroup "github.com/training-judge-center/backend/internal/domain/group"
 	"github.com/training-judge-center/backend/internal/domain/shared"
+	appshared "github.com/training-judge-center/backend/internal/application/shared"
 	"github.com/training-judge-center/backend/pkg/apperror"
 )
 
 type ListMyGroupsInput struct {
-	CurrentUser shared.CurrentUser
+	CurrentUser appshared.CurrentUser
 	Role        *string
 	Search      string
 	SortBy      string
@@ -22,9 +23,9 @@ type ListMyGroupsInput struct {
 }
 
 type MyGroupItem struct {
-	Group       *domainGroup.Group
+	Group       GroupDTO
 	MemberCount int
-	MyRole      domainGroup.MemberRole
+	MyRole      string
 	JoinedAt    time.Time
 }
 
@@ -114,9 +115,9 @@ func (uc *ListMyGroupsUseCase) Execute(ctx context.Context, in ListMyGroupsInput
 			continue
 		}
 		items = append(items, MyGroupItem{
-			Group:       g,
+			Group:       groupToDTO(g),
 			MemberCount: s.Count,
-			MyRole:      s.Role,
+			MyRole:      s.Role.String(),
 			JoinedAt:    s.JoinedAt,
 		})
 	}

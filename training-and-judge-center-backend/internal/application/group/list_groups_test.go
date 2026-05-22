@@ -1,4 +1,4 @@
-package group
+﻿package group
 
 import (
 	"context"
@@ -7,6 +7,7 @@ import (
 
 	domainGroup "github.com/training-judge-center/backend/internal/domain/group"
 	"github.com/training-judge-center/backend/internal/domain/shared"
+	appshared "github.com/training-judge-center/backend/internal/application/shared"
 	"github.com/training-judge-center/backend/pkg/apperror"
 )
 
@@ -47,19 +48,28 @@ func (f *fakeRepo) List(ctx context.Context, filters domainGroup.ListFilters) ([
 }
 
 type fakeMemberRepo struct {
-	memberCounts map[string]int
-	memberships  map[string]*domainGroup.GroupMember // key: groupID+userID
-	leadCounts   map[string]int
-	leads        map[string][]*domainGroup.GroupMember
+	memberCounts         map[string]int
+	memberships          map[string]*domainGroup.GroupMember // key: groupID+userID
+	leadCounts           map[string]int
+	leads                map[string][]*domainGroup.GroupMember
+	saveErr              error
+	savedMember          *domainGroup.GroupMember
+	findByGroupAndUserErr error
 }
 
 func keyOf(groupID string, userID shared.UserID) string { return groupID + "::" + userID.Value() }
 
-func (f *fakeMemberRepo) Save(ctx context.Context, m *domainGroup.GroupMember) error { return nil }
+func (f *fakeMemberRepo) Save(_ context.Context, m *domainGroup.GroupMember) error {
+	f.savedMember = m
+	return f.saveErr
+}
 func (f *fakeMemberRepo) SaveAll(ctx context.Context, members []*domainGroup.GroupMember) error {
 	return nil
 }
 func (f *fakeMemberRepo) FindByGroupAndUser(ctx context.Context, groupID string, userID shared.UserID) (*domainGroup.GroupMember, error) {
+	if f.findByGroupAndUserErr != nil {
+		return nil, f.findByGroupAndUserErr
+	}
 	if m, ok := f.memberships[keyOf(groupID, userID)]; ok {
 		return m, nil
 	}
@@ -96,23 +106,113 @@ func (f *fakeMemberRepo) BulkStats(ctx context.Context, groupIDs []string, viewe
 
 // --- helpers ---
 
+var testNow = time.Date(2024, 1, 15, 12, 0, 0, 0, time.UTC)
+
 func mustGroup(t *testing.T, id, name string, visibility domainGroup.Visibility, joinPolicy domainGroup.JoinPolicy) *domainGroup.Group {
 	t.Helper()
 	gn, err := domainGroup.NewGroupName(name)
 	if err != nil {
 		t.Fatalf("NewGroupName: %v", err)
 	}
-	g, err := domainGroup.NewGroup(id, gn, nil, visibility, joinPolicy, shared.RestoreUserID("creator-id"), func() time.Time {
-		return time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
-	})
+	g, err := domainGroup.NewGroup(id, gn, nil, visibility, joinPolicy, shared.RestoreUserID("creator-id"),
+		time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC))
 	if err != nil {
 		t.Fatalf("NewGroup: %v", err)
 	}
 	return g
 }
 
-func currentUser(id, role string) shared.CurrentUser {
-	return shared.CurrentUser{ID: id, Role: role}
+func currentUser(id string, role shared.Role) appshared.CurrentUser {
+	return appshared.CurrentUser{ID: id, Role: role}
+}
+
+type fakeJoinRequestRepo struct {
+	requests      []*domainGroup.JoinRequest
+	savedRequests []*domainGroup.JoinRequest
+	deletedIDs    []string
+	saveErr       error
+	findErr       error
+}
+
+func (f *fakeJoinRequestRepo) Save(_ context.Context, r *domainGroup.JoinRequest) error {
+	if f.saveErr != nil {
+		return f.saveErr
+	}
+	for i, existing := range f.savedRequests {
+		if existing.ID() == r.ID() {
+			f.savedRequests[i] = r
+			return nil
+		}
+	}
+	f.savedRequests = append(f.savedRequests, r)
+	return nil
+}
+
+func (f *fakeJoinRequestRepo) FindByID(_ context.Context, id string) (*domainGroup.JoinRequest, error) {
+	if f.findErr != nil {
+		return nil, f.findErr
+	}
+	for _, r := range f.requests {
+		if r.ID() == id {
+			return r, nil
+		}
+	}
+	return nil, nil
+}
+
+func (f *fakeJoinRequestRepo) FindByGroupAndUser(_ context.Context, groupID string, userID shared.UserID) (*domainGroup.JoinRequest, error) {
+	if f.findErr != nil {
+		return nil, f.findErr
+	}
+	var latest *domainGroup.JoinRequest
+	for _, r := range f.requests {
+		if r.GroupID() == groupID && r.RequesterUserID().Value() == userID.Value() {
+			if r.IsPending() {
+				return r, nil
+			}
+			if latest == nil {
+				latest = r
+			}
+		}
+	}
+	return latest, nil
+}
+
+func (f *fakeJoinRequestRepo) FindByGroup(_ context.Context, groupID string, filters domainGroup.JoinRequestFilters) ([]*domainGroup.JoinRequest, int, error) {
+	var out []*domainGroup.JoinRequest
+	for _, r := range f.requests {
+		if r.GroupID() != groupID {
+			continue
+		}
+		if filters.Status != nil && r.Status() != *filters.Status {
+			continue
+		}
+		out = append(out, r)
+	}
+	return out, len(out), nil
+}
+
+func (f *fakeJoinRequestRepo) Delete(_ context.Context, id string) error {
+	f.deletedIDs = append(f.deletedIDs, id)
+	return nil
+}
+
+type fakeTxManager struct{}
+
+func (f *fakeTxManager) WithTx(ctx context.Context, fn func(context.Context) error) error {
+	return fn(ctx)
+}
+
+func mustJoinRequest(t *testing.T, id, groupID, userID string) *domainGroup.JoinRequest {
+	t.Helper()
+	req, err := domainGroup.NewJoinRequest(
+		id, groupID, shared.RestoreUserID(userID), nil,
+		time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC),
+	)
+	if err != nil {
+		t.Fatalf("NewJoinRequest: %v", err)
+	}
+	return req
 }
 
 // --- tests ---
@@ -165,7 +265,7 @@ func TestListGroups_EnrichesWithMemberCountAndRole(t *testing.T) {
 	g := mustGroup(t, "g1", "Club Programming", domainGroup.VisibilityVisible, domainGroup.JoinPolicyOpen)
 
 	userID := shared.RestoreUserID("u1")
-	gm, _ := domainGroup.NewGroupMember("m1", "g1", userID, domainGroup.MemberRoleLead, func() time.Time { return time.Now() })
+	gm, _ := domainGroup.NewGroupMember("m1", "g1", userID, domainGroup.MemberRoleLead, testNow)
 
 	repo := &fakeRepo{groups: []*domainGroup.Group{g}, total: 1}
 	memberRepo := &fakeMemberRepo{
@@ -188,7 +288,7 @@ func TestListGroups_EnrichesWithMemberCountAndRole(t *testing.T) {
 	if out.Groups[0].MemberCount != 10 {
 		t.Errorf("expected memberCount=10, got %d", out.Groups[0].MemberCount)
 	}
-	if out.Groups[0].UserRole != domainGroup.MemberRoleLead {
+	if out.Groups[0].UserRole != domainGroup.MemberRoleLead.String() {
 		t.Errorf("expected role=LEAD, got %v", out.Groups[0].UserRole)
 	}
 }

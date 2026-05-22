@@ -2,22 +2,27 @@ package group
 
 import "github.com/training-judge-center/backend/pkg/apperror"
 
-type Visibility string
-
 const (
-	VisibilityVisible    Visibility = "VISIBLE"
-	VisibilityNotVisible Visibility = "NOT_VISIBLE"
+	visibilityVisible    = "VISIBLE"
+	visibilityNotVisible = "NOT_VISIBLE"
+)
+
+type Visibility struct{ value string }
+
+var (
+	VisibilityVisible    = Visibility{value: visibilityVisible}
+	VisibilityNotVisible = Visibility{value: visibilityNotVisible}
 )
 
 func NewVisibility(s string) (Visibility, error) {
-	switch Visibility(s) {
-	case VisibilityVisible, VisibilityNotVisible:
-		return Visibility(s), nil
+	switch s {
+	case visibilityVisible, visibilityNotVisible:
+		return Visibility{value: s}, nil
 	}
-	return "", apperror.NewValidation([]apperror.FieldError{
+	return Visibility{}, apperror.NewValidation([]apperror.FieldError{
 		{Field: "visibility", Message: "invalid visibility: " + s},
 	})
 }
 
-func RestoreVisibility(s string) Visibility { return Visibility(s) }
-func (v Visibility) String() string         { return string(v) }
+func RestoreVisibility(s string) Visibility { return Visibility{value: s} }
+func (v Visibility) String() string         { return v.value }

@@ -1,12 +1,14 @@
-package user
+package user_test
 
 import (
 	"strings"
 	"testing"
+
+	"github.com/training-judge-center/backend/internal/domain/user"
 )
 
 func TestNewPassword_Valid(t *testing.T) {
-	pw, err := NewPassword("Secret1!")
+	pw, err := user.NewPassword("Secret1!")
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
@@ -20,7 +22,7 @@ func TestNewPassword_Valid(t *testing.T) {
 
 func TestNewPassword_Compare(t *testing.T) {
 	raw := "Secret1!"
-	pw, err := NewPassword(raw)
+	pw, err := user.NewPassword(raw)
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
@@ -33,69 +35,38 @@ func TestNewPassword_Compare(t *testing.T) {
 	}
 }
 
-func TestNewPassword_TooShort(t *testing.T) {
-	_, err := NewPassword("Sh1!")
-	if err == nil {
-		t.Fatal("expected error for short password, got nil")
+func TestNewPassword_Invalid(t *testing.T) {
+	tests := []struct {
+		name  string
+		input string
+	}{
+		{"too short", "Sh1!"},
+		{"too long (73 bytes)", "A1!" + strings.Repeat("a", 70)},
+		{"missing uppercase", "secret1!"},
+		{"missing digit", "Secret!!"},
+		{"missing special char", "Secret12"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, err := user.NewPassword(tt.input)
+			if err == nil {
+				t.Fatalf("input %q: expected error, got nil", tt.input)
+			}
+		})
 	}
 }
 
-func TestNewPassword_TooLong(t *testing.T) {
-	long := make([]byte, 73)
-	for i := range long {
-		long[i] = 'a'
-	}
-	long[0] = 'A'
-	long[1] = '1'
-	long[2] = '!'
-	_, err := NewPassword(string(long))
-	if err == nil {
-		t.Fatal("expected error for 73-char password, got nil")
-	}
-}
-
-func TestNewPassword_MissingUppercase(t *testing.T) {
-	_, err := NewPassword("secret1!")
-	if err == nil {
-		t.Fatal("expected error for missing uppercase, got nil")
-	}
-}
-
-func TestNewPassword_MissingDigit(t *testing.T) {
-	_, err := NewPassword("Secret!!")
-	if err == nil {
-		t.Fatal("expected error for missing digit, got nil")
-	}
-}
-
-func TestNewPassword_MissingSpecialChar(t *testing.T) {
-	_, err := NewPassword("Secret12")
-	if err == nil {
-		t.Fatal("expected error for missing special char, got nil")
-	}
-}
-
-func TestNewPasswordFromHash_Valid(t *testing.T) {
+func TestRestorePassword(t *testing.T) {
 	hash := "$2a$10$somefakehashvalue"
-	pw, err := NewPasswordFromHash(hash)
-	if err != nil {
-		t.Fatalf("expected no error, got %v", err)
-	}
+	pw := user.RestorePassword(hash)
 	if pw.Hash() != hash {
 		t.Errorf("expected hash %q, got %q", hash, pw.Hash())
 	}
 }
 
-func TestNewPasswordFromHash_InvalidFormat(t *testing.T) {
-	_, err := NewPasswordFromHash("Secret1!")
-	if err == nil {
-		t.Fatal("expected error for raw password passed as hash, got nil")
-	}
-}
-
 func TestNewPassword_ExactlyAtBcryptLimit(t *testing.T) {
 	raw := "A1!" + strings.Repeat("a", 69)
-	pw, err := NewPassword(raw)
+	pw, err := user.NewPassword(raw)
 	if err != nil {
 		t.Fatalf("expected no error at 72 bytes, got %v", err)
 	}
@@ -104,15 +75,12 @@ func TestNewPassword_ExactlyAtBcryptLimit(t *testing.T) {
 	}
 }
 
-func TestNewPasswordFromHash_RoundTrip(t *testing.T) {
-	pw, err := NewPassword("Secret1!")
+func TestRestorePassword_RoundTrip(t *testing.T) {
+	pw, err := user.NewPassword("Secret1!")
 	if err != nil {
 		t.Fatalf("unexpected error creating password: %v", err)
 	}
-	restored, err := NewPasswordFromHash(pw.Hash())
-	if err != nil {
-		t.Fatalf("unexpected error restoring from hash: %v", err)
-	}
+	restored := user.RestorePassword(pw.Hash())
 	if !restored.Compare("Secret1!") {
 		t.Error("restored password should compare correctly against original")
 	}
@@ -122,7 +90,7 @@ func TestNewPasswordFromHash_RoundTrip(t *testing.T) {
 }
 
 func TestPassword_CompareEmpty(t *testing.T) {
-	pw, err := NewPassword("Secret1!")
+	pw, err := user.NewPassword("Secret1!")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}

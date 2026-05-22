@@ -2,7 +2,6 @@ package problem
 
 import (
 	"context"
-	"errors"
 	"testing"
 
 	domainProblem "github.com/training-judge-center/backend/internal/domain/problem"
@@ -25,14 +24,14 @@ func TestCreateProblem_Success_Coach(t *testing.T) {
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
-	if result.Problem.Slug().String() != testSlug {
-		t.Errorf("expected slug %q, got %q", testSlug, result.Problem.Slug().String())
+	if result.Problem.Slug != testSlug {
+		t.Errorf("expected slug %q, got %q", testSlug, result.Problem.Slug)
 	}
-	if result.Problem.Status().String() != "DRAFT" {
-		t.Errorf("expected DRAFT status, got %q", result.Problem.Status().String())
+	if result.Problem.Status != "DRAFT" {
+		t.Errorf("expected DRAFT status, got %q", result.Problem.Status)
 	}
-	if result.Problem.AuthorID().Value() != authorID {
-		t.Errorf("expected authorID %q, got %q", authorID, result.Problem.AuthorID().Value())
+	if result.Problem.AuthorID != authorID {
+		t.Errorf("expected authorID %q, got %q", authorID, result.Problem.AuthorID)
 	}
 }
 
@@ -65,8 +64,8 @@ func TestCreateProblem_Forbidden_Contestant(t *testing.T) {
 	if !ok {
 		t.Fatalf("expected *apperror.AppError, got %T", err)
 	}
-	if appErr.Code != apperror.ErrCodeForbidden {
-		t.Errorf("expected FORBIDDEN, got %q", appErr.Code)
+	if appErr.Code != ErrCodeInsufficientPermissions {
+		t.Errorf("expected INSUFFICIENT_PERMISSIONS, got %q", appErr.Code)
 	}
 }
 
@@ -135,8 +134,8 @@ func TestCreateProblem_InvalidTag(t *testing.T) {
 
 func TestCreateProblem_SlugAlreadyExists(t *testing.T) {
 	repo := &mockProblemRepository{
-		saveFn: func(_ context.Context, p *domainProblem.Problem) error {
-			return &domainProblem.ErrSlugAlreadyExists{Slug: p.Slug().String()}
+		saveFn: func(_ context.Context, _ *domainProblem.Problem) error {
+			return apperror.NewConflict(domainProblem.ErrCodeSlugAlreadyExists, "slug already in use")
 		},
 	}
 	uc := NewCreateProblemUseCase(repo, newDefaultSettings())
@@ -150,15 +149,15 @@ func TestCreateProblem_SlugAlreadyExists(t *testing.T) {
 	if !ok {
 		t.Fatalf("expected *apperror.AppError, got %T", err)
 	}
-	if appErr.Code != ErrCodeProblemSlugAlreadyExists {
-		t.Errorf("expected %q, got %q", ErrCodeProblemSlugAlreadyExists, appErr.Code)
+	if appErr.Code != domainProblem.ErrCodeSlugAlreadyExists {
+		t.Errorf("expected %q, got %q", domainProblem.ErrCodeSlugAlreadyExists, appErr.Code)
 	}
 }
 
 func TestCreateProblem_RepositoryError(t *testing.T) {
 	repo := &mockProblemRepository{
 		saveFn: func(_ context.Context, _ *domainProblem.Problem) error {
-			return errors.New("db connection lost")
+			return apperror.NewInternal()
 		},
 	}
 	uc := NewCreateProblemUseCase(repo, newDefaultSettings())

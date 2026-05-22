@@ -4,7 +4,8 @@ import (
 	"context"
 	"time"
 
-	"github.com/training-judge-center/backend/internal/domain/notification"
+	appshared "github.com/training-judge-center/backend/internal/application/shared"
+	"github.com/training-judge-center/backend/internal/domain/shared"
 	domain "github.com/training-judge-center/backend/internal/domain/user"
 )
 
@@ -30,10 +31,10 @@ func (m *mockRateLimiter) Reset(ctx context.Context, key string) error {
 }
 
 type mockEmailSender struct {
-	sendFn func(ctx context.Context, msg notification.EmailMessage) error
+	sendFn func(ctx context.Context, msg appshared.EmailMessage) error
 }
 
-func (m *mockEmailSender) Send(ctx context.Context, msg notification.EmailMessage) error {
+func (m *mockEmailSender) Send(ctx context.Context, msg appshared.EmailMessage) error {
 	if m.sendFn != nil {
 		return m.sendFn(ctx, msg)
 	}
@@ -109,12 +110,12 @@ func newNoConflictRepo() *mockUserRepository {
 	return &mockUserRepository{}
 }
 
-func newUserWithRole(id string, role domain.Role, status domain.Status) *domain.User {
+func newUserWithRole(id string, role shared.Role, status domain.Status) *domain.User {
 	p, _ := domain.NewPassword("Secret1!")
 	emailStr := id + "@example.com"
 	nicknameStr := id
 
-	u, err := domain.RestoreUser(
+	return domain.RestoreUser(
 		id,
 		&emailStr,
 		p.Hash(),
@@ -129,17 +130,13 @@ func newUserWithRole(id string, role domain.Role, status domain.Status) *domain.
 		nil,
 		nil,
 	)
-	if err != nil {
-		panic("newUserWithRole: " + err.Error())
-	}
-	return u
 }
 
 type mockEmailChangeRepo struct {
 	saveFn                func(ctx context.Context, req *domain.EmailChangeRequest) error
 	findByIDFn            func(ctx context.Context, id string) (*domain.EmailChangeRequest, error)
 	findByCodeAndUserIDFn func(ctx context.Context, code string, userID string) (*domain.EmailChangeRequest, error)
-	invalidatePendingFn   func(ctx context.Context, userID string) error
+	invalidatePendingFn   func(ctx context.Context, userID string, now time.Time) error
 	updateFn              func(ctx context.Context, req *domain.EmailChangeRequest) error
 }
 
@@ -164,9 +161,9 @@ func (m *mockEmailChangeRepo) FindByCodeAndUserID(ctx context.Context, code stri
 	return nil, nil
 }
 
-func (m *mockEmailChangeRepo) InvalidatePendingByUserID(ctx context.Context, userID string) error {
+func (m *mockEmailChangeRepo) InvalidatePendingByUserID(ctx context.Context, userID string, now time.Time) error {
 	if m.invalidatePendingFn != nil {
-		return m.invalidatePendingFn(ctx, userID)
+		return m.invalidatePendingFn(ctx, userID, now)
 	}
 	return nil
 }
@@ -179,10 +176,10 @@ func (m *mockEmailChangeRepo) Update(ctx context.Context, req *domain.EmailChang
 }
 
 type mockTransactionManager struct {
-	withTxFn func(ctx context.Context, fn func(ctx context.Context) error) error
+	withTxFn func(ctx context.Context, fn func(txCtx context.Context) error) error
 }
 
-func (m *mockTransactionManager) WithTx(ctx context.Context, fn func(ctx context.Context) error) error {
+func (m *mockTransactionManager) WithTx(ctx context.Context, fn func(txCtx context.Context) error) error {
 	if m.withTxFn != nil {
 		return m.withTxFn(ctx, fn)
 	}

@@ -1,4 +1,4 @@
-package problem
+﻿package problem
 
 import (
 	"context"
@@ -6,11 +6,10 @@ import (
 
 	domainProblem "github.com/training-judge-center/backend/internal/domain/problem"
 	"github.com/training-judge-center/backend/internal/domain/shared"
+	appshared "github.com/training-judge-center/backend/internal/application/shared"
 )
 
 var testNow = time.Date(2024, 1, 15, 10, 0, 0, 0, time.UTC)
-
-func fixedClock() time.Time { return testNow }
 
 // ── Repository mock ──────────────────────────────────────────────────────────
 
@@ -120,27 +119,31 @@ func (m *mockFileStorage) DeleteFilesWithPrefix(ctx context.Context, prefix stri
 
 // ── PlatformSettings default ─────────────────────────────────────────────────
 
-func newDefaultSettings() *domainProblem.PlatformSettings {
-	return &domainProblem.PlatformSettings{
-		GlobalMaxTimeLimit:    10000,
-		GlobalMaxMemoryLimit:  512,
-		SupportedLanguages:    map[string]struct{}{"cpp": {}},
-		LanguageExtensions:    map[string]string{".cpp": "cpp"},
-		AllowedTags:           map[string]struct{}{"dp": {}, "graphs": {}, "implementation": {}},
-		UploadMaxConcurrency:  4,
-		MaxFileCountSample:    10,
-		MaxFileSizeDefaultMB:  10,
-		MaxFileSizeTestCaseMB: 50,
-		MaxFileCountTestCase:  100,
-		LanguageLimits:        map[string]*domainProblem.LanguageLimit{},
+func newDefaultSettings() domainProblem.PlatformSettings {
+	s, err := domainProblem.NewPlatformSettings(
+		10000,
+		512,
+		map[string]domainProblem.LanguageLimit{},
+		map[string]struct{}{"cpp": {}},
+		map[string]string{".cpp": "cpp"},
+		map[string]struct{}{"dp": {}, "graphs": {}, "implementation": {}},
+		4,
+		10,
+		50,
+		100,
+		10,
+	)
+	if err != nil {
+		panic(err)
 	}
+	return s
 }
 
 // ── CurrentUser helpers ──────────────────────────────────────────────────────
 
-func asCoach(id string) shared.CurrentUser      { return shared.CurrentUser{ID: id, Role: shared.RoleCoach} }
-func asAdmin(id string) shared.CurrentUser      { return shared.CurrentUser{ID: id, Role: shared.RoleAdmin} }
-func asContestant(id string) shared.CurrentUser { return shared.CurrentUser{ID: id, Role: shared.RoleContestant} }
+func asCoach(id string) appshared.CurrentUser      { return appshared.CurrentUser{ID: id, Role: shared.RoleCoach} }
+func asAdmin(id string) appshared.CurrentUser      { return appshared.CurrentUser{ID: id, Role: shared.RoleAdmin} }
+func asContestant(id string) appshared.CurrentUser { return appshared.CurrentUser{ID: id, Role: shared.RoleContestant} }
 
 // ── Problem fixtures ─────────────────────────────────────────────────────────
 
@@ -163,7 +166,7 @@ func newDraftProblem() *domainProblem.Problem {
 		nil, []domainProblem.JudgingFile{},
 		nil, nil, nil,
 		testNow, testNow,
-	).WithClock(fixedClock)
+	)
 }
 
 func newPublishedProblem() *domainProblem.Problem {
@@ -177,7 +180,7 @@ func newPublishedProblem() *domainProblem.Problem {
 		nil, []domainProblem.JudgingFile{},
 		nil, nil, nil,
 		testNow, testNow,
-	).WithClock(fixedClock)
+	)
 }
 
 func newDraftProblemWithModifier() *domainProblem.Problem {
@@ -191,7 +194,7 @@ func newDraftProblemWithModifier() *domainProblem.Problem {
 		nil, []domainProblem.JudgingFile{},
 		nil, nil, nil,
 		testNow, testNow,
-	).WithClock(fixedClock)
+	)
 }
 
 func newPublishedProblemWithModifier() *domainProblem.Problem {
@@ -205,7 +208,7 @@ func newPublishedProblemWithModifier() *domainProblem.Problem {
 		nil, []domainProblem.JudgingFile{},
 		nil, nil, nil,
 		testNow, testNow,
-	).WithClock(fixedClock)
+	)
 }
 
 func repoWith(p *domainProblem.Problem) *mockProblemRepository {

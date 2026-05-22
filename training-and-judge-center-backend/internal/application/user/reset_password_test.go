@@ -6,23 +6,24 @@ import (
 	"testing"
 	"time"
 
+	"github.com/training-judge-center/backend/internal/domain/shared"
 	domain "github.com/training-judge-center/backend/internal/domain/user"
 	"github.com/training-judge-center/backend/pkg/apperror"
 )
 
 func TestResetPassword_Success(t *testing.T) {
 	userRepo := newNoConflictRepo()
-	activeUser := newUserWithRole("user-1", domain.RoleContestant, domain.StatusActive)
+	activeUser := newUserWithRole("user-1", shared.RoleContestant, domain.StatusActive)
 	userRepo.findByEmailFn = func(_ context.Context, email domain.Email) (*domain.User, error) {
 		return activeUser, nil
 	}
 
 	recoveryRepo := &mockPasswordRecoveryRepo{
 		findPendingByUserIDFn: func(ctx context.Context, userID string) (*domain.PasswordRecoveryRequest, error) {
-			return domain.RestorePasswordRecoveryRequest("req-1", "user-1", "123456", domain.StatusPending, time.Now().Add(10 * time.Minute), time.Time{}, nil), nil
+			return domain.RestorePasswordRecoveryRequest("req-1", "user-1", "123456", domain.RequestStatusPending, time.Now().Add(10 * time.Minute), time.Time{}, nil), nil
 		},
 		updateFn: func(ctx context.Context, req *domain.PasswordRecoveryRequest) error {
-			if req.Status() != domain.StatusUsed {
+			if req.Status() != domain.RequestStatusUsed {
 				t.Errorf("expected status to be USED")
 			}
 			return nil
@@ -42,7 +43,7 @@ func TestResetPassword_Success(t *testing.T) {
 
 	uc := NewResetPasswordUseCase(userRepo, recoveryRepo, invalidator, &mockTransactionManager{})
 
-	err := uc.Execute(context.Background(), ResetPasswordInput{
+	_, err := uc.Execute(context.Background(), ResetPasswordInput{
 		Email:       "user-1@example.com",
 		Code:        "123456",
 		NewPassword: "NewSecret123!",
@@ -58,20 +59,20 @@ func TestResetPassword_Success(t *testing.T) {
 
 func TestResetPassword_InvalidCode(t *testing.T) {
 	userRepo := newNoConflictRepo()
-	activeUser := newUserWithRole("user-1", domain.RoleContestant, domain.StatusActive)
+	activeUser := newUserWithRole("user-1", shared.RoleContestant, domain.StatusActive)
 	userRepo.findByEmailFn = func(_ context.Context, email domain.Email) (*domain.User, error) {
 		return activeUser, nil
 	}
 
 	recoveryRepo := &mockPasswordRecoveryRepo{
 		findPendingByUserIDFn: func(ctx context.Context, userID string) (*domain.PasswordRecoveryRequest, error) {
-			return domain.RestorePasswordRecoveryRequest("req-1", "user-1", "654321", domain.StatusPending, time.Now().Add(10*time.Minute), time.Time{}, nil), nil
+			return domain.RestorePasswordRecoveryRequest("req-1", "user-1", "654321", domain.RequestStatusPending, time.Now().Add(10*time.Minute), time.Time{}, nil), nil
 		},
 	}
 
 	uc := NewResetPasswordUseCase(userRepo, recoveryRepo, &mockSessionInvalidator{}, &mockTransactionManager{})
 
-	err := uc.Execute(context.Background(), ResetPasswordInput{
+	_, err := uc.Execute(context.Background(), ResetPasswordInput{
 		Email:       "user-1@example.com",
 		Code:        "123456",
 		NewPassword: "NewSecret123!",
@@ -81,14 +82,14 @@ func TestResetPassword_InvalidCode(t *testing.T) {
 		t.Fatal("expected error, got nil")
 	}
 	appErr, ok := err.(*apperror.AppError)
-	if !ok || appErr.Code != "INVALID_RECOVERY_ATTEMPT" {
+	if !ok || appErr.Code != ErrCodeInvalidRecoveryAttempt {
 		t.Errorf("expected INVALID_RECOVERY_ATTEMPT, got %v", err)
 	}
 }
 
 func TestResetPassword_NoPendingRequest(t *testing.T) {
 	userRepo := newNoConflictRepo()
-	activeUser := newUserWithRole("user-1", domain.RoleContestant, domain.StatusActive)
+	activeUser := newUserWithRole("user-1", shared.RoleContestant, domain.StatusActive)
 	userRepo.findByEmailFn = func(_ context.Context, email domain.Email) (*domain.User, error) {
 		return activeUser, nil
 	}
@@ -100,7 +101,7 @@ func TestResetPassword_NoPendingRequest(t *testing.T) {
 	}
 
 	uc := NewResetPasswordUseCase(userRepo, recoveryRepo, &mockSessionInvalidator{}, &mockTransactionManager{})
-	err := uc.Execute(context.Background(), ResetPasswordInput{
+	_, err := uc.Execute(context.Background(), ResetPasswordInput{
 		Email:       "user-1@example.com",
 		Code:        "123456",
 		NewPassword: "NewSecret123!",
@@ -110,14 +111,14 @@ func TestResetPassword_NoPendingRequest(t *testing.T) {
 		t.Fatal("expected error, got nil")
 	}
 	appErr, ok := err.(*apperror.AppError)
-	if !ok || appErr.Code != "INVALID_RECOVERY_ATTEMPT" {
+	if !ok || appErr.Code != ErrCodeInvalidRecoveryAttempt {
 		t.Errorf("expected INVALID_RECOVERY_ATTEMPT, got %v", err)
 	}
 }
 
 func TestResetPassword_ExpiredRequest(t *testing.T) {
 	userRepo := newNoConflictRepo()
-	activeUser := newUserWithRole("user-1", domain.RoleContestant, domain.StatusActive)
+	activeUser := newUserWithRole("user-1", shared.RoleContestant, domain.StatusActive)
 	userRepo.findByEmailFn = func(_ context.Context, _ domain.Email) (*domain.User, error) {
 		return activeUser, nil
 	}
@@ -125,13 +126,13 @@ func TestResetPassword_ExpiredRequest(t *testing.T) {
 	recoveryRepo := &mockPasswordRecoveryRepo{
 		findPendingByUserIDFn: func(_ context.Context, _ string) (*domain.PasswordRecoveryRequest, error) {
 			// Request exists in DB but its window has already elapsed
-			return domain.RestorePasswordRecoveryRequest("req-1", "user-1", "123456", domain.StatusPending, time.Now().Add(-1*time.Minute), time.Time{}, nil), nil
+			return domain.RestorePasswordRecoveryRequest("req-1", "user-1", "123456", domain.RequestStatusPending, time.Now().Add(-1*time.Minute), time.Time{}, nil), nil
 		},
 	}
 
 	uc := NewResetPasswordUseCase(userRepo, recoveryRepo, &mockSessionInvalidator{}, &mockTransactionManager{})
 
-	err := uc.Execute(context.Background(), ResetPasswordInput{
+	_, err := uc.Execute(context.Background(), ResetPasswordInput{
 		Email:       "user-1@example.com",
 		Code:        "123456",
 		NewPassword: "NewSecret123!",
@@ -141,21 +142,21 @@ func TestResetPassword_ExpiredRequest(t *testing.T) {
 		t.Fatal("expected error for expired request, got nil")
 	}
 	appErr, ok := err.(*apperror.AppError)
-	if !ok || appErr.Code != "INVALID_RECOVERY_ATTEMPT" {
+	if !ok || appErr.Code != ErrCodeInvalidRecoveryAttempt {
 		t.Errorf("expected INVALID_RECOVERY_ATTEMPT, got %v", err)
 	}
 }
 
 func TestResetPassword_WeakPassword(t *testing.T) {
 	userRepo := newNoConflictRepo()
-	activeUser := newUserWithRole("user-1", domain.RoleContestant, domain.StatusActive)
+	activeUser := newUserWithRole("user-1", shared.RoleContestant, domain.StatusActive)
 	userRepo.findByEmailFn = func(_ context.Context, _ domain.Email) (*domain.User, error) {
 		return activeUser, nil
 	}
 
 	recoveryRepo := &mockPasswordRecoveryRepo{
 		findPendingByUserIDFn: func(_ context.Context, _ string) (*domain.PasswordRecoveryRequest, error) {
-			return domain.RestorePasswordRecoveryRequest("req-1", "user-1", "123456", domain.StatusPending, time.Now().Add(10*time.Minute), time.Time{}, nil), nil
+			return domain.RestorePasswordRecoveryRequest("req-1", "user-1", "123456", domain.RequestStatusPending, time.Now().Add(10*time.Minute), time.Time{}, nil), nil
 		},
 	}
 
@@ -178,7 +179,7 @@ func TestResetPassword_WeakPassword(t *testing.T) {
 		},
 	)
 
-	err := uc.Execute(context.Background(), ResetPasswordInput{
+	_, err := uc.Execute(context.Background(), ResetPasswordInput{
 		Email:       "user-1@example.com",
 		Code:        "123456",
 		NewPassword: "weak",
@@ -188,7 +189,7 @@ func TestResetPassword_WeakPassword(t *testing.T) {
 		t.Fatal("expected validation error for weak password, got nil")
 	}
 	appErr, ok := err.(*apperror.AppError)
-	if !ok || appErr.Code != "VALIDATION_ERROR" {
+	if !ok || appErr.Code != apperror.ErrCodeValidationError {
 		t.Errorf("expected VALIDATION_ERROR, got %v", err)
 	}
 	if txCalled {
@@ -207,7 +208,7 @@ func TestResetPassword_UserNotFound(t *testing.T) {
 
 	uc := NewResetPasswordUseCase(userRepo, &mockPasswordRecoveryRepo{}, &mockSessionInvalidator{}, &mockTransactionManager{})
 
-	err := uc.Execute(context.Background(), ResetPasswordInput{
+	_, err := uc.Execute(context.Background(), ResetPasswordInput{
 		Email:       "ghost@example.com",
 		Code:        "123456",
 		NewPassword: "NewSecret123!",
@@ -217,21 +218,21 @@ func TestResetPassword_UserNotFound(t *testing.T) {
 		t.Fatal("expected error when user not found, got nil")
 	}
 	appErr, ok := err.(*apperror.AppError)
-	if !ok || appErr.Code != "INVALID_RECOVERY_ATTEMPT" {
+	if !ok || appErr.Code != ErrCodeInvalidRecoveryAttempt {
 		t.Errorf("expected INVALID_RECOVERY_ATTEMPT to avoid information leakage, got %v", err)
 	}
 }
 
 func TestResetPassword_TxFailure(t *testing.T) {
 	userRepo := newNoConflictRepo()
-	activeUser := newUserWithRole("user-1", domain.RoleContestant, domain.StatusActive)
+	activeUser := newUserWithRole("user-1", shared.RoleContestant, domain.StatusActive)
 	userRepo.findByEmailFn = func(_ context.Context, _ domain.Email) (*domain.User, error) {
 		return activeUser, nil
 	}
 
 	recoveryRepo := &mockPasswordRecoveryRepo{
 		findPendingByUserIDFn: func(_ context.Context, _ string) (*domain.PasswordRecoveryRequest, error) {
-			return domain.RestorePasswordRecoveryRequest("req-1", "user-1", "123456", domain.StatusPending, time.Now().Add(10*time.Minute), time.Time{}, nil), nil
+			return domain.RestorePasswordRecoveryRequest("req-1", "user-1", "123456", domain.RequestStatusPending, time.Now().Add(10*time.Minute), time.Time{}, nil), nil
 		},
 	}
 
@@ -242,7 +243,7 @@ func TestResetPassword_TxFailure(t *testing.T) {
 	}
 
 	uc := NewResetPasswordUseCase(userRepo, recoveryRepo, &mockSessionInvalidator{}, tx)
-	err := uc.Execute(context.Background(), ResetPasswordInput{
+	_, err := uc.Execute(context.Background(), ResetPasswordInput{
 		Email:       "user-1@example.com",
 		Code:        "123456",
 		NewPassword: "NewSecret123!",
@@ -252,21 +253,21 @@ func TestResetPassword_TxFailure(t *testing.T) {
 		t.Fatal("expected error, got nil")
 	}
 	appErr, ok := err.(*apperror.AppError)
-	if !ok || appErr.Code != "INTERNAL_ERROR" {
+	if !ok || appErr.Code != apperror.ErrCodeInternalError {
 		t.Errorf("expected INTERNAL_ERROR, got %v", err)
 	}
 }
 
 func TestResetPassword_SessionInvalidationFailure(t *testing.T) {
 	userRepo := newNoConflictRepo()
-	activeUser := newUserWithRole("user-1", domain.RoleContestant, domain.StatusActive)
+	activeUser := newUserWithRole("user-1", shared.RoleContestant, domain.StatusActive)
 	userRepo.findByEmailFn = func(_ context.Context, _ domain.Email) (*domain.User, error) {
 		return activeUser, nil
 	}
 
 	recoveryRepo := &mockPasswordRecoveryRepo{
 		findPendingByUserIDFn: func(_ context.Context, _ string) (*domain.PasswordRecoveryRequest, error) {
-			return domain.RestorePasswordRecoveryRequest("req-1", "user-1", "123456", domain.StatusPending, time.Now().Add(10*time.Minute), time.Time{}, nil), nil
+			return domain.RestorePasswordRecoveryRequest("req-1", "user-1", "123456", domain.RequestStatusPending, time.Now().Add(10*time.Minute), time.Time{}, nil), nil
 		},
 		updateFn: func(_ context.Context, _ *domain.PasswordRecoveryRequest) error { return nil },
 	}
@@ -278,16 +279,16 @@ func TestResetPassword_SessionInvalidationFailure(t *testing.T) {
 	}
 
 	uc := NewResetPasswordUseCase(userRepo, recoveryRepo, invalidator, &mockTransactionManager{})
-	err := uc.Execute(context.Background(), ResetPasswordInput{
+	out, err := uc.Execute(context.Background(), ResetPasswordInput{
 		Email:       "user-1@example.com",
 		Code:        "123456",
 		NewPassword: "NewSecret123!",
 	})
 
-	if err == nil {
-		t.Fatal("expected error, got nil")
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
 	}
-	if err != ErrSessionsNotInvalidated {
-		t.Errorf("expected ErrSessionsNotInvalidated, got %v", err)
+	if out.SessionsInvalidated {
+		t.Fatal("expected sessions not to be invalidated")
 	}
 }

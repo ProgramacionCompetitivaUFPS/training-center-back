@@ -1,8 +1,9 @@
-package material
+package material_test
 
 import (
 	"testing"
 
+	"github.com/training-judge-center/backend/internal/domain/material"
 	"github.com/training-judge-center/backend/pkg/apperror"
 )
 
@@ -31,7 +32,7 @@ func TestNewTags(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			_, err := NewTags(tt.input)
+			_, err := material.NewTags(tt.input)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("NewTags(%v) error = %v, wantErr %v", tt.input, err, tt.wantErr)
 			}
@@ -40,7 +41,7 @@ func TestNewTags(t *testing.T) {
 }
 
 func TestNewTags_InvalidReturnsValidationError(t *testing.T) {
-	_, err := NewTags([]string{"Invalid-Tag"})
+	_, err := material.NewTags([]string{"Invalid-Tag"})
 	if err == nil {
 		t.Fatal("expected error for invalid tag")
 	}
@@ -51,7 +52,7 @@ func TestNewTags_InvalidReturnsValidationError(t *testing.T) {
 }
 
 func TestNewTags_Deduplication(t *testing.T) {
-	tags, err := NewTags([]string{"important", "important", "news"})
+	tags, err := material.NewTags([]string{"important", "important", "news"})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}

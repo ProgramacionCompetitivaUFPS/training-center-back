@@ -1,20 +1,32 @@
 package user
 
-import "fmt"
-
-type RequestStatus string
+import "github.com/training-judge-center/backend/pkg/apperror"
 
 const (
-	StatusPending RequestStatus = "PENDING"
-	StatusUsed    RequestStatus = "USED"
-	StatusExpired RequestStatus = "EXPIRED"
+	requestStatusPending = "PENDING"
+	requestStatusUsed    = "USED"
+	requestStatusExpired = "EXPIRED"
+)
+
+type RequestStatus struct{ value string }
+
+var (
+	RequestStatusPending = RequestStatus{value: requestStatusPending}
+	RequestStatusUsed    = RequestStatus{value: requestStatusUsed}
+	RequestStatusExpired = RequestStatus{value: requestStatusExpired}
 )
 
 func NewRequestStatus(s string) (RequestStatus, error) {
-	switch RequestStatus(s) {
-	case StatusPending, StatusUsed, StatusExpired:
-		return RequestStatus(s), nil
+	switch s {
+	case requestStatusPending, requestStatusUsed, requestStatusExpired:
+		return RequestStatus{value: s}, nil
 	}
-	return "", fmt.Errorf("invalid request status: %q", s)
+	return RequestStatus{}, apperror.NewValidation([]apperror.FieldError{
+		{Field: "status", Message: "invalid request status: " + s},
+	})
 }
+
+func RestoreRequestStatus(s string) RequestStatus { return RequestStatus{value: s} }
+
+func (r RequestStatus) String() string { return r.value }
 

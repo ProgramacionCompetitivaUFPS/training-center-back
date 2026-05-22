@@ -6,7 +6,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/training-judge-center/backend/internal/domain/notification"
+	appshared "github.com/training-judge-center/backend/internal/application/shared"
+	domainShared "github.com/training-judge-center/backend/internal/domain/shared"
 	domain "github.com/training-judge-center/backend/internal/domain/user"
 	"github.com/training-judge-center/backend/pkg/apperror"
 )
@@ -52,7 +53,7 @@ func (m *mockDeactivationRepo) InvalidatePendingByUserID(ctx context.Context, us
 
 func TestRequestDeactivation_Success(t *testing.T) {
 	userRepo := newNoConflictRepo()
-	activeUser := newUserWithRole("user-1", domain.RoleContestant, domain.StatusActive)
+	activeUser := newUserWithRole("user-1", domainShared.RoleContestant, domain.StatusActive)
 
 	userRepo.findByIDFn = func(_ context.Context, id string) (*domain.User, error) {
 		if id == "user-1" {
@@ -78,7 +79,7 @@ func TestRequestDeactivation_Success(t *testing.T) {
 
 	emailSent := false
 	mockEmail := &mockEmailSender{
-		sendFn: func(ctx context.Context, msg notification.EmailMessage) error {
+		sendFn: func(ctx context.Context, msg appshared.EmailMessage) error {
 			emailSent = true
 			if msg.To != "user-1@example.com" {
 				t.Errorf("expected user@example.com, got %s", msg.To)
@@ -100,7 +101,7 @@ func TestRequestDeactivation_Success(t *testing.T) {
 
 func TestRequestDeactivation_AdminForbidden(t *testing.T) {
 	userRepo := newNoConflictRepo()
-	adminUser := newUserWithRole("admin-1", domain.RoleAdmin, domain.StatusActive)
+	adminUser := newUserWithRole("admin-1", domainShared.RoleAdmin, domain.StatusActive)
 	userRepo.findByIDFn = func(_ context.Context, id string) (*domain.User, error) {
 		return adminUser, nil
 	}
@@ -112,7 +113,7 @@ func TestRequestDeactivation_AdminForbidden(t *testing.T) {
 		t.Fatal("expected error, got nil")
 	}
 	appErr, ok := err.(*apperror.AppError)
-	if !ok || appErr.Code != "FORBIDDEN" {
+	if !ok || appErr.Code != ErrCodeAdminCannotRequestDeactivation {
 		t.Errorf("expected FORBIDDEN error, got %v", err)
 	}
 }
@@ -130,7 +131,7 @@ func TestRequestDeactivation_UserNotFound(t *testing.T) {
 		t.Fatal("expected error, got nil")
 	}
 	appErr, ok := err.(*apperror.AppError)
-	if !ok || appErr.Code != "NOT_FOUND" {
+	if !ok || appErr.Code != domain.ErrCodeUserNotFound {
 		t.Errorf("expected NOT_FOUND error, got %v", err)
 	}
 }
@@ -148,14 +149,14 @@ func TestRequestDeactivation_UserRepoError(t *testing.T) {
 		t.Fatal("expected error, got nil")
 	}
 	appErr, ok := err.(*apperror.AppError)
-	if !ok || appErr.Code != "INTERNAL_ERROR" {
+	if !ok || appErr.Code != apperror.ErrCodeInternalError {
 		t.Errorf("expected INTERNAL_ERROR, got %v", err)
 	}
 }
 
 func TestRequestDeactivation_InvalidatePendingError(t *testing.T) {
 	userRepo := newNoConflictRepo()
-	activeUser := newUserWithRole("user-1", domain.RoleContestant, domain.StatusActive)
+	activeUser := newUserWithRole("user-1", domainShared.RoleContestant, domain.StatusActive)
 	userRepo.findByIDFn = func(_ context.Context, _ string) (*domain.User, error) { return activeUser, nil }
 
 	deactRepo := &mockDeactivationRepo{
@@ -171,14 +172,14 @@ func TestRequestDeactivation_InvalidatePendingError(t *testing.T) {
 		t.Fatal("expected error, got nil")
 	}
 	appErr, ok := err.(*apperror.AppError)
-	if !ok || appErr.Code != "INTERNAL_ERROR" {
+	if !ok || appErr.Code != apperror.ErrCodeInternalError {
 		t.Errorf("expected INTERNAL_ERROR, got %v", err)
 	}
 }
 
 func TestRequestDeactivation_SaveError(t *testing.T) {
 	userRepo := newNoConflictRepo()
-	activeUser := newUserWithRole("user-1", domain.RoleContestant, domain.StatusActive)
+	activeUser := newUserWithRole("user-1", domainShared.RoleContestant, domain.StatusActive)
 	userRepo.findByIDFn = func(_ context.Context, _ string) (*domain.User, error) { return activeUser, nil }
 
 	deactRepo := &mockDeactivationRepo{
@@ -194,18 +195,18 @@ func TestRequestDeactivation_SaveError(t *testing.T) {
 		t.Fatal("expected error, got nil")
 	}
 	appErr, ok := err.(*apperror.AppError)
-	if !ok || appErr.Code != "INTERNAL_ERROR" {
+	if !ok || appErr.Code != apperror.ErrCodeInternalError {
 		t.Errorf("expected INTERNAL_ERROR, got %v", err)
 	}
 }
 
 func TestRequestDeactivation_EmailDeliveryFailure(t *testing.T) {
 	userRepo := newNoConflictRepo()
-	activeUser := newUserWithRole("user-1", domain.RoleContestant, domain.StatusActive)
+	activeUser := newUserWithRole("user-1", domainShared.RoleContestant, domain.StatusActive)
 	userRepo.findByIDFn = func(_ context.Context, _ string) (*domain.User, error) { return activeUser, nil }
 
 	emailSender := &mockEmailSender{
-		sendFn: func(_ context.Context, _ notification.EmailMessage) error {
+		sendFn: func(_ context.Context, _ appshared.EmailMessage) error {
 			return errors.New("smtp error")
 		},
 	}
@@ -217,7 +218,7 @@ func TestRequestDeactivation_EmailDeliveryFailure(t *testing.T) {
 		t.Fatal("expected error, got nil")
 	}
 	appErr, ok := err.(*apperror.AppError)
-	if !ok || appErr.Code != "EMAIL_DELIVERY_FAILED" {
+	if !ok || appErr.Code != ErrCodeEmailDeliveryFailed {
 		t.Errorf("expected EMAIL_DELIVERY_FAILED, got %v", err)
 	}
 }

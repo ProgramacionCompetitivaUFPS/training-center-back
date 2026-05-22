@@ -6,7 +6,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/training-judge-center/backend/internal/domain/notification"
+	appshared "github.com/training-judge-center/backend/internal/application/shared"
+	domainShared "github.com/training-judge-center/backend/internal/domain/shared"
 	domain "github.com/training-judge-center/backend/internal/domain/user"
 	"github.com/training-judge-center/backend/pkg/apperror"
 )
@@ -24,7 +25,7 @@ func (m *mockAuditRepo) Save(ctx context.Context, log *domain.DeactivationAuditL
 
 func TestConfirmDeactivation_Success(t *testing.T) {
 	userRepo := newNoConflictRepo()
-	activeUser := newUserWithRole("user-1", domain.RoleContestant, domain.StatusActive)
+	activeUser := newUserWithRole("user-1", domainShared.RoleContestant, domain.StatusActive)
 
 	userRepo.findByIDFn = func(_ context.Context, id string) (*domain.User, error) {
 		if id == "user-1" {
@@ -36,8 +37,8 @@ func TestConfirmDeactivation_Success(t *testing.T) {
 		if u.Status() != domain.StatusDeactivated {
 			t.Errorf("expected DEACTIVATED status, got %s", u.Status())
 		}
-		if u.Email() != nil {
-			t.Errorf("expected Email to be nil, got %v", u.Email())
+		if u.Email().String() != "" {
+			t.Errorf("expected Email to be empty after deactivation, got %v", u.Email())
 		}
 		return nil
 	}
@@ -75,7 +76,7 @@ func TestConfirmDeactivation_Success(t *testing.T) {
 	
 	emailSent := false
 	mockEmail := &mockEmailSender{
-		sendFn: func(ctx context.Context, msg notification.EmailMessage) error {
+		sendFn: func(ctx context.Context, msg appshared.EmailMessage) error {
 			emailSent = true
 			return nil
 		},
@@ -83,7 +84,7 @@ func TestConfirmDeactivation_Success(t *testing.T) {
 
 	uc := NewConfirmDeactivationUseCase(userRepo, deactRepo, auditRepo, mockEmail, invalidator, &mockTransactionManager{})
 
-	err := uc.Execute(context.Background(), ConfirmDeactivationInput{
+	_, err := uc.Execute(context.Background(), ConfirmDeactivationInput{
 		UserID:    "user-1",
 		Code:      "123456",
 	})
@@ -104,7 +105,7 @@ func TestConfirmDeactivation_Success(t *testing.T) {
 
 func TestConfirmDeactivation_InvalidCode(t *testing.T) {
 	userRepo := newNoConflictRepo()
-	activeUser := newUserWithRole("user-1", domain.RoleContestant, domain.StatusActive)
+	activeUser := newUserWithRole("user-1", domainShared.RoleContestant, domain.StatusActive)
 	userRepo.findByIDFn = func(_ context.Context, id string) (*domain.User, error) {
 		return activeUser, nil
 	}
@@ -123,7 +124,7 @@ func TestConfirmDeactivation_InvalidCode(t *testing.T) {
 
 	uc := NewConfirmDeactivationUseCase(userRepo, deactRepo, &mockAuditRepo{}, &mockEmailSender{}, &mockSessionInvalidator{}, &mockTransactionManager{})
 
-	err := uc.Execute(context.Background(), ConfirmDeactivationInput{
+	_, err := uc.Execute(context.Background(), ConfirmDeactivationInput{
 		UserID: "user-1",
 		Code:   "000000",
 	})
@@ -132,7 +133,7 @@ func TestConfirmDeactivation_InvalidCode(t *testing.T) {
 		t.Fatal("expected error, got nil")
 	}
 	appErr, ok := err.(*apperror.AppError)
-	if !ok || appErr.Code != "INVALID_CODE" {
+	if !ok || appErr.Code != ErrCodeInvalidCode {
 		t.Errorf("expected INVALID_CODE, got %v", err)
 	}
 }
@@ -140,7 +141,7 @@ func TestConfirmDeactivation_InvalidCode(t *testing.T) {
 func TestConfirmDeactivation_ExpiredCode_UpdateFails_ReturnsInternal(t *testing.T) {
 	userRepo := newNoConflictRepo()
 	userRepo.findByIDFn = func(_ context.Context, id string) (*domain.User, error) {
-		return newUserWithRole("user-1", domain.RoleContestant, domain.StatusActive), nil
+		return newUserWithRole("user-1", domainShared.RoleContestant, domain.StatusActive), nil
 	}
 
 	dbErr := errors.New("connection refused")
@@ -156,22 +157,22 @@ func TestConfirmDeactivation_ExpiredCode_UpdateFails_ReturnsInternal(t *testing.
 	uc := NewConfirmDeactivationUseCase(userRepo, deactRepo, &mockAuditRepo{}, &mockEmailSender{}, &mockSessionInvalidator{}, &mockTransactionManager{})
 
 	// Act
-	err := uc.Execute(context.Background(), ConfirmDeactivationInput{UserID: "user-1", Code: "123456"})
+	_, err := uc.Execute(context.Background(), ConfirmDeactivationInput{UserID: "user-1", Code: "123456"})
 
 	// Assert
 	if err == nil {
 		t.Fatal("expected error, got nil")
 	}
 	appErr, ok := err.(*apperror.AppError)
-	if !ok || appErr.StatusCode != 500 {
-		t.Errorf("expected internal error (500), got %v", err)
+	if !ok || appErr.Kind != apperror.KindInternal {
+		t.Errorf("expected kind INTERNAL, got %v", err)
 	}
 }
 
 func TestConfirmDeactivation_InvalidCode_UpdateFails_ReturnsInternal(t *testing.T) {
 	userRepo := newNoConflictRepo()
 	userRepo.findByIDFn = func(_ context.Context, id string) (*domain.User, error) {
-		return newUserWithRole("user-1", domain.RoleContestant, domain.StatusActive), nil
+		return newUserWithRole("user-1", domainShared.RoleContestant, domain.StatusActive), nil
 	}
 
 	dbErr := errors.New("connection refused")
@@ -187,22 +188,22 @@ func TestConfirmDeactivation_InvalidCode_UpdateFails_ReturnsInternal(t *testing.
 	uc := NewConfirmDeactivationUseCase(userRepo, deactRepo, &mockAuditRepo{}, &mockEmailSender{}, &mockSessionInvalidator{}, &mockTransactionManager{})
 
 	// Act
-	err := uc.Execute(context.Background(), ConfirmDeactivationInput{UserID: "user-1", Code: "000000"})
+	_, err := uc.Execute(context.Background(), ConfirmDeactivationInput{UserID: "user-1", Code: "000000"})
 
 	// Assert
 	if err == nil {
 		t.Fatal("expected error, got nil")
 	}
 	appErr, ok := err.(*apperror.AppError)
-	if !ok || appErr.StatusCode != 500 {
-		t.Errorf("expected internal error (500), got %v", err)
+	if !ok || appErr.Kind != apperror.KindInternal {
+		t.Errorf("expected kind INTERNAL, got %v", err)
 	}
 }
 
 func TestConfirmDeactivation_BlockedState_UpdateFails_ReturnsInternal(t *testing.T) {
 	userRepo := newNoConflictRepo()
 	userRepo.findByIDFn = func(_ context.Context, id string) (*domain.User, error) {
-		return newUserWithRole("user-1", domain.RoleContestant, domain.StatusActive), nil
+		return newUserWithRole("user-1", domainShared.RoleContestant, domain.StatusActive), nil
 	}
 
 	dbErr := errors.New("connection refused")
@@ -218,21 +219,21 @@ func TestConfirmDeactivation_BlockedState_UpdateFails_ReturnsInternal(t *testing
 	uc := NewConfirmDeactivationUseCase(userRepo, deactRepo, &mockAuditRepo{}, &mockEmailSender{}, &mockSessionInvalidator{}, &mockTransactionManager{})
 
 	// Act
-	err := uc.Execute(context.Background(), ConfirmDeactivationInput{UserID: "user-1", Code: "000000"})
+	_, err := uc.Execute(context.Background(), ConfirmDeactivationInput{UserID: "user-1", Code: "000000"})
 
 	// Assert
 	if err == nil {
 		t.Fatal("expected error, got nil")
 	}
 	appErr, ok := err.(*apperror.AppError)
-	if !ok || appErr.StatusCode != 500 {
-		t.Errorf("expected internal error (500), got %v", err)
+	if !ok || appErr.Kind != apperror.KindInternal {
+		t.Errorf("expected kind INTERNAL, got %v", err)
 	}
 }
 
 func TestConfirmDeactivation_AuditLogSaveFails_ReturnsNil(t *testing.T) {
 	userRepo := newNoConflictRepo()
-	activeUser := newUserWithRole("user-1", domain.RoleContestant, domain.StatusActive)
+	activeUser := newUserWithRole("user-1", domainShared.RoleContestant, domain.StatusActive)
 	userRepo.findByIDFn = func(_ context.Context, id string) (*domain.User, error) {
 		return activeUser, nil
 	}
@@ -253,7 +254,7 @@ func TestConfirmDeactivation_AuditLogSaveFails_ReturnsNil(t *testing.T) {
 
 	uc := NewConfirmDeactivationUseCase(userRepo, deactRepo, auditRepo, &mockEmailSender{}, &mockSessionInvalidator{}, &mockTransactionManager{})
 
-	err := uc.Execute(context.Background(), ConfirmDeactivationInput{UserID: "user-1", Code: "123456"})
+	_, err := uc.Execute(context.Background(), ConfirmDeactivationInput{UserID: "user-1", Code: "123456"})
 
 	if err != nil {
 		t.Fatalf("expected nil (fail-safe), got %v", err)
@@ -262,7 +263,7 @@ func TestConfirmDeactivation_AuditLogSaveFails_ReturnsNil(t *testing.T) {
 
 func TestConfirmDeactivation_EmailSendFails_ReturnsNil(t *testing.T) {
 	userRepo := newNoConflictRepo()
-	activeUser := newUserWithRole("user-1", domain.RoleContestant, domain.StatusActive)
+	activeUser := newUserWithRole("user-1", domainShared.RoleContestant, domain.StatusActive)
 	userRepo.findByIDFn = func(_ context.Context, id string) (*domain.User, error) {
 		return activeUser, nil
 	}
@@ -276,14 +277,14 @@ func TestConfirmDeactivation_EmailSendFails_ReturnsNil(t *testing.T) {
 	}
 
 	emailSender := &mockEmailSender{
-		sendFn: func(ctx context.Context, msg notification.EmailMessage) error {
+		sendFn: func(ctx context.Context, msg appshared.EmailMessage) error {
 			return errors.New("smtp timeout")
 		},
 	}
 
 	uc := NewConfirmDeactivationUseCase(userRepo, deactRepo, &mockAuditRepo{}, emailSender, &mockSessionInvalidator{}, &mockTransactionManager{})
 
-	err := uc.Execute(context.Background(), ConfirmDeactivationInput{UserID: "user-1", Code: "123456"})
+	_, err := uc.Execute(context.Background(), ConfirmDeactivationInput{UserID: "user-1", Code: "123456"})
 
 	if err != nil {
 		t.Fatalf("expected nil (fail-safe), got %v", err)
@@ -293,7 +294,7 @@ func TestConfirmDeactivation_EmailSendFails_ReturnsNil(t *testing.T) {
 func TestConfirmDeactivation_BlockExpired_MarksExpiredAndReturnsError(t *testing.T) {
 	userRepo := newNoConflictRepo()
 	userRepo.findByIDFn = func(_ context.Context, id string) (*domain.User, error) {
-		return newUserWithRole("user-1", domain.RoleContestant, domain.StatusActive), nil
+		return newUserWithRole("user-1", domainShared.RoleContestant, domain.StatusActive), nil
 	}
 
 	expiredBlockedUntil := time.Now().Add(-1 * time.Minute)
@@ -311,13 +312,13 @@ func TestConfirmDeactivation_BlockExpired_MarksExpiredAndReturnsError(t *testing
 
 	uc := NewConfirmDeactivationUseCase(userRepo, deactRepo, &mockAuditRepo{}, &mockEmailSender{}, &mockSessionInvalidator{}, &mockTransactionManager{})
 
-	err := uc.Execute(context.Background(), ConfirmDeactivationInput{UserID: "user-1", Code: "123456"})
+	_, err := uc.Execute(context.Background(), ConfirmDeactivationInput{UserID: "user-1", Code: "123456"})
 
 	if err == nil {
 		t.Fatal("expected error, got nil")
 	}
 	appErr, ok := err.(*apperror.AppError)
-	if !ok || appErr.Code != "EXPIRED_CODE" {
+	if !ok || appErr.Code != ErrCodeExpiredCode {
 		t.Errorf("expected EXPIRED_CODE after block expiry, got %v", err)
 	}
 }
@@ -325,7 +326,7 @@ func TestConfirmDeactivation_BlockExpired_MarksExpiredAndReturnsError(t *testing
 func TestConfirmDeactivation_BlockExpired_UpdateFails_ReturnsInternal(t *testing.T) {
 	userRepo := newNoConflictRepo()
 	userRepo.findByIDFn = func(_ context.Context, id string) (*domain.User, error) {
-		return newUserWithRole("user-1", domain.RoleContestant, domain.StatusActive), nil
+		return newUserWithRole("user-1", domainShared.RoleContestant, domain.StatusActive), nil
 	}
 
 	expiredBlockedUntil := time.Now().Add(-1 * time.Minute)
@@ -340,21 +341,21 @@ func TestConfirmDeactivation_BlockExpired_UpdateFails_ReturnsInternal(t *testing
 
 	uc := NewConfirmDeactivationUseCase(userRepo, deactRepo, &mockAuditRepo{}, &mockEmailSender{}, &mockSessionInvalidator{}, &mockTransactionManager{})
 
-	err := uc.Execute(context.Background(), ConfirmDeactivationInput{UserID: "user-1", Code: "123456"})
+	_, err := uc.Execute(context.Background(), ConfirmDeactivationInput{UserID: "user-1", Code: "123456"})
 
 	if err == nil {
 		t.Fatal("expected error, got nil")
 	}
 	appErr, ok := err.(*apperror.AppError)
-	if !ok || appErr.StatusCode != 500 {
-		t.Errorf("expected internal error (500), got %v", err)
+	if !ok || appErr.Kind != apperror.KindInternal {
+		t.Errorf("expected kind INTERNAL, got %v", err)
 	}
 }
 
 func TestConfirmDeactivation_ActiveBlock(t *testing.T) {
 	userRepo := newNoConflictRepo()
 	userRepo.findByIDFn = func(_ context.Context, _ string) (*domain.User, error) {
-		return newUserWithRole("user-1", domain.RoleContestant, domain.StatusActive), nil
+		return newUserWithRole("user-1", domainShared.RoleContestant, domain.StatusActive), nil
 	}
 
 	blockedUntil := time.Now().Add(30 * time.Minute)
@@ -365,20 +366,20 @@ func TestConfirmDeactivation_ActiveBlock(t *testing.T) {
 	}
 
 	uc := NewConfirmDeactivationUseCase(userRepo, deactRepo, &mockAuditRepo{}, &mockEmailSender{}, &mockSessionInvalidator{}, &mockTransactionManager{})
-	err := uc.Execute(context.Background(), ConfirmDeactivationInput{UserID: "user-1", Code: "123456"})
+	_, err := uc.Execute(context.Background(), ConfirmDeactivationInput{UserID: "user-1", Code: "123456"})
 
 	if err == nil {
 		t.Fatal("expected error, got nil")
 	}
 	appErr, ok := err.(*apperror.AppError)
-	if !ok || appErr.Code != "MAX_ATTEMPTS_EXCEEDED" {
+	if !ok || appErr.Code != ErrCodeMaxAttemptsExceeded {
 		t.Errorf("expected MAX_ATTEMPTS_EXCEEDED, got %v", err)
 	}
 }
 
 func TestConfirmDeactivation_ExceedAttemptsAndBlock(t *testing.T) {
 	userRepo := newNoConflictRepo()
-	activeUser := newUserWithRole("user-1", domain.RoleContestant, domain.StatusActive)
+	activeUser := newUserWithRole("user-1", domainShared.RoleContestant, domain.StatusActive)
 	userRepo.findByIDFn = func(_ context.Context, id string) (*domain.User, error) {
 		return activeUser, nil
 	}
@@ -400,7 +401,7 @@ func TestConfirmDeactivation_ExceedAttemptsAndBlock(t *testing.T) {
 
 	uc := NewConfirmDeactivationUseCase(userRepo, deactRepo, &mockAuditRepo{}, &mockEmailSender{}, &mockSessionInvalidator{}, &mockTransactionManager{})
 
-	err := uc.Execute(context.Background(), ConfirmDeactivationInput{
+	_, err := uc.Execute(context.Background(), ConfirmDeactivationInput{
 		UserID: "user-1",
 		Code:   "000000",
 	})
@@ -409,7 +410,7 @@ func TestConfirmDeactivation_ExceedAttemptsAndBlock(t *testing.T) {
 		t.Fatal("expected error, got nil")
 	}
 	appErr, ok := err.(*apperror.AppError)
-	if !ok || appErr.Code != "MAX_ATTEMPTS_EXCEEDED" {
+	if !ok || appErr.Code != ErrCodeMaxAttemptsExceeded {
 		t.Errorf("expected MAX_ATTEMPTS_EXCEEDED, got %v", err)
 	}
 }

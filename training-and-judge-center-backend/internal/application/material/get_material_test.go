@@ -8,8 +8,8 @@ import (
 	"github.com/training-judge-center/backend/pkg/apperror"
 )
 
-func newGetUC(repo *mockMaterialRepository, vis *mockGroupVisibilityProvider, mem *mockGroupMemberProvider) *GetMaterial {
-	return NewGetMaterial(repo, vis, mem, stubAuthorProvider())
+func newGetUC(repo *mockMaterialRepository, vis *mockGroupVisibilityProvider, mem *mockGroupMemberProvider) *GetMaterialUseCase {
+	return NewGetMaterialUseCase(repo, vis, mem, stubAuthorProvider())
 }
 
 func TestGetMaterial_GroupNotFound_Returns404(t *testing.T) {
@@ -29,7 +29,7 @@ func TestGetMaterial_NotVisibleGroup_NonMember_Returns403(t *testing.T) {
 		GroupID:     testGroupID,
 		MaterialID:  testMaterialID,
 	})
-	assertErrCode(t, err, ErrCodeInsufficientPerms)
+	assertErrCode(t, err, ErrCodeInsufficientPermissions)
 }
 
 func TestGetMaterial_NotVisibleGroup_Admin_CanAccess(t *testing.T) {
@@ -167,7 +167,7 @@ func TestGetMaterial_AuthorProviderError_Returns500(t *testing.T) {
 			return nil, apperror.NewInternal()
 		},
 	}
-	uc := NewGetMaterial(repo, visibleGroup(), isMemberNotLead(), authorProvider)
+	uc := NewGetMaterialUseCase(repo, visibleGroup(), isMemberNotLead(), authorProvider)
 
 	_, err := uc.Execute(context.Background(), GetMaterialInput{
 		CurrentUser: asCoach(testOtherID),
@@ -186,7 +186,7 @@ func TestListMaterials_AuthorProviderError_Returns500(t *testing.T) {
 			return nil, apperror.NewInternal()
 		},
 	}
-	uc := NewListMaterials(repoWithList([]*domainMaterial.Material{newPublishedMaterial()}), visibleGroup(), isMemberNotLead(), authorProvider)
+	uc := NewListMaterialsUseCase(repoWithList([]*domainMaterial.Material{newPublishedMaterial()}), visibleGroup(), isMemberNotLead(), authorProvider)
 
 	_, err := uc.Execute(context.Background(), defaultListInput())
 
@@ -257,7 +257,7 @@ func TestGetMaterial_LeadCheckError_Returns500(t *testing.T) {
 		},
 	}
 	repo := repoWith(newTestMaterial())
-	uc := NewGetMaterial(repo, visibleGroup(), mem, stubAuthorProvider())
+	uc := NewGetMaterialUseCase(repo, visibleGroup(), mem, stubAuthorProvider())
 	_, err := uc.Execute(context.Background(), GetMaterialInput{
 		CurrentUser: asCoach(testOtherID),
 		GroupID:     testGroupID,

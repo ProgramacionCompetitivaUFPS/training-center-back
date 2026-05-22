@@ -15,9 +15,7 @@ type GroupMember struct {
 	joinedAt time.Time
 }
 
-// NewGroupMember constructs a validated GroupMember. Pass a non-nil clock for
-// deterministic joinedAt in tests; nil defaults to time.Now.
-func NewGroupMember(id, groupID string, userID shared.UserID, role MemberRole, clock func() time.Time) (*GroupMember, error) {
+func NewGroupMember(id, groupID string, userID shared.UserID, role MemberRole, now time.Time) (*GroupMember, error) {
 	if id == "" {
 		return nil, apperror.NewInternal()
 	}
@@ -27,15 +25,12 @@ func NewGroupMember(id, groupID string, userID shared.UserID, role MemberRole, c
 	if userID.Value() == "" {
 		return nil, apperror.NewInternal()
 	}
-	if clock == nil {
-		clock = time.Now
-	}
 	return &GroupMember{
 		id:       id,
 		groupID:  groupID,
 		userID:   userID,
 		role:     role,
-		joinedAt: clock().UTC(),
+		joinedAt: now.UTC(),
 	}, nil
 }
 

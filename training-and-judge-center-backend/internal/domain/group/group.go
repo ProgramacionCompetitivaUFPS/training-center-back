@@ -17,29 +17,16 @@ type Group struct {
 	createdBy   shared.UserID
 	createdAt   time.Time
 	updatedAt   time.Time
-	clock       func() time.Time
 }
 
-func (g *Group) now() time.Time { return g.clock().UTC() }
-
-func (g *Group) WithClock(fn func() time.Time) *Group {
-	g.clock = fn
-	return g
-}
-
-// NewGroup constructs a validated Group. Pass a non-nil clock for deterministic
-// timestamps in tests; nil defaults to time.Now.
-func NewGroup(id string, name GroupName, description *string, visibility Visibility, joinPolicy JoinPolicy, createdBy shared.UserID, clock func() time.Time) (*Group, error) {
+func NewGroup(id string, name GroupName, description *string, visibility Visibility, joinPolicy JoinPolicy, createdBy shared.UserID, now time.Time) (*Group, error) {
 	if id == "" {
 		return nil, apperror.NewInternal()
 	}
 	if err := validatePolicyCombination(visibility, joinPolicy); err != nil {
 		return nil, err
 	}
-	if clock == nil {
-		clock = time.Now
-	}
-	now := clock().UTC()
+	t := now.UTC()
 	return &Group{
 		id:          id,
 		name:        name,
@@ -48,9 +35,8 @@ func NewGroup(id string, name GroupName, description *string, visibility Visibil
 		joinPolicy:  joinPolicy,
 		isDefault:   false,
 		createdBy:   createdBy,
-		createdAt:   now,
-		updatedAt:   now,
-		clock:       clock,
+		createdAt:   t,
+		updatedAt:   t,
 	}, nil
 }
 
@@ -65,7 +51,6 @@ func RestoreGroup(id string, name GroupName, description *string, visibility Vis
 		createdBy:   createdBy,
 		createdAt:   createdAt,
 		updatedAt:   updatedAt,
-		clock:       time.Now,
 	}
 }
 
@@ -86,7 +71,7 @@ func (g *Group) CanBeDeleted() bool { return !g.isDefault }
 //   - Pass nil for description to leave it unchanged.
 //   - Pass &nilPtr (where nilPtr is a nil *string) to clear the description.
 //   - Pass &ptr (where ptr points to a string) to set a new value.
-func (g *Group) UpdateMetadata(name *GroupName, description **string) {
+func (g *Group) UpdateMetadata(name *GroupName, description **string, now time.Time) {
 	if name == nil && description == nil {
 		return
 	}
@@ -96,10 +81,10 @@ func (g *Group) UpdateMetadata(name *GroupName, description **string) {
 	if description != nil {
 		g.description = *description
 	}
-	g.updatedAt = g.now()
+	g.updatedAt = now.UTC()
 }
 
-func (g *Group) UpdatePolicies(visibility *Visibility, joinPolicy *JoinPolicy) error {
+func (g *Group) UpdatePolicies(visibility *Visibility, joinPolicy *JoinPolicy, now time.Time) error {
 	if visibility == nil && joinPolicy == nil {
 		return nil
 	}
@@ -116,7 +101,7 @@ func (g *Group) UpdatePolicies(visibility *Visibility, joinPolicy *JoinPolicy) e
 	}
 	g.visibility = newV
 	g.joinPolicy = newJP
-	g.updatedAt = g.now()
+	g.updatedAt = now.UTC()
 	return nil
 }
 

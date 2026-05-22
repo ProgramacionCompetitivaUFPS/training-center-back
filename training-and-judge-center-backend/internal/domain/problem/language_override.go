@@ -40,13 +40,13 @@ func NewLanguageOverride(
 	}
 
 	if langLimit != nil {
-		if timeLimit != nil && *timeLimit > 0 && *timeLimit > langLimit.MaxTimeLimit {
+		if timeLimit != nil && *timeLimit > 0 && *timeLimit > langLimit.MaxTimeLimit() {
 			fieldErrs = append(fieldErrs, apperror.FieldError{
 				Field:   "languageOverrides.timeLimit",
 				Message: "Exceeds maximum time limit for " + language,
 			})
 		}
-		if memoryLimit != nil && *memoryLimit > 0 && *memoryLimit > langLimit.MaxMemoryLimit {
+		if memoryLimit != nil && *memoryLimit > 0 && *memoryLimit > langLimit.MaxMemoryLimit() {
 			fieldErrs = append(fieldErrs, apperror.FieldError{
 				Field:   "languageOverrides.memoryLimit",
 				Message: "Exceeds maximum memory limit for " + language,

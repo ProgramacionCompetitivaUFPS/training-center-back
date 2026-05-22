@@ -1,21 +1,15 @@
-package problem
+﻿package problem
 
 import (
 	"context"
-	"errors"
-	"log/slog"
+	"time"
 
 	"github.com/google/uuid"
+	appshared "github.com/training-judge-center/backend/internal/application/shared"
 	"github.com/training-judge-center/backend/internal/domain/problem"
 	"github.com/training-judge-center/backend/internal/domain/shared"
 	"github.com/training-judge-center/backend/pkg/apperror"
 )
-
-type LanguageOverrideInput struct {
-	Language    string
-	TimeLimit   *int
-	MemoryLimit *int
-}
 
 type CreateProblemInput struct {
 	Slug          string
@@ -25,28 +19,28 @@ type CreateProblemInput struct {
 	MemoryLimit   *int
 	LangOverrides []LanguageOverrideInput
 	Tags          []string
-	CurrentUser   shared.CurrentUser
+	CurrentUser   appshared.CurrentUser
 }
 
-type CreateProblemResult struct {
-	Problem *problem.Problem
+type CreateProblemOutput struct {
+	Problem ProblemDTO
 }
 
 type CreateProblemUseCase struct {
 	repo             problem.Repository
-	platformSettings *problem.PlatformSettings
+	platformSettings problem.PlatformSettings
 }
 
-func NewCreateProblemUseCase(repo problem.Repository, platformSettings *problem.PlatformSettings) *CreateProblemUseCase {
+func NewCreateProblemUseCase(repo problem.Repository, platformSettings problem.PlatformSettings) *CreateProblemUseCase {
 	return &CreateProblemUseCase{
 		repo:             repo,
 		platformSettings: platformSettings,
 	}
 }
 
-func (usecase *CreateProblemUseCase) Execute(ctx context.Context, input CreateProblemInput) (*CreateProblemResult, error) {
+func (usecase *CreateProblemUseCase) Execute(ctx context.Context, input CreateProblemInput) (*CreateProblemOutput, error) {
 	if input.CurrentUser.Role != shared.RoleCoach && !input.CurrentUser.IsAdmin() {
-		return nil, apperror.NewForbidden(apperror.ErrCodeForbidden, "Only Coach and Admin users can create problems")
+		return nil, apperror.NewForbidden(ErrCodeInsufficientPermissions, "Only Coach and Admin users can create problems")
 	}
 
 	slug, err := problem.NewSlug(input.Slug)
@@ -66,7 +60,7 @@ func (usecase *CreateProblemUseCase) Execute(ctx context.Context, input CreatePr
 		return nil, err
 	}
 
-	globalMaxTime, globalMaxMemory := usecase.platformSettings.GetGlobalLimits()
+	globalMaxTime, globalMaxMemory := usecase.platformSettings.GlobalLimits()
 
 	var timeLimit *problem.TimeLimit
 	if input.TimeLimit != nil {
@@ -117,7 +111,11 @@ func (usecase *CreateProblemUseCase) Execute(ctx context.Context, input CreatePr
 		}
 		seenLangs[override.Language] = struct{}{}
 
-		langLimit := usecase.platformSettings.GetLanguageLimit(override.Language)
+		ll, hasLL := usecase.platformSettings.LanguageLimit(override.Language)
+		var langLimit *problem.LanguageLimit
+		if hasLL {
+			langLimit = &ll
+		}
 		langOverride, loErr := problem.NewLanguageOverride(
 			override.Language,
 			override.TimeLimit,
@@ -135,7 +133,7 @@ func (usecase *CreateProblemUseCase) Execute(ctx context.Context, input CreatePr
 		validOverrides = append(validOverrides, langOverride)
 	}
 
-	allowedTags := usecase.platformSettings.GetAllowedTags()
+	allowedTags := usecase.platformSettings.AllowedTags()
 	tags, err := problem.NewTags(input.Tags, allowedTags)
 	if err := apperror.AccumulateFieldErrors(err, &fieldErrs); err != nil {
 		return nil, err
@@ -146,7 +144,8 @@ func (usecase *CreateProblemUseCase) Execute(ctx context.Context, input CreatePr
 	}
 
 	newID := uuid.New().String()
-	newProblem := problem.NewProblem(
+	now := time.Now()
+	newProblem, err := problem.NewProblem(
 		newID,
 		slug,
 		title,
@@ -156,16 +155,15 @@ func (usecase *CreateProblemUseCase) Execute(ctx context.Context, input CreatePr
 		validOverrides,
 		tags,
 		shared.RestoreUserID(input.CurrentUser.ID),
+		now,
 	)
-
-	if err := usecase.repo.Save(ctx, newProblem); err != nil {
-		var slugErr *problem.ErrSlugAlreadyExists
-		if errors.As(err, &slugErr) {
-			return nil, apperror.NewConflict(ErrCodeProblemSlugAlreadyExists, "A problem with slug '"+slugErr.Slug+"' already exists")
-		}
-		slog.ErrorContext(ctx, "failed to save new problem", "error", err, "slug", slug.String())
-		return nil, apperror.NewInternal()
+	if err != nil {
+		return nil, err
 	}
 
-	return &CreateProblemResult{Problem: newProblem}, nil
+	if err := usecase.repo.Save(ctx, newProblem); err != nil {
+		return nil, err
+	}
+
+	return &CreateProblemOutput{Problem: problemToDTO(newProblem)}, nil
 }

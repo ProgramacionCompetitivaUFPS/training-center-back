@@ -31,11 +31,55 @@ services:
       postgres:
         condition: service_healthy
 
+  seed:
+    build: .
+    container_name: training-center-seed
+    entrypoint: ["/bin/seed"]
+    environment:
+      DB_HOST: postgres
+      DB_PORT: "5432"
+      DB_USER: ${POSTGRES_USER}
+      DB_PASSWORD: ${POSTGRES_PASSWORD}
+      DB_NAME: ${POSTGRES_DB}
+      ADMIN_EMAIL: ${ADMIN_EMAIL}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD}
+      ADMIN_NAME: ${ADMIN_NAME:-admin}
+      ADMIN_NICKNAME: ${ADMIN_NICKNAME:-admin}
+      ADMIN_COUNTRY: ${ADMIN_COUNTRY:-admin}
+      ADMIN_CITY: ${ADMIN_CITY:-admin}
+      ADMIN_INSTITUTION: ${ADMIN_INSTITUTION:-admin}
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+
+  nginx:
+    image: nginx:alpine
+    container_name: training-center-nginx
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/conf.d:/etc/nginx/conf.d:ro
+      - certbot_etc:/etc/letsencrypt
+      - certbot_var:/var/lib/letsencrypt
+      - certbot_webroot:/var/www/html
+    depends_on:
+      - backend
+
+  certbot:
+    image: certbot/certbot
+    container_name: training-center-certbot
+    volumes:
+      - certbot_etc:/etc/letsencrypt
+      - certbot_var:/var/lib/letsencrypt
+      - certbot_webroot:/var/www/html
+    command: certonly --webroot --webroot-path=/var/www/html --email ${CERTBOT_EMAIL} --agree-tos --no-eff-email --non-interactive -d ${DOMAIN}
+
   backend:
     build: .
     container_name: training-center-api
-    ports:
-      - "${PORT}:8080"
+    expose:
+      - "8080"
     environment:
       PORT: "8080"
       DB_HOST: postgres
@@ -55,10 +99,11 @@ services:
       STORAGE_BACKEND: ${STORAGE_BACKEND:-local}
       STORAGE_LOCAL_DIR: /data/uploads
       GCS_BUCKET: ${GCS_BUCKET:-}
+      ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-http://localhost:5173}
     volumes:
       - problem_uploads:/data/uploads
     depends_on:
-      migrate:
+      seed:
         condition: service_completed_successfully
       redis:
         condition: service_started
@@ -69,7 +114,7 @@ services:
     image: mailhog/mailhog
     container_name: training-center-mailhog
     ports:
-      - "1025:1025" # SMTP server
+      - "1025:1025" # SMTP http
       - "8025:8025" # Web UI
 
   redis:
@@ -81,3 +126,6 @@ services:
 volumes:
   postgres_data:
   problem_uploads:
+  certbot_etc:
+  certbot_var:
+  certbot_webroot:

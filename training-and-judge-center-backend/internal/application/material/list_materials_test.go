@@ -8,8 +8,8 @@ import (
 	"github.com/training-judge-center/backend/pkg/apperror"
 )
 
-func newListUC(repo *mockMaterialRepository, vis *mockGroupVisibilityProvider, mem *mockGroupMemberProvider) *ListMaterials {
-	return NewListMaterials(repo, vis, mem, stubAuthorProvider())
+func newListUC(repo *mockMaterialRepository, vis *mockGroupVisibilityProvider, mem *mockGroupMemberProvider) *ListMaterialsUseCase {
+	return NewListMaterialsUseCase(repo, vis, mem, stubAuthorProvider())
 }
 
 func defaultListInput() ListMaterialsInput {
@@ -26,7 +26,7 @@ func TestListMaterials_InvalidPage_Returns400(t *testing.T) {
 	in := defaultListInput()
 	in.Page = 0
 	_, err := uc.Execute(context.Background(), in)
-	assertErrCode(t, err, "VALIDATION_ERROR")
+	assertErrCode(t, err, apperror.ErrCodeValidationError)
 }
 
 func TestListMaterials_InvalidLimit_Returns400(t *testing.T) {
@@ -36,7 +36,7 @@ func TestListMaterials_InvalidLimit_Returns400(t *testing.T) {
 		in := defaultListInput()
 		in.Limit = limit
 		_, err := uc.Execute(context.Background(), in)
-		assertErrCode(t, err, "VALIDATION_ERROR")
+		assertErrCode(t, err, apperror.ErrCodeValidationError)
 	}
 }
 
@@ -51,7 +51,7 @@ func TestListMaterials_NotVisibleGroup_NonMember_Returns403(t *testing.T) {
 	in := defaultListInput()
 	in.CurrentUser = asCoach(testOtherID)
 	_, err := uc.Execute(context.Background(), in)
-	assertErrCode(t, err, ErrCodeInsufficientPerms)
+	assertErrCode(t, err, ErrCodeInsufficientPermissions)
 }
 
 func TestListMaterials_VisibleGroup_NonMember_Returns200(t *testing.T) {
@@ -212,7 +212,7 @@ func TestListMaterials_LeadCheckError_Returns500(t *testing.T) {
 			return true, nil
 		},
 	}
-	uc := NewListMaterials(&mockMaterialRepository{}, visibleGroup(), mem, stubAuthorProvider())
+	uc := NewListMaterialsUseCase(&mockMaterialRepository{}, visibleGroup(), mem, stubAuthorProvider())
 	_, err := uc.Execute(context.Background(), defaultListInput())
 	assertErrCode(t, err, apperror.ErrCodeInternalError)
 }

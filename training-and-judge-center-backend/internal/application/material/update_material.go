@@ -1,16 +1,18 @@
-package material
+﻿package material
 
 import (
 	"context"
 	"log/slog"
+	"time"
 
 	domainMaterial "github.com/training-judge-center/backend/internal/domain/material"
 	"github.com/training-judge-center/backend/internal/domain/shared"
+	appshared "github.com/training-judge-center/backend/internal/application/shared"
 	"github.com/training-judge-center/backend/pkg/apperror"
 )
 
 type UpdateMaterialInput struct {
-	CurrentUser shared.CurrentUser
+	CurrentUser appshared.CurrentUser
 	// GroupID scopes the operation: the material must belong to this group.
 	// A material whose GroupID differs from this value is treated as not found.
 	GroupID     string
@@ -24,21 +26,21 @@ type UpdateMaterialOutput struct {
 	Material MaterialData
 }
 
-type UpdateMaterial struct {
+type UpdateMaterialUseCase struct {
 	repo           domainMaterial.Repository
 	groupProvider  GroupProvider
 	authorProvider AuthorProvider
 }
 
-func NewUpdateMaterial(
+func NewUpdateMaterialUseCase(
 	repo domainMaterial.Repository,
 	groupProvider GroupProvider,
 	authorProvider AuthorProvider,
-) *UpdateMaterial {
-	return &UpdateMaterial{repo: repo, groupProvider: groupProvider, authorProvider: authorProvider}
+) *UpdateMaterialUseCase {
+	return &UpdateMaterialUseCase{repo: repo, groupProvider: groupProvider, authorProvider: authorProvider}
 }
 
-func (uc *UpdateMaterial) Execute(ctx context.Context, in UpdateMaterialInput) (*UpdateMaterialOutput, error) {
+func (uc *UpdateMaterialUseCase) Execute(ctx context.Context, in UpdateMaterialInput) (*UpdateMaterialOutput, error) {
 	exists, err := uc.groupProvider.Exists(ctx, in.GroupID)
 	if err != nil {
 		slog.ErrorContext(ctx, "failed to check group existence", "error", err, "group_id", in.GroupID)
@@ -75,25 +77,27 @@ func (uc *UpdateMaterial) Execute(ctx context.Context, in UpdateMaterialInput) (
 		}
 	}
 
-	var content *domainMaterial.Content
+	var content **domainMaterial.Content
 	if in.Content != nil {
 		c, cErr := domainMaterial.NewContent(*in.Content)
 		if err := apperror.AccumulateFieldErrors(cErr, &fieldErrs); err != nil {
 			return nil, err
 		}
 		if cErr == nil {
-			content = &c
+			ptr := &c
+			content = &ptr
 		}
 	}
 
-	var tags *domainMaterial.Tags
+	var tags **domainMaterial.Tags
 	if in.Tags != nil {
 		t, tErr := domainMaterial.NewTags(*in.Tags)
 		if err := apperror.AccumulateFieldErrors(tErr, &fieldErrs); err != nil {
 			return nil, err
 		}
 		if tErr == nil {
-			tags = &t
+			ptr := &t
+			tags = &ptr
 		}
 	}
 
@@ -101,7 +105,8 @@ func (uc *UpdateMaterial) Execute(ctx context.Context, in UpdateMaterialInput) (
 		return nil, apperror.NewValidation(fieldErrs)
 	}
 
-	m.UpdateMetadata(title, content, tags)
+	now := time.Now()
+	m.UpdateMetadata(title, content, tags, now)
 
 	if err := uc.repo.Save(ctx, m); err != nil {
 		slog.ErrorContext(ctx, "failed to save updated material", "error", err, "material_id", in.MaterialID)
@@ -114,7 +119,9 @@ func (uc *UpdateMaterial) Execute(ctx context.Context, in UpdateMaterialInput) (
 		slog.ErrorContext(ctx, "failed to resolve author display", "error", err, "author_id", m.AuthorID().Value())
 		return nil, apperror.NewInternal()
 	}
-	data.Author = displays[m.AuthorID().Value()]
+	if disp := displays[m.AuthorID().Value()]; disp != nil {
+		data.Author = &AuthorDTO{Nickname: disp.Nickname, Name: disp.Name}
+	}
 
 	return &UpdateMaterialOutput{Material: data}, nil
 }

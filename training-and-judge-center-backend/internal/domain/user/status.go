@@ -1,21 +1,32 @@
 package user
 
-import "fmt"
-
-type Status string
+import "github.com/training-judge-center/backend/pkg/apperror"
 
 const (
-	StatusActive      Status = "ACTIVE"
-	StatusDeactivated Status = "DEACTIVATED"
+	statusActive      = "ACTIVE"
+	statusDeactivated = "DEACTIVATED"
+)
+
+type Status struct{ value string }
+
+var (
+	StatusActive      = Status{value: statusActive}
+	StatusDeactivated = Status{value: statusDeactivated}
 )
 
 func NewStatus(value string) (Status, error) {
-	switch Status(value) {
-	case StatusActive, StatusDeactivated:
-		return Status(value), nil
+	switch value {
+	case statusActive, statusDeactivated:
+		return Status{value: value}, nil
 	default:
-		return "", fmt.Errorf("invalid status: %s", value)
+		return Status{}, apperror.NewValidation([]apperror.FieldError{
+			{Field: "status", Message: "invalid status: " + value},
+		})
 	}
+}
+
+func RestoreStatus(value string) Status {
+	return Status{value: value}
 }
 
 func (s Status) IsValid() bool {
@@ -27,5 +38,5 @@ func (s Status) IsValid() bool {
 }
 
 func (s Status) String() string {
-	return string(s)
+	return s.value
 }

@@ -1,12 +1,14 @@
-package group
+﻿package group
 
 import (
 	"context"
 	"log/slog"
+	"time"
 
 	"github.com/google/uuid"
 	domainGroup "github.com/training-judge-center/backend/internal/domain/group"
 	"github.com/training-judge-center/backend/internal/domain/shared"
+	appshared "github.com/training-judge-center/backend/internal/application/shared"
 	"github.com/training-judge-center/backend/pkg/apperror"
 )
 
@@ -15,25 +17,35 @@ type CreateGroupInput struct {
 	Description *string
 	JoinMode    string
 	Visibility  string
-	CurrentUser shared.CurrentUser
+	CurrentUser appshared.CurrentUser
 }
 
-type CreateGroupResult struct {
-	Group *domainGroup.Group
+type CreateGroupOutput struct {
+	ID          string
+	Name        string
+	Description *string
+	JoinPolicy  string
+	Visibility  string
+	IsDefault   bool
+	CreatedBy   string
+	CreatedAt   time.Time
+	UpdatedAt   time.Time
 }
 
 type CreateGroupUseCase struct {
-	repo domainGroup.Repository
+	repo       domainGroup.Repository
+	memberRepo domainGroup.MemberRepository
+	txManager  appshared.TransactionManager
 }
 
-func NewCreateGroupUseCase(repo domainGroup.Repository) *CreateGroupUseCase {
-	return &CreateGroupUseCase{repo: repo}
+func NewCreateGroupUseCase(repo domainGroup.Repository, memberRepo domainGroup.MemberRepository, txManager appshared.TransactionManager) *CreateGroupUseCase {
+	return &CreateGroupUseCase{repo: repo, memberRepo: memberRepo, txManager: txManager}
 }
 
-func (uc *CreateGroupUseCase) Execute(ctx context.Context, input CreateGroupInput) (*CreateGroupResult, error) {
+func (uc *CreateGroupUseCase) Execute(ctx context.Context, input CreateGroupInput) (*CreateGroupOutput, error) {
 	if input.CurrentUser.Role != shared.RoleCoach && !input.CurrentUser.IsAdmin() {
 		return nil, apperror.NewForbidden(
-			domainGroup.ErrCodeInsufficientPermissions,
+			ErrCodeInsufficientPermissions,
 			"Only Admin and Coach users can create groups",
 		)
 	}
@@ -67,24 +79,39 @@ func (uc *CreateGroupUseCase) Execute(ctx context.Context, input CreateGroupInpu
 		return nil, apperror.NewConflict(domainGroup.ErrCodeNameAlreadyExists, "A group with this name already exists")
 	}
 
+	now := time.Now()
 	newID := uuid.New().String()
-	g, err := domainGroup.NewGroup(
-		newID,
-		groupName,
-		input.Description,
-		visibility,
-		joinPolicy,
-		shared.RestoreUserID(input.CurrentUser.ID),
-		nil,
-	)
+	creatorID := shared.RestoreUserID(input.CurrentUser.ID)
+	g, err := domainGroup.NewGroup(newID, groupName, input.Description, visibility, joinPolicy, creatorID, now)
 	if err != nil {
 		return nil, err
 	}
 
-	if err := uc.repo.Save(ctx, g); err != nil {
-		slog.ErrorContext(ctx, "failed to save new group", "error", err, "group_id", newID)
-		return nil, apperror.NewInternal()
+	newLeadMemberID := uuid.New().String()
+	lead, err := domainGroup.NewGroupMember(newLeadMemberID, newID, creatorID, domainGroup.MemberRoleLead, now)
+	if err != nil {
+		return nil, err
 	}
 
-	return &CreateGroupResult{Group: g}, nil
+	if err := uc.txManager.WithTx(ctx, func(txCtx context.Context) error {
+		if err := uc.repo.Save(txCtx, g); err != nil {
+			slog.ErrorContext(txCtx, "failed to save new group", "error", err, "group_id", newID)
+			return apperror.NewInternal()
+		}
+		return uc.memberRepo.Save(txCtx, lead)
+	}); err != nil {
+		return nil, err
+	}
+
+	return &CreateGroupOutput{
+		ID:          g.ID(),
+		Name:        g.Name().Value(),
+		Description: g.Description(),
+		JoinPolicy:  g.JoinPolicy().String(),
+		Visibility:  g.Visibility().String(),
+		IsDefault:   g.IsDefault(),
+		CreatedBy:   g.CreatedBy().Value(),
+		CreatedAt:   g.CreatedAt(),
+		UpdatedAt:   g.UpdatedAt(),
+	}, nil
 }

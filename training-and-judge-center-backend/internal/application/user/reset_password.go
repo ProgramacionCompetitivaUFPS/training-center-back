@@ -6,11 +6,10 @@ import (
 	"log/slog"
 	"time"
 
+	appshared "github.com/training-judge-center/backend/internal/application/shared"
 	"github.com/training-judge-center/backend/internal/domain/user"
 	"github.com/training-judge-center/backend/pkg/apperror"
 )
-
-var errInvalidRecoveryAttempt = apperror.NewBadRequest("INVALID_RECOVERY_ATTEMPT", "Invalid email or recovery code")
 
 type ResetPasswordInput struct {
 	Email       string
@@ -18,18 +17,22 @@ type ResetPasswordInput struct {
 	NewPassword string
 }
 
+type ResetPasswordOutput struct {
+	SessionsInvalidated bool
+}
+
 type ResetPasswordUseCase struct {
-	userRepo           user.UserRepository
+	userRepo           user.Repository
 	recoveryRepo       user.PasswordRecoveryRepository
 	sessionInvalidator user.SessionInvalidator
-	txManager          user.TransactionManager
+	txManager          appshared.TransactionManager
 }
 
 func NewResetPasswordUseCase(
-	userRepo user.UserRepository,
+	userRepo user.Repository,
 	recoveryRepo user.PasswordRecoveryRepository,
 	sessionInvalidator user.SessionInvalidator,
-	txManager user.TransactionManager,
+	txManager appshared.TransactionManager,
 ) *ResetPasswordUseCase {
 	return &ResetPasswordUseCase{
 		userRepo:           userRepo,
@@ -39,51 +42,51 @@ func NewResetPasswordUseCase(
 	}
 }
 
-func (uc *ResetPasswordUseCase) Execute(ctx context.Context, input ResetPasswordInput) error {
+func (uc *ResetPasswordUseCase) Execute(ctx context.Context, input ResetPasswordInput) (*ResetPasswordOutput, error) {
 	emailVO, err := user.NewEmail(input.Email)
 	if err != nil {
-		return apperror.NewValidation([]apperror.FieldError{
+		return nil, apperror.NewValidation([]apperror.FieldError{
 			{Field: "email", Message: err.Error()},
 		})
 	}
 
 	foundUser, err := uc.userRepo.FindByEmail(ctx, emailVO)
 	if err != nil {
-		slog.Error("failed to find user by email during password reset", "error", err)
-		return apperror.NewInternal()
+		slog.ErrorContext(ctx, "failed to find user by email during password reset", "error", err)
+		return nil, apperror.NewInternal()
 	}
 	if foundUser == nil || foundUser.Status() == user.StatusDeactivated {
-		return errInvalidRecoveryAttempt
+		return nil, apperror.NewBadRequest(ErrCodeInvalidRecoveryAttempt, "Invalid email or recovery code")
 	}
 
 	req, err := uc.recoveryRepo.FindPendingByUserID(ctx, foundUser.ID())
 	if err != nil {
-		slog.Error("failed to find pending recovery request", "user_id", foundUser.ID(), "error", err)
-		return apperror.NewInternal()
+		slog.ErrorContext(ctx, "failed to find pending recovery request", "user_id", foundUser.ID(), "error", err)
+		return nil, apperror.NewInternal()
 	}
 	if req == nil {
-		return errInvalidRecoveryAttempt
+		return nil, apperror.NewBadRequest(ErrCodeInvalidRecoveryAttempt, "Invalid email or recovery code")
 	}
 
 	now := time.Now()
 	if req.IsExpired(now) || subtle.ConstantTimeCompare([]byte(req.Code()), []byte(input.Code)) != 1 {
-		return errInvalidRecoveryAttempt
+		return nil, apperror.NewBadRequest(ErrCodeInvalidRecoveryAttempt, "Invalid email or recovery code")
 	}
 
 	newPassword, err := user.NewPassword(input.NewPassword)
 	if err != nil {
-		return apperror.NewValidation([]apperror.FieldError{
+		return nil, apperror.NewValidation([]apperror.FieldError{
 			{Field: "newPassword", Message: err.Error()},
 		})
 	}
 
-	if err := foundUser.UpdatePassword(newPassword); err != nil {
-		slog.Error("failed to update password on user domain object", "user_id", foundUser.ID(), "error", err)
-		return apperror.NewInternal()
+	if err := foundUser.UpdatePassword(newPassword, now); err != nil {
+		slog.ErrorContext(ctx, "failed to update password on user domain object", "user_id", foundUser.ID(), "error", err)
+		return nil, apperror.NewInternal()
 	}
 	if err := req.MarkAsUsed(now); err != nil {
-		slog.Error("failed to mark recovery request as used", "user_id", foundUser.ID(), "error", err)
-		return apperror.NewInternal()
+		slog.ErrorContext(ctx, "failed to mark recovery request as used", "user_id", foundUser.ID(), "error", err)
+		return nil, apperror.NewInternal()
 	}
 
 	if err := uc.txManager.WithTx(ctx, func(txCtx context.Context) error {
@@ -95,14 +98,15 @@ func (uc *ResetPasswordUseCase) Execute(ctx context.Context, input ResetPassword
 		}
 		return nil
 	}); err != nil {
-		slog.Error("failed to commit password reset transaction", "user_id", foundUser.ID(), "error", err)
-		return apperror.NewInternal()
+		slog.ErrorContext(ctx, "failed to commit password reset transaction", "user_id", foundUser.ID(), "error", err)
+		return nil, apperror.NewInternal()
 	}
 
+	sessionsInvalidated := true
 	if err := uc.sessionInvalidator.InvalidateAllUserSessions(ctx, foundUser.ID(), now); err != nil {
-		slog.Error("failed to invalidate sessions after password reset", "user_id", foundUser.ID(), "error", err)
-		return ErrSessionsNotInvalidated
+		slog.ErrorContext(ctx, "failed to invalidate sessions after password reset", "user_id", foundUser.ID(), "error", err)
+		sessionsInvalidated = false
 	}
 
-	return nil
+	return &ResetPasswordOutput{SessionsInvalidated: sessionsInvalidated}, nil
 }

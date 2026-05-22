@@ -77,9 +77,8 @@ func TestListMyGroups_AdminHasNoImplicitMemberships(t *testing.T) {
 func TestListMyGroups_EnrichesEachResult(t *testing.T) {
 	g := mustGroup(t, "g1", "Club", domainGroup.VisibilityVisible, domainGroup.JoinPolicyOpen)
 	uid := shared.RestoreUserID("u1")
-	gm, _ := domainGroup.NewGroupMember("m1", "g1", uid, domainGroup.MemberRoleLead, func() time.Time {
-		return time.Date(2026, 2, 1, 10, 0, 0, 0, time.UTC)
-	})
+	gm, _ := domainGroup.NewGroupMember("m1", "g1", uid, domainGroup.MemberRoleLead,
+		time.Date(2026, 2, 1, 10, 0, 0, 0, time.UTC))
 
 	repo := &fakeRepo{groups: []*domainGroup.Group{g}, total: 1}
 	memberRepo := &fakeMemberRepo{
@@ -99,7 +98,7 @@ func TestListMyGroups_EnrichesEachResult(t *testing.T) {
 	if len(out.Groups) != 1 {
 		t.Fatalf("expected 1 group, got %d", len(out.Groups))
 	}
-	if out.Groups[0].MyRole != domainGroup.MemberRoleLead {
+	if out.Groups[0].MyRole != domainGroup.MemberRoleLead.String() {
 		t.Errorf("expected LEAD, got %v", out.Groups[0].MyRole)
 	}
 	if out.Groups[0].MemberCount != 3 {

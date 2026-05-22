@@ -19,11 +19,11 @@ type LoginOutput struct {
 }
 
 type LoginUseCase struct {
-	repo         user.UserRepository
+	repo         user.Repository
 	tokenService user.TokenService
 }
 
-func NewLoginUseCase(repo user.UserRepository, tokenService user.TokenService) *LoginUseCase {
+func NewLoginUseCase(repo user.Repository, tokenService user.TokenService) *LoginUseCase {
 	return &LoginUseCase{repo: repo, tokenService: tokenService}
 }
 
@@ -42,29 +42,29 @@ func (uc *LoginUseCase) Execute(ctx context.Context, input LoginInput) (*LoginOu
 
 	email, err := user.NewEmail(input.Email)
 	if err != nil {
-		return nil, apperror.NewUnauthorized("INVALID_CREDENTIALS", "Invalid email or password")
+		return nil, apperror.NewUnauthorized(ErrCodeInvalidCredentials, "Invalid email or password")
 	}
 
 	foundUser, err := uc.repo.FindByEmail(ctx, email)
 	if err != nil {
-		slog.Error("failed to find user by email during login", "error", err)
+		slog.ErrorContext(ctx, "failed to find user by email during login", "error", err)
 		return nil, apperror.NewInternal()
 	}
 	if foundUser == nil {
-		return nil, apperror.NewUnauthorized("INVALID_CREDENTIALS", "Invalid email or password")
+		return nil, apperror.NewUnauthorized(ErrCodeInvalidCredentials, "Invalid email or password")
 	}
 
 	if foundUser.Status() != user.StatusActive {
-		return nil, apperror.NewForbidden("ACCOUNT_DEACTIVATED", "This account has been deactivated")
+		return nil, apperror.NewForbidden(ErrCodeAccountDeactivated, "This account has been deactivated")
 	}
 
 	if !foundUser.Password().Compare(input.Password) {
-		return nil, apperror.NewUnauthorized("INVALID_CREDENTIALS", "Invalid email or password")
+		return nil, apperror.NewUnauthorized(ErrCodeInvalidCredentials, "Invalid email or password")
 	}
 
 	token, err := uc.tokenService.GenerateToken(foundUser)
 	if err != nil {
-		slog.Error("failed to generate token during login", "user_id", foundUser.ID(), "error", err)
+		slog.ErrorContext(ctx, "failed to generate token during login", "user_id", foundUser.ID(), "error", err)
 		return nil, apperror.NewInternal()
 	}
 

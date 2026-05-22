@@ -3,25 +3,25 @@ package user
 import (
 	"context"
 	"errors"
-	"net/http"
 	"testing"
 
+	"github.com/training-judge-center/backend/internal/domain/shared"
 	domain "github.com/training-judge-center/backend/internal/domain/user"
 	"github.com/training-judge-center/backend/pkg/apperror"
 )
 
 func TestGetMyProfile_Success(t *testing.T) {
 	repo := newNoConflictRepo()
-	activeUser := newUserWithRole("user-1", domain.RoleContestant, domain.StatusActive)
+	activeUser := newUserWithRole("user-1", shared.RoleContestant, domain.StatusActive)
 	repo.findByIDFn = func(_ context.Context, id string) (*domain.User, error) {
 		if id == "user-1" {
 			return activeUser, nil
 		}
 		return nil, nil
 	}
-	uc := NewGetUserProfileUseCase(repo)
+	uc := NewGetMyProfileUseCase(repo)
 
-	result, err := uc.GetMyProfile(context.Background(), "user-1")
+	result, err := uc.Execute(context.Background(), GetMyProfileInput{UserID: "user-1"})
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
@@ -38,9 +38,9 @@ func TestGetMyProfile_Success(t *testing.T) {
 
 func TestGetMyProfile_UserNotFound(t *testing.T) {
 	repo := newNoConflictRepo()
-	uc := NewGetUserProfileUseCase(repo)
+	uc := NewGetMyProfileUseCase(repo)
 
-	_, err := uc.GetMyProfile(context.Background(), "nonexistent")
+	_, err := uc.Execute(context.Background(), GetMyProfileInput{UserID: "nonexistent"})
 	if err == nil {
 		t.Fatal("expected error, got nil")
 	}
@@ -49,11 +49,11 @@ func TestGetMyProfile_UserNotFound(t *testing.T) {
 	if !ok {
 		t.Fatalf("expected *apperror.AppError, got %T", err)
 	}
-	if appErr.Code != "NOT_FOUND" {
+	if appErr.Code != domain.ErrCodeUserNotFound {
 		t.Errorf("expected code NOT_FOUND, got %q", appErr.Code)
 	}
-	if appErr.StatusCode != http.StatusNotFound {
-		t.Errorf("expected status 404, got %d", appErr.StatusCode)
+	if appErr.Kind != apperror.KindNotFound {
+		t.Errorf("expected kind NOT_FOUND, got %s", appErr.Kind)
 	}
 }
 
@@ -62,9 +62,9 @@ func TestGetMyProfile_RepositoryError(t *testing.T) {
 	repo.findByIDFn = func(_ context.Context, _ string) (*domain.User, error) {
 		return nil, errors.New("db connection lost")
 	}
-	uc := NewGetUserProfileUseCase(repo)
+	uc := NewGetMyProfileUseCase(repo)
 
-	_, err := uc.GetMyProfile(context.Background(), "user-1")
+	_, err := uc.Execute(context.Background(), GetMyProfileInput{UserID: "user-1"})
 	if err == nil {
 		t.Fatal("expected error, got nil")
 	}
@@ -73,20 +73,20 @@ func TestGetMyProfile_RepositoryError(t *testing.T) {
 	if !ok {
 		t.Fatalf("expected *apperror.AppError, got %T", err)
 	}
-	if appErr.Code != "INTERNAL_ERROR" {
+	if appErr.Code != apperror.ErrCodeInternalError {
 		t.Errorf("expected code INTERNAL_ERROR, got %q", appErr.Code)
 	}
 }
 
 func TestGetByNickname_PublicProfile(t *testing.T) {
 	repo := newNoConflictRepo()
-	targetUser := newUserWithRole("target", domain.RoleCoach, domain.StatusActive)
+	targetUser := newUserWithRole("target", shared.RoleCoach, domain.StatusActive)
 	repo.findByNicknameFn = func(_ context.Context, _ domain.Nickname) (*domain.User, error) {
 		return targetUser, nil
 	}
-	uc := NewGetUserProfileUseCase(repo)
+	uc := NewGetUserByNicknameUseCase(repo)
 
-	result, err := uc.GetUserByNickname(context.Background(), "requester-1", domain.RoleContestant, "target")
+	result, err := uc.Execute(context.Background(), GetUserByNicknameInput{RequesterID: "requester-1", RequesterRole: shared.RoleContestant, Nickname: "target"})
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
@@ -100,13 +100,13 @@ func TestGetByNickname_PublicProfile(t *testing.T) {
 
 func TestGetByNickname_AdminViewsAll(t *testing.T) {
 	repo := newNoConflictRepo()
-	targetUser := newUserWithRole("target", domain.RoleContestant, domain.StatusActive)
+	targetUser := newUserWithRole("target", shared.RoleContestant, domain.StatusActive)
 	repo.findByNicknameFn = func(_ context.Context, _ domain.Nickname) (*domain.User, error) {
 		return targetUser, nil
 	}
-	uc := NewGetUserProfileUseCase(repo)
+	uc := NewGetUserByNicknameUseCase(repo)
 
-	result, err := uc.GetUserByNickname(context.Background(), "admin-1", domain.RoleAdmin, "target")
+	result, err := uc.Execute(context.Background(), GetUserByNicknameInput{RequesterID: "admin-1", RequesterRole: shared.RoleAdmin, Nickname: "target"})
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
@@ -117,13 +117,13 @@ func TestGetByNickname_AdminViewsAll(t *testing.T) {
 
 func TestGetByNickname_SelfViaNickname(t *testing.T) {
 	repo := newNoConflictRepo()
-	selfUser := newUserWithRole("self-user", domain.RoleContestant, domain.StatusActive)
+	selfUser := newUserWithRole("self-user", shared.RoleContestant, domain.StatusActive)
 	repo.findByNicknameFn = func(_ context.Context, _ domain.Nickname) (*domain.User, error) {
 		return selfUser, nil
 	}
-	uc := NewGetUserProfileUseCase(repo)
+	uc := NewGetUserByNicknameUseCase(repo)
 
-	result, err := uc.GetUserByNickname(context.Background(), "self-user", domain.RoleContestant, "self-user")
+	result, err := uc.Execute(context.Background(), GetUserByNicknameInput{RequesterID: "self-user", RequesterRole: shared.RoleContestant, Nickname: "self-user"})
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
@@ -134,13 +134,13 @@ func TestGetByNickname_SelfViaNickname(t *testing.T) {
 
 func TestGetByNickname_NonAdminViewsAdmin(t *testing.T) {
 	repo := newNoConflictRepo()
-	adminUser := newUserWithRole("admin-target", domain.RoleAdmin, domain.StatusActive)
+	adminUser := newUserWithRole("admin-target", shared.RoleAdmin, domain.StatusActive)
 	repo.findByNicknameFn = func(_ context.Context, _ domain.Nickname) (*domain.User, error) {
 		return adminUser, nil
 	}
-	uc := NewGetUserProfileUseCase(repo)
+	uc := NewGetUserByNicknameUseCase(repo)
 
-	_, err := uc.GetUserByNickname(context.Background(), "requester-1", domain.RoleContestant, "admin-target")
+	_, err := uc.Execute(context.Background(), GetUserByNicknameInput{RequesterID: "requester-1", RequesterRole: shared.RoleContestant, Nickname: "admin-target"})
 	if err == nil {
 		t.Fatal("expected error, got nil")
 	}
@@ -149,23 +149,23 @@ func TestGetByNickname_NonAdminViewsAdmin(t *testing.T) {
 	if !ok {
 		t.Fatalf("expected *apperror.AppError, got %T", err)
 	}
-	if appErr.Code != "ADMIN_PROFILE_RESTRICTED" {
+	if appErr.Code != ErrCodeAdminProfileRestricted {
 		t.Errorf("expected code ADMIN_PROFILE_RESTRICTED, got %q", appErr.Code)
 	}
-	if appErr.StatusCode != http.StatusForbidden {
-		t.Errorf("expected status 403, got %d", appErr.StatusCode)
+	if appErr.Kind != apperror.KindForbidden {
+		t.Errorf("expected kind FORBIDDEN, got %s", appErr.Kind)
 	}
 }
 
 func TestGetByNickname_DeactivatedUser(t *testing.T) {
 	repo := newNoConflictRepo()
-	deactivatedUser := newUserWithRole("deactivated", domain.RoleContestant, domain.StatusDeactivated)
+	deactivatedUser := newUserWithRole("deactivated", shared.RoleContestant, domain.StatusDeactivated)
 	repo.findByNicknameFn = func(_ context.Context, _ domain.Nickname) (*domain.User, error) {
 		return deactivatedUser, nil
 	}
-	uc := NewGetUserProfileUseCase(repo)
+	uc := NewGetUserByNicknameUseCase(repo)
 
-	_, err := uc.GetUserByNickname(context.Background(), "requester-1", domain.RoleContestant, "deactivated")
+	_, err := uc.Execute(context.Background(), GetUserByNicknameInput{RequesterID: "requester-1", RequesterRole: shared.RoleContestant, Nickname: "deactivated"})
 	if err == nil {
 		t.Fatal("expected error, got nil")
 	}
@@ -174,16 +174,16 @@ func TestGetByNickname_DeactivatedUser(t *testing.T) {
 	if !ok {
 		t.Fatalf("expected *apperror.AppError, got %T", err)
 	}
-	if appErr.Code != "NOT_FOUND" {
+	if appErr.Code != domain.ErrCodeUserNotFound {
 		t.Errorf("expected code NOT_FOUND, got %q", appErr.Code)
 	}
 }
 
 func TestGetByNickname_UserNotFound(t *testing.T) {
 	repo := newNoConflictRepo()
-	uc := NewGetUserProfileUseCase(repo)
+	uc := NewGetUserByNicknameUseCase(repo)
 
-	_, err := uc.GetUserByNickname(context.Background(), "requester-1", domain.RoleContestant, "nonexistent")
+	_, err := uc.Execute(context.Background(), GetUserByNicknameInput{RequesterID: "requester-1", RequesterRole: shared.RoleContestant, Nickname: "nonexistent"})
 	if err == nil {
 		t.Fatal("expected error, got nil")
 	}
@@ -192,16 +192,16 @@ func TestGetByNickname_UserNotFound(t *testing.T) {
 	if !ok {
 		t.Fatalf("expected *apperror.AppError, got %T", err)
 	}
-	if appErr.Code != "NOT_FOUND" {
+	if appErr.Code != domain.ErrCodeUserNotFound {
 		t.Errorf("expected code NOT_FOUND, got %q", appErr.Code)
 	}
 }
 
 func TestGetByNickname_InvalidNickname(t *testing.T) {
 	repo := newNoConflictRepo()
-	uc := NewGetUserProfileUseCase(repo)
+	uc := NewGetUserByNicknameUseCase(repo)
 
-	_, err := uc.GetUserByNickname(context.Background(), "requester-1", domain.RoleContestant, "")
+	_, err := uc.Execute(context.Background(), GetUserByNicknameInput{RequesterID: "requester-1", RequesterRole: shared.RoleContestant, Nickname: ""})
 	if err == nil {
 		t.Fatal("expected error, got nil")
 	}
@@ -210,23 +210,23 @@ func TestGetByNickname_InvalidNickname(t *testing.T) {
 	if !ok {
 		t.Fatalf("expected *apperror.AppError, got %T", err)
 	}
-	if appErr.Code != "VALIDATION_ERROR" {
+	if appErr.Code != apperror.ErrCodeValidationError {
 		t.Errorf("expected code VALIDATION_ERROR, got %q", appErr.Code)
 	}
-	if appErr.StatusCode != http.StatusBadRequest {
-		t.Errorf("expected status 400, got %d", appErr.StatusCode)
+	if appErr.Kind != apperror.KindValidation {
+		t.Errorf("expected kind VALIDATION, got %s", appErr.Kind)
 	}
 }
 
 func TestGetByNickname_AdminViewsDeactivated(t *testing.T) {
 	repo := newNoConflictRepo()
-	deactivatedUser := newUserWithRole("deactivated", domain.RoleContestant, domain.StatusDeactivated)
+	deactivatedUser := newUserWithRole("deactivated", shared.RoleContestant, domain.StatusDeactivated)
 	repo.findByNicknameFn = func(_ context.Context, _ domain.Nickname) (*domain.User, error) {
 		return deactivatedUser, nil
 	}
-	uc := NewGetUserProfileUseCase(repo)
+	uc := NewGetUserByNicknameUseCase(repo)
 
-	_, err := uc.GetUserByNickname(context.Background(), "admin-1", domain.RoleAdmin, "deactivated")
+	_, err := uc.Execute(context.Background(), GetUserByNicknameInput{RequesterID: "admin-1", RequesterRole: shared.RoleAdmin, Nickname: "deactivated"})
 	if err == nil {
 		t.Fatal("expected error, got nil")
 	}
@@ -235,7 +235,7 @@ func TestGetByNickname_AdminViewsDeactivated(t *testing.T) {
 	if !ok {
 		t.Fatalf("expected *apperror.AppError, got %T", err)
 	}
-	if appErr.Code != "NOT_FOUND" {
+	if appErr.Code != domain.ErrCodeUserNotFound {
 		t.Errorf("expected code NOT_FOUND, got %q (deactivated users return 404 even for admins)", appErr.Code)
 	}
 }

@@ -4,7 +4,7 @@ set -e  # exit immediately if any command fails
 # Configuration
 API_URL="http://localhost:8080"
 PROBLEM_SLUG="e2e-test-problem-final"
-# coach_john assumes the coach role according to internal/server/middleware/mock_auth.go
+# coach_john assumes the coach role according to internal/http/middleware/mock_auth.go
 MOCK_USER="coach_john"
 TMP_DIR="tmp_e2e_dummy_tc"
 TMP_ZIP="tmp_dummy_tc.zip"

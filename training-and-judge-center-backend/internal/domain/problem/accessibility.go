@@ -2,13 +2,18 @@ package problem
 
 import "github.com/training-judge-center/backend/pkg/apperror"
 
+const (
+	accessibilityPrivate = "PRIVATE"
+	accessibilityPublic  = "PUBLIC"
+)
+
 type Accessibility struct {
 	value string
 }
 
 func NewAccessibility(value string) (Accessibility, error) {
 	switch value {
-	case "PRIVATE", "PUBLIC":
+	case accessibilityPrivate, accessibilityPublic:
 		return Accessibility{value: value}, nil
 	default:
 		return Accessibility{}, apperror.NewValidation([]apperror.FieldError{
@@ -18,11 +23,11 @@ func NewAccessibility(value string) (Accessibility, error) {
 }
 
 func NewAccessibilityPrivate() Accessibility {
-	return Accessibility{value: "PRIVATE"}
+	return Accessibility{value: accessibilityPrivate}
 }
 
 func NewAccessibilityPublic() Accessibility {
-	return Accessibility{value: "PUBLIC"}
+	return Accessibility{value: accessibilityPublic}
 }
 
 func (a Accessibility) String() string {

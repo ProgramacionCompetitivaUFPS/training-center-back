@@ -10,7 +10,7 @@ import (
 	"github.com/training-judge-center/backend/pkg/apperror"
 )
 
-func validCreateInput(role string) CreateGroupInput {
+func validCreateInput(role shared.Role) CreateGroupInput {
 	return CreateGroupInput{
 		Name:        "Algorithms Club",
 		Description: nil,
@@ -20,8 +20,15 @@ func validCreateInput(role string) CreateGroupInput {
 	}
 }
 
+func newCreateGroupUC(repo *fakeRepo, memberRepo *fakeMemberRepo) *CreateGroupUseCase {
+	if memberRepo == nil {
+		memberRepo = &fakeMemberRepo{}
+	}
+	return NewCreateGroupUseCase(repo, memberRepo, &fakeTxManager{})
+}
+
 func TestCreateGroup_NonAdminNonCoachReturns403(t *testing.T) {
-	uc := NewCreateGroupUseCase(&fakeRepo{})
+	uc := newCreateGroupUC(&fakeRepo{}, nil)
 
 	_, err := uc.Execute(context.Background(), CreateGroupInput{
 		Name:        "My Group",
@@ -30,48 +37,48 @@ func TestCreateGroup_NonAdminNonCoachReturns403(t *testing.T) {
 		CurrentUser: currentUser("u1", shared.RoleContestant),
 	})
 	ae, ok := err.(*apperror.AppError)
-	if !ok || ae.Code != domainGroup.ErrCodeInsufficientPermissions {
+	if !ok || ae.Code != ErrCodeInsufficientPermissions {
 		t.Fatalf("expected INSUFFICIENT_PERMISSIONS, got %v", err)
 	}
 }
 
 func TestCreateGroup_ValidCoachCreatesGroup(t *testing.T) {
 	repo := &fakeRepo{}
-	uc := NewCreateGroupUseCase(repo)
+	uc := newCreateGroupUC(repo, nil)
 
 	out, err := uc.Execute(context.Background(), validCreateInput(shared.RoleCoach))
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if out.Group.Name().Value() != "Algorithms Club" {
-		t.Errorf("Name = %q, want %q", out.Group.Name().Value(), "Algorithms Club")
+	if out.Name != "Algorithms Club" {
+		t.Errorf("Name = %q, want %q", out.Name, "Algorithms Club")
 	}
-	if out.Group.JoinPolicy() != domainGroup.JoinPolicyOpen {
-		t.Errorf("JoinPolicy = %v, want OPEN", out.Group.JoinPolicy())
+	if out.JoinPolicy != "OPEN" {
+		t.Errorf("JoinPolicy = %q, want OPEN", out.JoinPolicy)
 	}
-	if out.Group.Visibility() != domainGroup.VisibilityVisible {
-		t.Errorf("Visibility = %v, want VISIBLE", out.Group.Visibility())
+	if out.Visibility != "VISIBLE" {
+		t.Errorf("Visibility = %q, want VISIBLE", out.Visibility)
 	}
-	if out.Group.ID() == "" {
+	if out.ID == "" {
 		t.Error("expected non-empty group ID")
 	}
 }
 
 func TestCreateGroup_ValidAdminCreatesGroup(t *testing.T) {
 	repo := &fakeRepo{}
-	uc := NewCreateGroupUseCase(repo)
+	uc := newCreateGroupUC(repo, nil)
 
 	out, err := uc.Execute(context.Background(), validCreateInput(shared.RoleAdmin))
 	if err != nil {
 		t.Fatalf("admin should be able to create groups, got: %v", err)
 	}
-	if out.Group == nil {
-		t.Error("expected non-nil group")
+	if out.ID == "" {
+		t.Error("expected non-empty group ID")
 	}
 }
 
 func TestCreateGroup_EmptyNameReturnsValidationError(t *testing.T) {
-	uc := NewCreateGroupUseCase(&fakeRepo{})
+	uc := newCreateGroupUC(&fakeRepo{}, nil)
 
 	_, err := uc.Execute(context.Background(), CreateGroupInput{
 		Name:        "",
@@ -89,7 +96,7 @@ func TestCreateGroup_EmptyNameReturnsValidationError(t *testing.T) {
 }
 
 func TestCreateGroup_InvalidJoinModeReturnsValidationError(t *testing.T) {
-	uc := NewCreateGroupUseCase(&fakeRepo{})
+	uc := newCreateGroupUC(&fakeRepo{}, nil)
 
 	_, err := uc.Execute(context.Background(), CreateGroupInput{
 		Name:        "My Group",
@@ -107,7 +114,7 @@ func TestCreateGroup_InvalidJoinModeReturnsValidationError(t *testing.T) {
 }
 
 func TestCreateGroup_InvalidVisibilityReturnsValidationError(t *testing.T) {
-	uc := NewCreateGroupUseCase(&fakeRepo{})
+	uc := newCreateGroupUC(&fakeRepo{}, nil)
 
 	_, err := uc.Execute(context.Background(), CreateGroupInput{
 		Name:        "My Group",
@@ -125,7 +132,7 @@ func TestCreateGroup_InvalidVisibilityReturnsValidationError(t *testing.T) {
 }
 
 func TestCreateGroup_MultipleInvalidFieldsAccumulated(t *testing.T) {
-	uc := NewCreateGroupUseCase(&fakeRepo{})
+	uc := newCreateGroupUC(&fakeRepo{}, nil)
 
 	_, err := uc.Execute(context.Background(), CreateGroupInput{
 		Name:        "",
@@ -146,7 +153,7 @@ func TestCreateGroup_DuplicateNameReturnsConflict(t *testing.T) {
 	repo := &fakeRepo{
 		existsByNameFn: func(_ domainGroup.GroupName) (bool, error) { return true, nil },
 	}
-	uc := NewCreateGroupUseCase(repo)
+	uc := newCreateGroupUC(repo, nil)
 
 	_, err := uc.Execute(context.Background(), validCreateInput(shared.RoleCoach))
 	ae, ok := err.(*apperror.AppError)
@@ -157,7 +164,7 @@ func TestCreateGroup_DuplicateNameReturnsConflict(t *testing.T) {
 
 func TestCreateGroup_RepoSaveFailureReturnsInternal(t *testing.T) {
 	repo := &fakeRepo{saveErr: errors.New("db failure")}
-	uc := NewCreateGroupUseCase(repo)
+	uc := newCreateGroupUC(repo, nil)
 
 	_, err := uc.Execute(context.Background(), validCreateInput(shared.RoleCoach))
 	ae, ok := err.(*apperror.AppError)
@@ -167,7 +174,7 @@ func TestCreateGroup_RepoSaveFailureReturnsInternal(t *testing.T) {
 }
 
 func TestCreateGroup_InvalidPolicyCombinationReturnsError(t *testing.T) {
-	uc := NewCreateGroupUseCase(&fakeRepo{})
+	uc := newCreateGroupUC(&fakeRepo{}, nil)
 
 	_, err := uc.Execute(context.Background(), CreateGroupInput{
 		Name:        "Secret Club",

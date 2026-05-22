@@ -2,8 +2,8 @@ package user
 
 import (
 	"context"
-	"errors"
 	"log/slog"
+	"time"
 
 	"github.com/training-judge-center/backend/internal/domain/user"
 	"github.com/training-judge-center/backend/pkg/apperror"
@@ -19,27 +19,31 @@ type UpdateUserInput struct {
 }
 
 type UpdateUserUseCase struct {
-	repo user.UserRepository
+	repo user.Repository
 }
 
-func NewUpdateUserUseCase(repo user.UserRepository) *UpdateUserUseCase {
+func NewUpdateUserUseCase(repo user.Repository) *UpdateUserUseCase {
 	return &UpdateUserUseCase{repo: repo}
 }
 
-func (uc *UpdateUserUseCase) Execute(ctx context.Context, input UpdateUserInput) (UserDTO, error) {
+type UpdateUserOutput struct {
+	User UserDTO
+}
+
+func (uc *UpdateUserUseCase) Execute(ctx context.Context, input UpdateUserInput) (*UpdateUserOutput, error) {
 	if input.Name == nil && input.Nickname == nil && input.Institution == nil && input.City == nil && input.Country == nil {
-		return UserDTO{}, apperror.NewValidation([]apperror.FieldError{
+		return nil,apperror.NewValidation([]apperror.FieldError{
 			{Field: "body", Message: "At least one updatable field must be provided"},
 		})
 	}
 
 	foundUser, err := uc.repo.FindByID(ctx, input.UserID)
 	if err != nil {
-		slog.Error("failed to find user by id during update", "user_id", input.UserID, "error", err)
-		return UserDTO{}, apperror.NewInternal()
+		slog.ErrorContext(ctx, "failed to find user by id during update", "user_id", input.UserID, "error", err)
+		return nil,apperror.NewInternal()
 	}
 	if foundUser == nil {
-		return UserDTO{}, apperror.NewNotFound("NOT_FOUND", "User not found")
+		return nil,apperror.NewNotFound(user.ErrCodeUserNotFound, "User not found")
 	}
 
 	var fieldErrors []apperror.FieldError
@@ -91,21 +95,18 @@ func (uc *UpdateUserUseCase) Execute(ctx context.Context, input UpdateUserInput)
 	}
 
 	if len(fieldErrors) > 0 {
-		return UserDTO{}, apperror.NewValidation(fieldErrors)
+		return nil,apperror.NewValidation(fieldErrors)
 	}
 
-	if err := foundUser.Update(nameToUpdate, nicknameToUpdate, institutionToUpdate, cityToUpdate, countryToUpdate); err != nil {
-		slog.Error("failed to apply update to user domain object", "user_id", foundUser.ID(), "error", err)
-		return UserDTO{}, apperror.NewInternal()
+	now := time.Now()
+	if err := foundUser.Update(nameToUpdate, nicknameToUpdate, institutionToUpdate, cityToUpdate, countryToUpdate, now); err != nil {
+		slog.ErrorContext(ctx, "failed to apply update to user domain object", "user_id", foundUser.ID(), "error", err)
+		return nil,apperror.NewInternal()
 	}
 
 	if err := uc.repo.Update(ctx, foundUser); err != nil {
-		if errors.Is(err, user.ErrNicknameConflict) {
-			return UserDTO{}, apperror.NewConflict("NICKNAME_ALREADY_EXISTS", "The nickname is already in use")
-		}
-		slog.Error("failed to persist user update", "user_id", foundUser.ID(), "error", err)
-		return UserDTO{}, apperror.NewInternal()
+		return nil,err
 	}
 
-	return userToDTO(foundUser), nil
+	return &UpdateUserOutput{User: userToDTO(foundUser)}, nil
 }

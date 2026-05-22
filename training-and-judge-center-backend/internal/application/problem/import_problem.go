@@ -1,4 +1,4 @@
-package problem
+﻿package problem
 
 import (
 	"context"
@@ -7,10 +7,12 @@ import (
 	"log/slog"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/training-judge-center/backend/internal/domain/problem"
 	"github.com/training-judge-center/backend/internal/domain/shared"
+	appshared "github.com/training-judge-center/backend/internal/application/shared"
 	"github.com/training-judge-center/backend/pkg/apperror"
 	"golang.org/x/sync/errgroup"
 )
@@ -18,29 +20,25 @@ import (
 type ImportProblemInput struct {
 	Slug        string
 	ZipData     []byte
-	CurrentUser shared.CurrentUser
+	CurrentUser appshared.CurrentUser
 }
 
-type ImportProblemResult struct {
-	Problem         *problem.Problem
-	TestCasesLoaded bool
-	CheckerLoaded   bool
-	ValidatorLoaded bool
-	SolutionsLoaded []string
+type ImportProblemOutput struct {
+	Problem ProblemDTO
 }
 
 type ImportProblemUseCase struct {
 	repo             problem.Repository
 	storage          ProblemFileRepository
 	packageParser    ICPCPackageParser
-	platformSettings *problem.PlatformSettings
+	platformSettings problem.PlatformSettings
 }
 
 func NewImportProblemUseCase(
 	repo problem.Repository,
 	storage ProblemFileRepository,
 	packageParser ICPCPackageParser,
-	platformSettings *problem.PlatformSettings,
+	platformSettings problem.PlatformSettings,
 ) *ImportProblemUseCase {
 	return &ImportProblemUseCase{
 		repo:             repo,
@@ -50,9 +48,9 @@ func NewImportProblemUseCase(
 	}
 }
 
-func (uc *ImportProblemUseCase) Execute(ctx context.Context, input ImportProblemInput) (*ImportProblemResult, error) {
+func (uc *ImportProblemUseCase) Execute(ctx context.Context, input ImportProblemInput) (*ImportProblemOutput, error) {
 	if input.CurrentUser.Role != shared.RoleCoach && !input.CurrentUser.IsAdmin() {
-		return nil, apperror.NewForbidden(apperror.ErrCodeForbidden, "Only Coach and Admin users can import problems")
+		return nil, apperror.NewForbidden(ErrCodeInsufficientPermissions, "Only Coach and Admin users can import problems")
 	}
 
 	slug, err := problem.NewSlug(input.Slug)
@@ -66,10 +64,10 @@ func (uc *ImportProblemUseCase) Execute(ctx context.Context, input ImportProblem
 		return nil, apperror.NewInternal()
 	}
 	if exists {
-		return nil, apperror.NewConflict(ErrCodeProblemSlugAlreadyExists, "A problem with slug '"+slug.String()+"' already exists")
+		return nil, apperror.NewConflict(problem.ErrCodeSlugAlreadyExists, "A problem with slug '"+slug.String()+"' already exists")
 	}
 
-	pkg, err := uc.packageParser.ParsePackageZip(input.ZipData)
+	pkg, err := uc.packageParser.ParsePackageZip(ctx, input.ZipData)
 	if err != nil {
 		return nil, err
 	}
@@ -86,7 +84,7 @@ func (uc *ImportProblemUseCase) Execute(ctx context.Context, input ImportProblem
 		}
 	}
 
-	globalMaxTime, globalMaxMemory := uc.platformSettings.GetGlobalLimits()
+	globalMaxTime, globalMaxMemory := uc.platformSettings.GlobalLimits()
 
 	var timeLimit *problem.TimeLimit
 	if pkg.TimeLimitMs != nil {
@@ -129,8 +127,9 @@ func (uc *ImportProblemUseCase) Execute(ctx context.Context, input ImportProblem
 		}
 	}
 
+	now := time.Now()
 	newID := uuid.New().String()
-	newProblem := problem.NewProblem(
+	newProblem, err := problem.NewProblem(
 		newID,
 		slug,
 		title,
@@ -140,7 +139,11 @@ func (uc *ImportProblemUseCase) Execute(ctx context.Context, input ImportProblem
 		nil,
 		problem.Tags{},
 		shared.RestoreUserID(input.CurrentUser.ID),
+		now,
 	)
+	if err != nil {
+		return nil, err
+	}
 
 	if pkg.ZipData != nil {
 		uploadInstanceID := uuid.New().String()
@@ -155,7 +158,7 @@ func (uc *ImportProblemUseCase) Execute(ctx context.Context, input ImportProblem
 		uploadedKeys = append(uploadedKeys, zipKey)
 
 		g, gCtx := errgroup.WithContext(ctx)
-		g.SetLimit(uc.platformSettings.GetUploadMaxConcurrency())
+		g.SetLimit(uc.platformSettings.UploadMaxConcurrency())
 
 		for _, file := range pkg.SampleFiles {
 			file := file
@@ -174,12 +177,12 @@ func (uc *ImportProblemUseCase) Execute(ctx context.Context, input ImportProblem
 			return nil, err
 		}
 
-		newProblem.SetTestCases(basePath)
+		newProblem.SetTestCases(basePath, now)
 	}
 
 	for _, sol := range pkg.Solutions {
 		cleanName := filepath.Base(sol.Path)
-		lang, ok := uc.platformSettings.GetLanguageByExtension(strings.ToLower(filepath.Ext(cleanName)))
+		lang, ok := uc.platformSettings.LanguageByExtension(strings.ToLower(filepath.Ext(cleanName)))
 		if !ok {
 			continue
 		}
@@ -195,17 +198,17 @@ func (uc *ImportProblemUseCase) Execute(ctx context.Context, input ImportProblem
 			return nil, apperror.NewInternal()
 		}
 		uploadedKeys = append(uploadedKeys, fileKey)
-		newProblem.AddSolution(solutionObj)
+		newProblem.AddSolution(solutionObj, now)
 	}
 
 	if pkg.Checker != nil {
-		if err := uc.uploadVerifier(ctx, slug.String(), FileTypeChecker, pkg.Checker, newProblem, &uploadedKeys, cleanup); err != nil {
+		if err := uc.uploadVerifier(ctx, slug.String(), FileTypeChecker, pkg.Checker, newProblem, &uploadedKeys, cleanup, now); err != nil {
 			return nil, err
 		}
 	}
 
 	if pkg.Validator != nil {
-		if err := uc.uploadVerifier(ctx, slug.String(), FileTypeValidator, pkg.Validator, newProblem, &uploadedKeys, cleanup); err != nil {
+		if err := uc.uploadVerifier(ctx, slug.String(), FileTypeValidator, pkg.Validator, newProblem, &uploadedKeys, cleanup, now); err != nil {
 			return nil, err
 		}
 	}
@@ -216,18 +219,7 @@ func (uc *ImportProblemUseCase) Execute(ctx context.Context, input ImportProblem
 		return nil, apperror.NewInternal()
 	}
 
-	solutionsLoaded := make([]string, 0, len(newProblem.Solutions()))
-	for _, sol := range newProblem.Solutions() {
-		solutionsLoaded = append(solutionsLoaded, sol.Filename())
-	}
-
-	return &ImportProblemResult{
-		Problem:         newProblem,
-		TestCasesLoaded: newProblem.TestCasesKey() != nil,
-		CheckerLoaded:   newProblem.Checker() != nil,
-		ValidatorLoaded: newProblem.Validator() != nil,
-		SolutionsLoaded: solutionsLoaded,
-	}, nil
+	return &ImportProblemOutput{Problem: problemToDTO(newProblem)}, nil
 }
 
 func (uc *ImportProblemUseCase) uploadVerifier(
@@ -237,10 +229,11 @@ func (uc *ImportProblemUseCase) uploadVerifier(
 	p *problem.Problem,
 	uploadedKeys *[]string,
 	cleanup func(),
+	now time.Time,
 ) error {
 	cleanName := filepath.Base(f.Path)
 	ext := strings.ToLower(filepath.Ext(cleanName))
-	lang, ok := uc.platformSettings.GetLanguageByExtension(ext)
+	lang, ok := uc.platformSettings.LanguageByExtension(ext)
 	if !ok {
 		return apperror.NewBadRequest(ErrCodeProblemUnsupportedFileExt, fmt.Sprintf("Unsupported %s file extension: %s", fileType, ext))
 	}
@@ -261,9 +254,9 @@ func (uc *ImportProblemUseCase) uploadVerifier(
 
 	switch fileType {
 	case FileTypeChecker:
-		p.SetChecker(verifierObj)
+		p.SetChecker(verifierObj, now)
 	case FileTypeValidator:
-		p.SetValidator(verifierObj)
+		p.SetValidator(verifierObj, now)
 	}
 	return nil
 }

@@ -1,11 +1,13 @@
-package problem
+﻿package problem
 
 import (
 	"context"
 	"log/slog"
+	"time"
 
 	"github.com/training-judge-center/backend/internal/domain/problem"
 	"github.com/training-judge-center/backend/internal/domain/shared"
+	appshared "github.com/training-judge-center/backend/internal/application/shared"
 	"github.com/training-judge-center/backend/pkg/apperror"
 )
 
@@ -18,26 +20,26 @@ type UpdateProblemInput struct {
 	LangOverrides []LanguageOverrideInput
 	Tags          []string
 	Accessibility *string
-	CurrentUser   shared.CurrentUser
+	CurrentUser   appshared.CurrentUser
 }
 
-type UpdateProblemResult struct {
-	Problem *problem.Problem
+type UpdateProblemOutput struct {
+	Problem ProblemDTO
 }
 
 type UpdateProblemUseCase struct {
 	repo             problem.Repository
-	platformSettings *problem.PlatformSettings
+	platformSettings problem.PlatformSettings
 }
 
-func NewUpdateProblemUseCase(repo problem.Repository, platformSettings *problem.PlatformSettings) *UpdateProblemUseCase {
+func NewUpdateProblemUseCase(repo problem.Repository, platformSettings problem.PlatformSettings) *UpdateProblemUseCase {
 	return &UpdateProblemUseCase{
 		repo:             repo,
 		platformSettings: platformSettings,
 	}
 }
 
-func (uc *UpdateProblemUseCase) Execute(ctx context.Context, input UpdateProblemInput) (*UpdateProblemResult, error) {
+func (uc *UpdateProblemUseCase) Execute(ctx context.Context, input UpdateProblemInput) (*UpdateProblemOutput, error) {
 	slug, err := problem.NewSlug(input.Slug)
 	if err != nil {
 		return nil, err
@@ -53,7 +55,7 @@ func (uc *UpdateProblemUseCase) Execute(ctx context.Context, input UpdateProblem
 	}
 
 	if !p.CanBeEditedBy(shared.RestoreUserID(input.CurrentUser.ID), input.CurrentUser.IsAdmin()) {
-		return nil, apperror.NewForbidden(apperror.ErrCodeForbidden, "Only the problem author, Admin, or assigned modifiers can update this problem")
+		return nil, apperror.NewForbidden(ErrCodeInsufficientPermissions, "Only the problem author, Admin, or assigned modifiers can update this problem")
 	}
 
 	var fieldErrs []apperror.FieldError
@@ -69,7 +71,7 @@ func (uc *UpdateProblemUseCase) Execute(ctx context.Context, input UpdateProblem
 		}
 	}
 
-	globalMaxTime, globalMaxMemory := uc.platformSettings.GetGlobalLimits()
+	globalMaxTime, globalMaxMemory := uc.platformSettings.GlobalLimits()
 
 	var timeLimit *problem.TimeLimit
 	if input.TimeLimit != nil {
@@ -121,7 +123,11 @@ func (uc *UpdateProblemUseCase) Execute(ctx context.Context, input UpdateProblem
 			}
 			seenLangs[override.Language] = struct{}{}
 
-			langLimit := uc.platformSettings.GetLanguageLimit(override.Language)
+			ll, hasLL := uc.platformSettings.LanguageLimit(override.Language)
+			var langLimit *problem.LanguageLimit
+			if hasLL {
+				langLimit = &ll
+			}
 			langOverride, loErr := problem.NewLanguageOverride(
 				override.Language,
 				override.TimeLimit,
@@ -142,7 +148,7 @@ func (uc *UpdateProblemUseCase) Execute(ctx context.Context, input UpdateProblem
 
 	var tags *problem.Tags
 	if input.Tags != nil {
-		allowedTags := uc.platformSettings.GetAllowedTags()
+		allowedTags := uc.platformSettings.AllowedTags()
 		t, tagsErr := problem.NewTags(input.Tags, allowedTags)
 		if err := apperror.AccumulateFieldErrors(tagsErr, &fieldErrs); err != nil {
 			return nil, err
@@ -178,10 +184,11 @@ func (uc *UpdateProblemUseCase) Execute(ctx context.Context, input UpdateProblem
 		return nil, apperror.NewValidation(fieldErrs)
 	}
 
-	p.UpdateMetadata(title, statementPtr, timeLimit, memoryLimit, validOverrides, tags)
+	now := time.Now()
+	p.UpdateMetadata(title, statementPtr, timeLimit, memoryLimit, validOverrides, tags, now)
 
 	if accessibility != nil {
-		p.UpdateAccessibility(*accessibility)
+		p.UpdateAccessibility(*accessibility, now)
 	}
 
 	if err := uc.repo.Save(ctx, p); err != nil {
@@ -189,5 +196,5 @@ func (uc *UpdateProblemUseCase) Execute(ctx context.Context, input UpdateProblem
 		return nil, apperror.NewInternal()
 	}
 
-	return &UpdateProblemResult{Problem: p}, nil
+	return &UpdateProblemOutput{Problem: problemToDTO(p)}, nil
 }

@@ -1,21 +1,20 @@
-package material
+package material_test
 
 import (
 	"errors"
 	"testing"
 	"time"
 
+	"github.com/training-judge-center/backend/internal/domain/material"
 	"github.com/training-judge-center/backend/internal/domain/shared"
 	"github.com/training-judge-center/backend/pkg/apperror"
 )
 
-func fixedClock(t time.Time) func() time.Time {
-	return func() time.Time { return t }
-}
+var testNow = time.Date(2024, 1, 15, 12, 0, 0, 0, time.UTC)
 
-func newTestMaterial() *Material {
-	fixed := fixedClock(time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC))
-	m, err := NewMaterial("id-1", "group-1", shared.RestoreUserID("author-1"), RestoreTitle("Test"), NewEmptyContent(), RestoreTags(nil), fixed)
+func newTestMaterial() *material.Material {
+	fixed := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
+	m, err := material.NewMaterial("id-1", "group-1", shared.RestoreUserID("author-1"), material.RestoreTitle("Test"), material.NewEmptyContent(), material.RestoreTags(nil), fixed)
 	if err != nil {
 		panic(err)
 	}
@@ -25,7 +24,7 @@ func newTestMaterial() *Material {
 func TestPublish(t *testing.T) {
 	m := newTestMaterial()
 
-	if err := m.Publish(); err != nil {
+	if err := m.Publish(testNow); err != nil {
 		t.Fatalf("unexpected error on first publish: %v", err)
 	}
 	if !m.Status().IsPublished() {
@@ -38,12 +37,12 @@ func TestPublish(t *testing.T) {
 	firstPublishedAt := *m.PublishedAt()
 
 	// publishedAt must not change on subsequent publishes
-	if err := m.Publish(); err == nil {
+	if err := m.Publish(testNow); err == nil {
 		t.Fatal("expected error when publishing an already published material")
 	} else {
 		var appErr *apperror.AppError
-		if !errors.As(err, &appErr) || appErr.Code != ErrCodeAlreadyPublished {
-			t.Errorf("expected error code %s, got %v", ErrCodeAlreadyPublished, err)
+		if !errors.As(err, &appErr) || appErr.Code != material.ErrCodeAlreadyPublished {
+			t.Errorf("expected error code %s, got %v", material.ErrCodeAlreadyPublished, err)
 		}
 	}
 	if *m.PublishedAt() != firstPublishedAt {
@@ -53,11 +52,11 @@ func TestPublish(t *testing.T) {
 
 func TestUnpublish(t *testing.T) {
 	m := newTestMaterial()
-	if err := m.Publish(); err != nil {
+	if err := m.Publish(testNow); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	if err := m.Unpublish(); err != nil {
+	if err := m.Unpublish(testNow); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	if !m.Status().IsDraft() {
@@ -68,26 +67,26 @@ func TestUnpublish(t *testing.T) {
 func TestUnpublish_AlreadyDraftReturnsError(t *testing.T) {
 	m := newTestMaterial()
 
-	err := m.Unpublish()
+	err := m.Unpublish(testNow)
 	if err == nil {
 		t.Fatal("expected error when unpublishing a DRAFT material")
 	}
 	var appErr *apperror.AppError
-	if !errors.As(err, &appErr) || appErr.Code != ErrCodeAlreadyDraft {
-		t.Errorf("expected error code %s, got %v", ErrCodeAlreadyDraft, err)
+	if !errors.As(err, &appErr) || appErr.Code != material.ErrCodeAlreadyDraft {
+		t.Errorf("expected error code %s, got %v", material.ErrCodeAlreadyDraft, err)
 	}
 }
 
 func TestUnpublish_AutoUnpin(t *testing.T) {
 	m := newTestMaterial()
-	if err := m.Publish(); err != nil {
+	if err := m.Publish(testNow); err != nil {
 		t.Fatalf("unexpected publish error: %v", err)
 	}
-	if err := m.Pin(); err != nil {
+	if err := m.Pin(testNow); err != nil {
 		t.Fatalf("unexpected pin error: %v", err)
 	}
 
-	if err := m.Unpublish(); err != nil {
+	if err := m.Unpublish(testNow); err != nil {
 		t.Fatalf("unexpected unpublish error: %v", err)
 	}
 	if m.Pinned() {
@@ -100,12 +99,12 @@ func TestUnpublish_AutoUnpin(t *testing.T) {
 
 func TestUnpublish_PreservesPublishedAt(t *testing.T) {
 	m := newTestMaterial()
-	if err := m.Publish(); err != nil {
+	if err := m.Publish(testNow); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	publishedAt := *m.PublishedAt()
 
-	if err := m.Unpublish(); err != nil {
+	if err := m.Unpublish(testNow); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	if m.PublishedAt() == nil || *m.PublishedAt() != publishedAt {
@@ -115,11 +114,11 @@ func TestUnpublish_PreservesPublishedAt(t *testing.T) {
 
 func TestPin(t *testing.T) {
 	m := newTestMaterial()
-	if err := m.Publish(); err != nil {
+	if err := m.Publish(testNow); err != nil {
 		t.Fatalf("unexpected publish error: %v", err)
 	}
 
-	if err := m.Pin(); err != nil {
+	if err := m.Pin(testNow); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	if !m.Pinned() {
@@ -132,7 +131,7 @@ func TestPin(t *testing.T) {
 	firstPinnedAt := *m.PinnedAt()
 
 	// pinnedAt must not change when already pinned
-	if err := m.Pin(); err != nil {
+	if err := m.Pin(testNow); err != nil {
 		t.Fatalf("unexpected error on second pin: %v", err)
 	}
 	if *m.PinnedAt() != firstPinnedAt {
@@ -143,26 +142,26 @@ func TestPin(t *testing.T) {
 func TestPin_DraftReturnsError(t *testing.T) {
 	m := newTestMaterial()
 
-	err := m.Pin()
+	err := m.Pin(testNow)
 	if err == nil {
 		t.Fatal("expected error when pinning a DRAFT material")
 	}
 	var appErr *apperror.AppError
-	if !errors.As(err, &appErr) || appErr.Code != ErrCodeCannotPinDraft {
-		t.Errorf("expected error code %s, got %v", ErrCodeCannotPinDraft, err)
+	if !errors.As(err, &appErr) || appErr.Code != material.ErrCodeCannotPinDraft {
+		t.Errorf("expected error code %s, got %v", material.ErrCodeCannotPinDraft, err)
 	}
 }
 
 func TestUnpin(t *testing.T) {
 	m := newTestMaterial()
-	if err := m.Publish(); err != nil {
+	if err := m.Publish(testNow); err != nil {
 		t.Fatalf("unexpected publish error: %v", err)
 	}
-	if err := m.Pin(); err != nil {
+	if err := m.Pin(testNow); err != nil {
 		t.Fatalf("unexpected pin error: %v", err)
 	}
 
-	m.Unpin()
+	m.Unpin(testNow)
 	if m.Pinned() {
 		t.Error("expected pinned=false after unpin")
 	}
@@ -171,7 +170,7 @@ func TestUnpin(t *testing.T) {
 	}
 
 	// second unpin must be a no-op
-	m.Unpin()
+	m.Unpin(testNow)
 	if m.Pinned() {
 		t.Error("expected pinned=false after second unpin")
 	}
@@ -179,13 +178,12 @@ func TestUnpin(t *testing.T) {
 
 func TestUpdateMetadata(t *testing.T) {
 	m := newTestMaterial()
-
-	newTitle, _ := NewTitle("Updated Title")
-	newContent, _ := NewContent("Updated content")
-	newTags, _ := NewTags([]string{"tag1", "tag2"})
-
-	m.UpdateMetadata(&newTitle, &newContent, &newTags)
-
+	newTitle, _ := material.NewTitle("Updated Title")
+	newContent, _ := material.NewContent("Updated content")
+	newTags, _ := material.NewTags([]string{"tag1", "tag2"})
+	contentPtr := &newContent
+	tagsPtr := &newTags
+	m.UpdateMetadata(&newTitle, &contentPtr, &tagsPtr, testNow)
 	if m.Title().String() != "Updated Title" {
 		t.Errorf("expected updated title, got %q", m.Title().String())
 	}
@@ -200,15 +198,39 @@ func TestUpdateMetadata(t *testing.T) {
 func TestUpdateMetadata_PartialUpdate(t *testing.T) {
 	m := newTestMaterial()
 	originalContent := m.Content().String()
-
-	newTitle, _ := NewTitle("Only Title Updated")
-	m.UpdateMetadata(&newTitle, nil, nil)
-
+	newTitle, _ := material.NewTitle("Only Title Updated")
+	m.UpdateMetadata(&newTitle, nil, nil, testNow)
 	if m.Title().String() != "Only Title Updated" {
 		t.Errorf("expected updated title, got %q", m.Title().String())
 	}
 	if m.Content().String() != originalContent {
 		t.Error("content should remain unchanged")
+	}
+}
+
+func TestUpdateMetadata_ClearContent(t *testing.T) {
+	m := newTestMaterial()
+	initial, _ := material.NewContent("some content")
+	initialPtr := &initial
+	m.UpdateMetadata(nil, &initialPtr, nil, testNow)
+	empty := material.NewEmptyContent()
+	emptyPtr := &empty
+	m.UpdateMetadata(nil, &emptyPtr, nil, testNow)
+	if m.Content().String() != "" {
+		t.Errorf("expected empty content after clearing, got %q", m.Content().String())
+	}
+}
+
+func TestUpdateMetadata_ClearTags(t *testing.T) {
+	m := newTestMaterial()
+	tags, _ := material.NewTags([]string{"initial-tag"})
+	tagsPtr := &tags
+	m.UpdateMetadata(nil, nil, &tagsPtr, testNow)
+	emptyTags, _ := material.NewTags([]string{})
+	emptyTagsPtr := &emptyTags
+	m.UpdateMetadata(nil, nil, &emptyTagsPtr, testNow)
+	if len(m.Tags().Values()) != 0 {
+		t.Errorf("expected empty tags after clearing, got %v", m.Tags().Values())
 	}
 }
 
@@ -226,20 +248,19 @@ func TestCanBeEditedBy(t *testing.T) {
 	}
 }
 
-func TestCanBePinnedBy(t *testing.T) {
+func TestCanModifyPinStateBy(t *testing.T) {
 	m := newTestMaterial()
 
-	if !m.CanBePinnedBy(shared.RestoreUserID("author-1"), false, false) {
+	if !m.CanModifyPinStateBy(shared.RestoreUserID("author-1"), false, false) {
 		t.Error("author should be able to pin")
 	}
-	if !m.CanBePinnedBy(shared.RestoreUserID("other"), true, false) {
+	if !m.CanModifyPinStateBy(shared.RestoreUserID("other"), true, false) {
 		t.Error("admin should be able to pin")
 	}
-	if !m.CanBePinnedBy(shared.RestoreUserID("other"), false, true) {
+	if !m.CanModifyPinStateBy(shared.RestoreUserID("other"), false, true) {
 		t.Error("group lead should be able to pin")
 	}
-	if m.CanBePinnedBy(shared.RestoreUserID("other"), false, false) {
+	if m.CanModifyPinStateBy(shared.RestoreUserID("other"), false, false) {
 		t.Error("regular member should not be able to pin")
 	}
 }
-

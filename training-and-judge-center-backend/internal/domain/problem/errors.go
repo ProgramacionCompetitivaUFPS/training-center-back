@@ -1,11 +1,10 @@
 package problem
 
 const (
-	ErrCodeSlugTooShort          = "SLUG_TOO_SHORT"
-	ErrCodeSlugTooLong           = "SLUG_TOO_LONG"
-	ErrCodeSlugInvalidFormat     = "INVALID_SLUG_FORMAT"
+	ErrCodeSlugAlreadyExists     = "SLUG_ALREADY_EXISTS"
 	ErrCodeModifierAlreadyExists = "MODIFIER_ALREADY_EXISTS"
 	ErrCodeModifierNotFound      = "MODIFIER_NOT_FOUND"
+	ErrCodeSolutionNotFound      = "SOLUTION_NOT_FOUND"
 	ErrCodeTooManyModifiers      = "TOO_MANY_MODIFIERS"
 	ErrCodeAlreadyDraft          = "ALREADY_DRAFT"
 	ErrCodeAlreadyPublished      = "ALREADY_PUBLISHED"

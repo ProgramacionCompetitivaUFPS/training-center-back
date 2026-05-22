@@ -13,7 +13,7 @@ func TestRemoveModifier_Success_Author(t *testing.T) {
 	repo := repoWith(newDraftProblemWithModifier())
 	uc := NewRemoveModifierUseCase(repo)
 
-	_, err := uc.Execute(context.Background(), RemoveModifierInput{
+	err := uc.Execute(context.Background(), RemoveModifierInput{
 		Slug:        testSlug,
 		UserID:      modifierID,
 		CurrentUser: asCoach(authorID),
@@ -27,7 +27,7 @@ func TestRemoveModifier_Success_Admin(t *testing.T) {
 	repo := repoWith(newDraftProblemWithModifier())
 	uc := NewRemoveModifierUseCase(repo)
 
-	_, err := uc.Execute(context.Background(), RemoveModifierInput{
+	err := uc.Execute(context.Background(), RemoveModifierInput{
 		Slug:        testSlug,
 		UserID:      modifierID,
 		CurrentUser: asAdmin(strangerID),
@@ -41,7 +41,7 @@ func TestRemoveModifier_Forbidden_Stranger(t *testing.T) {
 	repo := repoWith(newDraftProblemWithModifier())
 	uc := NewRemoveModifierUseCase(repo)
 
-	_, err := uc.Execute(context.Background(), RemoveModifierInput{
+	err := uc.Execute(context.Background(), RemoveModifierInput{
 		Slug:        testSlug,
 		UserID:      modifierID,
 		CurrentUser: asContestant(strangerID),
@@ -54,8 +54,8 @@ func TestRemoveModifier_Forbidden_Stranger(t *testing.T) {
 	if !ok {
 		t.Fatalf("expected *apperror.AppError, got %T", err)
 	}
-	if appErr.Code != apperror.ErrCodeForbidden {
-		t.Errorf("expected FORBIDDEN, got %q", appErr.Code)
+	if appErr.Code != ErrCodeInsufficientPermissions {
+		t.Errorf("expected INSUFFICIENT_PERMISSIONS, got %q", appErr.Code)
 	}
 }
 
@@ -63,7 +63,7 @@ func TestRemoveModifier_ModifierNotFound(t *testing.T) {
 	repo := repoWith(newDraftProblem()) // no modifiers
 	uc := NewRemoveModifierUseCase(repo)
 
-	_, err := uc.Execute(context.Background(), RemoveModifierInput{
+	err := uc.Execute(context.Background(), RemoveModifierInput{
 		Slug:        testSlug,
 		UserID:      modifierID,
 		CurrentUser: asCoach(authorID),
@@ -92,7 +92,7 @@ func TestRemoveModifier_RepositoryError(t *testing.T) {
 	}
 	uc := NewRemoveModifierUseCase(repo)
 
-	_, err := uc.Execute(context.Background(), RemoveModifierInput{
+	err := uc.Execute(context.Background(), RemoveModifierInput{
 		Slug:        testSlug,
 		UserID:      modifierID,
 		CurrentUser: asCoach(authorID),

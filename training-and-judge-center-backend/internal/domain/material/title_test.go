@@ -1,8 +1,10 @@
-package material
+package material_test
 
 import (
 	"strings"
 	"testing"
+
+	"github.com/training-judge-center/backend/internal/domain/material"
 )
 
 func TestNewTitle(t *testing.T) {
@@ -21,7 +23,7 @@ func TestNewTitle(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			_, err := NewTitle(tt.input)
+			_, err := material.NewTitle(tt.input)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("NewTitle(%q) error = %v, wantErr %v", tt.input, err, tt.wantErr)
 			}
@@ -31,7 +33,7 @@ func TestNewTitle(t *testing.T) {
 
 func TestTitle_NFKCNormalization(t *testing.T) {
 	// ﬁ is a ligature that normalizes to "fi" under NFKC
-	title, err := NewTitle("ﬁle")
+	title, err := material.NewTitle("ﬁle")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}

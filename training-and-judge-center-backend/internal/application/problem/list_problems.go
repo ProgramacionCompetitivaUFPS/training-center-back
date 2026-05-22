@@ -1,4 +1,4 @@
-package problem
+﻿package problem
 
 import (
 	"context"
@@ -7,14 +7,14 @@ import (
 	"math"
 
 	"github.com/training-judge-center/backend/internal/domain/problem"
-	"github.com/training-judge-center/backend/internal/domain/shared"
+	appshared "github.com/training-judge-center/backend/internal/application/shared"
 	"github.com/training-judge-center/backend/pkg/apperror"
 )
 
 const MaxPageLimit = 100
 
 type ListProblemsInput struct {
-	CurrentUser    shared.CurrentUser
+	CurrentUser    appshared.CurrentUser
 	Status         *string
 	Accessibility  *string
 	Tags           []string
@@ -24,7 +24,7 @@ type ListProblemsInput struct {
 }
 
 type ProblemSummary struct {
-	Problem *problem.Problem
+	Problem ProblemDTO
 	Author  ModifierDisplay
 }
 
@@ -134,7 +134,7 @@ func (uc *ListProblemsUseCase) Execute(ctx context.Context, in ListProblemsInput
 		if d != nil {
 			author = ModifierDisplay{Nickname: d.Nickname, Name: d.Name}
 		}
-		summaries = append(summaries, ProblemSummary{Problem: p, Author: author})
+		summaries = append(summaries, ProblemSummary{Problem: problemToDTO(p), Author: author})
 	}
 
 	totalPages := int(math.Ceil(float64(total) / float64(in.Limit)))

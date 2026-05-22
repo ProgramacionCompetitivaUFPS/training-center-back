@@ -1,9 +1,10 @@
-package problem
+﻿package problem
 
 import (
 	"context"
 	"log/slog"
 
+	appshared "github.com/training-judge-center/backend/internal/application/shared"
 	"github.com/training-judge-center/backend/internal/domain/problem"
 	"github.com/training-judge-center/backend/internal/domain/shared"
 	"github.com/training-judge-center/backend/pkg/apperror"
@@ -11,28 +12,18 @@ import (
 
 type GetProblemInput struct {
 	Slug        string
-	CurrentUser shared.CurrentUser
-}
-
-type ModifierDisplay struct {
-	Nickname string
-	Name     string
+	CurrentUser appshared.CurrentUser
 }
 
 type FilesAvailability struct {
 	TestCases bool
-	Solutions []SolutionInfo
+	Solutions []SolutionDTO
 	Checker   bool
 	Validator bool
 }
 
-type SolutionInfo struct {
-	Filename string
-	Language string
-}
-
 type GetProblemOutput struct {
-	Problem   *problem.Problem
+	Problem   ProblemDTO
 	Author    ModifierDisplay
 	Modifiers []ModifierDisplay
 	Files     *FilesAvailability
@@ -63,7 +54,7 @@ func (uc *GetProblemUseCase) Execute(ctx context.Context, in GetProblemInput) (*
 	isModifier := p.CanBeEditedBy(viewerID, isAdmin)
 
 	if p.Status().String() == "DRAFT" && !isModifier {
-		return nil, apperror.NewForbidden(apperror.ErrCodeForbidden, "Only the problem author, Admin, or assigned modifiers can view this DRAFT problem")
+		return nil, apperror.NewForbidden(ErrCodeInsufficientPermissions, "Only the problem author, Admin, or assigned modifiers can view this DRAFT problem")
 	}
 
 	authorDisplay, err := uc.userProvider.GetDisplay(ctx, p.AuthorID().Value())
@@ -73,7 +64,7 @@ func (uc *GetProblemUseCase) Execute(ctx context.Context, in GetProblemInput) (*
 	}
 
 	out := &GetProblemOutput{
-		Problem: p,
+		Problem: problemToDTO(p),
 		Author:  ModifierDisplay{Nickname: authorDisplay.Nickname, Name: authorDisplay.Name},
 	}
 
@@ -95,9 +86,9 @@ func (uc *GetProblemUseCase) Execute(ctx context.Context, in GetProblemInput) (*
 		}
 		out.Modifiers = modifiers
 
-		solutions := make([]SolutionInfo, 0, len(p.Solutions()))
+		solutions := make([]SolutionDTO, 0, len(p.Solutions()))
 		for _, sol := range p.Solutions() {
-			solutions = append(solutions, SolutionInfo{Filename: sol.Filename(), Language: sol.Language()})
+			solutions = append(solutions, SolutionDTO{Filename: sol.Filename(), Language: sol.Language()})
 		}
 		out.Files = &FilesAvailability{
 			TestCases: p.TestCasesKey() != nil,

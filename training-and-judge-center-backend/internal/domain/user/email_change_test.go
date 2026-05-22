@@ -1,42 +1,42 @@
-package user
+package user_test
 
 import (
 	"testing"
 	"time"
+
+	"github.com/training-judge-center/backend/internal/domain/user"
 )
 
 func TestEmailChangeRequest_MarkAsUsed(t *testing.T) {
-	now := time.Now()
-
-	newReq := func(status RequestStatus) *EmailChangeRequest {
-		email, _ := NewEmail("new@example.com")
-		return RestoreEmailChangeRequest(
+	newReq := func(status user.RequestStatus) *user.EmailChangeRequest {
+		email, _ := user.NewEmail("new@example.com")
+		return user.RestoreEmailChangeRequest(
 			"req-id", "user-id", email, "code123",
-			status, now.Add(time.Hour), now, nil,
+			status, testNow.Add(time.Hour), testNow, nil,
 		)
 	}
 
 	tests := []struct {
-		name      string
-		status    RequestStatus
-		wantErr   bool
+		name    string
+		status  user.RequestStatus
+		wantErr bool
 	}{
-		{"pending transitions to used", StatusPending, false},
-		{"used returns error", StatusUsed, true},
-		{"expired returns error", StatusExpired, true},
+		{"pending transitions to used", user.RequestStatusPending, false},
+		{"used returns error", user.RequestStatusUsed, true},
+		{"expired returns error", user.RequestStatusExpired, true},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			req := newReq(tt.status)
-			err := req.MarkAsUsed(now)
+			err := req.MarkAsUsed(testNow)
 			if tt.wantErr && err == nil {
 				t.Error("expected error, got nil")
 			}
 			if !tt.wantErr && err != nil {
 				t.Errorf("expected no error, got %v", err)
 			}
-			if !tt.wantErr && req.Status() != StatusUsed {
+			if !tt.wantErr && req.Status() != user.RequestStatusUsed {
 				t.Errorf("expected status USED, got %q", req.Status())
 			}
 		})

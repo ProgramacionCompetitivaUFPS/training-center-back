@@ -37,9 +37,8 @@ func userToDTO(u *user.User) UserDTO {
 		UpdatedAt:     u.UpdatedAt(),
 		DeactivatedAt: u.DeactivatedAt(),
 	}
-	if u.Email() != nil {
-		s := u.Email().String()
-		dto.Email = &s
+	if emailStr := u.Email().String(); emailStr != "" {
+		dto.Email = &emailStr
 	}
 	return dto
 }

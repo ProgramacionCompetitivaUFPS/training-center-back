@@ -5,6 +5,8 @@ import (
 	"log/slog"
 	"time"
 
+	"github.com/google/uuid"
+	"github.com/training-judge-center/backend/internal/domain/shared"
 	"github.com/training-judge-center/backend/internal/domain/user"
 	"github.com/training-judge-center/backend/pkg/apperror"
 )
@@ -15,11 +17,11 @@ type AdminDeactivateUserInput struct {
 }
 
 type AdminDeactivateUserUseCase struct {
-	repo               user.UserRepository
+	repo               user.Repository
 	sessionInvalidator user.SessionInvalidator
 }
 
-func NewAdminDeactivateUserUseCase(repo user.UserRepository, sessionInvalidator user.SessionInvalidator) *AdminDeactivateUserUseCase {
+func NewAdminDeactivateUserUseCase(repo user.Repository, sessionInvalidator user.SessionInvalidator) *AdminDeactivateUserUseCase {
 	return &AdminDeactivateUserUseCase{
 		repo:               repo,
 		sessionInvalidator: sessionInvalidator,
@@ -28,20 +30,20 @@ func NewAdminDeactivateUserUseCase(repo user.UserRepository, sessionInvalidator 
 
 func (uc *AdminDeactivateUserUseCase) Execute(ctx context.Context, input AdminDeactivateUserInput) error {
 	if input.RequesterID == input.TargetID {
-		return apperror.NewForbidden(apperror.ErrCodeCannotSelfDeactivate, "Administrators cannot deactivate their own account").WithCause(user.ErrCannotSelfDeactivate)
+		return apperror.NewForbidden(ErrCodeCannotSelfDeactivate, "Administrators cannot deactivate their own account")
 	}
 
 	foundUser, err := uc.repo.FindByID(ctx, input.TargetID)
 	if err != nil {
-		slog.Error("failed to find user by id during admin deactivation", "target_id", input.TargetID, "error", err)
+		slog.ErrorContext(ctx, "failed to find user by id during admin deactivation", "target_id", input.TargetID, "error", err)
 		return apperror.NewInternal()
 	}
 	if foundUser == nil {
-		return apperror.NewNotFound(apperror.ErrCodeNotFound, "User not found")
+		return apperror.NewNotFound(user.ErrCodeUserNotFound, "User not found")
 	}
 
-	if foundUser.Role() == user.RoleAdmin {
-		return apperror.NewForbidden(apperror.ErrCodeCannotDeactivateAdmin, "Cannot deactivate another administrator").WithCause(user.ErrCannotDeactivateAdmin)
+	if foundUser.Role() == shared.RoleAdmin {
+		return apperror.NewForbidden(ErrCodeCannotDeactivateAdmin, "Cannot deactivate another administrator")
 	}
 
 	// Idempotent: already deactivated users return success immediately
@@ -49,8 +51,10 @@ func (uc *AdminDeactivateUserUseCase) Execute(ctx context.Context, input AdminDe
 		return nil
 	}
 
-	if err := foundUser.Deactivate(); err != nil {
-		slog.Error("failed to deactivate user domain object", "user_id", foundUser.ID(), "error", err)
+	now := time.Now()
+	anonSuffix := uuid.New().String()[:10]
+	if err := foundUser.Deactivate(anonSuffix, now); err != nil {
+		slog.ErrorContext(ctx, "failed to deactivate user domain object", "user_id", foundUser.ID(), "error", err)
 		return apperror.NewInternal()
 	}
 
@@ -58,14 +62,13 @@ func (uc *AdminDeactivateUserUseCase) Execute(ctx context.Context, input AdminDe
 	// write never happens and the caller receives an error with clean state.
 	// If DB write fails after this point, the user loses their active session
 	// but is not officially deactivated — a minor inconsistency, not a security risk.
-	now := time.Now()
 	if err := uc.sessionInvalidator.InvalidateAllUserSessions(ctx, foundUser.ID(), now); err != nil {
-		slog.Error("failed to invalidate sessions during admin deactivation", "user_id", foundUser.ID(), "error", err)
+		slog.ErrorContext(ctx, "failed to invalidate sessions during admin deactivation", "user_id", foundUser.ID(), "error", err)
 		return apperror.NewInternal()
 	}
 
 	if err := uc.repo.Update(ctx, foundUser); err != nil {
-		slog.Error("failed to persist user deactivation", "user_id", foundUser.ID(), "error", err)
+		slog.ErrorContext(ctx, "failed to persist user deactivation", "user_id", foundUser.ID(), "error", err)
 		return apperror.NewInternal()
 	}
 

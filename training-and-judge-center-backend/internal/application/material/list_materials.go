@@ -1,4 +1,4 @@
-package material
+﻿package material
 
 import (
 	"context"
@@ -6,7 +6,7 @@ import (
 	"log/slog"
 
 	domainMaterial "github.com/training-judge-center/backend/internal/domain/material"
-	"github.com/training-judge-center/backend/internal/domain/shared"
+	appshared "github.com/training-judge-center/backend/internal/application/shared"
 	"github.com/training-judge-center/backend/pkg/apperror"
 )
 
@@ -17,7 +17,7 @@ const (
 )
 
 type ListMaterialsInput struct {
-	CurrentUser shared.CurrentUser
+	CurrentUser appshared.CurrentUser
 	GroupID     string
 	Pinned      *bool
 	Tags        []string
@@ -37,20 +37,20 @@ type ListMaterialsOutput struct {
 	Pagination PaginationData
 }
 
-type ListMaterials struct {
+type ListMaterialsUseCase struct {
 	repo            domainMaterial.Repository
 	groupVisibility GroupVisibilityProvider
 	memberProvider  GroupMemberProvider
 	authorProvider  AuthorProvider
 }
 
-func NewListMaterials(
+func NewListMaterialsUseCase(
 	repo domainMaterial.Repository,
 	groupVisibility GroupVisibilityProvider,
 	memberProvider GroupMemberProvider,
 	authorProvider AuthorProvider,
-) *ListMaterials {
-	return &ListMaterials{
+) *ListMaterialsUseCase {
+	return &ListMaterialsUseCase{
 		repo:            repo,
 		groupVisibility: groupVisibility,
 		memberProvider:  memberProvider,
@@ -58,7 +58,7 @@ func NewListMaterials(
 	}
 }
 
-func (uc *ListMaterials) Execute(ctx context.Context, in ListMaterialsInput) (*ListMaterialsOutput, error) {
+func (uc *ListMaterialsUseCase) Execute(ctx context.Context, in ListMaterialsInput) (*ListMaterialsOutput, error) {
 	if in.Page < 1 {
 		return nil, apperror.NewValidation([]apperror.FieldError{
 			{Field: "page", Message: "page must be a positive integer"},
@@ -104,7 +104,9 @@ func (uc *ListMaterials) Execute(ctx context.Context, in ListMaterialsInput) (*L
 	items := make([]MaterialData, 0, len(materials))
 	for _, m := range materials {
 		d := toMaterialData(m)
-		d.Author = displays[m.AuthorID().Value()]
+		if disp := displays[m.AuthorID().Value()]; disp != nil {
+			d.Author = &AuthorDTO{Nickname: disp.Nickname, Name: disp.Name}
+		}
 		items = append(items, d)
 	}
 
@@ -124,7 +126,7 @@ func (uc *ListMaterials) Execute(ctx context.Context, in ListMaterialsInput) (*L
 	}, nil
 }
 
-func (uc *ListMaterials) buildFilters(ctx context.Context, in ListMaterialsInput) (domainMaterial.ListFilters, error) {
+func (uc *ListMaterialsUseCase) buildFilters(ctx context.Context, in ListMaterialsInput) (domainMaterial.ListFilters, error) {
 	filters := domainMaterial.ListFilters{
 		Tags:   in.Tags,
 		Pinned: in.Pinned,

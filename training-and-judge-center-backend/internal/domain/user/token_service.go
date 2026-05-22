@@ -1,11 +1,15 @@
 package user
 
-import "time"
+import (
+	"time"
+
+	"github.com/training-judge-center/backend/internal/domain/shared"
+)
 
 type TokenClaims struct {
 	UserID   string
 	Email    Email
-	Role     Role
+	Role     shared.Role
 	IssuedAt time.Time
 }
 

@@ -1,17 +1,17 @@
-package material
+﻿package material
 
 import (
 	"context"
+	"errors"
 	"time"
 
 	domainMaterial "github.com/training-judge-center/backend/internal/domain/material"
 	"github.com/training-judge-center/backend/internal/domain/shared"
+	appshared "github.com/training-judge-center/backend/internal/application/shared"
 	"github.com/training-judge-center/backend/pkg/apperror"
 )
 
 var testNow = time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
-
-func fixedClock() time.Time { return testNow }
 
 // ── Repository mock ──────────────────────────────────────────────────────────
 
@@ -156,9 +156,9 @@ func stubAuthorProvider() *mockAuthorProvider { return &mockAuthorProvider{} }
 
 // ── CurrentUser helpers ──────────────────────────────────────────────────────
 
-func asAdmin(id string) shared.CurrentUser      { return shared.CurrentUser{ID: id, Role: shared.RoleAdmin} }
-func asCoach(id string) shared.CurrentUser      { return shared.CurrentUser{ID: id, Role: shared.RoleCoach} }
-func asContestant(id string) shared.CurrentUser { return shared.CurrentUser{ID: id, Role: shared.RoleContestant} }
+func asAdmin(id string) appshared.CurrentUser      { return appshared.CurrentUser{ID: id, Role: shared.RoleAdmin} }
+func asCoach(id string) appshared.CurrentUser      { return appshared.CurrentUser{ID: id, Role: shared.RoleCoach} }
+func asContestant(id string) appshared.CurrentUser { return appshared.CurrentUser{ID: id, Role: shared.RoleContestant} }
 
 // ── Material fixtures ────────────────────────────────────────────────────────
 
@@ -183,7 +183,7 @@ func newTestMaterial() *domainMaterial.Material {
 		testNow,
 		testNow,
 		nil,
-	).WithClock(fixedClock)
+	)
 }
 
 func newPublishedMaterial() *domainMaterial.Material {
@@ -201,7 +201,25 @@ func newPublishedMaterial() *domainMaterial.Material {
 		testNow,
 		testNow,
 		&now,
-	).WithClock(fixedClock)
+	)
+}
+
+func newPinnedMaterial() *domainMaterial.Material {
+	now := testNow
+	return domainMaterial.RestoreMaterial(
+		testMaterialID,
+		testGroupID,
+		shared.RestoreUserID(testAuthorID),
+		"Test Title",
+		"",
+		nil,
+		"PUBLISHED",
+		true,
+		&now,
+		testNow,
+		testNow,
+		&now,
+	)
 }
 
 func repoWith(m *domainMaterial.Material) *mockMaterialRepository {
@@ -226,4 +244,8 @@ func groupExists() *mockGroupProvider {
 
 func groupNotFound() *mockGroupProvider {
 	return &mockGroupProvider{existsFn: func(_ context.Context, _ string) (bool, error) { return false, nil }}
+}
+
+func groupProviderError() *mockGroupProvider {
+	return &mockGroupProvider{existsFn: func(_ context.Context, _ string) (bool, error) { return false, errors.New("db timeout") }}
 }

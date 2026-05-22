@@ -1,23 +1,23 @@
 package user
 
 import (
-	"fmt"
 	"strings"
 	"time"
 
-	"github.com/google/uuid"
+	"github.com/training-judge-center/backend/internal/domain/shared"
+	"github.com/training-judge-center/backend/pkg/apperror"
 )
 
 type User struct {
 	id            string
-	email         *Email
+	email         Email
 	password      Password
 	name          string
 	nickname      Nickname
 	country       string
 	city          string
 	institution   string
-	role          Role
+	role          shared.Role
 	status        Status
 	createdAt     time.Time
 	updatedAt     *time.Time
@@ -26,96 +26,108 @@ type User struct {
 
 // Accessors
 func (u *User) ID() string                   { return u.id }
-func (u *User) Email() *Email                { return u.email }
+func (u *User) Email() Email                 { return u.email }
 func (u *User) Password() Password           { return u.password }
 func (u *User) Name() string                 { return u.name }
 func (u *User) Nickname() Nickname           { return u.nickname }
 func (u *User) Country() string              { return u.country }
 func (u *User) City() string                 { return u.city }
 func (u *User) Institution() string          { return u.institution }
-func (u *User) Role() Role                   { return u.role }
+func (u *User) Role() shared.Role            { return u.role }
 func (u *User) Status() Status               { return u.status }
 func (u *User) CreatedAt() time.Time         { return u.createdAt }
 func (u *User) UpdatedAt() *time.Time        { return u.updatedAt }
 func (u *User) DeactivatedAt() *time.Time    { return u.deactivatedAt }
 
-func NewUser(email Email, password Password, name string, nickname Nickname, country, city, institution string) (*User, error) {
+func NewUser(id string, now time.Time, email Email, password Password, name string, nickname Nickname, country, city, institution string) (*User, error) {
+	if id == "" {
+		return nil, apperror.NewInternal()
+	}
+	var fieldErrs []apperror.FieldError
 	if strings.TrimSpace(name) == "" {
-		return nil, fmt.Errorf("name is required")
+		fieldErrs = append(fieldErrs, apperror.FieldError{Field: "name", Message: "name is required"})
 	}
 	if strings.TrimSpace(country) == "" {
-		return nil, fmt.Errorf("country is required")
+		fieldErrs = append(fieldErrs, apperror.FieldError{Field: "country", Message: "country is required"})
 	}
 	if strings.TrimSpace(city) == "" {
-		return nil, fmt.Errorf("city is required")
+		fieldErrs = append(fieldErrs, apperror.FieldError{Field: "city", Message: "city is required"})
 	}
 	if strings.TrimSpace(institution) == "" {
-		return nil, fmt.Errorf("institution is required")
+		fieldErrs = append(fieldErrs, apperror.FieldError{Field: "institution", Message: "institution is required"})
+	}
+	if len(fieldErrs) > 0 {
+		return nil, apperror.NewValidation(fieldErrs)
 	}
 
 	return &User{
-		id:          uuid.New().String(),
-		email:       &email,
+		id:          id,
+		email:       email,
 		password:    password,
 		name:        name,
 		nickname:    nickname,
 		country:     country,
 		city:        city,
 		institution: institution,
-		role:        RoleContestant,
+		role:        shared.RoleContestant,
 		status:      StatusActive,
-		createdAt:   time.Now(),
+		createdAt:   now,
 	}, nil
 }
 
-func (u *User) Update(name *string, nickname *Nickname, institution *string, city *string, country *string) error {
+func (u *User) Update(name *string, nickname *Nickname, institution *string, city *string, country *string, now time.Time) error {
+	var fieldErrs []apperror.FieldError
+	if name != nil && strings.TrimSpace(*name) == "" {
+		fieldErrs = append(fieldErrs, apperror.FieldError{Field: "name", Message: "name cannot be empty"})
+	}
+	if institution != nil && strings.TrimSpace(*institution) == "" {
+		fieldErrs = append(fieldErrs, apperror.FieldError{Field: "institution", Message: "institution cannot be empty"})
+	}
+	if city != nil && strings.TrimSpace(*city) == "" {
+		fieldErrs = append(fieldErrs, apperror.FieldError{Field: "city", Message: "city cannot be empty"})
+	}
+	if country != nil && strings.TrimSpace(*country) == "" {
+		fieldErrs = append(fieldErrs, apperror.FieldError{Field: "country", Message: "country cannot be empty"})
+	}
+	if len(fieldErrs) > 0 {
+		return apperror.NewValidation(fieldErrs)
+	}
+
 	if name != nil {
-		if strings.TrimSpace(*name) == "" {
-			return fmt.Errorf("name cannot be empty")
-		}
 		u.name = *name
 	}
 	if nickname != nil {
 		u.nickname = *nickname
 	}
 	if institution != nil {
-		if strings.TrimSpace(*institution) == "" {
-			return fmt.Errorf("institution cannot be empty")
-		}
 		u.institution = *institution
 	}
 	if city != nil {
-		if strings.TrimSpace(*city) == "" {
-			return fmt.Errorf("city cannot be empty")
-		}
 		u.city = *city
 	}
 	if country != nil {
-		if strings.TrimSpace(*country) == "" {
-			return fmt.Errorf("country cannot be empty")
-		}
 		u.country = *country
 	}
 
-	now := time.Now()
-	u.updatedAt = &now
+	t := now.UTC()
+	u.updatedAt = &t
 	return nil
 }
 
-func (u *User) AdminUpdate(name *string, nickname *Nickname, institution *string, city *string, country *string, email *Email, role *Role) error {
+func (u *User) AdminUpdate(name *string, nickname *Nickname, institution *string, city *string, country *string, email *Email, role *shared.Role, now time.Time) error {
 	if role != nil && !role.IsValid() {
-		return fmt.Errorf("invalid role: %s", *role)
+		return apperror.NewValidation([]apperror.FieldError{{Field: "role", Message: "invalid role"}})
 	}
-	if role != nil && *role == RoleAdmin {
-		return fmt.Errorf("role ADMIN cannot be assigned through standard update")
+	if role != nil && *role == shared.RoleAdmin {
+		return apperror.NewConflict(ErrCodeCannotAssignAdminRole, "role ADMIN cannot be assigned through standard update")
 	}
 
-	if err := u.Update(name, nickname, institution, city, country); err != nil {
+	if err := u.Update(name, nickname, institution, city, country, now); err != nil {
 		return err
 	}
 
 	if email != nil {
-		u.email = email
+		u.email = *email
 	}
 	if role != nil {
 		u.role = *role
@@ -124,40 +136,40 @@ func (u *User) AdminUpdate(name *string, nickname *Nickname, institution *string
 	return nil
 }
 
-func (u *User) UpdatePassword(newPassword Password) error {
+func (u *User) UpdatePassword(newPassword Password, now time.Time) error {
 	if u.status == StatusDeactivated {
-		return fmt.Errorf("cannot update password of a deactivated user")
+		return apperror.NewConflict(ErrCodeCannotUpdateDeactivated, "cannot update password of a deactivated user")
 	}
 	u.password = newPassword
-	now := time.Now()
-	u.updatedAt = &now
+	t := now.UTC()
+	u.updatedAt = &t
 	return nil
 }
 
-func (u *User) UpdateEmail(newEmail Email) error {
+func (u *User) UpdateEmail(newEmail Email, now time.Time) error {
 	if u.status == StatusDeactivated {
-		return fmt.Errorf("cannot update email of a deactivated user")
+		return apperror.NewConflict(ErrCodeCannotUpdateDeactivated, "cannot update email of a deactivated user")
 	}
-	u.email = &newEmail
-	now := time.Now()
-	u.updatedAt = &now
+	u.email = newEmail
+	t := now.UTC()
+	u.updatedAt = &t
 	return nil
 }
 
-func (u *User) Deactivate() error {
+func (u *User) Deactivate(anonymousSuffix string, now time.Time) error {
 	if u.status == StatusDeactivated {
-		return fmt.Errorf("user is already deactivated")
+		return apperror.NewConflict(ErrCodeAlreadyDeactivated, "user is already deactivated")
 	}
-	anonymousNickname, err := NewNickname("user_anonimo_" + uuid.New().String()[:10])
+	anonymousNickname, err := NewNickname("user_anonimo_" + anonymousSuffix)
 	if err != nil {
-		return fmt.Errorf("generating anonymous nickname: %w", err)
+		return apperror.NewInternal()
 	}
-	now := time.Now()
+	t := now.UTC()
 	u.nickname = anonymousNickname
-	u.email = nil
+	u.email = Email{}
 	u.status = StatusDeactivated
-	u.deactivatedAt = &now
-	u.updatedAt = &now
+	u.deactivatedAt = &t
+	u.updatedAt = &t
 	return nil
 }
 
@@ -175,50 +187,25 @@ func RestoreUser(
 	createdAt time.Time,
 	updatedAt *time.Time,
 	deactivatedAt *time.Time,
-) (*User, error) {
+) *User {
 	u := &User{
 		id:            id,
 		name:          name,
 		country:       country,
 		city:          city,
 		institution:   institution,
+		password:      RestorePassword(passwordHash),
+		nickname:      RestoreNickname(nicknameStr),
+		role:          shared.RestoreRole(roleStr),
+		status:        RestoreStatus(statusStr),
 		createdAt:     createdAt,
 		updatedAt:     updatedAt,
 		deactivatedAt: deactivatedAt,
 	}
 
 	if emailStr != nil {
-		parsedEmail, err := NewEmail(*emailStr)
-		if err != nil {
-			return nil, fmt.Errorf("restoring user %s: invalid email: %w", id, err)
-		}
-		u.email = &parsedEmail
+		u.email = RestoreEmail(*emailStr)
 	}
 
-	parsedPassword, err := NewPasswordFromHash(passwordHash)
-	if err != nil {
-		return nil, fmt.Errorf("restoring user %s: invalid password hash: %w", id, err)
-	}
-	u.password = parsedPassword
-
-	parsedNickname, err := NewNickname(nicknameStr)
-	if err != nil {
-		return nil, fmt.Errorf("restoring user %s: invalid nickname: %w", id, err)
-	}
-	u.nickname = parsedNickname
-
-	parsedRole, err := NewRole(roleStr)
-	if err != nil {
-		return nil, fmt.Errorf("restoring user %s: invalid role: %w", id, err)
-	}
-	u.role = parsedRole
-
-	parsedStatus, err := NewStatus(statusStr)
-	if err != nil {
-		return nil, fmt.Errorf("restoring user %s: invalid status: %w", id, err)
-	}
-	u.status = parsedStatus
-
-	return u, nil
+	return u
 }
-

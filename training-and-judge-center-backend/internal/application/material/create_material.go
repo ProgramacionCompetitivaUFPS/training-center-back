@@ -1,17 +1,19 @@
-package material
+﻿package material
 
 import (
 	"context"
 	"log/slog"
+	"time"
 
 	"github.com/google/uuid"
 	domainMaterial "github.com/training-judge-center/backend/internal/domain/material"
 	"github.com/training-judge-center/backend/internal/domain/shared"
+	appshared "github.com/training-judge-center/backend/internal/application/shared"
 	"github.com/training-judge-center/backend/pkg/apperror"
 )
 
 type CreateMaterialInput struct {
-	CurrentUser shared.CurrentUser
+	CurrentUser appshared.CurrentUser
 	GroupID     string
 	Title       string
 	Content     *string
@@ -22,20 +24,20 @@ type CreateMaterialOutput struct {
 	Material MaterialData
 }
 
-type CreateMaterial struct {
+type CreateMaterialUseCase struct {
 	repo           domainMaterial.Repository
 	groupProvider  GroupProvider
 	memberProvider GroupMemberProvider
 	authorProvider AuthorProvider
 }
 
-func NewCreateMaterial(
+func NewCreateMaterialUseCase(
 	repo domainMaterial.Repository,
 	groupProvider GroupProvider,
 	memberProvider GroupMemberProvider,
 	authorProvider AuthorProvider,
-) *CreateMaterial {
-	return &CreateMaterial{
+) *CreateMaterialUseCase {
+	return &CreateMaterialUseCase{
 		repo:           repo,
 		groupProvider:  groupProvider,
 		memberProvider: memberProvider,
@@ -43,7 +45,7 @@ func NewCreateMaterial(
 	}
 }
 
-func (uc *CreateMaterial) Execute(ctx context.Context, in CreateMaterialInput) (*CreateMaterialOutput, error) {
+func (uc *CreateMaterialUseCase) Execute(ctx context.Context, in CreateMaterialInput) (*CreateMaterialOutput, error) {
 	exists, err := uc.groupProvider.Exists(ctx, in.GroupID)
 	if err != nil {
 		slog.ErrorContext(ctx, "failed to check group existence", "error", err, "group_id", in.GroupID)
@@ -60,7 +62,7 @@ func (uc *CreateMaterial) Execute(ctx context.Context, in CreateMaterialInput) (
 			return nil, apperror.NewInternal()
 		}
 		if !isLead {
-			return nil, apperror.NewForbidden(ErrCodeInsufficientPerms, "only group leads can create materials")
+			return nil, apperror.NewForbidden(ErrCodeInsufficientPermissions, "only group leads can create materials")
 		}
 	}
 
@@ -91,14 +93,16 @@ func (uc *CreateMaterial) Execute(ctx context.Context, in CreateMaterialInput) (
 		return nil, apperror.NewValidation(fieldErrs)
 	}
 
+	newID := uuid.New().String()
+	now := time.Now()
 	m, err := domainMaterial.NewMaterial(
-		uuid.New().String(),
+		newID,
 		in.GroupID,
 		shared.RestoreUserID(in.CurrentUser.ID),
 		title,
 		content,
 		tags,
-		nil,
+		now,
 	)
 	if err != nil {
 		slog.ErrorContext(ctx, "unexpected error constructing material", "error", err, "group_id", in.GroupID)
@@ -116,7 +120,9 @@ func (uc *CreateMaterial) Execute(ctx context.Context, in CreateMaterialInput) (
 		slog.ErrorContext(ctx, "failed to resolve author display", "error", err, "author_id", m.AuthorID().Value())
 		return nil, apperror.NewInternal()
 	}
-	data.Author = displays[m.AuthorID().Value()]
+	if disp := displays[m.AuthorID().Value()]; disp != nil {
+		data.Author = &AuthorDTO{Nickname: disp.Nickname, Name: disp.Name}
+	}
 
 	return &CreateMaterialOutput{Material: data}, nil
 }

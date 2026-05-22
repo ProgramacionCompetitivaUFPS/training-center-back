@@ -3,9 +3,9 @@ package user
 import (
 	"context"
 	"errors"
-	"net/http"
 	"testing"
 
+	"github.com/training-judge-center/backend/internal/domain/shared"
 	domain "github.com/training-judge-center/backend/internal/domain/user"
 	"github.com/training-judge-center/backend/pkg/apperror"
 )
@@ -20,8 +20,8 @@ func newListUsersRepo(users []*domain.User, total int, repoErr error) *mockUserR
 
 func TestListUsers_Success_NoFilters(t *testing.T) {
 	users := []*domain.User{
-		newUserWithRole("user-1", domain.RoleContestant, domain.StatusActive),
-		newUserWithRole("user-2", domain.RoleCoach, domain.StatusActive),
+		newUserWithRole("user-1", shared.RoleContestant, domain.StatusActive),
+		newUserWithRole("user-2", shared.RoleCoach, domain.StatusActive),
 	}
 	repo := newListUsersRepo(users, 2, nil)
 	uc := NewListUsersUseCase(repo)
@@ -85,11 +85,11 @@ func TestListUsers_InvalidRole(t *testing.T) {
 	if !ok {
 		t.Fatalf("expected *apperror.AppError, got %T", err)
 	}
-	if appErr.Code != "VALIDATION_ERROR" {
+	if appErr.Code != apperror.ErrCodeValidationError {
 		t.Errorf("expected code VALIDATION_ERROR, got %q", appErr.Code)
 	}
-	if appErr.StatusCode != http.StatusBadRequest {
-		t.Errorf("expected status 400, got %d", appErr.StatusCode)
+	if appErr.Kind != apperror.KindValidation {
+		t.Errorf("expected kind VALIDATION, got %s", appErr.Kind)
 	}
 }
 
@@ -102,7 +102,7 @@ func TestListUsers_InvalidStatus(t *testing.T) {
 		t.Fatal("expected error, got nil")
 	}
 	appErr := err.(*apperror.AppError)
-	if appErr.Code != "VALIDATION_ERROR" {
+	if appErr.Code != apperror.ErrCodeValidationError {
 		t.Errorf("expected VALIDATION_ERROR, got %q", appErr.Code)
 	}
 }
@@ -116,7 +116,7 @@ func TestListUsers_InvalidSort(t *testing.T) {
 		t.Fatal("expected error, got nil")
 	}
 	appErr := err.(*apperror.AppError)
-	if appErr.Code != "VALIDATION_ERROR" {
+	if appErr.Code != apperror.ErrCodeValidationError {
 		t.Errorf("expected VALIDATION_ERROR, got %q", appErr.Code)
 	}
 }
@@ -130,7 +130,7 @@ func TestListUsers_InvalidOrder(t *testing.T) {
 		t.Fatal("expected error, got nil")
 	}
 	appErr := err.(*apperror.AppError)
-	if appErr.Code != "VALIDATION_ERROR" {
+	if appErr.Code != apperror.ErrCodeValidationError {
 		t.Errorf("expected VALIDATION_ERROR, got %q", appErr.Code)
 	}
 }
@@ -144,7 +144,7 @@ func TestListUsers_InvalidSearchField(t *testing.T) {
 		t.Fatal("expected error, got nil")
 	}
 	appErr := err.(*apperror.AppError)
-	if appErr.Code != "VALIDATION_ERROR" {
+	if appErr.Code != apperror.ErrCodeValidationError {
 		t.Errorf("expected VALIDATION_ERROR, got %q", appErr.Code)
 	}
 }
@@ -158,7 +158,7 @@ func TestListUsers_RepositoryError(t *testing.T) {
 		t.Fatal("expected error, got nil")
 	}
 	appErr := err.(*apperror.AppError)
-	if appErr.Code != "INTERNAL_ERROR" {
+	if appErr.Code != apperror.ErrCodeInternalError {
 		t.Errorf("expected INTERNAL_ERROR, got %q", appErr.Code)
 	}
 }
