@@ -11,7 +11,11 @@ import (
 	"github.com/training-judge-center/backend/pkg/apperror"
 )
 
-const maxPageLimit = 100
+const (
+	maxPageLimit = 100
+	DefaultPage  = 1
+	DefaultLimit = 20
+)
 
 type ListUsersInput struct {
 	Roles       []string
