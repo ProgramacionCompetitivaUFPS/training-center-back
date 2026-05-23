@@ -3,38 +3,25 @@ package group
 import (
 	"context"
 	"testing"
-	"time"
 
 	domainGroup "github.com/training-judge-center/backend/internal/domain/group"
 	"github.com/training-judge-center/backend/internal/domain/shared"
 	"github.com/training-judge-center/backend/pkg/apperror"
 )
 
-func newApproveUC(memberRepo *fakeMemberRepo, reqRepo *fakeJoinRequestRepo) *ApproveRequestUseCase {
-	return NewApproveRequestUseCase(memberRepo, reqRepo, &fakeTxManager{})
-}
-
-func leadMemberRepo(groupID, userID string) *fakeMemberRepo {
-	uid := shared.RestoreUserID(userID)
-	lead, _ := domainGroup.NewGroupMember("m-lead", groupID, uid, domainGroup.MemberRoleLead, testNow)
-	return &fakeMemberRepo{memberships: map[string]*domainGroup.GroupMember{keyOf(groupID, uid): lead}}
-}
-
-func pendingRequest(id, groupID, requesterID string) *domainGroup.JoinRequest {
-	req, _ := domainGroup.NewJoinRequest(id, groupID, shared.RestoreUserID(requesterID), nil,
-		time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC))
-	return req
+func newApproveRequestUseCase(memberRepo *mockMemberRepository, reqRepo *mockJoinRequestRepository) *ApproveRequestUseCase {
+	return NewApproveRequestUseCase(memberRepo, reqRepo, &mockTransactionManager{})
 }
 
 func TestApproveRequest_NonLeadReturns403(t *testing.T) {
 	req := pendingRequest("r1", "g1", "requester")
-	reqRepo := &fakeJoinRequestRepo{requests: []*domainGroup.JoinRequest{req}}
-	uc := newApproveUC(&fakeMemberRepo{}, reqRepo)
+	reqRepo := &mockJoinRequestRepository{requests: []*domainGroup.JoinRequest{req}}
+	uc := newApproveRequestUseCase(&mockMemberRepository{}, reqRepo)
 
 	_, err := uc.Execute(context.Background(), ApproveRequestInput{
 		GroupID:     "g1",
 		RequestID:   "r1",
-		CurrentUser: currentUser("not-lead", shared.RoleContestant),
+		CurrentUser: asContestant("not-lead"),
 	})
 	ae, ok := err.(*apperror.AppError)
 	if !ok || ae.Code != ErrCodeInsufficientPermissions {
@@ -44,13 +31,13 @@ func TestApproveRequest_NonLeadReturns403(t *testing.T) {
 
 func TestApproveRequest_AdminCanApproveWithoutMembership(t *testing.T) {
 	req := pendingRequest("r1", "g1", "requester-id")
-	reqRepo := &fakeJoinRequestRepo{requests: []*domainGroup.JoinRequest{req}}
-	uc := newApproveUC(&fakeMemberRepo{}, reqRepo)
+	reqRepo := &mockJoinRequestRepository{requests: []*domainGroup.JoinRequest{req}}
+	uc := newApproveRequestUseCase(&mockMemberRepository{}, reqRepo)
 
 	out, err := uc.Execute(context.Background(), ApproveRequestInput{
 		GroupID:     "g1",
 		RequestID:   "r1",
-		CurrentUser: currentUser("admin-id", shared.RoleAdmin),
+		CurrentUser: asAdmin("admin-id"),
 	})
 	if err != nil {
 		t.Fatalf("admin should be able to approve, got: %v", err)
@@ -61,12 +48,12 @@ func TestApproveRequest_AdminCanApproveWithoutMembership(t *testing.T) {
 }
 
 func TestApproveRequest_RequestNotFoundReturns404(t *testing.T) {
-	uc := newApproveUC(leadMemberRepo("g1", "lead-id"), &fakeJoinRequestRepo{})
+	uc := newApproveRequestUseCase(leadMemberRepo("g1", "lead-id"), &mockJoinRequestRepository{})
 
 	_, err := uc.Execute(context.Background(), ApproveRequestInput{
 		GroupID:     "g1",
 		RequestID:   "nonexistent",
-		CurrentUser: currentUser("lead-id", shared.RoleContestant),
+		CurrentUser: asContestant("lead-id"),
 	})
 	ae, ok := err.(*apperror.AppError)
 	if !ok || ae.Code != domainGroup.ErrCodeRequestNotFound {
@@ -76,13 +63,13 @@ func TestApproveRequest_RequestNotFoundReturns404(t *testing.T) {
 
 func TestApproveRequest_WrongGroupIDReturns404(t *testing.T) {
 	req := pendingRequest("r1", "other-group", "requester-id")
-	reqRepo := &fakeJoinRequestRepo{requests: []*domainGroup.JoinRequest{req}}
-	uc := newApproveUC(leadMemberRepo("g1", "lead-id"), reqRepo)
+	reqRepo := &mockJoinRequestRepository{requests: []*domainGroup.JoinRequest{req}}
+	uc := newApproveRequestUseCase(leadMemberRepo("g1", "lead-id"), reqRepo)
 
 	_, err := uc.Execute(context.Background(), ApproveRequestInput{
 		GroupID:     "g1",
 		RequestID:   "r1",
-		CurrentUser: currentUser("lead-id", shared.RoleContestant),
+		CurrentUser: asContestant("lead-id"),
 	})
 	ae, ok := err.(*apperror.AppError)
 	if !ok || ae.Code != domainGroup.ErrCodeRequestNotFound {
@@ -93,13 +80,13 @@ func TestApproveRequest_WrongGroupIDReturns404(t *testing.T) {
 func TestApproveRequest_AlreadyProcessedReturns400(t *testing.T) {
 	req := pendingRequest("r1", "g1", "requester-id")
 	_ = req.Reject()
-	reqRepo := &fakeJoinRequestRepo{requests: []*domainGroup.JoinRequest{req}}
-	uc := newApproveUC(leadMemberRepo("g1", "lead-id"), reqRepo)
+	reqRepo := &mockJoinRequestRepository{requests: []*domainGroup.JoinRequest{req}}
+	uc := newApproveRequestUseCase(leadMemberRepo("g1", "lead-id"), reqRepo)
 
 	_, err := uc.Execute(context.Background(), ApproveRequestInput{
 		GroupID:     "g1",
 		RequestID:   "r1",
-		CurrentUser: currentUser("lead-id", shared.RoleContestant),
+		CurrentUser: asContestant("lead-id"),
 	})
 	ae, ok := err.(*apperror.AppError)
 	if !ok || ae.Code != domainGroup.ErrCodeRequestAlreadyProcessed {
@@ -109,14 +96,14 @@ func TestApproveRequest_AlreadyProcessedReturns400(t *testing.T) {
 
 func TestApproveRequest_SuccessCreatesMembership(t *testing.T) {
 	req := pendingRequest("r1", "g1", "requester-id")
-	reqRepo := &fakeJoinRequestRepo{requests: []*domainGroup.JoinRequest{req}}
+	reqRepo := &mockJoinRequestRepository{requests: []*domainGroup.JoinRequest{req}}
 	memberRepo := leadMemberRepo("g1", "lead-id")
-	uc := newApproveUC(memberRepo, reqRepo)
+	uc := newApproveRequestUseCase(memberRepo, reqRepo)
 
 	out, err := uc.Execute(context.Background(), ApproveRequestInput{
 		GroupID:     "g1",
 		RequestID:   "r1",
-		CurrentUser: currentUser("lead-id", shared.RoleContestant),
+		CurrentUser: asContestant("lead-id"),
 	})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -134,7 +121,7 @@ func TestApproveRequest_SuccessCreatesMembership(t *testing.T) {
 
 func TestApproveRequest_AlreadyMemberReturns409(t *testing.T) {
 	req := pendingRequest("r1", "g1", "requester-id")
-	reqRepo := &fakeJoinRequestRepo{requests: []*domainGroup.JoinRequest{req}}
+	reqRepo := &mockJoinRequestRepository{requests: []*domainGroup.JoinRequest{req}}
 
 	requesterUID := shared.RestoreUserID("requester-id")
 	existingMember, _ := domainGroup.NewGroupMember("m-existing", "g1", requesterUID, domainGroup.MemberRoleMember, testNow)
@@ -142,12 +129,12 @@ func TestApproveRequest_AlreadyMemberReturns409(t *testing.T) {
 	memberRepo := leadMemberRepo("g1", "lead-id")
 	memberRepo.memberships[keyOf("g1", requesterUID)] = existingMember
 
-	uc := newApproveUC(memberRepo, reqRepo)
+	uc := newApproveRequestUseCase(memberRepo, reqRepo)
 
 	_, err := uc.Execute(context.Background(), ApproveRequestInput{
 		GroupID:     "g1",
 		RequestID:   "r1",
-		CurrentUser: currentUser("lead-id", shared.RoleContestant),
+		CurrentUser: asContestant("lead-id"),
 	})
 	ae, ok := err.(*apperror.AppError)
 	if !ok || ae.Code != domainGroup.ErrCodeAlreadyMember {

@@ -5,16 +5,15 @@ import (
 	"testing"
 
 	domainGroup "github.com/training-judge-center/backend/internal/domain/group"
-	"github.com/training-judge-center/backend/internal/domain/shared"
 	"github.com/training-judge-center/backend/pkg/apperror"
 )
 
 func TestCancelMyRequest_NoRequestReturns404(t *testing.T) {
-	uc := NewCancelMyRequestUseCase(&fakeJoinRequestRepo{})
+	uc := NewCancelMyRequestUseCase(&mockJoinRequestRepository{})
 
 	err := uc.Execute(context.Background(), CancelMyRequestInput{
 		GroupID:     "g1",
-		CurrentUser: currentUser("u1", shared.RoleContestant),
+		CurrentUser: asContestant("u1"),
 	})
 	ae, ok := err.(*apperror.AppError)
 	if !ok || ae.Code != domainGroup.ErrCodeRequestNotFound {
@@ -25,12 +24,12 @@ func TestCancelMyRequest_NoRequestReturns404(t *testing.T) {
 func TestCancelMyRequest_AlreadyProcessedReturns400(t *testing.T) {
 	req := mustJoinRequest(t, "r1", "g1", "u1")
 	_ = req.Approve()
-	reqRepo := &fakeJoinRequestRepo{requests: []*domainGroup.JoinRequest{req}}
+	reqRepo := &mockJoinRequestRepository{requests: []*domainGroup.JoinRequest{req}}
 	uc := NewCancelMyRequestUseCase(reqRepo)
 
 	err := uc.Execute(context.Background(), CancelMyRequestInput{
 		GroupID:     "g1",
-		CurrentUser: currentUser("u1", shared.RoleContestant),
+		CurrentUser: asContestant("u1"),
 	})
 	ae, ok := err.(*apperror.AppError)
 	if !ok || ae.Code != domainGroup.ErrCodeRequestAlreadyProcessed {
@@ -40,12 +39,12 @@ func TestCancelMyRequest_AlreadyProcessedReturns400(t *testing.T) {
 
 func TestCancelMyRequest_DeletesPendingRequest(t *testing.T) {
 	req := mustJoinRequest(t, "r1", "g1", "u1")
-	reqRepo := &fakeJoinRequestRepo{requests: []*domainGroup.JoinRequest{req}}
+	reqRepo := &mockJoinRequestRepository{requests: []*domainGroup.JoinRequest{req}}
 	uc := NewCancelMyRequestUseCase(reqRepo)
 
 	err := uc.Execute(context.Background(), CancelMyRequestInput{
 		GroupID:     "g1",
-		CurrentUser: currentUser("u1", shared.RoleContestant),
+		CurrentUser: asContestant("u1"),
 	})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)

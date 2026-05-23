@@ -5,23 +5,22 @@ import (
 	"testing"
 
 	domainGroup "github.com/training-judge-center/backend/internal/domain/group"
-	"github.com/training-judge-center/backend/internal/domain/shared"
 	"github.com/training-judge-center/backend/pkg/apperror"
 )
 
-func newRejectUC(memberRepo *fakeMemberRepo, reqRepo *fakeJoinRequestRepo) *RejectRequestUseCase {
+func newRejectRequestUseCase(memberRepo *mockMemberRepository, reqRepo *mockJoinRequestRepository) *RejectRequestUseCase {
 	return NewRejectRequestUseCase(memberRepo, reqRepo)
 }
 
 func TestRejectRequest_NonLeadReturns403(t *testing.T) {
 	req := pendingRequest("r1", "g1", "requester-id")
-	reqRepo := &fakeJoinRequestRepo{requests: []*domainGroup.JoinRequest{req}}
-	uc := newRejectUC(&fakeMemberRepo{}, reqRepo)
+	reqRepo := &mockJoinRequestRepository{requests: []*domainGroup.JoinRequest{req}}
+	uc := newRejectRequestUseCase(&mockMemberRepository{}, reqRepo)
 
 	_, err := uc.Execute(context.Background(), RejectRequestInput{
 		GroupID:     "g1",
 		RequestID:   "r1",
-		CurrentUser: currentUser("nobody", shared.RoleContestant),
+		CurrentUser: asContestant("nobody"),
 	})
 	ae, ok := err.(*apperror.AppError)
 	if !ok || ae.Code != ErrCodeInsufficientPermissions {
@@ -31,13 +30,13 @@ func TestRejectRequest_NonLeadReturns403(t *testing.T) {
 
 func TestRejectRequest_AdminCanRejectWithoutMembership(t *testing.T) {
 	req := pendingRequest("r1", "g1", "requester-id")
-	reqRepo := &fakeJoinRequestRepo{requests: []*domainGroup.JoinRequest{req}}
-	uc := newRejectUC(&fakeMemberRepo{}, reqRepo)
+	reqRepo := &mockJoinRequestRepository{requests: []*domainGroup.JoinRequest{req}}
+	uc := newRejectRequestUseCase(&mockMemberRepository{}, reqRepo)
 
 	out, err := uc.Execute(context.Background(), RejectRequestInput{
 		GroupID:     "g1",
 		RequestID:   "r1",
-		CurrentUser: currentUser("admin-id", shared.RoleAdmin),
+		CurrentUser: asAdmin("admin-id"),
 	})
 	if err != nil {
 		t.Fatalf("admin should be able to reject, got: %v", err)
@@ -48,12 +47,12 @@ func TestRejectRequest_AdminCanRejectWithoutMembership(t *testing.T) {
 }
 
 func TestRejectRequest_RequestNotFoundReturns404(t *testing.T) {
-	uc := newRejectUC(leadMemberRepo("g1", "lead-id"), &fakeJoinRequestRepo{})
+	uc := newRejectRequestUseCase(leadMemberRepo("g1", "lead-id"), &mockJoinRequestRepository{})
 
 	_, err := uc.Execute(context.Background(), RejectRequestInput{
 		GroupID:     "g1",
 		RequestID:   "nonexistent",
-		CurrentUser: currentUser("lead-id", shared.RoleContestant),
+		CurrentUser: asContestant("lead-id"),
 	})
 	ae, ok := err.(*apperror.AppError)
 	if !ok || ae.Code != domainGroup.ErrCodeRequestNotFound {
@@ -64,13 +63,13 @@ func TestRejectRequest_RequestNotFoundReturns404(t *testing.T) {
 func TestRejectRequest_AlreadyProcessedReturns400(t *testing.T) {
 	req := pendingRequest("r1", "g1", "requester-id")
 	_ = req.Approve()
-	reqRepo := &fakeJoinRequestRepo{requests: []*domainGroup.JoinRequest{req}}
-	uc := newRejectUC(leadMemberRepo("g1", "lead-id"), reqRepo)
+	reqRepo := &mockJoinRequestRepository{requests: []*domainGroup.JoinRequest{req}}
+	uc := newRejectRequestUseCase(leadMemberRepo("g1", "lead-id"), reqRepo)
 
 	_, err := uc.Execute(context.Background(), RejectRequestInput{
 		GroupID:     "g1",
 		RequestID:   "r1",
-		CurrentUser: currentUser("lead-id", shared.RoleContestant),
+		CurrentUser: asContestant("lead-id"),
 	})
 	ae, ok := err.(*apperror.AppError)
 	if !ok || ae.Code != domainGroup.ErrCodeRequestAlreadyProcessed {
@@ -80,13 +79,13 @@ func TestRejectRequest_AlreadyProcessedReturns400(t *testing.T) {
 
 func TestRejectRequest_SuccessUpdatesStatus(t *testing.T) {
 	req := pendingRequest("r1", "g1", "requester-id")
-	reqRepo := &fakeJoinRequestRepo{requests: []*domainGroup.JoinRequest{req}}
-	uc := newRejectUC(leadMemberRepo("g1", "lead-id"), reqRepo)
+	reqRepo := &mockJoinRequestRepository{requests: []*domainGroup.JoinRequest{req}}
+	uc := newRejectRequestUseCase(leadMemberRepo("g1", "lead-id"), reqRepo)
 
 	out, err := uc.Execute(context.Background(), RejectRequestInput{
 		GroupID:     "g1",
 		RequestID:   "r1",
-		CurrentUser: currentUser("lead-id", shared.RoleContestant),
+		CurrentUser: asContestant("lead-id"),
 	})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)

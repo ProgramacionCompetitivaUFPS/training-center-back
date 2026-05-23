@@ -16,11 +16,11 @@ func openGroup(t *testing.T) *domainGroup.Group {
 }
 
 func TestJoinGroup_EmptyGroupIDReturnsValidationError(t *testing.T) {
-	uc := NewJoinGroupUseCase(&fakeRepo{}, &fakeMemberRepo{})
+	uc := NewJoinGroupUseCase(&mockGroupRepository{}, &mockMemberRepository{})
 
 	_, err := uc.Execute(context.Background(), JoinGroupInput{
 		GroupID:     "",
-		CurrentUser: currentUser("u1", shared.RoleContestant),
+		CurrentUser: asContestant("u1"),
 	})
 
 	ae, ok := err.(*apperror.AppError)
@@ -33,11 +33,11 @@ func TestJoinGroup_EmptyGroupIDReturnsValidationError(t *testing.T) {
 }
 
 func TestJoinGroup_GroupNotFoundReturns404(t *testing.T) {
-	uc := NewJoinGroupUseCase(&fakeRepo{}, &fakeMemberRepo{})
+	uc := NewJoinGroupUseCase(&mockGroupRepository{}, &mockMemberRepository{})
 
 	_, err := uc.Execute(context.Background(), JoinGroupInput{
 		GroupID:     "nonexistent",
-		CurrentUser: currentUser("u1", shared.RoleContestant),
+		CurrentUser: asContestant("u1"),
 	})
 
 	ae, ok := err.(*apperror.AppError)
@@ -48,11 +48,11 @@ func TestJoinGroup_GroupNotFoundReturns404(t *testing.T) {
 
 func TestJoinGroup_InvitePolicyReturns403(t *testing.T) {
 	g := mustGroup(t, "g1", "Invite Club", domainGroup.VisibilityVisible, domainGroup.JoinPolicyInvite)
-	uc := NewJoinGroupUseCase(&fakeRepo{groups: []*domainGroup.Group{g}}, &fakeMemberRepo{})
+	uc := NewJoinGroupUseCase(&mockGroupRepository{groups: []*domainGroup.Group{g}}, &mockMemberRepository{})
 
 	_, err := uc.Execute(context.Background(), JoinGroupInput{
 		GroupID:     "g1",
-		CurrentUser: currentUser("u1", shared.RoleContestant),
+		CurrentUser: asContestant("u1"),
 	})
 
 	ae, ok := err.(*apperror.AppError)
@@ -66,11 +66,11 @@ func TestJoinGroup_InvitePolicyReturns403(t *testing.T) {
 
 func TestJoinGroup_RequestPolicyReturns403(t *testing.T) {
 	g := mustGroup(t, "g1", "Request Club", domainGroup.VisibilityVisible, domainGroup.JoinPolicyRequest)
-	uc := NewJoinGroupUseCase(&fakeRepo{groups: []*domainGroup.Group{g}}, &fakeMemberRepo{})
+	uc := NewJoinGroupUseCase(&mockGroupRepository{groups: []*domainGroup.Group{g}}, &mockMemberRepository{})
 
 	_, err := uc.Execute(context.Background(), JoinGroupInput{
 		GroupID:     "g1",
-		CurrentUser: currentUser("u1", shared.RoleContestant),
+		CurrentUser: asContestant("u1"),
 	})
 
 	ae, ok := err.(*apperror.AppError)
@@ -83,16 +83,16 @@ func TestJoinGroup_AlreadyMemberReturns409(t *testing.T) {
 	g := openGroup(t)
 	userID := shared.RestoreUserID("u1")
 	existingMember := domainGroup.RestoreGroupMember("m1", "g1", userID, domainGroup.MemberRoleMember, testNow)
-	memberRepo := &fakeMemberRepo{
+	memberRepo := &mockMemberRepository{
 		memberships: map[string]*domainGroup.GroupMember{
 			keyOf("g1", userID): existingMember,
 		},
 	}
-	uc := NewJoinGroupUseCase(&fakeRepo{groups: []*domainGroup.Group{g}}, memberRepo)
+	uc := NewJoinGroupUseCase(&mockGroupRepository{groups: []*domainGroup.Group{g}}, memberRepo)
 
 	_, err := uc.Execute(context.Background(), JoinGroupInput{
 		GroupID:     "g1",
-		CurrentUser: currentUser("u1", shared.RoleContestant),
+		CurrentUser: asContestant("u1"),
 	})
 
 	ae, ok := err.(*apperror.AppError)
@@ -106,12 +106,12 @@ func TestJoinGroup_AlreadyMemberReturns409(t *testing.T) {
 
 func TestJoinGroup_SuccessSavesMemberWithRoleMember(t *testing.T) {
 	g := openGroup(t)
-	memberRepo := &fakeMemberRepo{}
-	uc := NewJoinGroupUseCase(&fakeRepo{groups: []*domainGroup.Group{g}}, memberRepo)
+	memberRepo := &mockMemberRepository{}
+	uc := NewJoinGroupUseCase(&mockGroupRepository{groups: []*domainGroup.Group{g}}, memberRepo)
 
 	out, err := uc.Execute(context.Background(), JoinGroupInput{
 		GroupID:     "g1",
-		CurrentUser: currentUser("u1", shared.RoleContestant),
+		CurrentUser: asContestant("u1"),
 	})
 
 	if err != nil {
@@ -127,12 +127,12 @@ func TestJoinGroup_SuccessSavesMemberWithRoleMember(t *testing.T) {
 
 func TestJoinGroup_SaveFailurePropagatesError(t *testing.T) {
 	g := openGroup(t)
-	memberRepo := &fakeMemberRepo{saveErr: errors.New("db failure")}
-	uc := NewJoinGroupUseCase(&fakeRepo{groups: []*domainGroup.Group{g}}, memberRepo)
+	memberRepo := &mockMemberRepository{saveErr: errors.New("db failure")}
+	uc := NewJoinGroupUseCase(&mockGroupRepository{groups: []*domainGroup.Group{g}}, memberRepo)
 
 	_, err := uc.Execute(context.Background(), JoinGroupInput{
 		GroupID:     "g1",
-		CurrentUser: currentUser("u1", shared.RoleContestant),
+		CurrentUser: asContestant("u1"),
 	})
 
 	if err == nil {
@@ -142,12 +142,12 @@ func TestJoinGroup_SaveFailurePropagatesError(t *testing.T) {
 
 func TestJoinGroup_FindMemberErrorPropagates(t *testing.T) {
 	g := openGroup(t)
-	memberRepo := &fakeMemberRepo{findByGroupAndUserErr: errors.New("db timeout")}
-	uc := NewJoinGroupUseCase(&fakeRepo{groups: []*domainGroup.Group{g}}, memberRepo)
+	memberRepo := &mockMemberRepository{findByGroupAndUserErr: errors.New("db timeout")}
+	uc := NewJoinGroupUseCase(&mockGroupRepository{groups: []*domainGroup.Group{g}}, memberRepo)
 
 	_, err := uc.Execute(context.Background(), JoinGroupInput{
 		GroupID:     "g1",
-		CurrentUser: currentUser("u1", shared.RoleContestant),
+		CurrentUser: asContestant("u1"),
 	})
 
 	if err == nil {
