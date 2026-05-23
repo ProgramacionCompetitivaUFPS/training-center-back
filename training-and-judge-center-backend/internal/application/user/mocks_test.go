@@ -185,3 +185,89 @@ func (m *mockTransactionManager) WithTx(ctx context.Context, fn func(txCtx conte
 	}
 	return fn(ctx)
 }
+
+// ── mockDeactivationRepo ──────────────────────────────────────────────────────
+
+type mockDeactivationRepo struct {
+	saveFn                      func(ctx context.Context, req *domain.DeactivationRequest) error
+	findByIDFn                  func(ctx context.Context, id string) (*domain.DeactivationRequest, error)
+	updateFn                    func(ctx context.Context, req *domain.DeactivationRequest) error
+	findPendingByUserIDFn       func(ctx context.Context, userID string) (*domain.DeactivationRequest, error)
+	invalidatePendingByUserIDFn func(ctx context.Context, userID string, now time.Time) error
+}
+
+func (m *mockDeactivationRepo) Save(ctx context.Context, req *domain.DeactivationRequest) error {
+	if m.saveFn != nil {
+		return m.saveFn(ctx, req)
+	}
+	return nil
+}
+func (m *mockDeactivationRepo) FindByID(ctx context.Context, id string) (*domain.DeactivationRequest, error) {
+	if m.findByIDFn != nil {
+		return m.findByIDFn(ctx, id)
+	}
+	return nil, nil
+}
+func (m *mockDeactivationRepo) Update(ctx context.Context, req *domain.DeactivationRequest) error {
+	if m.updateFn != nil {
+		return m.updateFn(ctx, req)
+	}
+	return nil
+}
+func (m *mockDeactivationRepo) FindPendingByUserID(ctx context.Context, userID string) (*domain.DeactivationRequest, error) {
+	if m.findPendingByUserIDFn != nil {
+		return m.findPendingByUserIDFn(ctx, userID)
+	}
+	return nil, nil
+}
+func (m *mockDeactivationRepo) InvalidatePendingByUserID(ctx context.Context, userID string, now time.Time) error {
+	if m.invalidatePendingByUserIDFn != nil {
+		return m.invalidatePendingByUserIDFn(ctx, userID, now)
+	}
+	return nil
+}
+
+// ── mockPasswordRecoveryRepo ──────────────────────────────────────────────────
+
+type mockPasswordRecoveryRepo struct {
+	saveFn                      func(ctx context.Context, req *domain.PasswordRecoveryRequest) error
+	findByIDFn                  func(ctx context.Context, id string) (*domain.PasswordRecoveryRequest, error)
+	updateFn                    func(ctx context.Context, req *domain.PasswordRecoveryRequest) error
+	findPendingByUserIDFn       func(ctx context.Context, userID string) (*domain.PasswordRecoveryRequest, error)
+	invalidatePendingByUserIDFn func(ctx context.Context, userID string, now time.Time) error
+}
+
+func (m *mockPasswordRecoveryRepo) Save(ctx context.Context, req *domain.PasswordRecoveryRequest) error {
+	if m.saveFn != nil {
+		return m.saveFn(ctx, req)
+	}
+	return nil
+}
+func (m *mockPasswordRecoveryRepo) FindByID(ctx context.Context, id string) (*domain.PasswordRecoveryRequest, error) {
+	if m.findByIDFn != nil {
+		return m.findByIDFn(ctx, id)
+	}
+	return nil, nil
+}
+func (m *mockPasswordRecoveryRepo) Update(ctx context.Context, req *domain.PasswordRecoveryRequest) error {
+	if m.updateFn != nil {
+		return m.updateFn(ctx, req)
+	}
+	return nil
+}
+func (m *mockPasswordRecoveryRepo) FindPendingByUserID(ctx context.Context, userID string) (*domain.PasswordRecoveryRequest, error) {
+	if m.findPendingByUserIDFn != nil {
+		return m.findPendingByUserIDFn(ctx, userID)
+	}
+	return nil, nil
+}
+func (m *mockPasswordRecoveryRepo) InvalidatePendingByUserID(ctx context.Context, userID string, now time.Time) error {
+	if m.invalidatePendingByUserIDFn != nil {
+		return m.invalidatePendingByUserIDFn(ctx, userID, now)
+	}
+	return nil
+}
+
+// ── helpers ───────────────────────────────────────────────────────────────────
+
+func strPtr(s string) *string { return &s }
