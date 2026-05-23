@@ -1,0 +1,11 @@
+language: "go"
+path: "training-and-judge-center-backend"
+reviews:
+  tools:
+    golangci-lint:
+      enabled: true
+      config:
+        linters:
+          disable:
+            - revive
+            - godot
