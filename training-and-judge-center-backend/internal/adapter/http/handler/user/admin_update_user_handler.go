@@ -31,7 +31,7 @@ type adminUpdateUserRequest struct {
 // @Failure      401 {object} apperror.AppError
 // @Failure      403 {object} apperror.AppError
 // @Router       /admin/users/{id} [put]
-func (h *UserHandler) AdminUpdateUser(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) AdminUpdateUser(w http.ResponseWriter, r *http.Request) {
 	targetID := chi.URLParam(r, "id")
 
 	var req adminUpdateUserRequest

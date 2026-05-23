@@ -77,7 +77,7 @@ func main() {
 	slog.Info("redis connected successfully")
 
 	// Problem repositories & settings
-	problemRepo := problem.NewProblemRepository(dbPool)
+	problemRepo := problem.NewRepository(dbPool)
 	settingsProvider, err := platformConfig.NewPlatformSettings(cfg.VirtualObject)
 	if err != nil {
 		slog.Error("invalid platform settings in config", "error", err)
@@ -98,10 +98,10 @@ func main() {
 			os.Exit(1)
 		}
 		slog.Info("using GCS storage backend", "bucket", cfg.GCSBucket)
-		fileStorage = problem.NewGCSProblemFileRepository(gcsClient, cfg.GCSBucket)
+		fileStorage = problem.NewGCSFileRepository(gcsClient, cfg.GCSBucket)
 	default:
 		localDir := cfg.StorageLocalDir
-		localRepo, err := problem.NewLocalStorageRepository(localDir)
+		localRepo, err := problem.NewLocalFileRepository(localDir)
 		if err != nil {
 			slog.Error("failed to create local file storage", "error", err)
 			os.Exit(1)
@@ -117,16 +117,16 @@ func main() {
 		settingsProvider.MaxFileCountSample(),
 		cfg.VirtualObject.LanguageExtensions,
 	)
-	zipParserAdapter := problem.NewICPCParserAdapter(icpcParser)
-	packageParserAdapter := problem.NewICPCPackageParserAdapter(icpcParser)
+	zipParser := problem.NewZipParser(icpcParser)
+	packageParser := problem.NewICPCPackageParser(icpcParser)
 
-	userProvider := problem.NewProblemUserProvider(dbPool)
+	userProvider := problem.NewUserProvider(dbPool)
 
 	// Problem use cases
 	createProblemUseCase := appProblem.NewCreateProblemUseCase(problemRepo, settingsProvider)
-	importProblemUseCase := appProblem.NewImportProblemUseCase(problemRepo, fileStorage, packageParserAdapter, settingsProvider)
+	importProblemUseCase := appProblem.NewImportProblemUseCase(problemRepo, fileStorage, packageParser, settingsProvider)
 	updateProblemUseCase := appProblem.NewUpdateProblemUseCase(problemRepo, settingsProvider)
-	uploadProblemFilesUseCase := appProblem.NewUploadProblemFilesUseCase(problemRepo, fileStorage, zipParserAdapter, settingsProvider)
+	uploadProblemFilesUseCase := appProblem.NewUploadProblemFilesUseCase(problemRepo, fileStorage, zipParser, settingsProvider)
 	deleteProblemFileUseCase := appProblem.NewDeleteProblemFileUseCase(problemRepo, fileStorage)
 	addModifierUseCase := appProblem.NewAddModifierUseCase(problemRepo, userProvider)
 	removeModifierUseCase := appProblem.NewRemoveModifierUseCase(problemRepo)
@@ -156,18 +156,18 @@ func main() {
 	)
 
 	// User platform adapters
-	userRepo := user.NewUserRepository(dbPool)
+	userRepo := user.NewRepository(dbPool)
 	passwordRecoveryRepo := user.NewPasswordRecoveryRepository(dbPool)
 	emailChangeRepo := user.NewEmailChangeRepository(dbPool)
 	deactRepo := user.NewDeactivationRequestRepository(dbPool)
 	auditRepo := user.NewDeactivationAuditLogRepository(dbPool)
 
 	// Infrastructure and cross-cutting services
-	txManager := postgres.NewPostgresTransactionManager(dbPool)
+	txManager := postgres.NewTransactionManager(dbPool)
 	jwtService := auth.NewJWTService(cfg.JWTSecret, cfg.JWTExpirationHours)
 	emailSender := email.NewSMTPSender(cfg.SMTPHost, cfg.SMTPPort, cfg.SMTPUser, cfg.SMTPPassword, cfg.SMTPFrom)
 	redisRateLimiter := ratelimit.NewRedisRateLimiter(redisClient)
-	sessionInvalidator := auth.NewSessionInvalidator(redisClient, time.Duration(cfg.JWTExpirationHours)*time.Hour)
+	sessionInvalidator := auth.NewRedisSessionInvalidator(redisClient, time.Duration(cfg.JWTExpirationHours)*time.Hour)
 
 	// User use cases
 	createUserUC := appuser.NewCreateUserUseCase(userRepo)
@@ -187,16 +187,16 @@ func main() {
 	confirmDeactUC := appuser.NewConfirmDeactivationUseCase(userRepo, deactRepo, auditRepo, emailSender, sessionInvalidator, txManager)
 
 	// Handlers
-	userHandler := handlerUser.NewUserHandler(createUserUC, getMyProfileUC, getUserByNicknameUC, updateUserUC, updatePasswordUC, adminUpdateUserUC, adminDeactivateUserUC, listUsersUC, requestEmailChangeUC, confirmEmailChangeUC, requestPasswordRecoveryUC, resetPasswordUC, requestDeactUC, confirmDeactUC)
+	userHandler := handlerUser.NewHandler(createUserUC, getMyProfileUC, getUserByNicknameUC, updateUserUC, updatePasswordUC, adminUpdateUserUC, adminDeactivateUserUC, listUsersUC, requestEmailChangeUC, confirmEmailChangeUC, requestPasswordRecoveryUC, resetPasswordUC, requestDeactUC, confirmDeactUC)
 	authHandler := handler.NewAuthHandler(loginUC)
 
 	// Group repositories & platform adapters
-	groupRepo := group.NewGroupRepository(dbPool)
+	groupRepo := group.NewRepository(dbPool)
 	groupMemberRepo := group.NewMemberRepository(dbPool)
 	groupUserProvider := group.NewUserProvider(dbPool)
 	groupPrefsReader := group.NewPreferencesReader(dbPool)
 	joinRequestRepo := group.NewJoinRequestRepository(dbPool)
-	groupTxManager := postgres.NewPostgresTransactionManager(dbPool)
+	groupTxManager := postgres.NewTransactionManager(dbPool)
 
 	// Group use cases
 	createGroupUseCase := appGroup.NewCreateGroupUseCase(groupRepo, groupMemberRepo, groupTxManager)
@@ -211,7 +211,7 @@ func main() {
 	getMyRequestUseCase := appGroup.NewGetMyRequestUseCase(joinRequestRepo)
 	cancelMyRequestUseCase := appGroup.NewCancelMyRequestUseCase(joinRequestRepo)
 
-	groupInvitationJWTSvc := auth.NewGroupInvitationJWTService(cfg.JWTSecret)
+	groupInvitationJWTSvc := auth.NewInvitationJWTService(cfg.JWTSecret)
 	generateInviteUseCase := appGroup.NewGenerateInviteUseCase(groupRepo, groupMemberRepo, groupInvitationJWTSvc)
 	acceptInviteUseCase := appGroup.NewAcceptInviteUseCase(groupRepo, groupMemberRepo, groupInvitationJWTSvc)
 
@@ -224,7 +224,7 @@ func main() {
 	)
 
 	// Material platform adapters
-	materialRepo := material.NewMaterialRepository(dbPool)
+	materialRepo := material.NewRepository(dbPool)
 	groupProvider := material.NewGroupProvider(dbPool)
 	groupMemberProvider := material.NewGroupMemberProvider(dbPool)
 	authorProvider := material.NewAuthorProvider(dbPool)
@@ -253,7 +253,7 @@ func main() {
 	contestProblemProvider     := adaptercontest.NewProblemProvider(dbPool)
 	contestOwnerProvider       := adaptercontest.NewOwnerProvider(dbPool)
 	contestParticipantProvider := adaptercontest.NewContestParticipantProvider()
-	contestTxManager           := postgres.NewPostgresTransactionManager(dbPool)
+	contestTxManager           := postgres.NewTransactionManager(dbPool)
 
 	// contest use cases
 	createContestUseCase := appcontest.NewCreateContestUseCase(

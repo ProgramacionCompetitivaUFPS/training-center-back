@@ -14,14 +14,14 @@ import (
 	domainuser "github.com/training-judge-center/backend/internal/domain/user"
 )
 
-// newHandlerWithConfirmEmailChange builds a UserHandler with only confirmEmailChange wired.
-func newHandlerWithConfirmEmailChange(uc *appuser.ConfirmEmailChangeUseCase) *UserHandler {
-	return &UserHandler{confirmEmailChange: uc}
+// newHandlerWithConfirmEmailChange builds a Handler with only confirmEmailChange wired.
+func newHandlerWithConfirmEmailChange(uc *appuser.ConfirmEmailChangeUseCase) *Handler {
+	return &Handler{confirmEmailChange: uc}
 }
 
-// newHandlerWithRequestEmailChange builds a UserHandler with only requestEmailChange wired.
-func newHandlerWithRequestEmailChange(uc *appuser.RequestEmailChangeUseCase) *UserHandler {
-	return &UserHandler{requestEmailChange: uc}
+// newHandlerWithRequestEmailChange builds a Handler with only requestEmailChange wired.
+func newHandlerWithRequestEmailChange(uc *appuser.RequestEmailChangeUseCase) *Handler {
+	return &Handler{requestEmailChange: uc}
 }
 
 // activeUserWithEmail returns a valid ACTIVE user with the given email address.

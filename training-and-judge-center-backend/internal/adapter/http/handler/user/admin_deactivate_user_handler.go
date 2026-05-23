@@ -18,7 +18,7 @@ import (
 // @Failure      401 {object} apperror.AppError
 // @Failure      403 {object} apperror.AppError
 // @Router       /admin/users/{id}/deactivate [post]
-func (h *UserHandler) AdminDeactivateUser(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) AdminDeactivateUser(w http.ResponseWriter, r *http.Request) {
 	claims := middleware.GetClaims(r.Context())
 	if claims == nil {
 		handler.WriteJSON(r.Context(), w, http.StatusUnauthorized, map[string]string{

@@ -49,7 +49,7 @@ type listUsersResponse struct {
 // @Failure      401 {object} apperror.AppError
 // @Failure      403 {object} apperror.AppError
 // @Router       /admin/users [get]
-func (h *UserHandler) ListUsers(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) ListUsers(w http.ResponseWriter, r *http.Request) {
 	q := r.URL.Query()
 
 	var roles []string

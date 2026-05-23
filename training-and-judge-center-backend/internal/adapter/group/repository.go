@@ -19,15 +19,15 @@ import (
 	"github.com/training-judge-center/backend/pkg/apperror"
 )
 
-type GroupRepository struct {
+type Repository struct {
 	db *pgxpool.Pool
 }
 
-func NewGroupRepository(db *pgxpool.Pool) *GroupRepository {
-	return &GroupRepository{db: db}
+func NewRepository(db *pgxpool.Pool) *Repository {
+	return &Repository{db: db}
 }
 
-func (r *GroupRepository) Save(ctx context.Context, g *domainGroup.Group) error {
+func (r *Repository) Save(ctx context.Context, g *domainGroup.Group) error {
 	query := `
 		INSERT INTO groups (
 			id, name, description, visibility, join_policy,
@@ -58,7 +58,7 @@ func (r *GroupRepository) Save(ctx context.Context, g *domainGroup.Group) error 
 	return nil
 }
 
-func (r *GroupRepository) FindByID(ctx context.Context, id string) (*domainGroup.Group, error) {
+func (r *Repository) FindByID(ctx context.Context, id string) (*domainGroup.Group, error) {
 	const q = `
 		SELECT id, name, description, visibility, join_policy, is_default,
 		       created_by, created_at, updated_at
@@ -76,7 +76,7 @@ func (r *GroupRepository) FindByID(ctx context.Context, id string) (*domainGroup
 	return g, nil
 }
 
-func (r *GroupRepository) ExistsByName(ctx context.Context, name domainGroup.GroupName) (bool, error) {
+func (r *Repository) ExistsByName(ctx context.Context, name domainGroup.GroupName) (bool, error) {
 	var exists bool
 	err := r.db.QueryRow(ctx,
 		`SELECT EXISTS(SELECT 1 FROM groups WHERE LOWER(name) = LOWER($1))`,
@@ -89,7 +89,7 @@ func (r *GroupRepository) ExistsByName(ctx context.Context, name domainGroup.Gro
 	return exists, nil
 }
 
-func (r *GroupRepository) FindDefault(ctx context.Context) (*domainGroup.Group, error) {
+func (r *Repository) FindDefault(ctx context.Context) (*domainGroup.Group, error) {
 	row := r.db.QueryRow(ctx, `
 		SELECT id, name, description, visibility, join_policy,
 		       is_default, created_by, created_at, updated_at
@@ -108,7 +108,7 @@ func (r *GroupRepository) FindDefault(ctx context.Context) (*domainGroup.Group, 
 	return g, nil
 }
 
-func (r *GroupRepository) Delete(ctx context.Context, id string) error {
+func (r *Repository) Delete(ctx context.Context, id string) error {
 	tag, err := r.db.Exec(ctx, `DELETE FROM groups WHERE id = $1`, id)
 	if err != nil {
 		slog.ErrorContext(ctx, "failed to delete group", "error", err, "group_id", id)
@@ -120,7 +120,7 @@ func (r *GroupRepository) Delete(ctx context.Context, id string) error {
 	return nil
 }
 
-func (r *GroupRepository) List(ctx context.Context, filters domainGroup.ListFilters) ([]*domainGroup.Group, int, error) {
+func (r *Repository) List(ctx context.Context, filters domainGroup.ListFilters) ([]*domainGroup.Group, int, error) {
 	var conds []string
 	var args []any
 	idx := 1

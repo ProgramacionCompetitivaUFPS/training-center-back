@@ -21,7 +21,7 @@ type requestPasswordRecoveryBody struct {
 // @Failure      400 {object} apperror.AppError
 // @Failure      500 {object} apperror.AppError
 // @Router       /password/forgot [post]
-func (h *UserHandler) RequestPasswordRecovery(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) RequestPasswordRecovery(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	var body requestPasswordRecoveryBody
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {

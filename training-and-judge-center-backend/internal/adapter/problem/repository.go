@@ -19,15 +19,15 @@ import (
 	"github.com/training-judge-center/backend/pkg/apperror"
 )
 
-type ProblemRepository struct {
+type Repository struct {
 	db *pgxpool.Pool
 }
 
-func NewProblemRepository(db *pgxpool.Pool) *ProblemRepository {
-	return &ProblemRepository{db: db}
+func NewRepository(db *pgxpool.Pool) *Repository {
+	return &Repository{db: db}
 }
 
-func (r *ProblemRepository) Save(ctx context.Context, p *domainProblem.Problem) error {
+func (r *Repository) Save(ctx context.Context, p *domainProblem.Problem) error {
 	query := `
 		INSERT INTO problems (
 			id, slug, title, statement, time_limit, memory_limit,
@@ -135,7 +135,7 @@ func (r *ProblemRepository) Save(ctx context.Context, p *domainProblem.Problem) 
 	return nil
 }
 
-func (r *ProblemRepository) FindBySlug(ctx context.Context, slug domainProblem.Slug) (*domainProblem.Problem, error) {
+func (r *Repository) FindBySlug(ctx context.Context, slug domainProblem.Slug) (*domainProblem.Problem, error) {
 	query := `
 		SELECT id, slug, title, statement, time_limit, memory_limit,
 			tags, status, accessibility, author_id, modifiers_ids, lang_overrides,
@@ -235,7 +235,7 @@ func scanProblem(ctx context.Context, row pgx.Row) (*domainProblem.Problem, erro
 	), nil
 }
 
-func (r *ProblemRepository) ExistsBySlug(ctx context.Context, slug domainProblem.Slug) (bool, error) {
+func (r *Repository) ExistsBySlug(ctx context.Context, slug domainProblem.Slug) (bool, error) {
 	query := `SELECT EXISTS(SELECT 1 FROM problems WHERE slug = $1)`
 
 	var exists bool
@@ -337,7 +337,7 @@ func judgingFileFromDB(data []byte) (*domainProblem.JudgingFile, error) {
 	return &j, nil
 }
 
-func (r *ProblemRepository) Delete(ctx context.Context, id string) error {
+func (r *Repository) Delete(ctx context.Context, id string) error {
 	tag, err := r.db.Exec(ctx, `DELETE FROM problems WHERE id = $1`, id)
 	if err != nil {
 		slog.ErrorContext(ctx, "Database error in Delete", "error", err, "problem_id", id)
@@ -349,7 +349,7 @@ func (r *ProblemRepository) Delete(ctx context.Context, id string) error {
 	return nil
 }
 
-func (r *ProblemRepository) List(ctx context.Context, filters domainProblem.ListFilters) ([]*domainProblem.Problem, int, error) {
+func (r *Repository) List(ctx context.Context, filters domainProblem.ListFilters) ([]*domainProblem.Problem, int, error) {
 	var conds []string
 	var args []any
 	idx := 1

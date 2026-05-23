@@ -12,21 +12,21 @@ import (
 	"google.golang.org/api/iterator"
 )
 
-type GCSProblemFileRepository struct {
+type GCSFileRepository struct {
 	client *storage.Client
 	bucket string
 }
 
-var _ appProblem.ProblemFileRepository = (*GCSProblemFileRepository)(nil)
+var _ appProblem.ProblemFileRepository = (*GCSFileRepository)(nil)
 
-func NewGCSProblemFileRepository(client *storage.Client, bucketName string) *GCSProblemFileRepository {
-	return &GCSProblemFileRepository{
+func NewGCSFileRepository(client *storage.Client, bucketName string) *GCSFileRepository {
+	return &GCSFileRepository{
 		client: client,
 		bucket: bucketName,
 	}
 }
 
-func (r *GCSProblemFileRepository) UploadFile(ctx context.Context, path string, content []byte) error {
+func (r *GCSFileRepository) UploadFile(ctx context.Context, path string, content []byte) error {
 	obj := r.client.Bucket(r.bucket).Object(path)
 	writer := obj.NewWriter(ctx)
 
@@ -44,7 +44,7 @@ func (r *GCSProblemFileRepository) UploadFile(ctx context.Context, path string, 
 	return nil
 }
 
-func (r *GCSProblemFileRepository) DeleteFile(ctx context.Context, path string) error {
+func (r *GCSFileRepository) DeleteFile(ctx context.Context, path string) error {
 	obj := r.client.Bucket(r.bucket).Object(path)
 	if err := obj.Delete(ctx); err != nil {
 		if errors.Is(err, storage.ErrObjectNotExist) {
@@ -55,7 +55,7 @@ func (r *GCSProblemFileRepository) DeleteFile(ctx context.Context, path string) 
 	return nil
 }
 
-func (r *GCSProblemFileRepository) DeleteFilesWithPrefix(ctx context.Context, prefix string) error {
+func (r *GCSFileRepository) DeleteFilesWithPrefix(ctx context.Context, prefix string) error {
 	it := r.client.Bucket(r.bucket).Objects(ctx, &storage.Query{Prefix: prefix})
 
 	var names []string

@@ -25,7 +25,7 @@ type requestEmailChangeBody struct {
 // @Failure      400 {object} apperror.AppError
 // @Failure      401 {object} apperror.AppError
 // @Router       /users/email-change/request [post]
-func (h *UserHandler) RequestEmailChange(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) RequestEmailChange(w http.ResponseWriter, r *http.Request) {
 	claims := middleware.GetClaims(r.Context())
 	if claims == nil {
 		handler.WriteJSON(r.Context(), w, http.StatusUnauthorized, map[string]string{
@@ -89,7 +89,7 @@ type confirmEmailChangeBody struct {
 // @Failure      400 {object} apperror.AppError
 // @Failure      401 {object} apperror.AppError
 // @Router       /users/email-change/confirm [post]
-func (h *UserHandler) ConfirmEmailChange(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) ConfirmEmailChange(w http.ResponseWriter, r *http.Request) {
 	claims := middleware.GetClaims(r.Context())
 	if claims == nil {
 		handler.WriteJSON(r.Context(), w, http.StatusUnauthorized, map[string]string{

@@ -10,15 +10,15 @@ import (
 	appProblem "github.com/training-judge-center/backend/internal/application/problem"
 )
 
-type ProblemUserProvider struct {
+type UserProvider struct {
 	db *pgxpool.Pool
 }
 
-func NewProblemUserProvider(db *pgxpool.Pool) *ProblemUserProvider {
-	return &ProblemUserProvider{db: db}
+func NewUserProvider(db *pgxpool.Pool) *UserProvider {
+	return &UserProvider{db: db}
 }
 
-func (p *ProblemUserProvider) ExistsByID(ctx context.Context, userID string) (bool, error) {
+func (p *UserProvider) ExistsByID(ctx context.Context, userID string) (bool, error) {
 	var exists bool
 	err := p.db.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM users WHERE id = $1)`, userID).Scan(&exists)
 	if err != nil {
@@ -27,7 +27,7 @@ func (p *ProblemUserProvider) ExistsByID(ctx context.Context, userID string) (bo
 	return exists, nil
 }
 
-func (p *ProblemUserProvider) GetDisplay(ctx context.Context, userID string) (*appProblem.UserDisplay, error) {
+func (p *UserProvider) GetDisplay(ctx context.Context, userID string) (*appProblem.UserDisplay, error) {
 	var nickname, name string
 	err := p.db.QueryRow(ctx, `SELECT nickname, name FROM users WHERE id = $1`, userID).Scan(&nickname, &name)
 	if err != nil {
@@ -39,7 +39,7 @@ func (p *ProblemUserProvider) GetDisplay(ctx context.Context, userID string) (*a
 	return &appProblem.UserDisplay{Nickname: nickname, Name: name}, nil
 }
 
-func (p *ProblemUserProvider) GetDisplays(ctx context.Context, userIDs []string) (map[string]*appProblem.UserDisplay, error) {
+func (p *UserProvider) GetDisplays(ctx context.Context, userIDs []string) (map[string]*appProblem.UserDisplay, error) {
 	if len(userIDs) == 0 {
 		return map[string]*appProblem.UserDisplay{}, nil
 	}
@@ -60,7 +60,7 @@ func (p *ProblemUserProvider) GetDisplays(ctx context.Context, userIDs []string)
 	return result, rows.Err()
 }
 
-func (p *ProblemUserProvider) GetIDByNickname(ctx context.Context, nickname string) (string, bool, error) {
+func (p *UserProvider) GetIDByNickname(ctx context.Context, nickname string) (string, bool, error) {
 	var id string
 	err := p.db.QueryRow(ctx, `SELECT id FROM users WHERE LOWER(nickname) = LOWER($1)`, nickname).Scan(&id)
 	if err != nil {

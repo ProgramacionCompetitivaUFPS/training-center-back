@@ -22,7 +22,7 @@ type resetPasswordBody struct {
 // @Success      200 {object} map[string]string
 // @Failure      400 {object} apperror.AppError
 // @Router       /password/reset [post]
-func (h *UserHandler) ResetPassword(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) ResetPassword(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	var body resetPasswordBody
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {

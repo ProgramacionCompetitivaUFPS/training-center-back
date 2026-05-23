@@ -8,16 +8,16 @@ import (
 	"github.com/redis/go-redis/v9"
 )
 
-type SessionInvalidator struct {
+type RedisSessionInvalidator struct {
 	client   *redis.Client
 	tokenTTL time.Duration
 }
 
-func NewSessionInvalidator(client *redis.Client, tokenTTL time.Duration) *SessionInvalidator {
-	return &SessionInvalidator{client: client, tokenTTL: tokenTTL}
+func NewRedisSessionInvalidator(client *redis.Client, tokenTTL time.Duration) *RedisSessionInvalidator {
+	return &RedisSessionInvalidator{client: client, tokenTTL: tokenTTL}
 }
 
-func (s *SessionInvalidator) InvalidateAllUserSessions(ctx context.Context, userID string, timestamp time.Time) error {
+func (s *RedisSessionInvalidator) InvalidateAllUserSessions(ctx context.Context, userID string, timestamp time.Time) error {
 	key := fmt.Sprintf("revoked_sessions:%s", userID)
 	// TTL matches the JWT expiration so the revocation key outlives any token it covers.
 	err := s.client.Set(ctx, key, timestamp.Unix(), s.tokenTTL).Err()
@@ -27,7 +27,7 @@ func (s *SessionInvalidator) InvalidateAllUserSessions(ctx context.Context, user
 	return nil
 }
 
-func (s *SessionInvalidator) IsSessionRevoked(ctx context.Context, userID string, tokenIssuedAt time.Time) (bool, error) {
+func (s *RedisSessionInvalidator) IsSessionRevoked(ctx context.Context, userID string, tokenIssuedAt time.Time) (bool, error) {
 	key := fmt.Sprintf("revoked_sessions:%s", userID)
 
 	val, err := s.client.Get(ctx, key).Int64()
