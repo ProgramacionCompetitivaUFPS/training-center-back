@@ -551,8 +551,8 @@ func TestListMaterials_ValidRequest_Returns200WithPagination(t *testing.T) {
 	if resp.Materials == nil {
 		t.Error("expected materials array, got nil")
 	}
-	if resp.Pagination.ItemsPerPage != appMaterial.DefaultLimit {
-		t.Errorf("expected itemsPerPage=%d, got %d", appMaterial.DefaultLimit, resp.Pagination.ItemsPerPage)
+	if resp.Pagination.ItemsPerPage != 20 {
+		t.Errorf("expected itemsPerPage=%d, got %d", 20, resp.Pagination.ItemsPerPage)
 	}
 }
 

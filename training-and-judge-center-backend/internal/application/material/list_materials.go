@@ -9,6 +9,8 @@ import (
 	"github.com/training-judge-center/backend/pkg/apperror"
 )
 
+const maxLimit = 100
+
 
 type ListMaterialsInput struct {
 	CurrentUser appshared.CurrentUser
@@ -53,7 +55,7 @@ func NewListMaterialsUseCase(
 }
 
 func (uc *ListMaterialsUseCase) Execute(ctx context.Context, in ListMaterialsInput) (*ListMaterialsOutput, error) {
-	if err := appshared.ValidatePagination(in.Page, in.Limit, MaxLimit); err != nil {
+	if err := appshared.ValidatePagination(in.Page, in.Limit, maxLimit); err != nil {
 		return nil, err
 	}
 
