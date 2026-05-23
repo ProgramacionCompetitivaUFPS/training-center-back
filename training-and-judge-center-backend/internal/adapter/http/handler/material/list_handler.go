@@ -12,6 +12,12 @@ import (
 	"github.com/training-judge-center/backend/pkg/apperror"
 )
 
+const (
+	defaultPage  = 1
+	defaultLimit = 20
+	maxLimit     = 100
+)
+
 // @Summary      List materials
 // @Tags         materials
 // @Produce      json
@@ -94,8 +100,8 @@ func (h *Handler) List(w http.ResponseWriter, r *http.Request) {
 }
 
 func parsePagination(ctx context.Context, w http.ResponseWriter, rawPage, rawLimit string) (page, limit int, ok bool) {
-	page = appMaterial.DefaultPage
-	limit = appMaterial.DefaultLimit
+	page = defaultPage
+	limit = defaultLimit
 
 	if rawPage != "" {
 		v, err := strconv.Atoi(rawPage)
@@ -110,9 +116,9 @@ func parsePagination(ctx context.Context, w http.ResponseWriter, rawPage, rawLim
 
 	if rawLimit != "" {
 		v, err := strconv.Atoi(rawLimit)
-		if err != nil || v < 1 || v > appMaterial.MaxLimit {
+		if err != nil || v < 1 || v > maxLimit {
 			handler.WriteError(ctx, w, apperror.NewValidation([]apperror.FieldError{
-				{Field: "limit", Message: fmt.Sprintf("limit must be between 1 and %d", appMaterial.MaxLimit)},
+				{Field: "limit", Message: fmt.Sprintf("limit must be between 1 and %d", maxLimit)},
 			}))
 			return 0, 0, false
 		}

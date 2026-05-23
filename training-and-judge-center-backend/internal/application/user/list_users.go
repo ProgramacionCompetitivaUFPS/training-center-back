@@ -5,9 +5,16 @@ import (
 	"log/slog"
 	"strings"
 
+	appshared "github.com/training-judge-center/backend/internal/application/shared"
 	"github.com/training-judge-center/backend/internal/domain/shared"
 	"github.com/training-judge-center/backend/internal/domain/user"
 	"github.com/training-judge-center/backend/pkg/apperror"
+)
+
+const (
+	maxPageLimit = 100
+	DefaultPage  = 1
+	DefaultLimit = 20
 )
 
 type ListUsersInput struct {
@@ -108,17 +115,11 @@ func (uc *ListUsersUseCase) Execute(ctx context.Context, input ListUsersInput) (
 		return nil, apperror.NewValidation(fieldErrors)
 	}
 
+	if err := appshared.ValidatePagination(input.Page, input.Limit, maxPageLimit); err != nil {
+		return nil, err
+	}
 	page := input.Page
-	if page < 1 {
-		page = 1
-	}
 	limit := input.Limit
-	if limit < 1 {
-		limit = 20
-	}
-	if limit > 100 {
-		limit = 100
-	}
 
 	builtFilter, err := user.NewUserFilter(
 		roles, status,

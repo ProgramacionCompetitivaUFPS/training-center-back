@@ -33,6 +33,8 @@ func TestListJoinRequests_AdminCanList(t *testing.T) {
 
 	out, err := uc.Execute(context.Background(), ListJoinRequestsInput{
 		GroupID:     "g1",
+		Page:        1,
+		Limit:       20,
 		CurrentUser: currentUser("admin", shared.RoleAdmin),
 	})
 	if err != nil {
@@ -52,6 +54,8 @@ func TestListJoinRequests_DefaultsToStatusPending(t *testing.T) {
 
 	out, err := uc.Execute(context.Background(), ListJoinRequestsInput{
 		GroupID:     "g1",
+		Page:        1,
+		Limit:       20,
 		CurrentUser: currentUser("lead-id", shared.RoleContestant),
 	})
 	if err != nil {

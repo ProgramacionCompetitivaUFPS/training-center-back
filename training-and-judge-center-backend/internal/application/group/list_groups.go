@@ -10,10 +10,6 @@ import (
 	"github.com/training-judge-center/backend/pkg/apperror"
 )
 
-const (
-	MaxPageLimit     = 50
-	DefaultPageLimit = 20
-)
 
 type ListGroupsInput struct {
 	CurrentUser appshared.CurrentUser
@@ -50,7 +46,7 @@ func NewListGroupsUseCase(repo domainGroup.Repository, memberRepo domainGroup.Me
 }
 
 func (uc *ListGroupsUseCase) Execute(ctx context.Context, in ListGroupsInput) (*ListGroupsOutput, error) {
-	if err := validatePagination(in.Page, in.Limit); err != nil {
+	if err := appshared.ValidatePagination(in.Page, in.Limit, maxPageLimit); err != nil {
 		return nil, err
 	}
 
@@ -129,7 +125,7 @@ func (uc *ListGroupsUseCase) Execute(ctx context.Context, in ListGroupsInput) (*
 	return &ListGroupsOutput{
 		Groups:     items,
 		TotalCount: total,
-		TotalPages: calcTotalPages(total, in.Limit),
+		TotalPages: appshared.CalcTotalPages(total, in.Limit),
 		Page:       in.Page,
 		Limit:      in.Limit,
 	}, nil

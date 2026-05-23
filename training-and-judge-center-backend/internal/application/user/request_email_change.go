@@ -2,10 +2,8 @@ package user
 
 import (
 	"context"
-	"crypto/rand"
 	"fmt"
 	"log/slog"
-	"math/big"
 	"time"
 
 	"github.com/google/uuid"
@@ -110,15 +108,4 @@ func (uc *RequestEmailChangeUseCase) Execute(ctx context.Context, input RequestE
 	}
 
 	return &RequestEmailChangeOutput{ExpiresAt: req.ExpiresAt()}, nil
-}
-
-func generateSixDigitCode() (string, error) {
-	// Generate a random number between 0 and 999999
-	max := big.NewInt(1000000)
-	n, err := rand.Int(rand.Reader, max)
-	if err != nil {
-		return "", err
-	}
-	// Format as a 6-digit string with leading zeros
-	return fmt.Sprintf("%06d", n.Int64()), nil
 }

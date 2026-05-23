@@ -8,6 +8,7 @@ import (
 
 	"github.com/training-judge-center/backend/internal/adapter/http/handler"
 	appuser "github.com/training-judge-center/backend/internal/application/user"
+	"github.com/training-judge-center/backend/pkg/apperror"
 )
 
 type listUserItem struct {
@@ -57,8 +58,29 @@ func (h *Handler) ListUsers(w http.ResponseWriter, r *http.Request) {
 		roles = strings.Split(raw, ",")
 	}
 
-	page, _ := strconv.Atoi(q.Get("page"))
-	limit, _ := strconv.Atoi(q.Get("limit"))
+	page := appuser.DefaultPage
+	if raw := q.Get("page"); raw != "" {
+		n, err := strconv.Atoi(raw)
+		if err != nil || n < 1 {
+			handler.WriteError(r.Context(), w, apperror.NewValidation([]apperror.FieldError{
+				{Field: "page", Message: "page must be a positive integer"},
+			}))
+			return
+		}
+		page = n
+	}
+
+	limit := appuser.DefaultLimit
+	if raw := q.Get("limit"); raw != "" {
+		n, err := strconv.Atoi(raw)
+		if err != nil || n < 1 {
+			handler.WriteError(r.Context(), w, apperror.NewValidation([]apperror.FieldError{
+				{Field: "limit", Message: "limit must be a positive integer"},
+			}))
+			return
+		}
+		limit = n
+	}
 
 	input := appuser.ListUsersInput{
 		Roles:       roles,
