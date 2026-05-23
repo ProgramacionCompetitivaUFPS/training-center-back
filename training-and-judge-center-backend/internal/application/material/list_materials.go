@@ -2,19 +2,13 @@
 
 import (
 	"context"
-	"fmt"
 	"log/slog"
 
-	domainMaterial "github.com/training-judge-center/backend/internal/domain/material"
 	appshared "github.com/training-judge-center/backend/internal/application/shared"
+	domainMaterial "github.com/training-judge-center/backend/internal/domain/material"
 	"github.com/training-judge-center/backend/pkg/apperror"
 )
 
-const (
-	DefaultPage  = 1
-	DefaultLimit = 20
-	MaxLimit     = 100
-)
 
 type ListMaterialsInput struct {
 	CurrentUser appshared.CurrentUser
@@ -59,15 +53,8 @@ func NewListMaterialsUseCase(
 }
 
 func (uc *ListMaterialsUseCase) Execute(ctx context.Context, in ListMaterialsInput) (*ListMaterialsOutput, error) {
-	if in.Page < 1 {
-		return nil, apperror.NewValidation([]apperror.FieldError{
-			{Field: "page", Message: "page must be a positive integer"},
-		})
-	}
-	if in.Limit < 1 || in.Limit > MaxLimit {
-		return nil, apperror.NewValidation([]apperror.FieldError{
-			{Field: "limit", Message: fmt.Sprintf("limit must be between 1 and %d", MaxLimit)},
-		})
+	if err := appshared.ValidatePagination(in.Page, in.Limit, MaxLimit); err != nil {
+		return nil, err
 	}
 
 	visibility, exists, err := uc.groupVisibility.FindVisibility(ctx, in.GroupID)
@@ -110,10 +97,7 @@ func (uc *ListMaterialsUseCase) Execute(ctx context.Context, in ListMaterialsInp
 		items = append(items, d)
 	}
 
-	totalPages := total / in.Limit
-	if total%in.Limit != 0 {
-		totalPages++
-	}
+	totalPages := appshared.CalcTotalPages(total, in.Limit)
 
 	return &ListMaterialsOutput{
 		Materials: items,
