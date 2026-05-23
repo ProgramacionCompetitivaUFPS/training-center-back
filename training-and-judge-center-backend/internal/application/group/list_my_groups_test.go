@@ -10,6 +10,10 @@ import (
 	"github.com/training-judge-center/backend/pkg/apperror"
 )
 
+func newListMyGroupsUseCase(repo *mockGroupRepository, memberRepo *mockMemberRepository, prefs *mockPreferencesReader) *ListMyGroupsUseCase {
+	return NewListMyGroupsUseCase(repo, memberRepo, prefs)
+}
+
 func TestListMyGroups_InvalidRoleReturnsValidationError(t *testing.T) {
 	uc := NewListMyGroupsUseCase(&mockGroupRepository{}, &mockMemberRepository{}, &mockPreferencesReader{})
 	role := "OWNER"

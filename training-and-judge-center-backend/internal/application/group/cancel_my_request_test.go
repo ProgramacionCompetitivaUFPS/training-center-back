@@ -8,6 +8,10 @@ import (
 	"github.com/training-judge-center/backend/pkg/apperror"
 )
 
+func newCancelMyRequestUseCase(reqRepo *mockJoinRequestRepository) *CancelMyRequestUseCase {
+	return NewCancelMyRequestUseCase(reqRepo)
+}
+
 func TestCancelMyRequest_NoRequestReturns404(t *testing.T) {
 	uc := NewCancelMyRequestUseCase(&mockJoinRequestRepository{})
 

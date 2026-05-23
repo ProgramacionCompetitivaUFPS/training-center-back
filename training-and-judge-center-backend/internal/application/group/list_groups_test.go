@@ -8,6 +8,10 @@ import (
 	"github.com/training-judge-center/backend/internal/domain/shared"
 )
 
+func newListGroupsUseCase(repo *mockGroupRepository, memberRepo *mockMemberRepository) *ListGroupsUseCase {
+	return NewListGroupsUseCase(repo, memberRepo)
+}
+
 func TestListGroups_PageValidation(t *testing.T) {
 	uc := NewListGroupsUseCase(&mockGroupRepository{}, &mockMemberRepository{})
 	_, err := uc.Execute(context.Background(), ListGroupsInput{

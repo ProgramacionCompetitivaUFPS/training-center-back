@@ -9,6 +9,10 @@ import (
 	"github.com/training-judge-center/backend/pkg/apperror"
 )
 
+func newGenerateInviteUseCase(repo *mockGroupRepository, memberRepo *mockMemberRepository, svc *mockInvitationTokenService) *GenerateInviteUseCase {
+	return NewGenerateInviteUseCase(repo, memberRepo, svc)
+}
+
 // --- helpers ---
 
 func inviteGroup(t *testing.T) *domainGroup.Group {

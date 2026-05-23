@@ -10,6 +10,10 @@ import (
 	"github.com/training-judge-center/backend/pkg/apperror"
 )
 
+func newJoinGroupUseCase(repo *mockGroupRepository, memberRepo *mockMemberRepository) *JoinGroupUseCase {
+	return NewJoinGroupUseCase(repo, memberRepo)
+}
+
 func openGroup(t *testing.T) *domainGroup.Group {
 	t.Helper()
 	return mustGroup(t, "g1", "Open Club", domainGroup.VisibilityVisible, domainGroup.JoinPolicyOpen)
