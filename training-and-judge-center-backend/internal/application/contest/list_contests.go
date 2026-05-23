@@ -11,11 +11,6 @@ import (
 	"github.com/training-judge-center/backend/pkg/apperror"
 )
 
-const (
-	DefaultPage  = 1
-	DefaultLimit = 20
-	MaxLimit     = 100
-)
 
 type ContestListItem struct {
 	ID                string
@@ -90,16 +85,11 @@ func NewListContestsUseCase(
 }
 
 func (uc *ListContestsUseCase) Execute(ctx context.Context, in ListContestsInput) (*ListContestsOutput, error) {
+	if err := appshared.ValidatePagination(in.Page, in.Limit, MaxLimit); err != nil {
+		return nil, err
+	}
 	page := in.Page
-	if page < 1 {
-		page = DefaultPage
-	}
 	limit := in.Limit
-	if limit < 1 {
-		limit = DefaultLimit
-	} else if limit > MaxLimit {
-		limit = MaxLimit
-	}
 
 	group, err := uc.groupProvider.FindByID(ctx, in.GroupID)
 	if err != nil {
@@ -204,10 +194,7 @@ func (uc *ListContestsUseCase) Execute(ctx context.Context, in ListContestsInput
 		})
 	}
 
-	totalPages := total / limit
-	if total%limit != 0 {
-		totalPages++
-	}
+	totalPages := appshared.CalcTotalPages(total, limit)
 
 	return &ListContestsOutput{
 		Items: items,

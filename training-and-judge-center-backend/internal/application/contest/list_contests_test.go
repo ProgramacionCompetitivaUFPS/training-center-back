@@ -115,51 +115,37 @@ func TestListContests_AdminCanListNotVisibleGroup(t *testing.T) {
 	}
 }
 
-func TestListContests_DefaultPageAndLimit(t *testing.T) {
-	var capturedFilters domainContest.ListFilters
-	repo := &mockContestRepository{
-		listFn: func(_ context.Context, f domainContest.ListFilters) ([]*domainContest.Contest, int, error) {
-			capturedFilters = f
-			return []*domainContest.Contest{}, 0, nil
-		},
-	}
-	uc := newListContestsUseCase(repo, groupFound(), isMemberNotLead(), mockParticipants())
+func TestListContests_InvalidPageReturnsError(t *testing.T) {
+	uc := newListContestsUseCase(
+		&mockContestRepository{},
+		groupFound(),
+		isMemberNotLead(),
+		mockParticipants(),
+	)
 
 	in := validListInput()
 	in.Page = 0
-	in.Limit = 0
 
 	_, err := uc.Execute(context.Background(), in)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if capturedFilters.Page != DefaultPage {
-		t.Errorf("expected default page %d, got %d", DefaultPage, capturedFilters.Page)
-	}
-	if capturedFilters.Limit != DefaultLimit {
-		t.Errorf("expected default limit %d, got %d", DefaultLimit, capturedFilters.Limit)
+	if err == nil {
+		t.Fatal("expected error for page=0, got nil")
 	}
 }
 
-func TestListContests_LimitCappedAtMax(t *testing.T) {
-	var capturedFilters domainContest.ListFilters
-	repo := &mockContestRepository{
-		listFn: func(_ context.Context, f domainContest.ListFilters) ([]*domainContest.Contest, int, error) {
-			capturedFilters = f
-			return []*domainContest.Contest{}, 0, nil
-		},
-	}
-	uc := newListContestsUseCase(repo, groupFound(), isMemberNotLead(), mockParticipants())
+func TestListContests_InvalidLimitReturnsError(t *testing.T) {
+	uc := newListContestsUseCase(
+		&mockContestRepository{},
+		groupFound(),
+		isMemberNotLead(),
+		mockParticipants(),
+	)
 
 	in := validListInput()
 	in.Limit = 999
 
 	_, err := uc.Execute(context.Background(), in)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if capturedFilters.Limit != MaxLimit {
-		t.Errorf("expected limit capped at %d, got %d", MaxLimit, capturedFilters.Limit)
+	if err == nil {
+		t.Fatal("expected error for limit=999 (exceeds MaxLimit), got nil")
 	}
 }
 
