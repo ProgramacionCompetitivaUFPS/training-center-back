@@ -1,0 +1,62 @@
+training-and-judge-center-backend/internal/adapter/http/handler/user/request_password_recovery_handler_test.go
+  s_d814095e59d218::t_5f3bd6c334706d 12-14
+training-and-judge-center-backend/internal/adapter/http/handler/user/admin_deactivate_user_handler.go
+  s_d814095e59d218::t_5f3bd6c334706d 21
+training-and-judge-center-backend/internal/adapter/http/handler/user/get_user_profile_handler.go
+  s_d814095e59d218::t_5f3bd6c334706d 39,67
+training-and-judge-center-backend/internal/adapter/http/handler/user/update_password_handler_test.go
+  s_d814095e59d218::t_5f3bd6c334706d 18-20
+training-and-judge-center-backend/internal/adapter/http/handler/user/reset_password_handler.go
+  s_d814095e59d218::t_5f3bd6c334706d 25
+training-and-judge-center-backend/internal/adapter/http/handler/user/update_user_handler.go
+  s_d814095e59d218::t_5f3bd6c334706d 30
+training-and-judge-center-backend/internal/adapter/http/handler/user/deactivation_handler_test.go
+  s_d814095e59d218::t_5f3bd6c334706d 18,21-22
+training-and-judge-center-backend/internal/adapter/http/router.go
+  s_d814095e59d218::t_5f3bd6c334706d 22
+training-and-judge-center-backend/internal/adapter/http/handler/user/request_password_recovery_handler.go
+  s_d814095e59d218::t_5f3bd6c334706d 24
+training-and-judge-center-backend/internal/adapter/http/handler/user/update_email_handler.go
+  s_d814095e59d218::t_5f3bd6c334706d 28,92
+training-and-judge-center-backend/internal/adapter/http/handler/user/admin_update_user_handler.go
+  s_d814095e59d218::t_5f3bd6c334706d 34
+training-and-judge-center-backend/internal/adapter/http/handler/user/handler.go
+  s_d814095e59d218::t_49c3a35c961b5c 7,24,39-40
+training-and-judge-center-backend/internal/adapter/http/handler/user/deactivation_handler.go
+  s_d814095e59d218::t_5f3bd6c334706d 19,55
+training-and-judge-center-backend/cmd/api/main.go
+  s_d814095e59d218::t_a12866af4d932f 159
+  s_d814095e59d218::t_e8d3aec0aecda1 194
+  s_d814095e59d218::t_3dcf2690990f56 227
+  s_d814095e59d218::t_69d084bb67ce04 80
+  s_d814095e59d218::t_384c55f7ae96de 166,199
+  s_d814095e59d218::t_7c9041c6d6f0b6 214
+  s_d814095e59d218::t_147ae984b2a3f9 123
+  s_d814095e59d218::t_5f3bd6c334706d 190
+training-and-judge-center-backend/internal/adapter/http/handler/user/reset_password_handler_test.go
+  s_d814095e59d218::t_5f3bd6c334706d 17-19
+training-and-judge-center-backend/internal/adapter/http/handler/user/update_email_handler_test.go
+  s_d814095e59d218::t_5f3bd6c334706d 17-19,22-24
+training-and-judge-center-backend/internal/adapter/http/handler/user/update_password_handler.go
+  s_d814095e59d218::t_5f3bd6c334706d 27
+training-and-judge-center-backend/internal/adapter/http/handler/user/list_users_handler.go
+  s_d814095e59d218::t_5f3bd6c334706d 52
+training-and-judge-center-backend/internal/adapter/http/handler/user/create_handler.go
+  s_d814095e59d218::t_5f3bd6c334706d 41
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.0",
+  "base_commit_sha": "fec3454e173169f4885f2adad3b72eadb8e1cfd2",
+  "prompts": {},
+  "sessions": {
+    "s_d814095e59d218": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "c3ad5a18-3b83-4ccb-9f49-d5cbb9a53bca",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "AlexaVJ <alexandra19vela@gmail.com>"
+    }
+  }
+}

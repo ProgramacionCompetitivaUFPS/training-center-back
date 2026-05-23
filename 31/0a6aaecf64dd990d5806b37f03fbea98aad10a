@@ -1,0 +1,43 @@
+training-and-judge-center-backend/internal/adapter/auth/session_invalidator.go
+  s_c0be7c2854cbbc::t_64f15168ae3db4 11,16-17,20
+  s_c0be7c2854cbbc::t_ba9ce617d286be 30
+training-and-judge-center-backend/cmd/api/main.go
+  s_d814095e59d218::t_a12866af4d932f 159
+  s_d814095e59d218::t_e8d3aec0aecda1 194
+  s_d814095e59d218::t_3dcf2690990f56 227
+  s_d814095e59d218::t_69d084bb67ce04 80
+  s_d814095e59d218::t_384c55f7ae96de 166,199
+  s_d814095e59d218::t_7c9041c6d6f0b6 214
+  s_d814095e59d218::t_147ae984b2a3f9 123
+  s_d814095e59d218::t_5f3bd6c334706d 190
+  s_d814095e59d218::t_7aa22c6d24225d 101
+  s_d814095e59d218::t_e4fbf305a8bf9a 104
+  s_d814095e59d218::t_731bdcc2fb3c54 120-121
+  s_d814095e59d218::t_521b2ee858f6ca 127
+  s_d814095e59d218::t_498583d5c0d3c0 129
+  s_c0be7c2854cbbc::t_eb0794bb4b7783 170
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.0",
+  "base_commit_sha": "310a6aaecf64dd990d5806b37f03fbea98aad10a",
+  "prompts": {},
+  "sessions": {
+    "s_c0be7c2854cbbc": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "f847d351-57e3-42a1-8138-3047ef103684",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "AlexaVJ <alexandra19vela@gmail.com>"
+    },
+    "s_d814095e59d218": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "c3ad5a18-3b83-4ccb-9f49-d5cbb9a53bca",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "AlexaVJ <alexandra19vela@gmail.com>"
+    }
+  }
+}

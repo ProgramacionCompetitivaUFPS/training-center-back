@@ -1,0 +1,20 @@
+.coderabbit.yaml
+  s_e5961f07100143::t_38dd607591e97f 1-2
+  s_e5961f07100143::t_2a1b676955ae65 3-11
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.0",
+  "base_commit_sha": "34972937a85503629813adfb8e6e3ec4676cdfcf",
+  "prompts": {},
+  "sessions": {
+    "s_e5961f07100143": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "929c3825-8c9b-498c-b2ef-d000f18d1c64",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "AlexaVJ <alexandra19vela@gmail.com>"
+    }
+  }
+}
