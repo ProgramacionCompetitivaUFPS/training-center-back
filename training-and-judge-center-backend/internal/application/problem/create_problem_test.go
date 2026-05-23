@@ -8,6 +8,10 @@ import (
 	"github.com/training-judge-center/backend/pkg/apperror"
 )
 
+func newCreateProblemUseCase(repo *mockProblemRepository) *CreateProblemUseCase {
+	return NewCreateProblemUseCase(repo, newDefaultSettings())
+}
+
 func validCreateInput() CreateProblemInput {
 	return CreateProblemInput{
 		Slug:        testSlug,
@@ -18,7 +22,7 @@ func validCreateInput() CreateProblemInput {
 
 func TestCreateProblem_Success_Coach(t *testing.T) {
 	repo := &mockProblemRepository{}
-	uc := NewCreateProblemUseCase(repo, newDefaultSettings())
+	uc := newCreateProblemUseCase(repo)
 
 	result, err := uc.Execute(context.Background(), validCreateInput())
 	if err != nil {
@@ -37,7 +41,7 @@ func TestCreateProblem_Success_Coach(t *testing.T) {
 
 func TestCreateProblem_Success_Admin(t *testing.T) {
 	repo := &mockProblemRepository{}
-	uc := NewCreateProblemUseCase(repo, newDefaultSettings())
+	uc := newCreateProblemUseCase(repo)
 
 	input := validCreateInput()
 	input.CurrentUser = asAdmin(authorID)
@@ -50,7 +54,7 @@ func TestCreateProblem_Success_Admin(t *testing.T) {
 
 func TestCreateProblem_Forbidden_Contestant(t *testing.T) {
 	repo := &mockProblemRepository{}
-	uc := NewCreateProblemUseCase(repo, newDefaultSettings())
+	uc := newCreateProblemUseCase(repo)
 
 	input := validCreateInput()
 	input.CurrentUser = asContestant(strangerID)
@@ -71,7 +75,7 @@ func TestCreateProblem_Forbidden_Contestant(t *testing.T) {
 
 func TestCreateProblem_InvalidSlug(t *testing.T) {
 	repo := &mockProblemRepository{}
-	uc := NewCreateProblemUseCase(repo, newDefaultSettings())
+	uc := newCreateProblemUseCase(repo)
 
 	input := validCreateInput()
 	input.Slug = "ab" // too short (min 3 chars)
@@ -92,7 +96,7 @@ func TestCreateProblem_InvalidSlug(t *testing.T) {
 
 func TestCreateProblem_InvalidTitle(t *testing.T) {
 	repo := &mockProblemRepository{}
-	uc := NewCreateProblemUseCase(repo, newDefaultSettings())
+	uc := newCreateProblemUseCase(repo)
 
 	input := validCreateInput()
 	input.Title = "" // empty title
@@ -113,7 +117,7 @@ func TestCreateProblem_InvalidTitle(t *testing.T) {
 
 func TestCreateProblem_InvalidTag(t *testing.T) {
 	repo := &mockProblemRepository{}
-	uc := NewCreateProblemUseCase(repo, newDefaultSettings())
+	uc := newCreateProblemUseCase(repo)
 
 	input := validCreateInput()
 	input.Tags = []string{"not-a-valid-tag"}
@@ -138,7 +142,7 @@ func TestCreateProblem_SlugAlreadyExists(t *testing.T) {
 			return apperror.NewConflict(domainProblem.ErrCodeSlugAlreadyExists, "slug already in use")
 		},
 	}
-	uc := NewCreateProblemUseCase(repo, newDefaultSettings())
+	uc := newCreateProblemUseCase(repo)
 
 	_, err := uc.Execute(context.Background(), validCreateInput())
 	if err == nil {
@@ -160,7 +164,7 @@ func TestCreateProblem_RepositoryError(t *testing.T) {
 			return apperror.NewInternal()
 		},
 	}
-	uc := NewCreateProblemUseCase(repo, newDefaultSettings())
+	uc := newCreateProblemUseCase(repo)
 
 	_, err := uc.Execute(context.Background(), validCreateInput())
 	if err == nil {

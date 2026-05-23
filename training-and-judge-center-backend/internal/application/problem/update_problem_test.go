@@ -9,9 +9,13 @@ import (
 	"github.com/training-judge-center/backend/pkg/apperror"
 )
 
+func newUpdateProblemUseCase(repo *mockProblemRepository) *UpdateProblemUseCase {
+	return NewUpdateProblemUseCase(repo, newDefaultSettings())
+}
+
 func TestUpdateProblem_Success_Author(t *testing.T) {
 	repo := repoWith(newDraftProblem())
-	uc := NewUpdateProblemUseCase(repo, newDefaultSettings())
+	uc := newUpdateProblemUseCase(repo)
 
 	newTitle := "Updated Title"
 	result, err := uc.Execute(context.Background(), UpdateProblemInput{
@@ -29,7 +33,7 @@ func TestUpdateProblem_Success_Author(t *testing.T) {
 
 func TestUpdateProblem_Success_Modifier(t *testing.T) {
 	repo := repoWith(newDraftProblemWithModifier())
-	uc := NewUpdateProblemUseCase(repo, newDefaultSettings())
+	uc := newUpdateProblemUseCase(repo)
 
 	newTitle := "Modifier's Title"
 	_, err := uc.Execute(context.Background(), UpdateProblemInput{
@@ -44,7 +48,7 @@ func TestUpdateProblem_Success_Modifier(t *testing.T) {
 
 func TestUpdateProblem_Success_Admin(t *testing.T) {
 	repo := repoWith(newDraftProblem())
-	uc := NewUpdateProblemUseCase(repo, newDefaultSettings())
+	uc := newUpdateProblemUseCase(repo)
 
 	newTitle := "Admin Title"
 	_, err := uc.Execute(context.Background(), UpdateProblemInput{
@@ -59,7 +63,7 @@ func TestUpdateProblem_Success_Admin(t *testing.T) {
 
 func TestUpdateProblem_Forbidden_Stranger(t *testing.T) {
 	repo := repoWith(newDraftProblem())
-	uc := NewUpdateProblemUseCase(repo, newDefaultSettings())
+	uc := newUpdateProblemUseCase(repo)
 
 	newTitle := "Stolen Title"
 	_, err := uc.Execute(context.Background(), UpdateProblemInput{
@@ -82,7 +86,7 @@ func TestUpdateProblem_Forbidden_Stranger(t *testing.T) {
 
 func TestUpdateProblem_CannotUpdatePublished(t *testing.T) {
 	repo := repoWith(newPublishedProblem())
-	uc := NewUpdateProblemUseCase(repo, newDefaultSettings())
+	uc := newUpdateProblemUseCase(repo)
 
 	newTitle := "New Title"
 	_, err := uc.Execute(context.Background(), UpdateProblemInput{
@@ -105,7 +109,7 @@ func TestUpdateProblem_CannotUpdatePublished(t *testing.T) {
 
 func TestUpdateProblem_InvalidTimeLimit(t *testing.T) {
 	repo := repoWith(newDraftProblem())
-	uc := NewUpdateProblemUseCase(repo, newDefaultSettings())
+	uc := newUpdateProblemUseCase(repo)
 
 	tooHigh := 999999 // exceeds global max of 10000
 	_, err := uc.Execute(context.Background(), UpdateProblemInput{
@@ -132,7 +136,7 @@ func TestUpdateProblem_NotFound(t *testing.T) {
 			return nil, apperror.NewNotFound(apperror.ErrCodeNotFound, "problem not found")
 		},
 	}
-	uc := NewUpdateProblemUseCase(repo, newDefaultSettings())
+	uc := newUpdateProblemUseCase(repo)
 
 	newTitle := "Title"
 	_, err := uc.Execute(context.Background(), UpdateProblemInput{
@@ -154,7 +158,7 @@ func TestUpdateProblem_RepositoryError(t *testing.T) {
 			return errors.New("db error")
 		},
 	}
-	uc := NewUpdateProblemUseCase(repo, newDefaultSettings())
+	uc := newUpdateProblemUseCase(repo)
 
 	newTitle := "Title"
 	_, err := uc.Execute(context.Background(), UpdateProblemInput{

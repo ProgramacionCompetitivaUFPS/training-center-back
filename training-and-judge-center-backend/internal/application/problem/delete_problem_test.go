@@ -8,9 +8,13 @@ import (
 	"github.com/training-judge-center/backend/pkg/apperror"
 )
 
+func newDeleteProblemUseCase(repo *mockProblemRepository) *DeleteProblemUseCase {
+	return NewDeleteProblemUseCase(repo, &mockFileStorage{})
+}
+
 func TestDeleteProblem_Success_Author(t *testing.T) {
 	repo := repoWith(newDraftProblem())
-	uc := NewDeleteProblemUseCase(repo, &mockFileStorage{})
+	uc := newDeleteProblemUseCase(repo)
 
 	err := uc.Execute(context.Background(), DeleteProblemInput{
 		Slug:        testSlug,
@@ -24,7 +28,7 @@ func TestDeleteProblem_Success_Author(t *testing.T) {
 
 func TestDeleteProblem_Success_Admin(t *testing.T) {
 	repo := repoWith(newDraftProblem())
-	uc := NewDeleteProblemUseCase(repo, &mockFileStorage{})
+	uc := newDeleteProblemUseCase(repo)
 
 	err := uc.Execute(context.Background(), DeleteProblemInput{
 		Slug:        testSlug,
@@ -38,7 +42,7 @@ func TestDeleteProblem_Success_Admin(t *testing.T) {
 
 func TestDeleteProblem_Forbidden_Stranger(t *testing.T) {
 	repo := repoWith(newDraftProblem())
-	uc := NewDeleteProblemUseCase(repo, &mockFileStorage{})
+	uc := newDeleteProblemUseCase(repo)
 
 	err := uc.Execute(context.Background(), DeleteProblemInput{
 		Slug:        testSlug,
@@ -60,7 +64,7 @@ func TestDeleteProblem_Forbidden_Stranger(t *testing.T) {
 
 func TestDeleteProblem_ConfirmSlugMismatch(t *testing.T) {
 	repo := repoWith(newDraftProblem())
-	uc := NewDeleteProblemUseCase(repo, &mockFileStorage{})
+	uc := newDeleteProblemUseCase(repo)
 
 	err := uc.Execute(context.Background(), DeleteProblemInput{
 		Slug:        testSlug,
@@ -82,7 +86,7 @@ func TestDeleteProblem_ConfirmSlugMismatch(t *testing.T) {
 
 func TestDeleteProblem_EmptyConfirmSlug(t *testing.T) {
 	repo := repoWith(newDraftProblem())
-	uc := NewDeleteProblemUseCase(repo, &mockFileStorage{})
+	uc := newDeleteProblemUseCase(repo)
 
 	err := uc.Execute(context.Background(), DeleteProblemInput{
 		Slug:        testSlug,
@@ -108,7 +112,7 @@ func TestDeleteProblem_NotFound(t *testing.T) {
 			return nil, apperror.NewNotFound(apperror.ErrCodeNotFound, "problem not found")
 		},
 	}
-	uc := NewDeleteProblemUseCase(repo, &mockFileStorage{})
+	uc := newDeleteProblemUseCase(repo)
 
 	err := uc.Execute(context.Background(), DeleteProblemInput{
 		Slug:        testSlug,

@@ -8,9 +8,13 @@ import (
 	"github.com/training-judge-center/backend/pkg/apperror"
 )
 
+func newUnpublishProblemUseCase(repo *mockProblemRepository) *UnpublishProblemUseCase {
+	return NewUnpublishProblemUseCase(repo)
+}
+
 func TestUnpublishProblem_Success_Author(t *testing.T) {
 	repo := repoWith(newPublishedProblem())
-	uc := NewUnpublishProblemUseCase(repo)
+	uc := newUnpublishProblemUseCase(repo)
 
 	out, err := uc.Execute(context.Background(), UnpublishProblemInput{
 		Slug:        testSlug,
@@ -26,7 +30,7 @@ func TestUnpublishProblem_Success_Author(t *testing.T) {
 
 func TestUnpublishProblem_Success_Admin(t *testing.T) {
 	repo := repoWith(newPublishedProblem())
-	uc := NewUnpublishProblemUseCase(repo)
+	uc := newUnpublishProblemUseCase(repo)
 
 	_, err := uc.Execute(context.Background(), UnpublishProblemInput{
 		Slug:        testSlug,
@@ -39,7 +43,7 @@ func TestUnpublishProblem_Success_Admin(t *testing.T) {
 
 func TestUnpublishProblem_Success_Modifier(t *testing.T) {
 	repo := repoWith(newPublishedProblemWithModifier())
-	uc := NewUnpublishProblemUseCase(repo)
+	uc := newUnpublishProblemUseCase(repo)
 
 	_, err := uc.Execute(context.Background(), UnpublishProblemInput{
 		Slug:        testSlug,
@@ -52,7 +56,7 @@ func TestUnpublishProblem_Success_Modifier(t *testing.T) {
 
 func TestUnpublishProblem_Forbidden_Stranger(t *testing.T) {
 	repo := repoWith(newPublishedProblem())
-	uc := NewUnpublishProblemUseCase(repo)
+	uc := newUnpublishProblemUseCase(repo)
 
 	_, err := uc.Execute(context.Background(), UnpublishProblemInput{
 		Slug:        testSlug,
@@ -73,7 +77,7 @@ func TestUnpublishProblem_Forbidden_Stranger(t *testing.T) {
 
 func TestUnpublishProblem_AlreadyDraft(t *testing.T) {
 	repo := repoWith(newDraftProblem())
-	uc := NewUnpublishProblemUseCase(repo)
+	uc := newUnpublishProblemUseCase(repo)
 
 	_, err := uc.Execute(context.Background(), UnpublishProblemInput{
 		Slug:        testSlug,
