@@ -198,7 +198,7 @@ As an administrator, I want to sort users by different fields so that I can view
 - Invalid role filter value (returns 400 Bad Request)
 - Invalid status filter value (returns 400 Bad Request)
 - Page beyond available results (returns empty array)
-- Limit exceeds maximum (capped at 100)
+- Limit exceeds maximum (returns 400 Bad Request with VALIDATION_ERROR)
 - Concurrent admin requests (handled independently)
 - Very large result sets (pagination handles efficiently)
 
@@ -411,7 +411,7 @@ List all users in the platform with optional filters, search, sorting, and pagin
 - **FR-029**: The system MUST default to page=1 and limit=20 if pagination parameters are not provided.
 - **FR-030**: The system MUST validate that page is a positive integer (minimum 1).
 - **FR-031**: The system MUST validate that limit is between 1 and 100 (inclusive).
-- **FR-032**: The system MUST enforce a maximum limit of 100 items per page.
+- **FR-032**: The system MUST reject requests where limit exceeds 100 with HTTP 400 VALIDATION_ERROR.
 - **FR-033**: The system MUST return pagination metadata (totalCount, currentPage, totalPages, itemsPerPage).
 - **FR-034**: The system MUST return empty users array with correct pagination metadata when requested page exceeds available pages.
 

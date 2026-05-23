@@ -9,8 +9,6 @@ import (
 	"github.com/training-judge-center/backend/pkg/apperror"
 )
 
-const maxRequestsPageLimit = 100
-
 type ListJoinRequestsInput struct {
 	GroupID     string
 	Status      string

@@ -26,7 +26,7 @@ func TestListUsers_Success_NoFilters(t *testing.T) {
 	repo := newListUsersRepo(users, 2, nil)
 	uc := NewListUsersUseCase(repo)
 
-	result, err := uc.Execute(context.Background(), ListUsersInput{})
+	result, err := uc.Execute(context.Background(), ListUsersInput{Page: 1, Limit: 20})
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
@@ -37,10 +37,10 @@ func TestListUsers_Success_NoFilters(t *testing.T) {
 		t.Errorf("expected totalCount=2, got %d", result.TotalCount)
 	}
 	if result.Page != 1 {
-		t.Errorf("expected default page=1, got %d", result.Page)
+		t.Errorf("expected page=1, got %d", result.Page)
 	}
 	if result.Limit != 20 {
-		t.Errorf("expected default limit=20, got %d", result.Limit)
+		t.Errorf("expected limit=20, got %d", result.Limit)
 	}
 }
 
@@ -60,16 +60,20 @@ func TestListUsers_CustomPagination(t *testing.T) {
 	}
 }
 
-func TestListUsers_LimitCappedAt100(t *testing.T) {
+func TestListUsers_LimitExceedsMaximum_ReturnsValidationError(t *testing.T) {
 	repo := newListUsersRepo(nil, 0, nil)
 	uc := NewListUsersUseCase(repo)
 
-	result, err := uc.Execute(context.Background(), ListUsersInput{Limit: 999})
-	if err != nil {
-		t.Fatalf("expected no error, got %v", err)
+	_, err := uc.Execute(context.Background(), ListUsersInput{Page: 1, Limit: 999})
+	if err == nil {
+		t.Fatal("expected validation error for limit=999, got nil")
 	}
-	if result.Limit != 100 {
-		t.Errorf("expected limit capped at 100, got %d", result.Limit)
+	appErr, ok := err.(*apperror.AppError)
+	if !ok {
+		t.Fatalf("expected *apperror.AppError, got %T", err)
+	}
+	if appErr.Code != apperror.ErrCodeValidationError {
+		t.Errorf("expected VALIDATION_ERROR, got %q", appErr.Code)
 	}
 }
 
@@ -153,7 +157,7 @@ func TestListUsers_RepositoryError(t *testing.T) {
 	repo := newListUsersRepo(nil, 0, errors.New("db error"))
 	uc := NewListUsersUseCase(repo)
 
-	_, err := uc.Execute(context.Background(), ListUsersInput{})
+	_, err := uc.Execute(context.Background(), ListUsersInput{Page: 1, Limit: 20})
 	if err == nil {
 		t.Fatal("expected error, got nil")
 	}

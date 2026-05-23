@@ -9,8 +9,9 @@ import (
 )
 
 const (
-	maxPageLimit     = 50
-	DefaultPageLimit = 20
+	maxPageLimit         = 50
+	DefaultPageLimit     = 20
+	maxRequestsPageLimit = 100
 )
 
 func parseSort(raw string, def domainGroup.SortField, allowed []domainGroup.SortField) (domainGroup.SortField, error) {

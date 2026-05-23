@@ -58,7 +58,13 @@ func (h *Handler) ListUsers(w http.ResponseWriter, r *http.Request) {
 	}
 
 	page, _ := strconv.Atoi(q.Get("page"))
+	if page < 1 {
+		page = 1
+	}
 	limit, _ := strconv.Atoi(q.Get("limit"))
+	if limit < 1 {
+		limit = 20
+	}
 
 	input := appuser.ListUsersInput{
 		Roles:       roles,
