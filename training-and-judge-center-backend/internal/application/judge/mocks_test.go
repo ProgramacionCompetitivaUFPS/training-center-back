@@ -141,11 +141,11 @@ func (m *mockStandingUpdater) RecordVerdict(ctx context.Context, req RecordVerdi
 
 // ── TransactionManager mock ──────────────────────────────────────────────────
 
-type mockTxManager struct {
+type mockTransactionManager struct {
 	withTxFn func(ctx context.Context, fn func(txCtx context.Context) error) error
 }
 
-func (m *mockTxManager) WithTx(ctx context.Context, fn func(txCtx context.Context) error) error {
+func (m *mockTransactionManager) WithTx(ctx context.Context, fn func(txCtx context.Context) error) error {
 	if m.withTxFn != nil {
 		return m.withTxFn(ctx, fn)
 	}
