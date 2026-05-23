@@ -6,7 +6,7 @@ import (
 
 	domainProblem "github.com/training-judge-center/backend/internal/domain/problem"
 	"github.com/training-judge-center/backend/internal/domain/shared"
-	appshared "github.com/training-judge-center/backend/internal/application/shared"
+	"github.com/training-judge-center/backend/internal/testutil"
 )
 
 var testNow = time.Date(2024, 1, 15, 10, 0, 0, 0, time.UTC)
@@ -141,9 +141,11 @@ func newDefaultSettings() domainProblem.PlatformSettings {
 
 // ── CurrentUser helpers ──────────────────────────────────────────────────────
 
-func asCoach(id string) appshared.CurrentUser      { return appshared.CurrentUser{ID: id, Role: shared.RoleCoach} }
-func asAdmin(id string) appshared.CurrentUser      { return appshared.CurrentUser{ID: id, Role: shared.RoleAdmin} }
-func asContestant(id string) appshared.CurrentUser { return appshared.CurrentUser{ID: id, Role: shared.RoleContestant} }
+var (
+	asAdmin      = testutil.AsAdmin
+	asCoach      = testutil.AsCoach
+	asContestant = testutil.AsContestant
+)
 
 // ── Problem fixtures ─────────────────────────────────────────────────────────
 

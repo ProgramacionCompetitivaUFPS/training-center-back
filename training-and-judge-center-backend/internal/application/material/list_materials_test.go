@@ -8,7 +8,7 @@ import (
 	"github.com/training-judge-center/backend/pkg/apperror"
 )
 
-func newListUC(repo *mockMaterialRepository, vis *mockGroupVisibilityProvider, mem *mockGroupMemberProvider) *ListMaterialsUseCase {
+func newListMaterialsUseCase(repo *mockMaterialRepository, vis *mockGroupVisibilityProvider, mem *mockGroupMemberProvider) *ListMaterialsUseCase {
 	return NewListMaterialsUseCase(repo, vis, mem, stubAuthorProvider())
 }
 
@@ -22,7 +22,7 @@ func defaultListInput() ListMaterialsInput {
 }
 
 func TestListMaterials_InvalidPage_Returns400(t *testing.T) {
-	uc := newListUC(&mockMaterialRepository{}, visibleGroup(), isMemberNotLead())
+	uc := newListMaterialsUseCase(&mockMaterialRepository{}, visibleGroup(), isMemberNotLead())
 	in := defaultListInput()
 	in.Page = 0
 	_, err := uc.Execute(context.Background(), in)
@@ -30,7 +30,7 @@ func TestListMaterials_InvalidPage_Returns400(t *testing.T) {
 }
 
 func TestListMaterials_InvalidLimit_Returns400(t *testing.T) {
-	uc := newListUC(&mockMaterialRepository{}, visibleGroup(), isMemberNotLead())
+	uc := newListMaterialsUseCase(&mockMaterialRepository{}, visibleGroup(), isMemberNotLead())
 
 	for _, limit := range []int{0, 101} {
 		in := defaultListInput()
@@ -41,13 +41,13 @@ func TestListMaterials_InvalidLimit_Returns400(t *testing.T) {
 }
 
 func TestListMaterials_GroupNotFound_Returns404(t *testing.T) {
-	uc := newListUC(&mockMaterialRepository{}, groupVisibilityNotFound(), notLead())
+	uc := newListMaterialsUseCase(&mockMaterialRepository{}, groupVisibilityNotFound(), notLead())
 	_, err := uc.Execute(context.Background(), defaultListInput())
 	assertErrCode(t, err, ErrCodeGroupNotFound)
 }
 
 func TestListMaterials_NotVisibleGroup_NonMember_Returns403(t *testing.T) {
-	uc := newListUC(&mockMaterialRepository{}, notVisibleGroup(), notLead())
+	uc := newListMaterialsUseCase(&mockMaterialRepository{}, notVisibleGroup(), notLead())
 	in := defaultListInput()
 	in.CurrentUser = asCoach(testOtherID)
 	_, err := uc.Execute(context.Background(), in)
@@ -55,7 +55,7 @@ func TestListMaterials_NotVisibleGroup_NonMember_Returns403(t *testing.T) {
 }
 
 func TestListMaterials_VisibleGroup_NonMember_Returns200(t *testing.T) {
-	uc := newListUC(repoWithList(nil), visibleGroup(), notLead())
+	uc := newListMaterialsUseCase(repoWithList(nil), visibleGroup(), notLead())
 	in := defaultListInput()
 	in.CurrentUser = asContestant(testOtherID)
 
@@ -73,7 +73,7 @@ func TestListMaterials_Member_FiltersOnlyPublished(t *testing.T) {
 			return nil, 0, nil
 		},
 	}
-	uc := newListUC(repo, visibleGroup(), isMemberNotLead())
+	uc := newListMaterialsUseCase(repo, visibleGroup(), isMemberNotLead())
 	in := defaultListInput()
 	in.CurrentUser = asContestant(testOtherID)
 
@@ -94,7 +94,7 @@ func TestListMaterials_Lead_FiltersDraftAndPublished(t *testing.T) {
 			return nil, 0, nil
 		},
 	}
-	uc := newListUC(repo, visibleGroup(), isLead())
+	uc := newListMaterialsUseCase(repo, visibleGroup(), isLead())
 
 	if _, err := uc.Execute(context.Background(), defaultListInput()); err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -113,7 +113,7 @@ func TestListMaterials_Admin_FiltersDraftAndPublished(t *testing.T) {
 			return nil, 0, nil
 		},
 	}
-	uc := newListUC(repo, visibleGroup(), notLead())
+	uc := newListMaterialsUseCase(repo, visibleGroup(), notLead())
 	in := defaultListInput()
 	in.CurrentUser = asAdmin(testOtherID)
 
@@ -134,7 +134,7 @@ func TestListMaterials_Admin_NotVisibleGroup_SeesAll(t *testing.T) {
 			return nil, 0, nil
 		},
 	}
-	uc := newListUC(repo, notVisibleGroup(), notLead())
+	uc := newListMaterialsUseCase(repo, notVisibleGroup(), notLead())
 	in := defaultListInput()
 	in.CurrentUser = asAdmin(testOtherID)
 
@@ -148,7 +148,7 @@ func TestListMaterials_Admin_NotVisibleGroup_SeesAll(t *testing.T) {
 
 func TestListMaterials_PaginationMetadata(t *testing.T) {
 	materials := []*domainMaterial.Material{newPublishedMaterial()}
-	uc := newListUC(repoWithList(materials), visibleGroup(), isMemberNotLead())
+	uc := newListMaterialsUseCase(repoWithList(materials), visibleGroup(), isMemberNotLead())
 	in := defaultListInput()
 	in.Page = 1
 	in.Limit = 20
@@ -173,7 +173,7 @@ func TestListMaterials_PaginationMetadata(t *testing.T) {
 }
 
 func TestListMaterials_AuthorPopulated(t *testing.T) {
-	uc := newListUC(repoWithList([]*domainMaterial.Material{newPublishedMaterial()}), visibleGroup(), isMemberNotLead())
+	uc := newListMaterialsUseCase(repoWithList([]*domainMaterial.Material{newPublishedMaterial()}), visibleGroup(), isMemberNotLead())
 	out, err := uc.Execute(context.Background(), defaultListInput())
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -187,7 +187,7 @@ func TestListMaterials_AuthorPopulated(t *testing.T) {
 }
 
 func TestListMaterials_EmptyResult_ReturnsPaginationZero(t *testing.T) {
-	uc := newListUC(repoWithList(nil), visibleGroup(), isMemberNotLead())
+	uc := newListMaterialsUseCase(repoWithList(nil), visibleGroup(), isMemberNotLead())
 	out, err := uc.Execute(context.Background(), defaultListInput())
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -223,7 +223,7 @@ func TestListMaterials_RepoError_Returns500(t *testing.T) {
 			return nil, 0, apperror.NewInternal()
 		},
 	}
-	uc := newListUC(repo, visibleGroup(), isMemberNotLead())
+	uc := newListMaterialsUseCase(repo, visibleGroup(), isMemberNotLead())
 	_, err := uc.Execute(context.Background(), defaultListInput())
 	assertErrCode(t, err, apperror.ErrCodeInternalError)
 }

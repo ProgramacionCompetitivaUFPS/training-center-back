@@ -8,12 +8,12 @@ import (
 	"github.com/training-judge-center/backend/pkg/apperror"
 )
 
-func newGetUC(repo *mockMaterialRepository, vis *mockGroupVisibilityProvider, mem *mockGroupMemberProvider) *GetMaterialUseCase {
+func newGetMaterialUseCase(repo *mockMaterialRepository, vis *mockGroupVisibilityProvider, mem *mockGroupMemberProvider) *GetMaterialUseCase {
 	return NewGetMaterialUseCase(repo, vis, mem, stubAuthorProvider())
 }
 
 func TestGetMaterial_GroupNotFound_Returns404(t *testing.T) {
-	uc := newGetUC(&mockMaterialRepository{}, groupVisibilityNotFound(), notLead())
+	uc := newGetMaterialUseCase(&mockMaterialRepository{}, groupVisibilityNotFound(), notLead())
 	_, err := uc.Execute(context.Background(), GetMaterialInput{
 		CurrentUser: asCoach(testAuthorID),
 		GroupID:     testGroupID,
@@ -23,7 +23,7 @@ func TestGetMaterial_GroupNotFound_Returns404(t *testing.T) {
 }
 
 func TestGetMaterial_NotVisibleGroup_NonMember_Returns403(t *testing.T) {
-	uc := newGetUC(&mockMaterialRepository{}, notVisibleGroup(), notLead())
+	uc := newGetMaterialUseCase(&mockMaterialRepository{}, notVisibleGroup(), notLead())
 	_, err := uc.Execute(context.Background(), GetMaterialInput{
 		CurrentUser: asCoach(testOtherID),
 		GroupID:     testGroupID,
@@ -34,7 +34,7 @@ func TestGetMaterial_NotVisibleGroup_NonMember_Returns403(t *testing.T) {
 
 func TestGetMaterial_NotVisibleGroup_Admin_CanAccess(t *testing.T) {
 	repo := repoWith(newPublishedMaterial())
-	uc := newGetUC(repo, notVisibleGroup(), notLead())
+	uc := newGetMaterialUseCase(repo, notVisibleGroup(), notLead())
 	_, err := uc.Execute(context.Background(), GetMaterialInput{
 		CurrentUser: asAdmin(testOtherID),
 		GroupID:     testGroupID,
@@ -46,7 +46,7 @@ func TestGetMaterial_NotVisibleGroup_Admin_CanAccess(t *testing.T) {
 }
 
 func TestGetMaterial_MaterialNotFound_Returns404(t *testing.T) {
-	uc := newGetUC(&mockMaterialRepository{}, visibleGroup(), isMemberNotLead())
+	uc := newGetMaterialUseCase(&mockMaterialRepository{}, visibleGroup(), isMemberNotLead())
 	_, err := uc.Execute(context.Background(), GetMaterialInput{
 		CurrentUser: asCoach(testAuthorID),
 		GroupID:     testGroupID,
@@ -58,7 +58,7 @@ func TestGetMaterial_MaterialNotFound_Returns404(t *testing.T) {
 func TestGetMaterial_MaterialBelongsToDifferentGroup_Returns404(t *testing.T) {
 	m := newPublishedMaterial()
 	repo := repoWith(m)
-	uc := newGetUC(repo, visibleGroup(), isMemberNotLead())
+	uc := newGetMaterialUseCase(repo, visibleGroup(), isMemberNotLead())
 	_, err := uc.Execute(context.Background(), GetMaterialInput{
 		CurrentUser: asCoach(testAuthorID),
 		GroupID:     "other-group-id",
@@ -69,7 +69,7 @@ func TestGetMaterial_MaterialBelongsToDifferentGroup_Returns404(t *testing.T) {
 
 func TestGetMaterial_DraftMaterial_Member_Returns404(t *testing.T) {
 	repo := repoWith(newTestMaterial())
-	uc := newGetUC(repo, visibleGroup(), isMemberNotLead())
+	uc := newGetMaterialUseCase(repo, visibleGroup(), isMemberNotLead())
 	_, err := uc.Execute(context.Background(), GetMaterialInput{
 		CurrentUser: asCoach(testOtherID),
 		GroupID:     testGroupID,
@@ -80,7 +80,7 @@ func TestGetMaterial_DraftMaterial_Member_Returns404(t *testing.T) {
 
 func TestGetMaterial_DraftMaterial_Lead_Returns200(t *testing.T) {
 	repo := repoWith(newTestMaterial())
-	uc := newGetUC(repo, visibleGroup(), isLead())
+	uc := newGetMaterialUseCase(repo, visibleGroup(), isLead())
 	out, err := uc.Execute(context.Background(), GetMaterialInput{
 		CurrentUser: asCoach(testOtherID),
 		GroupID:     testGroupID,
@@ -96,7 +96,7 @@ func TestGetMaterial_DraftMaterial_Lead_Returns200(t *testing.T) {
 
 func TestGetMaterial_DraftMaterial_Admin_Returns200(t *testing.T) {
 	repo := repoWith(newTestMaterial())
-	uc := newGetUC(repo, visibleGroup(), notLead())
+	uc := newGetMaterialUseCase(repo, visibleGroup(), notLead())
 	out, err := uc.Execute(context.Background(), GetMaterialInput{
 		CurrentUser: asAdmin(testOtherID),
 		GroupID:     testGroupID,
@@ -112,7 +112,7 @@ func TestGetMaterial_DraftMaterial_Admin_Returns200(t *testing.T) {
 
 func TestGetMaterial_PublishedMaterial_Member_Returns200(t *testing.T) {
 	repo := repoWith(newPublishedMaterial())
-	uc := newGetUC(repo, visibleGroup(), isMemberNotLead())
+	uc := newGetMaterialUseCase(repo, visibleGroup(), isMemberNotLead())
 	out, err := uc.Execute(context.Background(), GetMaterialInput{
 		CurrentUser: asContestant(testOtherID),
 		GroupID:     testGroupID,
@@ -128,7 +128,7 @@ func TestGetMaterial_PublishedMaterial_Member_Returns200(t *testing.T) {
 
 func TestGetMaterial_AuthorPopulated(t *testing.T) {
 	repo := repoWith(newPublishedMaterial())
-	uc := newGetUC(repo, visibleGroup(), isMemberNotLead())
+	uc := newGetMaterialUseCase(repo, visibleGroup(), isMemberNotLead())
 	out, err := uc.Execute(context.Background(), GetMaterialInput{
 		CurrentUser: asCoach(testOtherID),
 		GroupID:     testGroupID,
@@ -201,7 +201,7 @@ func TestGetMaterial_GroupVisibilityError_Returns500(t *testing.T) {
 			return "", false, apperror.NewInternal()
 		},
 	}
-	uc := newGetUC(&mockMaterialRepository{}, vis, notLead())
+	uc := newGetMaterialUseCase(&mockMaterialRepository{}, vis, notLead())
 	_, err := uc.Execute(context.Background(), GetMaterialInput{
 		CurrentUser: asCoach(testAuthorID),
 		GroupID:     testGroupID,
@@ -216,7 +216,7 @@ func TestListMaterials_GroupVisibilityError_Returns500(t *testing.T) {
 			return "", false, apperror.NewInternal()
 		},
 	}
-	uc := newListUC(&mockMaterialRepository{}, vis, notLead())
+	uc := newListMaterialsUseCase(&mockMaterialRepository{}, vis, notLead())
 	_, err := uc.Execute(context.Background(), defaultListInput())
 	assertErrCode(t, err, apperror.ErrCodeInternalError)
 }
@@ -227,7 +227,7 @@ func TestGetMaterial_MemberCheckError_Returns500(t *testing.T) {
 			return false, apperror.NewInternal()
 		},
 	}
-	uc := newGetUC(&mockMaterialRepository{}, notVisibleGroup(), mem)
+	uc := newGetMaterialUseCase(&mockMaterialRepository{}, notVisibleGroup(), mem)
 	_, err := uc.Execute(context.Background(), GetMaterialInput{
 		CurrentUser: asCoach(testOtherID),
 		GroupID:     testGroupID,
@@ -242,7 +242,7 @@ func TestListMaterials_MemberCheckError_Returns500(t *testing.T) {
 			return false, apperror.NewInternal()
 		},
 	}
-	uc := newListUC(&mockMaterialRepository{}, notVisibleGroup(), mem)
+	uc := newListMaterialsUseCase(&mockMaterialRepository{}, notVisibleGroup(), mem)
 	_, err := uc.Execute(context.Background(), defaultListInput())
 	assertErrCode(t, err, apperror.ErrCodeInternalError)
 }

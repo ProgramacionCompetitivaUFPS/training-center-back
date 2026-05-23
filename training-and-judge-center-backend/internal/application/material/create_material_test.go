@@ -9,12 +9,12 @@ import (
 	"github.com/training-judge-center/backend/pkg/apperror"
 )
 
-func newCreateUC(repo *mockMaterialRepository, group *mockGroupProvider, member *mockGroupMemberProvider) *CreateMaterialUseCase {
+func newCreateMaterialUseCase(repo *mockMaterialRepository, group *mockGroupProvider, member *mockGroupMemberProvider) *CreateMaterialUseCase {
 	return NewCreateMaterialUseCase(repo, group, member, stubAuthorProvider())
 }
 
 func TestCreateMaterial_SuccessByLead(t *testing.T) {
-	uc := newCreateUC(&mockMaterialRepository{}, groupExists(), isLead())
+	uc := newCreateMaterialUseCase(&mockMaterialRepository{}, groupExists(), isLead())
 
 	out, err := uc.Execute(context.Background(), CreateMaterialInput{
 		CurrentUser: asCoach(testAuthorID),
@@ -40,7 +40,7 @@ func TestCreateMaterial_SuccessByLead(t *testing.T) {
 }
 
 func TestCreateMaterial_SuccessByAdmin(t *testing.T) {
-	uc := newCreateUC(&mockMaterialRepository{}, groupExists(), notLead())
+	uc := newCreateMaterialUseCase(&mockMaterialRepository{}, groupExists(), notLead())
 
 	out, err := uc.Execute(context.Background(), CreateMaterialInput{
 		CurrentUser: asAdmin(testAuthorID),
@@ -62,7 +62,7 @@ func TestCreateMaterial_GroupProviderError(t *testing.T) {
 			return false, errors.New("redis timeout")
 		},
 	}
-	uc := newCreateUC(&mockMaterialRepository{}, group, notLead())
+	uc := newCreateMaterialUseCase(&mockMaterialRepository{}, group, notLead())
 	_, err := uc.Execute(context.Background(), CreateMaterialInput{
 		CurrentUser: asCoach(testAuthorID),
 		GroupID:     testGroupID,
@@ -75,7 +75,7 @@ func TestCreateMaterial_GroupProviderError(t *testing.T) {
 }
 
 func TestCreateMaterial_GroupNotFound(t *testing.T) {
-	uc := newCreateUC(&mockMaterialRepository{}, groupNotFound(), notLead())
+	uc := newCreateMaterialUseCase(&mockMaterialRepository{}, groupNotFound(), notLead())
 
 	_, err := uc.Execute(context.Background(), CreateMaterialInput{
 		CurrentUser: asCoach(testAuthorID),
@@ -95,7 +95,7 @@ func TestCreateMaterial_MemberProviderError(t *testing.T) {
 			return false, errors.New("group service unavailable")
 		},
 	}
-	uc := newCreateUC(&mockMaterialRepository{}, groupExists(), member)
+	uc := newCreateMaterialUseCase(&mockMaterialRepository{}, groupExists(), member)
 	_, err := uc.Execute(context.Background(), CreateMaterialInput{
 		CurrentUser: asCoach(testAuthorID),
 		GroupID:     testGroupID,
@@ -108,7 +108,7 @@ func TestCreateMaterial_MemberProviderError(t *testing.T) {
 }
 
 func TestCreateMaterial_ForbiddenIfNotLead(t *testing.T) {
-	uc := newCreateUC(&mockMaterialRepository{}, groupExists(), notLead())
+	uc := newCreateMaterialUseCase(&mockMaterialRepository{}, groupExists(), notLead())
 
 	_, err := uc.Execute(context.Background(), CreateMaterialInput{
 		CurrentUser: asCoach(testAuthorID),
@@ -123,7 +123,7 @@ func TestCreateMaterial_ForbiddenIfNotLead(t *testing.T) {
 }
 
 func TestCreateMaterial_ForbiddenIfContestant(t *testing.T) {
-	uc := newCreateUC(&mockMaterialRepository{}, groupExists(), notLead())
+	uc := newCreateMaterialUseCase(&mockMaterialRepository{}, groupExists(), notLead())
 
 	_, err := uc.Execute(context.Background(), CreateMaterialInput{
 		CurrentUser: asContestant(testAuthorID),
@@ -138,7 +138,7 @@ func TestCreateMaterial_ForbiddenIfContestant(t *testing.T) {
 }
 
 func TestCreateMaterial_ValidationErrorEmptyTitle(t *testing.T) {
-	uc := newCreateUC(&mockMaterialRepository{}, groupExists(), isLead())
+	uc := newCreateMaterialUseCase(&mockMaterialRepository{}, groupExists(), isLead())
 
 	_, err := uc.Execute(context.Background(), CreateMaterialInput{
 		CurrentUser: asCoach(testAuthorID),
@@ -158,7 +158,7 @@ func TestCreateMaterial_SaveRepositoryError(t *testing.T) {
 			return errors.New("db connection lost")
 		},
 	}
-	uc := newCreateUC(repo, groupExists(), isLead())
+	uc := newCreateMaterialUseCase(repo, groupExists(), isLead())
 	_, err := uc.Execute(context.Background(), CreateMaterialInput{
 		CurrentUser: asCoach(testAuthorID),
 		GroupID:     testGroupID,
@@ -171,7 +171,7 @@ func TestCreateMaterial_SaveRepositoryError(t *testing.T) {
 }
 
 func TestCreateMaterial_ValidationErrorInvalidTags(t *testing.T) {
-	uc := newCreateUC(&mockMaterialRepository{}, groupExists(), isLead())
+	uc := newCreateMaterialUseCase(&mockMaterialRepository{}, groupExists(), isLead())
 
 	_, err := uc.Execute(context.Background(), CreateMaterialInput{
 		CurrentUser: asCoach(testAuthorID),
@@ -187,7 +187,7 @@ func TestCreateMaterial_ValidationErrorInvalidTags(t *testing.T) {
 }
 
 func TestCreateMaterial_NilTagsTreatedAsEmpty(t *testing.T) {
-	uc := newCreateUC(&mockMaterialRepository{}, groupExists(), isLead())
+	uc := newCreateMaterialUseCase(&mockMaterialRepository{}, groupExists(), isLead())
 
 	out, err := uc.Execute(context.Background(), CreateMaterialInput{
 		CurrentUser: asCoach(testAuthorID),
@@ -205,7 +205,7 @@ func TestCreateMaterial_NilTagsTreatedAsEmpty(t *testing.T) {
 }
 
 func TestCreateMaterial_DefaultsContentAndTags(t *testing.T) {
-	uc := newCreateUC(&mockMaterialRepository{}, groupExists(), isLead())
+	uc := newCreateMaterialUseCase(&mockMaterialRepository{}, groupExists(), isLead())
 
 	out, err := uc.Execute(context.Background(), CreateMaterialInput{
 		CurrentUser: asCoach(testAuthorID),

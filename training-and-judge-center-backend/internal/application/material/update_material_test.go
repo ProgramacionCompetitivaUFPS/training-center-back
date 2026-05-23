@@ -9,13 +9,13 @@ import (
 	"github.com/training-judge-center/backend/pkg/apperror"
 )
 
-func newUpdateUC(repo *mockMaterialRepository, group *mockGroupProvider) *UpdateMaterialUseCase {
+func newUpdateMaterialUseCase(repo *mockMaterialRepository, group *mockGroupProvider) *UpdateMaterialUseCase {
 	return NewUpdateMaterialUseCase(repo, group, stubAuthorProvider())
 }
 
 func TestUpdateMaterial_SuccessByAuthor(t *testing.T) {
 	m := newTestMaterial()
-	uc := newUpdateUC(repoWith(m), groupExists())
+	uc := newUpdateMaterialUseCase(repoWith(m), groupExists())
 
 	newTitle := "Updated Title"
 	out, err := uc.Execute(context.Background(), UpdateMaterialInput{
@@ -35,7 +35,7 @@ func TestUpdateMaterial_SuccessByAuthor(t *testing.T) {
 
 func TestUpdateMaterial_SuccessByAdmin(t *testing.T) {
 	m := newTestMaterial()
-	uc := newUpdateUC(repoWith(m), groupExists())
+	uc := newUpdateMaterialUseCase(repoWith(m), groupExists())
 
 	newTitle := "Admin Update"
 	out, err := uc.Execute(context.Background(), UpdateMaterialInput{
@@ -55,7 +55,7 @@ func TestUpdateMaterial_SuccessByAdmin(t *testing.T) {
 
 func TestUpdateMaterial_ForbiddenIfNotAuthor(t *testing.T) {
 	m := newTestMaterial()
-	uc := newUpdateUC(repoWith(m), groupExists())
+	uc := newUpdateMaterialUseCase(repoWith(m), groupExists())
 
 	newTitle := "Sneaky Update"
 	_, err := uc.Execute(context.Background(), UpdateMaterialInput{
@@ -77,7 +77,7 @@ func TestUpdateMaterial_GroupProviderError(t *testing.T) {
 			return false, errors.New("redis timeout")
 		},
 	}
-	uc := newUpdateUC(&mockMaterialRepository{}, group)
+	uc := newUpdateMaterialUseCase(&mockMaterialRepository{}, group)
 	newTitle := "Title"
 	_, err := uc.Execute(context.Background(), UpdateMaterialInput{
 		CurrentUser: asCoach(testAuthorID),
@@ -92,7 +92,7 @@ func TestUpdateMaterial_GroupProviderError(t *testing.T) {
 }
 
 func TestUpdateMaterial_GroupNotFound(t *testing.T) {
-	uc := newUpdateUC(&mockMaterialRepository{}, groupNotFound())
+	uc := newUpdateMaterialUseCase(&mockMaterialRepository{}, groupNotFound())
 
 	newTitle := "Title"
 	_, err := uc.Execute(context.Background(), UpdateMaterialInput{
@@ -114,7 +114,7 @@ func TestUpdateMaterial_FindByIDInternalError(t *testing.T) {
 			return nil, apperror.NewInternal()
 		},
 	}
-	uc := newUpdateUC(repo, groupExists())
+	uc := newUpdateMaterialUseCase(repo, groupExists())
 	newTitle := "Title"
 	_, err := uc.Execute(context.Background(), UpdateMaterialInput{
 		CurrentUser: asCoach(testAuthorID),
@@ -129,7 +129,7 @@ func TestUpdateMaterial_FindByIDInternalError(t *testing.T) {
 }
 
 func TestUpdateMaterial_MaterialNotFound(t *testing.T) {
-	uc := newUpdateUC(&mockMaterialRepository{}, groupExists())
+	uc := newUpdateMaterialUseCase(&mockMaterialRepository{}, groupExists())
 
 	newTitle := "Title"
 	_, err := uc.Execute(context.Background(), UpdateMaterialInput{
@@ -147,7 +147,7 @@ func TestUpdateMaterial_MaterialNotFound(t *testing.T) {
 
 func TestUpdateMaterial_MaterialNotInGroup(t *testing.T) {
 	m := newTestMaterial()
-	uc := newUpdateUC(repoWith(m), groupExists())
+	uc := newUpdateMaterialUseCase(repoWith(m), groupExists())
 
 	newTitle := "Title"
 	_, err := uc.Execute(context.Background(), UpdateMaterialInput{
@@ -165,7 +165,7 @@ func TestUpdateMaterial_MaterialNotInGroup(t *testing.T) {
 
 func TestUpdateMaterial_PartialUpdate(t *testing.T) {
 	m := newTestMaterial()
-	uc := newUpdateUC(repoWith(m), groupExists())
+	uc := newUpdateMaterialUseCase(repoWith(m), groupExists())
 
 	newTitle := "Only Title"
 	out, err := uc.Execute(context.Background(), UpdateMaterialInput{
@@ -188,7 +188,7 @@ func TestUpdateMaterial_PartialUpdate(t *testing.T) {
 
 func TestUpdateMaterial_ClearTags(t *testing.T) {
 	m := newTestMaterial()
-	uc := newUpdateUC(repoWith(m), groupExists())
+	uc := newUpdateMaterialUseCase(repoWith(m), groupExists())
 
 	emptyTags := []string{}
 	out, err := uc.Execute(context.Background(), UpdateMaterialInput{
@@ -208,7 +208,7 @@ func TestUpdateMaterial_ClearTags(t *testing.T) {
 
 func TestUpdateMaterial_ClearContent(t *testing.T) {
 	m := newTestMaterial()
-	uc := newUpdateUC(repoWith(m), groupExists())
+	uc := newUpdateMaterialUseCase(repoWith(m), groupExists())
 
 	emptyContent := ""
 	out, err := uc.Execute(context.Background(), UpdateMaterialInput{
@@ -228,7 +228,7 @@ func TestUpdateMaterial_ClearContent(t *testing.T) {
 
 func TestUpdateMaterial_ImmutableFields(t *testing.T) {
 	m := newTestMaterial()
-	uc := newUpdateUC(repoWith(m), groupExists())
+	uc := newUpdateMaterialUseCase(repoWith(m), groupExists())
 
 	newTitle := "New Title"
 	out, err := uc.Execute(context.Background(), UpdateMaterialInput{
@@ -265,7 +265,7 @@ func TestUpdateMaterial_SaveRepositoryError(t *testing.T) {
 			return errors.New("db connection lost")
 		},
 	}
-	uc := newUpdateUC(repo, groupExists())
+	uc := newUpdateMaterialUseCase(repo, groupExists())
 	newTitle := "Updated"
 	_, err := uc.Execute(context.Background(), UpdateMaterialInput{
 		CurrentUser: asCoach(testAuthorID),
@@ -291,7 +291,7 @@ func TestUpdateMaterial_NoOpAllNil_StillSavesAndUpdatesTimestamp(t *testing.T) {
 			return nil
 		},
 	}
-	uc := newUpdateUC(repo, groupExists())
+	uc := newUpdateMaterialUseCase(repo, groupExists())
 
 	_, err := uc.Execute(context.Background(), UpdateMaterialInput{
 		CurrentUser: asCoach(testAuthorID),
@@ -309,7 +309,7 @@ func TestUpdateMaterial_NoOpAllNil_StillSavesAndUpdatesTimestamp(t *testing.T) {
 
 func TestUpdateMaterial_ValidationErrorEmptyTitle(t *testing.T) {
 	m := newTestMaterial()
-	uc := newUpdateUC(repoWith(m), groupExists())
+	uc := newUpdateMaterialUseCase(repoWith(m), groupExists())
 
 	emptyTitle := ""
 	_, err := uc.Execute(context.Background(), UpdateMaterialInput{

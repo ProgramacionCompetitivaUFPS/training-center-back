@@ -9,7 +9,7 @@ import (
 	"github.com/training-judge-center/backend/pkg/apperror"
 )
 
-func newUnpinUC(repo *mockMaterialRepository, group *mockGroupProvider, member *mockGroupMemberProvider) *UnpinMaterialUseCase {
+func newUnpinMaterialUseCase(repo *mockMaterialRepository, group *mockGroupProvider, member *mockGroupMemberProvider) *UnpinMaterialUseCase {
 	return NewUnpinMaterialUseCase(repo, group, member, stubAuthorProvider())
 }
 
@@ -20,7 +20,7 @@ func TestUnpinMaterial_SuccessByAuthor(t *testing.T) {
 		findByIDFn: func(_ context.Context, _ string) (*domainMaterial.Material, error) { return m, nil },
 		saveFn:     func(_ context.Context, _ *domainMaterial.Material) error { saved = true; return nil },
 	}
-	uc := newUnpinUC(repo, groupExists(), notLead())
+	uc := newUnpinMaterialUseCase(repo, groupExists(), notLead())
 
 	out, err := uc.Execute(context.Background(), UnpinMaterialInput{
 		CurrentUser: asCoach(testAuthorID),
@@ -44,7 +44,7 @@ func TestUnpinMaterial_SuccessByAuthor(t *testing.T) {
 
 func TestUnpinMaterial_SuccessByOtherLead(t *testing.T) {
 	m := newPinnedMaterial()
-	uc := newUnpinUC(repoWith(m), groupExists(), isLead())
+	uc := newUnpinMaterialUseCase(repoWith(m), groupExists(), isLead())
 
 	out, err := uc.Execute(context.Background(), UnpinMaterialInput{
 		CurrentUser: asCoach(testOtherID),
@@ -62,7 +62,7 @@ func TestUnpinMaterial_SuccessByOtherLead(t *testing.T) {
 
 func TestUnpinMaterial_SuccessByAdmin(t *testing.T) {
 	m := newPinnedMaterial()
-	uc := newUnpinUC(repoWith(m), groupExists(), notLead())
+	uc := newUnpinMaterialUseCase(repoWith(m), groupExists(), notLead())
 
 	out, err := uc.Execute(context.Background(), UnpinMaterialInput{
 		CurrentUser: asAdmin(testOtherID),
@@ -87,7 +87,7 @@ func TestUnpinMaterial_Admin_SkipsLeadCheck(t *testing.T) {
 			return false, errors.New("should not be called")
 		},
 	}
-	uc := newUnpinUC(repoWith(m), groupExists(), member)
+	uc := newUnpinMaterialUseCase(repoWith(m), groupExists(), member)
 
 	_, err := uc.Execute(context.Background(), UnpinMaterialInput{
 		CurrentUser: asAdmin(testOtherID),
@@ -105,7 +105,7 @@ func TestUnpinMaterial_Admin_SkipsLeadCheck(t *testing.T) {
 
 func TestUnpinMaterial_Idempotent_AlreadyUnpinned(t *testing.T) {
 	m := newPublishedMaterial()
-	uc := newUnpinUC(repoWith(m), groupExists(), notLead())
+	uc := newUnpinMaterialUseCase(repoWith(m), groupExists(), notLead())
 
 	out, err := uc.Execute(context.Background(), UnpinMaterialInput{
 		CurrentUser: asCoach(testAuthorID),
@@ -126,7 +126,7 @@ func TestUnpinMaterial_Idempotent_AlreadyUnpinned(t *testing.T) {
 
 func TestUnpinMaterial_Forbidden_Member(t *testing.T) {
 	m := newPinnedMaterial()
-	uc := newUnpinUC(repoWith(m), groupExists(), isMemberNotLead())
+	uc := newUnpinMaterialUseCase(repoWith(m), groupExists(), isMemberNotLead())
 
 	_, err := uc.Execute(context.Background(), UnpinMaterialInput{
 		CurrentUser: asCoach(testOtherID),
@@ -147,7 +147,7 @@ func TestUnpinMaterial_MemberProviderError_Returns500(t *testing.T) {
 			return false, errors.New("db timeout")
 		},
 	}
-	uc := newUnpinUC(repoWith(m), groupExists(), member)
+	uc := newUnpinMaterialUseCase(repoWith(m), groupExists(), member)
 
 	_, err := uc.Execute(context.Background(), UnpinMaterialInput{
 		CurrentUser: asCoach(testOtherID),
@@ -162,7 +162,7 @@ func TestUnpinMaterial_MemberProviderError_Returns500(t *testing.T) {
 }
 
 func TestUnpinMaterial_GroupProviderError_Returns500(t *testing.T) {
-	uc := newUnpinUC(&mockMaterialRepository{}, groupProviderError(), notLead())
+	uc := newUnpinMaterialUseCase(&mockMaterialRepository{}, groupProviderError(), notLead())
 
 	_, err := uc.Execute(context.Background(), UnpinMaterialInput{
 		CurrentUser: asCoach(testAuthorID),
@@ -177,7 +177,7 @@ func TestUnpinMaterial_GroupProviderError_Returns500(t *testing.T) {
 }
 
 func TestUnpinMaterial_GroupNotFound(t *testing.T) {
-	uc := newUnpinUC(&mockMaterialRepository{}, groupNotFound(), notLead())
+	uc := newUnpinMaterialUseCase(&mockMaterialRepository{}, groupNotFound(), notLead())
 
 	_, err := uc.Execute(context.Background(), UnpinMaterialInput{
 		CurrentUser: asCoach(testAuthorID),
@@ -193,7 +193,7 @@ func TestUnpinMaterial_GroupNotFound(t *testing.T) {
 
 func TestUnpinMaterial_MaterialInOtherGroup(t *testing.T) {
 	m := newPinnedMaterial()
-	uc := newUnpinUC(repoWith(m), groupExists(), notLead())
+	uc := newUnpinMaterialUseCase(repoWith(m), groupExists(), notLead())
 
 	_, err := uc.Execute(context.Background(), UnpinMaterialInput{
 		CurrentUser: asCoach(testAuthorID),
@@ -213,7 +213,7 @@ func TestUnpinMaterial_SaveError(t *testing.T) {
 		findByIDFn: func(_ context.Context, _ string) (*domainMaterial.Material, error) { return m, nil },
 		saveFn:     func(_ context.Context, _ *domainMaterial.Material) error { return errors.New("db error") },
 	}
-	uc := newUnpinUC(repo, groupExists(), notLead())
+	uc := newUnpinMaterialUseCase(repo, groupExists(), notLead())
 
 	_, err := uc.Execute(context.Background(), UnpinMaterialInput{
 		CurrentUser: asCoach(testAuthorID),
