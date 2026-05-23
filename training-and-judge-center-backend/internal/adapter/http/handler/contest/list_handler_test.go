@@ -82,10 +82,10 @@ func TestListContests_PaginationDefaults(t *testing.T) {
 	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
 		t.Fatalf("could not decode response: %v", err)
 	}
-	if resp.Pagination.Page != appcontest.DefaultPage {
-		t.Errorf("expected page %d, got %d", appcontest.DefaultPage, resp.Pagination.Page)
+	if resp.Pagination.Page != 1 {
+		t.Errorf("expected page %d, got %d", 1, resp.Pagination.Page)
 	}
-	if resp.Pagination.Limit != appcontest.DefaultLimit {
-		t.Errorf("expected limit %d, got %d", appcontest.DefaultLimit, resp.Pagination.Limit)
+	if resp.Pagination.Limit != 20 {
+		t.Errorf("expected limit %d, got %d", 20, resp.Pagination.Limit)
 	}
 }
