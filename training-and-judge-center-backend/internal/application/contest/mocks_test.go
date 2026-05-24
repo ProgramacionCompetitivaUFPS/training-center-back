@@ -7,7 +7,6 @@ import (
 	domainContest "github.com/training-judge-center/backend/internal/domain/contest"
 	"github.com/training-judge-center/backend/internal/domain/shared"
 	"github.com/training-judge-center/backend/internal/testutil"
-	"github.com/training-judge-center/backend/pkg/apperror"
 )
 
 // ── Time fixture ─────────────────────────────────────────────────────────────
@@ -48,7 +47,7 @@ func (m *mockContestRepository) FindByID(ctx context.Context, id string) (*domai
 	if m.findByIDFn != nil {
 		return m.findByIDFn(ctx, id)
 	}
-	return nil, apperror.NewNotFound(domainContest.ErrCodeContestNotFound, "contest not found")
+	return nil, nil
 }
 func (m *mockContestRepository) Delete(ctx context.Context, id string) error {
 	if m.deleteFn != nil {
@@ -218,6 +217,104 @@ func (m *mockContestParticipantProvider) IsRegisteredBulk(ctx context.Context, c
 
 func mockParticipants() *mockContestParticipantProvider { return &mockContestParticipantProvider{} }
 
+// ── RegistrationRepository mock ──────────────────────────────────────────────
+
+type mockRegistrationRepository struct {
+	saveFn                  func(ctx context.Context, r *domainContest.ContestRegistration) error
+	findByContestAndUserFn  func(ctx context.Context, contestID, userID string) (*domainContest.ContestRegistration, error)
+	deleteFn                func(ctx context.Context, contestID, userID string) error
+	listByContestFn         func(ctx context.Context, contestID string, page, limit int) ([]*domainContest.ContestRegistration, int, error)
+	existsByContestAndUser  func(ctx context.Context, contestID, userID string) (bool, error)
+	countByContestFn        func(ctx context.Context, contestID string) (int, error)
+	countByContestBulkFn    func(ctx context.Context, contestIDs []string) (map[string]int, error)
+	existsByUserBulkFn      func(ctx context.Context, contestIDs []string, userID string) (map[string]bool, error)
+}
+
+func (m *mockRegistrationRepository) Save(ctx context.Context, r *domainContest.ContestRegistration) error {
+	if m.saveFn != nil {
+		return m.saveFn(ctx, r)
+	}
+	return nil
+}
+
+func (m *mockRegistrationRepository) FindByContestAndUser(ctx context.Context, contestID, userID string) (*domainContest.ContestRegistration, error) {
+	if m.findByContestAndUserFn != nil {
+		return m.findByContestAndUserFn(ctx, contestID, userID)
+	}
+	return nil, nil
+}
+
+func (m *mockRegistrationRepository) Delete(ctx context.Context, contestID, userID string) error {
+	if m.deleteFn != nil {
+		return m.deleteFn(ctx, contestID, userID)
+	}
+	return nil
+}
+
+func (m *mockRegistrationRepository) ListByContest(ctx context.Context, contestID string, page, limit int) ([]*domainContest.ContestRegistration, int, error) {
+	if m.listByContestFn != nil {
+		return m.listByContestFn(ctx, contestID, page, limit)
+	}
+	return []*domainContest.ContestRegistration{}, 0, nil
+}
+
+func (m *mockRegistrationRepository) ExistsByContestAndUser(ctx context.Context, contestID, userID string) (bool, error) {
+	if m.existsByContestAndUser != nil {
+		return m.existsByContestAndUser(ctx, contestID, userID)
+	}
+	return false, nil
+}
+
+func (m *mockRegistrationRepository) CountByContest(ctx context.Context, contestID string) (int, error) {
+	if m.countByContestFn != nil {
+		return m.countByContestFn(ctx, contestID)
+	}
+	return 0, nil
+}
+
+func (m *mockRegistrationRepository) CountByContestBulk(ctx context.Context, contestIDs []string) (map[string]int, error) {
+	if m.countByContestBulkFn != nil {
+		return m.countByContestBulkFn(ctx, contestIDs)
+	}
+	result := make(map[string]int, len(contestIDs))
+	for _, id := range contestIDs {
+		result[id] = 0
+	}
+	return result, nil
+}
+
+func (m *mockRegistrationRepository) ExistsByUserBulk(ctx context.Context, contestIDs []string, userID string) (map[string]bool, error) {
+	if m.existsByUserBulkFn != nil {
+		return m.existsByUserBulkFn(ctx, contestIDs, userID)
+	}
+	result := make(map[string]bool, len(contestIDs))
+	for _, id := range contestIDs {
+		result[id] = false
+	}
+	return result, nil
+}
+
+func mockRegistrations() *mockRegistrationRepository { return &mockRegistrationRepository{} }
+
+// ── ParticipantNicknameProvider mock ─────────────────────────────────────────
+
+type mockNicknameProvider struct {
+	getFn func(ctx context.Context, userIDs []string) (map[string]string, error)
+}
+
+func (m *mockNicknameProvider) GetNicknamesByIDs(ctx context.Context, userIDs []string) (map[string]string, error) {
+	if m.getFn != nil {
+		return m.getFn(ctx, userIDs)
+	}
+	result := make(map[string]string, len(userIDs))
+	for _, id := range userIDs {
+		result[id] = "nick_" + id
+	}
+	return result, nil
+}
+
+func mockNicknames() *mockNicknameProvider { return &mockNicknameProvider{} }
+
 // ── OwnerProvider mock ───────────────────────────────────────────────────────
 
 type mockOwnerProvider struct {
@@ -273,6 +370,25 @@ func newTestContest(ownerID string) *domainContest.Contest {
 		nil,
 		testStart,
 		testEnd,
+		domainContest.RestorePenalty(20),
+		0,
+		false,
+		false,
+		shared.RestoreGroupID(testGroupID),
+		shared.RestoreUserID(ownerID),
+		[]domainContest.ContestProblem{},
+		testNow.Add(-time.Hour),
+		nil,
+	)
+}
+
+func newFinishedContest(ownerID string) *domainContest.Contest {
+	return domainContest.RestoreContest(
+		testContestID,
+		domainContest.RestoreContestName("Finished Contest"),
+		nil,
+		time.Now().Add(-48*time.Hour),
+		time.Now().Add(-24*time.Hour),
 		domainContest.RestorePenalty(20),
 		0,
 		false,

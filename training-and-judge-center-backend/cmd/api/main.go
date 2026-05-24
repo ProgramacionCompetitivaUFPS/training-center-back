@@ -247,13 +247,15 @@ func main() {
 	)
 
 	// contest adapters
-	contestRepo                := adaptercontest.NewRepository(dbPool)
-	contestGroupProvider       := adaptercontest.NewGroupProvider(dbPool)
-	contestMemberProvider      := adaptercontest.NewGroupMemberProvider(dbPool)
-	contestProblemProvider     := adaptercontest.NewProblemProvider(dbPool)
-	contestOwnerProvider       := adaptercontest.NewOwnerProvider(dbPool)
-	contestParticipantProvider := adaptercontest.NewContestParticipantProvider()
-	contestTxManager           := postgres.NewTransactionManager(dbPool)
+	contestRepo                    := adaptercontest.NewRepository(dbPool)
+	contestGroupProvider           := adaptercontest.NewGroupProvider(dbPool)
+	contestMemberProvider          := adaptercontest.NewGroupMemberProvider(dbPool)
+	contestProblemProvider         := adaptercontest.NewProblemProvider(dbPool)
+	contestOwnerProvider           := adaptercontest.NewOwnerProvider(dbPool)
+	contestRegistrationRepo        := adaptercontest.NewRegistrationRepository(dbPool)
+	contestParticipantProvider     := adaptercontest.NewContestParticipantProvider(contestRegistrationRepo)
+	contestNicknameProvider        := adaptercontest.NewParticipantNicknameProvider(dbPool)
+	contestTxManager               := postgres.NewTransactionManager(dbPool)
 
 	// contest use cases
 	createContestUseCase := appcontest.NewCreateContestUseCase(
@@ -271,7 +273,23 @@ func main() {
 	listContestsUseCase := appcontest.NewListContestsUseCase(
 		contestRepo, contestGroupProvider, contestMemberProvider, contestParticipantProvider,
 	)
-	contestHandler := handlercontest.NewHandler(createContestUseCase, updateContestUseCase, getContestUseCase, listContestsUseCase)
+	registerToContestUseCase := appcontest.NewRegisterToContestUseCase(
+		contestRepo, contestRegistrationRepo, contestMemberProvider,
+	)
+	unregisterFromContestUseCase := appcontest.NewUnregisterFromContestUseCase(
+		contestRepo, contestRegistrationRepo, contestMemberProvider,
+	)
+	getRegistrationStatusUseCase := appcontest.NewGetRegistrationStatusUseCase(
+		contestRepo, contestRegistrationRepo,
+	)
+	listContestRegistrationsUseCase := appcontest.NewListContestRegistrationsUseCase(
+		contestRepo, contestRegistrationRepo, contestMemberProvider, contestNicknameProvider,
+	)
+	contestHandler := handlercontest.NewHandler(
+		createContestUseCase, updateContestUseCase, getContestUseCase, listContestsUseCase,
+		registerToContestUseCase, unregisterFromContestUseCase,
+		getRegistrationStatusUseCase, listContestRegistrationsUseCase,
+	)
 
 	router := adapterhttp.NewRouter(&adapterhttp.Handlers{
 		Problem:  problemHandler,
