@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	appcontest "github.com/training-judge-center/backend/internal/application/contest"
 	domainContest "github.com/training-judge-center/backend/internal/domain/contest"
@@ -77,6 +78,9 @@ func TestRegister_HappyPath_Returns201(t *testing.T) {
 	if resp.RegisteredAt == "" {
 		t.Error("expected non-empty registeredAt")
 	}
+	if _, err := time.Parse(time.RFC3339, resp.RegisteredAt); err != nil {
+		t.Errorf("registeredAt is not RFC3339: %q", resp.RegisteredAt)
+	}
 }
 
 func TestRegister_ContestNotFound_Returns404(t *testing.T) {
@@ -139,6 +143,15 @@ func TestRegister_AlreadyRegistered_Returns409(t *testing.T) {
 	if w.Code != http.StatusConflict {
 		t.Fatalf("expected 409, got %d: %s", w.Code, w.Body.String())
 	}
+	var errResp struct {
+		Code string `json:"error"`
+	}
+	if err := json.NewDecoder(w.Body).Decode(&errResp); err != nil {
+		t.Fatalf("could not decode error body: %v", err)
+	}
+	if errResp.Code != domainContest.ErrCodeAlreadyRegistered {
+		t.Errorf("expected error code %q, got %q", domainContest.ErrCodeAlreadyRegistered, errResp.Code)
+	}
 }
 
 func TestRegister_RegistrationClosed_Returns409(t *testing.T) {
@@ -158,5 +171,14 @@ func TestRegister_RegistrationClosed_Returns409(t *testing.T) {
 
 	if w.Code != http.StatusConflict {
 		t.Fatalf("expected 409, got %d: %s", w.Code, w.Body.String())
+	}
+	var errResp struct {
+		Code string `json:"error"`
+	}
+	if err := json.NewDecoder(w.Body).Decode(&errResp); err != nil {
+		t.Fatalf("could not decode error body: %v", err)
+	}
+	if errResp.Code != domainContest.ErrCodeRegistrationClosed {
+		t.Errorf("expected error code %q, got %q", domainContest.ErrCodeRegistrationClosed, errResp.Code)
 	}
 }

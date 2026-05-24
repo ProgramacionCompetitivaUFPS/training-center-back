@@ -77,6 +77,9 @@ func (uc *GetContestUseCase) Execute(ctx context.Context, in GetContestInput) (*
 	if err != nil {
 		return nil, err
 	}
+	if c == nil {
+		return nil, apperror.NewNotFound(domainContest.ErrCodeContestNotFound, "contest not found")
+	}
 	if c.GroupID().Value() != in.GroupID {
 		return nil, apperror.NewNotFound(domainContest.ErrCodeContestNotFound, "contest not found")
 	}

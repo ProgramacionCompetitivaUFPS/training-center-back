@@ -2,17 +2,14 @@ package contest
 
 import (
 	"context"
-
-	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-// ContestParticipantProvider is a no-op stub. Replace with a real implementation when participant registration is supported.
 type ContestParticipantProvider struct {
 	reg *RegistrationRepository
 }
 
-func NewContestParticipantProvider(db *pgxpool.Pool) *ContestParticipantProvider {
-	return &ContestParticipantProvider{reg: NewRegistrationRepository(db)}
+func NewContestParticipantProvider(reg *RegistrationRepository) *ContestParticipantProvider {
+	return &ContestParticipantProvider{reg: reg}
 }
 
 func (p *ContestParticipantProvider) IsRegistered(ctx context.Context, contestID, userID string) (bool, error) {

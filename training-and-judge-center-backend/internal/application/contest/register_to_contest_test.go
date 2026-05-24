@@ -122,3 +122,63 @@ func TestRegisterToContest_AlreadyRegistered_Returns409(t *testing.T) {
 		t.Errorf("expected ALREADY_REGISTERED, got %v", err)
 	}
 }
+
+func TestRegisterToContest_RepoFindError_Propagates(t *testing.T) {
+	repo := &mockContestRepository{
+		findByIDFn: func(_ context.Context, _ string) (*domainContest.Contest, error) {
+			return nil, apperror.NewInternal()
+		},
+	}
+	uc := newRegisterUseCase(repo, mockRegistrations(), groupFound(), isMemberNotLead())
+
+	_, err := uc.Execute(context.Background(), validRegisterInput())
+
+	if err == nil {
+		t.Fatal("expected error from failed FindByID")
+	}
+}
+
+func TestRegisterToContest_MemberProviderError_Propagates(t *testing.T) {
+	member := &mockGroupMemberProvider{
+		isMemberFn: func(_ context.Context, _, _ string) (bool, error) {
+			return false, apperror.NewInternal()
+		},
+	}
+	uc := newRegisterUseCase(repoWith(newTestContest(otherID)), mockRegistrations(), groupFound(), member)
+
+	_, err := uc.Execute(context.Background(), validRegisterInput())
+
+	if err == nil {
+		t.Fatal("expected error from failed IsMemberOfGroup")
+	}
+}
+
+func TestRegisterToContest_RegistrationCheckError_Propagates(t *testing.T) {
+	reg := &mockRegistrationRepository{
+		existsByContestAndUser: func(_ context.Context, _, _ string) (bool, error) {
+			return false, apperror.NewInternal()
+		},
+	}
+	uc := newRegisterUseCase(repoWith(newTestContest(otherID)), reg, groupFound(), isMemberNotLead())
+
+	_, err := uc.Execute(context.Background(), validRegisterInput())
+
+	if err == nil {
+		t.Fatal("expected error from failed registration check")
+	}
+}
+
+func TestRegisterToContest_SaveError_Propagates(t *testing.T) {
+	reg := &mockRegistrationRepository{
+		saveFn: func(_ context.Context, _ *domainContest.ContestRegistration) error {
+			return apperror.NewInternal()
+		},
+	}
+	uc := newRegisterUseCase(repoWith(newTestContest(otherID)), reg, groupFound(), isMemberNotLead())
+
+	_, err := uc.Execute(context.Background(), validRegisterInput())
+
+	if err == nil {
+		t.Fatal("expected error from failed Save")
+	}
+}

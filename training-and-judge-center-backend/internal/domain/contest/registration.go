@@ -23,7 +23,7 @@ func RestoreContestRegistration(id, contestID, userID string, registeredAt time.
 		id:           id,
 		contestID:    contestID,
 		userID:       userID,
-		registeredAt: registeredAt,
+		registeredAt: registeredAt.UTC(),
 	}
 }
 

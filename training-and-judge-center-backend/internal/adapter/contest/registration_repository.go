@@ -2,8 +2,10 @@ package contest
 
 import (
 	"context"
+	"errors"
 	"log/slog"
 
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 	infraPostgres "github.com/training-judge-center/backend/internal/adapter/postgres"
 	domainContest "github.com/training-judge-center/backend/internal/domain/contest"
@@ -26,6 +28,10 @@ func (r *RegistrationRepository) Save(ctx context.Context, reg *domainContest.Co
 		reg.ID(), reg.ContestID(), reg.UserID(), reg.RegisteredAt(),
 	)
 	if err != nil {
+		var pgErr *pgconn.PgError
+		if errors.As(err, &pgErr) && pgErr.Code == "23505" {
+			return apperror.NewConflict(domainContest.ErrCodeAlreadyRegistered, "you are already registered for this contest")
+		}
 		slog.ErrorContext(ctx, "failed to save contest registration",
 			"contest_id", reg.ContestID(), "user_id", reg.UserID(), "error", err)
 		return apperror.NewInternal()
@@ -77,7 +83,7 @@ func (r *RegistrationRepository) CountByContestBulk(ctx context.Context, contest
 	)
 	if err != nil {
 		slog.ErrorContext(ctx, "failed to bulk count contest registrations", "error", err)
-		return nil, apperror.NewInternal()
+		return result, apperror.NewInternal()
 	}
 	defer rows.Close()
 	for rows.Next() {
@@ -85,13 +91,13 @@ func (r *RegistrationRepository) CountByContestBulk(ctx context.Context, contest
 		var count int
 		if err := rows.Scan(&contestID, &count); err != nil {
 			slog.ErrorContext(ctx, "failed to scan bulk count row", "error", err)
-			return nil, apperror.NewInternal()
+			return result, apperror.NewInternal()
 		}
 		result[contestID] = count
 	}
 	if err := rows.Err(); err != nil {
 		slog.ErrorContext(ctx, "bulk count rows error", "error", err)
-		return nil, apperror.NewInternal()
+		return result, apperror.NewInternal()
 	}
 	return result, nil
 }
@@ -111,20 +117,20 @@ func (r *RegistrationRepository) ExistsByUserBulk(ctx context.Context, contestID
 	)
 	if err != nil {
 		slog.ErrorContext(ctx, "failed to bulk check contest registrations", "error", err)
-		return nil, apperror.NewInternal()
+		return result, apperror.NewInternal()
 	}
 	defer rows.Close()
 	for rows.Next() {
 		var contestID string
 		if err := rows.Scan(&contestID); err != nil {
 			slog.ErrorContext(ctx, "failed to scan bulk exists row", "error", err)
-			return nil, apperror.NewInternal()
+			return result, apperror.NewInternal()
 		}
 		result[contestID] = true
 	}
 	if err := rows.Err(); err != nil {
 		slog.ErrorContext(ctx, "bulk exists rows error", "error", err)
-		return nil, apperror.NewInternal()
+		return result, apperror.NewInternal()
 	}
 	return result, nil
 }

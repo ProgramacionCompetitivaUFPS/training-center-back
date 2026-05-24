@@ -253,7 +253,7 @@ func main() {
 	contestProblemProvider     := adaptercontest.NewProblemProvider(dbPool)
 	contestOwnerProvider       := adaptercontest.NewOwnerProvider(dbPool)
 	contestRegistrationRepo    := adaptercontest.NewRegistrationRepository(dbPool)
-	contestParticipantProvider := adaptercontest.NewContestParticipantProvider(dbPool)
+	contestParticipantProvider := adaptercontest.NewContestParticipantProvider(contestRegistrationRepo)
 	contestTxManager           := postgres.NewTransactionManager(dbPool)
 
 	// contest use cases
