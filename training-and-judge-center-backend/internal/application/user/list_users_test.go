@@ -1,8 +1,7 @@
-package user
+﻿package user
 
 import (
 	"context"
-	"errors"
 	"testing"
 
 	"github.com/training-judge-center/backend/internal/domain/shared"
@@ -154,7 +153,7 @@ func TestListUsers_InvalidSearchField(t *testing.T) {
 }
 
 func TestListUsers_RepositoryError(t *testing.T) {
-	repo := newListUsersRepo(nil, 0, errors.New("db error"))
+	repo := newListUsersRepo(nil, 0, apperror.NewInternal())
 	uc := NewListUsersUseCase(repo)
 
 	_, err := uc.Execute(context.Background(), ListUsersInput{Page: 1, Limit: 20})

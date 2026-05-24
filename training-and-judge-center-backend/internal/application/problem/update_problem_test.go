@@ -1,8 +1,7 @@
-package problem
+﻿package problem
 
 import (
 	"context"
-	"errors"
 	"testing"
 
 	domainProblem "github.com/training-judge-center/backend/internal/domain/problem"
@@ -151,7 +150,7 @@ func TestUpdateProblem_RepositoryError(t *testing.T) {
 			return newDraftProblem(), nil
 		},
 		saveFn: func(_ context.Context, _ *domainProblem.Problem) error {
-			return errors.New("db error")
+			return apperror.NewInternal()
 		},
 	}
 	uc := NewUpdateProblemUseCase(repo, newDefaultSettings())

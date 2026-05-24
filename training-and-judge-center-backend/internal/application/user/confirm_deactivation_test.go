@@ -1,4 +1,4 @@
-package user
+﻿package user
 
 import (
 	"context"
@@ -144,7 +144,7 @@ func TestConfirmDeactivation_ExpiredCode_UpdateFails_ReturnsInternal(t *testing.
 		return newUserWithRole("user-1", domainShared.RoleContestant, domain.StatusActive), nil
 	}
 
-	dbErr := errors.New("connection refused")
+	dbErr := apperror.NewInternal()
 	deactRepo := &mockDeactivationRepo{
 		findPendingByUserIDFn: func(ctx context.Context, userID string) (*domain.DeactivationRequest, error) {
 			return domain.RestoreDeactivationRequest("req-1", "user-1", "123456", time.Now().Add(-1*time.Minute), 0, nil, domain.DeactivationStatusPending, time.Time{}, time.Time{}), nil
@@ -173,7 +173,7 @@ func TestConfirmDeactivation_InvalidCode_UpdateFails_ReturnsInternal(t *testing.
 		return newUserWithRole("user-1", domainShared.RoleContestant, domain.StatusActive), nil
 	}
 
-	dbErr := errors.New("connection refused")
+	dbErr := apperror.NewInternal()
 	deactRepo := &mockDeactivationRepo{
 		findPendingByUserIDFn: func(ctx context.Context, userID string) (*domain.DeactivationRequest, error) {
 			return domain.RestoreDeactivationRequest("req-1", "user-1", "123456", time.Now().Add(10*time.Minute), 0, nil, domain.DeactivationStatusPending, time.Time{}, time.Time{}), nil
@@ -202,7 +202,7 @@ func TestConfirmDeactivation_BlockedState_UpdateFails_ReturnsInternal(t *testing
 		return newUserWithRole("user-1", domainShared.RoleContestant, domain.StatusActive), nil
 	}
 
-	dbErr := errors.New("connection refused")
+	dbErr := apperror.NewInternal()
 	deactRepo := &mockDeactivationRepo{
 		findPendingByUserIDFn: func(ctx context.Context, userID string) (*domain.DeactivationRequest, error) {
 			return domain.RestoreDeactivationRequest("req-1", "user-1", "123456", time.Now().Add(10*time.Minute), 4, nil, domain.DeactivationStatusPending, time.Time{}, time.Time{}), nil
@@ -329,7 +329,7 @@ func TestConfirmDeactivation_BlockExpired_UpdateFails_ReturnsInternal(t *testing
 			return domain.RestoreDeactivationRequest("req-1", "user-1", "123456", time.Now().Add(10*time.Minute), 5, &expiredBlockedUntil, domain.DeactivationStatusBlocked, time.Time{}, time.Time{}), nil
 		},
 		updateFn: func(ctx context.Context, req *domain.DeactivationRequest) error {
-			return errors.New("db unavailable")
+			return apperror.NewInternal()
 		},
 	}
 

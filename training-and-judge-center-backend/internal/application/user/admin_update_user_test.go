@@ -1,8 +1,7 @@
-package user
+﻿package user
 
 import (
 	"context"
-	"errors"
 	"testing"
 
 	"github.com/training-judge-center/backend/internal/domain/shared"
@@ -186,7 +185,7 @@ func TestAdminUpdateUser_EmailAlreadyExists(t *testing.T) {
 func TestAdminUpdateUser_RepositoryFindError(t *testing.T) {
 	repo := newNoConflictRepo()
 	repo.findByIDFn = func(_ context.Context, _ string) (*domain.User, error) {
-		return nil, errors.New("db connection lost")
+		return nil, apperror.NewInternal()
 	}
 	uc := NewAdminUpdateUserUseCase(repo)
 

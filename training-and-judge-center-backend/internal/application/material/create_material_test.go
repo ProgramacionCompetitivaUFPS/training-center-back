@@ -59,7 +59,7 @@ func TestCreateMaterial_SuccessByAdmin(t *testing.T) {
 func TestCreateMaterial_GroupProviderError(t *testing.T) {
 	group := &mockGroupProvider{
 		existsFn: func(_ context.Context, _ string) (bool, error) {
-			return false, errors.New("redis timeout")
+			return false, apperror.NewInternal()
 		},
 	}
 	uc := newCreateMaterialUseCase(&mockMaterialRepository{}, group, notLead())
@@ -92,7 +92,7 @@ func TestCreateMaterial_GroupNotFound(t *testing.T) {
 func TestCreateMaterial_MemberProviderError(t *testing.T) {
 	member := &mockGroupMemberProvider{
 		isLeadFn: func(_ context.Context, _, _ string) (bool, error) {
-			return false, errors.New("group service unavailable")
+			return false, apperror.NewInternal()
 		},
 	}
 	uc := newCreateMaterialUseCase(&mockMaterialRepository{}, groupExists(), member)
@@ -155,7 +155,7 @@ func TestCreateMaterial_ValidationErrorEmptyTitle(t *testing.T) {
 func TestCreateMaterial_SaveRepositoryError(t *testing.T) {
 	repo := &mockMaterialRepository{
 		saveFn: func(_ context.Context, _ *domainMaterial.Material) error {
-			return errors.New("db connection lost")
+			return apperror.NewInternal()
 		},
 	}
 	uc := newCreateMaterialUseCase(repo, groupExists(), isLead())

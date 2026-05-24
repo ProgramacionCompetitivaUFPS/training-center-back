@@ -1,8 +1,7 @@
-package user
+﻿package user
 
 import (
 	"context"
-	"errors"
 	"testing"
 	"time"
 
@@ -203,7 +202,7 @@ func TestConfirmEmailChange_UserNotFound(t *testing.T) {
 func TestConfirmEmailChange_UserRepoError(t *testing.T) {
 	userRepo := newNoConflictRepo()
 	userRepo.findByIDFn = func(_ context.Context, _ string) (*domain.User, error) {
-		return nil, errors.New("db error")
+		return nil, apperror.NewInternal()
 	}
 
 	uc := NewConfirmEmailChangeUseCase(userRepo, &mockEmailChangeRepo{}, &mockEmailSender{}, &mockTransactionManager{})
@@ -225,7 +224,7 @@ func TestConfirmEmailChange_EmailChangeRepoError(t *testing.T) {
 
 	emailChangeRepo := &mockEmailChangeRepo{
 		findByCodeAndUserIDFn: func(_ context.Context, _ string, _ string) (*domain.EmailChangeRequest, error) {
-			return nil, errors.New("db error")
+			return nil, apperror.NewInternal()
 		},
 	}
 

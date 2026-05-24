@@ -144,7 +144,7 @@ func TestUnpinMaterial_MemberProviderError_Returns500(t *testing.T) {
 	m := newPinnedMaterial()
 	member := &mockGroupMemberProvider{
 		isLeadFn: func(_ context.Context, _, _ string) (bool, error) {
-			return false, errors.New("db timeout")
+			return false, apperror.NewInternal()
 		},
 	}
 	uc := newUnpinMaterialUseCase(repoWith(m), groupExists(), member)
@@ -211,7 +211,7 @@ func TestUnpinMaterial_SaveError(t *testing.T) {
 	m := newPinnedMaterial()
 	repo := &mockMaterialRepository{
 		findByIDFn: func(_ context.Context, _ string) (*domainMaterial.Material, error) { return m, nil },
-		saveFn:     func(_ context.Context, _ *domainMaterial.Material) error { return errors.New("db error") },
+		saveFn:     func(_ context.Context, _ *domainMaterial.Material) error { return apperror.NewInternal() },
 	}
 	uc := newUnpinMaterialUseCase(repo, groupExists(), notLead())
 

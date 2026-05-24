@@ -1,8 +1,7 @@
-package problem
+﻿package problem
 
 import (
 	"context"
-	"errors"
 	"testing"
 
 	domainProblem "github.com/training-judge-center/backend/internal/domain/problem"
@@ -114,7 +113,7 @@ func TestAddModifier_UserProviderError(t *testing.T) {
 	repo := repoWith(newDraftProblem())
 	provider := &mockUserProvider{
 		existsByIDFn: func(_ context.Context, _ string) (bool, error) {
-			return false, errors.New("provider down")
+			return false, apperror.NewInternal()
 		},
 	}
 	uc := NewAddModifierUseCase(repo, provider)

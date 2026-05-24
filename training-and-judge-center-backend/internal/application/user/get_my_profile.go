@@ -2,7 +2,7 @@ package user
 
 import (
 	"context"
-	"log/slog"
+
 
 	domain "github.com/training-judge-center/backend/internal/domain/user"
 	"github.com/training-judge-center/backend/pkg/apperror"
@@ -28,8 +28,7 @@ func NewGetMyProfileUseCase(repo domain.Repository) *GetMyProfileUseCase {
 func (uc *GetMyProfileUseCase) Execute(ctx context.Context, in GetMyProfileInput) (*GetMyProfileOutput, error) {
 	foundUser, err := uc.repo.FindByID(ctx, in.UserID)
 	if err != nil {
-		slog.ErrorContext(ctx, "failed to find user profile by id", "user_id", in.UserID, "error", err)
-		return nil, apperror.NewInternal()
+		return nil, err
 	}
 	if foundUser == nil {
 		return nil, apperror.NewNotFound(domain.ErrCodeUserNotFound, "User not found")

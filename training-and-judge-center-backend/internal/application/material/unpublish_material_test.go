@@ -158,7 +158,7 @@ func TestUnpublishMaterial_SaveError(t *testing.T) {
 	m := newPublishedMaterial()
 	repo := &mockMaterialRepository{
 		findByIDFn: func(_ context.Context, _ string) (*domainMaterial.Material, error) { return m, nil },
-		saveFn:     func(_ context.Context, _ *domainMaterial.Material) error { return errors.New("db error") },
+		saveFn:     func(_ context.Context, _ *domainMaterial.Material) error { return apperror.NewInternal() },
 	}
 	uc := newUnpublishMaterialUseCase(repo, groupExists())
 

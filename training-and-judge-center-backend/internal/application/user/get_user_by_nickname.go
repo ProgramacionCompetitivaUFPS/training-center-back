@@ -2,7 +2,7 @@ package user
 
 import (
 	"context"
-	"log/slog"
+
 
 	"github.com/training-judge-center/backend/internal/domain/shared"
 	domain "github.com/training-judge-center/backend/internal/domain/user"
@@ -38,8 +38,7 @@ func (uc *GetUserByNicknameUseCase) Execute(ctx context.Context, in GetUserByNic
 
 	targetUser, err := uc.repo.FindByNickname(ctx, parsedNickname)
 	if err != nil {
-		slog.ErrorContext(ctx, "failed to find user profile by nickname", "nickname", in.Nickname, "error", err)
-		return nil, apperror.NewInternal()
+		return nil, err
 	}
 	
 	if targetUser == nil || targetUser.Status() == domain.StatusDeactivated {

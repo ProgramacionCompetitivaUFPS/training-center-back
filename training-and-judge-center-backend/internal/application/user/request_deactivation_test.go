@@ -1,4 +1,4 @@
-package user
+﻿package user
 
 import (
 	"context"
@@ -100,7 +100,7 @@ func TestRequestDeactivation_UserNotFound(t *testing.T) {
 func TestRequestDeactivation_UserRepoError(t *testing.T) {
 	userRepo := newNoConflictRepo()
 	userRepo.findByIDFn = func(_ context.Context, _ string) (*domain.User, error) {
-		return nil, errors.New("db down")
+		return nil, apperror.NewInternal()
 	}
 
 	uc := NewRequestDeactivationUseCase(userRepo, &mockDeactivationRepo{}, &mockEmailSender{})
@@ -122,7 +122,7 @@ func TestRequestDeactivation_InvalidatePendingError(t *testing.T) {
 
 	deactRepo := &mockDeactivationRepo{
 		invalidatePendingByUserIDFn: func(_ context.Context, _ string, _ time.Time) error {
-			return errors.New("db error")
+			return apperror.NewInternal()
 		},
 	}
 
@@ -145,7 +145,7 @@ func TestRequestDeactivation_SaveError(t *testing.T) {
 
 	deactRepo := &mockDeactivationRepo{
 		saveFn: func(_ context.Context, _ *domain.DeactivationRequest) error {
-			return errors.New("insert failed")
+			return apperror.NewInternal()
 		},
 	}
 
