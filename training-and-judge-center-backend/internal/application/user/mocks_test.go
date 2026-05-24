@@ -64,6 +64,8 @@ func (m *mockSessionInvalidator) IsSessionRevoked(ctx context.Context, userID st
 	return false, nil
 }
 
+// ── mockUserRepository ───────────────────────────────────────────────────────
+
 type mockUserRepository struct {
 	saveFn           func(ctx context.Context, u *domain.User) error
 	findByIDFn       func(ctx context.Context, id string) (*domain.User, error)
@@ -136,6 +138,8 @@ func newUserWithRole(id string, role shared.Role, status domain.Status) *domain.
 	)
 }
 
+// ── mockEmailChangeRepo ───────────────────────────────────────────────────────
+
 type mockEmailChangeRepo struct {
 	saveFn                func(ctx context.Context, req *domain.EmailChangeRequest) error
 	findByIDFn            func(ctx context.Context, id string) (*domain.EmailChangeRequest, error)
@@ -178,6 +182,8 @@ func (m *mockEmailChangeRepo) Update(ctx context.Context, req *domain.EmailChang
 	}
 	return nil
 }
+
+// ── mockTransactionManager ───────────────────────────────────────────────────
 
 type mockTransactionManager struct {
 	withTxFn func(ctx context.Context, fn func(txCtx context.Context) error) error

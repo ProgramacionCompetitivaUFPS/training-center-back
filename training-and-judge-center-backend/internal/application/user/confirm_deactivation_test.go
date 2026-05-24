@@ -156,10 +156,8 @@ func TestConfirmDeactivation_ExpiredCode_UpdateFails_ReturnsInternal(t *testing.
 
 	uc := NewConfirmDeactivationUseCase(userRepo, deactRepo, &mockAuditRepo{}, &mockEmailSender{}, &mockSessionInvalidator{}, &mockTransactionManager{})
 
-	// Act
 	_, err := uc.Execute(context.Background(), ConfirmDeactivationInput{UserID: "user-1", Code: "123456"})
 
-	// Assert
 	if err == nil {
 		t.Fatal("expected error, got nil")
 	}
@@ -187,10 +185,8 @@ func TestConfirmDeactivation_InvalidCode_UpdateFails_ReturnsInternal(t *testing.
 
 	uc := NewConfirmDeactivationUseCase(userRepo, deactRepo, &mockAuditRepo{}, &mockEmailSender{}, &mockSessionInvalidator{}, &mockTransactionManager{})
 
-	// Act
 	_, err := uc.Execute(context.Background(), ConfirmDeactivationInput{UserID: "user-1", Code: "000000"})
 
-	// Assert
 	if err == nil {
 		t.Fatal("expected error, got nil")
 	}
@@ -218,10 +214,8 @@ func TestConfirmDeactivation_BlockedState_UpdateFails_ReturnsInternal(t *testing
 
 	uc := NewConfirmDeactivationUseCase(userRepo, deactRepo, &mockAuditRepo{}, &mockEmailSender{}, &mockSessionInvalidator{}, &mockTransactionManager{})
 
-	// Act
 	_, err := uc.Execute(context.Background(), ConfirmDeactivationInput{UserID: "user-1", Code: "000000"})
 
-	// Assert
 	if err == nil {
 		t.Fatal("expected error, got nil")
 	}
