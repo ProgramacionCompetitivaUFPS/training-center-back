@@ -11,7 +11,7 @@ type mockTokenService struct {
 	validateTokenFn func(tokenString string) (*user.TokenClaims, error)
 }
 
-func (m *mockTokenService) GenerateToken(_ *user.User) (string, error) { return "", nil }
+func (m *mockTokenService) GenerateToken(_ context.Context, _ *user.User) (string, error) { return "", nil }
 
 func (m *mockTokenService) ValidateToken(tokenString string) (*user.TokenClaims, error) {
 	if m.validateTokenFn != nil {

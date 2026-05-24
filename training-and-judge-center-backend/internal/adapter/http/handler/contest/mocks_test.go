@@ -19,7 +19,7 @@ import (
 
 type mockTokenSvc struct{}
 
-func (m *mockTokenSvc) GenerateToken(_ *domainUser.User) (string, error) { return "tok", nil }
+func (m *mockTokenSvc) GenerateToken(_ context.Context, _ *domainUser.User) (string, error) { return "tok", nil }
 func (m *mockTokenSvc) ValidateToken(_ string) (*domainUser.TokenClaims, error) {
 	return &domainUser.TokenClaims{UserID: shared.RestoreUserID("u1").Value(), Role: shared.RoleCoach}, nil
 }
