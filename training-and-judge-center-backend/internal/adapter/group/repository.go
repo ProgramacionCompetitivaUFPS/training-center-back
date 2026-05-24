@@ -49,7 +49,7 @@ func (r *Repository) Save(ctx context.Context, g *domainGroup.Group) error {
 	)
 	if err != nil {
 		var pgErr *pgconn.PgError
-		if errors.As(err, &pgErr) && pgErr.Code == "23505" {
+		if errors.As(err, &pgErr) && pgErr.Code == infraPostgres.UniqueViolation {
 			return apperror.NewConflict(domainGroup.ErrCodeNameAlreadyExists, "A group with this name already exists")
 		}
 		slog.ErrorContext(ctx, "failed to save group", "error", err, "group_id", g.ID())
