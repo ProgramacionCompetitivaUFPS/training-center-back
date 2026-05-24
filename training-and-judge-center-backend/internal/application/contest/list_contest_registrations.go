@@ -67,11 +67,7 @@ func (uc *ListContestRegistrationsUseCase) Execute(ctx context.Context, in ListC
 	if err != nil {
 		return nil, err
 	}
-	isLead, err := uc.memberProvider.IsLeadOfGroup(ctx, in.CurrentUser.ID, in.GroupID)
-	if err != nil {
-		return nil, err
-	}
-	if !isMember && !isLead && !in.CurrentUser.IsAdmin() {
+	if !isMember && !in.CurrentUser.IsAdmin() {
 		return nil, apperror.NewForbidden(ErrCodeNotGroupMember, "only group members can view contest registrations")
 	}
 

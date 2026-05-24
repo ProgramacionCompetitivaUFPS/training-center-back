@@ -8,17 +8,16 @@ import (
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
-	"github.com/jackc/pgx/v5/pgxpool"
 	infraPostgres "github.com/training-judge-center/backend/internal/adapter/postgres"
 	domainContest "github.com/training-judge-center/backend/internal/domain/contest"
 	"github.com/training-judge-center/backend/pkg/apperror"
 )
 
 type RegistrationRepository struct {
-	db *pgxpool.Pool
+	db infraPostgres.Querier
 }
 
-func NewRegistrationRepository(db *pgxpool.Pool) *RegistrationRepository {
+func NewRegistrationRepository(db infraPostgres.Querier) *RegistrationRepository {
 	return &RegistrationRepository{db: db}
 }
 
