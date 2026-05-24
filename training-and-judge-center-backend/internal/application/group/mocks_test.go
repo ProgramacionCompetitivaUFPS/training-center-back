@@ -292,3 +292,8 @@ func pendingRequest(id, groupID, requesterID string) *domainGroup.JoinRequest {
 		time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC))
 	return req
 }
+
+func inviteGroup(t *testing.T) *domainGroup.Group {
+	t.Helper()
+	return mustGroup(t, "g1", "Invite Club", domainGroup.VisibilityVisible, domainGroup.JoinPolicyInvite)
+}

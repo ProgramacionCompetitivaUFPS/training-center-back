@@ -9,13 +9,9 @@ import (
 	"github.com/training-judge-center/backend/pkg/apperror"
 )
 
-func newRemoveModifierUseCase(repo *mockProblemRepository) *RemoveModifierUseCase {
-	return NewRemoveModifierUseCase(repo)
-}
-
 func TestRemoveModifier_Success_Author(t *testing.T) {
 	repo := repoWith(newDraftProblemWithModifier())
-	uc := newRemoveModifierUseCase(repo)
+	uc := NewRemoveModifierUseCase(repo)
 
 	err := uc.Execute(context.Background(), RemoveModifierInput{
 		Slug:        testSlug,
@@ -29,7 +25,7 @@ func TestRemoveModifier_Success_Author(t *testing.T) {
 
 func TestRemoveModifier_Success_Admin(t *testing.T) {
 	repo := repoWith(newDraftProblemWithModifier())
-	uc := newRemoveModifierUseCase(repo)
+	uc := NewRemoveModifierUseCase(repo)
 
 	err := uc.Execute(context.Background(), RemoveModifierInput{
 		Slug:        testSlug,
@@ -43,7 +39,7 @@ func TestRemoveModifier_Success_Admin(t *testing.T) {
 
 func TestRemoveModifier_Forbidden_Stranger(t *testing.T) {
 	repo := repoWith(newDraftProblemWithModifier())
-	uc := newRemoveModifierUseCase(repo)
+	uc := NewRemoveModifierUseCase(repo)
 
 	err := uc.Execute(context.Background(), RemoveModifierInput{
 		Slug:        testSlug,
@@ -65,7 +61,7 @@ func TestRemoveModifier_Forbidden_Stranger(t *testing.T) {
 
 func TestRemoveModifier_ModifierNotFound(t *testing.T) {
 	repo := repoWith(newDraftProblem()) // no modifiers
-	uc := newRemoveModifierUseCase(repo)
+	uc := NewRemoveModifierUseCase(repo)
 
 	err := uc.Execute(context.Background(), RemoveModifierInput{
 		Slug:        testSlug,
@@ -94,7 +90,7 @@ func TestRemoveModifier_RepositoryError(t *testing.T) {
 			return errors.New("db error")
 		},
 	}
-	uc := newRemoveModifierUseCase(repo)
+	uc := NewRemoveModifierUseCase(repo)
 
 	err := uc.Execute(context.Background(), RemoveModifierInput{
 		Slug:        testSlug,

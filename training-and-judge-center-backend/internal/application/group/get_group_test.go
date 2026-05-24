@@ -10,9 +10,6 @@ import (
 	"github.com/training-judge-center/backend/pkg/apperror"
 )
 
-func newGetGroupUseCase(repo *mockGroupRepository, memberRepo *mockMemberRepository, user *mockUserProvider) *GetGroupUseCase {
-	return NewGetGroupUseCase(repo, memberRepo, user)
-}
 
 func notVisibleGroup(t *testing.T) *domainGroup.Group {
 	t.Helper()

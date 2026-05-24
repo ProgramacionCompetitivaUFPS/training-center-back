@@ -9,9 +9,6 @@ import (
 	"github.com/training-judge-center/backend/pkg/apperror"
 )
 
-func newRequestJoinUseCase(repo *mockGroupRepository, memberRepo *mockMemberRepository, reqRepo *mockJoinRequestRepository) *RequestJoinUseCase {
-	return NewRequestJoinUseCase(repo, memberRepo, reqRepo)
-}
 
 func requestGroup(t *testing.T) *domainGroup.Group {
 	t.Helper()
@@ -19,7 +16,7 @@ func requestGroup(t *testing.T) *domainGroup.Group {
 }
 
 func TestRequestJoin_GroupNotFoundReturns404(t *testing.T) {
-	uc := newRequestJoinUseCase(&mockGroupRepository{}, &mockMemberRepository{}, &mockJoinRequestRepository{})
+	uc := NewRequestJoinUseCase(&mockGroupRepository{}, &mockMemberRepository{}, &mockJoinRequestRepository{})
 
 	_, err := uc.Execute(context.Background(), RequestJoinInput{
 		GroupID:     "nonexistent",
@@ -34,7 +31,7 @@ func TestRequestJoin_GroupNotFoundReturns404(t *testing.T) {
 func TestRequestJoin_NotVisibleGroupReturns404(t *testing.T) {
 	g := mustGroup(t, "g1", "Secret", domainGroup.VisibilityNotVisible, domainGroup.JoinPolicyInvite)
 	repo := &mockGroupRepository{groups: []*domainGroup.Group{g}}
-	uc := newRequestJoinUseCase(repo, &mockMemberRepository{}, &mockJoinRequestRepository{})
+	uc := NewRequestJoinUseCase(repo, &mockMemberRepository{}, &mockJoinRequestRepository{})
 
 	_, err := uc.Execute(context.Background(), RequestJoinInput{
 		GroupID:     "g1",
@@ -49,7 +46,7 @@ func TestRequestJoin_NotVisibleGroupReturns404(t *testing.T) {
 func TestRequestJoin_OpenGroupReturns400InvalidPolicy(t *testing.T) {
 	g := mustGroup(t, "g1", "Open Club", domainGroup.VisibilityVisible, domainGroup.JoinPolicyOpen)
 	repo := &mockGroupRepository{groups: []*domainGroup.Group{g}}
-	uc := newRequestJoinUseCase(repo, &mockMemberRepository{}, &mockJoinRequestRepository{})
+	uc := NewRequestJoinUseCase(repo, &mockMemberRepository{}, &mockJoinRequestRepository{})
 
 	_, err := uc.Execute(context.Background(), RequestJoinInput{
 		GroupID:     "g1",
@@ -68,7 +65,7 @@ func TestRequestJoin_AlreadyMemberReturns409(t *testing.T) {
 
 	repo := &mockGroupRepository{groups: []*domainGroup.Group{g}}
 	memberRepo := &mockMemberRepository{memberships: map[string]*domainGroup.GroupMember{keyOf("g1", userID): member}}
-	uc := newRequestJoinUseCase(repo, memberRepo, &mockJoinRequestRepository{})
+	uc := NewRequestJoinUseCase(repo, memberRepo, &mockJoinRequestRepository{})
 
 	_, err := uc.Execute(context.Background(), RequestJoinInput{
 		GroupID:     "g1",
@@ -86,7 +83,7 @@ func TestRequestJoin_AlreadyPendingReturns409(t *testing.T) {
 
 	repo := &mockGroupRepository{groups: []*domainGroup.Group{g}}
 	reqRepo := &mockJoinRequestRepository{requests: []*domainGroup.JoinRequest{existingReq}}
-	uc := newRequestJoinUseCase(repo, &mockMemberRepository{}, reqRepo)
+	uc := NewRequestJoinUseCase(repo, &mockMemberRepository{}, reqRepo)
 
 	_, err := uc.Execute(context.Background(), RequestJoinInput{
 		GroupID:     "g1",
@@ -102,7 +99,7 @@ func TestRequestJoin_SuccessCreatesRequest(t *testing.T) {
 	g := requestGroup(t)
 	repo := &mockGroupRepository{groups: []*domainGroup.Group{g}}
 	reqRepo := &mockJoinRequestRepository{}
-	uc := newRequestJoinUseCase(repo, &mockMemberRepository{}, reqRepo)
+	uc := NewRequestJoinUseCase(repo, &mockMemberRepository{}, reqRepo)
 
 	msg := "I want to join"
 	out, err := uc.Execute(context.Background(), RequestJoinInput{

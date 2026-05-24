@@ -9,15 +9,11 @@ import (
 	"github.com/training-judge-center/backend/pkg/apperror"
 )
 
-func newAddModifierUseCase(repo *mockProblemRepository, user *mockUserProvider) *AddModifierUseCase {
-	return NewAddModifierUseCase(repo, user)
-}
-
 const newModifierID = "cccccccc-0000-0000-0000-000000000001"
 
 func TestAddModifier_Success_Author(t *testing.T) {
 	repo := repoWith(newDraftProblem())
-	uc := newAddModifierUseCase(repo, &mockUserProvider{})
+	uc := NewAddModifierUseCase(repo, &mockUserProvider{})
 
 	err := uc.Execute(context.Background(), AddModifierInput{
 		Slug:        testSlug,
@@ -31,7 +27,7 @@ func TestAddModifier_Success_Author(t *testing.T) {
 
 func TestAddModifier_Success_Admin(t *testing.T) {
 	repo := repoWith(newDraftProblem())
-	uc := newAddModifierUseCase(repo, &mockUserProvider{})
+	uc := NewAddModifierUseCase(repo, &mockUserProvider{})
 
 	err := uc.Execute(context.Background(), AddModifierInput{
 		Slug:        testSlug,
@@ -45,7 +41,7 @@ func TestAddModifier_Success_Admin(t *testing.T) {
 
 func TestAddModifier_Forbidden_Stranger(t *testing.T) {
 	repo := repoWith(newDraftProblem())
-	uc := newAddModifierUseCase(repo, &mockUserProvider{})
+	uc := NewAddModifierUseCase(repo, &mockUserProvider{})
 
 	err := uc.Execute(context.Background(), AddModifierInput{
 		Slug:        testSlug,
@@ -72,7 +68,7 @@ func TestAddModifier_UserNotFound(t *testing.T) {
 			return false, nil
 		},
 	}
-	uc := newAddModifierUseCase(repo, provider)
+	uc := NewAddModifierUseCase(repo, provider)
 
 	err := uc.Execute(context.Background(), AddModifierInput{
 		Slug:        testSlug,
@@ -94,7 +90,7 @@ func TestAddModifier_UserNotFound(t *testing.T) {
 
 func TestAddModifier_UserAlreadyModifier(t *testing.T) {
 	repo := repoWith(newDraftProblemWithModifier()) // modifierID already in list
-	uc := newAddModifierUseCase(repo, &mockUserProvider{})
+	uc := NewAddModifierUseCase(repo, &mockUserProvider{})
 
 	err := uc.Execute(context.Background(), AddModifierInput{
 		Slug:        testSlug,
@@ -121,7 +117,7 @@ func TestAddModifier_UserProviderError(t *testing.T) {
 			return false, errors.New("provider down")
 		},
 	}
-	uc := newAddModifierUseCase(repo, provider)
+	uc := NewAddModifierUseCase(repo, provider)
 
 	err := uc.Execute(context.Background(), AddModifierInput{
 		Slug:        testSlug,
@@ -143,7 +139,7 @@ func TestAddModifier_UserProviderError(t *testing.T) {
 
 func TestAddModifier_InvalidUserID(t *testing.T) {
 	repo := repoWith(newDraftProblem())
-	uc := newAddModifierUseCase(repo, &mockUserProvider{})
+	uc := NewAddModifierUseCase(repo, &mockUserProvider{})
 
 	err := uc.Execute(context.Background(), AddModifierInput{
 		Slug:        testSlug,

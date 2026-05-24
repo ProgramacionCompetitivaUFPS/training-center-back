@@ -8,14 +8,11 @@ import (
 	"github.com/training-judge-center/backend/pkg/apperror"
 )
 
-func newRejectRequestUseCase(memberRepo *mockMemberRepository, reqRepo *mockJoinRequestRepository) *RejectRequestUseCase {
-	return NewRejectRequestUseCase(memberRepo, reqRepo)
-}
 
 func TestRejectRequest_NonLeadReturns403(t *testing.T) {
 	req := pendingRequest("r1", "g1", "requester-id")
 	reqRepo := &mockJoinRequestRepository{requests: []*domainGroup.JoinRequest{req}}
-	uc := newRejectRequestUseCase(&mockMemberRepository{}, reqRepo)
+	uc := NewRejectRequestUseCase(&mockMemberRepository{}, reqRepo)
 
 	_, err := uc.Execute(context.Background(), RejectRequestInput{
 		GroupID:     "g1",
@@ -31,7 +28,7 @@ func TestRejectRequest_NonLeadReturns403(t *testing.T) {
 func TestRejectRequest_AdminCanRejectWithoutMembership(t *testing.T) {
 	req := pendingRequest("r1", "g1", "requester-id")
 	reqRepo := &mockJoinRequestRepository{requests: []*domainGroup.JoinRequest{req}}
-	uc := newRejectRequestUseCase(&mockMemberRepository{}, reqRepo)
+	uc := NewRejectRequestUseCase(&mockMemberRepository{}, reqRepo)
 
 	out, err := uc.Execute(context.Background(), RejectRequestInput{
 		GroupID:     "g1",
@@ -47,7 +44,7 @@ func TestRejectRequest_AdminCanRejectWithoutMembership(t *testing.T) {
 }
 
 func TestRejectRequest_RequestNotFoundReturns404(t *testing.T) {
-	uc := newRejectRequestUseCase(leadMemberRepo("g1", "lead-id"), &mockJoinRequestRepository{})
+	uc := NewRejectRequestUseCase(leadMemberRepo("g1", "lead-id"), &mockJoinRequestRepository{})
 
 	_, err := uc.Execute(context.Background(), RejectRequestInput{
 		GroupID:     "g1",
@@ -64,7 +61,7 @@ func TestRejectRequest_AlreadyProcessedReturns400(t *testing.T) {
 	req := pendingRequest("r1", "g1", "requester-id")
 	_ = req.Approve()
 	reqRepo := &mockJoinRequestRepository{requests: []*domainGroup.JoinRequest{req}}
-	uc := newRejectRequestUseCase(leadMemberRepo("g1", "lead-id"), reqRepo)
+	uc := NewRejectRequestUseCase(leadMemberRepo("g1", "lead-id"), reqRepo)
 
 	_, err := uc.Execute(context.Background(), RejectRequestInput{
 		GroupID:     "g1",
@@ -80,7 +77,7 @@ func TestRejectRequest_AlreadyProcessedReturns400(t *testing.T) {
 func TestRejectRequest_SuccessUpdatesStatus(t *testing.T) {
 	req := pendingRequest("r1", "g1", "requester-id")
 	reqRepo := &mockJoinRequestRepository{requests: []*domainGroup.JoinRequest{req}}
-	uc := newRejectRequestUseCase(leadMemberRepo("g1", "lead-id"), reqRepo)
+	uc := NewRejectRequestUseCase(leadMemberRepo("g1", "lead-id"), reqRepo)
 
 	out, err := uc.Execute(context.Background(), RejectRequestInput{
 		GroupID:     "g1",

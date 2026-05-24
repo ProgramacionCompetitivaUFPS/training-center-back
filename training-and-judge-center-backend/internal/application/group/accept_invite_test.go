@@ -10,9 +10,6 @@ import (
 	"github.com/training-judge-center/backend/pkg/apperror"
 )
 
-func newAcceptInviteUseCase(repo *mockGroupRepository, memberRepo *mockMemberRepository, svc *mockInvitationTokenService) *AcceptInviteUseCase {
-	return NewAcceptInviteUseCase(repo, memberRepo, svc)
-}
 
 func TestAcceptInvite_EmptyTokenReturnsValidationError(t *testing.T) {
 	uc := NewAcceptInviteUseCase(&mockGroupRepository{}, &mockMemberRepository{}, &mockInvitationTokenService{})

@@ -8,12 +8,8 @@ import (
 	"github.com/training-judge-center/backend/pkg/apperror"
 )
 
-func newGetProblemUseCase(repo *mockProblemRepository) *GetProblemUseCase {
-	return NewGetProblemUseCase(repo, &mockUserProvider{})
-}
-
 func TestGetProblem_AuthorCanSeeDraft(t *testing.T) {
-	uc := newGetProblemUseCase(repoWith(newDraftProblem()))
+	uc := NewGetProblemUseCase(repoWith(newDraftProblem()), &mockUserProvider{})
 
 	out, err := uc.Execute(context.Background(), GetProblemInput{
 		Slug:        testSlug,
@@ -31,7 +27,7 @@ func TestGetProblem_AuthorCanSeeDraft(t *testing.T) {
 }
 
 func TestGetProblem_AdminCanSeeDraft(t *testing.T) {
-	uc := newGetProblemUseCase(repoWith(newDraftProblem()))
+	uc := NewGetProblemUseCase(repoWith(newDraftProblem()), &mockUserProvider{})
 
 	_, err := uc.Execute(context.Background(), GetProblemInput{
 		Slug:        testSlug,
@@ -43,7 +39,7 @@ func TestGetProblem_AdminCanSeeDraft(t *testing.T) {
 }
 
 func TestGetProblem_ModifierCanSeeDraft(t *testing.T) {
-	uc := newGetProblemUseCase(repoWith(newDraftProblemWithModifier()))
+	uc := NewGetProblemUseCase(repoWith(newDraftProblemWithModifier()), &mockUserProvider{})
 
 	_, err := uc.Execute(context.Background(), GetProblemInput{
 		Slug:        testSlug,
@@ -55,7 +51,7 @@ func TestGetProblem_ModifierCanSeeDraft(t *testing.T) {
 }
 
 func TestGetProblem_StrangerCannotSeeDraft(t *testing.T) {
-	uc := newGetProblemUseCase(repoWith(newDraftProblem()))
+	uc := NewGetProblemUseCase(repoWith(newDraftProblem()), &mockUserProvider{})
 
 	_, err := uc.Execute(context.Background(), GetProblemInput{
 		Slug:        testSlug,
@@ -75,7 +71,7 @@ func TestGetProblem_StrangerCannotSeeDraft(t *testing.T) {
 }
 
 func TestGetProblem_AnyoneCanSeePublished(t *testing.T) {
-	uc := newGetProblemUseCase(repoWith(newPublishedProblem()))
+	uc := NewGetProblemUseCase(repoWith(newPublishedProblem()), &mockUserProvider{})
 
 	_, err := uc.Execute(context.Background(), GetProblemInput{
 		Slug:        testSlug,
@@ -87,7 +83,7 @@ func TestGetProblem_AnyoneCanSeePublished(t *testing.T) {
 }
 
 func TestGetProblem_NonEditorDoesNotSeeModifiersOrFiles(t *testing.T) {
-	uc := newGetProblemUseCase(repoWith(newPublishedProblem()))
+	uc := NewGetProblemUseCase(repoWith(newPublishedProblem()), &mockUserProvider{})
 
 	out, err := uc.Execute(context.Background(), GetProblemInput{
 		Slug:        testSlug,
@@ -110,7 +106,7 @@ func TestGetProblem_NotFound(t *testing.T) {
 			return nil, apperror.NewNotFound(apperror.ErrCodeNotFound, "problem not found")
 		},
 	}
-	uc := newGetProblemUseCase(repo)
+	uc := NewGetProblemUseCase(repo, &mockUserProvider{})
 
 	_, err := uc.Execute(context.Background(), GetProblemInput{
 		Slug:        testSlug,
