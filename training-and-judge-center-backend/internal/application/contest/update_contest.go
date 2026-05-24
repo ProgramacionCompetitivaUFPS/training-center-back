@@ -2,7 +2,7 @@ package contest
 
 import (
 	"context"
-	"log/slog"
+
 	"time"
 
 	"github.com/google/uuid"
@@ -217,8 +217,7 @@ func (uc *UpdateContestUseCase) Execute(ctx context.Context, in UpdateContestInp
 	if err := uc.txManager.WithTx(ctx, func(txCtx context.Context) error {
 		return uc.repo.Update(txCtx, c)
 	}); err != nil {
-		slog.ErrorContext(ctx, "failed to persist contest update", "contest_id", c.ID(), "error", err)
-		return nil, apperror.NewInternal()
+		return nil, err
 	}
 
 	group, err := uc.groupProvider.FindByID(ctx, in.GroupID)

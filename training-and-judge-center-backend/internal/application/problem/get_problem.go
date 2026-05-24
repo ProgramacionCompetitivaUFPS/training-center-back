@@ -2,7 +2,7 @@
 
 import (
 	"context"
-	"log/slog"
+
 
 	appshared "github.com/training-judge-center/backend/internal/application/shared"
 	"github.com/training-judge-center/backend/internal/domain/problem"
@@ -59,8 +59,7 @@ func (uc *GetProblemUseCase) Execute(ctx context.Context, in GetProblemInput) (*
 
 	authorDisplay, err := uc.userProvider.GetDisplay(ctx, p.AuthorID().Value())
 	if err != nil {
-		slog.ErrorContext(ctx, "failed to fetch author display", "error", err, "author_id", p.AuthorID().Value())
-		return nil, apperror.NewInternal()
+		return nil, err
 	}
 
 	out := &GetProblemOutput{
@@ -75,8 +74,7 @@ func (uc *GetProblemUseCase) Execute(ctx context.Context, in GetProblemInput) (*
 		}
 		displays, err := uc.userProvider.GetDisplays(ctx, modifierIDs)
 		if err != nil {
-			slog.ErrorContext(ctx, "failed to fetch modifier displays", "error", err)
-			return nil, apperror.NewInternal()
+			return nil, err
 		}
 		modifiers := make([]ModifierDisplay, 0, len(p.ModifierIDs()))
 		for _, id := range modifierIDs {

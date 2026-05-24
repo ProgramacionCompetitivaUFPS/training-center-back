@@ -2,7 +2,7 @@
 
 import (
 	"context"
-	"log/slog"
+
 
 	appshared "github.com/training-judge-center/backend/internal/application/shared"
 	"github.com/training-judge-center/backend/internal/domain/problem"
@@ -82,8 +82,7 @@ func (uc *ListProblemsUseCase) Execute(ctx context.Context, in ListProblemsInput
 	if in.AuthorNickname != nil {
 		authorID, found, err := uc.userProvider.GetIDByNickname(ctx, *in.AuthorNickname)
 		if err != nil {
-			slog.ErrorContext(ctx, "failed to get author ID by nickname", "error", err, "nickname", *in.AuthorNickname)
-			return nil, apperror.NewInternal()
+			return nil, err
 		}
 		if !found {
 			return &ListProblemsOutput{
@@ -114,8 +113,7 @@ func (uc *ListProblemsUseCase) Execute(ctx context.Context, in ListProblemsInput
 
 	displays, err := uc.userProvider.GetDisplays(ctx, authorIDs)
 	if err != nil {
-		slog.ErrorContext(ctx, "failed to fetch author displays", "error", err)
-		return nil, apperror.NewInternal()
+		return nil, err
 	}
 
 	summaries := make([]ProblemSummary, 0, len(problems))

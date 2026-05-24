@@ -2,7 +2,7 @@
 
 import (
 	"context"
-	"log/slog"
+
 	"time"
 
 	"github.com/training-judge-center/backend/internal/domain/problem"
@@ -51,8 +51,7 @@ func (uc *UnpublishProblemUseCase) Execute(ctx context.Context, in UnpublishProb
 	}
 
 	if err := uc.repo.Save(ctx, p); err != nil {
-		slog.ErrorContext(ctx, "failed to save problem after unpublish", "error", err, "slug", p.Slug().String())
-		return nil, apperror.NewInternal()
+		return nil, err
 	}
 
 	return &UnpublishProblemOutput{Problem: problemToDTO(p)}, nil

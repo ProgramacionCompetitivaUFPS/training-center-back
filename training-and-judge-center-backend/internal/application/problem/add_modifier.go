@@ -2,7 +2,7 @@
 
 import (
 	"context"
-	"log/slog"
+
 	"time"
 
 	"github.com/training-judge-center/backend/internal/domain/problem"
@@ -49,8 +49,7 @@ func (uc *AddModifierUseCase) Execute(ctx context.Context, input AddModifierInpu
 
 	exists, err := uc.userProvider.ExistsByID(ctx, input.UserID)
 	if err != nil {
-		slog.ErrorContext(ctx, "failed to check user existence", "error", err, "user_id", input.UserID)
-		return apperror.NewInternal()
+		return err
 	}
 	if !exists {
 		return apperror.NewNotFound(ErrCodeUserNotFound, "User not found")
@@ -67,8 +66,7 @@ func (uc *AddModifierUseCase) Execute(ctx context.Context, input AddModifierInpu
 	}
 
 	if err := uc.repo.Save(ctx, p); err != nil {
-		slog.ErrorContext(ctx, "failed to save problem with new modifier", "error", err, "slug", p.Slug().String())
-		return apperror.NewInternal()
+		return err
 	}
 
 	return nil
