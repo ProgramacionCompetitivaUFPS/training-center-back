@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"log/slog"
 	"path/filepath"
 	"strings"
 	"time"
@@ -60,8 +59,7 @@ func (uc *ImportProblemUseCase) Execute(ctx context.Context, input ImportProblem
 
 	exists, err := uc.repo.ExistsBySlug(ctx, slug)
 	if err != nil {
-		slog.ErrorContext(ctx, "failed to check slug existence before import", "error", err, "slug", slug.String())
-		return nil, apperror.NewInternal()
+		return nil, err
 	}
 	if exists {
 		return nil, apperror.NewConflict(problem.ErrCodeSlugAlreadyExists, "A problem with slug '"+slug.String()+"' already exists")
@@ -121,9 +119,7 @@ func (uc *ImportProblemUseCase) Execute(ctx context.Context, input ImportProblem
 	var uploadedKeys []string
 	cleanup := func() {
 		for _, key := range uploadedKeys {
-			if err := uc.storage.DeleteFile(ctx, key); err != nil {
-				slog.ErrorContext(ctx, "rollback: failed to delete uploaded file", "key", key, "error", err)
-			}
+			_ = uc.storage.DeleteFile(ctx, key)
 		}
 	}
 
@@ -151,9 +147,8 @@ func (uc *ImportProblemUseCase) Execute(ctx context.Context, input ImportProblem
 		zipKey := fmt.Sprintf("%s/testcases.zip", basePath)
 
 		if err := uc.storage.UploadFile(ctx, zipKey, pkg.ZipData); err != nil {
-			slog.ErrorContext(ctx, "import: failed to upload testcases zip", "error", err)
 			cleanup()
-			return nil, apperror.NewInternal()
+			return nil, err
 		}
 		uploadedKeys = append(uploadedKeys, zipKey)
 
@@ -166,8 +161,7 @@ func (uc *ImportProblemUseCase) Execute(ctx context.Context, input ImportProblem
 			uploadedKeys = append(uploadedKeys, destPath)
 			g.Go(func() error {
 				if err := uc.storage.UploadFile(gCtx, destPath, file.Content); err != nil {
-					slog.ErrorContext(gCtx, "import: failed to upload sample file", "path", destPath, "error", err)
-					return apperror.NewInternal()
+					return err
 				}
 				return nil
 			})
@@ -193,9 +187,8 @@ func (uc *ImportProblemUseCase) Execute(ctx context.Context, input ImportProblem
 			return nil, err
 		}
 		if err := uc.storage.UploadFile(ctx, fileKey, sol.Content); err != nil {
-			slog.ErrorContext(ctx, "import: failed to upload solution", "file", cleanName, "error", err)
 			cleanup()
-			return nil, apperror.NewInternal()
+			return nil, err
 		}
 		uploadedKeys = append(uploadedKeys, fileKey)
 		newProblem.AddSolution(solutionObj, now)
@@ -214,9 +207,8 @@ func (uc *ImportProblemUseCase) Execute(ctx context.Context, input ImportProblem
 	}
 
 	if err := uc.repo.Save(ctx, newProblem); err != nil {
-		slog.ErrorContext(ctx, "import: failed to save problem", "error", err, "slug", slug.String())
 		cleanup()
-		return nil, apperror.NewInternal()
+		return nil, err
 	}
 
 	return &ImportProblemOutput{Problem: problemToDTO(newProblem)}, nil
@@ -246,9 +238,8 @@ func (uc *ImportProblemUseCase) uploadVerifier(
 	}
 
 	if err := uc.storage.UploadFile(ctx, fileKey, f.Content); err != nil {
-		slog.ErrorContext(ctx, "import: failed to upload "+fileType, "file", cleanName, "error", err)
 		cleanup()
-		return apperror.NewInternal()
+		return err
 	}
 	*uploadedKeys = append(*uploadedKeys, fileKey)
 

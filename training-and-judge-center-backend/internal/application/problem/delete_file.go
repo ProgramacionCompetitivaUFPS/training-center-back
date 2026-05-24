@@ -116,19 +116,16 @@ func (usecase *DeleteProblemFileUseCase) Execute(ctx context.Context, input Dele
 
 	if deleteByPrefix {
 		if err := usecase.fileStorage.DeleteFilesWithPrefix(ctx, storageKeyToDelete); err != nil {
-			slog.ErrorContext(ctx, "failed to delete files from storage", "prefix", storageKeyToDelete, "error", err)
-			return apperror.NewInternal()
+			return err
 		}
 	} else {
 		if err := usecase.fileStorage.DeleteFile(ctx, storageKeyToDelete); err != nil {
-			slog.ErrorContext(ctx, "failed to delete file from storage", "key", storageKeyToDelete, "error", err)
-			return apperror.NewInternal()
+			return err
 		}
 	}
 
 	if err := usecase.repo.Save(ctx, foundProblem); err != nil {
-		slog.ErrorContext(ctx, "failed to save problem after file deletion", "error", err, "slug", foundProblem.Slug().String())
-		return apperror.NewInternal()
+		return err
 	}
 
 	return nil
