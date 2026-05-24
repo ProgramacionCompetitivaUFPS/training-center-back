@@ -78,7 +78,10 @@ func (uc *RegisterToContestUseCase) Execute(ctx context.Context, in RegisterToCo
 		return nil, apperror.NewConflict(domainContest.ErrCodeAlreadyRegistered, "you are already registered for this contest")
 	}
 
-	reg := domainContest.NewContestRegistration(uuid.New().String(), in.ContestID, in.CurrentUser.ID, now)
+	reg, err := domainContest.NewContestRegistration(uuid.New().String(), in.ContestID, in.CurrentUser.ID, now)
+	if err != nil {
+		return nil, err
+	}
 	if err := uc.registrationRepo.Save(ctx, reg); err != nil {
 		return nil, err
 	}

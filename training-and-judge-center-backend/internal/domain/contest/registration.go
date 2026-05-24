@@ -1,6 +1,10 @@
 package contest
 
-import "time"
+import (
+	"time"
+
+	"github.com/training-judge-center/backend/pkg/apperror"
+)
 
 type ContestRegistration struct {
 	id           string
@@ -9,13 +13,16 @@ type ContestRegistration struct {
 	registeredAt time.Time
 }
 
-func NewContestRegistration(id, contestID, userID string, now time.Time) *ContestRegistration {
+func NewContestRegistration(id, contestID, userID string, now time.Time) (*ContestRegistration, error) {
+	if id == "" || contestID == "" || userID == "" || now.IsZero() {
+		return nil, apperror.NewInternal()
+	}
 	return &ContestRegistration{
 		id:           id,
 		contestID:    contestID,
 		userID:       userID,
 		registeredAt: now.UTC(),
-	}
+	}, nil
 }
 
 func RestoreContestRegistration(id, contestID, userID string, registeredAt time.Time) *ContestRegistration {
