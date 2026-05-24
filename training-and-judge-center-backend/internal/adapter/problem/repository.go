@@ -181,7 +181,7 @@ func scanProblem(ctx context.Context, row pgx.Row) (*domainProblem.Problem, erro
 	)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			return nil, apperror.NewNotFound(apperror.ErrCodeNotFound, "problem not found")
+			return nil, apperror.NewNotFound(domainProblem.ErrCodeProblemNotFound, "problem not found")
 		}
 		slog.ErrorContext(ctx, "Database error in scanProblem", "error", err)
 		return nil, apperror.NewInternal()
@@ -345,7 +345,7 @@ func (r *Repository) Delete(ctx context.Context, id string) error {
 		return apperror.NewInternal()
 	}
 	if tag.RowsAffected() == 0 {
-		return apperror.NewNotFound(apperror.ErrCodeNotFound, "problem not found")
+		return apperror.NewNotFound(domainProblem.ErrCodeProblemNotFound, "problem not found")
 	}
 	return nil
 }
@@ -423,28 +423,34 @@ func (r *Repository) List(ctx context.Context, filters domainProblem.ListFilters
 	g.Go(func() error {
 		rows, queryErr := r.db.Query(gCtx, selectQuery, args...)
 		if queryErr != nil {
-			return queryErr
+			slog.ErrorContext(gCtx, "database error querying problems", "error", queryErr)
+			return apperror.NewInternal()
 		}
 		defer rows.Close()
 		for rows.Next() {
 			p, err := scanProblem(gCtx, rows)
 			if err != nil {
-				return err
+				return err // scanProblem already returns apperror
 			}
 			result = append(result, p)
 		}
-		return rows.Err()
+		if err := rows.Err(); err != nil {
+			slog.ErrorContext(gCtx, "database error iterating problem rows", "error", err)
+			return apperror.NewInternal()
+		}
+		return nil
 	})
 
 	g.Go(func() error {
-		var countErr error
-		countErr = r.db.QueryRow(gCtx, countQuery, countArgs...).Scan(&total)
-		return countErr
+		if err := r.db.QueryRow(gCtx, countQuery, countArgs...).Scan(&total); err != nil {
+			slog.ErrorContext(gCtx, "database error counting problems", "error", err)
+			return apperror.NewInternal()
+		}
+		return nil
 	})
 
 	if err := g.Wait(); err != nil {
-		slog.ErrorContext(ctx, "Database error in List", "error", err)
-		return nil, 0, apperror.NewInternal()
+		return nil, 0, err // already apperror — goroutines already logged
 	}
 
 	if result == nil {
