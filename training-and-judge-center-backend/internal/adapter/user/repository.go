@@ -44,7 +44,7 @@ func (r *Repository) Save(ctx context.Context, u *domainUser.User) error {
 	)
 	if err != nil {
 		var pgErr *pgconn.PgError
-		if errors.As(err, &pgErr) && pgErr.Code == "23505" {
+		if errors.As(err, &pgErr) && pgErr.Code == infraPostgres.UniqueViolation {
 			switch pgErr.ConstraintName {
 			case "users_email_key":
 				return apperror.NewConflict(domainUser.ErrCodeEmailConflict, "email already in use")
@@ -89,7 +89,7 @@ func (r *Repository) Update(ctx context.Context, u *domainUser.User) error {
 	)
 	if err != nil {
 		var pgErr *pgconn.PgError
-		if errors.As(err, &pgErr) && pgErr.Code == "23505" {
+		if errors.As(err, &pgErr) && pgErr.Code == infraPostgres.UniqueViolation {
 			switch pgErr.ConstraintName {
 			case "users_nickname_key":
 				return apperror.NewConflict(domainUser.ErrCodeNicknameConflict, "nickname already in use")

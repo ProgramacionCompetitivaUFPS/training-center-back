@@ -14,6 +14,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	"golang.org/x/sync/errgroup"
 
+	infraPostgres "github.com/training-judge-center/backend/internal/adapter/postgres"
 	domainProblem "github.com/training-judge-center/backend/internal/domain/problem"
 	"github.com/training-judge-center/backend/internal/domain/shared"
 	"github.com/training-judge-center/backend/pkg/apperror"
@@ -125,7 +126,7 @@ func (r *Repository) Save(ctx context.Context, p *domainProblem.Problem) error {
 
 	if err != nil {
 		var pgErr *pgconn.PgError
-		if errors.As(err, &pgErr) && pgErr.Code == "23505" && pgErr.ConstraintName == "problems_slug_key" {
+		if errors.As(err, &pgErr) && pgErr.Code == infraPostgres.UniqueViolation && pgErr.ConstraintName == "problems_slug_key" {
 			return apperror.NewConflict(domainProblem.ErrCodeSlugAlreadyExists, "slug '"+slug+"' already in use")
 		}
 		slog.ErrorContext(ctx, "Database error in Save", "error", err, "problem_id", p.ID(), "slug", slug)

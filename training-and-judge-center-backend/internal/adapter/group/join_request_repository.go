@@ -42,7 +42,7 @@ func (r *JoinRequestRepository) Save(ctx context.Context, req *domainGroup.JoinR
 	)
 	if err != nil {
 		var pgErr *pgconn.PgError
-		if errors.As(err, &pgErr) && pgErr.Code == "23505" {
+		if errors.As(err, &pgErr) && pgErr.Code == infraPostgres.UniqueViolation {
 			return apperror.NewConflict(domainGroup.ErrCodeRequestAlreadyPending, "a pending request already exists for this user and group")
 		}
 		slog.ErrorContext(ctx, "JoinRequestRepository.Save failed", "error", err)

@@ -34,7 +34,7 @@ func (r *MemberRepository) Save(ctx context.Context, m *domainGroup.GroupMember)
 	_, err := db.Exec(ctx, q, m.ID(), m.GroupID(), m.UserID().Value(), m.Role().String(), m.JoinedAt())
 	if err != nil {
 		var pgErr *pgconn.PgError
-		if errors.As(err, &pgErr) && pgErr.Code == "23505" && pgErr.ConstraintName == "group_members_group_id_user_id_key" {
+		if errors.As(err, &pgErr) && pgErr.Code == infraPostgres.UniqueViolation && pgErr.ConstraintName == "group_members_group_id_user_id_key" {
 			slog.WarnContext(ctx, "MemberRepository.Save: unique constraint hit (possible TOCTOU race)",
 				"group_id", m.GroupID(), "user_id", m.UserID().Value(), "constraint", pgErr.ConstraintName)
 			return apperror.NewConflict(domainGroup.ErrCodeAlreadyMember, "You are already a member of this group")
