@@ -1,8 +1,7 @@
-package user
+﻿package user
 
 import (
 	"context"
-	"errors"
 	"strings"
 	"testing"
 	"time"
@@ -35,7 +34,7 @@ func newActiveUser() *domain.User {
 		"Test User",
 		"testuser",
 		"Colombia",
-		"Cúcuta",
+		"CÃºcuta",
 		"UFPS",
 		shared.RoleContestant.String(),
 		domain.StatusActive.String(),
@@ -266,7 +265,7 @@ func TestLogin_TokenGenerationError(t *testing.T) {
 func TestLogin_RepositoryFindByEmailError(t *testing.T) {
 	repo, tokenSvc := newLoginDeps()
 	repo.findByEmailFn = func(_ context.Context, _ domain.Email) (*domain.User, error) {
-		return nil, errors.New("db connection lost")
+		return nil, apperror.NewInternal()
 	}
 	uc := NewLoginUseCase(repo, tokenSvc)
 
@@ -301,7 +300,7 @@ func TestLogin_PasswordAtBcryptBoundary(t *testing.T) {
 		"Boundary User",
 		"boundaryuser",
 		"Colombia",
-		"Cúcuta",
+		"CÃºcuta",
 		"UFPS",
 		shared.RoleContestant.String(),
 		domain.StatusActive.String(),

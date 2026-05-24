@@ -135,8 +135,7 @@ func (uc *ListUsersUseCase) Execute(ctx context.Context, input ListUsersInput) (
 
 	users, total, err := uc.repo.FindAll(ctx, builtFilter)
 	if err != nil {
-		slog.ErrorContext(ctx, "failed to list users", "error", err)
-		return nil, apperror.NewInternal()
+		return nil, err
 	}
 
 	dtos := make([]UserDTO, len(users))

@@ -40,8 +40,7 @@ func (uc *UpdatePasswordUseCase) Execute(ctx context.Context, input UpdatePasswo
 	rateKey := "rate_limit:update_password:" + input.UserID
 	allowed, err := uc.rateLimiter.Allow(ctx, rateKey, 5, time.Hour)
 	if err != nil {
-		slog.ErrorContext(ctx, "failed to check rate limit for password update", "user_id", input.UserID, "error", err)
-		return nil, apperror.NewInternal()
+		return nil, err
 	}
 	if !allowed {
 		return nil, apperror.NewTooManyRequests(ErrCodeTooManyRequests, "Too many password update attempts. Please try again in an hour.", 3600)
@@ -49,8 +48,7 @@ func (uc *UpdatePasswordUseCase) Execute(ctx context.Context, input UpdatePasswo
 
 	foundUser, err := uc.repo.FindByID(ctx, input.UserID)
 	if err != nil {
-		slog.ErrorContext(ctx, "failed to find user during password update", "user_id", input.UserID, "error", err)
-		return nil, apperror.NewInternal()
+		return nil, err
 	}
 	if foundUser == nil {
 		return nil, apperror.NewNotFound(user.ErrCodeUserNotFound, "User not found")
@@ -82,29 +80,25 @@ func (uc *UpdatePasswordUseCase) Execute(ctx context.Context, input UpdatePasswo
 	}
 
 	if err := uc.repo.Update(ctx, foundUser); err != nil {
-		slog.ErrorContext(ctx, "failed to persist password update", "user_id", foundUser.ID(), "error", err)
-		return nil, apperror.NewInternal()
+		return nil, err
 	}
 
 	// Password changed successfully — reset rate limit so the user can make fresh attempts later.
 	if err := uc.rateLimiter.Reset(ctx, rateKey); err != nil {
-		slog.ErrorContext(ctx, "failed to reset rate limit after successful password update", "user_id", foundUser.ID(), "error", err)
 		// Don't fail the operation; the password was already saved.
+		_ = err
 	}
 
 	sessionsInvalidated := true
 	if err := uc.sessionInvalidator.InvalidateAllUserSessions(ctx, foundUser.ID(), now); err != nil {
-		slog.ErrorContext(ctx, "failed to invalidate sessions after password update", "user_id", foundUser.ID(), "error", err)
 		sessionsInvalidated = false
 	}
 
-	if err := uc.emailSender.Send(ctx, appshared.EmailMessage{
+	_ = uc.emailSender.Send(ctx, appshared.EmailMessage{
 		To:      foundUser.Email().String(),
 		Subject: "Security Alert: Password Changed",
 		Body:    "Your password has been changed successfully. If you did not make this change, please contact support immediately.",
-	}); err != nil {
-		slog.ErrorContext(ctx, "failed to send password changed email", "user_id", foundUser.ID(), "email", foundUser.Email().String(), "error", err)
-	}
+	})
 
 	return &UpdatePasswordOutput{SessionsInvalidated: sessionsInvalidated}, nil
 }

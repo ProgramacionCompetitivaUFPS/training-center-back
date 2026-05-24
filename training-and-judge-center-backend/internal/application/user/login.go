@@ -2,7 +2,7 @@ package user
 
 import (
 	"context"
-	"log/slog"
+
 
 	"github.com/training-judge-center/backend/internal/domain/user"
 	"github.com/training-judge-center/backend/pkg/apperror"
@@ -47,8 +47,7 @@ func (uc *LoginUseCase) Execute(ctx context.Context, input LoginInput) (*LoginOu
 
 	foundUser, err := uc.repo.FindByEmail(ctx, email)
 	if err != nil {
-		slog.ErrorContext(ctx, "failed to find user by email during login", "error", err)
-		return nil, apperror.NewInternal()
+		return nil, err
 	}
 	if foundUser == nil {
 		return nil, apperror.NewUnauthorized(ErrCodeInvalidCredentials, "Invalid email or password")

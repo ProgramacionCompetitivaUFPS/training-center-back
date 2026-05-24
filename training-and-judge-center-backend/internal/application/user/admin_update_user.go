@@ -42,8 +42,7 @@ func (uc *AdminUpdateUserUseCase) Execute(ctx context.Context, input AdminUpdate
 
 	foundUser, err := uc.repo.FindByID(ctx, input.TargetID)
 	if err != nil {
-		slog.ErrorContext(ctx, "failed to find user by id during admin update", "target_id", input.TargetID, "error", err)
-		return nil,apperror.NewInternal()
+		return nil, err
 	}
 	if foundUser == nil {
 		return nil,apperror.NewNotFound(user.ErrCodeUserNotFound, "User not found")

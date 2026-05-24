@@ -1,4 +1,4 @@
-package user
+﻿package user
 
 import (
 	"context"
@@ -238,7 +238,7 @@ func TestResetPassword_TxFailure(t *testing.T) {
 
 	tx := &mockTransactionManager{
 		withTxFn: func(_ context.Context, _ func(context.Context) error) error {
-			return errors.New("db error")
+			return apperror.NewInternal()
 		},
 	}
 

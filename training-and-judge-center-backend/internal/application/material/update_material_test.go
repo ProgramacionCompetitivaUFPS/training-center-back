@@ -74,7 +74,7 @@ func TestUpdateMaterial_ForbiddenIfNotAuthor(t *testing.T) {
 func TestUpdateMaterial_GroupProviderError(t *testing.T) {
 	group := &mockGroupProvider{
 		existsFn: func(_ context.Context, _ string) (bool, error) {
-			return false, errors.New("redis timeout")
+			return false, apperror.NewInternal()
 		},
 	}
 	uc := newUpdateMaterialUseCase(&mockMaterialRepository{}, group)
@@ -262,7 +262,7 @@ func TestUpdateMaterial_SaveRepositoryError(t *testing.T) {
 			return m, nil
 		},
 		saveFn: func(_ context.Context, _ *domainMaterial.Material) error {
-			return errors.New("db connection lost")
+			return apperror.NewInternal()
 		},
 	}
 	uc := newUpdateMaterialUseCase(repo, groupExists())

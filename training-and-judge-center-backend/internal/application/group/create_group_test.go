@@ -1,8 +1,7 @@
-package group
+﻿package group
 
 import (
 	"context"
-	"errors"
 	"testing"
 
 	domainGroup "github.com/training-judge-center/backend/internal/domain/group"
@@ -170,7 +169,7 @@ func TestCreateGroup_DuplicateNameReturnsConflict(t *testing.T) {
 }
 
 func TestCreateGroup_RepoSaveFailureReturnsInternal(t *testing.T) {
-	repo := &mockGroupRepository{saveErr: errors.New("db failure")}
+	repo := &mockGroupRepository{saveErr: apperror.NewInternal()}
 	uc := newCreateGroupUseCase(repo, nil)
 
 	_, err := uc.Execute(context.Background(), validCreateInput(shared.RoleCoach))

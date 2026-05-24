@@ -38,8 +38,7 @@ func NewRequestDeactivationUseCase(
 func (uc *RequestDeactivationUseCase) Execute(ctx context.Context, input RequestDeactivationInput) error {
 	foundUser, err := uc.userRepo.FindByID(ctx, input.UserID)
 	if err != nil {
-		slog.ErrorContext(ctx, "failed to find user during deactivation request", "user_id", input.UserID, "error", err)
-		return apperror.NewInternal()
+		return err
 	}
 	if foundUser == nil || foundUser.Status() == user.StatusDeactivated {
 		return apperror.NewNotFound(user.ErrCodeUserNotFound, "User not found")
@@ -53,8 +52,7 @@ func (uc *RequestDeactivationUseCase) Execute(ctx context.Context, input Request
 
 	// Invalidate previous requests to ensure only one code is active
 	if err := uc.deactRepo.InvalidatePendingByUserID(ctx, foundUser.ID(), now); err != nil {
-		slog.ErrorContext(ctx, "failed to invalidate pending deactivation requests", "user_id", foundUser.ID(), "error", err)
-		return apperror.NewInternal()
+		return err
 	}
 
 	code, err := generateSixDigitCode()
@@ -71,8 +69,7 @@ func (uc *RequestDeactivationUseCase) Execute(ctx context.Context, input Request
 	}
 
 	if err := uc.deactRepo.Save(ctx, req); err != nil {
-		slog.ErrorContext(ctx, "failed to save deactivation request", "user_id", foundUser.ID(), "error", err)
-		return apperror.NewInternal()
+		return err
 	}
 
 	if err := uc.emailSender.Send(ctx, appshared.EmailMessage{
@@ -80,7 +77,6 @@ func (uc *RequestDeactivationUseCase) Execute(ctx context.Context, input Request
 		Subject: "Account Deactivation Code",
 		Body:    fmt.Sprintf("You requested to deactivate your account.\n\nYour confirmation code is: %s\n\nThis code will expire in 15 minutes. Note: Confirming this code will completely anonymize your account and log you out immediately.", code),
 	}); err != nil {
-		slog.ErrorContext(ctx, "failed to send deactivation code email", "user_id", foundUser.ID(), "error", err)
 		return apperror.NewServiceUnavailable(ErrCodeEmailDeliveryFailed, "Failed to send verification email")
 	}
 

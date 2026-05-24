@@ -166,7 +166,7 @@ func TestDeleteMaterial_MaterialInOtherGroup(t *testing.T) {
 func TestDeleteMaterial_FindByIDInfraError_Returns500(t *testing.T) {
 	repo := &mockMaterialRepository{
 		findByIDFn: func(_ context.Context, _ string) (*domainMaterial.Material, error) {
-			return nil, errors.New("db connection lost")
+			return nil, apperror.NewInternal()
 		},
 	}
 	uc := NewDeleteMaterialUseCase(repo, groupExists())
@@ -202,7 +202,7 @@ func TestDeleteMaterial_DeleteError_Returns500(t *testing.T) {
 	m := newTestMaterial()
 	repo := &mockMaterialRepository{
 		findByIDFn: func(_ context.Context, _ string) (*domainMaterial.Material, error) { return m, nil },
-		deleteFn:   func(_ context.Context, _ string) error { return errors.New("db error") },
+		deleteFn:   func(_ context.Context, _ string) error { return apperror.NewInternal() },
 	}
 	uc := NewDeleteMaterialUseCase(repo, groupExists())
 

@@ -1,8 +1,7 @@
-package user
+﻿package user
 
 import (
 	"context"
-	"errors"
 	"testing"
 	"time"
 
@@ -136,7 +135,7 @@ func TestAdminDeactivateUser_AlreadyDeactivated_Idempotent(t *testing.T) {
 func TestAdminDeactivateUser_RepositoryFindError(t *testing.T) {
 	repo := newNoConflictRepo()
 	repo.findByIDFn = func(_ context.Context, _ string) (*domain.User, error) {
-		return nil, errors.New("db error")
+		return nil, apperror.NewInternal()
 	}
 	uc := NewAdminDeactivateUserUseCase(repo, &mockSessionInvalidator{})
 
@@ -163,7 +162,7 @@ func TestAdminDeactivateUser_SessionInvalidationError_DoesNotPersist(t *testing.
 	}
 	invalidator := &mockSessionInvalidator{
 		invalidateAllUserSessionsFn: func(_ context.Context, _ string, _ time.Time) error {
-			return errors.New("redis unavailable")
+			return apperror.NewInternal()
 		},
 	}
 	uc := NewAdminDeactivateUserUseCase(repo, invalidator)
@@ -188,7 +187,7 @@ func TestAdminDeactivateUser_RepositoryUpdateError(t *testing.T) {
 		return target, nil
 	}
 	repo.updateFn = func(_ context.Context, _ *domain.User) error {
-		return errors.New("db update failed")
+		return apperror.NewInternal()
 	}
 	uc := NewAdminDeactivateUserUseCase(repo, &mockSessionInvalidator{})
 

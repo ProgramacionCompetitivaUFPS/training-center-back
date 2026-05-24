@@ -1,4 +1,4 @@
-package user
+﻿package user
 
 import (
 	"context"
@@ -159,7 +159,7 @@ func TestUpdatePassword_SamePassword(t *testing.T) {
 func TestUpdatePassword_RepositoryFindError(t *testing.T) {
 	repo := newNoConflictRepo()
 	repo.findByIDFn = func(_ context.Context, _ string) (*domain.User, error) {
-		return nil, errors.New("db connection lost")
+		return nil, apperror.NewInternal()
 	}
 	uc := NewUpdatePasswordUseCase(repo, &mockEmailSender{}, &mockSessionInvalidator{}, &mockRateLimiter{})
 
@@ -188,7 +188,7 @@ func TestUpdatePassword_RepositoryUpdateError(t *testing.T) {
 		return activeUser, nil
 	}
 	repo.updateFn = func(_ context.Context, _ *domain.User) error {
-		return errors.New("db update failed")
+		return apperror.NewInternal()
 	}
 	uc := NewUpdatePasswordUseCase(repo, &mockEmailSender{}, &mockSessionInvalidator{}, &mockRateLimiter{})
 
