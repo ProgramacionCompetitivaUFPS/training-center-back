@@ -3,11 +3,13 @@ package problem
 import (
 	"context"
 	"errors"
+	"log/slog"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	appProblem "github.com/training-judge-center/backend/internal/application/problem"
+	"github.com/training-judge-center/backend/pkg/apperror"
 )
 
 type UserProvider struct {
@@ -22,7 +24,8 @@ func (p *UserProvider) ExistsByID(ctx context.Context, userID string) (bool, err
 	var exists bool
 	err := p.db.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM users WHERE id = $1)`, userID).Scan(&exists)
 	if err != nil {
-		return false, err
+		slog.ErrorContext(ctx, "database error checking user existence", "user_id", userID, "error", err)
+		return false, apperror.NewInternal()
 	}
 	return exists, nil
 }
@@ -34,7 +37,8 @@ func (p *UserProvider) GetDisplay(ctx context.Context, userID string) (*appProbl
 		if errors.Is(err, pgx.ErrNoRows) {
 			return &appProblem.UserDisplay{Nickname: "unknown", Name: ""}, nil
 		}
-		return nil, err
+		slog.ErrorContext(ctx, "database error fetching user display", "user_id", userID, "error", err)
+		return nil, apperror.NewInternal()
 	}
 	return &appProblem.UserDisplay{Nickname: nickname, Name: name}, nil
 }
@@ -45,7 +49,8 @@ func (p *UserProvider) GetDisplays(ctx context.Context, userIDs []string) (map[s
 	}
 	rows, err := p.db.Query(ctx, `SELECT id, nickname, name FROM users WHERE id = ANY($1)`, userIDs)
 	if err != nil {
-		return nil, err
+		slog.ErrorContext(ctx, "database error fetching user displays", "error", err)
+		return nil, apperror.NewInternal()
 	}
 	defer rows.Close()
 
@@ -53,11 +58,16 @@ func (p *UserProvider) GetDisplays(ctx context.Context, userIDs []string) (map[s
 	for rows.Next() {
 		var id, nickname, name string
 		if err := rows.Scan(&id, &nickname, &name); err != nil {
-			return nil, err
+			slog.ErrorContext(ctx, "database error scanning user display row", "error", err)
+			return nil, apperror.NewInternal()
 		}
 		result[id] = &appProblem.UserDisplay{Nickname: nickname, Name: name}
 	}
-	return result, rows.Err()
+	if err := rows.Err(); err != nil {
+		slog.ErrorContext(ctx, "database error iterating user display rows", "error", err)
+		return nil, apperror.NewInternal()
+	}
+	return result, nil
 }
 
 func (p *UserProvider) GetIDByNickname(ctx context.Context, nickname string) (string, bool, error) {
@@ -67,7 +77,8 @@ func (p *UserProvider) GetIDByNickname(ctx context.Context, nickname string) (st
 		if errors.Is(err, pgx.ErrNoRows) {
 			return "", false, nil
 		}
-		return "", false, err
+		slog.ErrorContext(ctx, "database error fetching user id by nickname", "nickname", nickname, "error", err)
+		return "", false, apperror.NewInternal()
 	}
 	return id, true, nil
 }
