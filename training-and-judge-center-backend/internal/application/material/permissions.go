@@ -17,8 +17,7 @@ func checkGroupAccess(ctx context.Context, mp GroupMemberProvider, user appshare
 	}
 	isMember, err := mp.IsMemberOfGroup(ctx, user.ID, groupID)
 	if err != nil {
-		slog.ErrorContext(ctx, "failed to check group membership", "error", err, "user_id", user.ID, "group_id", groupID)
-		return apperror.NewInternal()
+		return err
 	}
 	if !isMember {
 		return apperror.NewForbidden(ErrCodeInsufficientPermissions, "you do not have permission to view materials in this group")

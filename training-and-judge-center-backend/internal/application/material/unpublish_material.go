@@ -2,7 +2,6 @@
 
 import (
 	"context"
-	"log/slog"
 	"time"
 
 	domainMaterial "github.com/training-judge-center/backend/internal/domain/material"
@@ -38,8 +37,7 @@ func NewUnpublishMaterialUseCase(
 func (uc *UnpublishMaterialUseCase) Execute(ctx context.Context, in UnpublishMaterialInput) (*UnpublishMaterialOutput, error) {
 	exists, err := uc.groupProvider.Exists(ctx, in.GroupID)
 	if err != nil {
-		slog.ErrorContext(ctx, "failed to check group existence", "error", err, "group_id", in.GroupID)
-		return nil, apperror.NewInternal()
+		return nil, err
 	}
 	if !exists {
 		return nil, apperror.NewNotFound(ErrCodeGroupNotFound, "group not found")
@@ -65,16 +63,13 @@ func (uc *UnpublishMaterialUseCase) Execute(ctx context.Context, in UnpublishMat
 			return nil, err
 		}
 		if err := uc.repo.Save(ctx, m); err != nil {
-			slog.ErrorContext(ctx, "failed to save unpublished material", "error", err, "material_id", in.MaterialID)
-			return nil, apperror.NewInternal()
+			return nil, err
 		}
 	}
 
 	data := toMaterialData(m)
 	displays, err := uc.authorProvider.GetDisplays(ctx, []string{m.AuthorID().Value()})
-	if err != nil {
-		slog.WarnContext(ctx, "failed to resolve author display, returning without author info", "error", err, "author_id", m.AuthorID().Value())
-	} else {
+	if err == nil {
 		if disp := displays[m.AuthorID().Value()]; disp != nil {
 			data.Author = &AuthorDTO{Nickname: disp.Nickname, Name: disp.Name}
 		}

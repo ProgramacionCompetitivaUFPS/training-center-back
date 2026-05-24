@@ -2,7 +2,6 @@
 
 import (
 	"context"
-	"log/slog"
 
 	appshared "github.com/training-judge-center/backend/internal/application/shared"
 	domainMaterial "github.com/training-judge-center/backend/internal/domain/material"
@@ -61,8 +60,7 @@ func (uc *ListMaterialsUseCase) Execute(ctx context.Context, in ListMaterialsInp
 
 	visibility, exists, err := uc.groupVisibility.FindVisibility(ctx, in.GroupID)
 	if err != nil {
-		slog.ErrorContext(ctx, "failed to find group visibility", "error", err, "group_id", in.GroupID)
-		return nil, apperror.NewInternal()
+		return nil, err
 	}
 	if !exists {
 		return nil, apperror.NewNotFound(ErrCodeGroupNotFound, "group not found")
@@ -79,15 +77,13 @@ func (uc *ListMaterialsUseCase) Execute(ctx context.Context, in ListMaterialsInp
 
 	materials, total, err := uc.repo.List(ctx, in.GroupID, filters)
 	if err != nil {
-		slog.ErrorContext(ctx, "failed to list materials", "error", err, "group_id", in.GroupID)
-		return nil, apperror.NewInternal()
+		return nil, err
 	}
 
 	authorIDs := uniqueAuthorIDs(materials)
 	displays, err := uc.authorProvider.GetDisplays(ctx, authorIDs)
 	if err != nil {
-		slog.ErrorContext(ctx, "failed to resolve author displays", "error", err, "group_id", in.GroupID)
-		return nil, apperror.NewInternal()
+		return nil, err
 	}
 
 	items := make([]MaterialData, 0, len(materials))
@@ -127,8 +123,7 @@ func (uc *ListMaterialsUseCase) buildFilters(ctx context.Context, in ListMateria
 
 	isLead, err := uc.memberProvider.IsLeadOfGroup(ctx, in.CurrentUser.ID, in.GroupID)
 	if err != nil {
-		slog.ErrorContext(ctx, "failed to check lead role", "error", err, "user_id", in.CurrentUser.ID, "group_id", in.GroupID)
-		return domainMaterial.ListFilters{}, apperror.NewInternal()
+		return domainMaterial.ListFilters{}, err
 	}
 
 	// Unlike problems (where ViewerModifierID controls draft visibility via authorship),
