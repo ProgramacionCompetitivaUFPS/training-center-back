@@ -341,7 +341,7 @@ judge:
       memoryBytes: 2147483648        # 2Gi
       compileCmd: "g++ -std=c++20 -O2 -o /sandbox/solution /sandbox/solution.cpp"
       runCmd: "/sandbox/solution"
-      extension: ".cpp"
+      extension: "cpp"
 
     java17:
       image: "judge-runner:java17"
@@ -349,7 +349,7 @@ judge:
       memoryBytes: 2147483648        # 2Gi — más alto por el JVM
       compileCmd: "javac -encoding UTF-8 /sandbox/Solution.java"
       runCmd: "java -Xmx{memoryLimit}m Solution"
-      extension: ".java"
+      extension: "java"
 
     python310:
       image: "judge-runner:python310"
@@ -358,7 +358,7 @@ judge:
       compileCmd: ""                 # vacío = lenguaje interpretado
       syntaxCheckCmd: "pypy3 -m py_compile /sandbox/solution.py"
       runCmd: "pypy3 /sandbox/solution.py"
-      extension: ".py"
+      extension: "py"
 ```
 
 ---

@@ -220,6 +220,29 @@ func parseCPUNanos(cpu string) int64 {
 	return int64(f * 1e9)
 }
 
+// Discard destroys a busy container that is in an unknown state (e.g. safety-net fired).
+// The caller must NOT call Release after Discard.
+//
+// If ContainerRemove fails, the container stays in stateDraining with allocatedBytes
+// unchanged — the real memory is still occupied. evictExpired retries on the next tick.
+func (p *Pool) Discard(ctx context.Context, c *Container) {
+	p.mu.Lock()
+	c.state = stateDraining
+	p.mu.Unlock()
+
+	_, err := p.docker.ContainerRemove(ctx, c.id, client.ContainerRemoveOptions{Force: true})
+	if err != nil {
+		slog.ErrorContext(ctx, "pool: discard container failed, reaper will retry",
+			"container_id", c.id, "error", err)
+		return
+	}
+
+	p.mu.Lock()
+	p.allocatedBytes -= c.memoryBytes
+	p.containers = removeFromSlice(p.containers, c)
+	p.mu.Unlock()
+}
+
 func removeFromSlice(s []*Container, target *Container) []*Container {
 	for i, c := range s {
 		if c == target {
