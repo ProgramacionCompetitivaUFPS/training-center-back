@@ -2,12 +2,14 @@ package user
 
 import (
 	"context"
-	"fmt"
+	"errors"
+	"log/slog"
 	"time"
 
 	"github.com/jackc/pgx/v5"
 	infraPostgres "github.com/training-judge-center/backend/internal/adapter/postgres"
 	domainUser "github.com/training-judge-center/backend/internal/domain/user"
+	"github.com/training-judge-center/backend/pkg/apperror"
 )
 
 type PasswordRecoveryRepository struct {
@@ -34,7 +36,8 @@ func (r *PasswordRecoveryRepository) Save(ctx context.Context, req *domainUser.P
 		req.UpdatedAt(),
 	)
 	if err != nil {
-		return fmt.Errorf("failed to save password recovery request: %w", err)
+		slog.ErrorContext(ctx, "database error saving password recovery request", "error", err)
+		return apperror.NewInternal()
 	}
 	return nil
 }
@@ -61,15 +64,17 @@ func (r *PasswordRecoveryRepository) FindByID(ctx context.Context, id string) (*
 	)
 
 	if err != nil {
-		if err == pgx.ErrNoRows {
-			return nil, nil // Not found
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, nil
 		}
-		return nil, fmt.Errorf("failed to find password recovery request: %w", err)
+		slog.ErrorContext(ctx, "database error finding password recovery request by id", "id", id, "error", err)
+		return nil, apperror.NewInternal()
 	}
 
 	status, err := domainUser.NewRequestStatus(statusStr)
 	if err != nil {
-		return nil, fmt.Errorf("invalid status in password recovery request: %w", err)
+		slog.ErrorContext(ctx, "corrupted status in password_recovery_requests table", "id", returnedID, "status", statusStr, "error", err)
+		return nil, apperror.NewInternal()
 	}
 	req := domainUser.RestorePasswordRecoveryRequest(returnedID, userID, code, status, expiresAt, createdAt, updatedAt)
 	return req, nil
@@ -88,7 +93,8 @@ func (r *PasswordRecoveryRepository) Update(ctx context.Context, req *domainUser
 		req.ID(),
 	)
 	if err != nil {
-		return fmt.Errorf("failed to update password recovery request: %w", err)
+		slog.ErrorContext(ctx, "database error updating password recovery request", "id", req.ID(), "error", err)
+		return apperror.NewInternal()
 	}
 	return nil
 }
@@ -115,15 +121,17 @@ func (r *PasswordRecoveryRepository) FindPendingByUserID(ctx context.Context, us
 	)
 
 	if err != nil {
-		if err == pgx.ErrNoRows {
-			return nil, nil // Not found
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, nil
 		}
-		return nil, fmt.Errorf("failed to find pending password recovery request: %w", err)
+		slog.ErrorContext(ctx, "database error finding pending password recovery request", "user_id", userID, "error", err)
+		return nil, apperror.NewInternal()
 	}
 
 	status, err := domainUser.NewRequestStatus(statusStr)
 	if err != nil {
-		return nil, fmt.Errorf("invalid status in pending password recovery request: %w", err)
+		slog.ErrorContext(ctx, "corrupted status in password_recovery_requests table", "id", id, "status", statusStr, "error", err)
+		return nil, apperror.NewInternal()
 	}
 	req := domainUser.RestorePasswordRecoveryRequest(id, returnedUserID, code, status, expiresAt, createdAt, updatedAt)
 	return req, nil
@@ -138,7 +146,8 @@ func (r *PasswordRecoveryRepository) InvalidatePendingByUserID(ctx context.Conte
 	querier := infraPostgres.GetQuerier(ctx, r.querier)
 	_, err := querier.Exec(ctx, query, domainUser.RequestStatusExpired.String(), now, userID, domainUser.RequestStatusPending.String())
 	if err != nil {
-		return fmt.Errorf("failed to invalidate pending password recovery requests: %w", err)
+		slog.ErrorContext(ctx, "database error invalidating pending password recovery requests", "user_id", userID, "error", err)
+		return apperror.NewInternal()
 	}
 	return nil
 }
