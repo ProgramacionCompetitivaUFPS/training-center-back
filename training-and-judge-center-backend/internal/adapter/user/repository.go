@@ -157,7 +157,8 @@ func (r *Repository) FindByEmail(ctx context.Context, email domainUser.Email) (*
 
 	u, err := scanUser(r.querier.QueryRow(ctx, query, email.String()))
 	if err != nil {
-		return nil, fmt.Errorf("failed to find user by email: %w", err)
+		slog.ErrorContext(ctx, "database error in FindByEmail", "error", err)
+		return nil, apperror.NewInternal()
 	}
 	return u, nil
 }
@@ -167,7 +168,8 @@ func (r *Repository) FindByID(ctx context.Context, id string) (*domainUser.User,
 
 	u, err := scanUser(r.querier.QueryRow(ctx, query, id))
 	if err != nil {
-		return nil, fmt.Errorf("failed to find user by id: %w", err)
+		slog.ErrorContext(ctx, "database error in FindByID", "error", err)
+		return nil, apperror.NewInternal()
 	}
 	return u, nil
 }
@@ -177,7 +179,8 @@ func (r *Repository) FindByNickname(ctx context.Context, nickname domainUser.Nic
 
 	u, err := scanUser(r.querier.QueryRow(ctx, query, nickname.String()))
 	if err != nil {
-		return nil, fmt.Errorf("failed to find user by nickname: %w", err)
+		slog.ErrorContext(ctx, "database error in FindByNickname", "error", err)
+		return nil, apperror.NewInternal()
 	}
 	return u, nil
 }
@@ -291,7 +294,8 @@ func (r *Repository) FindAll(ctx context.Context, filter domainUser.UserFilter) 
 	countQuery := fmt.Sprintf(`SELECT COUNT(*) FROM users %s`, whereClause)
 	var totalCount int
 	if err := r.querier.QueryRow(ctx, countQuery, args...).Scan(&totalCount); err != nil {
-		return nil, 0, fmt.Errorf("failed to count users: %w", err)
+		slog.ErrorContext(ctx, "database error counting users", "error", err)
+		return nil, 0, apperror.NewInternal()
 	}
 
 	// Main query with pagination
@@ -304,7 +308,8 @@ func (r *Repository) FindAll(ctx context.Context, filter domainUser.UserFilter) 
 
 	rows, err := r.querier.Query(ctx, dataQuery, args...)
 	if err != nil {
-		return nil, 0, fmt.Errorf("failed to list users: %w", err)
+		slog.ErrorContext(ctx, "database error listing users", "error", err)
+		return nil, 0, apperror.NewInternal()
 	}
 	defer rows.Close()
 
@@ -312,7 +317,8 @@ func (r *Repository) FindAll(ctx context.Context, filter domainUser.UserFilter) 
 	for rows.Next() {
 		u, err := scanUser(rows)
 		if err != nil {
-			return nil, 0, fmt.Errorf("failed to scan user row: %w", err)
+			slog.ErrorContext(ctx, "database error scanning user row", "error", err)
+			return nil, 0, apperror.NewInternal()
 		}
 		if u != nil {
 			users = append(users, u)
@@ -320,7 +326,8 @@ func (r *Repository) FindAll(ctx context.Context, filter domainUser.UserFilter) 
 	}
 
 	if err := rows.Err(); err != nil {
-		return nil, 0, fmt.Errorf("error iterating user rows: %w", err)
+		slog.ErrorContext(ctx, "database error iterating user rows", "error", err)
+		return nil, 0, apperror.NewInternal()
 	}
 
 	return users, totalCount, nil
