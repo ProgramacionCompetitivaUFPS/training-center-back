@@ -62,10 +62,9 @@ func (uc *LoginUseCase) Execute(ctx context.Context, input LoginInput) (*LoginOu
 		return nil, apperror.NewUnauthorized(ErrCodeInvalidCredentials, "Invalid email or password")
 	}
 
-	token, err := uc.tokenService.GenerateToken(foundUser)
+	token, err := uc.tokenService.GenerateToken(ctx, foundUser)
 	if err != nil {
-		slog.ErrorContext(ctx, "failed to generate token during login", "user_id", foundUser.ID(), "error", err)
-		return nil, apperror.NewInternal()
+		return nil, err
 	}
 
 	return &LoginOutput{Token: token, User: userToDTO(foundUser)}, nil

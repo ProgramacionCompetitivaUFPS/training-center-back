@@ -13,12 +13,12 @@ import (
 )
 
 type mockTokenService struct {
-	generateTokenFn func(user *domain.User) (string, error)
+	generateTokenFn func(ctx context.Context, user *domain.User) (string, error)
 	validateTokenFn func(tokenString string) (*domain.TokenClaims, error)
 }
 
-func (m *mockTokenService) GenerateToken(user *domain.User) (string, error) {
-	return m.generateTokenFn(user)
+func (m *mockTokenService) GenerateToken(ctx context.Context, user *domain.User) (string, error) {
+	return m.generateTokenFn(ctx, user)
 }
 
 func (m *mockTokenService) ValidateToken(tokenString string) (*domain.TokenClaims, error) {
@@ -48,7 +48,7 @@ func newActiveUser() *domain.User {
 func newLoginDeps() (*mockUserRepository, *mockTokenService) {
 	repo := newNoConflictRepo()
 	tokenService := &mockTokenService{
-		generateTokenFn: func(_ *domain.User) (string, error) { return "mock-jwt-token", nil },
+		generateTokenFn: func(_ context.Context, _ *domain.User) (string, error) { return "mock-jwt-token", nil },
 		validateTokenFn: func(_ string) (*domain.TokenClaims, error) { return nil, nil },
 	}
 	return repo, tokenService
@@ -241,8 +241,8 @@ func TestLogin_TokenGenerationError(t *testing.T) {
 	repo.findByEmailFn = func(_ context.Context, _ domain.Email) (*domain.User, error) {
 		return activeUser, nil
 	}
-	tokenSvc.generateTokenFn = func(_ *domain.User) (string, error) {
-		return "", errors.New("signing key error")
+	tokenSvc.generateTokenFn = func(_ context.Context, _ *domain.User) (string, error) {
+		return "", apperror.NewInternal()
 	}
 	uc := NewLoginUseCase(repo, tokenSvc)
 
