@@ -79,7 +79,7 @@ type mockTokenService struct {
 	validateFn func(token string) (*domainuser.TokenClaims, error)
 }
 
-func (m *mockTokenService) GenerateToken(_ *domainuser.User) (string, error) { return "", nil }
+func (m *mockTokenService) GenerateToken(_ context.Context, _ *domainuser.User) (string, error) { return "", nil }
 func (m *mockTokenService) ValidateToken(token string) (*domainuser.TokenClaims, error) {
 	return m.validateFn(token)
 }

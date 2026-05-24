@@ -162,7 +162,7 @@ func stubHandler() *Handler {
 // mockTokenSvc always validates successfully with a contestant role.
 type mockTokenSvc struct{}
 
-func (m *mockTokenSvc) GenerateToken(_ *domainUser.User) (string, error) { return "tok", nil }
+func (m *mockTokenSvc) GenerateToken(_ context.Context, _ *domainUser.User) (string, error) { return "tok", nil }
 func (m *mockTokenSvc) ValidateToken(_ string) (*domainUser.TokenClaims, error) {
 	return &domainUser.TokenClaims{UserID: "u1", Role: shared.RoleContestant}, nil
 }
@@ -170,7 +170,7 @@ func (m *mockTokenSvc) ValidateToken(_ string) (*domainUser.TokenClaims, error) 
 // mockAdminTokenSvc always validates successfully with an admin role.
 type mockAdminTokenSvc struct{}
 
-func (m *mockAdminTokenSvc) GenerateToken(_ *domainUser.User) (string, error) { return "tok", nil }
+func (m *mockAdminTokenSvc) GenerateToken(_ context.Context, _ *domainUser.User) (string, error) { return "tok", nil }
 func (m *mockAdminTokenSvc) ValidateToken(_ string) (*domainUser.TokenClaims, error) {
 	return &domainUser.TokenClaims{UserID: "admin-1", Role: shared.RoleAdmin}, nil
 }
