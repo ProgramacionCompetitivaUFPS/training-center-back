@@ -1,6 +1,7 @@
 package user
 
 import (
+	"context"
 	"time"
 
 	"github.com/training-judge-center/backend/internal/domain/shared"
@@ -14,6 +15,6 @@ type TokenClaims struct {
 }
 
 type TokenService interface {
-	GenerateToken(user *User) (string, error)
+	GenerateToken(ctx context.Context, user *User) (string, error)
 	ValidateToken(tokenString string) (*TokenClaims, error)
 }
