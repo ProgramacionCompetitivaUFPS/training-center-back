@@ -10,7 +10,6 @@ import (
 
 	appcontest "github.com/training-judge-center/backend/internal/application/contest"
 	domainContest "github.com/training-judge-center/backend/internal/domain/contest"
-	"github.com/training-judge-center/backend/pkg/apperror"
 )
 
 func newHandlerWithRegister(uc *appcontest.RegisterToContestUseCase) *Handler {
@@ -22,7 +21,6 @@ func defaultRegisterUC() *appcontest.RegisterToContestUseCase {
 	return appcontest.NewRegisterToContestUseCase(
 		repo,
 		&mockRegistrationRepository{},
-		&mockGroupProvider{},
 		&mockMemberProvider{isLead: false, isMember: true},
 	)
 }
@@ -35,9 +33,6 @@ type mockRepoReturning struct {
 func (s *mockRepoReturning) Create(_ context.Context, _ *domainContest.Contest) error { return nil }
 func (s *mockRepoReturning) Update(_ context.Context, _ *domainContest.Contest) error { return nil }
 func (s *mockRepoReturning) FindByID(_ context.Context, _ string) (*domainContest.Contest, error) {
-	if s.contest == nil {
-		return nil, apperror.NewNotFound(domainContest.ErrCodeContestNotFound, "not found")
-	}
 	return s.contest, nil
 }
 func (s *mockRepoReturning) Delete(_ context.Context, _ string) error { return nil }
@@ -87,7 +82,6 @@ func TestRegister_ContestNotFound_Returns404(t *testing.T) {
 	uc := appcontest.NewRegisterToContestUseCase(
 		&mockRepoReturning{contest: nil},
 		&mockRegistrationRepository{},
-		&mockGroupProvider{},
 		&mockMemberProvider{isMember: true},
 	)
 	h := newHandlerWithRegister(uc)
@@ -107,7 +101,6 @@ func TestRegister_NonMember_Returns403(t *testing.T) {
 	uc := appcontest.NewRegisterToContestUseCase(
 		&mockRepoReturning{contest: scheduledContest()},
 		&mockRegistrationRepository{},
-		&mockGroupProvider{},
 		&mockMemberProvider{isLead: false, isMember: false},
 	)
 	h := newHandlerWithRegister(uc)
@@ -129,7 +122,6 @@ func TestRegister_AlreadyRegistered_Returns409(t *testing.T) {
 		&mockRegistrationRepository{
 			existsByContestAndUser: func(_ context.Context, _, _ string) (bool, error) { return true, nil },
 		},
-		&mockGroupProvider{},
 		&mockMemberProvider{isMember: true},
 	)
 	h := newHandlerWithRegister(uc)
@@ -158,7 +150,6 @@ func TestRegister_RegistrationClosed_Returns409(t *testing.T) {
 	uc := appcontest.NewRegisterToContestUseCase(
 		&mockRepoReturning{contest: finishedContest()},
 		&mockRegistrationRepository{},
-		&mockGroupProvider{},
 		&mockMemberProvider{isMember: true},
 	)
 	h := newHandlerWithRegister(uc)

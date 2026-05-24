@@ -23,20 +23,17 @@ type RegisterToContestOutput struct {
 type RegisterToContestUseCase struct {
 	repo             domainContest.Repository
 	registrationRepo domainContest.RegistrationRepository
-	groupProvider    GroupProvider
 	memberProvider   GroupMemberProvider
 }
 
 func NewRegisterToContestUseCase(
 	repo domainContest.Repository,
 	registrationRepo domainContest.RegistrationRepository,
-	groupProvider GroupProvider,
 	memberProvider GroupMemberProvider,
 ) *RegisterToContestUseCase {
 	return &RegisterToContestUseCase{
 		repo:             repo,
 		registrationRepo: registrationRepo,
-		groupProvider:    groupProvider,
 		memberProvider:   memberProvider,
 	}
 }

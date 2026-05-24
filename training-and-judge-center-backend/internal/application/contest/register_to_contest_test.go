@@ -12,10 +12,9 @@ import (
 func newRegisterUseCase(
 	repo *mockContestRepository,
 	reg *mockRegistrationRepository,
-	group *mockGroupProvider,
 	member *mockGroupMemberProvider,
 ) *RegisterToContestUseCase {
-	return NewRegisterToContestUseCase(repo, reg, group, member)
+	return NewRegisterToContestUseCase(repo, reg, member)
 }
 
 func validRegisterInput() RegisterToContestInput {
@@ -27,7 +26,7 @@ func validRegisterInput() RegisterToContestInput {
 }
 
 func TestRegisterToContest_HappyPath(t *testing.T) {
-	uc := newRegisterUseCase(repoWith(newTestContest(otherID)), mockRegistrations(), groupFound(), isMemberNotLead())
+	uc := newRegisterUseCase(repoWith(newTestContest(otherID)), mockRegistrations(), isMemberNotLead())
 
 	out, err := uc.Execute(context.Background(), validRegisterInput())
 
@@ -45,7 +44,7 @@ func TestRegisterToContest_ContestNotFound(t *testing.T) {
 			return nil, nil
 		},
 	}
-	uc := newRegisterUseCase(repo, mockRegistrations(), groupFound(), isMemberNotLead())
+	uc := newRegisterUseCase(repo, mockRegistrations(), isMemberNotLead())
 
 	_, err := uc.Execute(context.Background(), validRegisterInput())
 
@@ -56,7 +55,7 @@ func TestRegisterToContest_ContestNotFound(t *testing.T) {
 }
 
 func TestRegisterToContest_GroupMismatch_Returns404(t *testing.T) {
-	uc := newRegisterUseCase(repoWith(newTestContest(otherID)), mockRegistrations(), groupFound(), isMemberNotLead())
+	uc := newRegisterUseCase(repoWith(newTestContest(otherID)), mockRegistrations(), isMemberNotLead())
 
 	in := validRegisterInput()
 	in.GroupID = "different-group-id"
@@ -70,7 +69,7 @@ func TestRegisterToContest_GroupMismatch_Returns404(t *testing.T) {
 }
 
 func TestRegisterToContest_NonMember_Returns403(t *testing.T) {
-	uc := newRegisterUseCase(repoWith(newTestContest(otherID)), mockRegistrations(), groupFound(), notLead())
+	uc := newRegisterUseCase(repoWith(newTestContest(otherID)), mockRegistrations(), notLead())
 
 	_, err := uc.Execute(context.Background(), validRegisterInput())
 
@@ -81,7 +80,7 @@ func TestRegisterToContest_NonMember_Returns403(t *testing.T) {
 }
 
 func TestRegisterToContest_AdminBypassesMembership(t *testing.T) {
-	uc := newRegisterUseCase(repoWith(newTestContest(otherID)), mockRegistrations(), groupFound(), notLead())
+	uc := newRegisterUseCase(repoWith(newTestContest(otherID)), mockRegistrations(), notLead())
 
 	in := validRegisterInput()
 	in.CurrentUser = asAdmin(callerID)
@@ -97,7 +96,7 @@ func TestRegisterToContest_AdminBypassesMembership(t *testing.T) {
 }
 
 func TestRegisterToContest_FinishedContest_Returns409(t *testing.T) {
-	uc := newRegisterUseCase(repoWith(newFinishedContest(otherID)), mockRegistrations(), groupFound(), isMemberNotLead())
+	uc := newRegisterUseCase(repoWith(newFinishedContest(otherID)), mockRegistrations(), isMemberNotLead())
 
 	_, err := uc.Execute(context.Background(), validRegisterInput())
 
@@ -113,7 +112,7 @@ func TestRegisterToContest_AlreadyRegistered_Returns409(t *testing.T) {
 			return true, nil
 		},
 	}
-	uc := newRegisterUseCase(repoWith(newTestContest(otherID)), reg, groupFound(), isMemberNotLead())
+	uc := newRegisterUseCase(repoWith(newTestContest(otherID)), reg, isMemberNotLead())
 
 	_, err := uc.Execute(context.Background(), validRegisterInput())
 
@@ -129,7 +128,7 @@ func TestRegisterToContest_RepoFindError_Propagates(t *testing.T) {
 			return nil, apperror.NewInternal()
 		},
 	}
-	uc := newRegisterUseCase(repo, mockRegistrations(), groupFound(), isMemberNotLead())
+	uc := newRegisterUseCase(repo, mockRegistrations(), isMemberNotLead())
 
 	_, err := uc.Execute(context.Background(), validRegisterInput())
 
@@ -144,7 +143,7 @@ func TestRegisterToContest_MemberProviderError_Propagates(t *testing.T) {
 			return false, apperror.NewInternal()
 		},
 	}
-	uc := newRegisterUseCase(repoWith(newTestContest(otherID)), mockRegistrations(), groupFound(), member)
+	uc := newRegisterUseCase(repoWith(newTestContest(otherID)), mockRegistrations(), member)
 
 	_, err := uc.Execute(context.Background(), validRegisterInput())
 
@@ -159,7 +158,7 @@ func TestRegisterToContest_RegistrationCheckError_Propagates(t *testing.T) {
 			return false, apperror.NewInternal()
 		},
 	}
-	uc := newRegisterUseCase(repoWith(newTestContest(otherID)), reg, groupFound(), isMemberNotLead())
+	uc := newRegisterUseCase(repoWith(newTestContest(otherID)), reg, isMemberNotLead())
 
 	_, err := uc.Execute(context.Background(), validRegisterInput())
 
@@ -174,7 +173,7 @@ func TestRegisterToContest_SaveError_Propagates(t *testing.T) {
 			return apperror.NewInternal()
 		},
 	}
-	uc := newRegisterUseCase(repoWith(newTestContest(otherID)), reg, groupFound(), isMemberNotLead())
+	uc := newRegisterUseCase(repoWith(newTestContest(otherID)), reg, isMemberNotLead())
 
 	_, err := uc.Execute(context.Background(), validRegisterInput())
 

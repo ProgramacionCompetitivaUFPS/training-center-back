@@ -273,7 +273,7 @@ func main() {
 		contestRepo, contestGroupProvider, contestMemberProvider, contestParticipantProvider,
 	)
 	registerToContestUseCase := appcontest.NewRegisterToContestUseCase(
-		contestRepo, contestRegistrationRepo, contestGroupProvider, contestMemberProvider,
+		contestRepo, contestRegistrationRepo, contestMemberProvider,
 	)
 	contestHandler := handlercontest.NewHandler(createContestUseCase, updateContestUseCase, getContestUseCase, listContestsUseCase, registerToContestUseCase)
 
