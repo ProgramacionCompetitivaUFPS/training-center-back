@@ -87,6 +87,9 @@ func (r *RegistrationRepository) ListByContest(ctx context.Context, contestID st
 		slog.ErrorContext(ctx, "failed to count contest registrations for list", "contest_id", contestID, "error", err)
 		return nil, 0, apperror.NewInternal()
 	}
+	if total == 0 {
+		return []*domainContest.ContestRegistration{}, 0, nil
+	}
 
 	offset := (page - 1) * limit
 	rows, err := q.Query(ctx,
@@ -146,12 +149,12 @@ func (r *RegistrationRepository) CountByContest(ctx context.Context, contestID s
 }
 
 func (r *RegistrationRepository) CountByContestBulk(ctx context.Context, contestIDs []string) (map[string]int, error) {
+	if len(contestIDs) == 0 {
+		return map[string]int{}, nil
+	}
 	result := make(map[string]int, len(contestIDs))
 	for _, id := range contestIDs {
 		result[id] = 0
-	}
-	if len(contestIDs) == 0 {
-		return result, nil
 	}
 	q := infraPostgres.GetQuerier(ctx, r.db)
 	rows, err := q.Query(ctx,
@@ -180,12 +183,12 @@ func (r *RegistrationRepository) CountByContestBulk(ctx context.Context, contest
 }
 
 func (r *RegistrationRepository) ExistsByUserBulk(ctx context.Context, contestIDs []string, userID string) (map[string]bool, error) {
+	if len(contestIDs) == 0 {
+		return map[string]bool{}, nil
+	}
 	result := make(map[string]bool, len(contestIDs))
 	for _, id := range contestIDs {
 		result[id] = false
-	}
-	if len(contestIDs) == 0 {
-		return result, nil
 	}
 	q := infraPostgres.GetQuerier(ctx, r.db)
 	rows, err := q.Query(ctx,

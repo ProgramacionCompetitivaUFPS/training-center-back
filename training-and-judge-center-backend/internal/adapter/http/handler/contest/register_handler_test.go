@@ -112,7 +112,7 @@ func TestRegister_AlreadyRegistered_Returns204(t *testing.T) {
 	uc := appcontest.NewRegisterToContestUseCase(
 		&mockRepoReturning{contest: scheduledContest()},
 		&mockRegistrationRepository{
-			existsByContestAndUser: func(_ context.Context, _, _ string) (bool, error) { return true, nil },
+			existsByContestAndUserFn: func(_ context.Context, _, _ string) (bool, error) { return true, nil },
 		},
 		&mockMemberProvider{isMember: true},
 	)

@@ -9,7 +9,6 @@ import (
 	"github.com/training-judge-center/backend/pkg/apperror"
 )
 
-
 func newGetStatusUseCase(
 	repo *mockContestRepository,
 	reg *mockRegistrationRepository,
@@ -108,5 +107,20 @@ func TestGetRegistrationStatus_RegistrationLookupError_Propagates(t *testing.T) 
 
 	if _, err := uc.Execute(context.Background(), validStatusInput()); err == nil {
 		t.Fatal("expected error from failed FindByContestAndUser")
+	}
+}
+
+func TestGetRegistrationStatus_NoMembershipRequired(t *testing.T) {
+	// Any authenticated user may query their own status — the use case deliberately
+	// skips a membership check. A non-member gets {registered: false}, not a 403.
+	uc := newGetStatusUseCase(repoWith(newTestContest(otherID)), mockRegistrations())
+
+	out, err := uc.Execute(context.Background(), validStatusInput())
+
+	if err != nil {
+		t.Fatalf("non-member should be able to query own status: %v", err)
+	}
+	if out.Registered {
+		t.Error("expected registered=false")
 	}
 }

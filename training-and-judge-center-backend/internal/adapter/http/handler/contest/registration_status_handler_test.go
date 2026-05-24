@@ -68,7 +68,7 @@ func TestGetRegistrationStatus_Registered_Returns200WithTimestamp(t *testing.T) 
 	uc := appcontest.NewGetRegistrationStatusUseCase(
 		&mockRepoReturning{contest: scheduledContest()},
 		&mockRegistrationRepository{
-			findByContestAndUser: func(_ context.Context, _, _ string) (*domainContest.ContestRegistration, error) {
+			findByContestAndUserFn: func(_ context.Context, _, _ string) (*domainContest.ContestRegistration, error) {
 				return domainContest.RestoreContestRegistration("r1", "c1", "u1", time.Now()), nil
 			},
 		},

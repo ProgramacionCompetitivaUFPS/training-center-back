@@ -143,11 +143,11 @@ func (s *mockTransactionManager) WithTx(_ context.Context, fn func(context.Conte
 // ── RegistrationRepository mock ──────────────────────────────────────────────
 
 type mockRegistrationRepository struct {
-	saveFn                 func(ctx context.Context, r *domainContest.ContestRegistration) error
-	findByContestAndUser   func(ctx context.Context, contestID, userID string) (*domainContest.ContestRegistration, error)
-	deleteFn               func(ctx context.Context, contestID, userID string) error
-	listByContestFn        func(ctx context.Context, contestID string, page, limit int) ([]*domainContest.ContestRegistration, int, error)
-	existsByContestAndUser func(ctx context.Context, contestID, userID string) (bool, error)
+	saveFn                   func(ctx context.Context, r *domainContest.ContestRegistration) error
+	findByContestAndUserFn   func(ctx context.Context, contestID, userID string) (*domainContest.ContestRegistration, error)
+	deleteFn                 func(ctx context.Context, contestID, userID string) error
+	listByContestFn          func(ctx context.Context, contestID string, page, limit int) ([]*domainContest.ContestRegistration, int, error)
+	existsByContestAndUserFn func(ctx context.Context, contestID, userID string) (bool, error)
 }
 
 func (m *mockRegistrationRepository) Save(ctx context.Context, r *domainContest.ContestRegistration) error {
@@ -158,8 +158,8 @@ func (m *mockRegistrationRepository) Save(ctx context.Context, r *domainContest.
 }
 
 func (m *mockRegistrationRepository) FindByContestAndUser(ctx context.Context, contestID, userID string) (*domainContest.ContestRegistration, error) {
-	if m.findByContestAndUser != nil {
-		return m.findByContestAndUser(ctx, contestID, userID)
+	if m.findByContestAndUserFn != nil {
+		return m.findByContestAndUserFn(ctx, contestID, userID)
 	}
 	return nil, nil
 }
@@ -179,8 +179,8 @@ func (m *mockRegistrationRepository) ListByContest(ctx context.Context, contestI
 }
 
 func (m *mockRegistrationRepository) ExistsByContestAndUser(ctx context.Context, contestID, userID string) (bool, error) {
-	if m.existsByContestAndUser != nil {
-		return m.existsByContestAndUser(ctx, contestID, userID)
+	if m.existsByContestAndUserFn != nil {
+		return m.existsByContestAndUserFn(ctx, contestID, userID)
 	}
 	return false, nil
 }
