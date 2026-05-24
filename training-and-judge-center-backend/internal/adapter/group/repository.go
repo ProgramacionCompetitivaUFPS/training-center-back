@@ -213,31 +213,35 @@ func (r *Repository) List(ctx context.Context, filters domainGroup.ListFilters) 
 	eg.Go(func() error {
 		rows, err := r.db.Query(gCtx, selectQuery, args...)
 		if err != nil {
-			return err
+			slog.ErrorContext(gCtx, "database error querying groups", "error", err)
+			return apperror.NewInternal()
 		}
 		defer rows.Close()
 		for rows.Next() {
 			g, err := scanGroupRow(rows, memberCountSelect != "")
 			if err != nil {
-				slog.ErrorContext(gCtx, "List groups scan failed", "error", err)
-				return err
+				slog.ErrorContext(gCtx, "database error scanning group row", "error", err)
+				return apperror.NewInternal()
 			}
 			result = append(result, g)
 		}
 		if err := rows.Err(); err != nil {
-			slog.ErrorContext(gCtx, "List groups rows error", "error", err)
-			return err
+			slog.ErrorContext(gCtx, "database error iterating group rows", "error", err)
+			return apperror.NewInternal()
 		}
 		return nil
 	})
 
 	eg.Go(func() error {
-		return r.db.QueryRow(gCtx, countQuery, countArgs...).Scan(&total)
+		if err := r.db.QueryRow(gCtx, countQuery, countArgs...).Scan(&total); err != nil {
+			slog.ErrorContext(gCtx, "database error counting groups", "error", err)
+			return apperror.NewInternal()
+		}
+		return nil
 	})
 
 	if err := eg.Wait(); err != nil {
-		slog.ErrorContext(ctx, "List groups failed", "error", err)
-		return nil, 0, apperror.NewInternal()
+		return nil, 0, err // already apperror — goroutines already logged
 	}
 	if result == nil {
 		result = []*domainGroup.Group{}

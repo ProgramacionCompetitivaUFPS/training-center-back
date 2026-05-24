@@ -204,11 +204,13 @@ func (r *MemberRepository) ListLeads(ctx context.Context, groupID string) ([]*do
 	for rows.Next() {
 		m, err := scanMember(rows)
 		if err != nil {
+			slog.ErrorContext(ctx, "database error scanning group member row in ListLeads", "group_id", groupID, "error", err)
 			return nil, apperror.NewInternal()
 		}
 		out = append(out, m)
 	}
 	if err := rows.Err(); err != nil {
+		slog.ErrorContext(ctx, "database error iterating group member rows in ListLeads", "group_id", groupID, "error", err)
 		return nil, apperror.NewInternal()
 	}
 	return out, nil
