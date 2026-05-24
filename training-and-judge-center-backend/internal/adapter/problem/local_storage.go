@@ -3,10 +3,12 @@ package problem
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"os"
 	"path/filepath"
 
 	appProblem "github.com/training-judge-center/backend/internal/application/problem"
+	"github.com/training-judge-center/backend/pkg/apperror"
 )
 
 type LocalFileRepository struct {
@@ -33,11 +35,13 @@ func (r *LocalFileRepository) UploadFile(ctx context.Context, path string, conte
 
 	dir := filepath.Dir(fullPath)
 	if err := os.MkdirAll(dir, 0755); err != nil {
-		return fmt.Errorf("failed to create directory %s: %w", dir, err)
+		slog.ErrorContext(ctx, "local: failed to create directory", "dir", dir, "error", err)
+		return apperror.NewInternal()
 	}
 
 	if err := os.WriteFile(fullPath, content, 0644); err != nil {
-		return fmt.Errorf("failed to write file %s: %w", fullPath, err)
+		slog.ErrorContext(ctx, "local: failed to write file", "path", fullPath, "error", err)
+		return apperror.NewInternal()
 	}
 
 	return nil
@@ -50,7 +54,8 @@ func (r *LocalFileRepository) DeleteFile(ctx context.Context, path string) error
 		if os.IsNotExist(err) {
 			return nil
 		}
-		return fmt.Errorf("failed to delete file %s: %w", fullPath, err)
+		slog.ErrorContext(ctx, "local: failed to delete file", "path", fullPath, "error", err)
+		return apperror.NewInternal()
 	}
 
 	return nil
@@ -59,7 +64,8 @@ func (r *LocalFileRepository) DeleteFile(ctx context.Context, path string) error
 func (r *LocalFileRepository) DeleteFilesWithPrefix(ctx context.Context, prefix string) error {
 	fullPath := r.resolvePath(prefix)
 	if err := os.RemoveAll(fullPath); err != nil && !os.IsNotExist(err) {
-		return fmt.Errorf("failed to remove directory %s: %w", fullPath, err)
+		slog.ErrorContext(ctx, "local: failed to remove directory", "path", fullPath, "error", err)
+		return apperror.NewInternal()
 	}
 	return nil
 }

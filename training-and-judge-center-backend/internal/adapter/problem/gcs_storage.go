@@ -3,11 +3,11 @@ package problem
 import (
 	"context"
 	"errors"
-	"fmt"
 	"log/slog"
 
 	"cloud.google.com/go/storage"
 	appProblem "github.com/training-judge-center/backend/internal/application/problem"
+	"github.com/training-judge-center/backend/pkg/apperror"
 	"golang.org/x/sync/errgroup"
 	"google.golang.org/api/iterator"
 )
@@ -34,11 +34,13 @@ func (r *GCSFileRepository) UploadFile(ctx context.Context, path string, content
 		if closeErr := writer.Close(); closeErr != nil {
 			slog.ErrorContext(ctx, "GCS writer close failed after write error", "close_error", closeErr, "path", path)
 		}
-		return fmt.Errorf("failed to write data to GCS object %s: %w", path, err)
+		slog.ErrorContext(ctx, "gcs: failed to write object", "path", path, "error", err)
+		return apperror.NewInternal()
 	}
 
 	if err := writer.Close(); err != nil {
-		return fmt.Errorf("failed to close GCS writer for object %s: %w", path, err)
+		slog.ErrorContext(ctx, "gcs: failed to close writer", "path", path, "error", err)
+		return apperror.NewInternal()
 	}
 
 	return nil
@@ -50,7 +52,8 @@ func (r *GCSFileRepository) DeleteFile(ctx context.Context, path string) error {
 		if errors.Is(err, storage.ErrObjectNotExist) {
 			return nil
 		}
-		return fmt.Errorf("failed to delete GCS object %s: %w", path, err)
+		slog.ErrorContext(ctx, "gcs: failed to delete object", "path", path, "error", err)
+		return apperror.NewInternal()
 	}
 	return nil
 }
@@ -65,7 +68,8 @@ func (r *GCSFileRepository) DeleteFilesWithPrefix(ctx context.Context, prefix st
 			break
 		}
 		if err != nil {
-			return fmt.Errorf("failed to list GCS objects with prefix %s: %w", prefix, err)
+			slog.ErrorContext(ctx, "gcs: failed to list objects", "prefix", prefix, "error", err)
+			return apperror.NewInternal()
 		}
 		names = append(names, attrs.Name)
 	}
@@ -82,7 +86,8 @@ func (r *GCSFileRepository) DeleteFilesWithPrefix(ctx context.Context, prefix st
 		g.Go(func() error {
 			if err := r.client.Bucket(r.bucket).Object(name).Delete(gCtx); err != nil {
 				if !errors.Is(err, storage.ErrObjectNotExist) {
-					return fmt.Errorf("failed to delete GCS object %s: %w", name, err)
+					slog.ErrorContext(gCtx, "gcs: failed to delete object", "name", name, "error", err)
+					return apperror.NewInternal()
 				}
 			}
 			return nil
