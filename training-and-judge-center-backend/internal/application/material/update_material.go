@@ -2,7 +2,6 @@
 
 import (
 	"context"
-	"log/slog"
 	"time"
 
 	domainMaterial "github.com/training-judge-center/backend/internal/domain/material"
@@ -43,8 +42,7 @@ func NewUpdateMaterialUseCase(
 func (uc *UpdateMaterialUseCase) Execute(ctx context.Context, in UpdateMaterialInput) (*UpdateMaterialOutput, error) {
 	exists, err := uc.groupProvider.Exists(ctx, in.GroupID)
 	if err != nil {
-		slog.ErrorContext(ctx, "failed to check group existence", "error", err, "group_id", in.GroupID)
-		return nil, apperror.NewInternal()
+		return nil, err
 	}
 	if !exists {
 		return nil, apperror.NewNotFound(ErrCodeGroupNotFound, "group not found")
@@ -109,15 +107,13 @@ func (uc *UpdateMaterialUseCase) Execute(ctx context.Context, in UpdateMaterialI
 	m.UpdateMetadata(title, content, tags, now)
 
 	if err := uc.repo.Save(ctx, m); err != nil {
-		slog.ErrorContext(ctx, "failed to save updated material", "error", err, "material_id", in.MaterialID)
-		return nil, apperror.NewInternal()
+		return nil, err
 	}
 
 	data := toMaterialData(m)
 	displays, err := uc.authorProvider.GetDisplays(ctx, []string{m.AuthorID().Value()})
 	if err != nil {
-		slog.ErrorContext(ctx, "failed to resolve author display", "error", err, "author_id", m.AuthorID().Value())
-		return nil, apperror.NewInternal()
+		return nil, err
 	}
 	if disp := displays[m.AuthorID().Value()]; disp != nil {
 		data.Author = &AuthorDTO{Nickname: disp.Nickname, Name: disp.Name}
