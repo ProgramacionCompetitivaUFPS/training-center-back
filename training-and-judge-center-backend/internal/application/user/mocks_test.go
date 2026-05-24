@@ -9,8 +9,8 @@ import (
 	domain "github.com/training-judge-center/backend/internal/domain/user"
 )
 
-// mockRateLimiter implementa ratelimit.RateLimiter para tests.
-// Por defecto permite todas las solicitudes y no falla.
+// ── mockRateLimiter ───────────────────────────────────────────────────────────
+
 type mockRateLimiter struct {
 	allowFn func(ctx context.Context, key string, maxAttempts int, window time.Duration) (bool, error)
 	resetFn func(ctx context.Context, key string) error
@@ -30,6 +30,8 @@ func (m *mockRateLimiter) Reset(ctx context.Context, key string) error {
 	return nil
 }
 
+// ── mockEmailSender ───────────────────────────────────────────────────────────
+
 type mockEmailSender struct {
 	sendFn func(ctx context.Context, msg appshared.EmailMessage) error
 }
@@ -40,6 +42,8 @@ func (m *mockEmailSender) Send(ctx context.Context, msg appshared.EmailMessage) 
 	}
 	return nil
 }
+
+// ── mockSessionInvalidator ────────────────────────────────────────────────────
 
 type mockSessionInvalidator struct {
 	invalidateAllUserSessionsFn func(ctx context.Context, userID string, timestamp time.Time) error
@@ -59,6 +63,8 @@ func (m *mockSessionInvalidator) IsSessionRevoked(ctx context.Context, userID st
 	}
 	return false, nil
 }
+
+// ── mockUserRepository ───────────────────────────────────────────────────────
 
 type mockUserRepository struct {
 	saveFn           func(ctx context.Context, u *domain.User) error
@@ -132,6 +138,8 @@ func newUserWithRole(id string, role shared.Role, status domain.Status) *domain.
 	)
 }
 
+// ── mockEmailChangeRepo ───────────────────────────────────────────────────────
+
 type mockEmailChangeRepo struct {
 	saveFn                func(ctx context.Context, req *domain.EmailChangeRequest) error
 	findByIDFn            func(ctx context.Context, id string) (*domain.EmailChangeRequest, error)
@@ -175,6 +183,8 @@ func (m *mockEmailChangeRepo) Update(ctx context.Context, req *domain.EmailChang
 	return nil
 }
 
+// ── mockTransactionManager ───────────────────────────────────────────────────
+
 type mockTransactionManager struct {
 	withTxFn func(ctx context.Context, fn func(txCtx context.Context) error) error
 }
@@ -185,3 +195,89 @@ func (m *mockTransactionManager) WithTx(ctx context.Context, fn func(txCtx conte
 	}
 	return fn(ctx)
 }
+
+// ── mockDeactivationRepo ──────────────────────────────────────────────────────
+
+type mockDeactivationRepo struct {
+	saveFn                      func(ctx context.Context, req *domain.DeactivationRequest) error
+	findByIDFn                  func(ctx context.Context, id string) (*domain.DeactivationRequest, error)
+	updateFn                    func(ctx context.Context, req *domain.DeactivationRequest) error
+	findPendingByUserIDFn       func(ctx context.Context, userID string) (*domain.DeactivationRequest, error)
+	invalidatePendingByUserIDFn func(ctx context.Context, userID string, now time.Time) error
+}
+
+func (m *mockDeactivationRepo) Save(ctx context.Context, req *domain.DeactivationRequest) error {
+	if m.saveFn != nil {
+		return m.saveFn(ctx, req)
+	}
+	return nil
+}
+func (m *mockDeactivationRepo) FindByID(ctx context.Context, id string) (*domain.DeactivationRequest, error) {
+	if m.findByIDFn != nil {
+		return m.findByIDFn(ctx, id)
+	}
+	return nil, nil
+}
+func (m *mockDeactivationRepo) Update(ctx context.Context, req *domain.DeactivationRequest) error {
+	if m.updateFn != nil {
+		return m.updateFn(ctx, req)
+	}
+	return nil
+}
+func (m *mockDeactivationRepo) FindPendingByUserID(ctx context.Context, userID string) (*domain.DeactivationRequest, error) {
+	if m.findPendingByUserIDFn != nil {
+		return m.findPendingByUserIDFn(ctx, userID)
+	}
+	return nil, nil
+}
+func (m *mockDeactivationRepo) InvalidatePendingByUserID(ctx context.Context, userID string, now time.Time) error {
+	if m.invalidatePendingByUserIDFn != nil {
+		return m.invalidatePendingByUserIDFn(ctx, userID, now)
+	}
+	return nil
+}
+
+// ── mockPasswordRecoveryRepo ──────────────────────────────────────────────────
+
+type mockPasswordRecoveryRepo struct {
+	saveFn                      func(ctx context.Context, req *domain.PasswordRecoveryRequest) error
+	findByIDFn                  func(ctx context.Context, id string) (*domain.PasswordRecoveryRequest, error)
+	updateFn                    func(ctx context.Context, req *domain.PasswordRecoveryRequest) error
+	findPendingByUserIDFn       func(ctx context.Context, userID string) (*domain.PasswordRecoveryRequest, error)
+	invalidatePendingByUserIDFn func(ctx context.Context, userID string, now time.Time) error
+}
+
+func (m *mockPasswordRecoveryRepo) Save(ctx context.Context, req *domain.PasswordRecoveryRequest) error {
+	if m.saveFn != nil {
+		return m.saveFn(ctx, req)
+	}
+	return nil
+}
+func (m *mockPasswordRecoveryRepo) FindByID(ctx context.Context, id string) (*domain.PasswordRecoveryRequest, error) {
+	if m.findByIDFn != nil {
+		return m.findByIDFn(ctx, id)
+	}
+	return nil, nil
+}
+func (m *mockPasswordRecoveryRepo) Update(ctx context.Context, req *domain.PasswordRecoveryRequest) error {
+	if m.updateFn != nil {
+		return m.updateFn(ctx, req)
+	}
+	return nil
+}
+func (m *mockPasswordRecoveryRepo) FindPendingByUserID(ctx context.Context, userID string) (*domain.PasswordRecoveryRequest, error) {
+	if m.findPendingByUserIDFn != nil {
+		return m.findPendingByUserIDFn(ctx, userID)
+	}
+	return nil, nil
+}
+func (m *mockPasswordRecoveryRepo) InvalidatePendingByUserID(ctx context.Context, userID string, now time.Time) error {
+	if m.invalidatePendingByUserIDFn != nil {
+		return m.invalidatePendingByUserIDFn(ctx, userID, now)
+	}
+	return nil
+}
+
+// ── helpers ───────────────────────────────────────────────────────────────────
+
+func strPtr(s string) *string { return &s }

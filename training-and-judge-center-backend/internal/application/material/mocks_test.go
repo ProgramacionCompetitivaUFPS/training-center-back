@@ -7,7 +7,7 @@ import (
 
 	domainMaterial "github.com/training-judge-center/backend/internal/domain/material"
 	"github.com/training-judge-center/backend/internal/domain/shared"
-	appshared "github.com/training-judge-center/backend/internal/application/shared"
+	"github.com/training-judge-center/backend/internal/testutil"
 	"github.com/training-judge-center/backend/pkg/apperror"
 )
 
@@ -156,9 +156,11 @@ func stubAuthorProvider() *mockAuthorProvider { return &mockAuthorProvider{} }
 
 // ── CurrentUser helpers ──────────────────────────────────────────────────────
 
-func asAdmin(id string) appshared.CurrentUser      { return appshared.CurrentUser{ID: id, Role: shared.RoleAdmin} }
-func asCoach(id string) appshared.CurrentUser      { return appshared.CurrentUser{ID: id, Role: shared.RoleCoach} }
-func asContestant(id string) appshared.CurrentUser { return appshared.CurrentUser{ID: id, Role: shared.RoleContestant} }
+var (
+	asAdmin      = testutil.AsAdmin
+	asCoach      = testutil.AsCoach
+	asContestant = testutil.AsContestant
+)
 
 // ── Material fixtures ────────────────────────────────────────────────────────
 

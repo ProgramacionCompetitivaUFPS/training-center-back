@@ -9,10 +9,6 @@ import (
 	"github.com/training-judge-center/backend/pkg/apperror"
 )
 
-func newDeleteUC(repo *mockMaterialRepository, group *mockGroupProvider) *DeleteMaterialUseCase {
-	return NewDeleteMaterialUseCase(repo, group)
-}
-
 func TestDeleteMaterial_SuccessByAuthor(t *testing.T) {
 	m := newTestMaterial()
 	deleted := false
@@ -20,7 +16,7 @@ func TestDeleteMaterial_SuccessByAuthor(t *testing.T) {
 		findByIDFn: func(_ context.Context, _ string) (*domainMaterial.Material, error) { return m, nil },
 		deleteFn:   func(_ context.Context, _ string) error { deleted = true; return nil },
 	}
-	uc := newDeleteUC(repo, groupExists())
+	uc := NewDeleteMaterialUseCase(repo, groupExists())
 
 	err := uc.Execute(context.Background(), DeleteMaterialInput{
 		CurrentUser: asCoach(testAuthorID),
@@ -43,7 +39,7 @@ func TestDeleteMaterial_SuccessByAdmin(t *testing.T) {
 		findByIDFn: func(_ context.Context, _ string) (*domainMaterial.Material, error) { return m, nil },
 		deleteFn:   func(_ context.Context, _ string) error { deleted = true; return nil },
 	}
-	uc := newDeleteUC(repo, groupExists())
+	uc := NewDeleteMaterialUseCase(repo, groupExists())
 
 	err := uc.Execute(context.Background(), DeleteMaterialInput{
 		CurrentUser: asAdmin(testOtherID),
@@ -66,7 +62,7 @@ func TestDeleteMaterial_SuccessPublishedMaterial(t *testing.T) {
 		findByIDFn: func(_ context.Context, _ string) (*domainMaterial.Material, error) { return m, nil },
 		deleteFn:   func(_ context.Context, _ string) error { deleted = true; return nil },
 	}
-	uc := newDeleteUC(repo, groupExists())
+	uc := NewDeleteMaterialUseCase(repo, groupExists())
 
 	err := uc.Execute(context.Background(), DeleteMaterialInput{
 		CurrentUser: asCoach(testAuthorID),
@@ -89,7 +85,7 @@ func TestDeleteMaterial_SuccessPinnedMaterial(t *testing.T) {
 		findByIDFn: func(_ context.Context, _ string) (*domainMaterial.Material, error) { return m, nil },
 		deleteFn:   func(_ context.Context, _ string) error { deleted = true; return nil },
 	}
-	uc := newDeleteUC(repo, groupExists())
+	uc := NewDeleteMaterialUseCase(repo, groupExists())
 
 	err := uc.Execute(context.Background(), DeleteMaterialInput{
 		CurrentUser: asCoach(testAuthorID),
@@ -107,7 +103,7 @@ func TestDeleteMaterial_SuccessPinnedMaterial(t *testing.T) {
 
 func TestDeleteMaterial_Forbidden_NonAuthorLead(t *testing.T) {
 	m := newTestMaterial()
-	uc := newDeleteUC(repoWith(m), groupExists())
+	uc := NewDeleteMaterialUseCase(repoWith(m), groupExists())
 
 	err := uc.Execute(context.Background(), DeleteMaterialInput{
 		CurrentUser: asCoach(testOtherID),
@@ -122,7 +118,7 @@ func TestDeleteMaterial_Forbidden_NonAuthorLead(t *testing.T) {
 }
 
 func TestDeleteMaterial_GroupNotFound(t *testing.T) {
-	uc := newDeleteUC(&mockMaterialRepository{}, groupNotFound())
+	uc := NewDeleteMaterialUseCase(&mockMaterialRepository{}, groupNotFound())
 
 	err := uc.Execute(context.Background(), DeleteMaterialInput{
 		CurrentUser: asCoach(testAuthorID),
@@ -137,7 +133,7 @@ func TestDeleteMaterial_GroupNotFound(t *testing.T) {
 }
 
 func TestDeleteMaterial_MaterialNotFound(t *testing.T) {
-	uc := newDeleteUC(&mockMaterialRepository{}, groupExists())
+	uc := NewDeleteMaterialUseCase(&mockMaterialRepository{}, groupExists())
 
 	err := uc.Execute(context.Background(), DeleteMaterialInput{
 		CurrentUser: asCoach(testAuthorID),
@@ -153,7 +149,7 @@ func TestDeleteMaterial_MaterialNotFound(t *testing.T) {
 
 func TestDeleteMaterial_MaterialInOtherGroup(t *testing.T) {
 	m := newTestMaterial()
-	uc := newDeleteUC(repoWith(m), groupExists())
+	uc := NewDeleteMaterialUseCase(repoWith(m), groupExists())
 
 	err := uc.Execute(context.Background(), DeleteMaterialInput{
 		CurrentUser: asCoach(testAuthorID),
@@ -173,7 +169,7 @@ func TestDeleteMaterial_FindByIDInfraError_Returns500(t *testing.T) {
 			return nil, errors.New("db connection lost")
 		},
 	}
-	uc := newDeleteUC(repo, groupExists())
+	uc := NewDeleteMaterialUseCase(repo, groupExists())
 
 	err := uc.Execute(context.Background(), DeleteMaterialInput{
 		CurrentUser: asCoach(testAuthorID),
@@ -188,7 +184,7 @@ func TestDeleteMaterial_FindByIDInfraError_Returns500(t *testing.T) {
 }
 
 func TestDeleteMaterial_GroupProviderError_Returns500(t *testing.T) {
-	uc := newDeleteUC(&mockMaterialRepository{}, groupProviderError())
+	uc := NewDeleteMaterialUseCase(&mockMaterialRepository{}, groupProviderError())
 
 	err := uc.Execute(context.Background(), DeleteMaterialInput{
 		CurrentUser: asCoach(testAuthorID),
@@ -208,7 +204,7 @@ func TestDeleteMaterial_DeleteError_Returns500(t *testing.T) {
 		findByIDFn: func(_ context.Context, _ string) (*domainMaterial.Material, error) { return m, nil },
 		deleteFn:   func(_ context.Context, _ string) error { return errors.New("db error") },
 	}
-	uc := newDeleteUC(repo, groupExists())
+	uc := NewDeleteMaterialUseCase(repo, groupExists())
 
 	err := uc.Execute(context.Background(), DeleteMaterialInput{
 		CurrentUser: asCoach(testAuthorID),

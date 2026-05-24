@@ -9,7 +9,7 @@ import (
 	"github.com/training-judge-center/backend/pkg/apperror"
 )
 
-func newPinUC(repo *mockMaterialRepository, group *mockGroupProvider, member *mockGroupMemberProvider) *PinMaterialUseCase {
+func newPinMaterialUseCase(repo *mockMaterialRepository, group *mockGroupProvider, member *mockGroupMemberProvider) *PinMaterialUseCase {
 	return NewPinMaterialUseCase(repo, group, member, stubAuthorProvider())
 }
 
@@ -20,7 +20,7 @@ func TestPinMaterial_SuccessByAuthor(t *testing.T) {
 		findByIDFn: func(_ context.Context, _ string) (*domainMaterial.Material, error) { return m, nil },
 		saveFn:     func(_ context.Context, _ *domainMaterial.Material) error { saved = true; return nil },
 	}
-	uc := newPinUC(repo, groupExists(), notLead())
+	uc := newPinMaterialUseCase(repo, groupExists(), notLead())
 
 	out, err := uc.Execute(context.Background(), PinMaterialInput{
 		CurrentUser: asCoach(testAuthorID),
@@ -44,7 +44,7 @@ func TestPinMaterial_SuccessByAuthor(t *testing.T) {
 
 func TestPinMaterial_SuccessByOtherLead(t *testing.T) {
 	m := newPublishedMaterial()
-	uc := newPinUC(repoWith(m), groupExists(), isLead())
+	uc := newPinMaterialUseCase(repoWith(m), groupExists(), isLead())
 
 	out, err := uc.Execute(context.Background(), PinMaterialInput{
 		CurrentUser: asCoach(testOtherID),
@@ -62,7 +62,7 @@ func TestPinMaterial_SuccessByOtherLead(t *testing.T) {
 
 func TestPinMaterial_SuccessByAdmin(t *testing.T) {
 	m := newPublishedMaterial()
-	uc := newPinUC(repoWith(m), groupExists(), notLead())
+	uc := newPinMaterialUseCase(repoWith(m), groupExists(), notLead())
 
 	out, err := uc.Execute(context.Background(), PinMaterialInput{
 		CurrentUser: asAdmin(testOtherID),
@@ -87,7 +87,7 @@ func TestPinMaterial_Admin_SkipsLeadCheck(t *testing.T) {
 			return false, errors.New("should not be called")
 		},
 	}
-	uc := newPinUC(repoWith(m), groupExists(), member)
+	uc := newPinMaterialUseCase(repoWith(m), groupExists(), member)
 
 	_, err := uc.Execute(context.Background(), PinMaterialInput{
 		CurrentUser: asAdmin(testOtherID),
@@ -106,7 +106,7 @@ func TestPinMaterial_Admin_SkipsLeadCheck(t *testing.T) {
 func TestPinMaterial_Idempotent_AlreadyPinned(t *testing.T) {
 	m := newPinnedMaterial()
 	originalPinnedAt := m.PinnedAt()
-	uc := newPinUC(repoWith(m), groupExists(), notLead())
+	uc := newPinMaterialUseCase(repoWith(m), groupExists(), notLead())
 
 	out, err := uc.Execute(context.Background(), PinMaterialInput{
 		CurrentUser: asCoach(testAuthorID),
@@ -127,7 +127,7 @@ func TestPinMaterial_Idempotent_AlreadyPinned(t *testing.T) {
 
 func TestPinMaterial_CannotPinDraft(t *testing.T) {
 	m := newTestMaterial()
-	uc := newPinUC(repoWith(m), groupExists(), notLead())
+	uc := newPinMaterialUseCase(repoWith(m), groupExists(), notLead())
 
 	_, err := uc.Execute(context.Background(), PinMaterialInput{
 		CurrentUser: asCoach(testAuthorID),
@@ -143,7 +143,7 @@ func TestPinMaterial_CannotPinDraft(t *testing.T) {
 
 func TestPinMaterial_Forbidden_Member(t *testing.T) {
 	m := newPublishedMaterial()
-	uc := newPinUC(repoWith(m), groupExists(), isMemberNotLead())
+	uc := newPinMaterialUseCase(repoWith(m), groupExists(), isMemberNotLead())
 
 	_, err := uc.Execute(context.Background(), PinMaterialInput{
 		CurrentUser: asCoach(testOtherID),
@@ -164,7 +164,7 @@ func TestPinMaterial_MemberProviderError_Returns500(t *testing.T) {
 			return false, errors.New("db timeout")
 		},
 	}
-	uc := newPinUC(repoWith(m), groupExists(), member)
+	uc := newPinMaterialUseCase(repoWith(m), groupExists(), member)
 
 	_, err := uc.Execute(context.Background(), PinMaterialInput{
 		CurrentUser: asCoach(testOtherID),
@@ -179,7 +179,7 @@ func TestPinMaterial_MemberProviderError_Returns500(t *testing.T) {
 }
 
 func TestPinMaterial_GroupProviderError_Returns500(t *testing.T) {
-	uc := newPinUC(&mockMaterialRepository{}, groupProviderError(), notLead())
+	uc := newPinMaterialUseCase(&mockMaterialRepository{}, groupProviderError(), notLead())
 
 	_, err := uc.Execute(context.Background(), PinMaterialInput{
 		CurrentUser: asCoach(testAuthorID),
@@ -194,7 +194,7 @@ func TestPinMaterial_GroupProviderError_Returns500(t *testing.T) {
 }
 
 func TestPinMaterial_GroupNotFound(t *testing.T) {
-	uc := newPinUC(&mockMaterialRepository{}, groupNotFound(), notLead())
+	uc := newPinMaterialUseCase(&mockMaterialRepository{}, groupNotFound(), notLead())
 
 	_, err := uc.Execute(context.Background(), PinMaterialInput{
 		CurrentUser: asCoach(testAuthorID),
@@ -210,7 +210,7 @@ func TestPinMaterial_GroupNotFound(t *testing.T) {
 
 func TestPinMaterial_MaterialInOtherGroup(t *testing.T) {
 	m := newPublishedMaterial()
-	uc := newPinUC(repoWith(m), groupExists(), notLead())
+	uc := newPinMaterialUseCase(repoWith(m), groupExists(), notLead())
 
 	_, err := uc.Execute(context.Background(), PinMaterialInput{
 		CurrentUser: asCoach(testAuthorID),
@@ -230,7 +230,7 @@ func TestPinMaterial_SaveError(t *testing.T) {
 		findByIDFn: func(_ context.Context, _ string) (*domainMaterial.Material, error) { return m, nil },
 		saveFn:     func(_ context.Context, _ *domainMaterial.Material) error { return errors.New("db error") },
 	}
-	uc := newPinUC(repo, groupExists(), notLead())
+	uc := newPinMaterialUseCase(repo, groupExists(), notLead())
 
 	_, err := uc.Execute(context.Background(), PinMaterialInput{
 		CurrentUser: asCoach(testAuthorID),

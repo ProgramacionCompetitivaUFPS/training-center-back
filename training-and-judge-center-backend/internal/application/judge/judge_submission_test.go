@@ -18,7 +18,7 @@ func newJudgeSubmissionUseCase(
 ) *JudgeSubmissionUseCase {
 	return NewJudgeSubmissionUseCase(
 		updater, downloader, problems, testCases,
-		executor, checker, standing, &mockTxManager{},
+		executor, checker, standing, &mockTransactionManager{},
 	)
 }
 

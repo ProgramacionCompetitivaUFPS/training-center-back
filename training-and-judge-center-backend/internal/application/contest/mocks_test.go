@@ -10,6 +10,8 @@ import (
 	"github.com/training-judge-center/backend/pkg/apperror"
 )
 
+// ── Time fixture ─────────────────────────────────────────────────────────────
+
 // testNow is a fixed anchor for createdAt/updatedAt in fixtures (not used for validation).
 var testNow = time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
 
@@ -18,22 +20,6 @@ var testNow = time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
 var (
 	testStart = time.Now().Add(24 * time.Hour)
 	testEnd   = time.Now().Add(29 * time.Hour)
-)
-
-const (
-	callerID      = "aaaaaaaa-0000-0000-0000-000000000001"
-	otherID       = "aaaaaaaa-0000-0000-0000-000000000002"
-	testGroupID   = "bbbbbbbb-0000-0000-0000-000000000001"
-	testContestID = "cccccccc-0000-0000-0000-000000000001"
-	testProblemID = "dddddddd-0000-0000-0000-000000000001"
-)
-
-// ── CurrentUser helpers ──────────────────────────────────────────────────────
-
-var (
-	asAdmin      = testutil.AsAdmin
-	asCoach      = testutil.AsCoach
-	asContestant = testutil.AsContestant
 )
 
 // ── Repository mock ──────────────────────────────────────────────────────────
@@ -145,8 +131,8 @@ func isMemberNotLead() *mockGroupMemberProvider {
 // ── ProblemProvider mock ─────────────────────────────────────────────────────
 
 type mockProblemProvider struct {
-	findBySlugsFn        func(ctx context.Context, slugs []string, callerID string, isAdmin bool) (map[string]*ProblemInfo, error)
-	findByIDsFn          func(ctx context.Context, ids []string) (map[string]*ProblemBasicInfo, error)
+	findBySlugsFn         func(ctx context.Context, slugs []string, callerID string, isAdmin bool) (map[string]*ProblemInfo, error)
+	findByIDsFn           func(ctx context.Context, ids []string) (map[string]*ProblemBasicInfo, error)
 	findByIDsWithLimitsFn func(ctx context.Context, ids []string) (map[string]*ProblemWithLimits, error)
 }
 
@@ -247,6 +233,37 @@ func (m *mockOwnerProvider) GetDisplay(ctx context.Context, userID string) (*Use
 
 func mockOwner() *mockOwnerProvider { return &mockOwnerProvider{} }
 
+// ── TransactionManager mock ──────────────────────────────────────────────────
+
+type mockTransactionManager struct {
+	withTxFn func(ctx context.Context, fn func(txCtx context.Context) error) error
+}
+
+func (m *mockTransactionManager) WithTx(ctx context.Context, fn func(txCtx context.Context) error) error {
+	if m.withTxFn != nil {
+		return m.withTxFn(ctx, fn)
+	}
+	return fn(ctx)
+}
+
+// ── CurrentUser helpers ──────────────────────────────────────────────────────
+
+var (
+	asAdmin      = testutil.AsAdmin
+	asCoach      = testutil.AsCoach
+	asContestant = testutil.AsContestant
+)
+
+// ── Test constants ───────────────────────────────────────────────────────────
+
+const (
+	callerID      = "aaaaaaaa-0000-0000-0000-000000000001"
+	otherID       = "aaaaaaaa-0000-0000-0000-000000000002"
+	testGroupID   = "bbbbbbbb-0000-0000-0000-000000000001"
+	testContestID = "cccccccc-0000-0000-0000-000000000001"
+	testProblemID = "dddddddd-0000-0000-0000-000000000001"
+)
+
 // ── Contest fixture ──────────────────────────────────────────────────────────
 
 func newTestContest(ownerID string) *domainContest.Contest {
@@ -274,17 +291,4 @@ func repoWith(c *domainContest.Contest) *mockContestRepository {
 			return c, nil
 		},
 	}
-}
-
-// ── TransactionManager mock ──────────────────────────────────────────────────
-
-type mockTransactionManager struct {
-	withTxFn func(ctx context.Context, fn func(txCtx context.Context) error) error
-}
-
-func (m *mockTransactionManager) WithTx(ctx context.Context, fn func(txCtx context.Context) error) error {
-	if m.withTxFn != nil {
-		return m.withTxFn(ctx, fn)
-	}
-	return fn(ctx)
 }

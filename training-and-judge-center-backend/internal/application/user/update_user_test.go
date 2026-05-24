@@ -9,8 +9,6 @@ import (
 	"github.com/training-judge-center/backend/pkg/apperror"
 )
 
-func strPtr(s string) *string { return &s }
-
 func TestUpdateUser_Success_AllFields(t *testing.T) {
 	repo := newNoConflictRepo()
 	activeUser := newUserWithRole("user-1", shared.RoleContestant, domain.StatusActive)

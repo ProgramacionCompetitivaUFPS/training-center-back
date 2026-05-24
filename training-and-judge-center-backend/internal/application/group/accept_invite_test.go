@@ -10,12 +10,13 @@ import (
 	"github.com/training-judge-center/backend/pkg/apperror"
 )
 
+
 func TestAcceptInvite_EmptyTokenReturnsValidationError(t *testing.T) {
-	uc := NewAcceptInviteUseCase(&fakeRepo{}, &fakeMemberRepo{}, &fakeInvitationSvc{})
+	uc := NewAcceptInviteUseCase(&mockGroupRepository{}, &mockMemberRepository{}, &mockInvitationTokenService{})
 
 	_, err := uc.Execute(context.Background(), AcceptInviteInput{
 		Token:       "",
-		CurrentUser: currentUser("u1", shared.RoleContestant),
+		CurrentUser: asContestant("u1"),
 	})
 
 	ae, ok := err.(*apperror.AppError)
@@ -29,12 +30,12 @@ func TestAcceptInvite_EmptyTokenReturnsValidationError(t *testing.T) {
 
 func TestAcceptInvite_InvalidTokenPropagatesError(t *testing.T) {
 	invalidErr := apperror.NewBadRequest(domainGroup.ErrCodeInvalidInviteToken, "invalid invitation token")
-	svc := &fakeInvitationSvc{validateErr: invalidErr}
-	uc := NewAcceptInviteUseCase(&fakeRepo{}, &fakeMemberRepo{}, svc)
+	svc := &mockInvitationTokenService{validateErr: invalidErr}
+	uc := NewAcceptInviteUseCase(&mockGroupRepository{}, &mockMemberRepository{}, svc)
 
 	_, err := uc.Execute(context.Background(), AcceptInviteInput{
 		Token:       "bad.token",
-		CurrentUser: currentUser("u1", shared.RoleContestant),
+		CurrentUser: asContestant("u1"),
 	})
 
 	ae, ok := err.(*apperror.AppError)
@@ -45,12 +46,12 @@ func TestAcceptInvite_InvalidTokenPropagatesError(t *testing.T) {
 
 func TestAcceptInvite_ExpiredTokenPropagatesError(t *testing.T) {
 	expiredErr := apperror.NewBadRequest(domainGroup.ErrCodeExpiredInviteToken, "invitation link has expired")
-	svc := &fakeInvitationSvc{validateErr: expiredErr}
-	uc := NewAcceptInviteUseCase(&fakeRepo{}, &fakeMemberRepo{}, svc)
+	svc := &mockInvitationTokenService{validateErr: expiredErr}
+	uc := NewAcceptInviteUseCase(&mockGroupRepository{}, &mockMemberRepository{}, svc)
 
 	_, err := uc.Execute(context.Background(), AcceptInviteInput{
 		Token:       "expired.token",
-		CurrentUser: currentUser("u1", shared.RoleContestant),
+		CurrentUser: asContestant("u1"),
 	})
 
 	ae, ok := err.(*apperror.AppError)
@@ -60,12 +61,12 @@ func TestAcceptInvite_ExpiredTokenPropagatesError(t *testing.T) {
 }
 
 func TestAcceptInvite_GroupNotFoundReturns404(t *testing.T) {
-	svc := &fakeInvitationSvc{claims: &InvitationClaims{GroupID: "nonexistent"}}
-	uc := NewAcceptInviteUseCase(&fakeRepo{}, &fakeMemberRepo{}, svc)
+	svc := &mockInvitationTokenService{claims: &InvitationClaims{GroupID: "nonexistent"}}
+	uc := NewAcceptInviteUseCase(&mockGroupRepository{}, &mockMemberRepository{}, svc)
 
 	_, err := uc.Execute(context.Background(), AcceptInviteInput{
 		Token:       "valid.token",
-		CurrentUser: currentUser("u1", shared.RoleContestant),
+		CurrentUser: asContestant("u1"),
 	})
 
 	ae, ok := err.(*apperror.AppError)
@@ -76,12 +77,12 @@ func TestAcceptInvite_GroupNotFoundReturns404(t *testing.T) {
 
 func TestAcceptInvite_PolicyChangedReturns403(t *testing.T) {
 	g := mustGroup(t, "g1", "Open Club", domainGroup.VisibilityVisible, domainGroup.JoinPolicyOpen)
-	svc := &fakeInvitationSvc{claims: &InvitationClaims{GroupID: "g1"}}
-	uc := NewAcceptInviteUseCase(&fakeRepo{groups: []*domainGroup.Group{g}}, &fakeMemberRepo{}, svc)
+	svc := &mockInvitationTokenService{claims: &InvitationClaims{GroupID: "g1"}}
+	uc := NewAcceptInviteUseCase(&mockGroupRepository{groups: []*domainGroup.Group{g}}, &mockMemberRepository{}, svc)
 
 	_, err := uc.Execute(context.Background(), AcceptInviteInput{
 		Token:       "valid.token",
-		CurrentUser: currentUser("u1", shared.RoleContestant),
+		CurrentUser: asContestant("u1"),
 	})
 
 	ae, ok := err.(*apperror.AppError)
@@ -97,17 +98,17 @@ func TestAcceptInvite_AlreadyMemberReturns409(t *testing.T) {
 	g := inviteGroup(t)
 	userID := shared.RestoreUserID("u1")
 	existing := domainGroup.RestoreGroupMember("m1", "g1", userID, domainGroup.MemberRoleMember, testNow)
-	memberRepo := &fakeMemberRepo{
+	memberRepo := &mockMemberRepository{
 		memberships: map[string]*domainGroup.GroupMember{
 			keyOf("g1", userID): existing,
 		},
 	}
-	svc := &fakeInvitationSvc{claims: &InvitationClaims{GroupID: "g1"}}
-	uc := NewAcceptInviteUseCase(&fakeRepo{groups: []*domainGroup.Group{g}}, memberRepo, svc)
+	svc := &mockInvitationTokenService{claims: &InvitationClaims{GroupID: "g1"}}
+	uc := NewAcceptInviteUseCase(&mockGroupRepository{groups: []*domainGroup.Group{g}}, memberRepo, svc)
 
 	_, err := uc.Execute(context.Background(), AcceptInviteInput{
 		Token:       "valid.token",
-		CurrentUser: currentUser("u1", shared.RoleContestant),
+		CurrentUser: asContestant("u1"),
 	})
 
 	ae, ok := err.(*apperror.AppError)
@@ -121,13 +122,13 @@ func TestAcceptInvite_AlreadyMemberReturns409(t *testing.T) {
 
 func TestAcceptInvite_SuccessCreatesMemberWithRoleMember(t *testing.T) {
 	g := inviteGroup(t)
-	memberRepo := &fakeMemberRepo{}
-	svc := &fakeInvitationSvc{claims: &InvitationClaims{GroupID: "g1"}}
-	uc := NewAcceptInviteUseCase(&fakeRepo{groups: []*domainGroup.Group{g}}, memberRepo, svc)
+	memberRepo := &mockMemberRepository{}
+	svc := &mockInvitationTokenService{claims: &InvitationClaims{GroupID: "g1"}}
+	uc := NewAcceptInviteUseCase(&mockGroupRepository{groups: []*domainGroup.Group{g}}, memberRepo, svc)
 
 	out, err := uc.Execute(context.Background(), AcceptInviteInput{
 		Token:       "valid.token",
-		CurrentUser: currentUser("u1", shared.RoleContestant),
+		CurrentUser: asContestant("u1"),
 	})
 
 	if err != nil {
@@ -143,13 +144,13 @@ func TestAcceptInvite_SuccessCreatesMemberWithRoleMember(t *testing.T) {
 
 func TestAcceptInvite_SaveFailurePropagatesError(t *testing.T) {
 	g := inviteGroup(t)
-	memberRepo := &fakeMemberRepo{saveErr: errors.New("db failure")}
-	svc := &fakeInvitationSvc{claims: &InvitationClaims{GroupID: "g1"}}
-	uc := NewAcceptInviteUseCase(&fakeRepo{groups: []*domainGroup.Group{g}}, memberRepo, svc)
+	memberRepo := &mockMemberRepository{saveErr: errors.New("db failure")}
+	svc := &mockInvitationTokenService{claims: &InvitationClaims{GroupID: "g1"}}
+	uc := NewAcceptInviteUseCase(&mockGroupRepository{groups: []*domainGroup.Group{g}}, memberRepo, svc)
 
 	_, err := uc.Execute(context.Background(), AcceptInviteInput{
 		Token:       "valid.token",
-		CurrentUser: currentUser("u1", shared.RoleContestant),
+		CurrentUser: asContestant("u1"),
 	})
 
 	if err == nil {

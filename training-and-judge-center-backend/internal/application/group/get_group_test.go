@@ -10,23 +10,6 @@ import (
 	"github.com/training-judge-center/backend/pkg/apperror"
 )
 
-type fakeUserProvider struct {
-	displays map[string]*UserDisplay
-	err      error
-}
-
-func (f *fakeUserProvider) GetDisplays(ctx context.Context, ids []string) (map[string]*UserDisplay, error) {
-	if f.err != nil {
-		return nil, f.err
-	}
-	out := make(map[string]*UserDisplay, len(ids))
-	for _, id := range ids {
-		if d, ok := f.displays[id]; ok {
-			out[id] = d
-		}
-	}
-	return out, nil
-}
 
 func notVisibleGroup(t *testing.T) *domainGroup.Group {
 	t.Helper()
@@ -39,11 +22,11 @@ func visibleGroup(t *testing.T) *domainGroup.Group {
 }
 
 func TestGetGroup_EmptyGroupIDReturnsValidationError(t *testing.T) {
-	uc := NewGetGroupUseCase(&fakeRepo{}, &fakeMemberRepo{}, &fakeUserProvider{})
+	uc := NewGetGroupUseCase(&mockGroupRepository{}, &mockMemberRepository{}, &mockUserProvider{})
 
 	_, err := uc.Execute(context.Background(), GetGroupInput{
 		GroupID:     "",
-		CurrentUser: currentUser("u1", shared.RoleContestant),
+		CurrentUser: asContestant("u1"),
 	})
 	if err == nil {
 		t.Fatal("expected validation error for empty groupId")
@@ -59,17 +42,17 @@ func TestGetGroup_UserProviderErrorReturnsInternal(t *testing.T) {
 	uidLead := shared.RestoreUserID("lead1")
 	lead, _ := domainGroup.NewGroupMember("m1", "g1", uidLead, domainGroup.MemberRoleLead, testNow)
 
-	repo := &fakeRepo{groups: []*domainGroup.Group{g}}
-	memberRepo := &fakeMemberRepo{
+	repo := &mockGroupRepository{groups: []*domainGroup.Group{g}}
+	memberRepo := &mockMemberRepository{
 		memberCounts: map[string]int{"g1": 1},
 		leadCounts:   map[string]int{"g1": 1},
 		leads:        map[string][]*domainGroup.GroupMember{"g1": {lead}},
 	}
-	uc := NewGetGroupUseCase(repo, memberRepo, &fakeUserProvider{err: errors.New("db down")})
+	uc := NewGetGroupUseCase(repo, memberRepo, &mockUserProvider{err: errors.New("db down")})
 
 	_, err := uc.Execute(context.Background(), GetGroupInput{
 		GroupID:     "g1",
-		CurrentUser: currentUser("u1", shared.RoleContestant),
+		CurrentUser: asContestant("u1"),
 	})
 	if err == nil {
 		t.Fatal("expected error when user provider fails")
@@ -82,13 +65,13 @@ func TestGetGroup_UserProviderErrorReturnsInternal(t *testing.T) {
 
 func TestGetGroup_NotVisibleHiddenFromStranger(t *testing.T) {
 	g := notVisibleGroup(t)
-	repo := &fakeRepo{groups: []*domainGroup.Group{g}}
-	memberRepo := &fakeMemberRepo{}
-	uc := NewGetGroupUseCase(repo, memberRepo, &fakeUserProvider{})
+	repo := &mockGroupRepository{groups: []*domainGroup.Group{g}}
+	memberRepo := &mockMemberRepository{}
+	uc := NewGetGroupUseCase(repo, memberRepo, &mockUserProvider{})
 
 	_, err := uc.Execute(context.Background(), GetGroupInput{
 		GroupID:     "g1",
-		CurrentUser: currentUser("stranger", shared.RoleContestant),
+		CurrentUser: asContestant("stranger"),
 	})
 	if err == nil {
 		t.Fatal("expected 404 for non-member on NOT_VISIBLE group")
@@ -104,17 +87,17 @@ func TestGetGroup_NotVisibleReturnedToMember(t *testing.T) {
 	uid := shared.RestoreUserID("member")
 	gm, _ := domainGroup.NewGroupMember("m1", "g1", uid, domainGroup.MemberRoleMember, testNow)
 
-	repo := &fakeRepo{groups: []*domainGroup.Group{g}}
-	memberRepo := &fakeMemberRepo{
+	repo := &mockGroupRepository{groups: []*domainGroup.Group{g}}
+	memberRepo := &mockMemberRepository{
 		memberships:  map[string]*domainGroup.GroupMember{keyOf("g1", uid): gm},
 		memberCounts: map[string]int{"g1": 5},
 		leadCounts:   map[string]int{"g1": 1},
 	}
-	uc := NewGetGroupUseCase(repo, memberRepo, &fakeUserProvider{})
+	uc := NewGetGroupUseCase(repo, memberRepo, &mockUserProvider{})
 
 	out, err := uc.Execute(context.Background(), GetGroupInput{
 		GroupID:     "g1",
-		CurrentUser: currentUser("member", shared.RoleContestant),
+		CurrentUser: asContestant("member"),
 	})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -129,13 +112,13 @@ func TestGetGroup_NotVisibleReturnedToMember(t *testing.T) {
 
 func TestGetGroup_AdminSeesNotVisible(t *testing.T) {
 	g := notVisibleGroup(t)
-	repo := &fakeRepo{groups: []*domainGroup.Group{g}}
-	memberRepo := &fakeMemberRepo{memberCounts: map[string]int{"g1": 0}, leadCounts: map[string]int{"g1": 0}}
-	uc := NewGetGroupUseCase(repo, memberRepo, &fakeUserProvider{})
+	repo := &mockGroupRepository{groups: []*domainGroup.Group{g}}
+	memberRepo := &mockMemberRepository{memberCounts: map[string]int{"g1": 0}, leadCounts: map[string]int{"g1": 0}}
+	uc := NewGetGroupUseCase(repo, memberRepo, &mockUserProvider{})
 
 	_, err := uc.Execute(context.Background(), GetGroupInput{
 		GroupID:     "g1",
-		CurrentUser: currentUser("admin", shared.RoleAdmin),
+		CurrentUser: asAdmin("admin"),
 	})
 	if err != nil {
 		t.Fatalf("admin should see NOT_VISIBLE, got %v", err)
@@ -147,20 +130,20 @@ func TestGetGroup_LeadsPopulated(t *testing.T) {
 	uidLead := shared.RestoreUserID("lead1")
 	lead, _ := domainGroup.NewGroupMember("m1", "g1", uidLead, domainGroup.MemberRoleLead, testNow)
 
-	repo := &fakeRepo{groups: []*domainGroup.Group{g}}
-	memberRepo := &fakeMemberRepo{
+	repo := &mockGroupRepository{groups: []*domainGroup.Group{g}}
+	memberRepo := &mockMemberRepository{
 		memberCounts: map[string]int{"g1": 1},
 		leadCounts:   map[string]int{"g1": 1},
 		leads:        map[string][]*domainGroup.GroupMember{"g1": {lead}},
 	}
-	userProvider := &fakeUserProvider{
+	userProvider := &mockUserProvider{
 		displays: map[string]*UserDisplay{"lead1": {Nickname: "johnny", Name: "John Smith"}},
 	}
 	uc := NewGetGroupUseCase(repo, memberRepo, userProvider)
 
 	out, err := uc.Execute(context.Background(), GetGroupInput{
 		GroupID:     "g1",
-		CurrentUser: currentUser("anyone", shared.RoleContestant),
+		CurrentUser: asContestant("anyone"),
 	})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)

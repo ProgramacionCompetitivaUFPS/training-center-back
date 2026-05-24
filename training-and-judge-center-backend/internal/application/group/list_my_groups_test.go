@@ -10,20 +10,13 @@ import (
 	"github.com/training-judge-center/backend/pkg/apperror"
 )
 
-type fakePreferences struct {
-	hide bool
-}
-
-func (f *fakePreferences) HideGlobalGroup(ctx context.Context, userID string) (bool, error) {
-	return f.hide, nil
-}
 
 func TestListMyGroups_InvalidRoleReturnsValidationError(t *testing.T) {
-	uc := NewListMyGroupsUseCase(&fakeRepo{}, &fakeMemberRepo{}, &fakePreferences{})
+	uc := NewListMyGroupsUseCase(&mockGroupRepository{}, &mockMemberRepository{}, &mockPreferencesReader{})
 	role := "OWNER"
 
 	_, err := uc.Execute(context.Background(), ListMyGroupsInput{
-		CurrentUser: currentUser("u1", shared.RoleContestant),
+		CurrentUser: asContestant("u1"),
 		Role:        &role,
 		Page:        1,
 		Limit:       20,
@@ -38,11 +31,11 @@ func TestListMyGroups_InvalidRoleReturnsValidationError(t *testing.T) {
 }
 
 func TestListMyGroups_ExcludeDefaultSetWhenPreferenceTrue(t *testing.T) {
-	repo := &fakeRepo{}
-	uc := NewListMyGroupsUseCase(repo, &fakeMemberRepo{}, &fakePreferences{hide: true})
+	repo := &mockGroupRepository{}
+	uc := NewListMyGroupsUseCase(repo, &mockMemberRepository{}, &mockPreferencesReader{hide: true})
 
 	_, err := uc.Execute(context.Background(), ListMyGroupsInput{
-		CurrentUser: currentUser("u1", shared.RoleContestant),
+		CurrentUser: asContestant("u1"),
 		Page:        1,
 		Limit:       20,
 	})
@@ -58,11 +51,11 @@ func TestListMyGroups_ExcludeDefaultSetWhenPreferenceTrue(t *testing.T) {
 }
 
 func TestListMyGroups_AdminHasNoImplicitMemberships(t *testing.T) {
-	repo := &fakeRepo{}
-	uc := NewListMyGroupsUseCase(repo, &fakeMemberRepo{}, &fakePreferences{})
+	repo := &mockGroupRepository{}
+	uc := NewListMyGroupsUseCase(repo, &mockMemberRepository{}, &mockPreferencesReader{})
 
 	_, err := uc.Execute(context.Background(), ListMyGroupsInput{
-		CurrentUser: currentUser("admin", shared.RoleAdmin),
+		CurrentUser: asAdmin("admin"),
 		Page:        1,
 		Limit:       20,
 	})
@@ -80,15 +73,15 @@ func TestListMyGroups_EnrichesEachResult(t *testing.T) {
 	gm, _ := domainGroup.NewGroupMember("m1", "g1", uid, domainGroup.MemberRoleLead,
 		time.Date(2026, 2, 1, 10, 0, 0, 0, time.UTC))
 
-	repo := &fakeRepo{groups: []*domainGroup.Group{g}, total: 1}
-	memberRepo := &fakeMemberRepo{
+	repo := &mockGroupRepository{groups: []*domainGroup.Group{g}, total: 1}
+	memberRepo := &mockMemberRepository{
 		memberships:  map[string]*domainGroup.GroupMember{keyOf("g1", uid): gm},
 		memberCounts: map[string]int{"g1": 3},
 	}
-	uc := NewListMyGroupsUseCase(repo, memberRepo, &fakePreferences{})
+	uc := NewListMyGroupsUseCase(repo, memberRepo, &mockPreferencesReader{})
 
 	out, err := uc.Execute(context.Background(), ListMyGroupsInput{
-		CurrentUser: currentUser("u1", shared.RoleContestant),
+		CurrentUser: asContestant("u1"),
 		Page:        1,
 		Limit:       20,
 	})

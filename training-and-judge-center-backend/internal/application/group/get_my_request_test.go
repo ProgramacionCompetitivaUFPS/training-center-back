@@ -5,16 +5,16 @@ import (
 	"testing"
 
 	domainGroup "github.com/training-judge-center/backend/internal/domain/group"
-	"github.com/training-judge-center/backend/internal/domain/shared"
 	"github.com/training-judge-center/backend/pkg/apperror"
 )
 
+
 func TestGetMyRequest_NoRequestReturns404(t *testing.T) {
-	uc := NewGetMyRequestUseCase(&fakeJoinRequestRepo{})
+	uc := NewGetMyRequestUseCase(&mockJoinRequestRepository{})
 
 	_, err := uc.Execute(context.Background(), GetMyRequestInput{
 		GroupID:     "g1",
-		CurrentUser: currentUser("u1", shared.RoleContestant),
+		CurrentUser: asContestant("u1"),
 	})
 	ae, ok := err.(*apperror.AppError)
 	if !ok || ae.Code != domainGroup.ErrCodeRequestNotFound {
@@ -24,12 +24,12 @@ func TestGetMyRequest_NoRequestReturns404(t *testing.T) {
 
 func TestGetMyRequest_ReturnsOwnRequest(t *testing.T) {
 	req := mustJoinRequest(t, "r1", "g1", "u1")
-	reqRepo := &fakeJoinRequestRepo{requests: []*domainGroup.JoinRequest{req}}
+	reqRepo := &mockJoinRequestRepository{requests: []*domainGroup.JoinRequest{req}}
 	uc := NewGetMyRequestUseCase(reqRepo)
 
 	out, err := uc.Execute(context.Background(), GetMyRequestInput{
 		GroupID:     "g1",
-		CurrentUser: currentUser("u1", shared.RoleContestant),
+		CurrentUser: asContestant("u1"),
 	})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -41,12 +41,12 @@ func TestGetMyRequest_ReturnsOwnRequest(t *testing.T) {
 
 func TestGetMyRequest_OtherUsersRequestNotReturned(t *testing.T) {
 	req := mustJoinRequest(t, "r1", "g1", "other-user")
-	reqRepo := &fakeJoinRequestRepo{requests: []*domainGroup.JoinRequest{req}}
+	reqRepo := &mockJoinRequestRepository{requests: []*domainGroup.JoinRequest{req}}
 	uc := NewGetMyRequestUseCase(reqRepo)
 
 	_, err := uc.Execute(context.Background(), GetMyRequestInput{
 		GroupID:     "g1",
-		CurrentUser: currentUser("u1", shared.RoleContestant),
+		CurrentUser: asContestant("u1"),
 	})
 	ae, ok := err.(*apperror.AppError)
 	if !ok || ae.Code != domainGroup.ErrCodeRequestNotFound {
