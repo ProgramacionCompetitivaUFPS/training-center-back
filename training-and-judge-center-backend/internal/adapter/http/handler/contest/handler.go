@@ -11,11 +11,14 @@ import (
 )
 
 type Handler struct {
-	createContest    *appContest.CreateContestUseCase
-	updateContest    *appContest.UpdateContestUseCase
-	getContest       *appContest.GetContestUseCase
-	listContests     *appContest.ListContestsUseCase
-	registerToContest *appContest.RegisterToContestUseCase
+	createContest             *appContest.CreateContestUseCase
+	updateContest             *appContest.UpdateContestUseCase
+	getContest                *appContest.GetContestUseCase
+	listContests              *appContest.ListContestsUseCase
+	registerToContest         *appContest.RegisterToContestUseCase
+	unregisterFromContest     *appContest.UnregisterFromContestUseCase
+	getRegistrationStatus     *appContest.GetRegistrationStatusUseCase
+	listContestRegistrations  *appContest.ListContestRegistrationsUseCase
 }
 
 func NewHandler(
@@ -24,13 +27,19 @@ func NewHandler(
 	getContest *appContest.GetContestUseCase,
 	listContests *appContest.ListContestsUseCase,
 	registerToContest *appContest.RegisterToContestUseCase,
+	unregisterFromContest *appContest.UnregisterFromContestUseCase,
+	getRegistrationStatus *appContest.GetRegistrationStatusUseCase,
+	listContestRegistrations *appContest.ListContestRegistrationsUseCase,
 ) *Handler {
 	return &Handler{
-		createContest:    createContest,
-		updateContest:    updateContest,
-		getContest:       getContest,
-		listContests:     listContests,
-		registerToContest: registerToContest,
+		createContest:            createContest,
+		updateContest:            updateContest,
+		getContest:               getContest,
+		listContests:             listContests,
+		registerToContest:        registerToContest,
+		unregisterFromContest:    unregisterFromContest,
+		getRegistrationStatus:    getRegistrationStatus,
+		listContestRegistrations: listContestRegistrations,
 	}
 }
 

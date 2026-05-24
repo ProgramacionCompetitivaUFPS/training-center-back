@@ -144,6 +144,9 @@ func (s *mockTransactionManager) WithTx(_ context.Context, fn func(context.Conte
 
 type mockRegistrationRepository struct {
 	saveFn                 func(ctx context.Context, r *domainContest.ContestRegistration) error
+	findByContestAndUser   func(ctx context.Context, contestID, userID string) (*domainContest.ContestRegistration, error)
+	deleteFn               func(ctx context.Context, contestID, userID string) error
+	listByContestFn        func(ctx context.Context, contestID string, page, limit int) ([]*domainContest.ContestRegistration, int, error)
 	existsByContestAndUser func(ctx context.Context, contestID, userID string) (bool, error)
 }
 
@@ -152,6 +155,27 @@ func (m *mockRegistrationRepository) Save(ctx context.Context, r *domainContest.
 		return m.saveFn(ctx, r)
 	}
 	return nil
+}
+
+func (m *mockRegistrationRepository) FindByContestAndUser(ctx context.Context, contestID, userID string) (*domainContest.ContestRegistration, error) {
+	if m.findByContestAndUser != nil {
+		return m.findByContestAndUser(ctx, contestID, userID)
+	}
+	return nil, nil
+}
+
+func (m *mockRegistrationRepository) Delete(ctx context.Context, contestID, userID string) error {
+	if m.deleteFn != nil {
+		return m.deleteFn(ctx, contestID, userID)
+	}
+	return nil
+}
+
+func (m *mockRegistrationRepository) ListByContest(ctx context.Context, contestID string, page, limit int) ([]*domainContest.ContestRegistration, int, error) {
+	if m.listByContestFn != nil {
+		return m.listByContestFn(ctx, contestID, page, limit)
+	}
+	return []*domainContest.ContestRegistration{}, 0, nil
 }
 
 func (m *mockRegistrationRepository) ExistsByContestAndUser(ctx context.Context, contestID, userID string) (bool, error) {
@@ -177,6 +201,18 @@ func (m *mockRegistrationRepository) ExistsByUserBulk(_ context.Context, contest
 	result := make(map[string]bool, len(contestIDs))
 	for _, id := range contestIDs {
 		result[id] = false
+	}
+	return result, nil
+}
+
+// ── ParticipantNicknameProvider mock ─────────────────────────────────────────
+
+type mockNicknameProvider struct{}
+
+func (s *mockNicknameProvider) GetNicknamesByIDs(_ context.Context, userIDs []string) (map[string]string, error) {
+	result := make(map[string]string, len(userIDs))
+	for _, id := range userIDs {
+		result[id] = "nick_" + id
 	}
 	return result, nil
 }

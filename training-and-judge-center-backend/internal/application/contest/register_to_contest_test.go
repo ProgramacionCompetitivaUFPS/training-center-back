@@ -28,13 +28,10 @@ func validRegisterInput() RegisterToContestInput {
 func TestRegisterToContest_HappyPath(t *testing.T) {
 	uc := newRegisterUseCase(repoWith(newTestContest(otherID)), mockRegistrations(), isMemberNotLead())
 
-	out, err := uc.Execute(context.Background(), validRegisterInput())
+	err := uc.Execute(context.Background(), validRegisterInput())
 
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
-	}
-	if out == nil || out.RegisteredAt.IsZero() {
-		t.Error("expected non-zero RegisteredAt in output")
 	}
 }
 
@@ -46,7 +43,7 @@ func TestRegisterToContest_ContestNotFound(t *testing.T) {
 	}
 	uc := newRegisterUseCase(repo, mockRegistrations(), isMemberNotLead())
 
-	_, err := uc.Execute(context.Background(), validRegisterInput())
+	err := uc.Execute(context.Background(), validRegisterInput())
 
 	var appErr *apperror.AppError
 	if !errors.As(err, &appErr) || appErr.Code != domainContest.ErrCodeContestNotFound {
@@ -60,7 +57,7 @@ func TestRegisterToContest_GroupMismatch_Returns404(t *testing.T) {
 	in := validRegisterInput()
 	in.GroupID = "different-group-id"
 
-	_, err := uc.Execute(context.Background(), in)
+	err := uc.Execute(context.Background(), in)
 
 	var appErr *apperror.AppError
 	if !errors.As(err, &appErr) || appErr.Code != domainContest.ErrCodeContestNotFound {
@@ -71,7 +68,7 @@ func TestRegisterToContest_GroupMismatch_Returns404(t *testing.T) {
 func TestRegisterToContest_NonMember_Returns403(t *testing.T) {
 	uc := newRegisterUseCase(repoWith(newTestContest(otherID)), mockRegistrations(), notLead())
 
-	_, err := uc.Execute(context.Background(), validRegisterInput())
+	err := uc.Execute(context.Background(), validRegisterInput())
 
 	var appErr *apperror.AppError
 	if !errors.As(err, &appErr) || appErr.Code != ErrCodeNotGroupMember {
@@ -79,34 +76,43 @@ func TestRegisterToContest_NonMember_Returns403(t *testing.T) {
 	}
 }
 
-func TestRegisterToContest_AdminBypassesMembership(t *testing.T) {
+func TestRegisterToContest_Admin_Returns403(t *testing.T) {
 	uc := newRegisterUseCase(repoWith(newTestContest(otherID)), mockRegistrations(), notLead())
 
 	in := validRegisterInput()
 	in.CurrentUser = asAdmin(callerID)
 
-	out, err := uc.Execute(context.Background(), in)
-
-	if err != nil {
-		t.Fatalf("admin should bypass membership check, got %v", err)
-	}
-	if out == nil {
-		t.Error("expected output")
-	}
-}
-
-func TestRegisterToContest_FinishedContest_Returns409(t *testing.T) {
-	uc := newRegisterUseCase(repoWith(newFinishedContest(otherID)), mockRegistrations(), isMemberNotLead())
-
-	_, err := uc.Execute(context.Background(), validRegisterInput())
+	err := uc.Execute(context.Background(), in)
 
 	var appErr *apperror.AppError
-	if !errors.As(err, &appErr) || appErr.Code != domainContest.ErrCodeRegistrationClosed {
-		t.Errorf("expected REGISTRATION_CLOSED, got %v", err)
+	if !errors.As(err, &appErr) || appErr.Code != ErrCodeAdminsCannotRegister {
+		t.Errorf("expected ADMINS_CANNOT_REGISTER, got %v", err)
 	}
 }
 
-func TestRegisterToContest_AlreadyRegistered_Returns409(t *testing.T) {
+func TestRegisterToContest_Lead_Returns403(t *testing.T) {
+	uc := newRegisterUseCase(repoWith(newTestContest(otherID)), mockRegistrations(), isLead())
+
+	err := uc.Execute(context.Background(), validRegisterInput())
+
+	var appErr *apperror.AppError
+	if !errors.As(err, &appErr) || appErr.Code != ErrCodeLeadsCannotRegister {
+		t.Errorf("expected LEADS_CANNOT_REGISTER, got %v", err)
+	}
+}
+
+func TestRegisterToContest_FinishedContest_Returns400(t *testing.T) {
+	uc := newRegisterUseCase(repoWith(newFinishedContest(otherID)), mockRegistrations(), isMemberNotLead())
+
+	err := uc.Execute(context.Background(), validRegisterInput())
+
+	var appErr *apperror.AppError
+	if !errors.As(err, &appErr) || appErr.Code != domainContest.ErrCodeContestAlreadyStarted {
+		t.Errorf("expected CONTEST_ALREADY_STARTED, got %v", err)
+	}
+}
+
+func TestRegisterToContest_AlreadyRegistered_IsIdempotent(t *testing.T) {
 	reg := &mockRegistrationRepository{
 		existsByContestAndUser: func(_ context.Context, _, _ string) (bool, error) {
 			return true, nil
@@ -114,11 +120,10 @@ func TestRegisterToContest_AlreadyRegistered_Returns409(t *testing.T) {
 	}
 	uc := newRegisterUseCase(repoWith(newTestContest(otherID)), reg, isMemberNotLead())
 
-	_, err := uc.Execute(context.Background(), validRegisterInput())
+	err := uc.Execute(context.Background(), validRegisterInput())
 
-	var appErr *apperror.AppError
-	if !errors.As(err, &appErr) || appErr.Code != domainContest.ErrCodeAlreadyRegistered {
-		t.Errorf("expected ALREADY_REGISTERED, got %v", err)
+	if err != nil {
+		t.Errorf("expected no error for duplicate registration (idempotent), got %v", err)
 	}
 }
 
@@ -130,7 +135,7 @@ func TestRegisterToContest_RepoFindError_Propagates(t *testing.T) {
 	}
 	uc := newRegisterUseCase(repo, mockRegistrations(), isMemberNotLead())
 
-	_, err := uc.Execute(context.Background(), validRegisterInput())
+	err := uc.Execute(context.Background(), validRegisterInput())
 
 	if err == nil {
 		t.Fatal("expected error from failed FindByID")
@@ -145,7 +150,7 @@ func TestRegisterToContest_MemberProviderError_Propagates(t *testing.T) {
 	}
 	uc := newRegisterUseCase(repoWith(newTestContest(otherID)), mockRegistrations(), member)
 
-	_, err := uc.Execute(context.Background(), validRegisterInput())
+	err := uc.Execute(context.Background(), validRegisterInput())
 
 	if err == nil {
 		t.Fatal("expected error from failed IsMemberOfGroup")
@@ -160,7 +165,7 @@ func TestRegisterToContest_RegistrationCheckError_Propagates(t *testing.T) {
 	}
 	uc := newRegisterUseCase(repoWith(newTestContest(otherID)), reg, isMemberNotLead())
 
-	_, err := uc.Execute(context.Background(), validRegisterInput())
+	err := uc.Execute(context.Background(), validRegisterInput())
 
 	if err == nil {
 		t.Fatal("expected error from failed registration check")
@@ -175,7 +180,7 @@ func TestRegisterToContest_SaveError_Propagates(t *testing.T) {
 	}
 	uc := newRegisterUseCase(repoWith(newTestContest(otherID)), reg, isMemberNotLead())
 
-	_, err := uc.Execute(context.Background(), validRegisterInput())
+	err := uc.Execute(context.Background(), validRegisterInput())
 
 	if err == nil {
 		t.Fatal("expected error from failed Save")

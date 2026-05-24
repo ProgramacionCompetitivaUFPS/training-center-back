@@ -138,10 +138,31 @@ type listContestsResponse struct {
 	Pagination pagination        `json:"pagination"`
 }
 
-// ── Register response ────────────────────────────────────────────────────────
+// ── Registration status response ─────────────────────────────────────────────
 
-type registerResponse struct {
+type registrationStatusResponse struct {
+	Registered   bool    `json:"registered"`
+	RegisteredAt *string `json:"registeredAt,omitempty"`
+}
+
+// ── List registrations response ───────────────────────────────────────────────
+
+type registrationItem struct {
+	Nickname     string `json:"nickname"`
 	RegisteredAt string `json:"registeredAt"`
+}
+
+type registrationsPagination struct {
+	Page       int  `json:"page"`
+	Limit      int  `json:"limit"`
+	Total      int  `json:"total"`
+	TotalPages int  `json:"totalPages"`
+	HasMore    bool `json:"hasMore"`
+}
+
+type listRegistrationsResponse struct {
+	Registrations []registrationItem      `json:"registrations"`
+	Pagination    registrationsPagination `json:"pagination"`
 }
 
 // ── Create/Update response ───────────────────────────────────────────────────

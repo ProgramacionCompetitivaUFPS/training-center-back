@@ -6,7 +6,6 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
-	"time"
 
 	appcontest "github.com/training-judge-center/backend/internal/application/contest"
 	domainContest "github.com/training-judge-center/backend/internal/domain/contest"
@@ -54,7 +53,7 @@ func TestRegister_Unauthenticated_Returns401(t *testing.T) {
 	}
 }
 
-func TestRegister_HappyPath_Returns201(t *testing.T) {
+func TestRegister_HappyPath_Returns204(t *testing.T) {
 	h := newHandlerWithRegister(defaultRegisterUC())
 	r := authedRequest(http.MethodPost, "/groups/g1/contests/c1/register", nil)
 	r.SetPathValue("groupId", "g1")
@@ -63,18 +62,11 @@ func TestRegister_HappyPath_Returns201(t *testing.T) {
 
 	wrapAuth(http.HandlerFunc(h.Register)).ServeHTTP(w, r)
 
-	if w.Code != http.StatusCreated {
-		t.Fatalf("expected 201, got %d: %s", w.Code, w.Body.String())
+	if w.Code != http.StatusNoContent {
+		t.Fatalf("expected 204, got %d: %s", w.Code, w.Body.String())
 	}
-	var resp registerResponse
-	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
-		t.Fatalf("could not decode response: %v", err)
-	}
-	if resp.RegisteredAt == "" {
-		t.Error("expected non-empty registeredAt")
-	}
-	if _, err := time.Parse(time.RFC3339, resp.RegisteredAt); err != nil {
-		t.Errorf("registeredAt is not RFC3339: %q", resp.RegisteredAt)
+	if w.Body.Len() != 0 {
+		t.Errorf("expected empty body, got %q", w.Body.String())
 	}
 }
 
@@ -116,7 +108,7 @@ func TestRegister_NonMember_Returns403(t *testing.T) {
 	}
 }
 
-func TestRegister_AlreadyRegistered_Returns409(t *testing.T) {
+func TestRegister_AlreadyRegistered_Returns204(t *testing.T) {
 	uc := appcontest.NewRegisterToContestUseCase(
 		&mockRepoReturning{contest: scheduledContest()},
 		&mockRegistrationRepository{
@@ -132,21 +124,12 @@ func TestRegister_AlreadyRegistered_Returns409(t *testing.T) {
 
 	wrapAuth(http.HandlerFunc(h.Register)).ServeHTTP(w, r)
 
-	if w.Code != http.StatusConflict {
-		t.Fatalf("expected 409, got %d: %s", w.Code, w.Body.String())
-	}
-	var errResp struct {
-		Code string `json:"error"`
-	}
-	if err := json.NewDecoder(w.Body).Decode(&errResp); err != nil {
-		t.Fatalf("could not decode error body: %v", err)
-	}
-	if errResp.Code != domainContest.ErrCodeAlreadyRegistered {
-		t.Errorf("expected error code %q, got %q", domainContest.ErrCodeAlreadyRegistered, errResp.Code)
+	if w.Code != http.StatusNoContent {
+		t.Fatalf("expected 204 (idempotent), got %d: %s", w.Code, w.Body.String())
 	}
 }
 
-func TestRegister_RegistrationClosed_Returns409(t *testing.T) {
+func TestRegister_ContestAlreadyStarted_Returns400(t *testing.T) {
 	uc := appcontest.NewRegisterToContestUseCase(
 		&mockRepoReturning{contest: finishedContest()},
 		&mockRegistrationRepository{},
@@ -160,8 +143,8 @@ func TestRegister_RegistrationClosed_Returns409(t *testing.T) {
 
 	wrapAuth(http.HandlerFunc(h.Register)).ServeHTTP(w, r)
 
-	if w.Code != http.StatusConflict {
-		t.Fatalf("expected 409, got %d: %s", w.Code, w.Body.String())
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400, got %d: %s", w.Code, w.Body.String())
 	}
 	var errResp struct {
 		Code string `json:"error"`
@@ -169,7 +152,7 @@ func TestRegister_RegistrationClosed_Returns409(t *testing.T) {
 	if err := json.NewDecoder(w.Body).Decode(&errResp); err != nil {
 		t.Fatalf("could not decode error body: %v", err)
 	}
-	if errResp.Code != domainContest.ErrCodeRegistrationClosed {
-		t.Errorf("expected error code %q, got %q", domainContest.ErrCodeRegistrationClosed, errResp.Code)
+	if errResp.Code != domainContest.ErrCodeContestAlreadyStarted {
+		t.Errorf("expected error code %q, got %q", domainContest.ErrCodeContestAlreadyStarted, errResp.Code)
 	}
 }

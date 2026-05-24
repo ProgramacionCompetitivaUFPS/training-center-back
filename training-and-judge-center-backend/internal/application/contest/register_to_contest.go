@@ -16,10 +16,6 @@ type RegisterToContestInput struct {
 	ContestID   string
 }
 
-type RegisterToContestOutput struct {
-	RegisteredAt time.Time
-}
-
 type RegisterToContestUseCase struct {
 	repo             domainContest.Repository
 	registrationRepo domainContest.RegistrationRepository
@@ -38,50 +34,55 @@ func NewRegisterToContestUseCase(
 	}
 }
 
-func (uc *RegisterToContestUseCase) Execute(ctx context.Context, in RegisterToContestInput) (*RegisterToContestOutput, error) {
+func (uc *RegisterToContestUseCase) Execute(ctx context.Context, in RegisterToContestInput) error {
 	c, err := uc.repo.FindByID(ctx, in.ContestID)
 	if err != nil {
-		return nil, err
+		return err
 	}
 	if c == nil {
-		return nil, apperror.NewNotFound(domainContest.ErrCodeContestNotFound, "contest not found")
+		return apperror.NewNotFound(domainContest.ErrCodeContestNotFound, "contest not found")
 	}
 
 	if c.GroupID().Value() != in.GroupID {
-		return nil, apperror.NewNotFound(domainContest.ErrCodeContestNotFound, "contest not found")
+		return apperror.NewNotFound(domainContest.ErrCodeContestNotFound, "contest not found")
 	}
 
 	now := time.Now()
-	if c.Status(now) == domainContest.StatusFinished {
-		return nil, apperror.NewConflict(domainContest.ErrCodeRegistrationClosed, "registration is closed for finished contests")
+	if c.Status(now) != domainContest.StatusScheduled {
+		return apperror.NewBadRequest(domainContest.ErrCodeContestAlreadyStarted, "registration is only allowed before the contest starts")
 	}
 
-	isAdmin := in.CurrentUser.IsAdmin()
-	if !isAdmin {
-		isMember, err := uc.memberProvider.IsMemberOfGroup(ctx, in.CurrentUser.ID, in.GroupID)
-		if err != nil {
-			return nil, err
-		}
-		if !isMember {
-			return nil, apperror.NewForbidden(ErrCodeNotGroupMember, "only group members can register to this contest")
-		}
+	if in.CurrentUser.IsAdmin() {
+		return apperror.NewForbidden(ErrCodeAdminsCannotRegister, "admins cannot register to contests")
+	}
+
+	isLead, err := uc.memberProvider.IsLeadOfGroup(ctx, in.CurrentUser.ID, in.GroupID)
+	if err != nil {
+		return err
+	}
+	if isLead {
+		return apperror.NewForbidden(ErrCodeLeadsCannotRegister, "leads cannot register to contests")
+	}
+
+	isMember, err := uc.memberProvider.IsMemberOfGroup(ctx, in.CurrentUser.ID, in.GroupID)
+	if err != nil {
+		return err
+	}
+	if !isMember {
+		return apperror.NewForbidden(ErrCodeNotGroupMember, "only group members can register to this contest")
 	}
 
 	exists, err := uc.registrationRepo.ExistsByContestAndUser(ctx, in.ContestID, in.CurrentUser.ID)
 	if err != nil {
-		return nil, err
+		return err
 	}
 	if exists {
-		return nil, apperror.NewConflict(domainContest.ErrCodeAlreadyRegistered, "you are already registered for this contest")
+		return nil
 	}
 
 	reg, err := domainContest.NewContestRegistration(uuid.New().String(), in.ContestID, in.CurrentUser.ID, now)
 	if err != nil {
-		return nil, err
+		return err
 	}
-	if err := uc.registrationRepo.Save(ctx, reg); err != nil {
-		return nil, err
-	}
-
-	return &RegisterToContestOutput{RegisteredAt: reg.RegisteredAt()}, nil
+	return uc.registrationRepo.Save(ctx, reg)
 }
