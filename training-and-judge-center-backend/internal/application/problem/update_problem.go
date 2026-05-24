@@ -2,7 +2,7 @@
 
 import (
 	"context"
-	"log/slog"
+
 	"time"
 
 	"github.com/training-judge-center/backend/internal/domain/problem"
@@ -192,8 +192,7 @@ func (uc *UpdateProblemUseCase) Execute(ctx context.Context, input UpdateProblem
 	}
 
 	if err := uc.repo.Save(ctx, p); err != nil {
-		slog.ErrorContext(ctx, "failed to save updated problem", "error", err, "slug", slug.String())
-		return nil, apperror.NewInternal()
+		return nil, err
 	}
 
 	return &UpdateProblemOutput{Problem: problemToDTO(p)}, nil

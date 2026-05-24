@@ -2,7 +2,7 @@
 
 import (
 	"context"
-	"log/slog"
+
 	"time"
 
 	"github.com/google/uuid"
@@ -79,8 +79,7 @@ func (uc *RequestJoinUseCase) Execute(ctx context.Context, input RequestJoinInpu
 	}
 
 	if err := uc.joinRequestRepo.Save(ctx, req); err != nil {
-		slog.ErrorContext(ctx, "failed to save join request", "error", err, "group_id", g.ID())
-		return nil, apperror.NewInternal()
+		return nil, err
 	}
 
 	return &RequestJoinOutput{Request: joinRequestToDTO(req)}, nil

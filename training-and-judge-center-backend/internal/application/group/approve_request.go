@@ -2,7 +2,7 @@
 
 import (
 	"context"
-	"log/slog"
+
 	"time"
 
 	"github.com/google/uuid"
@@ -69,8 +69,7 @@ func (uc *ApproveRequestUseCase) Execute(ctx context.Context, input ApproveReque
 		}
 
 		if err := uc.joinRequestRepo.Save(txCtx, req); err != nil {
-			slog.ErrorContext(txCtx, "failed to save approved request", "error", err)
-			return apperror.NewInternal()
+			return err
 		}
 
 		return uc.memberRepo.Save(txCtx, newMember)

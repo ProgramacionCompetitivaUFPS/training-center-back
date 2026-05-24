@@ -82,8 +82,7 @@ func (uc *ListJoinRequestsUseCase) Execute(ctx context.Context, input ListJoinRe
 	}
 	displays, err := uc.userProvider.GetDisplays(ctx, userIDs)
 	if err != nil {
-		slog.ErrorContext(ctx, "failed to get user displays for join requests", "error", err)
-		return nil, apperror.NewInternal()
+		return nil, err
 	}
 
 	details := make([]JoinRequestDetail, 0, len(requests))
