@@ -3,6 +3,7 @@ package problem
 import (
 	"context"
 	"errors"
+	"fmt"
 	"log/slog"
 
 	"cloud.google.com/go/storage"
@@ -95,4 +96,12 @@ func (r *GCSFileRepository) DeleteFilesWithPrefix(ctx context.Context, prefix st
 	}
 
 	return g.Wait()
+}
+
+func (r *GCSFileRepository) Validate(ctx context.Context) error {
+	_, err := r.client.Bucket(r.bucket).Attrs(ctx)
+	if err != nil {
+		return fmt.Errorf("GCS storage: bucket %q is not accessible: %w", r.bucket, err)
+	}
+	return nil
 }
