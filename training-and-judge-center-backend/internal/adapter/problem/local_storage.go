@@ -17,13 +17,20 @@ type LocalFileRepository struct {
 
 var _ appProblem.ProblemFileRepository = (*LocalFileRepository)(nil)
 
-func NewLocalFileRepository(baseDir string) (*LocalFileRepository, error) {
-	if err := os.MkdirAll(baseDir, 0755); err != nil {
-		return nil, fmt.Errorf("failed to create base directory %s: %w", baseDir, err)
+func NewLocalFileRepository(baseDir string) *LocalFileRepository {
+	return &LocalFileRepository{baseDir: baseDir}
+}
+
+func (r *LocalFileRepository) Validate() error {
+	if err := os.MkdirAll(r.baseDir, 0755); err != nil {
+		return fmt.Errorf("local storage: cannot create base directory %s: %w", r.baseDir, err)
 	}
-	return &LocalFileRepository{
-		baseDir: baseDir,
-	}, nil
+	testFile := filepath.Join(r.baseDir, ".write-test")
+	if err := os.WriteFile(testFile, []byte("ok"), 0644); err != nil {
+		return fmt.Errorf("local storage: base directory is not writable: %w", err)
+	}
+	os.Remove(testFile)
+	return nil
 }
 
 func (r *LocalFileRepository) resolvePath(path string) string {
