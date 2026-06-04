@@ -97,17 +97,22 @@ func main() {
 			slog.Error("failed to create GCS client", "error", err)
 			os.Exit(1)
 		}
+		repo := problem.NewGCSFileRepository(gcsClient, cfg.GCSBucket)
+		if err := repo.Validate(ctx); err != nil {
+			slog.Error("GCS storage not usable", "error", err)
+			os.Exit(1)
+		}
 		slog.Info("using GCS storage backend", "bucket", cfg.GCSBucket)
-		fileStorage = problem.NewGCSFileRepository(gcsClient, cfg.GCSBucket)
+		fileStorage = repo
 	default:
 		localDir := cfg.StorageLocalDir
-		localRepo, err := problem.NewLocalFileRepository(localDir)
-		if err != nil {
-			slog.Error("failed to create local file storage", "error", err)
+		repo := problem.NewLocalFileRepository(localDir)
+		if err := repo.Validate(); err != nil {
+			slog.Error("local storage not usable", "error", err)
 			os.Exit(1)
 		}
 		slog.Info("using local storage backend", "dir", localDir)
-		fileStorage = localRepo
+		fileStorage = repo
 	}
 
 	icpcParser := problem.NewICPCParser(
