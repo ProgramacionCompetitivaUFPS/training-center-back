@@ -7,15 +7,12 @@ import (
 	"os"
 	"path/filepath"
 
-	appProblem "github.com/training-judge-center/backend/internal/application/problem"
 	"github.com/training-judge-center/backend/pkg/apperror"
 )
 
 type LocalFileRepository struct {
 	baseDir string
 }
-
-var _ appProblem.ProblemFileRepository = (*LocalFileRepository)(nil)
 
 func NewLocalFileRepository(baseDir string) (*LocalFileRepository, error) {
 	if err := os.MkdirAll(baseDir, 0755); err != nil {
