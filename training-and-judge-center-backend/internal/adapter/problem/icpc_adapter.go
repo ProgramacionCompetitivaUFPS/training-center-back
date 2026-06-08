@@ -10,8 +10,6 @@ type ZipParser struct {
 	inner *ICPCParser
 }
 
-var _ appProblem.ZipParser = (*ZipParser)(nil)
-
 func NewZipParser(inner *ICPCParser) *ZipParser {
 	return &ZipParser{inner: inner}
 }
@@ -31,8 +29,6 @@ func (a *ZipParser) ParseTestCasesZip(ctx context.Context, zipData []byte) ([]ap
 type ICPCPackageParser struct {
 	inner *ICPCParser
 }
-
-var _ appProblem.ICPCPackageParser = (*ICPCPackageParser)(nil)
 
 func NewICPCPackageParser(inner *ICPCParser) *ICPCPackageParser {
 	return &ICPCPackageParser{inner: inner}

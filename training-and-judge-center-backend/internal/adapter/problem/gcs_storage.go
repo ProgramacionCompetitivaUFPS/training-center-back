@@ -6,7 +6,6 @@ import (
 	"log/slog"
 
 	"cloud.google.com/go/storage"
-	appProblem "github.com/training-judge-center/backend/internal/application/problem"
 	"github.com/training-judge-center/backend/pkg/apperror"
 	"golang.org/x/sync/errgroup"
 	"google.golang.org/api/iterator"
@@ -16,8 +15,6 @@ type GCSFileRepository struct {
 	client *storage.Client
 	bucket string
 }
-
-var _ appProblem.ProblemFileRepository = (*GCSFileRepository)(nil)
 
 func NewGCSFileRepository(client *storage.Client, bucketName string) *GCSFileRepository {
 	return &GCSFileRepository{

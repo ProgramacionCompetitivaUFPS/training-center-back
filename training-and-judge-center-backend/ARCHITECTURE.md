@@ -1528,6 +1528,62 @@ CreatedAt: out.CreatedAt.Format("2006-01-02T15:04:05Z")
 
 `time.RFC3339` equivale a `"2006-01-02T15:04:05Z07:00"`, que es el verbo correcto: si el valor está en UTC emite `Z`, si tiene offset lo emite como `+05:00`.
 
+### Ad13 — SDK clients: interfaz privada dentro del paquete
+
+Los adapters que dependen de un SDK externo con tipos concretos en su API (`*storage.Client` de GCS, `*client.Client` de Docker, etc.) definen una **interfaz privada mínima** dentro del paquete del adapter. El struct almacena esa interfaz — nunca el cliente concreto del SDK.
+
+**Por qué:** el cliente concreto no puede instanciarse en tests sin una conexión real al servicio externo. La interfaz privada permite inyectar un mock sin exponer la abstracción hacia afuera.
+
+**Estructura canónica** — cuando el SDK satisface la interfaz directamente (`*client.Client` para Docker):
+
+```go
+// pool/docker_client.go — tipo privado al paquete
+type dockerLifecycle interface {
+    ContainerCreate(ctx context.Context, opts client.ContainerCreateOptions) (client.ContainerCreateResult, error)
+    ContainerStart(ctx context.Context, containerID string, opts client.ContainerStartOptions) (client.ContainerStartResult, error)
+    ContainerRemove(ctx context.Context, containerID string, opts client.ContainerRemoveOptions) (client.ContainerRemoveResult, error)
+}
+// *client.Client satisface dockerLifecycle directamente.
+
+// pool/pool.go
+type Pool struct { docker dockerLifecycle }
+func NewPool(cfg PoolConfig, docker dockerLifecycle) *Pool
+// Tests pasan un mockDockerClient{}; producción pasa *client.Client.
+```
+
+**Cuando el SDK NO satisface la interfaz directamente** (e.g. GCS, cuya API es un chain de tipos concretos), se define además un thin adapter privado:
+
+```go
+// adapter/judge/gcs.go — private al paquete
+type gcsReader interface {
+    readObject(ctx context.Context, object string) (io.ReadCloser, error)
+}
+
+type gcsClientReader struct {
+    client *storage.Client
+    bucket string
+}
+
+func (r *gcsClientReader) readObject(ctx context.Context, object string) (io.ReadCloser, error) {
+    return r.client.Bucket(r.bucket).Object(object).NewReader(ctx)
+}
+
+func newGCSReader(client *storage.Client, bucket string) gcsReader {
+    return &gcsClientReader{client: client, bucket: bucket}
+}
+
+// adapter/judge/source_code_downloader.go
+type SourceCodeDownloader struct { reader gcsReader }
+
+func NewSourceCodeDownloader(client *storage.Client, bucket string) *SourceCodeDownloader {
+    return &SourceCodeDownloader{reader: newGCSReader(client, bucket)}
+}
+// El constructor público acepta el tipo concreto del SDK — el composition root
+// no ve la interfaz interna. Solo los tests la ven, inyectando un mockGCSReader.
+```
+
+**Cada paquete define su propia interfaz** con exactamente los métodos que necesita (Interface Segregation). No existe una interfaz GCS o Docker compartida entre paquetes — la duplicación de forma es intencional.
+
 ---
 
 ## 7. Middleware layer conventions
