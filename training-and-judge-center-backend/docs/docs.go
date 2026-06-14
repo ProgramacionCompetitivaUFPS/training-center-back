@@ -382,6 +382,584 @@ const docTemplate = `{
                 }
             }
         },
+        "/groups/{groupId}/contests": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "contests"
+                ],
+                "summary": "List contests",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Group ID",
+                        "name": "groupId",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Filter by status (SCHEDULED, ACTIVE, FINISHED)",
+                        "name": "status",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Sort field (name, startTime, createdAt)",
+                        "name": "sortBy",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Sort order (asc, desc)",
+                        "name": "order",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Page number (default 1)",
+                        "name": "page",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Items per page (default 20, max 100)",
+                        "name": "limit",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/contest.listContestsResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/apperror.AppError"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/apperror.AppError"
+                        }
+                    }
+                }
+            },
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "contests"
+                ],
+                "summary": "Create contest",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Group ID",
+                        "name": "groupId",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Contest data",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/contest.createContestRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "schema": {
+                            "$ref": "#/definitions/contest.contestResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/apperror.AppError"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/apperror.AppError"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/apperror.AppError"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/apperror.AppError"
+                        }
+                    }
+                }
+            }
+        },
+        "/groups/{groupId}/contests/{contestId}": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "contests"
+                ],
+                "summary": "Get contest",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Group ID",
+                        "name": "groupId",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Contest ID",
+                        "name": "contestId",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/contest.getContestResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/apperror.AppError"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/apperror.AppError"
+                        }
+                    }
+                }
+            },
+            "put": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "contests"
+                ],
+                "summary": "Update contest",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Group ID",
+                        "name": "groupId",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Contest ID",
+                        "name": "contestId",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Fields to update",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/contest.updateContestRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/contest.contestResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/apperror.AppError"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/apperror.AppError"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/apperror.AppError"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/apperror.AppError"
+                        }
+                    }
+                }
+            }
+        },
+        "/groups/{groupId}/contests/{contestId}/register": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "tags": [
+                    "contests"
+                ],
+                "summary": "Register to contest",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Group ID",
+                        "name": "groupId",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Contest ID",
+                        "name": "contestId",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "No Content"
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/apperror.AppError"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/apperror.AppError"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/apperror.AppError"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/apperror.AppError"
+                        }
+                    }
+                }
+            },
+            "delete": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "tags": [
+                    "contests"
+                ],
+                "summary": "Unregister from contest",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Group ID",
+                        "name": "groupId",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Contest ID",
+                        "name": "contestId",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "No Content"
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/apperror.AppError"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/apperror.AppError"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/apperror.AppError"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/apperror.AppError"
+                        }
+                    }
+                }
+            }
+        },
+        "/groups/{groupId}/contests/{contestId}/register/status": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "contests"
+                ],
+                "summary": "Get registration status",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Group ID",
+                        "name": "groupId",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Contest ID",
+                        "name": "contestId",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/contest.registrationStatusResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/apperror.AppError"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/apperror.AppError"
+                        }
+                    }
+                }
+            }
+        },
+        "/groups/{groupId}/contests/{contestId}/registrations": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "contests"
+                ],
+                "summary": "List contest registrations",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Group ID",
+                        "name": "groupId",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Contest ID",
+                        "name": "contestId",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Page (default 1)",
+                        "name": "page",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Limit (default 50, max 100)",
+                        "name": "limit",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/contest.listRegistrationsResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/apperror.AppError"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/apperror.AppError"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/apperror.AppError"
+                        }
+                    }
+                }
+            }
+        },
+        "/groups/{groupId}/contests/{contestId}/standings": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "contests"
+                ],
+                "summary": "Get contest standings (ICPC)",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Group ID",
+                        "name": "groupId",
+                        "in": "path"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Contest ID",
+                        "name": "contestId",
+                        "in": "path"
+                    },
+                    {
+                        "type": "boolean",
+                        "description": "Bypass freeze (lead/admin only)",
+                        "name": "realtime",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Page number (default 1)",
+                        "name": "page",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Items per page (default 50)",
+                        "name": "limit",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/contest.getStandingsResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/apperror.AppError"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/apperror.AppError"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/apperror.AppError"
+                        }
+                    }
+                }
+            }
+        },
         "/groups/{groupId}/invitations": {
             "post": {
                 "security": [
@@ -2673,6 +3251,503 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "message": {
+                    "type": "string"
+                }
+            }
+        },
+        "contest.contestListItem": {
+            "type": "object",
+            "properties": {
+                "description": {
+                    "type": "string"
+                },
+                "duration": {
+                    "type": "integer"
+                },
+                "enablePostContest": {
+                    "type": "boolean"
+                },
+                "endTime": {
+                    "type": "string"
+                },
+                "freezeMinutes": {
+                    "type": "integer"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "isRegistered": {
+                    "type": "boolean"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "participantCount": {
+                    "type": "integer"
+                },
+                "penalty": {
+                    "type": "integer"
+                },
+                "problemCount": {
+                    "type": "integer"
+                },
+                "startTime": {
+                    "type": "string"
+                },
+                "status": {
+                    "type": "string"
+                }
+            }
+        },
+        "contest.contestResponse": {
+            "type": "object",
+            "properties": {
+                "createdAt": {
+                    "type": "string"
+                },
+                "description": {
+                    "type": "string"
+                },
+                "duration": {
+                    "type": "integer"
+                },
+                "enablePostContest": {
+                    "type": "boolean"
+                },
+                "endTime": {
+                    "type": "string"
+                },
+                "freezeMinutes": {
+                    "type": "integer"
+                },
+                "group": {
+                    "$ref": "#/definitions/contest.groupDisplay"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "locked": {
+                    "type": "boolean"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "owner": {
+                    "$ref": "#/definitions/contest.ownerDisplay"
+                },
+                "penalty": {
+                    "type": "integer"
+                },
+                "problemCount": {
+                    "type": "integer"
+                },
+                "problems": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/contest.problemDisplay"
+                    }
+                },
+                "startTime": {
+                    "type": "string"
+                },
+                "status": {
+                    "type": "string"
+                },
+                "updatedAt": {
+                    "type": "string"
+                }
+            }
+        },
+        "contest.createContestRequest": {
+            "type": "object",
+            "properties": {
+                "description": {
+                    "type": "string"
+                },
+                "enablePostContest": {
+                    "type": "boolean"
+                },
+                "endTime": {
+                    "type": "string"
+                },
+                "freezeMinutes": {
+                    "type": "integer"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "penalty": {
+                    "type": "integer"
+                },
+                "problems": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "startTime": {
+                    "type": "string"
+                }
+            }
+        },
+        "contest.getContestResponse": {
+            "type": "object",
+            "properties": {
+                "createdAt": {
+                    "type": "string"
+                },
+                "description": {
+                    "type": "string"
+                },
+                "duration": {
+                    "type": "integer"
+                },
+                "enablePostContest": {
+                    "type": "boolean"
+                },
+                "endTime": {
+                    "type": "string"
+                },
+                "freezeMinutes": {
+                    "type": "integer"
+                },
+                "group": {
+                    "$ref": "#/definitions/contest.groupDisplay"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "isRegistered": {
+                    "type": "boolean"
+                },
+                "locked": {
+                    "type": "boolean"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "owner": {
+                    "$ref": "#/definitions/contest.ownerDisplay"
+                },
+                "participantCount": {
+                    "type": "integer"
+                },
+                "penalty": {
+                    "type": "integer"
+                },
+                "problems": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/contest.problemDetail"
+                    }
+                },
+                "startTime": {
+                    "type": "string"
+                },
+                "status": {
+                    "type": "string"
+                },
+                "updatedAt": {
+                    "type": "string"
+                }
+            }
+        },
+        "contest.getStandingsResponse": {
+            "type": "object",
+            "properties": {
+                "entries": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/contest.rankedEntryResponse"
+                    }
+                },
+                "meta": {
+                    "$ref": "#/definitions/contest.standingsMetaResponse"
+                },
+                "pagination": {
+                    "$ref": "#/definitions/contest.standingsPaginationResponse"
+                }
+            }
+        },
+        "contest.groupDisplay": {
+            "type": "object",
+            "properties": {
+                "id": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                }
+            }
+        },
+        "contest.listContestsResponse": {
+            "type": "object",
+            "properties": {
+                "items": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/contest.contestListItem"
+                    }
+                },
+                "pagination": {
+                    "$ref": "#/definitions/contest.pagination"
+                }
+            }
+        },
+        "contest.listRegistrationsResponse": {
+            "type": "object",
+            "properties": {
+                "pagination": {
+                    "$ref": "#/definitions/contest.registrationsPagination"
+                },
+                "registrations": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/contest.registrationItem"
+                    }
+                }
+            }
+        },
+        "contest.nullableString": {
+            "type": "object",
+            "properties": {
+                "present": {
+                    "type": "boolean"
+                },
+                "value": {
+                    "type": "string"
+                }
+            }
+        },
+        "contest.ownerDisplay": {
+            "type": "object",
+            "properties": {
+                "id": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "nickname": {
+                    "type": "string"
+                }
+            }
+        },
+        "contest.pagination": {
+            "type": "object",
+            "properties": {
+                "limit": {
+                    "type": "integer"
+                },
+                "page": {
+                    "type": "integer"
+                },
+                "total": {
+                    "type": "integer"
+                },
+                "totalPages": {
+                    "type": "integer"
+                }
+            }
+        },
+        "contest.problemDetail": {
+            "type": "object",
+            "properties": {
+                "memoryLimit": {
+                    "type": "integer"
+                },
+                "position": {
+                    "type": "integer"
+                },
+                "slug": {
+                    "type": "string"
+                },
+                "timeLimit": {
+                    "type": "integer"
+                },
+                "title": {
+                    "type": "string"
+                }
+            }
+        },
+        "contest.problemDisplay": {
+            "type": "object",
+            "properties": {
+                "order": {
+                    "type": "integer"
+                },
+                "slug": {
+                    "type": "string"
+                },
+                "title": {
+                    "type": "string"
+                }
+            }
+        },
+        "contest.problemOrderRequest": {
+            "type": "object",
+            "properties": {
+                "order": {
+                    "type": "integer"
+                },
+                "slug": {
+                    "type": "string"
+                }
+            }
+        },
+        "contest.rankedEntryResponse": {
+            "type": "object",
+            "properties": {
+                "contestantId": {
+                    "type": "string"
+                },
+                "lastAcceptedAt": {
+                    "type": "string"
+                },
+                "problems": {
+                    "type": "object",
+                    "additionalProperties": {
+                        "$ref": "#/definitions/contest.rankedProblemResponse"
+                    }
+                },
+                "problemsSolved": {
+                    "type": "integer"
+                },
+                "rank": {
+                    "type": "integer"
+                },
+                "totalPenalty": {
+                    "type": "integer"
+                }
+            }
+        },
+        "contest.rankedProblemResponse": {
+            "type": "object",
+            "properties": {
+                "acceptedAt": {
+                    "type": "string"
+                },
+                "attempts": {
+                    "type": "integer"
+                },
+                "isFrozen": {
+                    "type": "boolean"
+                },
+                "isSolved": {
+                    "type": "boolean"
+                },
+                "penalty": {
+                    "type": "integer"
+                }
+            }
+        },
+        "contest.registrationItem": {
+            "type": "object",
+            "properties": {
+                "nickname": {
+                    "type": "string"
+                },
+                "registeredAt": {
+                    "type": "string"
+                }
+            }
+        },
+        "contest.registrationStatusResponse": {
+            "type": "object",
+            "properties": {
+                "registered": {
+                    "type": "boolean"
+                },
+                "registeredAt": {
+                    "type": "string"
+                }
+            }
+        },
+        "contest.registrationsPagination": {
+            "type": "object",
+            "properties": {
+                "hasMore": {
+                    "type": "boolean"
+                },
+                "limit": {
+                    "type": "integer"
+                },
+                "page": {
+                    "type": "integer"
+                },
+                "total": {
+                    "type": "integer"
+                },
+                "totalPages": {
+                    "type": "integer"
+                }
+            }
+        },
+        "contest.standingsMetaResponse": {
+            "type": "object",
+            "properties": {
+                "contestStatus": {
+                    "type": "string"
+                },
+                "frozenAt": {
+                    "type": "string"
+                },
+                "isFrozen": {
+                    "type": "boolean"
+                },
+                "lastUpdated": {
+                    "type": "string"
+                }
+            }
+        },
+        "contest.standingsPaginationResponse": {
+            "type": "object",
+            "properties": {
+                "limit": {
+                    "type": "integer"
+                },
+                "page": {
+                    "type": "integer"
+                },
+                "total": {
+                    "type": "integer"
+                },
+                "totalPages": {
+                    "type": "integer"
+                }
+            }
+        },
+        "contest.updateContestRequest": {
+            "type": "object",
+            "properties": {
+                "description": {
+                    "$ref": "#/definitions/contest.nullableString"
+                },
+                "enablePostContest": {
+                    "type": "boolean"
+                },
+                "endTime": {
+                    "type": "string"
+                },
+                "freezeMinutes": {
+                    "type": "integer"
+                },
+                "locked": {
+                    "type": "boolean"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "penalty": {
+                    "type": "integer"
+                },
+                "problems": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/contest.problemOrderRequest"
+                    }
+                },
+                "startTime": {
                     "type": "string"
                 }
             }

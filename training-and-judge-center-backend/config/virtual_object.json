@@ -14,7 +14,7 @@
   "maxFileSizeTestCaseMB": 200,
   "maxFileCountTestCase": 10000,
   "maxFileSizeDefaultMB": 2,
-  "maxTimeLimitGlobal": 300000,
+  "maxTimeLimitGlobal": 600000,
   "maxMemoryLimitGlobal": 2048,
   "languageOverrides": [
     {

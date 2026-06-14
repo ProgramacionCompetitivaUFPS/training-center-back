@@ -82,6 +82,7 @@ func NewRouter(h *Handlers, s *Services, allowedOrigins []string) *chi.Mux {
 				r.Delete("/{contestId}/register", h.Contest.Unregister)
 				r.Get("/{contestId}/register/status", h.Contest.GetRegistrationStatus)
 				r.Get("/{contestId}/registrations", h.Contest.ListRegistrations)
+				r.Get("/{contestId}/standings", h.Contest.GetStandings)
 			})
 
 			r.Route("/{groupId}/materials", func(r chi.Router) {
