@@ -11,10 +11,17 @@ import (
 	"github.com/training-judge-center/backend/pkg/apperror"
 )
 
+type redisClient interface {
+	Get(ctx context.Context, key string) *redis.StringCmd
+	Set(ctx context.Context, key string, value interface{}, expiration time.Duration) *redis.StatusCmd
+	SetNX(ctx context.Context, key string, value interface{}, expiration time.Duration) *redis.BoolCmd
+	Del(ctx context.Context, keys ...string) *redis.IntCmd
+}
+
 // StandingsCache implements application/contest.StandingsCache using Redis.
 // Keys: standings:{contestID} (data), lock:standings:{contestID} (refresh lock).
 type StandingsCache struct {
-	client *redis.Client
+	client redisClient
 }
 
 func NewStandingsCache(client *redis.Client) *StandingsCache {

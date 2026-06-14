@@ -149,7 +149,7 @@ func emptyCache() *mockStandingsCache {
 func TestGetStandingsUseCase_CacheHit(t *testing.T) {
 	participants := []domainContest.ParticipantStanding{
 		{ContestantID: callerID, Problems: map[string]domainContest.ProblemAttempt{
-			"A": {Attempts: 0, AcceptedAt: tpStandings(10, 30)},
+			"A": {AcceptedAt: tpStandings(10, 30)},
 		}},
 	}
 	cache := freshCache(participants)
@@ -221,7 +221,7 @@ func TestGetStandingsUseCase_FreezeAppliedForRegularUser(t *testing.T) {
 	acceptedAfterFreeze := time.Now().Add(-20 * time.Minute)
 	participants := []domainContest.ParticipantStanding{
 		{ContestantID: callerID, Problems: map[string]domainContest.ProblemAttempt{
-			"A": {Attempts: 0, AcceptedAt: &acceptedAfterFreeze},
+			"A": {AcceptedAt: &acceptedAfterFreeze},
 		}},
 	}
 	uc := newGetStandingsUseCase(frozenContest(), nil, nil, freshCache(participants), visibleGroup(), isMemberNotLead())
@@ -248,7 +248,7 @@ func TestGetStandingsUseCase_RealtimeBypassesFreezeForLead(t *testing.T) {
 	acceptedAfterFreeze := time.Now().Add(-20 * time.Minute)
 	participants := []domainContest.ParticipantStanding{
 		{ContestantID: callerID, Problems: map[string]domainContest.ProblemAttempt{
-			"A": {Attempts: 0, AcceptedAt: &acceptedAfterFreeze},
+			"A": {AcceptedAt: &acceptedAfterFreeze},
 		}},
 	}
 	uc := newGetStandingsUseCase(frozenContest(), nil, nil, freshCache(participants), visibleGroup(), isLead())

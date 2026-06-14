@@ -29,26 +29,26 @@ func (m *mockStandingsContestRepo) List(_ context.Context, _ domainContest.ListF
 	return nil, 0, nil
 }
 
-type mockHandlerStandingsCache struct {
+type mockStandingsCache struct {
 	data *appcontest.CachedStandings
 }
 
-func (m *mockHandlerStandingsCache) Get(_ context.Context, _ string) (*appcontest.CachedStandings, error) {
+func (m *mockStandingsCache) Get(_ context.Context, _ string) (*appcontest.CachedStandings, error) {
 	return m.data, nil
 }
-func (m *mockHandlerStandingsCache) Set(_ context.Context, _ string, _ *appcontest.CachedStandings) error {
+func (m *mockStandingsCache) Set(_ context.Context, _ string, _ *appcontest.CachedStandings) error {
 	return nil
 }
-func (m *mockHandlerStandingsCache) AcquireRefreshLock(_ context.Context, _ string, _ time.Duration) (bool, error) {
+func (m *mockStandingsCache) AcquireRefreshLock(_ context.Context, _ string, _ time.Duration) (bool, error) {
 	return true, nil
 }
-func (m *mockHandlerStandingsCache) ReleaseRefreshLock(_ context.Context, _ string) error {
+func (m *mockStandingsCache) ReleaseRefreshLock(_ context.Context, _ string) error {
 	return nil
 }
 
-type mockHandlerSubProvider struct{}
+type mockSubmissionProvider struct{}
 
-func (m *mockHandlerSubProvider) ListByContest(_ context.Context, _ string) ([]appcontest.ContestSubmissionData, error) {
+func (m *mockSubmissionProvider) ListByContest(_ context.Context, _ string) ([]appcontest.ContestSubmissionData, error) {
 	return nil, nil
 }
 
@@ -80,7 +80,7 @@ func defaultGetStandingsUC() *appcontest.GetStandingsUseCase {
 	cached := &appcontest.CachedStandings{
 		Participants: []domainContest.ParticipantStanding{
 			{ContestantID: "u1", Problems: map[string]domainContest.ProblemAttempt{
-				"A": {Attempts: 0, AcceptedAt: &accepted},
+				"A": {AcceptedAt: &accepted},
 			}},
 		},
 		LastUpdated: time.Now(),
@@ -88,10 +88,10 @@ func defaultGetStandingsUC() *appcontest.GetStandingsUseCase {
 	return appcontest.NewGetStandingsUseCase(
 		&mockStandingsContestRepo{contest: activeContestForStandings()},
 		&mockRegistrationRepository{},
-		&mockHandlerSubProvider{},
+		&mockSubmissionProvider{},
 		&mockGroupProvider{},
 		&mockMemberProvider{isLead: true, isMember: true},
-		&mockHandlerStandingsCache{data: cached},
+		&mockStandingsCache{data: cached},
 		30*time.Second,
 	)
 }
@@ -154,10 +154,10 @@ func TestGetStandings_Pagination_Returns200(t *testing.T) {
 	uc := appcontest.NewGetStandingsUseCase(
 		&mockStandingsContestRepo{contest: activeContestForStandings()},
 		&mockRegistrationRepository{},
-		&mockHandlerSubProvider{},
+		&mockSubmissionProvider{},
 		&mockGroupProvider{},
 		&mockMemberProvider{isLead: true, isMember: true},
-		&mockHandlerStandingsCache{data: cached},
+		&mockStandingsCache{data: cached},
 		30*time.Second,
 	)
 	h := newHandlerWithGetStandings(uc)

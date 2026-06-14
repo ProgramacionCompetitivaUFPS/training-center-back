@@ -12,6 +12,23 @@ import (
 
 const maxStandingsParticipants = 10_000
 
+// RankedProblem is the per-problem view returned in a RankedEntry.
+type RankedProblem struct {
+	Attempts   int
+	AcceptedAt *time.Time // nil if not solved (or solved after freeze, which is hidden)
+	Penalty    int        // 0 if not solved
+}
+
+// RankedEntry is one row in the standings table.
+type RankedEntry struct {
+	Rank           int
+	ContestantID   string
+	ProblemsSolved int
+	TotalPenalty   int
+	LastAcceptedAt *time.Time
+	Problems       map[string]RankedProblem // key: problemID
+}
+
 type GetStandingsInput struct {
 	CurrentUser appshared.CurrentUser
 	GroupID     string
@@ -131,7 +148,7 @@ func (uc *GetStandingsUseCase) Execute(ctx context.Context, in GetStandingsInput
 
 	if cached != nil {
 		if time.Since(cached.LastUpdated) > uc.staleness {
-			go uc.backgroundRefresh(ctx, in.ContestID)
+			go uc.backgroundRefresh(in.ContestID)
 		}
 		return uc.buildOutput(cached, contest, applyFreeze, status, freezeTime, in.Page, in.Limit), nil
 	}
@@ -177,7 +194,7 @@ func (uc *GetStandingsUseCase) rebuild(ctx context.Context, contestID string) (*
 			attempt.AcceptedAt = &t
 			p.Problems[sub.ProblemID] = attempt
 		case "WRONG_ANSWER", "TIME_LIMIT_EXCEEDED", "MEMORY_LIMIT_EXCEEDED", "RUNTIME_ERROR":
-			attempt.Attempts++
+			attempt.WrongAttemptTimes = append(attempt.WrongAttemptTimes, sub.SubmittedAt)
 			p.Problems[sub.ProblemID] = attempt
 		}
 		// COMPILATION_ERROR and SYSTEM_ERROR don't count as wrong attempts (ICPC rules)
@@ -195,7 +212,7 @@ func (uc *GetStandingsUseCase) rebuild(ctx context.Context, contestID string) (*
 	return cached, nil
 }
 
-func (uc *GetStandingsUseCase) backgroundRefresh(requestCtx context.Context, contestID string) {
+func (uc *GetStandingsUseCase) backgroundRefresh(contestID string) {
 	ctx := context.Background()
 	acquired, err := uc.standingsCache.AcquireRefreshLock(ctx, contestID, uc.lockTTL)
 	if err != nil || !acquired {
@@ -204,7 +221,7 @@ func (uc *GetStandingsUseCase) backgroundRefresh(requestCtx context.Context, con
 	defer uc.standingsCache.ReleaseRefreshLock(ctx, contestID)
 
 	if _, err := uc.rebuild(ctx, contestID); err != nil {
-		slog.ErrorContext(requestCtx, "standings background refresh failed", "contest_id", contestID, "error", err)
+		slog.ErrorContext(ctx, "standings background refresh failed", "contest_id", contestID, "error", err)
 	}
 }
 

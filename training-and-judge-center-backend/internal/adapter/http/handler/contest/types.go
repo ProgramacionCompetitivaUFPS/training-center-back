@@ -167,31 +167,30 @@ type listRegistrationsResponse struct {
 
 // ── GET /contests/:id/standings response ─────────────────────────────────────
 
-type rankedProblemResponse struct {
+type rankedProblem struct {
 	Attempts   int     `json:"attempts"`
 	Penalty    int     `json:"penalty"`
 	IsSolved   bool    `json:"isSolved"`
-	IsFrozen   bool    `json:"isFrozen"`
 	AcceptedAt *string `json:"acceptedAt,omitempty"`
 }
 
-type rankedEntryResponse struct {
-	Rank           int                              `json:"rank"`
-	ContestantID   string                           `json:"contestantId"`
-	ProblemsSolved int                              `json:"problemsSolved"`
-	TotalPenalty   int                              `json:"totalPenalty"`
-	LastAcceptedAt *string                          `json:"lastAcceptedAt,omitempty"`
-	Problems       map[string]rankedProblemResponse `json:"problems"`
+type rankedEntry struct {
+	Rank           int                      `json:"rank"`
+	ContestantID   string                   `json:"contestantId"`
+	ProblemsSolved int                      `json:"problemsSolved"`
+	TotalPenalty   int                      `json:"totalPenalty"`
+	LastAcceptedAt *string                  `json:"lastAcceptedAt,omitempty"`
+	Problems       map[string]rankedProblem `json:"problems"`
 }
 
-type standingsMetaResponse struct {
+type standingsMeta struct {
 	LastUpdated   string  `json:"lastUpdated"`
 	IsFrozen      bool    `json:"isFrozen"`
 	FrozenAt      *string `json:"frozenAt,omitempty"`
 	ContestStatus string  `json:"contestStatus"`
 }
 
-type standingsPaginationResponse struct {
+type standingsPagination struct {
 	Page       int `json:"page"`
 	Limit      int `json:"limit"`
 	Total      int `json:"total"`
@@ -199,9 +198,9 @@ type standingsPaginationResponse struct {
 }
 
 type getStandingsResponse struct {
-	Entries    []rankedEntryResponse       `json:"entries"`
-	Pagination standingsPaginationResponse `json:"pagination"`
-	Meta       standingsMetaResponse       `json:"meta"`
+	Entries    []rankedEntry       `json:"entries"`
+	Pagination standingsPagination `json:"pagination"`
+	Meta       standingsMeta       `json:"meta"`
 }
 
 // ── Create/Update response ───────────────────────────────────────────────────

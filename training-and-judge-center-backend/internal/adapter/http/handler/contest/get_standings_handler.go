@@ -14,8 +14,8 @@ import (
 // @Tags         contests
 // @Produce      json
 // @Security     BearerAuth
-// @Param        groupId    path   string false "Group ID"
-// @Param        contestId  path   string false "Contest ID"
+// @Param        groupId    path   string true  "Group ID"
+// @Param        contestId  path   string true  "Contest ID"
 // @Param        realtime   query  bool   false "Bypass freeze (lead/admin only)"
 // @Param        page       query  int    false "Page number (default 1)"
 // @Param        limit      query  int    false "Items per page (default 50)"
@@ -72,15 +72,14 @@ func (h *Handler) GetStandings(w http.ResponseWriter, r *http.Request) {
 }
 
 func toGetStandingsResponse(out *appContest.GetStandingsOutput) getStandingsResponse {
-	entries := make([]rankedEntryResponse, len(out.Entries))
+	entries := make([]rankedEntry, len(out.Entries))
 	for i, e := range out.Entries {
-		probs := make(map[string]rankedProblemResponse, len(e.Problems))
+		probs := make(map[string]rankedProblem, len(e.Problems))
 		for key, p := range e.Problems {
-			rp := rankedProblemResponse{
+			rp := rankedProblem{
 				Attempts: p.Attempts,
 				Penalty:  p.Penalty,
-				IsSolved: p.AcceptedAt != nil && !p.IsFrozen,
-				IsFrozen: p.IsFrozen,
+				IsSolved: p.AcceptedAt != nil,
 			}
 			if p.AcceptedAt != nil {
 				s := p.AcceptedAt.UTC().Format(time.RFC3339)
@@ -89,7 +88,7 @@ func toGetStandingsResponse(out *appContest.GetStandingsOutput) getStandingsResp
 			probs[key] = rp
 		}
 
-		entry := rankedEntryResponse{
+		entry := rankedEntry{
 			Rank:           e.Rank,
 			ContestantID:   e.ContestantID,
 			ProblemsSolved: e.ProblemsSolved,
@@ -108,7 +107,7 @@ func toGetStandingsResponse(out *appContest.GetStandingsOutput) getStandingsResp
 		totalPages = (out.Total + out.Limit - 1) / out.Limit
 	}
 
-	meta := standingsMetaResponse{
+	meta := standingsMeta{
 		LastUpdated:   out.Meta.LastUpdated.UTC().Format(time.RFC3339),
 		IsFrozen:      out.Meta.IsFrozen,
 		ContestStatus: out.Meta.ContestStatus,
@@ -120,7 +119,7 @@ func toGetStandingsResponse(out *appContest.GetStandingsOutput) getStandingsResp
 
 	return getStandingsResponse{
 		Entries: entries,
-		Pagination: standingsPaginationResponse{
+		Pagination: standingsPagination{
 			Page:       out.Page,
 			Limit:      out.Limit,
 			Total:      out.Total,

@@ -7,30 +7,12 @@ import (
 	domainContest "github.com/training-judge-center/backend/internal/domain/contest"
 )
 
-// RankedProblem is the per-problem view returned in a RankedEntry.
-type RankedProblem struct {
-	Attempts   int
-	AcceptedAt *time.Time // nil if not solved or frozen
-	Penalty    int        // 0 if not solved or frozen
-	IsFrozen   bool       // true if accepted after freezeTime
-}
-
-// RankedEntry is one row in the standings table.
-type RankedEntry struct {
-	Rank           int
-	ContestantID   string
-	ProblemsSolved int
-	TotalPenalty   int
-	LastAcceptedAt *time.Time
-	Problems       map[string]RankedProblem // key: problemID
-}
-
 // RankStandings computes ICPC standings from raw participant data.
 //
 // Sort order: problemsSolved DESC → totalPenalty ASC → lastAcceptedAt ASC.
 // Penalty per problem: acceptedMinutes + wrongAttempts × contestPenalty.
-// If freezeTime is non-nil, submissions with acceptedAt > freezeTime are treated
-// as PENDING (IsFrozen=true) and do not count toward solved or penalty.
+// If freezeTime is non-nil, submissions after that point are invisible:
+// wrong attempts are not counted and accepted submissions are hidden.
 func RankStandings(
 	participants []domainContest.ParticipantStanding,
 	contestStart time.Time,
@@ -48,21 +30,25 @@ func RankStandings(
 		var lastAccepted *time.Time
 
 		for problemID, attempt := range p.Problems {
-			rp := RankedProblem{Attempts: attempt.Attempts}
+			// Count only pre-freeze wrong attempts; post-freeze ones are invisible.
+			preFreeze := 0
+			for _, t := range attempt.WrongAttemptTimes {
+				if freezeTime == nil || !t.After(*freezeTime) {
+					preFreeze++
+				}
+			}
 
-			if attempt.AcceptedAt != nil {
-				if freezeTime != nil && attempt.AcceptedAt.After(*freezeTime) {
-					rp.IsFrozen = true
-				} else {
-					minutes := int(attempt.AcceptedAt.Sub(contestStart).Minutes())
-					rp.Penalty = minutes + attempt.Attempts*contestPenalty
-					rp.AcceptedAt = attempt.AcceptedAt
-					entry.ProblemsSolved++
-					entry.TotalPenalty += rp.Penalty
-					if lastAccepted == nil || attempt.AcceptedAt.After(*lastAccepted) {
-						t := *attempt.AcceptedAt
-						lastAccepted = &t
-					}
+			rp := RankedProblem{Attempts: preFreeze}
+
+			if attempt.AcceptedAt != nil && (freezeTime == nil || !attempt.AcceptedAt.After(*freezeTime)) {
+				minutes := int(attempt.AcceptedAt.Sub(contestStart).Minutes())
+				rp.Penalty = minutes + preFreeze*contestPenalty
+				rp.AcceptedAt = attempt.AcceptedAt
+				entry.ProblemsSolved++
+				entry.TotalPenalty += rp.Penalty
+				if lastAccepted == nil || attempt.AcceptedAt.After(*lastAccepted) {
+					t := *attempt.AcceptedAt
+					lastAccepted = &t
 				}
 			}
 
