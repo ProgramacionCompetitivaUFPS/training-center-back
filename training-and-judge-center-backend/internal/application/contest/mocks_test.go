@@ -330,6 +330,53 @@ func (m *mockOwnerProvider) GetDisplay(ctx context.Context, userID string) (*Use
 
 func mockOwner() *mockOwnerProvider { return &mockOwnerProvider{} }
 
+// ── StandingsCache mock ──────────────────────────────────────────────────────
+
+type mockStandingsCache struct {
+	getFn                func(ctx context.Context, contestID string) (*CachedStandings, error)
+	setFn                func(ctx context.Context, contestID string, data *CachedStandings) error
+	acquireRefreshLockFn func(ctx context.Context, contestID string, ttl time.Duration) (bool, error)
+	releaseRefreshLockFn func(ctx context.Context, contestID string) error
+}
+
+func (m *mockStandingsCache) Get(ctx context.Context, contestID string) (*CachedStandings, error) {
+	if m.getFn != nil {
+		return m.getFn(ctx, contestID)
+	}
+	return nil, nil
+}
+func (m *mockStandingsCache) Set(ctx context.Context, contestID string, data *CachedStandings) error {
+	if m.setFn != nil {
+		return m.setFn(ctx, contestID, data)
+	}
+	return nil
+}
+func (m *mockStandingsCache) AcquireRefreshLock(ctx context.Context, contestID string, ttl time.Duration) (bool, error) {
+	if m.acquireRefreshLockFn != nil {
+		return m.acquireRefreshLockFn(ctx, contestID, ttl)
+	}
+	return true, nil
+}
+func (m *mockStandingsCache) ReleaseRefreshLock(ctx context.Context, contestID string) error {
+	if m.releaseRefreshLockFn != nil {
+		return m.releaseRefreshLockFn(ctx, contestID)
+	}
+	return nil
+}
+
+// ── StandingsSubmissionProvider mock ─────────────────────────────────────────
+
+type mockStandingsSubmissionProvider struct {
+	listByContestFn func(ctx context.Context, contestID string) ([]ContestSubmissionData, error)
+}
+
+func (m *mockStandingsSubmissionProvider) ListByContest(ctx context.Context, contestID string) ([]ContestSubmissionData, error) {
+	if m.listByContestFn != nil {
+		return m.listByContestFn(ctx, contestID)
+	}
+	return nil, nil
+}
+
 // ── TransactionManager mock ──────────────────────────────────────────────────
 
 type mockTransactionManager struct {

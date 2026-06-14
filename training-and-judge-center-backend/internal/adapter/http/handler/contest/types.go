@@ -165,6 +165,45 @@ type listRegistrationsResponse struct {
 	Pagination    registrationsPagination `json:"pagination"`
 }
 
+// ── GET /contests/:id/standings response ─────────────────────────────────────
+
+type rankedProblemResponse struct {
+	Attempts   int     `json:"attempts"`
+	Penalty    int     `json:"penalty"`
+	IsSolved   bool    `json:"isSolved"`
+	IsFrozen   bool    `json:"isFrozen"`
+	AcceptedAt *string `json:"acceptedAt,omitempty"`
+}
+
+type rankedEntryResponse struct {
+	Rank           int                              `json:"rank"`
+	ContestantID   string                           `json:"contestantId"`
+	ProblemsSolved int                              `json:"problemsSolved"`
+	TotalPenalty   int                              `json:"totalPenalty"`
+	LastAcceptedAt *string                          `json:"lastAcceptedAt,omitempty"`
+	Problems       map[string]rankedProblemResponse `json:"problems"`
+}
+
+type standingsMetaResponse struct {
+	LastUpdated   string  `json:"lastUpdated"`
+	IsFrozen      bool    `json:"isFrozen"`
+	FrozenAt      *string `json:"frozenAt,omitempty"`
+	ContestStatus string  `json:"contestStatus"`
+}
+
+type standingsPaginationResponse struct {
+	Page       int `json:"page"`
+	Limit      int `json:"limit"`
+	Total      int `json:"total"`
+	TotalPages int `json:"totalPages"`
+}
+
+type getStandingsResponse struct {
+	Entries    []rankedEntryResponse       `json:"entries"`
+	Pagination standingsPaginationResponse `json:"pagination"`
+	Meta       standingsMetaResponse       `json:"meta"`
+}
+
 // ── Create/Update response ───────────────────────────────────────────────────
 
 type contestResponse struct {
