@@ -217,6 +217,16 @@ func (s *mockNicknameProvider) GetNicknamesByIDs(_ context.Context, userIDs []st
 	return result, nil
 }
 
+// ── ContestSubmissionsProvider mock ──────────────────────────────────────────
+
+type mockContestSubmissionsProvider struct {
+	subs []appcontest.RichSubmissionData
+}
+
+func (m *mockContestSubmissionsProvider) ListByContest(_ context.Context, _ string, _ appcontest.ContestSubmissionFilters) ([]appcontest.RichSubmissionData, error) {
+	return m.subs, nil
+}
+
 // ── Contest fixture helpers ───────────────────────────────────────────────────
 
 func scheduledContest() *domainContest.Contest {

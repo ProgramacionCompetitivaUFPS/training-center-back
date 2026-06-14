@@ -258,6 +258,7 @@ func main() {
 	contestTxManager               := postgres.NewTransactionManager(dbPool)
 	contestStandingsCache          := adaptercontest.NewStandingsCache(redisClient)
 	contestSubmissionProvider      := adaptercontest.NewStandingsSubmissionProvider(dbPool)
+	contestSubmissionsProvider     := adaptercontest.NewContestSubmissionsProvider(dbPool)
 
 	// contest use cases
 	createContestUseCase := appcontest.NewCreateContestUseCase(
@@ -293,11 +294,15 @@ func main() {
 		contestStandingsCache,
 		30*time.Second,
 	)
+	listContestSubmissionsUseCase := appcontest.NewListContestSubmissionsUseCase(
+		contestRepo, contestGroupProvider, contestMemberProvider,
+		contestParticipantProvider, contestSubmissionsProvider,
+	)
 	contestHandler := handlercontest.NewHandler(
 		createContestUseCase, updateContestUseCase, getContestUseCase, listContestsUseCase,
 		registerToContestUseCase, unregisterFromContestUseCase,
 		getRegistrationStatusUseCase, listContestRegistrationsUseCase,
-		getStandingsUseCase,
+		getStandingsUseCase, listContestSubmissionsUseCase,
 	)
 
 	router := adapterhttp.NewRouter(&adapterhttp.Handlers{
