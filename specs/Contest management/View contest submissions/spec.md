@@ -27,14 +27,15 @@ As a contest participant, I want to view all submissions in the contest so that 
    * **Given** a contest is ACTIVE and in freeze period (currentTime > endTime - freezeMinutes)
    * **And** the authenticated user is registered to the contest
    * **When** they request the contest submissions
-   * **Then** submissions after freeze time show status as "?" (pending)
-   * **And** submissions before freeze time show actual verdict
+   * **Then** their own submissions are returned with the real verdict, regardless of when they were submitted
+   * **And** other participants' submissions submitted before the freeze time are returned with real verdict
+   * **And** other participants' submissions submitted at or after the freeze time are NOT returned
 
-3. **Scenario**: Lead views submissions during freeze period with realtime flag
+3. **Scenario**: Lead views submissions during freeze period
    * **Given** a contest is ACTIVE and in freeze period
    * **And** the authenticated user is a Lead of the group
-   * **When** they request submissions with `?realtime=true`
-   * **Then** all submissions show actual verdicts (no "?" for frozen submissions)
+   * **When** they request the contest submissions
+   * **Then** all submissions are returned with actual verdicts (no freeze filtering applied)
 
 4. **Scenario**: Non-participant attempts to view contest submissions
    * **Given** a contest exists
@@ -155,11 +156,11 @@ As a Lead or Admin, I want to view all contest submissions with full details at 
    * **When** they request the contest submissions
    * **Then** all submissions are returned with full details
 
-3. **Scenario**: Lead views submissions with realtime during freeze
+3. **Scenario**: Lead views submissions during freeze period
    * **Given** a contest is in freeze period
    * **And** the authenticated user is a Lead
-   * **When** they request submissions with `?realtime=true`
-   * **Then** actual verdicts are shown (no "?" for frozen submissions)
+   * **When** they request the contest submissions
+   * **Then** all submissions are returned with actual verdicts (no freeze filtering applied)
 
 ---
 
@@ -189,8 +190,8 @@ Retrieve the list of submissions for a contest.
 > **Important**: 
 > - **Source code is NEVER included in this endpoint** - not during competition, not after
 > - To view source code, use the individual submission endpoint: `GET /api/submissions/{id}`
-> - During competition (ACTIVE): Only verdict is visible to participants
-> - During freeze: Submissions after freeze show as "?" unless `realtime=true` for Leads/Admin
+> - During competition (ACTIVE): Only verdict is visible to participants (no execution details)
+> - During freeze: Participants see their own submissions (real verdict) + others' pre-freeze submissions only. Leads/Admin see all with real verdicts.
 > - After competition (FINISHED): Full details (verdict, time, memory) visible
 
 **Headers**:
@@ -215,7 +216,6 @@ Retrieve the list of submissions for a contest.
 | nickname | string | No | Filter by participant nickname. For individuals: shows their submissions. For team members: shows all submissions by their team |
 | page | integer | No | Page number for pagination (default: 1) |
 | limit | integer | No | Items per page (default: 50, max: 100) |
-| realtime | boolean | No | Show actual verdicts during freeze (only for Leads/Admin, default: false) |
 
 **Responses**:
 
@@ -279,8 +279,9 @@ Participant view - only verdict visible.
 }
 ```
 
-#### 200 OK - During freeze period
-Submissions after freeze time show status as "?".
+#### 200 OK - During freeze period (participant view)
+Participant sees own submissions (any time, real verdict) + others' pre-freeze submissions only.
+Post-freeze submissions from other participants are absent from the response.
 
 ```json
 {
@@ -301,12 +302,12 @@ Submissions after freeze time show status as "?".
       },
       "submittedBy": {
         "type": "INDIVIDUAL",
-        "nickname": "jane_smith",
-        "name": "Jane Smith"
+        "nickname": "john_doe",
+        "name": "John Doe"
       },
       "language": "java17",
       "submittedAt": "2026-02-19T18:30:00Z",
-      "status": "?"
+      "status": "ACCEPTED"
     }
   ],
   "pagination": {
@@ -319,6 +320,8 @@ Submissions after freeze time show status as "?".
   }
 }
 ```
+> Note: `john_doe` is the requesting user. Their own submission is always visible with the real verdict, even though it was submitted after the freeze time (18:30 > 18:00).
+> Another participant's submission at 18:30 would NOT appear in the response.
 
 #### 200 OK - After contest ends (FINISHED)
 Full details visible (verdict, time, memory).
@@ -402,7 +405,7 @@ Full details visible (verdict, time, memory).
 | submissions[].language | string | Language identifier |
 | submissions[].submittedAt | timestamp | When submission was created |
 | submissions[].judgedAt | timestamp | When judging completed (only after contest ends) |
-| submissions[].status | enum | Verdict (or "?" during freeze) |
+| submissions[].status | enum | Verdict — always real (no "?" state) |
 | submissions[].executionTime | integer | Execution time in ms (only after contest ends) |
 | submissions[].memoryUsed | integer | Memory used in MiB (only after contest ends) |
 | submissions[].phase | enum | `competition` or `postcompetition` (only after contest ends) |
@@ -418,7 +421,8 @@ Full details visible (verdict, time, memory).
 
 During competition:
 - `PENDING`, `RUNNING`, `ACCEPTED`, `WRONG_ANSWER`, `TIME_LIMIT_EXCEEDED`, `MEMORY_LIMIT_EXCEEDED`, `RUNTIME_EXCEPTION`, `COMPILATION_ERROR`, `PRESENTATION_ERROR`, `SYSTEM_ERROR`
-- `?` (during freeze period for submissions after freeze time)
+
+> Note: There is no `?` status. During freeze, other participants' post-freeze submissions are simply absent from the response rather than shown with an ambiguous status.
 
 #### 400 Bad Request
 Invalid query parameters.
@@ -457,13 +461,6 @@ User not registered to contest.
 }
 ```
 
-```json
-{
-  "error": "INSUFFICIENT_PERMISSIONS",
-  "message": "Only Leads and Admins can use realtime=true parameter"
-}
-```
-
 #### 404 Not Found
 Contest not found.
 
@@ -484,8 +481,8 @@ Contest not found.
 * **FR-VCS-001**: During ACTIVE contests, registered participants MUST be able to view all submissions in the contest.
 * **FR-VCS-002**: During ACTIVE contests, participants MUST only see: problem, submitter, language, submittedAt, and status (verdict).
 * **FR-VCS-003**: During ACTIVE contests, participants MUST NOT see: executionTime, memoryUsed, or sourceCode.
-* **FR-VCS-004**: During freeze period, submissions after freeze time MUST show status as "?" for regular participants.
-* **FR-VCS-005**: Leads and Admin with `realtime=true` MUST see actual verdicts during freeze period.
+* **FR-VCS-004**: During freeze period, a participant MUST always see their own submissions with real verdicts. Other participants' submissions submitted at or after the freeze time MUST NOT be returned.
+* **FR-VCS-005**: Leads and Admin MUST see all submissions with real verdicts at all times; freeze filtering is never applied to them.
 
 **Visibility After Competition (FINISHED)**
 * **FR-VCS-006**: After contest ends, registered participants MUST see full details: verdict, executionTime, memoryUsed.
@@ -497,7 +494,7 @@ Contest not found.
 * **FR-VCS-009**: Only registered participants, Leads, and Admin can view contest submissions.
 * **FR-VCS-010**: Non-registered users MUST receive 403 Forbidden.
 * **FR-VCS-011**: Leads and Admin MUST see full details at any time (during and after contest).
-* **FR-VCS-012**: Only Leads and Admin can use `realtime=true` parameter.
+* **FR-VCS-012**: The `realtime` query parameter does NOT apply to this endpoint; freeze behavior is role-based (participant vs. Lead/Admin) and cannot be overridden per-request.
 
 **Filtering**
 * **FR-VCS-013**: System MUST support filtering by phase: `competition`, `postcompetition`, `all`.
@@ -551,9 +548,9 @@ Contest not found.
 
 | Viewer | During ACTIVE | During Freeze | After FINISHED | Source Code |
 |--------|---------------|---------------|----------------|-------------|
-| Participant | Verdict only | "?" after freeze | Full details | Only PUBLIC or own |
-| Lead | Full details | Full details (realtime) | Full details | Only PUBLIC or own |
-| Admin | Full details | Full details (realtime) | Full details | Only PUBLIC or own |
+| Participant | Verdict only | Own: always visible (real verdict). Others: pre-freeze only | Full details | Only PUBLIC or own |
+| Lead | Full details | All submissions, real verdicts | Full details | Only PUBLIC or own |
+| Admin | Full details | All submissions, real verdicts | Full details | Only PUBLIC or own |
 | Non-registered | ❌ 403 | ❌ 403 | ❌ 403 | ❌ 403 |
 
 ---
@@ -564,8 +561,8 @@ Contest not found.
 
 * **SC-VCS-001**: Registered participants can view contest submissions via `GET /api/groups/{groupId}/contests/{contestId}/submissions` with HTTP 200.
 * **SC-VCS-002**: During ACTIVE contests, only verdict is visible to participants (no execution details).
-* **SC-VCS-003**: During freeze period, submissions after freeze show status "?" for participants.
-* **SC-VCS-004**: Leads/Admin with `realtime=true` see actual verdicts during freeze.
+* **SC-VCS-003**: During freeze period, participants see their own post-freeze submissions with real verdicts, and other participants' post-freeze submissions are absent from the response.
+* **SC-VCS-004**: Leads/Admin see all submissions with real verdicts during freeze, without any filtering.
 * **SC-VCS-005**: After contest ends, full details (verdict, time, memory) are visible.
 * **SC-VCS-006**: Source code is NOT included in list view at any time.
 * **SC-VCS-007**: Filtering by phase, problem, and user works correctly.
