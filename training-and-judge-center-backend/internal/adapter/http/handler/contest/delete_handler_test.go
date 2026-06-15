@@ -1,7 +1,6 @@
 package contest
 
 import (
-	"context"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -28,20 +27,6 @@ func contestToDelete() *domainContest.Contest {
 	)
 }
 
-type mockNoopStandingsCache struct{}
-
-func (m *mockNoopStandingsCache) Get(_ context.Context, _ string) (*appcontest.CachedStandings, error) {
-	return nil, nil
-}
-func (m *mockNoopStandingsCache) Set(_ context.Context, _ string, _ *appcontest.CachedStandings) error {
-	return nil
-}
-func (m *mockNoopStandingsCache) AcquireRefreshLock(_ context.Context, _ string, _ time.Duration) (bool, error) {
-	return true, nil
-}
-func (m *mockNoopStandingsCache) ReleaseRefreshLock(_ context.Context, _ string) error { return nil }
-func (m *mockNoopStandingsCache) Invalidate(_ context.Context, _ string) error          { return nil }
-
 func newHandlerWithDelete(uc *appcontest.DeleteContestUseCase) *Handler {
 	return &Handler{deleteContest: uc}
 }
@@ -51,7 +36,7 @@ func defaultDeleteUC() *appcontest.DeleteContestUseCase {
 		&mockRepoReturning{contest: contestToDelete()},
 		&mockGroupProvider{},
 		&mockMemberProvider{isLead: true, isMember: true},
-		&mockNoopStandingsCache{},
+		&mockStandingsCache{},
 	)
 }
 
@@ -88,7 +73,7 @@ func TestDeleteContest_ContestNotFound_Returns404(t *testing.T) {
 		&mockRepoReturning{contest: nil},
 		&mockGroupProvider{},
 		&mockMemberProvider{isLead: true, isMember: true},
-		&mockNoopStandingsCache{},
+		&mockStandingsCache{},
 	)
 	h := newHandlerWithDelete(uc)
 	r := authedRequest(http.MethodDelete, "/groups/g1/contests/c1", nil)

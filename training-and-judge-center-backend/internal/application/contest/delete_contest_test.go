@@ -2,11 +2,13 @@ package contest
 
 import (
 	"context"
+	"errors"
 	"testing"
 	"time"
 
 	domainContest "github.com/training-judge-center/backend/internal/domain/contest"
 	"github.com/training-judge-center/backend/internal/domain/shared"
+	"github.com/training-judge-center/backend/pkg/apperror"
 )
 
 func newDeleteContestUseCase(contest *domainContest.Contest, group *GroupInfo, memberProvider *mockGroupMemberProvider) *DeleteContestUseCase {
@@ -42,8 +44,9 @@ func TestDeleteContest_NotLead_Returns403(t *testing.T) {
 		GroupID:     testGroupID,
 		ContestID:   testContestID,
 	})
-	if err == nil {
-		t.Fatal("expected 403 error, got nil")
+	var appErr *apperror.AppError
+	if !errors.As(err, &appErr) || appErr.Code != ErrCodeInsufficientPermissions {
+		t.Fatalf("expected ErrCodeInsufficientPermissions, got %v", err)
 	}
 }
 

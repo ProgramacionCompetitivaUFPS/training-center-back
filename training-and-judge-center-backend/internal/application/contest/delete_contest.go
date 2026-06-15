@@ -49,7 +49,7 @@ func (uc *DeleteContestUseCase) Execute(ctx context.Context, in DeleteContestInp
 		return err
 	}
 	if group == nil {
-		return apperror.NewNotFound(domainContest.ErrCodeContestNotFound, "contest not found")
+		return apperror.NewNotFound(ErrCodeGroupNotFound, "group not found")
 	}
 
 	isAdmin := in.CurrentUser.IsAdmin()
