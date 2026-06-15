@@ -7,6 +7,7 @@ import (
 
 	"github.com/training-judge-center/backend/internal/adapter/http/handler"
 	appContest "github.com/training-judge-center/backend/internal/application/contest"
+	appshared "github.com/training-judge-center/backend/internal/application/shared"
 	"github.com/training-judge-center/backend/pkg/apperror"
 )
 
@@ -51,6 +52,10 @@ func (h *Handler) ListContestSubmissions(w http.ResponseWriter, r *http.Request)
 	}
 
 	phase := q.Get("phase")
+	if phase != "" && phase != "competition" && phase != "postcompetition" {
+		handler.WriteError(r.Context(), w, apperror.NewBadRequest(apperror.ErrCodeBadRequest, "phase must be 'competition' or 'postcompetition'"))
+		return
+	}
 
 	page := defaultPage
 	if v := q.Get("page"); v != "" {
@@ -108,10 +113,7 @@ func toListSubmissionsResponse(out *appContest.ListContestSubmissionsOutput) lis
 		items[i] = item
 	}
 
-	totalPages := 1
-	if out.Limit > 0 && out.Total > 0 {
-		totalPages = (out.Total + out.Limit - 1) / out.Limit
-	}
+	totalPages := appshared.CalcTotalPages(out.Total, out.Limit)
 
 	meta := submissionsContestMeta{
 		ID:       out.Meta.ID,

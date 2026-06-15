@@ -63,7 +63,7 @@ func (p *ContestSubmissionsProvider) ListByContest(
 		JOIN users u ON u.id = s.user_id
 		LEFT JOIN contest_problems cp ON cp.problem_id = s.problem_id AND cp.contest_id = s.contest_id
 		WHERE s.contest_id = $1%s
-		ORDER BY s.submitted_at DESC`, where)
+		ORDER BY s.submitted_at DESC, s.id`, where)
 
 	rows, err := q.Query(ctx, query, args...)
 	if err != nil {

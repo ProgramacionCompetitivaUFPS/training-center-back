@@ -128,6 +128,10 @@ func (uc *ListContestSubmissionsUseCase) Execute(ctx context.Context, in ListCon
 		}
 	}
 
+	if in.Page < 1 {
+		in.Page = 1
+	}
+
 	now := time.Now()
 	status := contest.Status(now)
 	endTime := contest.EndTime()
@@ -150,14 +154,20 @@ func (uc *ListContestSubmissionsUseCase) Execute(ctx context.Context, in ListCon
 
 	callerID := in.CurrentUser.ID
 	showFullDetails := status == domainContest.StatusFinished || isLead || isAdmin
+	postContestEnabled := contest.EnablePostContest()
 
 	var result []SubmissionDisplay
 	for _, sub := range subs {
 		// Freeze: leads/admins see all; participants see own always + others pre-freeze only.
 		if !isAdmin && !isLead && freezeTime != nil && sub.UserID != callerID {
-			if sub.SubmittedAt.After(*freezeTime) {
+			if !sub.SubmittedAt.Before(*freezeTime) {
 				continue
 			}
+		}
+
+		// Post-contest submissions hidden when the feature is disabled.
+		if !isAdmin && !isLead && !postContestEnabled && sub.SubmittedAt.After(endTime) {
+			continue
 		}
 
 		// Phase filter.
