@@ -57,7 +57,7 @@ func TestListGroups_EnrichesWithMemberCountAndRole(t *testing.T) {
 	g := mustGroup(t, "g1", "Club Programming", domainGroup.VisibilityVisible, domainGroup.JoinPolicyOpen)
 
 	userID := shared.RestoreUserID("u1")
-	gm, _ := domainGroup.NewGroupMember("m1", "g1", userID, domainGroup.MemberRoleLead, testNow)
+	gm, _ := domainGroup.NewGroupMember("m1", "g1", userID, domainGroup.MemberRoleLead, domainGroup.JoinMethodDirectAdd, nil, testNow)
 
 	repo := &mockGroupRepository{groups: []*domainGroup.Group{g}, total: 1}
 	memberRepo := &mockMemberRepository{

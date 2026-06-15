@@ -195,6 +195,7 @@ func main() {
 	groupMemberRepo := group.NewMemberRepository(dbPool)
 	groupUserProvider := group.NewUserProvider(dbPool)
 	groupPrefsReader := group.NewPreferencesReader(dbPool)
+	groupNicknameResolver := group.NewNicknameResolver(dbPool)
 	joinRequestRepo := group.NewJoinRequestRepository(dbPool)
 	groupTxManager := postgres.NewTransactionManager(dbPool)
 
@@ -215,12 +216,19 @@ func main() {
 	generateInviteUseCase := appGroup.NewGenerateInviteUseCase(groupRepo, groupMemberRepo, groupInvitationJWTSvc)
 	acceptInviteUseCase := appGroup.NewAcceptInviteUseCase(groupRepo, groupMemberRepo, groupInvitationJWTSvc)
 
+	addMemberUseCase := appGroup.NewAddMemberUseCase(groupRepo, groupMemberRepo, groupNicknameResolver)
+	removeMemberUseCase := appGroup.NewRemoveMemberUseCase(groupRepo, groupMemberRepo, groupNicknameResolver)
+	changeRoleUseCase := appGroup.NewChangeRoleUseCase(groupRepo, groupMemberRepo, groupNicknameResolver)
+	leaveGroupUseCase := appGroup.NewLeaveGroupUseCase(groupRepo, groupMemberRepo)
+	listMembersUseCase := appGroup.NewListMembersUseCase(groupRepo, groupMemberRepo, groupUserProvider)
+
 	groupHandler := handlerGroup.NewHandler(
 		createGroupUseCase, listGroupsUseCase, getGroupUseCase, listMyGroupsUseCase,
 		joinGroupUseCase,
 		requestJoinUseCase, approveRequestUseCase, rejectRequestUseCase,
 		listJoinRequestsUseCase, getMyRequestUseCase, cancelMyRequestUseCase,
 		generateInviteUseCase, acceptInviteUseCase,
+		addMemberUseCase, removeMemberUseCase, changeRoleUseCase, leaveGroupUseCase, listMembersUseCase,
 	)
 
 	// Material platform adapters

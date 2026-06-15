@@ -97,7 +97,7 @@ func TestAcceptInvite_PolicyChangedReturns403(t *testing.T) {
 func TestAcceptInvite_AlreadyMemberReturns409(t *testing.T) {
 	g := inviteGroup(t)
 	userID := shared.RestoreUserID("u1")
-	existing := domainGroup.RestoreGroupMember("m1", "g1", userID, domainGroup.MemberRoleMember, testNow)
+	existing := domainGroup.RestoreGroupMember("m1", "g1", userID, domainGroup.MemberRoleMember, testNow, nil, domainGroup.JoinMethodOpenJoin)
 	memberRepo := &mockMemberRepository{
 		memberships: map[string]*domainGroup.GroupMember{
 			keyOf("g1", userID): existing,

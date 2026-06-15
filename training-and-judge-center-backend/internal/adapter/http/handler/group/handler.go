@@ -1,4 +1,4 @@
-﻿package group
+package group
 
 import (
 	"net/http"
@@ -24,6 +24,11 @@ type Handler struct {
 	cancelMyRequest *appGroup.CancelMyRequestUseCase
 	generateInvite  *appGroup.GenerateInviteUseCase
 	acceptInvite    *appGroup.AcceptInviteUseCase
+	addMember       *appGroup.AddMemberUseCase
+	removeMember    *appGroup.RemoveMemberUseCase
+	changeRole      *appGroup.ChangeRoleUseCase
+	leaveGroup      *appGroup.LeaveGroupUseCase
+	listMembers     *appGroup.ListMembersUseCase
 }
 
 func NewHandler(
@@ -40,6 +45,11 @@ func NewHandler(
 	cancelMyRequest *appGroup.CancelMyRequestUseCase,
 	generateInvite *appGroup.GenerateInviteUseCase,
 	acceptInvite *appGroup.AcceptInviteUseCase,
+	addMember *appGroup.AddMemberUseCase,
+	removeMember *appGroup.RemoveMemberUseCase,
+	changeRole *appGroup.ChangeRoleUseCase,
+	leaveGroup *appGroup.LeaveGroupUseCase,
+	listMembers *appGroup.ListMembersUseCase,
 ) *Handler {
 	return &Handler{
 		createGroup:     createGroup,
@@ -55,6 +65,11 @@ func NewHandler(
 		cancelMyRequest: cancelMyRequest,
 		generateInvite:  generateInvite,
 		acceptInvite:    acceptInvite,
+		addMember:       addMember,
+		removeMember:    removeMember,
+		changeRole:      changeRole,
+		leaveGroup:      leaveGroup,
+		listMembers:     listMembers,
 	}
 }
 

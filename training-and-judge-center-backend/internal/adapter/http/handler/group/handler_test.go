@@ -48,7 +48,8 @@ type stubMemberRepo struct {
 	listLeadsFn          func(groupID string) ([]*domainGroup.GroupMember, error)
 }
 
-func (s *stubMemberRepo) Save(_ context.Context, _ *domainGroup.GroupMember) error { return nil }
+func (s *stubMemberRepo) Save(_ context.Context, _ *domainGroup.GroupMember) error   { return nil }
+func (s *stubMemberRepo) Update(_ context.Context, _ *domainGroup.GroupMember) error { return nil }
 func (s *stubMemberRepo) SaveAll(_ context.Context, _ []*domainGroup.GroupMember) error {
 	return nil
 }
@@ -156,6 +157,11 @@ func stubHandler() *Handler {
 		appGroup.NewCancelMyRequestUseCase(joinRequestRepo),
 		appGroup.NewGenerateInviteUseCase(repo, memberRepo, inviteSvc),
 		appGroup.NewAcceptInviteUseCase(repo, memberRepo, inviteSvc),
+		nil, /* addMember */
+		nil, /* removeMember */
+		nil, /* changeRole */
+		nil, /* leaveGroup */
+		nil, /* listMembers */
 	)
 }
 
@@ -263,6 +269,11 @@ func TestGetGroup_NotFoundReturns404(t *testing.T) {
 		appGroup.NewCancelMyRequestUseCase(&stubJoinRequestRepo{}),
 		nil, /* generateInvite */
 		nil, /* acceptInvite */
+		nil, /* addMember */
+		nil, /* removeMember */
+		nil, /* changeRole */
+		nil, /* leaveGroup */
+		nil, /* listMembers */
 	)
 
 	r := authedRequest("GET", "/groups/nonexistent")
@@ -300,6 +311,11 @@ func TestGetGroup_NonMemberHasNilRoleAndJoinedAt(t *testing.T) {
 		appGroup.NewCancelMyRequestUseCase(&stubJoinRequestRepo{}),
 		nil, /* generateInvite */
 		nil, /* acceptInvite */
+		nil, /* addMember */
+		nil, /* removeMember */
+		nil, /* changeRole */
+		nil, /* leaveGroup */
+		nil, /* listMembers */
 	)
 
 	r := authedRequest("GET", "/groups/g-1")
@@ -349,6 +365,11 @@ func TestGetGroup_ResponseShape(t *testing.T) {
 		appGroup.NewCancelMyRequestUseCase(&stubJoinRequestRepo{}),
 		nil, /* generateInvite */
 		nil, /* acceptInvite */
+		nil, /* addMember */
+		nil, /* removeMember */
+		nil, /* changeRole */
+		nil, /* leaveGroup */
+		nil, /* listMembers */
 	)
 
 	r := authedRequest("GET", "/groups/g-2")
@@ -500,6 +521,11 @@ func TestCreate_DuplicateNameReturns409(t *testing.T) {
 		appGroup.NewCancelMyRequestUseCase(&stubJoinRequestRepo{}),
 		nil, /* generateInvite */
 		nil, /* acceptInvite */
+		nil, /* addMember */
+		nil, /* removeMember */
+		nil, /* changeRole */
+		nil, /* leaveGroup */
+		nil, /* listMembers */
 	)
 	w := httptest.NewRecorder()
 
@@ -531,6 +557,11 @@ func TestJoin_GroupNotFoundReturns404(t *testing.T) {
 		appGroup.NewCancelMyRequestUseCase(&stubJoinRequestRepo{}),
 		nil, /* generateInvite */
 		nil, /* acceptInvite */
+		nil, /* addMember */
+		nil, /* removeMember */
+		nil, /* changeRole */
+		nil, /* leaveGroup */
+		nil, /* listMembers */
 	)
 
 	r := authedRequest("POST", "/groups/nonexistent/join")
@@ -567,6 +598,11 @@ func TestJoin_NonOpenPolicyReturns403(t *testing.T) {
 		appGroup.NewCancelMyRequestUseCase(&stubJoinRequestRepo{}),
 		nil, /* generateInvite */
 		nil, /* acceptInvite */
+		nil, /* addMember */
+		nil, /* removeMember */
+		nil, /* changeRole */
+		nil, /* leaveGroup */
+		nil, /* listMembers */
 	)
 
 	r := authedRequest("POST", "/groups/g-invite/join")
@@ -587,7 +623,7 @@ func TestJoin_AlreadyMemberReturns409(t *testing.T) {
 		false, shared.RestoreUserID("author-1"), testTime(), testTime(),
 	)
 	userID := shared.RestoreUserID("u1")
-	existingMember := domainGroup.RestoreGroupMember("m1", "g-open", userID, domainGroup.MemberRoleMember, testTime())
+	existingMember := domainGroup.RestoreGroupMember("m1", "g-open", userID, domainGroup.MemberRoleMember, testTime(), nil, domainGroup.JoinMethodOpenJoin)
 	repo := &stubGroupRepo{
 		findByIDFn: func(_ string) (*domainGroup.Group, error) { return g, nil },
 	}
@@ -610,6 +646,11 @@ func TestJoin_AlreadyMemberReturns409(t *testing.T) {
 		appGroup.NewCancelMyRequestUseCase(&stubJoinRequestRepo{}),
 		nil, /* generateInvite */
 		nil, /* acceptInvite */
+		nil, /* addMember */
+		nil, /* removeMember */
+		nil, /* changeRole */
+		nil, /* leaveGroup */
+		nil, /* listMembers */
 	)
 
 	r := authedRequest("POST", "/groups/g-open/join")
@@ -646,6 +687,11 @@ func TestJoin_SuccessReturns201WithRoleAndJoinedAt(t *testing.T) {
 		appGroup.NewCancelMyRequestUseCase(&stubJoinRequestRepo{}),
 		nil, /* generateInvite */
 		nil, /* acceptInvite */
+		nil, /* addMember */
+		nil, /* removeMember */
+		nil, /* changeRole */
+		nil, /* leaveGroup */
+		nil, /* listMembers */
 	)
 
 	r := authedRequest("POST", "/groups/g-open/join")
@@ -730,6 +776,11 @@ func TestRequestJoin_EmptyBodyIsValid(t *testing.T) {
 		appGroup.NewCancelMyRequestUseCase(&stubJoinRequestRepo{}),
 		nil, /* generateInvite */
 		nil, /* acceptInvite */
+		nil, /* addMember */
+		nil, /* removeMember */
+		nil, /* changeRole */
+		nil, /* leaveGroup */
+		nil, /* listMembers */
 	)
 
 	r := httptest.NewRequest("POST", "/groups/g-req/requests", nil)
