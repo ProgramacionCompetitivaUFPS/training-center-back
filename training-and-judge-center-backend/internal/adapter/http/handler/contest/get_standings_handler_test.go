@@ -42,9 +42,8 @@ func (m *mockStandingsCache) Set(_ context.Context, _ string, _ *appcontest.Cach
 func (m *mockStandingsCache) AcquireRefreshLock(_ context.Context, _ string, _ time.Duration) (bool, error) {
 	return true, nil
 }
-func (m *mockStandingsCache) ReleaseRefreshLock(_ context.Context, _ string) error {
-	return nil
-}
+func (m *mockStandingsCache) ReleaseRefreshLock(_ context.Context, _ string) error { return nil }
+func (m *mockStandingsCache) Invalidate(_ context.Context, _ string) error          { return nil }
 
 type mockSubmissionProvider struct{}
 

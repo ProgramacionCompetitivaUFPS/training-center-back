@@ -13,6 +13,7 @@ import (
 type Handler struct {
 	createContest             *appContest.CreateContestUseCase
 	updateContest             *appContest.UpdateContestUseCase
+	deleteContest             *appContest.DeleteContestUseCase
 	getContest                *appContest.GetContestUseCase
 	listContests              *appContest.ListContestsUseCase
 	registerToContest         *appContest.RegisterToContestUseCase
@@ -26,6 +27,7 @@ type Handler struct {
 func NewHandler(
 	createContest *appContest.CreateContestUseCase,
 	updateContest *appContest.UpdateContestUseCase,
+	deleteContest *appContest.DeleteContestUseCase,
 	getContest *appContest.GetContestUseCase,
 	listContests *appContest.ListContestsUseCase,
 	registerToContest *appContest.RegisterToContestUseCase,
@@ -38,6 +40,7 @@ func NewHandler(
 	return &Handler{
 		createContest:            createContest,
 		updateContest:            updateContest,
+		deleteContest:            deleteContest,
 		getContest:               getContest,
 		listContests:             listContests,
 		registerToContest:        registerToContest,

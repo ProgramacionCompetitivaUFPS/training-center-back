@@ -76,5 +76,13 @@ func (c *StandingsCache) ReleaseRefreshLock(ctx context.Context, contestID strin
 	return nil
 }
 
+func (c *StandingsCache) Invalidate(ctx context.Context, contestID string) error {
+	if err := c.client.Del(ctx, standingsKey(contestID), lockKey(contestID)).Err(); err != nil {
+		slog.ErrorContext(ctx, "standings cache invalidate failed", "contest_id", contestID, "error", err)
+		return apperror.NewInternal()
+	}
+	return nil
+}
+
 func standingsKey(contestID string) string { return "standings:" + contestID }
 func lockKey(contestID string) string      { return "lock:standings:" + contestID }

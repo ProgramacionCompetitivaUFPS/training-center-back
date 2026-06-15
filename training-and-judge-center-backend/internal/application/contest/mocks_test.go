@@ -337,6 +337,7 @@ type mockStandingsCache struct {
 	setFn                func(ctx context.Context, contestID string, data *CachedStandings) error
 	acquireRefreshLockFn func(ctx context.Context, contestID string, ttl time.Duration) (bool, error)
 	releaseRefreshLockFn func(ctx context.Context, contestID string) error
+	invalidateFn         func(ctx context.Context, contestID string) error
 }
 
 func (m *mockStandingsCache) Get(ctx context.Context, contestID string) (*CachedStandings, error) {
@@ -360,6 +361,12 @@ func (m *mockStandingsCache) AcquireRefreshLock(ctx context.Context, contestID s
 func (m *mockStandingsCache) ReleaseRefreshLock(ctx context.Context, contestID string) error {
 	if m.releaseRefreshLockFn != nil {
 		return m.releaseRefreshLockFn(ctx, contestID)
+	}
+	return nil
+}
+func (m *mockStandingsCache) Invalidate(ctx context.Context, contestID string) error {
+	if m.invalidateFn != nil {
+		return m.invalidateFn(ctx, contestID)
 	}
 	return nil
 }
