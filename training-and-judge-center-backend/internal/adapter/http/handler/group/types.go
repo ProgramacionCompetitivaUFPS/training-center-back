@@ -106,3 +106,46 @@ func buildPagination(total, page, totalPages, limit int) paginationResp {
 		HasPrevPage:  page > 1 && total > 0,
 	}
 }
+
+// ── Member endpoints ──────────────────────────────────────────────────────────
+
+type addMemberReq struct {
+	Nickname string `json:"nickname"`
+	Role     string `json:"role"`
+}
+
+type addMemberResp struct {
+	GroupID    string `json:"group_id"`
+	UserID     string `json:"user_id"`
+	Nickname   string `json:"nickname"`
+	Role       string `json:"role"`
+	JoinedAt   string `json:"joined_at"`
+	AddedBy    string `json:"added_by"`
+	JoinMethod string `json:"join_method"`
+}
+
+type changeRoleReq struct {
+	Role string `json:"role"`
+}
+
+type changeRoleResp struct {
+	GroupID       string `json:"group_id"`
+	UserID        string `json:"user_id"`
+	Nickname      string `json:"nickname"`
+	Role          string `json:"role"`
+	JoinedAt      string `json:"joined_at"`
+	RoleChangedAt string `json:"role_changed_at"`
+}
+
+type memberListItemResp struct {
+	UserID   string `json:"userId"`
+	Nickname string `json:"nickname"`
+	Name     string `json:"name"`
+	Role     string `json:"role"`
+	JoinedAt string `json:"joinedAt"`
+}
+
+type listMembersResp struct {
+	Members    []memberListItemResp `json:"members"`
+	Pagination paginationResp       `json:"pagination"`
+}

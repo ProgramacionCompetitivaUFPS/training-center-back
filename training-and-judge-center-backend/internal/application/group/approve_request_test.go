@@ -124,7 +124,7 @@ func TestApproveRequest_AlreadyMemberReturns409(t *testing.T) {
 	reqRepo := &mockJoinRequestRepository{requests: []*domainGroup.JoinRequest{req}}
 
 	requesterUID := shared.RestoreUserID("requester-id")
-	existingMember, _ := domainGroup.NewGroupMember("m-existing", "g1", requesterUID, domainGroup.MemberRoleMember, testNow)
+	existingMember, _ := domainGroup.NewGroupMember("m-existing", "g1", requesterUID, domainGroup.MemberRoleMember, domainGroup.JoinMethodOpenJoin, nil, testNow)
 
 	memberRepo := leadMemberRepo("g1", "lead-id")
 	memberRepo.memberships[keyOf("g1", requesterUID)] = existingMember

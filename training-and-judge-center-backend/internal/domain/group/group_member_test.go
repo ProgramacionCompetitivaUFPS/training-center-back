@@ -13,7 +13,7 @@ func testUserID() shared.UserID { return shared.RestoreUserID("user-abc") }
 
 func newMember(t *testing.T, id, groupID string, role group.MemberRole) *group.GroupMember {
 	t.Helper()
-	m, err := group.NewGroupMember(id, groupID, testUserID(), role, testNow)
+	m, err := group.NewGroupMember(id, groupID, testUserID(), role, group.JoinMethodOpenJoin, nil, testNow)
 	if err != nil {
 		t.Fatalf("NewGroupMember: %v", err)
 	}
@@ -22,7 +22,8 @@ func newMember(t *testing.T, id, groupID string, role group.MemberRole) *group.G
 
 func TestNewGroupMember_Valid(t *testing.T) {
 	fixed := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
-	m, err := group.NewGroupMember("m-1", "g-1", testUserID(), group.MemberRoleMember, fixed)
+	adder := shared.RestoreUserID("adder-id")
+	m, err := group.NewGroupMember("m-1", "g-1", testUserID(), group.MemberRoleMember, group.JoinMethodDirectAdd, &adder, fixed)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -44,17 +45,23 @@ func TestNewGroupMember_Valid(t *testing.T) {
 	if m.IsLead() {
 		t.Error("IsLead() should be false for MEMBER role")
 	}
+	if m.AddedBy() == nil || m.AddedBy().Value() != "adder-id" {
+		t.Errorf("AddedBy() = %v, want adder-id", m.AddedBy())
+	}
+	if m.JoinMethod() != group.JoinMethodDirectAdd {
+		t.Errorf("JoinMethod() = %v, want DIRECT_ADD", m.JoinMethod())
+	}
 }
 
 func TestNewGroupMember_EmptyID(t *testing.T) {
-	_, err := group.NewGroupMember("", "g-1", testUserID(), group.MemberRoleMember, testNow)
+	_, err := group.NewGroupMember("", "g-1", testUserID(), group.MemberRoleMember, group.JoinMethodOpenJoin, nil, testNow)
 	if err == nil {
 		t.Fatal("expected error for empty id, got nil")
 	}
 }
 
 func TestNewGroupMember_EmptyGroupID(t *testing.T) {
-	_, err := group.NewGroupMember("m-1", "", testUserID(), group.MemberRoleMember, testNow)
+	_, err := group.NewGroupMember("m-1", "", testUserID(), group.MemberRoleMember, group.JoinMethodOpenJoin, nil, testNow)
 	if err == nil {
 		t.Fatal("expected error for empty groupID, got nil")
 	}
@@ -62,7 +69,7 @@ func TestNewGroupMember_EmptyGroupID(t *testing.T) {
 
 func TestNewGroupMember_EmptyUserID(t *testing.T) {
 	zeroUser := shared.RestoreUserID("")
-	_, err := group.NewGroupMember("m-1", "g-1", zeroUser, group.MemberRoleMember, testNow)
+	_, err := group.NewGroupMember("m-1", "g-1", zeroUser, group.MemberRoleMember, group.JoinMethodOpenJoin, nil, testNow)
 	if err == nil {
 		t.Fatal("expected error for zero-value userID, got nil")
 	}
@@ -134,7 +141,7 @@ func TestGroupMember_Demote_AlreadyMember(t *testing.T) {
 
 func TestRestoreGroupMember(t *testing.T) {
 	joined := time.Date(2025, 6, 1, 0, 0, 0, 0, time.UTC)
-	m := group.RestoreGroupMember("m-99", "g-99", testUserID(), group.MemberRoleLead, joined)
+	m := group.RestoreGroupMember("m-99", "g-99", testUserID(), group.MemberRoleLead, joined, nil, group.JoinMethodOpenJoin)
 	if m.ID() != "m-99" {
 		t.Errorf("ID() = %q", m.ID())
 	}
@@ -146,5 +153,8 @@ func TestRestoreGroupMember(t *testing.T) {
 	}
 	if !m.IsLead() {
 		t.Error("IsLead() should be true")
+	}
+	if m.AddedBy() != nil {
+		t.Errorf("AddedBy() = %v, want nil", m.AddedBy())
 	}
 }

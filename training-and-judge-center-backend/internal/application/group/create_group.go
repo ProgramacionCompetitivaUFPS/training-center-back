@@ -88,7 +88,7 @@ func (uc *CreateGroupUseCase) Execute(ctx context.Context, input CreateGroupInpu
 	}
 
 	newLeadMemberID := uuid.New().String()
-	lead, err := domainGroup.NewGroupMember(newLeadMemberID, newID, creatorID, domainGroup.MemberRoleLead, now)
+	lead, err := domainGroup.NewGroupMember(newLeadMemberID, newID, creatorID, domainGroup.MemberRoleLead, domainGroup.JoinMethodDirectAdd, nil, now)
 	if err != nil {
 		return nil, err
 	}

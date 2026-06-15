@@ -17,6 +17,8 @@ import (
 	"github.com/training-judge-center/backend/pkg/apperror"
 )
 
+const memberCols = `id, group_id, user_id, member_role, joined_at, added_by, join_method`
+
 type MemberRepository struct {
 	db *pgxpool.Pool
 }
@@ -27,11 +29,19 @@ func NewMemberRepository(db *pgxpool.Pool) *MemberRepository {
 
 func (r *MemberRepository) Save(ctx context.Context, m *domainGroup.GroupMember) error {
 	const q = `
-		INSERT INTO group_members (id, group_id, user_id, member_role, joined_at)
-		VALUES ($1, $2, $3, $4, $5)
+		INSERT INTO group_members (id, group_id, user_id, member_role, joined_at, added_by, join_method)
+		VALUES ($1, $2, $3, $4, $5, $6, $7)
 	`
+	var addedByVal *string
+	if ab := m.AddedBy(); ab != nil {
+		v := ab.Value()
+		addedByVal = &v
+	}
 	db := memberDBFor(ctx, r.db)
-	_, err := db.Exec(ctx, q, m.ID(), m.GroupID(), m.UserID().Value(), m.Role().String(), m.JoinedAt())
+	_, err := db.Exec(ctx, q,
+		m.ID(), m.GroupID(), m.UserID().Value(), m.Role().String(), m.JoinedAt(),
+		addedByVal, m.JoinMethod().String(),
+	)
 	if err != nil {
 		var pgErr *pgconn.PgError
 		if errors.As(err, &pgErr) && pgErr.Code == infraPostgres.UniqueViolation && pgErr.ConstraintName == "group_members_group_id_user_id_key" {
@@ -45,9 +55,24 @@ func (r *MemberRepository) Save(ctx context.Context, m *domainGroup.GroupMember)
 	return nil
 }
 
+func (r *MemberRepository) Update(ctx context.Context, m *domainGroup.GroupMember) error {
+	const q = `UPDATE group_members SET member_role = $1 WHERE group_id = $2 AND user_id = $3`
+	db := memberDBFor(ctx, r.db)
+	tag, err := db.Exec(ctx, q, m.Role().String(), m.GroupID(), m.UserID().Value())
+	if err != nil {
+		slog.ErrorContext(ctx, "MemberRepository.Update failed", "group_id", m.GroupID(), "user_id", m.UserID().Value(), "error", err)
+		return apperror.NewInternal()
+	}
+	if tag.RowsAffected() == 0 {
+		return apperror.NewNotFound(domainGroup.ErrCodeNotAMember, "user is not a member of this group")
+	}
+	return nil
+}
+
 type memberDBQuerier interface {
 	Exec(ctx context.Context, sql string, arguments ...any) (pgconn.CommandTag, error)
 	QueryRow(ctx context.Context, sql string, args ...any) pgx.Row
+	Query(ctx context.Context, sql string, args ...any) (pgx.Rows, error)
 }
 
 func memberDBFor(ctx context.Context, pool *pgxpool.Pool) memberDBQuerier {
@@ -61,14 +86,64 @@ func (r *MemberRepository) SaveAll(_ context.Context, _ []*domainGroup.GroupMemb
 	panic("not implemented")
 }
 
-func (r *MemberRepository) FindByGroup(_ context.Context, _ string, _ domainGroup.MemberFilters) ([]*domainGroup.GroupMember, int, error) {
-	panic("not implemented")
+func (r *MemberRepository) FindByGroup(ctx context.Context, groupID string, filters domainGroup.MemberFilters) ([]*domainGroup.GroupMember, int, error) {
+	where := `WHERE group_id = $1`
+	args := []any{groupID}
+	argIdx := 2
+
+	if filters.Role != nil {
+		where += ` AND member_role = $` + itoa(argIdx)
+		args = append(args, filters.Role.String())
+		argIdx++
+	}
+
+	var total int
+	countQ := `SELECT COUNT(*) FROM group_members ` + where
+	if err := r.db.QueryRow(ctx, countQ, args...).Scan(&total); err != nil {
+		slog.ErrorContext(ctx, "FindByGroup count failed", "group_id", groupID, "error", err)
+		return nil, 0, apperror.NewInternal()
+	}
+
+	limit := filters.Limit
+	if limit <= 0 {
+		limit = 20
+	}
+	offset := (filters.Page - 1) * limit
+	if offset < 0 {
+		offset = 0
+	}
+
+	q := `SELECT ` + memberCols + ` FROM group_members ` + where +
+		` ORDER BY joined_at ASC LIMIT $` + itoa(argIdx) + ` OFFSET $` + itoa(argIdx+1)
+	args = append(args, limit, offset)
+
+	rows, err := r.db.Query(ctx, q, args...)
+	if err != nil {
+		slog.ErrorContext(ctx, "FindByGroup query failed", "group_id", groupID, "error", err)
+		return nil, 0, apperror.NewInternal()
+	}
+	defer rows.Close()
+
+	var out []*domainGroup.GroupMember
+	for rows.Next() {
+		m, err := scanMember(rows)
+		if err != nil {
+			slog.ErrorContext(ctx, "FindByGroup scan failed", "group_id", groupID, "error", err)
+			return nil, 0, apperror.NewInternal()
+		}
+		out = append(out, m)
+	}
+	if err := rows.Err(); err != nil {
+		slog.ErrorContext(ctx, "FindByGroup rows error", "group_id", groupID, "error", err)
+		return nil, 0, apperror.NewInternal()
+	}
+	return out, total, nil
 }
 
 // FindByGroupAndUser returns (nil, nil) when the user is not a member of the group.
 // Callers must check for a nil member before accessing its fields.
 func (r *MemberRepository) FindByGroupAndUser(ctx context.Context, groupID string, userID shared.UserID) (*domainGroup.GroupMember, error) {
-	const q = `SELECT id, group_id, user_id, member_role, joined_at FROM group_members WHERE group_id = $1 AND user_id = $2`
+	q := `SELECT ` + memberCols + ` FROM group_members WHERE group_id = $1 AND user_id = $2`
 	m, err := scanMember(memberDBFor(ctx, r.db).QueryRow(ctx, q, groupID, userID.Value()))
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
@@ -100,8 +175,18 @@ func (r *MemberRepository) CountMembers(ctx context.Context, groupID string) (in
 	return n, nil
 }
 
-func (r *MemberRepository) Delete(_ context.Context, _ string, _ shared.UserID) error {
-	panic("not implemented")
+func (r *MemberRepository) Delete(ctx context.Context, groupID string, userID shared.UserID) error {
+	const q = `DELETE FROM group_members WHERE group_id = $1 AND user_id = $2`
+	db := memberDBFor(ctx, r.db)
+	tag, err := db.Exec(ctx, q, groupID, userID.Value())
+	if err != nil {
+		slog.ErrorContext(ctx, "MemberRepository.Delete failed", "group_id", groupID, "user_id", userID.Value(), "error", err)
+		return apperror.NewInternal()
+	}
+	if tag.RowsAffected() == 0 {
+		return apperror.NewNotFound(domainGroup.ErrCodeNotAMember, "user is not a member of this group")
+	}
+	return nil
 }
 
 func (r *MemberRepository) BulkStats(ctx context.Context, groupIDs []string, viewerID shared.UserID) (map[string]domainGroup.MemberStats, error) {
@@ -141,10 +226,8 @@ func (r *MemberRepository) BulkStats(ctx context.Context, groupIDs []string, vie
 	})
 
 	eg.Go(func() error { // writes only to memberships — no other goroutine touches memberships
-		rows, err := r.db.Query(egCtx,
-			`SELECT id, group_id, user_id, member_role, joined_at FROM group_members WHERE group_id = ANY($1) AND user_id = $2`,
-			groupIDs, viewerID.Value(),
-		)
+		q := `SELECT ` + memberCols + ` FROM group_members WHERE group_id = ANY($1) AND user_id = $2`
+		rows, err := r.db.Query(egCtx, q, groupIDs, viewerID.Value())
 		if err != nil {
 			slog.ErrorContext(egCtx, "BulkStats memberships failed", "error", err)
 			return apperror.NewInternal()
@@ -183,16 +266,26 @@ func (r *MemberRepository) BulkStats(ctx context.Context, groupIDs []string, vie
 }
 
 func scanMember(row rowScanner) (*domainGroup.GroupMember, error) {
-	var id, gid, uid, role string
+	var id, gid, uid, role, joinMethod string
 	var joinedAt time.Time
-	if err := row.Scan(&id, &gid, &uid, &role, &joinedAt); err != nil {
+	var addedByRaw *string
+	if err := row.Scan(&id, &gid, &uid, &role, &joinedAt, &addedByRaw, &joinMethod); err != nil {
 		return nil, err
 	}
-	return domainGroup.RestoreGroupMember(id, gid, shared.RestoreUserID(uid), domainGroup.RestoreMemberRole(role), joinedAt), nil
+	var addedBy *shared.UserID
+	if addedByRaw != nil {
+		v := shared.RestoreUserID(*addedByRaw)
+		addedBy = &v
+	}
+	return domainGroup.RestoreGroupMember(
+		id, gid, shared.RestoreUserID(uid),
+		domainGroup.RestoreMemberRole(role), joinedAt,
+		addedBy, domainGroup.RestoreJoinMethod(joinMethod),
+	), nil
 }
 
 func (r *MemberRepository) ListLeads(ctx context.Context, groupID string) ([]*domainGroup.GroupMember, error) {
-	const q = `SELECT id, group_id, user_id, member_role, joined_at FROM group_members WHERE group_id = $1 AND member_role = 'LEAD' ORDER BY joined_at ASC`
+	q := `SELECT ` + memberCols + ` FROM group_members WHERE group_id = $1 AND member_role = 'LEAD' ORDER BY joined_at ASC`
 	rows, err := r.db.Query(ctx, q, groupID)
 	if err != nil {
 		slog.ErrorContext(ctx, "ListLeads failed", "error", err)
@@ -214,4 +307,12 @@ func (r *MemberRepository) ListLeads(ctx context.Context, groupID string) ([]*do
 		return nil, apperror.NewInternal()
 	}
 	return out, nil
+}
+
+func itoa(n int) string {
+	const digits = "0123456789"
+	if n < 10 {
+		return string(digits[n])
+	}
+	return itoa(n/10) + string(digits[n%10])
 }

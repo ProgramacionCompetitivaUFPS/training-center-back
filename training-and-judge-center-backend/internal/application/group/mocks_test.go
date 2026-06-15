@@ -69,6 +69,10 @@ func (m *mockMemberRepository) Save(_ context.Context, mem *domainGroup.GroupMem
 	m.savedMember = mem
 	return m.saveErr
 }
+func (m *mockMemberRepository) Update(_ context.Context, mem *domainGroup.GroupMember) error {
+	m.savedMember = mem
+	return m.saveErr
+}
 func (m *mockMemberRepository) SaveAll(ctx context.Context, members []*domainGroup.GroupMember) error {
 	return nil
 }
@@ -283,7 +287,7 @@ func mustJoinRequest(t *testing.T, id, groupID, userID string) *domainGroup.Join
 
 func leadMemberRepo(groupID, userID string) *mockMemberRepository {
 	uid := shared.RestoreUserID(userID)
-	lead, _ := domainGroup.NewGroupMember("m-lead", groupID, uid, domainGroup.MemberRoleLead, testNow)
+	lead, _ := domainGroup.NewGroupMember("m-lead", groupID, uid, domainGroup.MemberRoleLead, domainGroup.JoinMethodDirectAdd, nil, testNow)
 	return &mockMemberRepository{memberships: map[string]*domainGroup.GroupMember{keyOf(groupID, uid): lead}}
 }
 
@@ -296,4 +300,17 @@ func pendingRequest(id, groupID, requesterID string) *domainGroup.JoinRequest {
 func inviteGroup(t *testing.T) *domainGroup.Group {
 	t.Helper()
 	return mustGroup(t, "g1", "Invite Club", domainGroup.VisibilityVisible, domainGroup.JoinPolicyInvite)
+}
+
+func mustUID(id string) shared.UserID { return shared.RestoreUserID(id) }
+
+// ── mockNicknameResolver ──────────────────────────────────────────────────────
+
+type mockNicknameResolver struct {
+	user *UserDisplay
+	err  error
+}
+
+func (m *mockNicknameResolver) ResolveByNickname(_ context.Context, _ string) (*UserDisplay, error) {
+	return m.user, m.err
 }

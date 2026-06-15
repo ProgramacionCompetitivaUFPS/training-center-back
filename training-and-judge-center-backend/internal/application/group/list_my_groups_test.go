@@ -70,7 +70,7 @@ func TestListMyGroups_AdminHasNoImplicitMemberships(t *testing.T) {
 func TestListMyGroups_EnrichesEachResult(t *testing.T) {
 	g := mustGroup(t, "g1", "Club", domainGroup.VisibilityVisible, domainGroup.JoinPolicyOpen)
 	uid := shared.RestoreUserID("u1")
-	gm, _ := domainGroup.NewGroupMember("m1", "g1", uid, domainGroup.MemberRoleLead,
+	gm, _ := domainGroup.NewGroupMember("m1", "g1", uid, domainGroup.MemberRoleLead, domainGroup.JoinMethodDirectAdd, nil,
 		time.Date(2026, 2, 1, 10, 0, 0, 0, time.UTC))
 
 	repo := &mockGroupRepository{groups: []*domainGroup.Group{g}, total: 1}

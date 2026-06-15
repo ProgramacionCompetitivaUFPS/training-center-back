@@ -3,9 +3,11 @@ package group
 import "context"
 
 type UserDisplay struct {
-	Nickname string
-	Name     string
-	Email    string
+	ID         string
+	Nickname   string
+	Name       string
+	Email      string
+	SystemRole string
 }
 
 type UserProvider interface {

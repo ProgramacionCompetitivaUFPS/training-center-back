@@ -40,7 +40,7 @@ func TestGetGroup_EmptyGroupIDReturnsValidationError(t *testing.T) {
 func TestGetGroup_UserProviderErrorReturnsInternal(t *testing.T) {
 	g := visibleGroup(t)
 	uidLead := shared.RestoreUserID("lead1")
-	lead, _ := domainGroup.NewGroupMember("m1", "g1", uidLead, domainGroup.MemberRoleLead, testNow)
+	lead, _ := domainGroup.NewGroupMember("m1", "g1", uidLead, domainGroup.MemberRoleLead, domainGroup.JoinMethodDirectAdd, nil, testNow)
 
 	repo := &mockGroupRepository{groups: []*domainGroup.Group{g}}
 	memberRepo := &mockMemberRepository{
@@ -85,7 +85,7 @@ func TestGetGroup_NotVisibleHiddenFromStranger(t *testing.T) {
 func TestGetGroup_NotVisibleReturnedToMember(t *testing.T) {
 	g := notVisibleGroup(t)
 	uid := shared.RestoreUserID("member")
-	gm, _ := domainGroup.NewGroupMember("m1", "g1", uid, domainGroup.MemberRoleMember, testNow)
+	gm, _ := domainGroup.NewGroupMember("m1", "g1", uid, domainGroup.MemberRoleMember, domainGroup.JoinMethodOpenJoin, nil, testNow)
 
 	repo := &mockGroupRepository{groups: []*domainGroup.Group{g}}
 	memberRepo := &mockMemberRepository{
@@ -128,7 +128,7 @@ func TestGetGroup_AdminSeesNotVisible(t *testing.T) {
 func TestGetGroup_LeadsPopulated(t *testing.T) {
 	g := visibleGroup(t)
 	uidLead := shared.RestoreUserID("lead1")
-	lead, _ := domainGroup.NewGroupMember("m1", "g1", uidLead, domainGroup.MemberRoleLead, testNow)
+	lead, _ := domainGroup.NewGroupMember("m1", "g1", uidLead, domainGroup.MemberRoleLead, domainGroup.JoinMethodDirectAdd, nil, testNow)
 
 	repo := &mockGroupRepository{groups: []*domainGroup.Group{g}}
 	memberRepo := &mockMemberRepository{

@@ -58,7 +58,7 @@ func (uc *JoinGroupUseCase) Execute(ctx context.Context, input JoinGroupInput) (
 
 	now := time.Now()
 	newMemberID := uuid.New().String()
-	member, err := domainGroup.NewGroupMember(newMemberID, input.GroupID, userID, domainGroup.MemberRoleMember, now)
+	member, err := domainGroup.NewGroupMember(newMemberID, input.GroupID, userID, domainGroup.MemberRoleMember, domainGroup.JoinMethodOpenJoin, nil, now)
 	if err != nil {
 		return nil, err
 	}

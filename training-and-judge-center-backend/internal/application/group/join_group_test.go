@@ -83,7 +83,7 @@ func TestJoinGroup_RequestPolicyReturns403(t *testing.T) {
 func TestJoinGroup_AlreadyMemberReturns409(t *testing.T) {
 	g := openGroup(t)
 	userID := shared.RestoreUserID("u1")
-	existingMember := domainGroup.RestoreGroupMember("m1", "g1", userID, domainGroup.MemberRoleMember, testNow)
+	existingMember := domainGroup.RestoreGroupMember("m1", "g1", userID, domainGroup.MemberRoleMember, testNow, nil, domainGroup.JoinMethodOpenJoin)
 	memberRepo := &mockMemberRepository{
 		memberships: map[string]*domainGroup.GroupMember{
 			keyOf("g1", userID): existingMember,

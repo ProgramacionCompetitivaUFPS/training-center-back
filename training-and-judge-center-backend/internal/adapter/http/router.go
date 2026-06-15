@@ -65,6 +65,14 @@ func NewRouter(h *Handlers, s *Services, allowedOrigins []string) *chi.Mux {
 				r.Post("/accept", h.Group.AcceptInvite)
 			})
 
+			r.Route("/{groupId}/members", func(r chi.Router) {
+				r.Post("/", h.Group.AddMember)
+				r.Get("/", h.Group.ListMembers)
+				r.Delete("/me", h.Group.LeaveGroup)
+				r.Delete("/{nickname}", h.Group.RemoveMember)
+				r.Patch("/{nickname}", h.Group.ChangeRole)
+			})
+
 			r.Route("/{groupId}/requests", func(r chi.Router) {
 				r.Post("/", h.Group.RequestJoin)
 				r.Get("/", h.Group.ListJoinRequests)
