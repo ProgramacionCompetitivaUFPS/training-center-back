@@ -154,7 +154,6 @@ func (uc *ListContestSubmissionsUseCase) Execute(ctx context.Context, in ListCon
 
 	callerID := in.CurrentUser.ID
 	showFullDetails := status == domainContest.StatusFinished || isLead || isAdmin
-	postContestEnabled := contest.EnablePostContest()
 
 	var result []SubmissionDisplay
 	for _, sub := range subs {
@@ -163,11 +162,6 @@ func (uc *ListContestSubmissionsUseCase) Execute(ctx context.Context, in ListCon
 			if !sub.SubmittedAt.Before(*freezeTime) {
 				continue
 			}
-		}
-
-		// Post-contest submissions hidden when the feature is disabled.
-		if !isAdmin && !isLead && !postContestEnabled && sub.SubmittedAt.After(endTime) {
-			continue
 		}
 
 		// Phase filter.
