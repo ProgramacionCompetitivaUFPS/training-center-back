@@ -7,6 +7,15 @@ import (
 	appGroup "github.com/training-judge-center/backend/internal/application/group"
 )
 
+// @Summary      Leave group
+// @Tags         groups
+// @Security     BearerAuth
+// @Param        groupId path string true "Group ID"
+// @Success      204
+// @Failure      401 {object} apperror.AppError
+// @Failure      403 {object} apperror.AppError
+// @Failure      404 {object} apperror.AppError
+// @Router       /groups/{groupId}/members/me [delete]
 func (h *Handler) LeaveGroup(w http.ResponseWriter, r *http.Request) {
 	currentUser, ok := h.requireCurrentUser(w, r)
 	if !ok {

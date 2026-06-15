@@ -10,6 +10,20 @@ import (
 	"github.com/training-judge-center/backend/pkg/timeutil"
 )
 
+// @Summary      Add member to group
+// @Tags         groups
+// @Accept       json
+// @Produce      json
+// @Security     BearerAuth
+// @Param        groupId path string true "Group ID"
+// @Param        body body addMemberReq true "Member data"
+// @Success      201 {object} addMemberResp
+// @Failure      400 {object} apperror.AppError
+// @Failure      401 {object} apperror.AppError
+// @Failure      403 {object} apperror.AppError
+// @Failure      404 {object} apperror.AppError
+// @Failure      409 {object} apperror.AppError
+// @Router       /groups/{groupId}/members [post]
 func (h *Handler) AddMember(w http.ResponseWriter, r *http.Request) {
 	currentUser, ok := h.requireCurrentUser(w, r)
 	if !ok {

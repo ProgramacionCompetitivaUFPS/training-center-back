@@ -8,6 +8,19 @@ import (
 	"github.com/training-judge-center/backend/pkg/timeutil"
 )
 
+// @Summary      List group members
+// @Tags         groups
+// @Produce      json
+// @Security     BearerAuth
+// @Param        groupId path string true "Group ID"
+// @Param        page  query int    false "Page number"
+// @Param        limit query int    false "Page size"
+// @Param        role  query string false "Filter by role (LEAD, MEMBER)"
+// @Success      200 {object} listMembersResp
+// @Failure      401 {object} apperror.AppError
+// @Failure      403 {object} apperror.AppError
+// @Failure      404 {object} apperror.AppError
+// @Router       /groups/{groupId}/members [get]
 func (h *Handler) ListMembers(w http.ResponseWriter, r *http.Request) {
 	currentUser, ok := h.requireCurrentUser(w, r)
 	if !ok {

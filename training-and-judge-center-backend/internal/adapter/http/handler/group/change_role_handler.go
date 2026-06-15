@@ -10,6 +10,20 @@ import (
 	"github.com/training-judge-center/backend/pkg/timeutil"
 )
 
+// @Summary      Change member role
+// @Tags         groups
+// @Accept       json
+// @Produce      json
+// @Security     BearerAuth
+// @Param        groupId  path string        true "Group ID"
+// @Param        nickname path string        true "Member nickname"
+// @Param        body     body changeRoleReq true "Role data"
+// @Success      200 {object} changeRoleResp
+// @Failure      400 {object} apperror.AppError
+// @Failure      401 {object} apperror.AppError
+// @Failure      403 {object} apperror.AppError
+// @Failure      404 {object} apperror.AppError
+// @Router       /groups/{groupId}/members/{nickname} [patch]
 func (h *Handler) ChangeRole(w http.ResponseWriter, r *http.Request) {
 	currentUser, ok := h.requireCurrentUser(w, r)
 	if !ok {
