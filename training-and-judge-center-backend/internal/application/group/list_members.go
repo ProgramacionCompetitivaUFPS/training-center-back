@@ -29,6 +29,7 @@ type MemberItemDTO struct {
 type ListMembersOutput struct {
 	Members    []MemberItemDTO
 	TotalCount int
+	TotalPages int
 }
 
 type ListMembersUseCase struct {
@@ -107,5 +108,17 @@ func (uc *ListMembersUseCase) Execute(ctx context.Context, input ListMembersInpu
 		items = append(items, item)
 	}
 
-	return &ListMembersOutput{Members: items, TotalCount: total}, nil
+	effectiveLimit := filters.Limit
+	if effectiveLimit <= 0 {
+		effectiveLimit = 20
+	}
+	totalPages := total / effectiveLimit
+	if total%effectiveLimit != 0 {
+		totalPages++
+	}
+	if totalPages == 0 {
+		totalPages = 1
+	}
+
+	return &ListMembersOutput{Members: items, TotalCount: total, TotalPages: totalPages}, nil
 }

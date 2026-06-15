@@ -115,13 +115,13 @@ type addMemberReq struct {
 }
 
 type addMemberResp struct {
-	GroupID    string `json:"group_id"`
-	UserID     string `json:"user_id"`
+	GroupID    string `json:"groupId"`
+	UserID     string `json:"userId"`
 	Nickname   string `json:"nickname"`
 	Role       string `json:"role"`
-	JoinedAt   string `json:"joined_at"`
-	AddedBy    string `json:"added_by"`
-	JoinMethod string `json:"join_method"`
+	JoinedAt   string `json:"joinedAt"`
+	AddedBy    string `json:"addedBy"`
+	JoinMethod string `json:"joinMethod"`
 }
 
 type changeRoleReq struct {
@@ -129,12 +129,12 @@ type changeRoleReq struct {
 }
 
 type changeRoleResp struct {
-	GroupID       string `json:"group_id"`
-	UserID        string `json:"user_id"`
+	GroupID       string `json:"groupId"`
+	UserID        string `json:"userId"`
 	Nickname      string `json:"nickname"`
 	Role          string `json:"role"`
-	JoinedAt      string `json:"joined_at"`
-	RoleChangedAt string `json:"role_changed_at"`
+	JoinedAt      string `json:"joinedAt"`
+	RoleChangedAt string `json:"roleChangedAt"`
 }
 
 type memberListItemResp struct {

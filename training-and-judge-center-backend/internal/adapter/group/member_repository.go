@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"log/slog"
+	"strconv"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -20,7 +21,7 @@ import (
 const memberCols = `id, group_id, user_id, member_role, joined_at, added_by, join_method`
 
 type MemberRepository struct {
-	db *pgxpool.Pool
+	db infraPostgres.Querier
 }
 
 func NewMemberRepository(db *pgxpool.Pool) *MemberRepository {
@@ -37,7 +38,7 @@ func (r *MemberRepository) Save(ctx context.Context, m *domainGroup.GroupMember)
 		v := ab.Value()
 		addedByVal = &v
 	}
-	db := memberDBFor(ctx, r.db)
+	db := infraPostgres.GetQuerier(ctx, r.db)
 	_, err := db.Exec(ctx, q,
 		m.ID(), m.GroupID(), m.UserID().Value(), m.Role().String(), m.JoinedAt(),
 		addedByVal, m.JoinMethod().String(),
@@ -57,7 +58,7 @@ func (r *MemberRepository) Save(ctx context.Context, m *domainGroup.GroupMember)
 
 func (r *MemberRepository) Update(ctx context.Context, m *domainGroup.GroupMember) error {
 	const q = `UPDATE group_members SET member_role = $1 WHERE group_id = $2 AND user_id = $3`
-	db := memberDBFor(ctx, r.db)
+	db := infraPostgres.GetQuerier(ctx, r.db)
 	tag, err := db.Exec(ctx, q, m.Role().String(), m.GroupID(), m.UserID().Value())
 	if err != nil {
 		slog.ErrorContext(ctx, "MemberRepository.Update failed", "group_id", m.GroupID(), "user_id", m.UserID().Value(), "error", err)
@@ -69,37 +70,25 @@ func (r *MemberRepository) Update(ctx context.Context, m *domainGroup.GroupMembe
 	return nil
 }
 
-type memberDBQuerier interface {
-	Exec(ctx context.Context, sql string, arguments ...any) (pgconn.CommandTag, error)
-	QueryRow(ctx context.Context, sql string, args ...any) pgx.Row
-	Query(ctx context.Context, sql string, args ...any) (pgx.Rows, error)
-}
-
-func memberDBFor(ctx context.Context, pool *pgxpool.Pool) memberDBQuerier {
-	if tx := infraPostgres.TxFromContext(ctx); tx != nil {
-		return tx
-	}
-	return pool
-}
-
 func (r *MemberRepository) SaveAll(_ context.Context, _ []*domainGroup.GroupMember) error {
 	panic("not implemented")
 }
 
 func (r *MemberRepository) FindByGroup(ctx context.Context, groupID string, filters domainGroup.MemberFilters) ([]*domainGroup.GroupMember, int, error) {
+	db := infraPostgres.GetQuerier(ctx, r.db)
 	where := `WHERE group_id = $1`
 	args := []any{groupID}
 	argIdx := 2
 
 	if filters.Role != nil {
-		where += ` AND member_role = $` + itoa(argIdx)
+		where += ` AND member_role = $` + strconv.Itoa(argIdx)
 		args = append(args, filters.Role.String())
 		argIdx++
 	}
 
 	var total int
 	countQ := `SELECT COUNT(*) FROM group_members ` + where
-	if err := r.db.QueryRow(ctx, countQ, args...).Scan(&total); err != nil {
+	if err := db.QueryRow(ctx, countQ, args...).Scan(&total); err != nil {
 		slog.ErrorContext(ctx, "FindByGroup count failed", "group_id", groupID, "error", err)
 		return nil, 0, apperror.NewInternal()
 	}
@@ -114,10 +103,10 @@ func (r *MemberRepository) FindByGroup(ctx context.Context, groupID string, filt
 	}
 
 	q := `SELECT ` + memberCols + ` FROM group_members ` + where +
-		` ORDER BY joined_at ASC LIMIT $` + itoa(argIdx) + ` OFFSET $` + itoa(argIdx+1)
+		` ORDER BY joined_at ASC LIMIT $` + strconv.Itoa(argIdx) + ` OFFSET $` + strconv.Itoa(argIdx+1)
 	args = append(args, limit, offset)
 
-	rows, err := r.db.Query(ctx, q, args...)
+	rows, err := db.Query(ctx, q, args...)
 	if err != nil {
 		slog.ErrorContext(ctx, "FindByGroup query failed", "group_id", groupID, "error", err)
 		return nil, 0, apperror.NewInternal()
@@ -143,8 +132,9 @@ func (r *MemberRepository) FindByGroup(ctx context.Context, groupID string, filt
 // FindByGroupAndUser returns (nil, nil) when the user is not a member of the group.
 // Callers must check for a nil member before accessing its fields.
 func (r *MemberRepository) FindByGroupAndUser(ctx context.Context, groupID string, userID shared.UserID) (*domainGroup.GroupMember, error) {
+	db := infraPostgres.GetQuerier(ctx, r.db)
 	q := `SELECT ` + memberCols + ` FROM group_members WHERE group_id = $1 AND user_id = $2`
-	m, err := scanMember(memberDBFor(ctx, r.db).QueryRow(ctx, q, groupID, userID.Value()))
+	m, err := scanMember(db.QueryRow(ctx, q, groupID, userID.Value()))
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, nil
@@ -156,8 +146,9 @@ func (r *MemberRepository) FindByGroupAndUser(ctx context.Context, groupID strin
 }
 
 func (r *MemberRepository) CountLeads(ctx context.Context, groupID string) (int, error) {
+	db := infraPostgres.GetQuerier(ctx, r.db)
 	var n int
-	err := r.db.QueryRow(ctx, `SELECT COUNT(*) FROM group_members WHERE group_id = $1 AND member_role = 'LEAD'`, groupID).Scan(&n)
+	err := db.QueryRow(ctx, `SELECT COUNT(*) FROM group_members WHERE group_id = $1 AND member_role = 'LEAD'`, groupID).Scan(&n)
 	if err != nil {
 		slog.ErrorContext(ctx, "CountLeads failed", "error", err)
 		return 0, apperror.NewInternal()
@@ -166,8 +157,9 @@ func (r *MemberRepository) CountLeads(ctx context.Context, groupID string) (int,
 }
 
 func (r *MemberRepository) CountMembers(ctx context.Context, groupID string) (int, error) {
+	db := infraPostgres.GetQuerier(ctx, r.db)
 	var n int
-	err := r.db.QueryRow(ctx, `SELECT COUNT(*) FROM group_members WHERE group_id = $1`, groupID).Scan(&n)
+	err := db.QueryRow(ctx, `SELECT COUNT(*) FROM group_members WHERE group_id = $1`, groupID).Scan(&n)
 	if err != nil {
 		slog.ErrorContext(ctx, "CountMembers failed", "error", err)
 		return 0, apperror.NewInternal()
@@ -177,7 +169,7 @@ func (r *MemberRepository) CountMembers(ctx context.Context, groupID string) (in
 
 func (r *MemberRepository) Delete(ctx context.Context, groupID string, userID shared.UserID) error {
 	const q = `DELETE FROM group_members WHERE group_id = $1 AND user_id = $2`
-	db := memberDBFor(ctx, r.db)
+	db := infraPostgres.GetQuerier(ctx, r.db)
 	tag, err := db.Exec(ctx, q, groupID, userID.Value())
 	if err != nil {
 		slog.ErrorContext(ctx, "MemberRepository.Delete failed", "group_id", groupID, "user_id", userID.Value(), "error", err)
@@ -194,13 +186,14 @@ func (r *MemberRepository) BulkStats(ctx context.Context, groupIDs []string, vie
 		return map[string]domainGroup.MemberStats{}, nil
 	}
 
+	db := infraPostgres.GetQuerier(ctx, r.db)
 	counts := map[string]int{}
 	memberships := map[string]*domainGroup.GroupMember{}
 
 	eg, egCtx := errgroup.WithContext(ctx)
 
 	eg.Go(func() error { // writes only to counts — no other goroutine touches counts
-		rows, err := r.db.Query(egCtx,
+		rows, err := db.Query(egCtx,
 			`SELECT group_id, COUNT(*) FROM group_members WHERE group_id = ANY($1) GROUP BY group_id`,
 			groupIDs,
 		)
@@ -227,7 +220,7 @@ func (r *MemberRepository) BulkStats(ctx context.Context, groupIDs []string, vie
 
 	eg.Go(func() error { // writes only to memberships — no other goroutine touches memberships
 		q := `SELECT ` + memberCols + ` FROM group_members WHERE group_id = ANY($1) AND user_id = $2`
-		rows, err := r.db.Query(egCtx, q, groupIDs, viewerID.Value())
+		rows, err := db.Query(egCtx, q, groupIDs, viewerID.Value())
 		if err != nil {
 			slog.ErrorContext(egCtx, "BulkStats memberships failed", "error", err)
 			return apperror.NewInternal()
@@ -285,8 +278,9 @@ func scanMember(row rowScanner) (*domainGroup.GroupMember, error) {
 }
 
 func (r *MemberRepository) ListLeads(ctx context.Context, groupID string) ([]*domainGroup.GroupMember, error) {
+	db := infraPostgres.GetQuerier(ctx, r.db)
 	q := `SELECT ` + memberCols + ` FROM group_members WHERE group_id = $1 AND member_role = 'LEAD' ORDER BY joined_at ASC`
-	rows, err := r.db.Query(ctx, q, groupID)
+	rows, err := db.Query(ctx, q, groupID)
 	if err != nil {
 		slog.ErrorContext(ctx, "ListLeads failed", "error", err)
 		return nil, apperror.NewInternal()
@@ -307,12 +301,4 @@ func (r *MemberRepository) ListLeads(ctx context.Context, groupID string) ([]*do
 		return nil, apperror.NewInternal()
 	}
 	return out, nil
-}
-
-func itoa(n int) string {
-	const digits = "0123456789"
-	if n < 10 {
-		return string(digits[n])
-	}
-	return itoa(n/10) + string(digits[n%10])
 }

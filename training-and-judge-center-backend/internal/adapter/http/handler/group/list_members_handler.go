@@ -37,14 +37,6 @@ func (h *Handler) ListMembers(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	totalPages := out.TotalCount / limit
-	if out.TotalCount%limit != 0 {
-		totalPages++
-	}
-	if totalPages == 0 {
-		totalPages = 1
-	}
-
 	items := make([]memberListItemResp, 0, len(out.Members))
 	for _, m := range out.Members {
 		items = append(items, memberListItemResp{
@@ -58,6 +50,6 @@ func (h *Handler) ListMembers(w http.ResponseWriter, r *http.Request) {
 
 	handler.WriteJSON(r.Context(), w, http.StatusOK, listMembersResp{
 		Members:    items,
-		Pagination: buildPagination(out.TotalCount, page, totalPages, limit),
+		Pagination: buildPagination(out.TotalCount, page, out.TotalPages, limit),
 	})
 }

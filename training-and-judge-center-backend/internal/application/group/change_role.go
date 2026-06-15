@@ -65,11 +65,11 @@ func (uc *ChangeRoleUseCase) Execute(ctx context.Context, input ChangeRoleInput)
 		return nil, err
 	}
 	if target == nil {
-		return nil, apperror.NewNotFound("NICKNAME_NOT_FOUND", "the specified nickname does not exist")
+		return nil, apperror.NewNotFound(ErrCodeNicknameNotFound, "the specified nickname does not exist")
 	}
 
-	if newRole == domainGroup.MemberRoleLead && target.SystemRole == shared.RoleContestant.String() {
-		return nil, apperror.NewBadRequest(domainGroup.ErrCodeInvalidLeadAssignment, "only Coaches and Admins can be assigned as leads")
+	if err := requireNotContestantForLead(newRole, target); err != nil {
+		return nil, err
 	}
 
 	targetID := shared.RestoreUserID(target.ID)
@@ -91,18 +91,19 @@ func (uc *ChangeRoleUseCase) Execute(ctx context.Context, input ChangeRoleInput)
 		}
 	}
 
-	if newRole == domainGroup.MemberRoleLead {
-		if err := member.Promote(); err != nil {
+	if member.Role() != newRole {
+		if newRole == domainGroup.MemberRoleLead {
+			if err := member.Promote(); err != nil {
+				return nil, err
+			}
+		} else {
+			if err := member.Demote(); err != nil {
+				return nil, err
+			}
+		}
+		if err := uc.memberRepo.Update(ctx, member); err != nil {
 			return nil, err
 		}
-	} else {
-		if err := member.Demote(); err != nil {
-			return nil, err
-		}
-	}
-
-	if err := uc.memberRepo.Update(ctx, member); err != nil {
-		return nil, err
 	}
 
 	now := time.Now()

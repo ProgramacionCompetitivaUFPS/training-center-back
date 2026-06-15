@@ -14,6 +14,7 @@ const (
 	ErrCodeNotAMember                      = "NOT_A_MEMBER"
 	ErrCodeInvalidLeadAssignment           = "INVALID_LEAD_ASSIGNMENT"
 	ErrCodeCannotRemoveLastLead            = "CANNOT_REMOVE_LAST_LEAD"
+	ErrCodeCannotAddToGlobalGroup          = "CANNOT_ADD_TO_GLOBAL_GROUP"
 	ErrCodeCannotRemoveFromGlobalGroup     = "CANNOT_REMOVE_FROM_GLOBAL_GROUP"
 	ErrCodeCannotRemoveAdminFromGlobalGroup = "CANNOT_REMOVE_ADMIN_FROM_GLOBAL_GROUP"
 	ErrCodeCannotLeaveGlobalGroup          = "CANNOT_LEAVE_GLOBAL_GROUP"

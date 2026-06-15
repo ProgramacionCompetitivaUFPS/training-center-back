@@ -73,7 +73,7 @@ func (uc *AddMemberUseCase) Execute(ctx context.Context, input AddMemberInput) (
 	}
 
 	if g.IsDefault() {
-		return nil, apperror.NewBadRequest(domainGroup.ErrCodeCannotRemoveFromGlobalGroup, "cannot manually add members to the global group")
+		return nil, apperror.NewBadRequest(domainGroup.ErrCodeCannotAddToGlobalGroup, "cannot manually add members to the global group")
 	}
 
 	target, err := uc.nicknameResolver.ResolveByNickname(ctx, input.Nickname)
@@ -81,11 +81,11 @@ func (uc *AddMemberUseCase) Execute(ctx context.Context, input AddMemberInput) (
 		return nil, err
 	}
 	if target == nil {
-		return nil, apperror.NewNotFound("NICKNAME_NOT_FOUND", "the specified nickname does not exist")
+		return nil, apperror.NewNotFound(ErrCodeNicknameNotFound, "the specified nickname does not exist")
 	}
 
-	if role == domainGroup.MemberRoleLead && target.SystemRole == shared.RoleContestant.String() {
-		return nil, apperror.NewBadRequest(domainGroup.ErrCodeInvalidLeadAssignment, "only Coaches and Admins can be assigned as leads")
+	if err := requireNotContestantForLead(role, target); err != nil {
+		return nil, err
 	}
 
 	targetID := shared.RestoreUserID(target.ID)
