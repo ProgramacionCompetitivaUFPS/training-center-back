@@ -64,7 +64,7 @@ func (r *Repository) FindByID(ctx context.Context, id string) (*domainGroup.Grou
 		       created_by, created_at, updated_at
 		FROM groups WHERE id = $1
 	`
-	row := r.db.QueryRow(ctx, q, id)
+	row := infraPostgres.GetQuerier(ctx, r.db).QueryRow(ctx, q, id)
 	g, err := scanGroup(row)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {

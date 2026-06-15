@@ -27,7 +27,6 @@ type DeleteGroupOutput struct {
 type DeleteGroupUseCase struct {
 	groupRepo        domainGroup.Repository
 	memberRepo       domainGroup.MemberRepository
-	joinRequestRepo  domainGroup.JoinRequestRepository
 	deletionProvider GroupDeletionProvider
 	standingsCache   GroupStandingsInvalidator
 	txManager        appshared.TransactionManager
@@ -36,7 +35,6 @@ type DeleteGroupUseCase struct {
 func NewDeleteGroupUseCase(
 	groupRepo domainGroup.Repository,
 	memberRepo domainGroup.MemberRepository,
-	joinRequestRepo domainGroup.JoinRequestRepository,
 	deletionProvider GroupDeletionProvider,
 	standingsCache GroupStandingsInvalidator,
 	txManager appshared.TransactionManager,
@@ -44,7 +42,6 @@ func NewDeleteGroupUseCase(
 	return &DeleteGroupUseCase{
 		groupRepo:        groupRepo,
 		memberRepo:       memberRepo,
-		joinRequestRepo:  joinRequestRepo,
 		deletionProvider: deletionProvider,
 		standingsCache:   standingsCache,
 		txManager:        txManager,
@@ -80,22 +77,22 @@ func (uc *DeleteGroupUseCase) Execute(ctx context.Context, in DeleteGroupInput) 
 	}
 
 	if err := uc.txManager.WithTx(ctx, func(txCtx context.Context) error {
-		if err := uc.joinRequestRepo.DeleteByGroup(txCtx, in.GroupID); err != nil {
-			return err
-		}
 		return uc.groupRepo.Delete(txCtx, in.GroupID)
 	}); err != nil {
 		return nil, err
 	}
 
+	// Use a detached context so cache invalidation is not skipped if the
+	// client disconnected while the transaction was running.
+	invalidateCtx := context.WithoutCancel(ctx)
 	for _, contestID := range counts.ContestIDs {
-		_ = uc.standingsCache.Invalidate(ctx, contestID)
+		_ = uc.standingsCache.Invalidate(invalidateCtx, contestID)
 	}
 
 	return &DeleteGroupOutput{
 		GroupID:             g.ID(),
 		GroupName:           g.Name().Value(),
-		ContestsDeleted:     counts.ContestsCount,
+		ContestsDeleted:     len(counts.ContestIDs),
 		MaterialsDeleted:    counts.MaterialsCount,
 		StandingsDeleted:    len(counts.ContestIDs),
 		SubmissionsOrphaned: counts.SubmissionsCount,

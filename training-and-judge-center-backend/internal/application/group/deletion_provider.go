@@ -6,7 +6,6 @@ import "context"
 // ContestIDs is also included so the use case can invalidate standings caches after deletion.
 type DeletionCounts struct {
 	ContestIDs       []string
-	ContestsCount    int
 	MaterialsCount   int
 	SubmissionsCount int
 	MembersCount     int

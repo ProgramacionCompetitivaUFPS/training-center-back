@@ -163,15 +163,6 @@ func (r *JoinRequestRepository) Delete(ctx context.Context, id string) error {
 	return nil
 }
 
-func (r *JoinRequestRepository) DeleteByGroup(ctx context.Context, groupID string) error {
-	_, err := r.dbFor(ctx).Exec(ctx, `DELETE FROM join_requests WHERE group_id = $1`, groupID)
-	if err != nil {
-		slog.ErrorContext(ctx, "JoinRequestRepository.DeleteByGroup failed", "error", err, "group_id", groupID)
-		return apperror.NewInternal()
-	}
-	return nil
-}
-
 type joinRequestScanner interface {
 	Scan(dest ...any) error
 }

@@ -2,6 +2,7 @@ package group
 
 import (
 	"encoding/json"
+	"io"
 	"net/http"
 
 	"github.com/training-judge-center/backend/internal/adapter/http/handler"
@@ -29,7 +30,7 @@ func (h *Handler) DeleteGroup(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var req deleteGroupReq
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil && err != io.EOF {
 		handler.WriteError(r.Context(), w, apperror.NewValidation([]apperror.FieldError{
 			{Field: "body", Message: "invalid JSON"},
 		}))

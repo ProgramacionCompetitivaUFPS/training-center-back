@@ -13,13 +13,11 @@ import (
 func newDeleteGroupUseCase(
 	groupRepo *mockGroupRepository,
 	memberRepo *mockMemberRepository,
-	joinRequestRepo *mockJoinRequestRepository,
 	provider *mockGroupDeletionProvider,
 ) *DeleteGroupUseCase {
 	return NewDeleteGroupUseCase(
 		groupRepo,
 		memberRepo,
-		joinRequestRepo,
 		provider,
 		&mockGroupStandingsInvalidator{},
 		&mockTransactionManager{},
@@ -34,7 +32,6 @@ func openGroupForDelete(t *testing.T) *domainGroup.Group {
 func defaultCounts() DeletionCounts {
 	return DeletionCounts{
 		ContestIDs:       []string{"c1", "c2"},
-		ContestsCount:    2,
 		MaterialsCount:   3,
 		SubmissionsCount: 10,
 		MembersCount:     5,
@@ -47,7 +44,7 @@ func TestDeleteGroup_LeadDeletesSuccessfully(t *testing.T) {
 	memberRepo := leadMemberRepo("g1", "lead-1")
 	provider := &mockGroupDeletionProvider{counts: defaultCounts()}
 
-	uc := newDeleteGroupUseCase(groupRepo, memberRepo, &mockJoinRequestRepository{}, provider)
+	uc := newDeleteGroupUseCase(groupRepo, memberRepo, provider)
 
 	out, err := uc.Execute(context.Background(), DeleteGroupInput{
 		GroupID:          "g1",
@@ -86,7 +83,7 @@ func TestDeleteGroup_AdminDeletesGroupTheyDontBelongTo(t *testing.T) {
 	groupRepo := &mockGroupRepository{groups: []*domainGroup.Group{g}}
 	provider := &mockGroupDeletionProvider{counts: defaultCounts()}
 
-	uc := newDeleteGroupUseCase(groupRepo, &mockMemberRepository{}, &mockJoinRequestRepository{}, provider)
+	uc := newDeleteGroupUseCase(groupRepo, &mockMemberRepository{}, provider)
 
 	out, err := uc.Execute(context.Background(), DeleteGroupInput{
 		GroupID:          "g1",
@@ -104,7 +101,7 @@ func TestDeleteGroup_AdminDeletesGroupTheyDontBelongTo(t *testing.T) {
 
 func TestDeleteGroup_GroupNotFound(t *testing.T) {
 	groupRepo := &mockGroupRepository{groups: []*domainGroup.Group{}}
-	uc := newDeleteGroupUseCase(groupRepo, &mockMemberRepository{}, &mockJoinRequestRepository{}, &mockGroupDeletionProvider{})
+	uc := newDeleteGroupUseCase(groupRepo, &mockMemberRepository{}, &mockGroupDeletionProvider{})
 
 	_, err := uc.Execute(context.Background(), DeleteGroupInput{
 		GroupID:          "nonexistent",
@@ -129,7 +126,7 @@ func TestDeleteGroup_CannotDeleteGlobalGroup(t *testing.T) {
 		true, shared.RestoreUserID("system"), time.Now(), time.Now(),
 	)
 	groupRepo := &mockGroupRepository{groups: []*domainGroup.Group{global}}
-	uc := newDeleteGroupUseCase(groupRepo, &mockMemberRepository{}, &mockJoinRequestRepository{}, &mockGroupDeletionProvider{})
+	uc := newDeleteGroupUseCase(groupRepo, &mockMemberRepository{}, &mockGroupDeletionProvider{})
 
 	_, err := uc.Execute(context.Background(), DeleteGroupInput{
 		GroupID:          "global",
@@ -157,7 +154,7 @@ func TestDeleteGroup_NonLeadMemberForbidden(t *testing.T) {
 	memberRepo := &mockMemberRepository{
 		memberships: map[string]*domainGroup.GroupMember{keyOf("g1", uid): member},
 	}
-	uc := newDeleteGroupUseCase(groupRepo, memberRepo, &mockJoinRequestRepository{}, &mockGroupDeletionProvider{})
+	uc := newDeleteGroupUseCase(groupRepo, memberRepo, &mockGroupDeletionProvider{})
 
 	_, err := uc.Execute(context.Background(), DeleteGroupInput{
 		GroupID:          "g1",
@@ -177,7 +174,7 @@ func TestDeleteGroup_NonLeadMemberForbidden(t *testing.T) {
 func TestDeleteGroup_NonMemberForbidden(t *testing.T) {
 	g := openGroupForDelete(t)
 	groupRepo := &mockGroupRepository{groups: []*domainGroup.Group{g}}
-	uc := newDeleteGroupUseCase(groupRepo, &mockMemberRepository{}, &mockJoinRequestRepository{}, &mockGroupDeletionProvider{})
+	uc := newDeleteGroupUseCase(groupRepo, &mockMemberRepository{}, &mockGroupDeletionProvider{})
 
 	_, err := uc.Execute(context.Background(), DeleteGroupInput{
 		GroupID:          "g1",
@@ -198,7 +195,7 @@ func TestDeleteGroup_ConfirmationEmpty(t *testing.T) {
 	g := openGroupForDelete(t)
 	groupRepo := &mockGroupRepository{groups: []*domainGroup.Group{g}}
 	memberRepo := leadMemberRepo("g1", "lead-1")
-	uc := newDeleteGroupUseCase(groupRepo, memberRepo, &mockJoinRequestRepository{}, &mockGroupDeletionProvider{})
+	uc := newDeleteGroupUseCase(groupRepo, memberRepo, &mockGroupDeletionProvider{})
 
 	_, err := uc.Execute(context.Background(), DeleteGroupInput{
 		GroupID:          "g1",
@@ -219,7 +216,7 @@ func TestDeleteGroup_ConfirmationMismatch(t *testing.T) {
 	g := openGroupForDelete(t)
 	groupRepo := &mockGroupRepository{groups: []*domainGroup.Group{g}}
 	memberRepo := leadMemberRepo("g1", "lead-1")
-	uc := newDeleteGroupUseCase(groupRepo, memberRepo, &mockJoinRequestRepository{}, &mockGroupDeletionProvider{})
+	uc := newDeleteGroupUseCase(groupRepo, memberRepo, &mockGroupDeletionProvider{})
 
 	_, err := uc.Execute(context.Background(), DeleteGroupInput{
 		GroupID:          "g1",

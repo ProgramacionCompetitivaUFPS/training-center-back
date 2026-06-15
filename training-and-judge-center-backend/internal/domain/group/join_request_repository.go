@@ -18,5 +18,4 @@ type JoinRequestRepository interface {
 	FindByGroupAndUser(ctx context.Context, groupID string, userID shared.UserID) (*JoinRequest, error)
 	FindByGroup(ctx context.Context, groupID string, filters JoinRequestFilters) ([]*JoinRequest, int, error)
 	Delete(ctx context.Context, id string) error
-	DeleteByGroup(ctx context.Context, groupID string) error
 }

@@ -119,8 +119,7 @@ func (s *stubJoinRequestRepo) FindByGroupAndUser(_ context.Context, groupID stri
 func (s *stubJoinRequestRepo) FindByGroup(_ context.Context, _ string, _ domainGroup.JoinRequestFilters) ([]*domainGroup.JoinRequest, int, error) {
 	return nil, 0, nil
 }
-func (s *stubJoinRequestRepo) Delete(_ context.Context, _ string) error      { return nil }
-func (s *stubJoinRequestRepo) DeleteByGroup(_ context.Context, _ string) error { return nil }
+func (s *stubJoinRequestRepo) Delete(_ context.Context, _ string) error { return nil }
 
 type stubTxManager struct{}
 

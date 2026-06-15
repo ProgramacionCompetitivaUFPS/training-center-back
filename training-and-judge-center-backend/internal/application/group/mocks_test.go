@@ -187,10 +187,6 @@ func (m *mockJoinRequestRepository) Delete(_ context.Context, id string) error {
 	return nil
 }
 
-func (m *mockJoinRequestRepository) DeleteByGroup(_ context.Context, _ string) error {
-	return nil
-}
-
 // ── mockTransactionManager ────────────────────────────────────────────────────
 
 type mockTransactionManager struct {

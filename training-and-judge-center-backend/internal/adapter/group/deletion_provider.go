@@ -40,6 +40,7 @@ func (p *DeletionProvider) GetDeletionCounts(ctx context.Context, groupID string
 		slog.ErrorContext(ctx, "DeletionProvider: contest IDs rows error", "error", err)
 		return appGroup.DeletionCounts{}, apperror.NewInternal()
 	}
+	rows.Close()
 
 	var materialsCount int
 	if err := q.QueryRow(ctx, `SELECT COUNT(*) FROM materials WHERE group_id = $1`, groupID).Scan(&materialsCount); err != nil {
@@ -65,7 +66,6 @@ func (p *DeletionProvider) GetDeletionCounts(ctx context.Context, groupID string
 
 	return appGroup.DeletionCounts{
 		ContestIDs:       contestIDs,
-		ContestsCount:    len(contestIDs),
 		MaterialsCount:   materialsCount,
 		SubmissionsCount: submissionsCount,
 		MembersCount:     membersCount,
