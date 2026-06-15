@@ -19,4 +19,6 @@ const (
 	ErrCodeCannotRemoveAdminFromGlobalGroup = "CANNOT_REMOVE_ADMIN_FROM_GLOBAL_GROUP"
 	ErrCodeCannotLeaveGlobalGroup          = "CANNOT_LEAVE_GLOBAL_GROUP"
 	ErrCodeCannotLeaveAsLastLead           = "CANNOT_LEAVE_AS_LAST_LEAD"
+
+	ErrCodeCannotDeleteGlobalGroup = "CANNOT_DELETE_GLOBAL_GROUP"
 )

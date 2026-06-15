@@ -162,6 +162,7 @@ func stubHandler() *Handler {
 		nil, /* changeRole */
 		nil, /* leaveGroup */
 		nil, /* listMembers */
+		nil, /* deleteGroup */
 	)
 }
 
@@ -274,6 +275,7 @@ func TestGetGroup_NotFoundReturns404(t *testing.T) {
 		nil, /* changeRole */
 		nil, /* leaveGroup */
 		nil, /* listMembers */
+		nil, /* deleteGroup */
 	)
 
 	r := authedRequest("GET", "/groups/nonexistent")
@@ -316,6 +318,7 @@ func TestGetGroup_NonMemberHasNilRoleAndJoinedAt(t *testing.T) {
 		nil, /* changeRole */
 		nil, /* leaveGroup */
 		nil, /* listMembers */
+		nil, /* deleteGroup */
 	)
 
 	r := authedRequest("GET", "/groups/g-1")
@@ -370,6 +373,7 @@ func TestGetGroup_ResponseShape(t *testing.T) {
 		nil, /* changeRole */
 		nil, /* leaveGroup */
 		nil, /* listMembers */
+		nil, /* deleteGroup */
 	)
 
 	r := authedRequest("GET", "/groups/g-2")
@@ -526,6 +530,7 @@ func TestCreate_DuplicateNameReturns409(t *testing.T) {
 		nil, /* changeRole */
 		nil, /* leaveGroup */
 		nil, /* listMembers */
+		nil, /* deleteGroup */
 	)
 	w := httptest.NewRecorder()
 
@@ -562,6 +567,7 @@ func TestJoin_GroupNotFoundReturns404(t *testing.T) {
 		nil, /* changeRole */
 		nil, /* leaveGroup */
 		nil, /* listMembers */
+		nil, /* deleteGroup */
 	)
 
 	r := authedRequest("POST", "/groups/nonexistent/join")
@@ -603,6 +609,7 @@ func TestJoin_NonOpenPolicyReturns403(t *testing.T) {
 		nil, /* changeRole */
 		nil, /* leaveGroup */
 		nil, /* listMembers */
+		nil, /* deleteGroup */
 	)
 
 	r := authedRequest("POST", "/groups/g-invite/join")
@@ -651,6 +658,7 @@ func TestJoin_AlreadyMemberReturns409(t *testing.T) {
 		nil, /* changeRole */
 		nil, /* leaveGroup */
 		nil, /* listMembers */
+		nil, /* deleteGroup */
 	)
 
 	r := authedRequest("POST", "/groups/g-open/join")
@@ -692,6 +700,7 @@ func TestJoin_SuccessReturns201WithRoleAndJoinedAt(t *testing.T) {
 		nil, /* changeRole */
 		nil, /* leaveGroup */
 		nil, /* listMembers */
+		nil, /* deleteGroup */
 	)
 
 	r := authedRequest("POST", "/groups/g-open/join")
@@ -781,6 +790,7 @@ func TestRequestJoin_EmptyBodyIsValid(t *testing.T) {
 		nil, /* changeRole */
 		nil, /* leaveGroup */
 		nil, /* listMembers */
+		nil, /* deleteGroup */
 	)
 
 	r := httptest.NewRequest("POST", "/groups/g-req/requests", nil)
