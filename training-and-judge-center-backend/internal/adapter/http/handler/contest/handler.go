@@ -20,6 +20,7 @@ type Handler struct {
 	getRegistrationStatus     *appContest.GetRegistrationStatusUseCase
 	listContestRegistrations  *appContest.ListContestRegistrationsUseCase
 	getStandings              *appContest.GetStandingsUseCase
+	listContestSubmissions    *appContest.ListContestSubmissionsUseCase
 }
 
 func NewHandler(
@@ -32,6 +33,7 @@ func NewHandler(
 	getRegistrationStatus *appContest.GetRegistrationStatusUseCase,
 	listContestRegistrations *appContest.ListContestRegistrationsUseCase,
 	getStandings *appContest.GetStandingsUseCase,
+	listContestSubmissions *appContest.ListContestSubmissionsUseCase,
 ) *Handler {
 	return &Handler{
 		createContest:            createContest,
@@ -43,6 +45,7 @@ func NewHandler(
 		getRegistrationStatus:    getRegistrationStatus,
 		listContestRegistrations: listContestRegistrations,
 		getStandings:             getStandings,
+		listContestSubmissions:   listContestSubmissions,
 	}
 }
 

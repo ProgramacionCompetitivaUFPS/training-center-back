@@ -364,6 +364,19 @@ func (m *mockStandingsCache) ReleaseRefreshLock(ctx context.Context, contestID s
 	return nil
 }
 
+// ── ContestSubmissionsProvider mock ──────────────────────────────────────────
+
+type mockContestSubmissionsProvider struct {
+	listByContestFn func(ctx context.Context, contestID string, filters ContestSubmissionFilters) ([]RichSubmissionData, error)
+}
+
+func (m *mockContestSubmissionsProvider) ListByContest(ctx context.Context, contestID string, filters ContestSubmissionFilters) ([]RichSubmissionData, error) {
+	if m.listByContestFn != nil {
+		return m.listByContestFn(ctx, contestID, filters)
+	}
+	return nil, nil
+}
+
 // ── StandingsSubmissionProvider mock ─────────────────────────────────────────
 
 type mockStandingsSubmissionProvider struct {

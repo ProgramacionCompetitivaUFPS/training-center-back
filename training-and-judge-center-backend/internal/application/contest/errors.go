@@ -11,4 +11,5 @@ const (
 	ErrCodeNotGroupMember          = "NOT_GROUP_MEMBER"
 	ErrCodeLeadsCannotRegister     = "LEADS_CANNOT_REGISTER"
 	ErrCodeAdminsCannotRegister    = "ADMINS_CANNOT_REGISTER"
+	ErrCodeNotRegistered           = "NOT_REGISTERED"
 )

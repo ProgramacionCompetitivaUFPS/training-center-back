@@ -203,6 +203,45 @@ type getStandingsResponse struct {
 	Meta       standingsMeta       `json:"meta"`
 }
 
+// ── GET /contests/:id/submissions response ───────────────────────────────────
+
+type submissionProblem struct {
+	Slug  string `json:"slug"`
+	Title string `json:"title"`
+	Order int    `json:"order"`
+}
+
+type submissionSubmitter struct {
+	Nickname string `json:"nickname"`
+}
+
+type submissionItem struct {
+	ID          string              `json:"id"`
+	Problem     submissionProblem   `json:"problem"`
+	SubmittedBy submissionSubmitter `json:"submittedBy"`
+	Language    string              `json:"language"`
+	Status      string              `json:"status"`
+	SubmittedAt string              `json:"submittedAt"`
+	JudgedAt    *string             `json:"judgedAt,omitempty"`
+	TimeMs      *int                `json:"timeMs,omitempty"`
+	MemoryKb    *int                `json:"memoryKb,omitempty"`
+	Phase       *string             `json:"phase,omitempty"`
+}
+
+type submissionsContestMeta struct {
+	ID         string  `json:"id"`
+	Name       string  `json:"name"`
+	Status     string  `json:"status"`
+	InFreeze   bool    `json:"inFreeze"`
+	FreezeTime *string `json:"freezeTime,omitempty"`
+}
+
+type listSubmissionsResponse struct {
+	Contest     submissionsContestMeta `json:"contest"`
+	Submissions []submissionItem       `json:"submissions"`
+	Pagination  standingsPagination    `json:"pagination"`
+}
+
 // ── Create/Update response ───────────────────────────────────────────────────
 
 type contestResponse struct {
