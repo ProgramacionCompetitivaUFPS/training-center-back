@@ -149,3 +149,28 @@ type listMembersResp struct {
 	Members    []memberListItemResp `json:"members"`
 	Pagination paginationResp       `json:"pagination"`
 }
+
+// ── Delete group endpoint ─────────────────────────────────────────────────────
+
+type deleteGroupReq struct {
+	ConfirmationName string `json:"confirmationName"`
+}
+
+type deletedGroupInfo struct {
+	ID   string `json:"id"`
+	Name string `json:"name"`
+}
+
+type deletionSummary struct {
+	ContestsDeleted            int `json:"contestsDeleted"`
+	MaterialsDeleted           int `json:"materialsDeleted"`
+	StandingCollectionsDeleted int `json:"standingCollectionsDeleted"`
+	SubmissionsOrphaned        int `json:"submissionsOrphaned"`
+	MembersRemoved             int `json:"membersRemoved"`
+}
+
+type deleteGroupResp struct {
+	Message        string          `json:"message"`
+	DeletedGroup   deletedGroupInfo `json:"deletedGroup"`
+	DeletionSummary deletionSummary `json:"deletionSummary"`
+}

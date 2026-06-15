@@ -187,6 +187,10 @@ func (m *mockJoinRequestRepository) Delete(_ context.Context, id string) error {
 	return nil
 }
 
+func (m *mockJoinRequestRepository) DeleteByGroup(_ context.Context, _ string) error {
+	return nil
+}
+
 // ── mockTransactionManager ────────────────────────────────────────────────────
 
 type mockTransactionManager struct {
@@ -303,6 +307,30 @@ func inviteGroup(t *testing.T) *domainGroup.Group {
 }
 
 func mustUID(id string) shared.UserID { return shared.RestoreUserID(id) }
+
+// ── mockGroupDeletionProvider ─────────────────────────────────────────────────
+
+type mockGroupDeletionProvider struct {
+	counts DeletionCounts
+	err    error
+}
+
+func (m *mockGroupDeletionProvider) GetDeletionCounts(_ context.Context, _ string) (DeletionCounts, error) {
+	if m.err != nil {
+		return DeletionCounts{}, m.err
+	}
+	return m.counts, nil
+}
+
+// ── mockGroupStandingsInvalidator ─────────────────────────────────────────────
+
+type mockGroupStandingsInvalidator struct {
+	err error
+}
+
+func (m *mockGroupStandingsInvalidator) Invalidate(_ context.Context, _ string) error {
+	return m.err
+}
 
 // ── mockNicknameResolver ──────────────────────────────────────────────────────
 

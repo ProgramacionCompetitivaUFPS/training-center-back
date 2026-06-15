@@ -197,6 +197,7 @@ func main() {
 	groupPrefsReader := group.NewPreferencesReader(dbPool)
 	groupNicknameResolver := group.NewNicknameResolver(dbPool)
 	joinRequestRepo := group.NewJoinRequestRepository(dbPool)
+	groupDeletionProvider := group.NewDeletionProvider(dbPool)
 	groupTxManager := postgres.NewTransactionManager(dbPool)
 
 	// Group use cases
@@ -221,6 +222,8 @@ func main() {
 	changeRoleUseCase := appGroup.NewChangeRoleUseCase(groupRepo, groupMemberRepo, groupNicknameResolver)
 	leaveGroupUseCase := appGroup.NewLeaveGroupUseCase(groupRepo, groupMemberRepo)
 	listMembersUseCase := appGroup.NewListMembersUseCase(groupRepo, groupMemberRepo, groupUserProvider)
+	groupStandingsCache := adaptercontest.NewStandingsCache(redisClient)
+	deleteGroupUseCase := appGroup.NewDeleteGroupUseCase(groupRepo, groupMemberRepo, joinRequestRepo, groupDeletionProvider, groupStandingsCache, groupTxManager)
 
 	groupHandler := handlerGroup.NewHandler(
 		createGroupUseCase, listGroupsUseCase, getGroupUseCase, listMyGroupsUseCase,
@@ -229,6 +232,7 @@ func main() {
 		listJoinRequestsUseCase, getMyRequestUseCase, cancelMyRequestUseCase,
 		generateInviteUseCase, acceptInviteUseCase,
 		addMemberUseCase, removeMemberUseCase, changeRoleUseCase, leaveGroupUseCase, listMembersUseCase,
+		deleteGroupUseCase,
 	)
 
 	// Material platform adapters
