@@ -24,4 +24,6 @@ type StandingsCache interface {
 	AcquireRefreshLock(ctx context.Context, contestID string, ttl time.Duration) (bool, error)
 	// ReleaseRefreshLock deletes the lock key early (called after successful recompute).
 	ReleaseRefreshLock(ctx context.Context, contestID string) error
+	// Invalidate removes cached standings and the refresh lock for a contest.
+	Invalidate(ctx context.Context, contestID string) error
 }

@@ -298,8 +298,12 @@ func main() {
 		contestRepo, contestGroupProvider, contestMemberProvider,
 		contestParticipantProvider, contestSubmissionsProvider,
 	)
+	deleteContestUseCase := appcontest.NewDeleteContestUseCase(
+		contestRepo, contestGroupProvider, contestMemberProvider, contestStandingsCache,
+	)
 	contestHandler := handlercontest.NewHandler(
-		createContestUseCase, updateContestUseCase, getContestUseCase, listContestsUseCase,
+		createContestUseCase, updateContestUseCase, deleteContestUseCase,
+		getContestUseCase, listContestsUseCase,
 		registerToContestUseCase, unregisterFromContestUseCase,
 		getRegistrationStatusUseCase, listContestRegistrationsUseCase,
 		getStandingsUseCase, listContestSubmissionsUseCase,
