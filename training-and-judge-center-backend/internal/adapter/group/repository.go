@@ -109,7 +109,7 @@ func (r *Repository) FindDefault(ctx context.Context) (*domainGroup.Group, error
 }
 
 func (r *Repository) Delete(ctx context.Context, id string) error {
-	tag, err := r.db.Exec(ctx, `DELETE FROM groups WHERE id = $1`, id)
+	tag, err := infraPostgres.GetQuerier(ctx, r.db).Exec(ctx, `DELETE FROM groups WHERE id = $1`, id)
 	if err != nil {
 		slog.ErrorContext(ctx, "failed to delete group", "error", err, "group_id", id)
 		return apperror.NewInternal()
