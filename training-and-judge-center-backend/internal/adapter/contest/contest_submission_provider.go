@@ -11,17 +11,17 @@ import (
 	"github.com/training-judge-center/backend/pkg/apperror"
 )
 
-// ContestSubmissionsProvider implements application/contest.ContestSubmissionsProvider
+// ContestSubmissionProvider implements application/contest.ContestSubmissionProvider
 // by querying submissions with problem and user details from Postgres.
-type ContestSubmissionsProvider struct {
+type ContestSubmissionProvider struct {
 	db infraPostgres.Querier
 }
 
-func NewContestSubmissionsProvider(db infraPostgres.Querier) *ContestSubmissionsProvider {
-	return &ContestSubmissionsProvider{db: db}
+func NewContestSubmissionProvider(db infraPostgres.Querier) *ContestSubmissionProvider {
+	return &ContestSubmissionProvider{db: db}
 }
 
-func (p *ContestSubmissionsProvider) ListByContest(
+func (p *ContestSubmissionProvider) ListByContest(
 	ctx context.Context,
 	contestID string,
 	filters appContest.ContestSubmissionFilters,

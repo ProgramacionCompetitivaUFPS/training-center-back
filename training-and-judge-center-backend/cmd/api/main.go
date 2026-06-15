@@ -258,7 +258,7 @@ func main() {
 	contestTxManager               := postgres.NewTransactionManager(dbPool)
 	contestStandingsCache          := adaptercontest.NewStandingsCache(redisClient)
 	contestSubmissionProvider      := adaptercontest.NewStandingsSubmissionProvider(dbPool)
-	contestSubmissionsProvider     := adaptercontest.NewContestSubmissionsProvider(dbPool)
+	contestSubmissionsProvider     := adaptercontest.NewContestSubmissionProvider(dbPool)
 
 	// contest use cases
 	createContestUseCase := appcontest.NewCreateContestUseCase(

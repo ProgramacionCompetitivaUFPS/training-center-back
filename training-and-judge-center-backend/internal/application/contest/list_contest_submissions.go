@@ -64,7 +64,7 @@ type ListContestSubmissionsUseCase struct {
 	groupProvider       GroupProvider
 	memberProvider      GroupMemberProvider
 	participantProvider ContestParticipantProvider
-	submissionsProvider ContestSubmissionsProvider
+	submissionsProvider ContestSubmissionProvider
 }
 
 func NewListContestSubmissionsUseCase(
@@ -72,7 +72,7 @@ func NewListContestSubmissionsUseCase(
 	groupProvider GroupProvider,
 	memberProvider GroupMemberProvider,
 	participantProvider ContestParticipantProvider,
-	submissionsProvider ContestSubmissionsProvider,
+	submissionsProvider ContestSubmissionProvider,
 ) *ListContestSubmissionsUseCase {
 	return &ListContestSubmissionsUseCase{
 		contestRepo:         contestRepo,

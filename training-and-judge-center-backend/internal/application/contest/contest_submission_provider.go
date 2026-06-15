@@ -28,8 +28,8 @@ type RichSubmissionData struct {
 	MemoryKb     *int
 }
 
-// ContestSubmissionsProvider provides all submissions for a contest, ordered by
+// ContestSubmissionProvider provides all submissions for a contest, ordered by
 // submitted_at DESC, with problem and user details resolved.
-type ContestSubmissionsProvider interface {
+type ContestSubmissionProvider interface {
 	ListByContest(ctx context.Context, contestID string, filters ContestSubmissionFilters) ([]RichSubmissionData, error)
 }
