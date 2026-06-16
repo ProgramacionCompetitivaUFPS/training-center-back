@@ -28,17 +28,20 @@ import (
 	handlerGroup "github.com/training-judge-center/backend/internal/adapter/http/handler/group"
 	handlerMaterial "github.com/training-judge-center/backend/internal/adapter/http/handler/material"
 	handlerProblem "github.com/training-judge-center/backend/internal/adapter/http/handler/problem"
+	handlerteam "github.com/training-judge-center/backend/internal/adapter/http/handler/team"
 	handlerUser "github.com/training-judge-center/backend/internal/adapter/http/handler/user"
 	"github.com/training-judge-center/backend/internal/adapter/material"
 	"github.com/training-judge-center/backend/internal/adapter/postgres"
 	"github.com/training-judge-center/backend/internal/adapter/problem"
 	"github.com/training-judge-center/backend/internal/adapter/ratelimit"
+	adapterteam "github.com/training-judge-center/backend/internal/adapter/team"
 	"github.com/training-judge-center/backend/internal/adapter/user"
 
 	appcontest "github.com/training-judge-center/backend/internal/application/contest"
 	appGroup "github.com/training-judge-center/backend/internal/application/group"
 	appMaterial "github.com/training-judge-center/backend/internal/application/material"
 	appProblem "github.com/training-judge-center/backend/internal/application/problem"
+	appteam "github.com/training-judge-center/backend/internal/application/team"
 	appuser "github.com/training-judge-center/backend/internal/application/user"
 	"github.com/training-judge-center/backend/internal/config"
 )
@@ -321,6 +324,17 @@ func main() {
 		getStandingsUseCase, listContestSubmissionsUseCase,
 	)
 
+	// team adapters
+	teamRepo := adapterteam.NewRepository(dbPool)
+	teamMemberRepo := adapterteam.NewMemberRepository(dbPool)
+	teamUserProvider := adapterteam.NewUserProvider(dbPool)
+	teamTxManager := postgres.NewTransactionManager(dbPool)
+
+	// team use cases
+	createTeamUseCase := appteam.NewCreateTeamUseCase(teamRepo, teamMemberRepo, teamUserProvider, teamTxManager)
+
+	teamHandler := handlerteam.NewHandler(createTeamUseCase)
+
 	router := adapterhttp.NewRouter(&adapterhttp.Handlers{
 		Problem:  problemHandler,
 		User:     userHandler,
@@ -328,6 +342,7 @@ func main() {
 		Group:    groupHandler,
 		Material: materialHandler,
 		Contest:  contestHandler,
+		Team:     teamHandler,
 	}, &adapterhttp.Services{
 		TokenService:       jwtService,
 		SessionInvalidator: sessionInvalidator,
