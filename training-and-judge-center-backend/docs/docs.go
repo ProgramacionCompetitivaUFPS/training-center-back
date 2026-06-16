@@ -380,6 +380,73 @@ const docTemplate = `{
                         }
                     }
                 }
+            },
+            "delete": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "groups"
+                ],
+                "summary": "Delete group",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Group ID",
+                        "name": "groupId",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Confirmation name",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/group.deleteGroupReq"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/group.deleteGroupResp"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/apperror.AppError"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/apperror.AppError"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/apperror.AppError"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/apperror.AppError"
+                        }
+                    }
+                }
             }
         },
         "/groups/{groupId}/contests": {
@@ -628,6 +695,56 @@ const docTemplate = `{
                         "schema": {
                             "$ref": "#/definitions/apperror.AppError"
                         }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/apperror.AppError"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/apperror.AppError"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/apperror.AppError"
+                        }
+                    }
+                }
+            },
+            "delete": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "tags": [
+                    "contests"
+                ],
+                "summary": "Delete a contest",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Group ID",
+                        "name": "groupId",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Contest ID",
+                        "name": "contestId",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "No Content"
                     },
                     "401": {
                         "description": "Unauthorized",
@@ -905,13 +1022,15 @@ const docTemplate = `{
                         "type": "string",
                         "description": "Group ID",
                         "name": "groupId",
-                        "in": "path"
+                        "in": "path",
+                        "required": true
                     },
                     {
                         "type": "string",
                         "description": "Contest ID",
                         "name": "contestId",
-                        "in": "path"
+                        "in": "path",
+                        "required": true
                     },
                     {
                         "type": "boolean",
@@ -937,6 +1056,94 @@ const docTemplate = `{
                         "description": "OK",
                         "schema": {
                             "$ref": "#/definitions/contest.getStandingsResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/apperror.AppError"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/apperror.AppError"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/apperror.AppError"
+                        }
+                    }
+                }
+            }
+        },
+        "/groups/{groupId}/contests/{contestId}/submissions": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "contests"
+                ],
+                "summary": "List contest submissions",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Group ID",
+                        "name": "groupId",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Contest ID",
+                        "name": "contestId",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Filter by problem slug",
+                        "name": "problemSlug",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Filter by participant nickname",
+                        "name": "nickname",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Filter by phase: competition, postcompetition (default: all)",
+                        "name": "phase",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Page number (default 1)",
+                        "name": "page",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Items per page (default 50, max 100)",
+                        "name": "limit",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/contest.listSubmissionsResponse"
                         }
                     },
                     "401": {
@@ -1622,6 +1829,319 @@ const docTemplate = `{
                         "description": "OK",
                         "schema": {
                             "$ref": "#/definitions/material.materialResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/apperror.AppError"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/apperror.AppError"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/apperror.AppError"
+                        }
+                    }
+                }
+            }
+        },
+        "/groups/{groupId}/members": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "groups"
+                ],
+                "summary": "List group members",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Group ID",
+                        "name": "groupId",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Page number",
+                        "name": "page",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Page size",
+                        "name": "limit",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Filter by role (LEAD, MEMBER)",
+                        "name": "role",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/group.listMembersResp"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/apperror.AppError"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/apperror.AppError"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/apperror.AppError"
+                        }
+                    }
+                }
+            },
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "groups"
+                ],
+                "summary": "Add member to group",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Group ID",
+                        "name": "groupId",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Member data",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/group.addMemberReq"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "schema": {
+                            "$ref": "#/definitions/group.addMemberResp"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/apperror.AppError"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/apperror.AppError"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/apperror.AppError"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/apperror.AppError"
+                        }
+                    },
+                    "409": {
+                        "description": "Conflict",
+                        "schema": {
+                            "$ref": "#/definitions/apperror.AppError"
+                        }
+                    }
+                }
+            }
+        },
+        "/groups/{groupId}/members/me": {
+            "delete": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "tags": [
+                    "groups"
+                ],
+                "summary": "Leave group",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Group ID",
+                        "name": "groupId",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "No Content"
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/apperror.AppError"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/apperror.AppError"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/apperror.AppError"
+                        }
+                    }
+                }
+            }
+        },
+        "/groups/{groupId}/members/{nickname}": {
+            "delete": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "tags": [
+                    "groups"
+                ],
+                "summary": "Remove member from group",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Group ID",
+                        "name": "groupId",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Member nickname",
+                        "name": "nickname",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "No Content"
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/apperror.AppError"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/apperror.AppError"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/apperror.AppError"
+                        }
+                    }
+                }
+            },
+            "patch": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "groups"
+                ],
+                "summary": "Change member role",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Group ID",
+                        "name": "groupId",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Member nickname",
+                        "name": "nickname",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Role data",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/group.changeRoleReq"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/group.changeRoleResp"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/apperror.AppError"
                         }
                     },
                     "401": {
@@ -2771,6 +3291,62 @@ const docTemplate = `{
                 }
             }
         },
+        "/teams": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "teams"
+                ],
+                "summary": "Create team",
+                "parameters": [
+                    {
+                        "description": "Team data",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/team.createTeamRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "schema": {
+                            "$ref": "#/definitions/team.createTeamResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/apperror.AppError"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/apperror.AppError"
+                        }
+                    },
+                    "409": {
+                        "description": "Conflict",
+                        "schema": {
+                            "$ref": "#/definitions/apperror.AppError"
+                        }
+                    }
+                }
+            }
+        },
         "/users": {
             "put": {
                 "security": [
@@ -3458,14 +4034,14 @@ const docTemplate = `{
                 "entries": {
                     "type": "array",
                     "items": {
-                        "$ref": "#/definitions/contest.rankedEntryResponse"
+                        "$ref": "#/definitions/contest.rankedEntry"
                     }
                 },
                 "meta": {
-                    "$ref": "#/definitions/contest.standingsMetaResponse"
+                    "$ref": "#/definitions/contest.standingsMeta"
                 },
                 "pagination": {
-                    "$ref": "#/definitions/contest.standingsPaginationResponse"
+                    "$ref": "#/definitions/contest.standingsPagination"
                 }
             }
         },
@@ -3504,6 +4080,23 @@ const docTemplate = `{
                     "type": "array",
                     "items": {
                         "$ref": "#/definitions/contest.registrationItem"
+                    }
+                }
+            }
+        },
+        "contest.listSubmissionsResponse": {
+            "type": "object",
+            "properties": {
+                "contest": {
+                    "$ref": "#/definitions/contest.submissionsContestMeta"
+                },
+                "pagination": {
+                    "$ref": "#/definitions/contest.standingsPagination"
+                },
+                "submissions": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/contest.submissionItem"
                     }
                 }
             }
@@ -3595,7 +4188,7 @@ const docTemplate = `{
                 }
             }
         },
-        "contest.rankedEntryResponse": {
+        "contest.rankedEntry": {
             "type": "object",
             "properties": {
                 "contestantId": {
@@ -3607,7 +4200,7 @@ const docTemplate = `{
                 "problems": {
                     "type": "object",
                     "additionalProperties": {
-                        "$ref": "#/definitions/contest.rankedProblemResponse"
+                        "$ref": "#/definitions/contest.rankedProblem"
                     }
                 },
                 "problemsSolved": {
@@ -3621,7 +4214,7 @@ const docTemplate = `{
                 }
             }
         },
-        "contest.rankedProblemResponse": {
+        "contest.rankedProblem": {
             "type": "object",
             "properties": {
                 "acceptedAt": {
@@ -3629,9 +4222,6 @@ const docTemplate = `{
                 },
                 "attempts": {
                     "type": "integer"
-                },
-                "isFrozen": {
-                    "type": "boolean"
                 },
                 "isSolved": {
                     "type": "boolean"
@@ -3683,7 +4273,7 @@ const docTemplate = `{
                 }
             }
         },
-        "contest.standingsMetaResponse": {
+        "contest.standingsMeta": {
             "type": "object",
             "properties": {
                 "contestStatus": {
@@ -3700,7 +4290,7 @@ const docTemplate = `{
                 }
             }
         },
-        "contest.standingsPaginationResponse": {
+        "contest.standingsPagination": {
             "type": "object",
             "properties": {
                 "limit": {
@@ -3714,6 +4304,83 @@ const docTemplate = `{
                 },
                 "totalPages": {
                     "type": "integer"
+                }
+            }
+        },
+        "contest.submissionItem": {
+            "type": "object",
+            "properties": {
+                "id": {
+                    "type": "string"
+                },
+                "judgedAt": {
+                    "type": "string"
+                },
+                "language": {
+                    "type": "string"
+                },
+                "memoryKb": {
+                    "type": "integer"
+                },
+                "phase": {
+                    "type": "string"
+                },
+                "problem": {
+                    "$ref": "#/definitions/contest.submissionProblem"
+                },
+                "status": {
+                    "type": "string"
+                },
+                "submittedAt": {
+                    "type": "string"
+                },
+                "submittedBy": {
+                    "$ref": "#/definitions/contest.submissionSubmitter"
+                },
+                "timeMs": {
+                    "type": "integer"
+                }
+            }
+        },
+        "contest.submissionProblem": {
+            "type": "object",
+            "properties": {
+                "order": {
+                    "type": "integer"
+                },
+                "slug": {
+                    "type": "string"
+                },
+                "title": {
+                    "type": "string"
+                }
+            }
+        },
+        "contest.submissionSubmitter": {
+            "type": "object",
+            "properties": {
+                "nickname": {
+                    "type": "string"
+                }
+            }
+        },
+        "contest.submissionsContestMeta": {
+            "type": "object",
+            "properties": {
+                "freezeTime": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "inFreeze": {
+                    "type": "boolean"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "status": {
+                    "type": "string"
                 }
             }
         },
@@ -3760,6 +4427,74 @@ const docTemplate = `{
                 }
             }
         },
+        "group.addMemberReq": {
+            "type": "object",
+            "properties": {
+                "nickname": {
+                    "type": "string"
+                },
+                "role": {
+                    "type": "string"
+                }
+            }
+        },
+        "group.addMemberResp": {
+            "type": "object",
+            "properties": {
+                "addedBy": {
+                    "type": "string"
+                },
+                "groupId": {
+                    "type": "string"
+                },
+                "joinMethod": {
+                    "type": "string"
+                },
+                "joinedAt": {
+                    "type": "string"
+                },
+                "nickname": {
+                    "type": "string"
+                },
+                "role": {
+                    "type": "string"
+                },
+                "userId": {
+                    "type": "string"
+                }
+            }
+        },
+        "group.changeRoleReq": {
+            "type": "object",
+            "properties": {
+                "role": {
+                    "type": "string"
+                }
+            }
+        },
+        "group.changeRoleResp": {
+            "type": "object",
+            "properties": {
+                "groupId": {
+                    "type": "string"
+                },
+                "joinedAt": {
+                    "type": "string"
+                },
+                "nickname": {
+                    "type": "string"
+                },
+                "role": {
+                    "type": "string"
+                },
+                "roleChangedAt": {
+                    "type": "string"
+                },
+                "userId": {
+                    "type": "string"
+                }
+            }
+        },
         "group.createGroupRequest": {
             "type": "object",
             "properties": {
@@ -3774,6 +4509,59 @@ const docTemplate = `{
                 },
                 "visibility": {
                     "type": "string"
+                }
+            }
+        },
+        "group.deleteGroupReq": {
+            "type": "object",
+            "properties": {
+                "confirmationName": {
+                    "type": "string"
+                }
+            }
+        },
+        "group.deleteGroupResp": {
+            "type": "object",
+            "properties": {
+                "deletedGroup": {
+                    "$ref": "#/definitions/group.deletedGroupInfo"
+                },
+                "deletionSummary": {
+                    "$ref": "#/definitions/group.deletionSummary"
+                },
+                "message": {
+                    "type": "string"
+                }
+            }
+        },
+        "group.deletedGroupInfo": {
+            "type": "object",
+            "properties": {
+                "id": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                }
+            }
+        },
+        "group.deletionSummary": {
+            "type": "object",
+            "properties": {
+                "contestsDeleted": {
+                    "type": "integer"
+                },
+                "materialsDeleted": {
+                    "type": "integer"
+                },
+                "membersRemoved": {
+                    "type": "integer"
+                },
+                "standingCollectionsDeleted": {
+                    "type": "integer"
+                },
+                "submissionsOrphaned": {
+                    "type": "integer"
                 }
             }
         },
@@ -3952,6 +4740,20 @@ const docTemplate = `{
                 }
             }
         },
+        "group.listMembersResp": {
+            "type": "object",
+            "properties": {
+                "members": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/group.memberListItemResp"
+                    }
+                },
+                "pagination": {
+                    "$ref": "#/definitions/group.paginationResp"
+                }
+            }
+        },
         "group.listMyGroupsResponse": {
             "type": "object",
             "properties": {
@@ -3977,6 +4779,26 @@ const docTemplate = `{
                     "items": {
                         "$ref": "#/definitions/group.joinRequestResp"
                     }
+                }
+            }
+        },
+        "group.memberListItemResp": {
+            "type": "object",
+            "properties": {
+                "joinedAt": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "nickname": {
+                    "type": "string"
+                },
+                "role": {
+                    "type": "string"
+                },
+                "userId": {
+                    "type": "string"
                 }
             }
         },
@@ -4596,6 +5418,51 @@ const docTemplate = `{
                     "type": "integer"
                 },
                 "title": {
+                    "type": "string"
+                }
+            }
+        },
+        "team.createTeamRequest": {
+            "type": "object",
+            "properties": {
+                "name": {
+                    "type": "string"
+                }
+            }
+        },
+        "team.createTeamResponse": {
+            "type": "object",
+            "properties": {
+                "createdAt": {
+                    "type": "string"
+                },
+                "createdBy": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "members": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/team.member"
+                    }
+                },
+                "name": {
+                    "type": "string"
+                }
+            }
+        },
+        "team.member": {
+            "type": "object",
+            "properties": {
+                "joinedAt": {
+                    "type": "string"
+                },
+                "nickname": {
+                    "type": "string"
+                },
+                "userId": {
                     "type": "string"
                 }
             }

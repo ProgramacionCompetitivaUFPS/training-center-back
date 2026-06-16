@@ -11,6 +11,7 @@ import (
 	"github.com/training-judge-center/backend/internal/adapter/http/handler/group"
 	handlerMaterial "github.com/training-judge-center/backend/internal/adapter/http/handler/material"
 	"github.com/training-judge-center/backend/internal/adapter/http/handler/problem"
+	handlerTeam "github.com/training-judge-center/backend/internal/adapter/http/handler/team"
 	handlerUser "github.com/training-judge-center/backend/internal/adapter/http/handler/user"
 	"github.com/training-judge-center/backend/internal/adapter/http/middleware"
 	"github.com/training-judge-center/backend/internal/domain/shared"
@@ -24,6 +25,7 @@ type Handlers struct {
 	Group    *group.Handler
 	Material *handlerMaterial.Handler
 	Contest  *handlerContest.Handler
+	Team     *handlerTeam.Handler
 }
 
 type Services struct {
@@ -147,6 +149,8 @@ func NewRouter(h *Handlers, s *Services, allowedOrigins []string) *chi.Mux {
 	// Protected routes — authenticated users
 	r.Group(func(r chi.Router) {
 		r.Use(middleware.Auth(s.TokenService, s.SessionInvalidator))
+
+		r.Post("/teams", h.Team.Create)
 
 		r.Get("/users/me", h.User.GetMyProfile)
 		r.Get("/users/me/groups", h.Group.ListMyGroups)
