@@ -15,7 +15,7 @@ type TeamName struct {
 }
 
 func NewTeamName(s string) (TeamName, error) {
-	normalized := norm.NFKC.String(strings.TrimSpace(s))
+	normalized := strings.TrimSpace(norm.NFKC.String(s))
 	if normalized == "" {
 		return TeamName{}, apperror.NewValidation([]apperror.FieldError{
 			{Field: "name", Message: "team name cannot be empty"},

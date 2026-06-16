@@ -11,7 +11,7 @@ CREATE UNIQUE INDEX IF NOT EXISTS teams_name_lower_idx ON teams (LOWER(name));
 CREATE TABLE IF NOT EXISTS team_members (
     id        UUID PRIMARY KEY,
     team_id   UUID NOT NULL REFERENCES teams(id) ON DELETE CASCADE,
-    user_id   UUID NOT NULL REFERENCES users(id),
+    user_id   UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     joined_at TIMESTAMPTZ NOT NULL,
     CONSTRAINT team_members_team_user_key UNIQUE (team_id, user_id)
 );

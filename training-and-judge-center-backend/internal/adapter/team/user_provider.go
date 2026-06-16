@@ -6,22 +6,22 @@ import (
 	"log/slog"
 
 	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgxpool"
+	infraPostgres "github.com/training-judge-center/backend/internal/adapter/postgres"
 	appTeam "github.com/training-judge-center/backend/internal/application/team"
 	"github.com/training-judge-center/backend/pkg/apperror"
 )
 
 type UserProvider struct {
-	db *pgxpool.Pool
+	db infraPostgres.Querier
 }
 
-func NewUserProvider(db *pgxpool.Pool) *UserProvider {
+func NewUserProvider(db infraPostgres.Querier) *UserProvider {
 	return &UserProvider{db: db}
 }
 
 func (p *UserProvider) GetDisplay(ctx context.Context, userID string) (*appTeam.UserDisplay, error) {
 	var nickname string
-	err := p.db.QueryRow(ctx, `SELECT nickname FROM users WHERE id = $1`, userID).Scan(&nickname)
+	err := infraPostgres.GetQuerier(ctx, p.db).QueryRow(ctx, `SELECT nickname FROM users WHERE id = $1`, userID).Scan(&nickname)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, nil

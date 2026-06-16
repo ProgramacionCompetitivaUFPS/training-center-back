@@ -29,7 +29,7 @@ func (r *Repository) Save(ctx context.Context, t *domainTeam.Team) error {
 	)
 	if err != nil {
 		var pgErr *pgconn.PgError
-		if errors.As(err, &pgErr) && pgErr.Code == "23505" {
+		if errors.As(err, &pgErr) && pgErr.Code == infraPostgres.UniqueViolation && pgErr.ConstraintName == "teams_name_lower_idx" {
 			return apperror.NewConflict(domainTeam.ErrCodeTeamNameExists, "A team with this name already exists")
 		}
 		slog.ErrorContext(ctx, "failed to save team", "error", err, "team_id", t.ID())
