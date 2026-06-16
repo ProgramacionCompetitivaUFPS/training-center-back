@@ -8,7 +8,6 @@ import (
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
-	"github.com/jackc/pgx/v5/pgxpool"
 	infraPostgres "github.com/training-judge-center/backend/internal/adapter/postgres"
 	"github.com/training-judge-center/backend/internal/domain/shared"
 	domainTeam "github.com/training-judge-center/backend/internal/domain/team"
@@ -16,10 +15,10 @@ import (
 )
 
 type Repository struct {
-	db *pgxpool.Pool
+	db infraPostgres.Querier
 }
 
-func NewRepository(db *pgxpool.Pool) *Repository {
+func NewRepository(db infraPostgres.Querier) *Repository {
 	return &Repository{db: db}
 }
 
@@ -56,7 +55,7 @@ func (r *Repository) FindByID(ctx context.Context, id string) (*domainTeam.Team,
 
 func (r *Repository) ExistsByName(ctx context.Context, name domainTeam.TeamName) (bool, error) {
 	var exists bool
-	err := r.db.QueryRow(ctx,
+	err := infraPostgres.GetQuerier(ctx, r.db).QueryRow(ctx,
 		`SELECT EXISTS(SELECT 1 FROM teams WHERE LOWER(name) = LOWER($1))`,
 		name.Value(),
 	).Scan(&exists)

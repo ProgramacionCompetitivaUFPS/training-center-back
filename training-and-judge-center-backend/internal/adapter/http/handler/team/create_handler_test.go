@@ -10,48 +10,49 @@ import (
 
 	"github.com/training-judge-center/backend/internal/adapter/http/middleware"
 	appTeam "github.com/training-judge-center/backend/internal/application/team"
+	appshared "github.com/training-judge-center/backend/internal/application/shared"
 	domainTeam "github.com/training-judge-center/backend/internal/domain/team"
 	domainUser "github.com/training-judge-center/backend/internal/domain/user"
 	"github.com/training-judge-center/backend/internal/domain/shared"
 	"github.com/training-judge-center/backend/pkg/apperror"
 )
 
-// ── stubs ────────────────────────────────────────────────────────────────────
+// ── mocks ────────────────────────────────────────────────────────────────────
 
-type stubTeamRepo struct {
+type mockTeamRepo struct {
 	existsByNameFn func(name domainTeam.TeamName) (bool, error)
 	saveErr        error
 }
 
-func (s *stubTeamRepo) Save(_ context.Context, _ *domainTeam.Team) error { return s.saveErr }
-func (s *stubTeamRepo) FindByID(_ context.Context, _ string) (*domainTeam.Team, error) {
+func (m *mockTeamRepo) Save(_ context.Context, _ *domainTeam.Team) error { return m.saveErr }
+func (m *mockTeamRepo) FindByID(_ context.Context, _ string) (*domainTeam.Team, error) {
 	return nil, apperror.NewNotFound(domainTeam.ErrCodeTeamNotFound, "team not found")
 }
-func (s *stubTeamRepo) ExistsByName(_ context.Context, name domainTeam.TeamName) (bool, error) {
-	if s.existsByNameFn != nil {
-		return s.existsByNameFn(name)
+func (m *mockTeamRepo) ExistsByName(_ context.Context, name domainTeam.TeamName) (bool, error) {
+	if m.existsByNameFn != nil {
+		return m.existsByNameFn(name)
 	}
 	return false, nil
 }
 
-type stubMemberRepo struct{}
+type mockMemberRepo struct{}
 
-func (s *stubMemberRepo) Save(_ context.Context, _ *domainTeam.TeamMember) error {
+func (m *mockMemberRepo) Save(_ context.Context, _ *domainTeam.TeamMember) error {
 	return nil
 }
-func (s *stubMemberRepo) FindByTeam(_ context.Context, _ string) ([]*domainTeam.TeamMember, error) {
+func (m *mockMemberRepo) FindByTeam(_ context.Context, _ string) ([]*domainTeam.TeamMember, error) {
 	return nil, nil
 }
 
-type stubUserProvider struct{}
+type mockUserProvider struct{}
 
-func (s *stubUserProvider) GetDisplay(_ context.Context, _ string) (*appTeam.UserDisplay, error) {
+func (m *mockUserProvider) GetDisplay(_ context.Context, _ string) (*appTeam.UserDisplay, error) {
 	return &appTeam.UserDisplay{Nickname: "testuser"}, nil
 }
 
-type stubTxManager struct{}
+type mockTxManager struct{}
 
-func (s *stubTxManager) WithTx(ctx context.Context, fn func(context.Context) error) error {
+func (m *mockTxManager) WithTx(ctx context.Context, fn func(context.Context) error) error {
 	return fn(ctx)
 }
 
@@ -66,13 +67,8 @@ func (m *mockTokenSvc) ValidateToken(_ string) (*domainUser.TokenClaims, error) 
 
 // ── helpers ──────────────────────────────────────────────────────────────────
 
-func stubHandler() *Handler {
-	return NewHandler(appTeam.NewCreateTeamUseCase(
-		&stubTeamRepo{},
-		&stubMemberRepo{},
-		&stubUserProvider{},
-		&stubTxManager{},
-	))
+func newHandlerWithCreate(teamRepo domainTeam.Repository, memberRepo domainTeam.MemberRepository, userProvider appTeam.UserProvider, txManager appshared.TransactionManager) *Handler {
+	return NewHandler(appTeam.NewCreateTeamUseCase(teamRepo, memberRepo, userProvider, txManager))
 }
 
 func wrapAuth(h http.Handler) http.Handler {
@@ -89,7 +85,7 @@ func authedPostRequest(target, body string) *http.Request {
 // ── tests ─────────────────────────────────────────────────────────────────────
 
 func TestCreate_UnauthenticatedReturns401(t *testing.T) {
-	h := stubHandler()
+	h := newHandlerWithCreate(&mockTeamRepo{}, &mockMemberRepo{}, &mockUserProvider{}, &mockTxManager{})
 	w := httptest.NewRecorder()
 	r := httptest.NewRequest("POST", "/teams", nil)
 	wrapAuth(http.HandlerFunc(h.Create)).ServeHTTP(w, r)
@@ -99,7 +95,7 @@ func TestCreate_UnauthenticatedReturns401(t *testing.T) {
 }
 
 func TestCreate_InvalidJSONReturns400(t *testing.T) {
-	h := stubHandler()
+	h := newHandlerWithCreate(&mockTeamRepo{}, &mockMemberRepo{}, &mockUserProvider{}, &mockTxManager{})
 	w := httptest.NewRecorder()
 	r := authedPostRequest("/teams", `{invalid json}`)
 	wrapAuth(http.HandlerFunc(h.Create)).ServeHTTP(w, r)
@@ -109,7 +105,7 @@ func TestCreate_InvalidJSONReturns400(t *testing.T) {
 }
 
 func TestCreate_EmptyNameReturns400(t *testing.T) {
-	h := stubHandler()
+	h := newHandlerWithCreate(&mockTeamRepo{}, &mockMemberRepo{}, &mockUserProvider{}, &mockTxManager{})
 	w := httptest.NewRecorder()
 	r := authedPostRequest("/teams", `{"name":""}`)
 	wrapAuth(http.HandlerFunc(h.Create)).ServeHTTP(w, r)
@@ -126,7 +122,7 @@ func TestCreate_EmptyNameReturns400(t *testing.T) {
 }
 
 func TestCreate_ValidRequestReturns201(t *testing.T) {
-	h := stubHandler()
+	h := newHandlerWithCreate(&mockTeamRepo{}, &mockMemberRepo{}, &mockUserProvider{}, &mockTxManager{})
 	w := httptest.NewRecorder()
 	r := authedPostRequest("/teams", `{"name":"Alpha Team"}`)
 	wrapAuth(http.HandlerFunc(h.Create)).ServeHTTP(w, r)
@@ -152,10 +148,10 @@ func TestCreate_ValidRequestReturns201(t *testing.T) {
 }
 
 func TestCreate_DuplicateNameReturns409(t *testing.T) {
-	repo := &stubTeamRepo{
+	repo := &mockTeamRepo{
 		existsByNameFn: func(_ domainTeam.TeamName) (bool, error) { return true, nil },
 	}
-	h := NewHandler(appTeam.NewCreateTeamUseCase(repo, &stubMemberRepo{}, &stubUserProvider{}, &stubTxManager{}))
+	h := newHandlerWithCreate(repo, &mockMemberRepo{}, &mockUserProvider{}, &mockTxManager{})
 	w := httptest.NewRecorder()
 	r := authedPostRequest("/teams", `{"name":"Alpha Team"}`)
 	wrapAuth(http.HandlerFunc(h.Create)).ServeHTTP(w, r)
@@ -172,7 +168,7 @@ func TestCreate_DuplicateNameReturns409(t *testing.T) {
 }
 
 func TestCreate_ResponseContainsJoinedAt(t *testing.T) {
-	h := stubHandler()
+	h := newHandlerWithCreate(&mockTeamRepo{}, &mockMemberRepo{}, &mockUserProvider{}, &mockTxManager{})
 	w := httptest.NewRecorder()
 	r := authedPostRequest("/teams", `{"name":"Beta Team"}`)
 	wrapAuth(http.HandlerFunc(h.Create)).ServeHTTP(w, r)

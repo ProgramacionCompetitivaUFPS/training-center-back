@@ -328,10 +328,9 @@ func main() {
 	teamRepo := adapterteam.NewRepository(dbPool)
 	teamMemberRepo := adapterteam.NewMemberRepository(dbPool)
 	teamUserProvider := adapterteam.NewUserProvider(dbPool)
-	teamTxManager := postgres.NewTransactionManager(dbPool)
 
 	// team use cases
-	createTeamUseCase := appteam.NewCreateTeamUseCase(teamRepo, teamMemberRepo, teamUserProvider, teamTxManager)
+	createTeamUseCase := appteam.NewCreateTeamUseCase(teamRepo, teamMemberRepo, teamUserProvider, txManager)
 
 	teamHandler := handlerteam.NewHandler(createTeamUseCase)
 

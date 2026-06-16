@@ -5,7 +5,6 @@ import (
 	"log/slog"
 	"time"
 
-	"github.com/jackc/pgx/v5/pgxpool"
 	infraPostgres "github.com/training-judge-center/backend/internal/adapter/postgres"
 	"github.com/training-judge-center/backend/internal/domain/shared"
 	domainTeam "github.com/training-judge-center/backend/internal/domain/team"
@@ -13,10 +12,10 @@ import (
 )
 
 type MemberRepository struct {
-	db *pgxpool.Pool
+	db infraPostgres.Querier
 }
 
-func NewMemberRepository(db *pgxpool.Pool) *MemberRepository {
+func NewMemberRepository(db infraPostgres.Querier) *MemberRepository {
 	return &MemberRepository{db: db}
 }
 

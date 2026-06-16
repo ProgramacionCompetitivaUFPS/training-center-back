@@ -80,7 +80,7 @@ func (m *mockTxManager) WithTx(ctx context.Context, fn func(context.Context) err
 
 // ── helpers ──────────────────────────────────────────────────────────────────
 
-func newUC(teamRepo *mockTeamRepository, memberRepo *mockMemberRepository) *CreateTeamUseCase {
+func newCreateTeamUseCase(teamRepo *mockTeamRepository, memberRepo *mockMemberRepository) *CreateTeamUseCase {
 	if memberRepo == nil {
 		memberRepo = &mockMemberRepository{}
 	}

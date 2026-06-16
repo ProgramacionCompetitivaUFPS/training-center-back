@@ -9,7 +9,7 @@ import (
 )
 
 func TestCreateTeam_ValidContestantCreatesTeam(t *testing.T) {
-	uc := newUC(&mockTeamRepository{}, nil)
+	uc := newCreateTeamUseCase(&mockTeamRepository{}, nil)
 
 	out, err := uc.Execute(context.Background(), validInput(asContestant("u1")))
 	if err != nil {
@@ -36,7 +36,7 @@ func TestCreateTeam_ValidContestantCreatesTeam(t *testing.T) {
 }
 
 func TestCreateTeam_EmptyNameReturnsValidationError(t *testing.T) {
-	uc := newUC(&mockTeamRepository{}, nil)
+	uc := newCreateTeamUseCase(&mockTeamRepository{}, nil)
 
 	_, err := uc.Execute(context.Background(), CreateTeamInput{
 		Name:        "",
@@ -55,7 +55,7 @@ func TestCreateTeam_DuplicateNameReturnsConflict(t *testing.T) {
 	repo := &mockTeamRepository{
 		existsByNameFn: func(_ domainTeam.TeamName) (bool, error) { return true, nil },
 	}
-	uc := newUC(repo, nil)
+	uc := newCreateTeamUseCase(repo, nil)
 
 	_, err := uc.Execute(context.Background(), validInput(asContestant("u1")))
 	ae, ok := err.(*apperror.AppError)
@@ -66,7 +66,7 @@ func TestCreateTeam_DuplicateNameReturnsConflict(t *testing.T) {
 
 func TestCreateTeam_RepoSaveFailureReturnsInternal(t *testing.T) {
 	repo := &mockTeamRepository{saveErr: apperror.NewInternal()}
-	uc := newUC(repo, nil)
+	uc := newCreateTeamUseCase(repo, nil)
 
 	_, err := uc.Execute(context.Background(), validInput(asContestant("u1")))
 	ae, ok := err.(*apperror.AppError)
@@ -76,7 +76,7 @@ func TestCreateTeam_RepoSaveFailureReturnsInternal(t *testing.T) {
 }
 
 func TestCreateTeam_CreatorIsFirstMember(t *testing.T) {
-	uc := newUC(&mockTeamRepository{}, nil)
+	uc := newCreateTeamUseCase(&mockTeamRepository{}, nil)
 
 	out, err := uc.Execute(context.Background(), validInput(asAdmin("admin-1")))
 	if err != nil {

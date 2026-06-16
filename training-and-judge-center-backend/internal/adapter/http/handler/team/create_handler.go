@@ -3,6 +3,7 @@ package team
 import (
 	"encoding/json"
 	"net/http"
+	"time"
 
 	"github.com/training-judge-center/backend/internal/adapter/http/handler"
 	appTeam "github.com/training-judge-center/backend/internal/application/team"
@@ -13,18 +14,18 @@ type createTeamRequest struct {
 	Name string `json:"name"`
 }
 
-type memberResponse struct {
+type member struct {
 	UserID   string `json:"userId"`
 	Nickname string `json:"nickname"`
 	JoinedAt string `json:"joinedAt"`
 }
 
 type createTeamResponse struct {
-	ID        string           `json:"id"`
-	Name      string           `json:"name"`
-	CreatedBy string           `json:"createdBy"`
-	CreatedAt string           `json:"createdAt"`
-	Members   []memberResponse `json:"members"`
+	ID        string   `json:"id"`
+	Name      string   `json:"name"`
+	CreatedBy string   `json:"createdBy"`
+	CreatedAt string   `json:"createdAt"`
+	Members   []member `json:"members"`
 }
 
 // @Summary      Create team
@@ -61,12 +62,12 @@ func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	members := make([]memberResponse, len(out.Members))
+	members := make([]member, len(out.Members))
 	for i, m := range out.Members {
-		members[i] = memberResponse{
+		members[i] = member{
 			UserID:   m.UserID,
 			Nickname: m.Nickname,
-			JoinedAt: m.JoinedAt.Format("2006-01-02T15:04:05Z"),
+			JoinedAt: m.JoinedAt.UTC().Format(time.RFC3339),
 		}
 	}
 
@@ -74,7 +75,7 @@ func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
 		ID:        out.ID,
 		Name:      out.Name,
 		CreatedBy: out.CreatedBy,
-		CreatedAt: out.CreatedAt.Format("2006-01-02T15:04:05Z"),
+		CreatedAt: out.CreatedAt.UTC().Format(time.RFC3339),
 		Members:   members,
 	})
 }
