@@ -3383,12 +3383,6 @@ const docTemplate = `{
                             "$ref": "#/definitions/apperror.AppError"
                         }
                     },
-                    "403": {
-                        "description": "Forbidden",
-                        "schema": {
-                            "$ref": "#/definitions/apperror.AppError"
-                        }
-                    },
                     "404": {
                         "description": "Not Found",
                         "schema": {

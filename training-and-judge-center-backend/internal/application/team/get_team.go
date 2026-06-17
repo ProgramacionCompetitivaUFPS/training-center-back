@@ -4,15 +4,11 @@ import (
 	"context"
 	"time"
 
-	appshared "github.com/training-judge-center/backend/internal/application/shared"
 	domainTeam "github.com/training-judge-center/backend/internal/domain/team"
-	"github.com/training-judge-center/backend/internal/domain/shared"
-	"github.com/training-judge-center/backend/pkg/apperror"
 )
 
 type GetTeamInput struct {
-	TeamID      string
-	CurrentUser appshared.CurrentUser
+	TeamID string
 }
 
 type TeamMemberOutput struct {
@@ -53,11 +49,6 @@ func (uc *GetTeamUseCase) Execute(ctx context.Context, in GetTeamInput) (*GetTea
 	members, err := uc.memberRepo.FindByTeam(ctx, team.ID())
 	if err != nil {
 		return nil, err
-	}
-
-	viewerID := shared.RestoreUserID(in.CurrentUser.ID)
-	if !in.CurrentUser.IsAdmin() && !isMember(members, viewerID) {
-		return nil, apperror.NewForbidden(domainTeam.ErrCodeNotTeamMember, "Only team members can view team details")
 	}
 
 	seen := make(map[string]struct{}, len(members)+1)
@@ -107,11 +98,3 @@ func (uc *GetTeamUseCase) Execute(ctx context.Context, in GetTeamInput) (*GetTea
 	}, nil
 }
 
-func isMember(members []*domainTeam.TeamMember, userID shared.UserID) bool {
-	for _, m := range members {
-		if m.UserID().Value() == userID.Value() {
-			return true
-		}
-	}
-	return false
-}

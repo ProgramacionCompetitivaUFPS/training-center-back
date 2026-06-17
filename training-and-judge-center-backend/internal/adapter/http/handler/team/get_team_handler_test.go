@@ -21,7 +21,6 @@ func TestGetTeam_UnauthenticatedReturns401(t *testing.T) {
 	h := newHandlerWithGetTeam(&mockTeamRepo{}, &mockMemberRepo{}, &mockUserProvider{})
 	w := httptest.NewRecorder()
 	r := httptest.NewRequest("GET", "/teams/t1", nil)
-
 	wrapAuth(http.HandlerFunc(h.GetTeam)).ServeHTTP(w, r)
 	if w.Code != http.StatusUnauthorized {
 		t.Fatalf("expected 401, got %d", w.Code)
@@ -43,37 +42,7 @@ func TestGetTeam_NotFoundReturns404(t *testing.T) {
 	}
 }
 
-func TestGetTeam_NonMemberReturns403(t *testing.T) {
-	now := time.Now()
-	team := domainTeam.RestoreTeam("t1", domainTeam.RestoreTeamName("Alpha"), shared.RestoreUserID("creator"), now)
-	creator := domainTeam.RestoreTeamMember("m1", "t1", shared.RestoreUserID("creator"), now)
-
-	teamRepo := &mockTeamRepo{
-		findByIDFn: func(_ string) (*domainTeam.Team, error) { return team, nil },
-	}
-	memberRepo := &mockMemberRepo{
-		findByTeamFn: func(_ string) ([]*domainTeam.TeamMember, error) {
-			return []*domainTeam.TeamMember{creator}, nil
-		},
-	}
-	h := newHandlerWithGetTeam(teamRepo, memberRepo, &mockUserProvider{})
-	w := httptest.NewRecorder()
-	r := authedGetRequest("/teams/t1")
-
-	wrapAuth(http.HandlerFunc(h.GetTeam)).ServeHTTP(w, r)
-	if w.Code != http.StatusForbidden {
-		t.Fatalf("expected 403, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-	var body apperror.AppError
-	if err := json.NewDecoder(w.Body).Decode(&body); err != nil {
-		t.Fatalf("could not decode response: %v", err)
-	}
-	if body.Code != domainTeam.ErrCodeNotTeamMember {
-		t.Errorf("expected NOT_TEAM_MEMBER, got %s", body.Code)
-	}
-}
-
-func TestGetTeam_MemberReturns200WithMembers(t *testing.T) {
+func TestGetTeam_AnyAuthenticatedUserCanView(t *testing.T) {
 	now := time.Now()
 	uid := shared.RestoreUserID("u1")
 	team := domainTeam.RestoreTeam("t1", domainTeam.RestoreTeamName("Alpha"), uid, now)
@@ -100,7 +69,6 @@ func TestGetTeam_MemberReturns200WithMembers(t *testing.T) {
 	h := newHandlerWithGetTeam(teamRepo, memberRepo, userProv)
 	w := httptest.NewRecorder()
 	r := authedGetRequest("/teams/t1")
-
 	wrapAuth(http.HandlerFunc(h.GetTeam)).ServeHTTP(w, r)
 
 	if w.Code != http.StatusOK {

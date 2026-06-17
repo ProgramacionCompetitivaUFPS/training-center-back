@@ -35,11 +35,10 @@ type getTeamResponse struct {
 // @Param        teamId path string true "Team ID"
 // @Success      200 {object} getTeamResponse
 // @Failure      401 {object} apperror.AppError
-// @Failure      403 {object} apperror.AppError
 // @Failure      404 {object} apperror.AppError
 // @Router       /teams/{teamId} [get]
 func (h *Handler) GetTeam(w http.ResponseWriter, r *http.Request) {
-	currentUser, ok := h.requireCurrentUser(w, r)
+	_, ok := h.requireCurrentUser(w, r)
 	if !ok {
 		return
 	}
@@ -47,8 +46,7 @@ func (h *Handler) GetTeam(w http.ResponseWriter, r *http.Request) {
 	teamID := chi.URLParam(r, "teamId")
 
 	out, err := h.getTeam.Execute(r.Context(), appTeam.GetTeamInput{
-		TeamID:      teamID,
-		CurrentUser: *currentUser,
+		TeamID: teamID,
 	})
 	if err != nil {
 		handler.WriteError(r.Context(), w, err)
