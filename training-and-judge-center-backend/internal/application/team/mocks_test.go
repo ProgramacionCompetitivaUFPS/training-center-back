@@ -144,6 +144,7 @@ type mockInvitationRepository struct {
 	findByIDFn              func(id string) (*domainTeam.TeamInvitation, error)
 	findByTeamAndInviteeFn  func(teamID string, inviteeID shared.UserID) (*domainTeam.TeamInvitation, error)
 	findByInviteeFn         func(inviteeID shared.UserID) ([]*domainTeam.TeamInvitation, error)
+	deleteFn                func(id string) error
 	deleteErr               error
 }
 
@@ -172,7 +173,10 @@ func (m *mockInvitationRepository) FindByInvitee(_ context.Context, inviteeID sh
 	return []*domainTeam.TeamInvitation{}, nil
 }
 
-func (m *mockInvitationRepository) Delete(_ context.Context, _ string) error {
+func (m *mockInvitationRepository) Delete(_ context.Context, id string) error {
+	if m.deleteFn != nil {
+		return m.deleteFn(id)
+	}
 	return m.deleteErr
 }
 

@@ -109,10 +109,13 @@ func (r *MemberRepository) FindByTeamAndUser(ctx context.Context, teamID string,
 
 func (r *MemberRepository) DeleteByTeamAndUser(ctx context.Context, teamID string, userID shared.UserID) error {
 	const q = `DELETE FROM team_members WHERE team_id = $1 AND user_id = $2`
-	_, err := infraPostgres.GetQuerier(ctx, r.db).Exec(ctx, q, teamID, userID.Value())
+	tag, err := infraPostgres.GetQuerier(ctx, r.db).Exec(ctx, q, teamID, userID.Value())
 	if err != nil {
 		slog.ErrorContext(ctx, "failed to delete team member", "error", err, "team_id", teamID, "user_id", userID.Value())
 		return apperror.NewInternal()
+	}
+	if tag.RowsAffected() == 0 {
+		return apperror.NewNotFound(domainTeam.ErrCodeNotTeamMember, "User is not a member of this team")
 	}
 	return nil
 }

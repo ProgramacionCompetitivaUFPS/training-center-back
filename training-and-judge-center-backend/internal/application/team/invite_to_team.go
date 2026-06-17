@@ -79,6 +79,11 @@ func (uc *InviteToTeamUseCase) Execute(ctx context.Context, in InviteToTeamInput
 		return nil, err
 	}
 
+	requesterDisplay, err := uc.userProvider.GetDisplay(ctx, in.CurrentUser.ID)
+	if err != nil {
+		return nil, err
+	}
+
 	inv, err := domainTeam.NewTeamInvitation(uuid.New().String(), in.TeamID, inviteeID, requesterID, now)
 	if err != nil {
 		return nil, err
@@ -88,28 +93,16 @@ func (uc *InviteToTeamUseCase) Execute(ctx context.Context, in InviteToTeamInput
 		return nil, err
 	}
 
-	displays, err := uc.userProvider.GetDisplays(ctx, []string{invitee.ID, in.CurrentUser.ID})
-	if err != nil {
-		return nil, err
-	}
-
-	nickname := func(id string) string {
-		if d := displays[id]; d != nil {
-			return d.Nickname
-		}
-		return ""
-	}
-
 	return &InviteToTeamOutput{
 		ID:     inv.ID(),
 		TeamID: inv.TeamID(),
 		InviteeUser: UserDisplay{
 			ID:       invitee.ID,
-			Nickname: nickname(invitee.ID),
+			Nickname: invitee.Nickname,
 		},
 		InvitedBy: UserDisplay{
 			ID:       in.CurrentUser.ID,
-			Nickname: nickname(in.CurrentUser.ID),
+			Nickname: requesterDisplay.Nickname,
 		},
 		CreatedAt: inv.CreatedAt(),
 	}, nil

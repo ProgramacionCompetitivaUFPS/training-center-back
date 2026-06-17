@@ -21,16 +21,16 @@ func NewUserProvider(db infraPostgres.Querier) *UserProvider {
 }
 
 func (p *UserProvider) GetDisplay(ctx context.Context, userID string) (*appTeam.UserDisplay, error) {
-	var nickname string
-	err := infraPostgres.GetQuerier(ctx, p.db).QueryRow(ctx, `SELECT nickname FROM users WHERE id = $1`, userID).Scan(&nickname)
+	var id, nickname string
+	err := infraPostgres.GetQuerier(ctx, p.db).QueryRow(ctx, `SELECT id, nickname FROM users WHERE id = $1`, userID).Scan(&id, &nickname)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			return nil, nil
+			return nil, apperror.NewNotFound(domainTeam.ErrCodeUserNotFound, "User not found")
 		}
 		slog.ErrorContext(ctx, "GetDisplay query failed", "error", err, "user_id", userID)
 		return nil, apperror.NewInternal()
 	}
-	return &appTeam.UserDisplay{Nickname: nickname}, nil
+	return &appTeam.UserDisplay{ID: id, Nickname: nickname}, nil
 }
 
 func (p *UserProvider) GetDisplays(ctx context.Context, userIDs []string) (map[string]*appTeam.UserDisplay, error) {
@@ -63,7 +63,7 @@ func (p *UserProvider) GetDisplays(ctx context.Context, userIDs []string) (map[s
 }
 
 func (p *UserProvider) FindByNickname(ctx context.Context, nickname string) (*appTeam.UserDisplay, error) {
-	const q = `SELECT id, nickname FROM users WHERE nickname = $1`
+	const q = `SELECT id, nickname FROM users WHERE LOWER(nickname) = LOWER($1)`
 	var id, nick string
 	err := infraPostgres.GetQuerier(ctx, p.db).QueryRow(ctx, q, nickname).Scan(&id, &nick)
 	if err != nil {

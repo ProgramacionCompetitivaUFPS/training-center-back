@@ -98,10 +98,13 @@ func (r *InvitationRepository) FindByInvitee(ctx context.Context, inviteeID shar
 
 func (r *InvitationRepository) Delete(ctx context.Context, id string) error {
 	const q = `DELETE FROM team_invitations WHERE id = $1`
-	_, err := infraPostgres.GetQuerier(ctx, r.db).Exec(ctx, q, id)
+	tag, err := infraPostgres.GetQuerier(ctx, r.db).Exec(ctx, q, id)
 	if err != nil {
 		slog.ErrorContext(ctx, "failed to delete team invitation", "error", err, "invitation_id", id)
 		return apperror.NewInternal()
+	}
+	if tag.RowsAffected() == 0 {
+		return apperror.NewNotFound(domainTeam.ErrCodeInvitationNotFound, "Invitation not found")
 	}
 	return nil
 }

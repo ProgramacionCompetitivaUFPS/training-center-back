@@ -44,12 +44,17 @@ func TestAcceptInvitation_WrongUserReturns403(t *testing.T) {
 }
 
 func TestAcceptInvitation_SuccessCreatesMember(t *testing.T) {
+	var deletedID string
 	invRepo := &mockInvitationRepository{
 		findByIDFn: func(_ string) (*domainTeam.TeamInvitation, error) {
 			return domainTeam.RestoreTeamInvitation("inv1", "t1",
 				domainShared.RestoreUserID("u2"),
 				domainShared.RestoreUserID("u1"),
 				time.Now()), nil
+		},
+		deleteFn: func(id string) error {
+			deletedID = id
+			return nil
 		},
 	}
 	uc := NewAcceptInvitationUseCase(invRepo, &mockMemberRepository{}, &mockTxManager{})
@@ -63,5 +68,8 @@ func TestAcceptInvitation_SuccessCreatesMember(t *testing.T) {
 	}
 	if out.JoinedAt.IsZero() {
 		t.Error("expected non-zero JoinedAt")
+	}
+	if deletedID != "inv1" {
+		t.Errorf("expected Delete called with inv1, got %q", deletedID)
 	}
 }

@@ -47,9 +47,15 @@ func TestLeaveTeam_ActiveContestReturns409(t *testing.T) {
 }
 
 func TestLeaveTeam_SuccessDeletes(t *testing.T) {
+	var deletedTeam, deletedUser string
 	memberRepo := &mockMemberRepository{
 		findByTeamAndUserFn: func(_ string, userID domainShared.UserID) (*domainTeam.TeamMember, error) {
 			return makeMember("m1", "t1", userID.Value(), time.Now()), nil
+		},
+		deleteByTeamAndUserFn: func(teamID string, userID domainShared.UserID) error {
+			deletedTeam = teamID
+			deletedUser = userID.Value()
+			return nil
 		},
 	}
 	uc := NewLeaveTeamUseCase(memberRepo, &mockContestChecker{})
@@ -58,5 +64,8 @@ func TestLeaveTeam_SuccessDeletes(t *testing.T) {
 		TeamID:      "t1",
 	}); err != nil {
 		t.Fatalf("unexpected error: %v", err)
+	}
+	if deletedTeam != "t1" || deletedUser != "u1" {
+		t.Errorf("expected Delete(t1, u1), got Delete(%q, %q)", deletedTeam, deletedUser)
 	}
 }
