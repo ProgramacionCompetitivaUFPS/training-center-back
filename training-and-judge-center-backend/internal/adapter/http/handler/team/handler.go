@@ -11,20 +11,35 @@ import (
 )
 
 type Handler struct {
-	createTeam  *appTeam.CreateTeamUseCase
-	listMyTeams *appTeam.ListMyTeamsUseCase
-	getTeam     *appTeam.GetTeamUseCase
+	createTeam        *appTeam.CreateTeamUseCase
+	listMyTeams       *appTeam.ListMyTeamsUseCase
+	getTeam           *appTeam.GetTeamUseCase
+	inviteToTeam      *appTeam.InviteToTeamUseCase
+	listMyInvitations *appTeam.ListMyInvitationsUseCase
+	acceptInvitation  *appTeam.AcceptInvitationUseCase
+	rejectInvitation  *appTeam.RejectInvitationUseCase
+	leaveTeam         *appTeam.LeaveTeamUseCase
 }
 
 func NewHandler(
 	createTeam *appTeam.CreateTeamUseCase,
 	listMyTeams *appTeam.ListMyTeamsUseCase,
 	getTeam *appTeam.GetTeamUseCase,
+	inviteToTeam *appTeam.InviteToTeamUseCase,
+	listMyInvitations *appTeam.ListMyInvitationsUseCase,
+	acceptInvitation *appTeam.AcceptInvitationUseCase,
+	rejectInvitation *appTeam.RejectInvitationUseCase,
+	leaveTeam *appTeam.LeaveTeamUseCase,
 ) *Handler {
 	return &Handler{
-		createTeam:  createTeam,
-		listMyTeams: listMyTeams,
-		getTeam:     getTeam,
+		createTeam:        createTeam,
+		listMyTeams:       listMyTeams,
+		getTeam:           getTeam,
+		inviteToTeam:      inviteToTeam,
+		listMyInvitations: listMyInvitations,
+		acceptInvitation:  acceptInvitation,
+		rejectInvitation:  rejectInvitation,
+		leaveTeam:         leaveTeam,
 	}
 }
 

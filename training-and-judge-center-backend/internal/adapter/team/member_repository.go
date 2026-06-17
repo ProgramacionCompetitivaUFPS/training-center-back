@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"time"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 	infraPostgres "github.com/training-judge-center/backend/internal/adapter/postgres"
 	"github.com/training-judge-center/backend/internal/domain/shared"
@@ -89,6 +90,31 @@ func (r *MemberRepository) FindByUser(ctx context.Context, userID shared.UserID)
 		return nil, apperror.NewInternal()
 	}
 	return members, nil
+}
+
+func (r *MemberRepository) FindByTeamAndUser(ctx context.Context, teamID string, userID shared.UserID) (*domainTeam.TeamMember, error) {
+	const q = `SELECT id, team_id, user_id, joined_at FROM team_members WHERE team_id = $1 AND user_id = $2`
+	var id, tmID, uid string
+	var joinedAt time.Time
+	err := infraPostgres.GetQuerier(ctx, r.db).QueryRow(ctx, q, teamID, userID.Value()).Scan(&id, &tmID, &uid, &joinedAt)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, apperror.NewNotFound(domainTeam.ErrCodeNotTeamMember, "User is not a member of this team")
+		}
+		slog.ErrorContext(ctx, "failed to find team member by team and user", "error", err)
+		return nil, apperror.NewInternal()
+	}
+	return domainTeam.RestoreTeamMember(id, tmID, shared.RestoreUserID(uid), joinedAt), nil
+}
+
+func (r *MemberRepository) DeleteByTeamAndUser(ctx context.Context, teamID string, userID shared.UserID) error {
+	const q = `DELETE FROM team_members WHERE team_id = $1 AND user_id = $2`
+	_, err := infraPostgres.GetQuerier(ctx, r.db).Exec(ctx, q, teamID, userID.Value())
+	if err != nil {
+		slog.ErrorContext(ctx, "failed to delete team member", "error", err, "team_id", teamID, "user_id", userID.Value())
+		return apperror.NewInternal()
+	}
+	return nil
 }
 
 func (r *MemberRepository) BulkCountByTeams(ctx context.Context, teamIDs []string) (map[string]int, error) {

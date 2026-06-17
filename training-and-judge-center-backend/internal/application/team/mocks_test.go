@@ -57,10 +57,12 @@ func (m *mockTeamRepository) ExistsByName(_ context.Context, name domainTeam.Tea
 // ── mockMemberRepository ─────────────────────────────────────────────────────
 
 type mockMemberRepository struct {
-	saveErr      error
-	findByTeamFn func(teamID string) ([]*domainTeam.TeamMember, error)
-	findByUserFn func(userID shared.UserID) ([]*domainTeam.TeamMember, error)
-	bulkCountFn  func(teamIDs []string) (map[string]int, error)
+	saveErr              error
+	findByTeamFn         func(teamID string) ([]*domainTeam.TeamMember, error)
+	findByTeamAndUserFn  func(teamID string, userID shared.UserID) (*domainTeam.TeamMember, error)
+	findByUserFn         func(userID shared.UserID) ([]*domainTeam.TeamMember, error)
+	bulkCountFn          func(teamIDs []string) (map[string]int, error)
+	deleteByTeamAndUserFn func(teamID string, userID shared.UserID) error
 }
 
 func (m *mockMemberRepository) Save(_ context.Context, _ *domainTeam.TeamMember) error {
@@ -72,6 +74,13 @@ func (m *mockMemberRepository) FindByTeam(_ context.Context, teamID string) ([]*
 		return m.findByTeamFn(teamID)
 	}
 	return []*domainTeam.TeamMember{}, nil
+}
+
+func (m *mockMemberRepository) FindByTeamAndUser(_ context.Context, teamID string, userID shared.UserID) (*domainTeam.TeamMember, error) {
+	if m.findByTeamAndUserFn != nil {
+		return m.findByTeamAndUserFn(teamID, userID)
+	}
+	return nil, apperror.NewNotFound(domainTeam.ErrCodeNotTeamMember, "not a member")
 }
 
 func (m *mockMemberRepository) FindByUser(_ context.Context, userID shared.UserID) ([]*domainTeam.TeamMember, error) {
@@ -88,11 +97,19 @@ func (m *mockMemberRepository) BulkCountByTeams(_ context.Context, teamIDs []str
 	return map[string]int{}, nil
 }
 
+func (m *mockMemberRepository) DeleteByTeamAndUser(_ context.Context, teamID string, userID shared.UserID) error {
+	if m.deleteByTeamAndUserFn != nil {
+		return m.deleteByTeamAndUserFn(teamID, userID)
+	}
+	return nil
+}
+
 // ── mockUserProvider ─────────────────────────────────────────────────────────
 
 type mockUserProvider struct {
-	displayFn  func(userID string) (*UserDisplay, error)
-	displaysFn func(userIDs []string) (map[string]*UserDisplay, error)
+	displayFn       func(userID string) (*UserDisplay, error)
+	displaysFn      func(userIDs []string) (map[string]*UserDisplay, error)
+	findByNicknameFn func(nickname string) (*UserDisplay, error)
 }
 
 func (m *mockUserProvider) GetDisplay(_ context.Context, userID string) (*UserDisplay, error) {
@@ -108,9 +125,68 @@ func (m *mockUserProvider) GetDisplays(_ context.Context, userIDs []string) (map
 	}
 	result := make(map[string]*UserDisplay, len(userIDs))
 	for _, id := range userIDs {
-		result[id] = &UserDisplay{Nickname: "testuser"}
+		result[id] = &UserDisplay{ID: id, Nickname: "testuser"}
 	}
 	return result, nil
+}
+
+func (m *mockUserProvider) FindByNickname(_ context.Context, nickname string) (*UserDisplay, error) {
+	if m.findByNicknameFn != nil {
+		return m.findByNicknameFn(nickname)
+	}
+	return &UserDisplay{ID: "default-user-id", Nickname: nickname}, nil
+}
+
+// ── mockInvitationRepository ─────────────────────────────────────────────────
+
+type mockInvitationRepository struct {
+	saveErr                 error
+	findByIDFn              func(id string) (*domainTeam.TeamInvitation, error)
+	findByTeamAndInviteeFn  func(teamID string, inviteeID shared.UserID) (*domainTeam.TeamInvitation, error)
+	findByInviteeFn         func(inviteeID shared.UserID) ([]*domainTeam.TeamInvitation, error)
+	deleteErr               error
+}
+
+func (m *mockInvitationRepository) Save(_ context.Context, _ *domainTeam.TeamInvitation) error {
+	return m.saveErr
+}
+
+func (m *mockInvitationRepository) FindByID(_ context.Context, id string) (*domainTeam.TeamInvitation, error) {
+	if m.findByIDFn != nil {
+		return m.findByIDFn(id)
+	}
+	return nil, apperror.NewNotFound(domainTeam.ErrCodeInvitationNotFound, "invitation not found")
+}
+
+func (m *mockInvitationRepository) FindByTeamAndInvitee(_ context.Context, teamID string, inviteeID shared.UserID) (*domainTeam.TeamInvitation, error) {
+	if m.findByTeamAndInviteeFn != nil {
+		return m.findByTeamAndInviteeFn(teamID, inviteeID)
+	}
+	return nil, apperror.NewNotFound(domainTeam.ErrCodeInvitationNotFound, "invitation not found")
+}
+
+func (m *mockInvitationRepository) FindByInvitee(_ context.Context, inviteeID shared.UserID) ([]*domainTeam.TeamInvitation, error) {
+	if m.findByInviteeFn != nil {
+		return m.findByInviteeFn(inviteeID)
+	}
+	return []*domainTeam.TeamInvitation{}, nil
+}
+
+func (m *mockInvitationRepository) Delete(_ context.Context, _ string) error {
+	return m.deleteErr
+}
+
+// ── mockContestParticipationChecker ──────────────────────────────────────────
+
+type mockContestChecker struct {
+	inActiveFn func(userID, teamID string) (bool, error)
+}
+
+func (m *mockContestChecker) IsUserInActiveContestForTeam(_ context.Context, userID, teamID string) (bool, error) {
+	if m.inActiveFn != nil {
+		return m.inActiveFn(userID, teamID)
+	}
+	return false, nil
 }
 
 // ── mockTxManager ────────────────────────────────────────────────────────────

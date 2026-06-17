@@ -47,10 +47,12 @@ func (m *mockTeamRepo) ExistsByName(_ context.Context, name domainTeam.TeamName)
 }
 
 type mockMemberRepo struct {
-	saveErr      error
-	findByTeamFn func(teamID string) ([]*domainTeam.TeamMember, error)
-	findByUserFn func(userID shared.UserID) ([]*domainTeam.TeamMember, error)
-	bulkCountFn  func(teamIDs []string) (map[string]int, error)
+	saveErr               error
+	findByTeamFn          func(teamID string) ([]*domainTeam.TeamMember, error)
+	findByTeamAndUserFn   func(teamID string, userID shared.UserID) (*domainTeam.TeamMember, error)
+	findByUserFn          func(userID shared.UserID) ([]*domainTeam.TeamMember, error)
+	bulkCountFn           func(teamIDs []string) (map[string]int, error)
+	deleteByTeamAndUserFn func(teamID string, userID shared.UserID) error
 }
 
 func (m *mockMemberRepo) Save(_ context.Context, _ *domainTeam.TeamMember) error { return m.saveErr }
@@ -59,6 +61,12 @@ func (m *mockMemberRepo) FindByTeam(_ context.Context, teamID string) ([]*domain
 		return m.findByTeamFn(teamID)
 	}
 	return []*domainTeam.TeamMember{}, nil
+}
+func (m *mockMemberRepo) FindByTeamAndUser(_ context.Context, teamID string, userID shared.UserID) (*domainTeam.TeamMember, error) {
+	if m.findByTeamAndUserFn != nil {
+		return m.findByTeamAndUserFn(teamID, userID)
+	}
+	return nil, apperror.NewNotFound(domainTeam.ErrCodeNotTeamMember, "not a member")
 }
 func (m *mockMemberRepo) FindByUser(_ context.Context, userID shared.UserID) ([]*domainTeam.TeamMember, error) {
 	if m.findByUserFn != nil {
@@ -72,10 +80,17 @@ func (m *mockMemberRepo) BulkCountByTeams(_ context.Context, teamIDs []string) (
 	}
 	return map[string]int{}, nil
 }
+func (m *mockMemberRepo) DeleteByTeamAndUser(_ context.Context, teamID string, userID shared.UserID) error {
+	if m.deleteByTeamAndUserFn != nil {
+		return m.deleteByTeamAndUserFn(teamID, userID)
+	}
+	return nil
+}
 
 type mockUserProvider struct {
-	displayFn  func(userID string) (*appTeam.UserDisplay, error)
-	displaysFn func(userIDs []string) (map[string]*appTeam.UserDisplay, error)
+	displayFn        func(userID string) (*appTeam.UserDisplay, error)
+	displaysFn       func(userIDs []string) (map[string]*appTeam.UserDisplay, error)
+	findByNicknameFn func(nickname string) (*appTeam.UserDisplay, error)
 }
 
 func (m *mockUserProvider) GetDisplay(_ context.Context, userID string) (*appTeam.UserDisplay, error) {
@@ -90,9 +105,15 @@ func (m *mockUserProvider) GetDisplays(_ context.Context, userIDs []string) (map
 	}
 	result := make(map[string]*appTeam.UserDisplay, len(userIDs))
 	for _, id := range userIDs {
-		result[id] = &appTeam.UserDisplay{Nickname: "testuser"}
+		result[id] = &appTeam.UserDisplay{ID: id, Nickname: "testuser"}
 	}
 	return result, nil
+}
+func (m *mockUserProvider) FindByNickname(_ context.Context, nickname string) (*appTeam.UserDisplay, error) {
+	if m.findByNicknameFn != nil {
+		return m.findByNicknameFn(nickname)
+	}
+	return &appTeam.UserDisplay{ID: "found-user-id", Nickname: nickname}, nil
 }
 
 type mockTxManager struct{}

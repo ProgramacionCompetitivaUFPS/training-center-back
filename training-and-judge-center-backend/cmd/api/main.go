@@ -327,14 +327,30 @@ func main() {
 	// team adapters
 	teamRepo := adapterteam.NewRepository(dbPool)
 	teamMemberRepo := adapterteam.NewMemberRepository(dbPool)
+	teamInvitationRepo := adapterteam.NewInvitationRepository(dbPool)
 	teamUserProvider := adapterteam.NewUserProvider(dbPool)
+	teamContestChecker := &adapterteam.NoOpContestParticipationChecker{}
 
 	// team use cases
 	createTeamUseCase := appteam.NewCreateTeamUseCase(teamRepo, teamMemberRepo, teamUserProvider, txManager)
 	listMyTeamsUseCase := appteam.NewListMyTeamsUseCase(teamRepo, teamMemberRepo)
 	getTeamUseCase := appteam.NewGetTeamUseCase(teamRepo, teamMemberRepo, teamUserProvider)
+	inviteToTeamUseCase := appteam.NewInviteToTeamUseCase(teamRepo, teamMemberRepo, teamInvitationRepo, teamUserProvider)
+	listMyInvitationsUseCase := appteam.NewListMyInvitationsUseCase(teamInvitationRepo, teamRepo, teamUserProvider)
+	acceptInvitationUseCase := appteam.NewAcceptInvitationUseCase(teamInvitationRepo, teamMemberRepo, txManager)
+	rejectInvitationUseCase := appteam.NewRejectInvitationUseCase(teamInvitationRepo)
+	leaveTeamUseCase := appteam.NewLeaveTeamUseCase(teamMemberRepo, teamContestChecker)
 
-	teamHandler := handlerteam.NewHandler(createTeamUseCase, listMyTeamsUseCase, getTeamUseCase)
+	teamHandler := handlerteam.NewHandler(
+		createTeamUseCase,
+		listMyTeamsUseCase,
+		getTeamUseCase,
+		inviteToTeamUseCase,
+		listMyInvitationsUseCase,
+		acceptInvitationUseCase,
+		rejectInvitationUseCase,
+		leaveTeamUseCase,
+	)
 
 	router := adapterhttp.NewRouter(&adapterhttp.Handlers{
 		Problem:  problemHandler,

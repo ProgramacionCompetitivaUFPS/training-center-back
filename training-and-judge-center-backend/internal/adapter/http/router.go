@@ -147,11 +147,21 @@ func NewRouter(h *Handlers, s *Services, allowedOrigins []string) *chi.Mux {
 		r.Route("/teams", func(r chi.Router) {
 			r.Post("/", h.Team.Create)
 			r.Get("/{teamId}", h.Team.GetTeam)
+			r.Route("/{teamId}/invitations", func(r chi.Router) {
+				r.Post("/", h.Team.InviteToTeam)
+			})
+			r.Delete("/{teamId}/members/me", h.Team.LeaveTeam)
+		})
+
+		r.Route("/team-invitations", func(r chi.Router) {
+			r.Post("/{invitationId}/accept", h.Team.AcceptInvitation)
+			r.Delete("/{invitationId}", h.Team.RejectInvitation)
 		})
 
 		r.Get("/users/me", h.User.GetMyProfile)
 		r.Get("/users/me/groups", h.Group.ListMyGroups)
 		r.Get("/users/me/teams", h.Team.ListMyTeams)
+		r.Get("/users/me/team-invitations", h.Team.ListMyInvitations)
 		r.Get("/users/{nickname}", h.User.GetByNickname)
 		r.Put("/users", h.User.UpdateProfile)
 		r.Put("/users/password", h.User.UpdatePassword)
