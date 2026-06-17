@@ -43,16 +43,24 @@ func NewRouter(h *Handlers, s *Services, allowedOrigins []string) *chi.Mux {
 		AllowCredentials: true,
 		MaxAge:           300,
 	}))
+	r.Use(chimw.RequestID)
 	r.Use(chimw.Logger)
 	r.Use(chimw.Recoverer)
-	r.Use(chimw.RequestID)
 
 	r.Get("/swagger/*", httpSwagger.WrapHandler)
 
 	healthHandler := handler2.NewHealthHandler()
 	r.Get("/ping", healthHandler.Ping)
 
-	// Group and Problem routes — require authentication
+	// public
+	r.Post("/users", h.User.Create)
+	r.Post("/password/forgot", h.User.RequestPasswordRecovery)
+	r.Post("/password/reset", h.User.ResetPassword)
+	r.Route("/auth", func(r chi.Router) {
+		r.Post("/login", h.Auth.Login)
+	})
+
+	// authenticated
 	r.Group(func(r chi.Router) {
 		r.Use(middleware.Auth(s.TokenService, s.SessionInvalidator))
 
@@ -135,25 +143,15 @@ func NewRouter(h *Handlers, s *Services, allowedOrigins []string) *chi.Mux {
 				})
 			})
 		})
-	})
 
-	// Public user routes
-	r.Post("/users", h.User.Create)
-	r.Post("/password/forgot", h.User.RequestPasswordRecovery)
-	r.Post("/password/reset", h.User.ResetPassword)
-
-	r.Route("/auth", func(r chi.Router) {
-		r.Post("/login", h.Auth.Login)
-	})
-
-	// Protected routes — authenticated users
-	r.Group(func(r chi.Router) {
-		r.Use(middleware.Auth(s.TokenService, s.SessionInvalidator))
-
-		r.Post("/teams", h.Team.Create)
+		r.Route("/teams", func(r chi.Router) {
+			r.Post("/", h.Team.Create)
+			r.Get("/{teamId}", h.Team.GetTeam)
+		})
 
 		r.Get("/users/me", h.User.GetMyProfile)
 		r.Get("/users/me/groups", h.Group.ListMyGroups)
+		r.Get("/users/me/teams", h.Team.ListMyTeams)
 		r.Get("/users/{nickname}", h.User.GetByNickname)
 		r.Put("/users", h.User.UpdateProfile)
 		r.Put("/users/password", h.User.UpdatePassword)

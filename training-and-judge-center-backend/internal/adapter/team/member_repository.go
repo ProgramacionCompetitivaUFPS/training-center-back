@@ -64,3 +64,59 @@ func (r *MemberRepository) FindByTeam(ctx context.Context, teamID string) ([]*do
 	}
 	return members, nil
 }
+
+func (r *MemberRepository) FindByUser(ctx context.Context, userID shared.UserID) ([]*domainTeam.TeamMember, error) {
+	const q = `SELECT id, team_id, user_id, joined_at FROM team_members WHERE user_id = $1 ORDER BY joined_at DESC`
+	rows, err := infraPostgres.GetQuerier(ctx, r.db).Query(ctx, q, userID.Value())
+	if err != nil {
+		slog.ErrorContext(ctx, "failed to query team members by user", "error", err, "user_id", userID.Value())
+		return nil, apperror.NewInternal()
+	}
+	defer rows.Close()
+
+	members := make([]*domainTeam.TeamMember, 0)
+	for rows.Next() {
+		var id, tmID, uid string
+		var joinedAt time.Time
+		if err := rows.Scan(&id, &tmID, &uid, &joinedAt); err != nil {
+			slog.ErrorContext(ctx, "failed to scan team member row", "error", err)
+			return nil, apperror.NewInternal()
+		}
+		members = append(members, domainTeam.RestoreTeamMember(id, tmID, shared.RestoreUserID(uid), joinedAt))
+	}
+	if err := rows.Err(); err != nil {
+		slog.ErrorContext(ctx, "team members by user rows error", "error", err)
+		return nil, apperror.NewInternal()
+	}
+	return members, nil
+}
+
+func (r *MemberRepository) BulkCountByTeams(ctx context.Context, teamIDs []string) (map[string]int, error) {
+	if len(teamIDs) == 0 {
+		return map[string]int{}, nil
+	}
+
+	const q = `SELECT team_id, COUNT(*) FROM team_members WHERE team_id = ANY($1) GROUP BY team_id`
+	rows, err := infraPostgres.GetQuerier(ctx, r.db).Query(ctx, q, teamIDs)
+	if err != nil {
+		slog.ErrorContext(ctx, "failed to bulk count team members", "error", err)
+		return nil, apperror.NewInternal()
+	}
+	defer rows.Close()
+
+	counts := make(map[string]int, len(teamIDs))
+	for rows.Next() {
+		var teamID string
+		var count int
+		if err := rows.Scan(&teamID, &count); err != nil {
+			slog.ErrorContext(ctx, "failed to scan team member count", "error", err)
+			return nil, apperror.NewInternal()
+		}
+		counts[teamID] = count
+	}
+	if err := rows.Err(); err != nil {
+		slog.ErrorContext(ctx, "bulk count rows error", "error", err)
+		return nil, apperror.NewInternal()
+	}
+	return counts, nil
+}

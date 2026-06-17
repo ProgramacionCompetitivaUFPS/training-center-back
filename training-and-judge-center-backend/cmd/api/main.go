@@ -331,8 +331,10 @@ func main() {
 
 	// team use cases
 	createTeamUseCase := appteam.NewCreateTeamUseCase(teamRepo, teamMemberRepo, teamUserProvider, txManager)
+	listMyTeamsUseCase := appteam.NewListMyTeamsUseCase(teamRepo, teamMemberRepo)
+	getTeamUseCase := appteam.NewGetTeamUseCase(teamRepo, teamMemberRepo, teamUserProvider)
 
-	teamHandler := handlerteam.NewHandler(createTeamUseCase)
+	teamHandler := handlerteam.NewHandler(createTeamUseCase, listMyTeamsUseCase, getTeamUseCase)
 
 	router := adapterhttp.NewRouter(&adapterhttp.Handlers{
 		Problem:  problemHandler,

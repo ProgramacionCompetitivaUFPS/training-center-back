@@ -60,21 +60,21 @@ As a user, I want to see team invitations I've received so that I can accept or 
 
 ### User Story 3 - View team details (Priority: P2)
 
-As a team member, I want to view details of my team so that I can see all members.
+As an authenticated user, I want to view the details of any team so that I can see its members before accepting an invitation or checking contest standings.
 
-**Why this priority**: Team members need to know who else is on the team.
+**Why this priority**: Team composition is public information in a competitive programming context — any authenticated user should be able to look up who is on a team.
 
 **Acceptance Scenarios**:
 
-1. **Scenario**: Team member views team details
-   * **Given** user is a member of a team
+1. **Scenario**: Any authenticated user views team details
+   * **Given** user is authenticated (member or non-member)
    * **When** they request team details
    * **Then** system returns team name, members, and creation info
 
-2. **Scenario**: Non-member tries to view team details
-   * **Given** user is NOT a member of the team
-   * **When** they request team details
-   * **Then** system rejects with 403 Forbidden
+2. **Scenario**: Unauthenticated request
+   * **Given** request has no authentication
+   * **When** team details are requested
+   * **Then** system rejects with 401 Unauthorized
 
 3. **Scenario**: Team not found
    * **Given** no team exists with the provided ID
@@ -105,15 +105,15 @@ As a team member, I want to view details of my team so that I can see all member
 **Team Details**
 
 * **FR-VT-010**: System MUST provide endpoint to view team details.
-* **FR-VT-011**: Only team members MUST be able to view team details.
+* **FR-VT-011**: Any authenticated user MUST be able to view team details.
 * **FR-VT-012**: Team details MUST include all members with their join dates.
 * **FR-VT-013**: Team details MUST include pending invitations (for members only).
-* **FR-VT-014**: Admin MUST be able to view any team's details.
+* **FR-VT-014**: Unauthenticated requests MUST be rejected with 401.
 
 **Privacy**
 
-* **FR-VT-015**: Teams MUST NOT be searchable publicly.
-* **FR-VT-016**: Team access MUST only be through membership or invitation.
+* **FR-VT-015**: Teams MUST NOT be searchable or discoverable publicly (no list-all endpoint).
+* **FR-VT-016**: Users can only find teams by direct ID (e.g., from an invitation or standings).
 
 ---
 
@@ -270,15 +270,6 @@ View details of a specific team.
 
 **Error Responses**:
 
-#### 403 Forbidden
-
-```json
-{
-  "error": "NOT_TEAM_MEMBER",
-  "message": "Only team members can view team details"
-}
-```
-
 #### 404 Not Found
 
 ```json
@@ -292,8 +283,7 @@ View details of a specific team.
 
 ## Notes / Implementation hints
 
-* Teams are private by design - no public search/discovery
-* Users can only find teams through invitations
+* Team details are visible to any authenticated user — team composition is treated as public information (similar to user profiles)
+* Teams are not publicly searchable/discoverable; a user must know the team ID (from an invitation, standings, etc.)
 * Consider caching "my teams" as this is frequently accessed
-* Pending invitations should be filtered server-side (not including expired ones)
-* Admin access to team details is for support/moderation purposes
+* Pending invitations in the detail response should be filtered server-side (not including expired ones) — implemented in T-2

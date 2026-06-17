@@ -53,6 +53,35 @@ func (r *Repository) FindByID(ctx context.Context, id string) (*domainTeam.Team,
 	return domainTeam.RestoreTeam(tid, domainTeam.RestoreTeamName(name), shared.RestoreUserID(createdBy), createdAt), nil
 }
 
+func (r *Repository) FindByIDs(ctx context.Context, ids []string) ([]*domainTeam.Team, error) {
+	if len(ids) == 0 {
+		return []*domainTeam.Team{}, nil
+	}
+	const q = `SELECT id, name, created_by, created_at FROM teams WHERE id = ANY($1)`
+	rows, err := infraPostgres.GetQuerier(ctx, r.db).Query(ctx, q, ids)
+	if err != nil {
+		slog.ErrorContext(ctx, "failed to query teams by IDs", "error", err)
+		return nil, apperror.NewInternal()
+	}
+	defer rows.Close()
+
+	teams := make([]*domainTeam.Team, 0, len(ids))
+	for rows.Next() {
+		var tid, name, createdBy string
+		var createdAt time.Time
+		if err := rows.Scan(&tid, &name, &createdBy, &createdAt); err != nil {
+			slog.ErrorContext(ctx, "failed to scan team row", "error", err)
+			return nil, apperror.NewInternal()
+		}
+		teams = append(teams, domainTeam.RestoreTeam(tid, domainTeam.RestoreTeamName(name), shared.RestoreUserID(createdBy), createdAt))
+	}
+	if err := rows.Err(); err != nil {
+		slog.ErrorContext(ctx, "teams rows error", "error", err)
+		return nil, apperror.NewInternal()
+	}
+	return teams, nil
+}
+
 func (r *Repository) ExistsByName(ctx context.Context, name domainTeam.TeamName) (bool, error) {
 	var exists bool
 	err := infraPostgres.GetQuerier(ctx, r.db).QueryRow(ctx,

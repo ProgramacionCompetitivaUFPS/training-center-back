@@ -3347,6 +3347,51 @@ const docTemplate = `{
                 }
             }
         },
+        "/teams/{teamId}": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "teams"
+                ],
+                "summary": "Get team details",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Team ID",
+                        "name": "teamId",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/team.getTeamResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/apperror.AppError"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/apperror.AppError"
+                        }
+                    }
+                }
+            }
+        },
         "/users": {
             "put": {
                 "security": [
@@ -3695,6 +3740,52 @@ const docTemplate = `{
                         "description": "OK",
                         "schema": {
                             "$ref": "#/definitions/group.listMyGroupsResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/apperror.AppError"
+                        }
+                    }
+                }
+            }
+        },
+        "/users/me/teams": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "teams"
+                ],
+                "summary": "List my teams",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "default": 1,
+                        "description": "Page number",
+                        "name": "page",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "default": 20,
+                        "description": "Items per page",
+                        "name": "limit",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/team.listMyTeamsResponse"
                         }
                     },
                     "401": {
@@ -5453,6 +5544,43 @@ const docTemplate = `{
                 }
             }
         },
+        "team.getTeamResponse": {
+            "type": "object",
+            "properties": {
+                "createdAt": {
+                    "type": "string"
+                },
+                "createdBy": {
+                    "$ref": "#/definitions/team.teamCreator"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "members": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/team.teamMemberItem"
+                    }
+                },
+                "name": {
+                    "type": "string"
+                }
+            }
+        },
+        "team.listMyTeamsResponse": {
+            "type": "object",
+            "properties": {
+                "pagination": {
+                    "$ref": "#/definitions/team.paginationMeta"
+                },
+                "teams": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/team.myTeamItem"
+                    }
+                }
+            }
+        },
         "team.member": {
             "type": "object",
             "properties": {
@@ -5463,6 +5591,68 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "userId": {
+                    "type": "string"
+                }
+            }
+        },
+        "team.myTeamItem": {
+            "type": "object",
+            "properties": {
+                "createdAt": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "joinedAt": {
+                    "type": "string"
+                },
+                "memberCount": {
+                    "type": "integer"
+                },
+                "name": {
+                    "type": "string"
+                }
+            }
+        },
+        "team.paginationMeta": {
+            "type": "object",
+            "properties": {
+                "limit": {
+                    "type": "integer"
+                },
+                "page": {
+                    "type": "integer"
+                },
+                "total": {
+                    "type": "integer"
+                },
+                "totalPages": {
+                    "type": "integer"
+                }
+            }
+        },
+        "team.teamCreator": {
+            "type": "object",
+            "properties": {
+                "id": {
+                    "type": "string"
+                },
+                "nickname": {
+                    "type": "string"
+                }
+            }
+        },
+        "team.teamMemberItem": {
+            "type": "object",
+            "properties": {
+                "id": {
+                    "type": "string"
+                },
+                "joinedAt": {
+                    "type": "string"
+                },
+                "nickname": {
                     "type": "string"
                 }
             }
