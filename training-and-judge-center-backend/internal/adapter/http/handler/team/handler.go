@@ -11,11 +11,21 @@ import (
 )
 
 type Handler struct {
-	createTeam *appTeam.CreateTeamUseCase
+	createTeam  *appTeam.CreateTeamUseCase
+	listMyTeams *appTeam.ListMyTeamsUseCase
+	getTeam     *appTeam.GetTeamUseCase
 }
 
-func NewHandler(createTeam *appTeam.CreateTeamUseCase) *Handler {
-	return &Handler{createTeam: createTeam}
+func NewHandler(
+	createTeam *appTeam.CreateTeamUseCase,
+	listMyTeams *appTeam.ListMyTeamsUseCase,
+	getTeam *appTeam.GetTeamUseCase,
+) *Handler {
+	return &Handler{
+		createTeam:  createTeam,
+		listMyTeams: listMyTeams,
+		getTeam:     getTeam,
+	}
 }
 
 func (h *Handler) requireCurrentUser(w http.ResponseWriter, r *http.Request) (*shared.CurrentUser, bool) {

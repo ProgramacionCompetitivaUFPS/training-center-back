@@ -8,4 +8,5 @@ type UserDisplay struct {
 
 type UserProvider interface {
 	GetDisplay(ctx context.Context, userID string) (*UserDisplay, error)
+	GetDisplays(ctx context.Context, userIDs []string) (map[string]*UserDisplay, error)
 }

@@ -17,16 +17,27 @@ import (
 	"github.com/training-judge-center/backend/pkg/apperror"
 )
 
-// ── mocks ────────────────────────────────────────────────────────────────────
+// ── mocks ─────────────────────────────────────────────────────────────────────
 
 type mockTeamRepo struct {
-	existsByNameFn func(name domainTeam.TeamName) (bool, error)
 	saveErr        error
+	existsByNameFn func(name domainTeam.TeamName) (bool, error)
+	findByIDFn     func(id string) (*domainTeam.Team, error)
+	findByIDsFn    func(ids []string) ([]*domainTeam.Team, error)
 }
 
 func (m *mockTeamRepo) Save(_ context.Context, _ *domainTeam.Team) error { return m.saveErr }
-func (m *mockTeamRepo) FindByID(_ context.Context, _ string) (*domainTeam.Team, error) {
+func (m *mockTeamRepo) FindByID(_ context.Context, id string) (*domainTeam.Team, error) {
+	if m.findByIDFn != nil {
+		return m.findByIDFn(id)
+	}
 	return nil, apperror.NewNotFound(domainTeam.ErrCodeTeamNotFound, "team not found")
+}
+func (m *mockTeamRepo) FindByIDs(_ context.Context, ids []string) ([]*domainTeam.Team, error) {
+	if m.findByIDsFn != nil {
+		return m.findByIDsFn(ids)
+	}
+	return []*domainTeam.Team{}, nil
 }
 func (m *mockTeamRepo) ExistsByName(_ context.Context, name domainTeam.TeamName) (bool, error) {
 	if m.existsByNameFn != nil {
@@ -35,19 +46,53 @@ func (m *mockTeamRepo) ExistsByName(_ context.Context, name domainTeam.TeamName)
 	return false, nil
 }
 
-type mockMemberRepo struct{}
-
-func (m *mockMemberRepo) Save(_ context.Context, _ *domainTeam.TeamMember) error {
-	return nil
-}
-func (m *mockMemberRepo) FindByTeam(_ context.Context, _ string) ([]*domainTeam.TeamMember, error) {
-	return nil, nil
+type mockMemberRepo struct {
+	saveErr      error
+	findByTeamFn func(teamID string) ([]*domainTeam.TeamMember, error)
+	findByUserFn func(userID shared.UserID) ([]*domainTeam.TeamMember, error)
+	bulkCountFn  func(teamIDs []string) (map[string]int, error)
 }
 
-type mockUserProvider struct{}
+func (m *mockMemberRepo) Save(_ context.Context, _ *domainTeam.TeamMember) error { return m.saveErr }
+func (m *mockMemberRepo) FindByTeam(_ context.Context, teamID string) ([]*domainTeam.TeamMember, error) {
+	if m.findByTeamFn != nil {
+		return m.findByTeamFn(teamID)
+	}
+	return []*domainTeam.TeamMember{}, nil
+}
+func (m *mockMemberRepo) FindByUser(_ context.Context, userID shared.UserID) ([]*domainTeam.TeamMember, error) {
+	if m.findByUserFn != nil {
+		return m.findByUserFn(userID)
+	}
+	return []*domainTeam.TeamMember{}, nil
+}
+func (m *mockMemberRepo) BulkCountByTeams(_ context.Context, teamIDs []string) (map[string]int, error) {
+	if m.bulkCountFn != nil {
+		return m.bulkCountFn(teamIDs)
+	}
+	return map[string]int{}, nil
+}
 
-func (m *mockUserProvider) GetDisplay(_ context.Context, _ string) (*appTeam.UserDisplay, error) {
+type mockUserProvider struct {
+	displayFn  func(userID string) (*appTeam.UserDisplay, error)
+	displaysFn func(userIDs []string) (map[string]*appTeam.UserDisplay, error)
+}
+
+func (m *mockUserProvider) GetDisplay(_ context.Context, userID string) (*appTeam.UserDisplay, error) {
+	if m.displayFn != nil {
+		return m.displayFn(userID)
+	}
 	return &appTeam.UserDisplay{Nickname: "testuser"}, nil
+}
+func (m *mockUserProvider) GetDisplays(_ context.Context, userIDs []string) (map[string]*appTeam.UserDisplay, error) {
+	if m.displaysFn != nil {
+		return m.displaysFn(userIDs)
+	}
+	result := make(map[string]*appTeam.UserDisplay, len(userIDs))
+	for _, id := range userIDs {
+		result[id] = &appTeam.UserDisplay{Nickname: "testuser"}
+	}
+	return result, nil
 }
 
 type mockTxManager struct{}
@@ -65,10 +110,10 @@ func (m *mockTokenSvc) ValidateToken(_ string) (*domainUser.TokenClaims, error) 
 	return &domainUser.TokenClaims{UserID: "u1", Role: shared.RoleContestant}, nil
 }
 
-// ── helpers ──────────────────────────────────────────────────────────────────
+// ── helpers ───────────────────────────────────────────────────────────────────
 
 func newHandlerWithCreate(teamRepo domainTeam.Repository, memberRepo domainTeam.MemberRepository, userProvider appTeam.UserProvider, txManager appshared.TransactionManager) *Handler {
-	return NewHandler(appTeam.NewCreateTeamUseCase(teamRepo, memberRepo, userProvider, txManager))
+	return &Handler{createTeam: appTeam.NewCreateTeamUseCase(teamRepo, memberRepo, userProvider, txManager)}
 }
 
 func wrapAuth(h http.Handler) http.Handler {
