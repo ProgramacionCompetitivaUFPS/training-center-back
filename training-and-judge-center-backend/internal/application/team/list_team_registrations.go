@@ -34,6 +34,7 @@ type ListTeamRegistrationsOutput struct {
 }
 
 type ListTeamRegistrationsUseCase struct {
+	contestProvider  ContestProvider
 	groupChecker     GroupMemberChecker
 	teamParticipRepo domainContest.TeamParticipationRepository
 	teamRepo         domainTeam.Repository
@@ -41,12 +42,14 @@ type ListTeamRegistrationsUseCase struct {
 }
 
 func NewListTeamRegistrationsUseCase(
+	contestProvider ContestProvider,
 	groupChecker GroupMemberChecker,
 	teamParticipRepo domainContest.TeamParticipationRepository,
 	teamRepo domainTeam.Repository,
 	userProvider UserProvider,
 ) *ListTeamRegistrationsUseCase {
 	return &ListTeamRegistrationsUseCase{
+		contestProvider:  contestProvider,
 		groupChecker:     groupChecker,
 		teamParticipRepo: teamParticipRepo,
 		teamRepo:         teamRepo,
@@ -64,6 +67,15 @@ func (uc *ListTeamRegistrationsUseCase) Execute(ctx context.Context, in ListTeam
 	}
 	if !membership[requesterID.Value()] && !in.CurrentUser.IsAdmin() {
 		return nil, apperror.NewForbidden(ErrCodeMemberNotInGroup, "you are not a member of this group")
+	}
+
+	// Contest must belong to the given group.
+	contest, err := uc.contestProvider.GetContestInfo(ctx, in.ContestID)
+	if err != nil {
+		return nil, err
+	}
+	if contest.GroupID != in.GroupID {
+		return nil, apperror.NewNotFound(ErrCodeContestNotFound, "contest not found")
 	}
 
 	participations, total, err := uc.teamParticipRepo.List(ctx, in.ContestID, in.Page, in.Limit)

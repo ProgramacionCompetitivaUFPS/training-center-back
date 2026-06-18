@@ -14,7 +14,7 @@ func newListRegistrationsUseCase(
 	participRepo *mockTeamParticipRepo,
 	teamRepo *mockTeamRepository,
 ) *ListTeamRegistrationsUseCase {
-	return NewListTeamRegistrationsUseCase(groupChecker, participRepo, teamRepo, &mockUserProvider{})
+	return NewListTeamRegistrationsUseCase(&mockContestProvider{}, groupChecker, participRepo, teamRepo, &mockUserProvider{})
 }
 
 func TestListTeamRegistrations_Success(t *testing.T) {

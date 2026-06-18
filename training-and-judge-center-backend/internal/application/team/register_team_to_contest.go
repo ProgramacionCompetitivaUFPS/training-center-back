@@ -91,6 +91,15 @@ func (uc *RegisterTeamToContestUseCase) Execute(ctx context.Context, in Register
 		return nil, apperror.NewConflict(ErrCodeContestNotOpenForRegistration, "contest is not open for registration")
 	}
 
+	// Reject duplicate selected members.
+	seenMembers := make(map[string]struct{}, len(in.SelectedMembers))
+	for _, uid := range in.SelectedMembers {
+		if _, dup := seenMembers[uid]; dup {
+			return nil, apperror.NewBadRequest(ErrCodeInvalidSelectedMember, "selected members list contains duplicate user IDs")
+		}
+		seenMembers[uid] = struct{}{}
+	}
+
 	// 4. selectedMembers must all be members of the team.
 	teamMembers, err := uc.memberRepo.FindByTeam(ctx, in.TeamID)
 	if err != nil {

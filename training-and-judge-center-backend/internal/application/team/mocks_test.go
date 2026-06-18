@@ -231,7 +231,7 @@ func (m *mockContestProvider) GetContestInfo(_ context.Context, contestID string
 	}
 	return &ContestInfo{
 		ID:                contestID,
-		GroupID:           "group-001",
+		GroupID:           testGroupID,
 		ParticipationMode: "TEAM",
 		TeamSizeMin:       2,
 		TeamSizeMax:       3,

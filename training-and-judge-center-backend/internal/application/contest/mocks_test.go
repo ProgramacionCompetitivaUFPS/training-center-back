@@ -410,6 +410,40 @@ func (m *mockTransactionManager) WithTx(ctx context.Context, fn func(txCtx conte
 	return fn(ctx)
 }
 
+// ── TeamParticipationRepository mock ────────────────────────────────────────
+
+type mockTeamParticipationRepository struct {
+	listFn func(ctx context.Context, contestID string, page, limit int) ([]*domainContest.ContestTeamParticipation, int, error)
+}
+
+func (m *mockTeamParticipationRepository) Save(_ context.Context, _ *domainContest.ContestTeamParticipation) error {
+	return nil
+}
+func (m *mockTeamParticipationRepository) FindByContestAndTeam(_ context.Context, _, _ string) (*domainContest.ContestTeamParticipation, error) {
+	return nil, nil
+}
+func (m *mockTeamParticipationRepository) Update(_ context.Context, _ *domainContest.ContestTeamParticipation) error {
+	return nil
+}
+func (m *mockTeamParticipationRepository) Delete(_ context.Context, _, _ string) error { return nil }
+func (m *mockTeamParticipationRepository) List(ctx context.Context, contestID string, page, limit int) ([]*domainContest.ContestTeamParticipation, int, error) {
+	if m.listFn != nil {
+		return m.listFn(ctx, contestID, page, limit)
+	}
+	return []*domainContest.ContestTeamParticipation{}, 0, nil
+}
+func (m *mockTeamParticipationRepository) AreUsersSelectedInAnyTeam(_ context.Context, _ string, userIDs []string, _ string) (map[string]bool, error) {
+	result := make(map[string]bool, len(userIDs))
+	for _, id := range userIDs {
+		result[id] = false
+	}
+	return result, nil
+}
+
+func mockTeamParticipRepo() *mockTeamParticipationRepository {
+	return &mockTeamParticipationRepository{}
+}
+
 // ── CurrentUser helpers ──────────────────────────────────────────────────────
 
 var (

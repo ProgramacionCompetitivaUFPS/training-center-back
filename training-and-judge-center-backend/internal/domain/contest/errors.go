@@ -10,6 +10,7 @@ const (
 	ErrCodeContestAlreadyStarted       = "CONTEST_ALREADY_STARTED"
 	ErrCodeCannotUnregisterAfterStart  = "CANNOT_UNREGISTER_AFTER_START"
 	ErrCodeNotRegistered               = "NOT_REGISTERED"
-	ErrCodeTeamAlreadyRegistered       = "TEAM_ALREADY_REGISTERED"
-	ErrCodeTeamRegistrationNotFound    = "TEAM_REGISTRATION_NOT_FOUND"
+	ErrCodeTeamAlreadyRegistered          = "TEAM_ALREADY_REGISTERED"
+	ErrCodeTeamRegistrationNotFound       = "TEAM_REGISTRATION_NOT_FOUND"
+	ErrCodeContestHasTeamRegistrations    = "CONTEST_HAS_TEAM_REGISTRATIONS"
 )

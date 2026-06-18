@@ -51,7 +51,7 @@ func (uc *UnregisterTeamFromContestUseCase) Execute(ctx context.Context, in Unre
 		return err
 	}
 	if contest.Status != "SCHEDULED" {
-		return apperror.NewConflict(domainContest.ErrCodeContestAlreadyStarted, "contest has already started")
+		return apperror.NewConflict(domainContest.ErrCodeCannotUnregisterAfterStart, "cannot unregister after the contest has started")
 	}
 
 	return uc.teamParticipRepo.Delete(ctx, in.ContestID, in.TeamID)

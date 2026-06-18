@@ -140,6 +140,29 @@ func (s *mockTransactionManager) WithTx(_ context.Context, fn func(context.Conte
 	return fn(context.Background())
 }
 
+type mockTeamParticipRepo struct{}
+
+func (s *mockTeamParticipRepo) Save(_ context.Context, _ *domainContest.ContestTeamParticipation) error {
+	return nil
+}
+func (s *mockTeamParticipRepo) FindByContestAndTeam(_ context.Context, _, _ string) (*domainContest.ContestTeamParticipation, error) {
+	return nil, nil
+}
+func (s *mockTeamParticipRepo) Update(_ context.Context, _ *domainContest.ContestTeamParticipation) error {
+	return nil
+}
+func (s *mockTeamParticipRepo) Delete(_ context.Context, _, _ string) error { return nil }
+func (s *mockTeamParticipRepo) List(_ context.Context, _ string, _, _ int) ([]*domainContest.ContestTeamParticipation, int, error) {
+	return []*domainContest.ContestTeamParticipation{}, 0, nil
+}
+func (s *mockTeamParticipRepo) AreUsersSelectedInAnyTeam(_ context.Context, _ string, userIDs []string, _ string) (map[string]bool, error) {
+	result := make(map[string]bool, len(userIDs))
+	for _, id := range userIDs {
+		result[id] = false
+	}
+	return result, nil
+}
+
 // ── RegistrationRepository mock ──────────────────────────────────────────────
 
 type mockRegistrationRepository struct {

@@ -43,10 +43,12 @@ func (p *ContestProvider) GetContestInfo(ctx context.Context, contestID string) 
 
 	now := time.Now().UTC()
 	status := "SCHEDULED"
-	if !now.Before(startTime) && now.Before(endTime) {
-		status = "ACTIVE"
-	} else if !now.Before(endTime) {
-		status = "FINISHED"
+	if !now.Before(startTime) {
+		if now.After(endTime) {
+			status = "FINISHED"
+		} else {
+			status = "ACTIVE"
+		}
 	}
 
 	return &appTeam.ContestInfo{

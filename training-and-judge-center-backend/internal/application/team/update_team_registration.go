@@ -2,6 +2,7 @@ package team
 
 import (
 	"context"
+	"time"
 
 	appShared "github.com/training-judge-center/backend/internal/application/shared"
 	domainContest "github.com/training-judge-center/backend/internal/domain/contest"
@@ -23,6 +24,7 @@ type UpdateTeamRegistrationOutput struct {
 	TeamID          string
 	TeamName        string
 	SelectedMembers []SelectedMemberDisplay
+	RegisteredAt    time.Time
 }
 
 type UpdateTeamRegistrationUseCase struct {
@@ -83,6 +85,15 @@ func (uc *UpdateTeamRegistrationUseCase) Execute(ctx context.Context, in UpdateT
 		return nil, apperror.NewConflict(domainContest.ErrCodeContestAlreadyStarted, "contest has already started")
 	}
 
+	// Reject duplicate selected members.
+	seenMembers := make(map[string]struct{}, len(in.SelectedMembers))
+	for _, uid := range in.SelectedMembers {
+		if _, dup := seenMembers[uid]; dup {
+			return nil, apperror.NewBadRequest(ErrCodeInvalidSelectedMember, "selected members list contains duplicate user IDs")
+		}
+		seenMembers[uid] = struct{}{}
+	}
+
 	// 4. selectedMembers must all be team members.
 	teamMembers, err := uc.memberRepo.FindByTeam(ctx, in.TeamID)
 	if err != nil {
@@ -116,12 +127,14 @@ func (uc *UpdateTeamRegistrationUseCase) Execute(ctx context.Context, in UpdateT
 
 	// 7. Atomic: check conflicts then update.
 	var participationID string
+	var registeredAt time.Time
 	if err := uc.txManager.WithTx(ctx, func(txCtx context.Context) error {
 		existing, err := uc.teamParticipRepo.FindByContestAndTeam(txCtx, in.ContestID, in.TeamID)
 		if err != nil {
 			return err
 		}
 		participationID = existing.ID()
+		registeredAt = existing.RegisteredAt()
 
 		indivMap, err := uc.indivChecker.AreUsersRegisteredIndividually(txCtx, in.ContestID, in.SelectedMembers)
 		if err != nil {
@@ -174,5 +187,6 @@ func (uc *UpdateTeamRegistrationUseCase) Execute(ctx context.Context, in UpdateT
 		TeamID:          in.TeamID,
 		TeamName:        team.Name().Value(),
 		SelectedMembers: members,
+		RegisteredAt:    registeredAt,
 	}, nil
 }

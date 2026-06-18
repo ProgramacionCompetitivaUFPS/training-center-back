@@ -52,6 +52,7 @@ func defaultUpdateUC() *appcontest.UpdateContestUseCase {
 		&mockMemberProvider{isLead: true, isMember: true},
 		&mockProblemProvider{},
 		&mockOwnerProvider{},
+		&mockTeamParticipRepo{},
 		&mockTransactionManager{},
 	)
 }
@@ -134,6 +135,7 @@ func TestUpdateContest_ContestNotFound_Returns404(t *testing.T) {
 		&mockMemberProvider{isLead: true, isMember: true},
 		&mockProblemProvider{},
 		&mockOwnerProvider{},
+		&mockTeamParticipRepo{},
 		&mockTransactionManager{},
 	)
 	h := newHandlerWithUpdate(uc)

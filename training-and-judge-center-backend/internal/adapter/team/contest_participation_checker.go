@@ -18,7 +18,7 @@ func NewContestParticipationChecker(db infraPostgres.Querier) *ContestParticipat
 	return &ContestParticipationChecker{db: db}
 }
 
-func (c *ContestParticipationChecker) IsUserInActiveContestForTeam(ctx context.Context, teamID, userID string) (bool, error) {
+func (c *ContestParticipationChecker) IsUserInActiveContestForTeam(ctx context.Context, userID, teamID string) (bool, error) {
 	q := infraPostgres.GetQuerier(ctx, c.db)
 
 	var exists bool

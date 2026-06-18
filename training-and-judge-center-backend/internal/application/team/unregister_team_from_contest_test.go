@@ -50,7 +50,7 @@ func TestUnregisterTeamFromContest_ContestAlreadyStarted(t *testing.T) {
 	require.Error(t, err)
 	ae := err.(*apperror.AppError)
 	assert.Equal(t, apperror.KindConflict, ae.Kind)
-	assert.Equal(t, domainContest.ErrCodeContestAlreadyStarted, ae.Code)
+	assert.Equal(t, domainContest.ErrCodeCannotUnregisterAfterStart, ae.Code)
 }
 
 func TestUnregisterTeamFromContest_RequesterNotTeamMember(t *testing.T) {

@@ -273,6 +273,7 @@ func main() {
 	contestStandingsCache          := adaptercontest.NewStandingsCache(redisClient)
 	contestSubmissionProvider      := adaptercontest.NewStandingsSubmissionProvider(dbPool)
 	contestSubmissionsProvider     := adaptercontest.NewContestSubmissionProvider(dbPool)
+	contestTeamParticipationRepo   := adaptercontest.NewTeamParticipationRepository(dbPool)
 
 	// contest use cases
 	createContestUseCase := appcontest.NewCreateContestUseCase(
@@ -281,7 +282,7 @@ func main() {
 	)
 	updateContestUseCase := appcontest.NewUpdateContestUseCase(
 		contestRepo, contestGroupProvider, contestMemberProvider,
-		contestProblemProvider, contestOwnerProvider, txManager,
+		contestProblemProvider, contestOwnerProvider, contestTeamParticipationRepo, txManager,
 	)
 	getContestUseCase := appcontest.NewGetContestUseCase(
 		contestRepo, contestGroupProvider, contestMemberProvider,
@@ -332,9 +333,6 @@ func main() {
 	teamContestProvider := adapterteam.NewContestProvider(dbPool)
 	teamIndivChecker := adapterteam.NewIndividualRegistrationChecker(dbPool)
 	teamGroupMemberChecker := adapterteam.NewGroupMemberChecker(dbPool)
-	teamParticipationRepo := adaptercontest.NewTeamParticipationRepository(dbPool)
-
-
 	// team use cases
 	createTeamUseCase := appteam.NewCreateTeamUseCase(teamRepo, teamMemberRepo, teamUserProvider, txManager)
 	listMyTeamsUseCase := appteam.NewListMyTeamsUseCase(teamRepo, teamMemberRepo)
@@ -345,18 +343,18 @@ func main() {
 	rejectInvitationUseCase := appteam.NewRejectInvitationUseCase(teamInvitationRepo)
 	leaveTeamUseCase := appteam.NewLeaveTeamUseCase(teamMemberRepo, teamContestParticipationChecker)
 	registerTeamToContestUseCase := appteam.NewRegisterTeamToContestUseCase(
-		teamMemberRepo, teamRepo, teamContestProvider, teamParticipationRepo,
+		teamMemberRepo, teamRepo, teamContestProvider, contestTeamParticipationRepo,
 		teamIndivChecker, teamGroupMemberChecker, teamUserProvider, txManager,
 	)
 	updateTeamRegistrationUseCase := appteam.NewUpdateTeamRegistrationUseCase(
-		teamMemberRepo, teamRepo, teamContestProvider, teamParticipationRepo,
+		teamMemberRepo, teamRepo, teamContestProvider, contestTeamParticipationRepo,
 		teamIndivChecker, teamGroupMemberChecker, teamUserProvider, txManager,
 	)
 	unregisterTeamFromContestUseCase := appteam.NewUnregisterTeamFromContestUseCase(
-		teamMemberRepo, teamContestProvider, teamParticipationRepo,
+		teamMemberRepo, teamContestProvider, contestTeamParticipationRepo,
 	)
 	listTeamRegistrationsUseCase := appteam.NewListTeamRegistrationsUseCase(
-		teamGroupMemberChecker, teamParticipationRepo, teamRepo, teamUserProvider,
+		teamContestProvider, teamGroupMemberChecker, contestTeamParticipationRepo, teamRepo, teamUserProvider,
 	)
 
 	teamHandler := handlerteam.NewHandler(

@@ -19,6 +19,7 @@ type updateTeamRegistrationResponse struct {
 	TeamID          string                   `json:"teamId"`
 	TeamName        string                   `json:"teamName"`
 	SelectedMembers []selectedMemberResponse `json:"selectedMembers"`
+	RegisteredAt    string                   `json:"registeredAt"`
 }
 
 // @Summary      Update team registration selected members
@@ -75,5 +76,6 @@ func (h *Handler) UpdateTeamRegistration(w http.ResponseWriter, r *http.Request)
 		TeamID:          out.TeamID,
 		TeamName:        out.TeamName,
 		SelectedMembers: members,
+		RegisteredAt:    out.RegisteredAt.UTC().Format("2006-01-02T15:04:05Z"),
 	})
 }

@@ -39,12 +39,13 @@ type ProblemOrderInput struct {
 }
 
 type UpdateContestUseCase struct {
-	repo            domainContest.Repository
-	groupProvider   GroupProvider
-	memberProvider  GroupMemberProvider
-	problemProvider ProblemProvider
-	ownerProvider   OwnerProvider
-	txManager       appshared.TransactionManager
+	repo             domainContest.Repository
+	groupProvider    GroupProvider
+	memberProvider   GroupMemberProvider
+	problemProvider  ProblemProvider
+	ownerProvider    OwnerProvider
+	teamParticipRepo domainContest.TeamParticipationRepository
+	txManager        appshared.TransactionManager
 }
 
 func NewUpdateContestUseCase(
@@ -53,15 +54,17 @@ func NewUpdateContestUseCase(
 	memberProvider GroupMemberProvider,
 	problemProvider ProblemProvider,
 	ownerProvider OwnerProvider,
+	teamParticipRepo domainContest.TeamParticipationRepository,
 	txManager appshared.TransactionManager,
 ) *UpdateContestUseCase {
 	return &UpdateContestUseCase{
-		repo:            repo,
-		groupProvider:   groupProvider,
-		memberProvider:  memberProvider,
-		problemProvider: problemProvider,
-		ownerProvider:   ownerProvider,
-		txManager:       txManager,
+		repo:             repo,
+		groupProvider:    groupProvider,
+		memberProvider:   memberProvider,
+		problemProvider:  problemProvider,
+		ownerProvider:    ownerProvider,
+		teamParticipRepo: teamParticipRepo,
+		txManager:        txManager,
 	}
 }
 
@@ -224,6 +227,16 @@ func (uc *UpdateContestUseCase) Execute(ctx context.Context, in UpdateContestInp
 		return nil, err
 	}
 
+	if modePtr != nil || teamSizePtr != nil {
+		_, total, err := uc.teamParticipRepo.List(ctx, in.ContestID, 1, 1)
+		if err != nil {
+			return nil, err
+		}
+		if total > 0 {
+			return nil, apperror.NewConflict(domainContest.ErrCodeContestHasTeamRegistrations,
+				"cannot change participation settings while team registrations exist")
+		}
+	}
 	if modePtr != nil {
 		c.SetParticipationMode(*modePtr, now)
 	}
