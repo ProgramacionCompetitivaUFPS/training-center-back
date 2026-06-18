@@ -67,6 +67,7 @@ func activeContestForSubmissions() *domainContest.Contest {
 		0, false, false,
 		shared.RestoreGroupID("g1"),
 		shared.RestoreUserID("u1"),
+		domainContest.RestoreParticipationMode("INDIVIDUAL"), domainContest.RestoreTeamSize(2, 5),
 		[]domainContest.ContestProblem{},
 		time.Now(), nil,
 	)

@@ -66,6 +66,7 @@ func activeContest() *domainContest.Contest {
 		false, false,
 		shared.RestoreGroupID(testGroupID),
 		shared.RestoreUserID(callerID),
+		domainContest.RestoreParticipationMode("INDIVIDUAL"), domainContest.RestoreTeamSize(2, 5),
 		[]domainContest.ContestProblem{},
 		testNow, nil,
 	)
@@ -82,6 +83,7 @@ func finishedContest() *domainContest.Contest {
 		0, false, false,
 		shared.RestoreGroupID(testGroupID),
 		shared.RestoreUserID(callerID),
+		domainContest.RestoreParticipationMode("INDIVIDUAL"), domainContest.RestoreTeamSize(2, 5),
 		[]domainContest.ContestProblem{},
 		testNow, nil,
 	)
@@ -100,6 +102,7 @@ func frozenContest() *domainContest.Contest {
 		false, false,
 		shared.RestoreGroupID(testGroupID),
 		shared.RestoreUserID(callerID),
+		domainContest.RestoreParticipationMode("INDIVIDUAL"), domainContest.RestoreTeamSize(2, 5),
 		[]domainContest.ContestProblem{},
 		testNow, nil,
 	)

@@ -21,6 +21,9 @@ type CreateContestInput struct {
 	Penalty           *int
 	FreezeMinutes     *int
 	EnablePostContest bool
+	ParticipationMode string // "INDIVIDUAL" | "TEAM" | "MIXED"; defaults to "INDIVIDUAL"
+	TeamSizeMin       *int   // defaults to 2 when mode allows teams
+	TeamSizeMax       *int   // defaults to 5 when mode allows teams
 	Problems          []string // slugs; may be empty
 }
 
@@ -129,6 +132,33 @@ func (uc *CreateContestUseCase) Execute(ctx context.Context, in CreateContestInp
 		}
 	}
 
+	// Participation mode and team size.
+	modeRaw := in.ParticipationMode
+	if modeRaw == "" {
+		modeRaw = "INDIVIDUAL"
+	}
+	mode, modeErr := domainContest.NewParticipationMode(modeRaw)
+	if err := apperror.AccumulateFieldErrors(modeErr, &fieldErrs); err != nil {
+		return nil, err
+	}
+
+	teamSizeMinVal := 2
+	if in.TeamSizeMin != nil {
+		teamSizeMinVal = *in.TeamSizeMin
+	}
+	teamSizeMaxVal := 5
+	if in.TeamSizeMax != nil {
+		teamSizeMaxVal = *in.TeamSizeMax
+	}
+	teamSize, tsErr := domainContest.NewTeamSize(teamSizeMinVal, teamSizeMaxVal)
+	if err := apperror.AccumulateFieldErrors(tsErr, &fieldErrs); err != nil {
+		return nil, err
+	}
+
+	if len(fieldErrs) > 0 {
+		return nil, apperror.NewValidation(fieldErrs)
+	}
+
 	now := time.Now()
 	newID := uuid.New().String()
 
@@ -143,6 +173,8 @@ func (uc *CreateContestUseCase) Execute(ctx context.Context, in CreateContestInp
 		in.EnablePostContest,
 		shared.RestoreGroupID(in.GroupID),
 		shared.RestoreUserID(in.CurrentUser.ID),
+		mode,
+		teamSize,
 		now,
 	)
 	if err != nil {

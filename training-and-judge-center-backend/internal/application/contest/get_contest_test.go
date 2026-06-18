@@ -223,6 +223,7 @@ func newTestContestWithProblems(ownerID string) *domainContest.Contest {
 		false,
 		shared.RestoreGroupID(testGroupID),
 		shared.RestoreUserID(ownerID),
+		domainContest.RestoreParticipationMode("INDIVIDUAL"), domainContest.RestoreTeamSize(2, 5),
 		[]domainContest.ContestProblem{
 			domainContest.RestoreContestProblem("cp-1", testProblemID, 1),
 		},

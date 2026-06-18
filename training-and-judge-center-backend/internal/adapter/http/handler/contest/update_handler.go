@@ -56,6 +56,9 @@ func (h *Handler) Update(w http.ResponseWriter, r *http.Request) {
 		FreezeMinutes:     body.FreezeMinutes,
 		EnablePostContest: body.EnablePostContest,
 		Locked:            body.Locked,
+		ParticipationMode: body.ParticipationMode,
+		TeamSizeMin:       body.TeamSizeMin,
+		TeamSizeMax:       body.TeamSizeMax,
 	}
 
 	// description: three-state — omitted=no-op, null=clear, string=set.
@@ -97,6 +100,9 @@ func toContestResponse(out *appContest.ContestOutput) contestResponse {
 		FreezeMinutes:     out.FreezeMinutes,
 		EnablePostContest: out.EnablePostContest,
 		Locked:            out.Locked,
+		ParticipationMode: out.ParticipationMode,
+		TeamSizeMin:       out.TeamSizeMin,
+		TeamSizeMax:       out.TeamSizeMax,
 		Group:             groupDisplay{ID: out.Group.ID, Name: out.Group.Name},
 		Owner:             ownerDisplay{Nickname: out.Owner.Nickname, Name: out.Owner.Name},
 		Problems:          probs,

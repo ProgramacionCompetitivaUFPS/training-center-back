@@ -28,12 +28,14 @@ func (r *Repository) Create(ctx context.Context, c *domainContest.Contest) error
 	_, err := q.Exec(ctx, `
 		INSERT INTO contests (id, name, description, start_time, end_time,
 			penalty, freeze_minutes, enable_post_contest, locked,
-			group_id, owner_id, created_at, updated_at)
-		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)`,
+			group_id, owner_id, participation_mode, team_size_min, team_size_max,
+			created_at, updated_at)
+		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16)`,
 		c.ID(), c.Name().Value(), c.Description(),
 		c.StartTime(), c.EndTime(),
 		c.Penalty().Value(), c.FreezeMinutes(), c.EnablePostContest(), c.Locked(),
 		c.GroupID().Value(), c.OwnerID().Value(),
+		c.ParticipationMode().String(), c.TeamSize().Min(), c.TeamSize().Max(),
 		c.CreatedAt(), c.UpdatedAt(),
 	)
 	if err != nil {
@@ -54,11 +56,13 @@ func (r *Repository) Update(ctx context.Context, c *domainContest.Contest) error
 		UPDATE contests SET
 			name=$2, description=$3, start_time=$4, end_time=$5,
 			penalty=$6, freeze_minutes=$7, enable_post_contest=$8, locked=$9,
-			updated_at=$10
+			participation_mode=$10, team_size_min=$11, team_size_max=$12,
+			updated_at=$13
 		WHERE id=$1`,
 		c.ID(), c.Name().Value(), c.Description(),
 		c.StartTime(), c.EndTime(),
 		c.Penalty().Value(), c.FreezeMinutes(), c.EnablePostContest(), c.Locked(),
+		c.ParticipationMode().String(), c.TeamSize().Min(), c.TeamSize().Max(),
 		c.UpdatedAt(),
 	)
 	if err != nil {
@@ -84,21 +88,25 @@ func (r *Repository) FindByID(ctx context.Context, id string) (*domainContest.Co
 	q := infraPostgres.GetQuerier(ctx, r.db)
 
 	var (
-		cID, name, groupID, ownerID   string
-		description                    *string
-		startTime, endTime, createdAt  time.Time
-		updatedAt                      *time.Time
-		penalty, freezeMinutes         int
-		enablePostContest, locked      bool
+		cID, name, groupID, ownerID        string
+		participationMode                   string
+		description                         *string
+		startTime, endTime, createdAt       time.Time
+		updatedAt                           *time.Time
+		penalty, freezeMinutes              int
+		teamSizeMin, teamSizeMax            int
+		enablePostContest, locked           bool
 	)
 	err := q.QueryRow(ctx, `
 		SELECT id, name, description, start_time, end_time,
 		       penalty, freeze_minutes, enable_post_contest, locked,
-		       group_id, owner_id, created_at, updated_at
+		       group_id, owner_id, participation_mode, team_size_min, team_size_max,
+		       created_at, updated_at
 		FROM contests WHERE id=$1`, id).Scan(
 		&cID, &name, &description, &startTime, &endTime,
 		&penalty, &freezeMinutes, &enablePostContest, &locked,
-		&groupID, &ownerID, &createdAt, &updatedAt,
+		&groupID, &ownerID, &participationMode, &teamSizeMin, &teamSizeMax,
+		&createdAt, &updatedAt,
 	)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
@@ -124,6 +132,8 @@ func (r *Repository) FindByID(ctx context.Context, id string) (*domainContest.Co
 		locked,
 		shared.RestoreGroupID(groupID),
 		shared.RestoreUserID(ownerID),
+		domainContest.RestoreParticipationMode(participationMode),
+		domainContest.RestoreTeamSize(teamSizeMin, teamSizeMax),
 		problems,
 		createdAt,
 		updatedAt,
@@ -184,7 +194,8 @@ func (r *Repository) List(ctx context.Context, filters domainContest.ListFilters
 
 	query := `SELECT id, name, description, start_time, end_time,
 		       penalty, freeze_minutes, enable_post_contest, locked,
-		       group_id, owner_id, created_at, updated_at
+		       group_id, owner_id, participation_mode, team_size_min, team_size_max,
+		       created_at, updated_at
 		FROM contests ` + where +
 		` ORDER BY ` + col + ` ` + order +
 		` LIMIT $` + strconv.Itoa(limitPos) + ` OFFSET $` + strconv.Itoa(offsetPos)
@@ -199,17 +210,20 @@ func (r *Repository) List(ctx context.Context, filters domainContest.ListFilters
 	var result []*domainContest.Contest
 	for rows.Next() {
 		var (
-			cID, name, groupID, ownerID   string
-			description                    *string
-			startTime, endTime, createdAt  time.Time
-			updatedAt                      *time.Time
-			penalty, freezeMinutes         int
-			enablePostContest, locked      bool
+			cID, name, groupID, ownerID        string
+			participationMode                   string
+			description                         *string
+			startTime, endTime, createdAt       time.Time
+			updatedAt                           *time.Time
+			penalty, freezeMinutes              int
+			teamSizeMin, teamSizeMax            int
+			enablePostContest, locked           bool
 		)
 		if err := rows.Scan(
 			&cID, &name, &description, &startTime, &endTime,
 			&penalty, &freezeMinutes, &enablePostContest, &locked,
-			&groupID, &ownerID, &createdAt, &updatedAt,
+			&groupID, &ownerID, &participationMode, &teamSizeMin, &teamSizeMax,
+			&createdAt, &updatedAt,
 		); err != nil {
 			slog.ErrorContext(ctx, "failed to scan contest row", "error", err)
 			return nil, 0, apperror.NewInternal()
@@ -225,6 +239,8 @@ func (r *Repository) List(ctx context.Context, filters domainContest.ListFilters
 			locked,
 			shared.RestoreGroupID(groupID),
 			shared.RestoreUserID(ownerID),
+			domainContest.RestoreParticipationMode(participationMode),
+			domainContest.RestoreTeamSize(teamSizeMin, teamSizeMax),
 			nil,
 			createdAt,
 			updatedAt,
