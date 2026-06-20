@@ -26,8 +26,11 @@ type UpdateContestInput struct {
 	EnablePostContest *bool
 	// Problems, when non-nil, replaces the entire problem list.
 	// Each entry is (slug, order).
-	Problems *[]ProblemOrderInput
-	Locked   *bool
+	Problems          *[]ProblemOrderInput
+	Locked            *bool
+	ParticipationMode *string // "INDIVIDUAL" | "TEAM" | "MIXED"
+	TeamSizeMin       *int
+	TeamSizeMax       *int
 }
 
 type ProblemOrderInput struct {
@@ -36,12 +39,13 @@ type ProblemOrderInput struct {
 }
 
 type UpdateContestUseCase struct {
-	repo            domainContest.Repository
-	groupProvider   GroupProvider
-	memberProvider  GroupMemberProvider
-	problemProvider ProblemProvider
-	ownerProvider   OwnerProvider
-	txManager       appshared.TransactionManager
+	repo             domainContest.Repository
+	groupProvider    GroupProvider
+	memberProvider   GroupMemberProvider
+	problemProvider  ProblemProvider
+	ownerProvider    OwnerProvider
+	teamParticipRepo domainContest.TeamParticipationRepository
+	txManager        appshared.TransactionManager
 }
 
 func NewUpdateContestUseCase(
@@ -50,15 +54,17 @@ func NewUpdateContestUseCase(
 	memberProvider GroupMemberProvider,
 	problemProvider ProblemProvider,
 	ownerProvider OwnerProvider,
+	teamParticipRepo domainContest.TeamParticipationRepository,
 	txManager appshared.TransactionManager,
 ) *UpdateContestUseCase {
 	return &UpdateContestUseCase{
-		repo:            repo,
-		groupProvider:   groupProvider,
-		memberProvider:  memberProvider,
-		problemProvider: problemProvider,
-		ownerProvider:   ownerProvider,
-		txManager:       txManager,
+		repo:             repo,
+		groupProvider:    groupProvider,
+		memberProvider:   memberProvider,
+		problemProvider:  problemProvider,
+		ownerProvider:    ownerProvider,
+		teamParticipRepo: teamParticipRepo,
+		txManager:        txManager,
 	}
 }
 
@@ -136,6 +142,36 @@ func (uc *UpdateContestUseCase) Execute(ctx context.Context, in UpdateContestInp
 		}
 	}
 
+	var modePtr *domainContest.ParticipationMode
+	if in.ParticipationMode != nil {
+		m, modeErr := domainContest.NewParticipationMode(*in.ParticipationMode)
+		if err := apperror.AccumulateFieldErrors(modeErr, &fieldErrs); err != nil {
+			return nil, err
+		}
+		if modeErr == nil {
+			modePtr = &m
+		}
+	}
+
+	var teamSizePtr *domainContest.TeamSize
+	if in.TeamSizeMin != nil || in.TeamSizeMax != nil {
+		minVal := c.TeamSize().Min()
+		if in.TeamSizeMin != nil {
+			minVal = *in.TeamSizeMin
+		}
+		maxVal := c.TeamSize().Max()
+		if in.TeamSizeMax != nil {
+			maxVal = *in.TeamSizeMax
+		}
+		ts, tsErr := domainContest.NewTeamSize(minVal, maxVal)
+		if err := apperror.AccumulateFieldErrors(tsErr, &fieldErrs); err != nil {
+			return nil, err
+		}
+		if tsErr == nil {
+			teamSizePtr = &ts
+		}
+	}
+
 	if len(fieldErrs) > 0 {
 		return nil, apperror.NewValidation(fieldErrs)
 	}
@@ -189,6 +225,23 @@ func (uc *UpdateContestUseCase) Execute(ctx context.Context, in UpdateContestInp
 	// Apply scalar updates (also validates times).
 	if err := c.Update(namePtr, in.Description, in.StartTime, in.EndTime, penaltyPtr, in.FreezeMinutes, in.EnablePostContest, now); err != nil {
 		return nil, err
+	}
+
+	if modePtr != nil || teamSizePtr != nil {
+		_, total, err := uc.teamParticipRepo.List(ctx, in.ContestID, 1, 1)
+		if err != nil {
+			return nil, err
+		}
+		if total > 0 {
+			return nil, apperror.NewConflict(domainContest.ErrCodeContestHasTeamRegistrations,
+				"cannot change participation settings while team registrations exist")
+		}
+	}
+	if modePtr != nil {
+		c.SetParticipationMode(*modePtr, now)
+	}
+	if teamSizePtr != nil {
+		c.SetTeamSize(*teamSizePtr, now)
 	}
 
 	// Replace problem list if provided.
@@ -281,7 +334,8 @@ func (uc *UpdateContestUseCase) enrichProblems(ctx context.Context, cps []domain
 func hasAnyField(in UpdateContestInput) bool {
 	return in.Name != nil || in.Description != nil || in.StartTime != nil ||
 		in.EndTime != nil || in.Penalty != nil || in.FreezeMinutes != nil ||
-		in.EnablePostContest != nil || in.Problems != nil || in.Locked != nil
+		in.EnablePostContest != nil || in.Problems != nil || in.Locked != nil ||
+		in.ParticipationMode != nil || in.TeamSizeMin != nil || in.TeamSizeMax != nil
 }
 
 func deduplicateBySlug(entries []ProblemOrderInput) []ProblemOrderInput {

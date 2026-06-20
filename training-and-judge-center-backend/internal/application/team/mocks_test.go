@@ -2,12 +2,30 @@ package team
 
 import (
 	"context"
+	"time"
 
-	domainTeam "github.com/training-judge-center/backend/internal/domain/team"
-	"github.com/training-judge-center/backend/internal/domain/shared"
-	"github.com/training-judge-center/backend/internal/testutil"
 	appshared "github.com/training-judge-center/backend/internal/application/shared"
+	domainContest "github.com/training-judge-center/backend/internal/domain/contest"
+	"github.com/training-judge-center/backend/internal/domain/shared"
+	domainTeam "github.com/training-judge-center/backend/internal/domain/team"
+	"github.com/training-judge-center/backend/internal/testutil"
 	"github.com/training-judge-center/backend/pkg/apperror"
+)
+
+// ── time fixture ─────────────────────────────────────────────────────────────
+
+var testNow = time.Date(2026, 1, 15, 12, 0, 0, 0, time.UTC)
+
+// ── test constants ────────────────────────────────────────────────────────────
+
+const (
+	memberA   = "aaaaaaaa-0000-0000-0000-000000000001"
+	memberB   = "aaaaaaaa-0000-0000-0000-000000000002"
+	memberC   = "aaaaaaaa-0000-0000-0000-000000000003"
+	strangerID = "aaaaaaaa-0000-0000-0000-000000000099"
+	testTeamID    = "bbbbbbbb-0000-0000-0000-000000000001"
+	testContestID = "cccccccc-0000-0000-0000-000000000001"
+	testGroupID   = "dddddddd-0000-0000-0000-000000000001"
 )
 
 // ── CurrentUser helpers ──────────────────────────────────────────────────────
@@ -199,6 +217,118 @@ type mockTxManager struct{}
 
 func (m *mockTxManager) WithTx(ctx context.Context, fn func(context.Context) error) error {
 	return fn(ctx)
+}
+
+// ── mockContestProvider ───────────────────────────────────────────────────────
+
+type mockContestProvider struct {
+	infoFn func(contestID string) (*ContestInfo, error)
+}
+
+func (m *mockContestProvider) GetContestInfo(_ context.Context, contestID string) (*ContestInfo, error) {
+	if m.infoFn != nil {
+		return m.infoFn(contestID)
+	}
+	return &ContestInfo{
+		ID:                contestID,
+		GroupID:           testGroupID,
+		ParticipationMode: "TEAM",
+		TeamSizeMin:       2,
+		TeamSizeMax:       3,
+		Status:            "SCHEDULED",
+	}, nil
+}
+
+// ── mockIndividualRegistrationChecker ─────────────────────────────────────────
+
+type mockIndivChecker struct {
+	fn func(contestID string, userIDs []string) (map[string]bool, error)
+}
+
+func (m *mockIndivChecker) AreUsersRegisteredIndividually(_ context.Context, contestID string, userIDs []string) (map[string]bool, error) {
+	if m.fn != nil {
+		return m.fn(contestID, userIDs)
+	}
+	result := make(map[string]bool, len(userIDs))
+	for _, id := range userIDs {
+		result[id] = false
+	}
+	return result, nil
+}
+
+// ── mockGroupMemberChecker ────────────────────────────────────────────────────
+
+type mockGroupChecker struct {
+	fn func(groupID string, userIDs []string) (map[string]bool, error)
+}
+
+func (m *mockGroupChecker) AreUsersGroupMembers(_ context.Context, groupID string, userIDs []string) (map[string]bool, error) {
+	if m.fn != nil {
+		return m.fn(groupID, userIDs)
+	}
+	result := make(map[string]bool, len(userIDs))
+	for _, id := range userIDs {
+		result[id] = true
+	}
+	return result, nil
+}
+
+// ── mockTeamParticipationRepository ──────────────────────────────────────────
+
+type mockTeamParticipRepo struct {
+	saveFn                    func(p *domainContest.ContestTeamParticipation) error
+	findByContestAndTeamFn    func(contestID, teamID string) (*domainContest.ContestTeamParticipation, error)
+	updateFn                  func(p *domainContest.ContestTeamParticipation) error
+	deleteFn                  func(contestID, teamID string) error
+	listFn                    func(contestID string, page, limit int) ([]*domainContest.ContestTeamParticipation, int, error)
+	areUsersSelectedFn        func(contestID string, userIDs []string, excludeTeamID string) (map[string]bool, error)
+}
+
+func (m *mockTeamParticipRepo) Save(_ context.Context, p *domainContest.ContestTeamParticipation) error {
+	if m.saveFn != nil {
+		return m.saveFn(p)
+	}
+	return nil
+}
+
+func (m *mockTeamParticipRepo) FindByContestAndTeam(_ context.Context, contestID, teamID string) (*domainContest.ContestTeamParticipation, error) {
+	if m.findByContestAndTeamFn != nil {
+		return m.findByContestAndTeamFn(contestID, teamID)
+	}
+	return domainContest.RestoreContestTeamParticipation("part-001", contestID, teamID,
+		[]string{memberA, memberB}, testNow), nil
+}
+
+func (m *mockTeamParticipRepo) Update(_ context.Context, p *domainContest.ContestTeamParticipation) error {
+	if m.updateFn != nil {
+		return m.updateFn(p)
+	}
+	return nil
+}
+
+func (m *mockTeamParticipRepo) Delete(_ context.Context, contestID, teamID string) error {
+	if m.deleteFn != nil {
+		return m.deleteFn(contestID, teamID)
+	}
+	return nil
+}
+
+func (m *mockTeamParticipRepo) List(_ context.Context, contestID string, page, limit int) ([]*domainContest.ContestTeamParticipation, int, error) {
+	if m.listFn != nil {
+		return m.listFn(contestID, page, limit)
+	}
+	return []*domainContest.ContestTeamParticipation{}, 0, nil
+}
+
+func (m *mockTeamParticipRepo) AreUsersSelectedInAnyTeam(_ context.Context, contestID string, userIDs []string, excludeTeamID string) (map[string]bool, error) {
+	if m.areUsersSelectedFn != nil {
+		return m.areUsersSelectedFn(contestID, userIDs, excludeTeamID)
+	}
+	result := make(map[string]bool, len(userIDs))
+	for _, id := range userIDs {
+		result[id] = false
+	}
+	return result, nil
 }
 
 // ── helpers ──────────────────────────────────────────────────────────────────

@@ -31,14 +31,17 @@ func (n *nullableString) UnmarshalJSON(data []byte) error {
 // ── Request types ────────────────────────────────────────────────────────────
 
 type createContestRequest struct {
-	Name              string   `json:"name"`
-	Description       *string  `json:"description"`
+	Name              string    `json:"name"`
+	Description       *string   `json:"description"`
 	StartTime         time.Time `json:"startTime"`
 	EndTime           time.Time `json:"endTime"`
-	Penalty           *int     `json:"penalty"`
-	FreezeMinutes     *int     `json:"freezeMinutes"`
-	EnablePostContest bool     `json:"enablePostContest"`
-	Problems          []string `json:"problems"`
+	Penalty           *int      `json:"penalty"`
+	FreezeMinutes     *int      `json:"freezeMinutes"`
+	EnablePostContest bool      `json:"enablePostContest"`
+	ParticipationMode string    `json:"participationMode"`
+	TeamSizeMin       *int      `json:"teamSizeMin"`
+	TeamSizeMax       *int      `json:"teamSizeMax"`
+	Problems          []string  `json:"problems"`
 }
 
 type problemOrderRequest struct {
@@ -56,6 +59,9 @@ type updateContestRequest struct {
 	EnablePostContest *bool                 `json:"enablePostContest"`
 	Problems          *[]problemOrderRequest `json:"problems"`
 	Locked            *bool                 `json:"locked"`
+	ParticipationMode *string               `json:"participationMode"`
+	TeamSizeMin       *int                  `json:"teamSizeMin"`
+	TeamSizeMax       *int                  `json:"teamSizeMax"`
 }
 
 // ── Response types ───────────────────────────────────────────────────────────
@@ -245,21 +251,24 @@ type listSubmissionsResponse struct {
 // ── Create/Update response ───────────────────────────────────────────────────
 
 type contestResponse struct {
-	ID                string         `json:"id"`
-	Name              string         `json:"name"`
-	Description       *string        `json:"description,omitempty"`
-	StartTime         string         `json:"startTime"`
-	EndTime           string         `json:"endTime"`
-	Duration          int            `json:"duration"`
-	Penalty           int            `json:"penalty"`
-	FreezeMinutes     int            `json:"freezeMinutes"`
-	EnablePostContest bool           `json:"enablePostContest"`
-	Locked            bool           `json:"locked"`
-	Group             groupDisplay   `json:"group"`
-	Owner             ownerDisplay   `json:"owner"`
+	ID                string           `json:"id"`
+	Name              string           `json:"name"`
+	Description       *string          `json:"description,omitempty"`
+	StartTime         string           `json:"startTime"`
+	EndTime           string           `json:"endTime"`
+	Duration          int              `json:"duration"`
+	Penalty           int              `json:"penalty"`
+	FreezeMinutes     int              `json:"freezeMinutes"`
+	EnablePostContest bool             `json:"enablePostContest"`
+	Locked            bool             `json:"locked"`
+	ParticipationMode string           `json:"participationMode"`
+	TeamSizeMin       int              `json:"teamSizeMin"`
+	TeamSizeMax       int              `json:"teamSizeMax"`
+	Group             groupDisplay     `json:"group"`
+	Owner             ownerDisplay     `json:"owner"`
 	Problems          []problemDisplay `json:"problems"`
-	ProblemCount      int            `json:"problemCount"`
-	Status            string         `json:"status"`
-	CreatedAt         string         `json:"createdAt"`
-	UpdatedAt         *string        `json:"updatedAt,omitempty"`
+	ProblemCount      int              `json:"problemCount"`
+	Status            string           `json:"status"`
+	CreatedAt         string           `json:"createdAt"`
+	UpdatedAt         *string          `json:"updatedAt,omitempty"`
 }

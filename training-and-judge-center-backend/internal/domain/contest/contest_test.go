@@ -44,6 +44,7 @@ func validContest(t *testing.T) *contest.Contest {
 		false,
 		shared.RestoreGroupID("group-id"),
 		shared.RestoreUserID("owner-id"),
+		contest.RestoreParticipationMode("INDIVIDUAL"), contest.RestoreTeamSize(2, 5),
 		fixedNow,
 	)
 	if err != nil {
@@ -83,6 +84,7 @@ func TestNewContest_StartTimeInPast(t *testing.T) {
 		false,
 		shared.RestoreGroupID("group-id"),
 		shared.RestoreUserID("owner-id"),
+		contest.RestoreParticipationMode("INDIVIDUAL"), contest.RestoreTeamSize(2, 5),
 		fixedNow,
 	)
 	if err == nil {
@@ -109,6 +111,7 @@ func TestNewContest_EndBeforeStart(t *testing.T) {
 		false,
 		shared.RestoreGroupID("group-id"),
 		shared.RestoreUserID("owner-id"),
+		contest.RestoreParticipationMode("INDIVIDUAL"), contest.RestoreTeamSize(2, 5),
 		fixedNow,
 	)
 	if err == nil {
@@ -136,6 +139,7 @@ func TestNewContest_EndEqualStart(t *testing.T) {
 		false,
 		shared.RestoreGroupID("group-id"),
 		shared.RestoreUserID("owner-id"),
+		contest.RestoreParticipationMode("INDIVIDUAL"), contest.RestoreTeamSize(2, 5),
 		fixedNow,
 	)
 	if err == nil {
@@ -163,6 +167,7 @@ func TestNewContest_DescriptionTooLong(t *testing.T) {
 		false,
 		shared.RestoreGroupID("group-id"),
 		shared.RestoreUserID("owner-id"),
+		contest.RestoreParticipationMode("INDIVIDUAL"), contest.RestoreTeamSize(2, 5),
 		fixedNow,
 	)
 	assertValidationField(t, "NewContest(descriptionTooLong)", err, "description")
@@ -180,6 +185,7 @@ func TestNewContest_NegativeFreezeMinutes(t *testing.T) {
 		false,
 		shared.RestoreGroupID("group-id"),
 		shared.RestoreUserID("owner-id"),
+		contest.RestoreParticipationMode("INDIVIDUAL"), contest.RestoreTeamSize(2, 5),
 		fixedNow,
 	)
 	assertValidationField(t, "NewContest(negativeFreezeMinutes)", err, "freezeMinutes")
@@ -201,6 +207,7 @@ func TestContest_Status(t *testing.T) {
 		false,
 		shared.RestoreGroupID("g"),
 		shared.RestoreUserID("o"),
+		contest.RestoreParticipationMode("INDIVIDUAL"), contest.RestoreTeamSize(2, 5),
 		nil,
 		time.Now(),
 		nil,
@@ -364,6 +371,7 @@ func TestProblemsNeverNil(t *testing.T) {
 		false,
 		shared.RestoreGroupID("g"),
 		shared.RestoreUserID("o"),
+		contest.RestoreParticipationMode("INDIVIDUAL"), contest.RestoreTeamSize(2, 5),
 		nil,
 		fixedNow,
 		nil,

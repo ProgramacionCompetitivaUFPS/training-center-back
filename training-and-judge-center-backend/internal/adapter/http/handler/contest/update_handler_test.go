@@ -34,6 +34,7 @@ func (s *stubUpdateRepo) FindByID(_ context.Context, _ string) (*domainContest.C
 		0, false, false,
 		shared.RestoreGroupID("g1"),
 		shared.RestoreUserID("u1"),
+		domainContest.RestoreParticipationMode("INDIVIDUAL"), domainContest.RestoreTeamSize(2, 5),
 		[]domainContest.ContestProblem{},
 		time.Now().Add(-time.Hour),
 		nil,
@@ -51,6 +52,7 @@ func defaultUpdateUC() *appcontest.UpdateContestUseCase {
 		&mockMemberProvider{isLead: true, isMember: true},
 		&mockProblemProvider{},
 		&mockOwnerProvider{},
+		&mockTeamParticipRepo{},
 		&mockTransactionManager{},
 	)
 }
@@ -133,6 +135,7 @@ func TestUpdateContest_ContestNotFound_Returns404(t *testing.T) {
 		&mockMemberProvider{isLead: true, isMember: true},
 		&mockProblemProvider{},
 		&mockOwnerProvider{},
+		&mockTeamParticipRepo{},
 		&mockTransactionManager{},
 	)
 	h := newHandlerWithUpdate(uc)

@@ -52,6 +52,7 @@ func frozenActiveContest() *domainContest.Contest {
 		false, false,
 		shared.RestoreGroupID(testGroupID),
 		shared.RestoreUserID(callerID),
+		domainContest.RestoreParticipationMode("INDIVIDUAL"), domainContest.RestoreTeamSize(2, 5),
 		[]domainContest.ContestProblem{},
 		testNow, nil,
 	)

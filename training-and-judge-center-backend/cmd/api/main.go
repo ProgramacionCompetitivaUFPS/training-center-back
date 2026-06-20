@@ -270,10 +270,10 @@ func main() {
 	contestRegistrationRepo        := adaptercontest.NewRegistrationRepository(dbPool)
 	contestParticipantProvider     := adaptercontest.NewContestParticipantProvider(contestRegistrationRepo)
 	contestNicknameProvider        := adaptercontest.NewParticipantNicknameProvider(dbPool)
-	contestTxManager               := postgres.NewTransactionManager(dbPool)
 	contestStandingsCache          := adaptercontest.NewStandingsCache(redisClient)
 	contestSubmissionProvider      := adaptercontest.NewStandingsSubmissionProvider(dbPool)
 	contestSubmissionsProvider     := adaptercontest.NewContestSubmissionProvider(dbPool)
+	contestTeamParticipationRepo   := adaptercontest.NewTeamParticipationRepository(dbPool)
 
 	// contest use cases
 	createContestUseCase := appcontest.NewCreateContestUseCase(
@@ -282,7 +282,7 @@ func main() {
 	)
 	updateContestUseCase := appcontest.NewUpdateContestUseCase(
 		contestRepo, contestGroupProvider, contestMemberProvider,
-		contestProblemProvider, contestOwnerProvider, contestTxManager,
+		contestProblemProvider, contestOwnerProvider, contestTeamParticipationRepo, txManager,
 	)
 	getContestUseCase := appcontest.NewGetContestUseCase(
 		contestRepo, contestGroupProvider, contestMemberProvider,
@@ -329,8 +329,10 @@ func main() {
 	teamMemberRepo := adapterteam.NewMemberRepository(dbPool)
 	teamInvitationRepo := adapterteam.NewInvitationRepository(dbPool)
 	teamUserProvider := adapterteam.NewUserProvider(dbPool)
-	teamContestChecker := &adapterteam.NoOpContestParticipationChecker{}
-
+	teamContestParticipationChecker := adapterteam.NewContestParticipationChecker(dbPool)
+	teamContestProvider := adapterteam.NewContestProvider(dbPool)
+	teamIndivChecker := adapterteam.NewIndividualRegistrationChecker(dbPool)
+	teamGroupMemberChecker := adapterteam.NewGroupMemberChecker(dbPool)
 	// team use cases
 	createTeamUseCase := appteam.NewCreateTeamUseCase(teamRepo, teamMemberRepo, teamUserProvider, txManager)
 	listMyTeamsUseCase := appteam.NewListMyTeamsUseCase(teamRepo, teamMemberRepo)
@@ -339,7 +341,21 @@ func main() {
 	listMyInvitationsUseCase := appteam.NewListMyInvitationsUseCase(teamInvitationRepo, teamRepo, teamUserProvider)
 	acceptInvitationUseCase := appteam.NewAcceptInvitationUseCase(teamInvitationRepo, teamMemberRepo, txManager)
 	rejectInvitationUseCase := appteam.NewRejectInvitationUseCase(teamInvitationRepo)
-	leaveTeamUseCase := appteam.NewLeaveTeamUseCase(teamMemberRepo, teamContestChecker)
+	leaveTeamUseCase := appteam.NewLeaveTeamUseCase(teamMemberRepo, teamContestParticipationChecker)
+	registerTeamToContestUseCase := appteam.NewRegisterTeamToContestUseCase(
+		teamMemberRepo, teamRepo, teamContestProvider, contestTeamParticipationRepo,
+		teamIndivChecker, teamGroupMemberChecker, teamUserProvider, txManager,
+	)
+	updateTeamRegistrationUseCase := appteam.NewUpdateTeamRegistrationUseCase(
+		teamMemberRepo, teamRepo, teamContestProvider, contestTeamParticipationRepo,
+		teamIndivChecker, teamGroupMemberChecker, teamUserProvider, txManager,
+	)
+	unregisterTeamFromContestUseCase := appteam.NewUnregisterTeamFromContestUseCase(
+		teamMemberRepo, teamContestProvider, contestTeamParticipationRepo,
+	)
+	listTeamRegistrationsUseCase := appteam.NewListTeamRegistrationsUseCase(
+		teamContestProvider, teamGroupMemberChecker, contestTeamParticipationRepo, teamRepo, teamUserProvider,
+	)
 
 	teamHandler := handlerteam.NewHandler(
 		createTeamUseCase,
@@ -350,6 +366,10 @@ func main() {
 		acceptInvitationUseCase,
 		rejectInvitationUseCase,
 		leaveTeamUseCase,
+		registerTeamToContestUseCase,
+		updateTeamRegistrationUseCase,
+		unregisterTeamFromContestUseCase,
+		listTeamRegistrationsUseCase,
 	)
 
 	router := adapterhttp.NewRouter(&adapterhttp.Handlers{
