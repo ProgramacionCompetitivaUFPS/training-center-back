@@ -27,14 +27,15 @@ func (r *Repository) Save(ctx context.Context, s *domainSubmission.Submission) e
 	_, err := q.Exec(ctx, `
 		INSERT INTO submissions (
 			id, problem_id, user_id, contest_id, standing_id,
-			language, compiler, status, source_code_path,
+			language, compiler, status, visibility, source_code_path,
 			file_hash, file_size, submitted_at
-		) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
+		) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)
 		ON CONFLICT (id) DO UPDATE SET
-			status    = EXCLUDED.status,
-			compiler  = EXCLUDED.compiler,
-			file_hash = EXCLUDED.file_hash,
-			file_size = EXCLUDED.file_size
+			status     = EXCLUDED.status,
+			visibility = EXCLUDED.visibility,
+			compiler   = EXCLUDED.compiler,
+			file_hash  = EXCLUDED.file_hash,
+			file_size  = EXCLUDED.file_size
 	`,
 		s.ID(),
 		s.ProblemID(),
@@ -44,6 +45,7 @@ func (r *Repository) Save(ctx context.Context, s *domainSubmission.Submission) e
 		s.Language().String(),
 		s.Compiler(),
 		s.Status().String(),
+		s.Visibility().String(),
 		s.SourceCodePath(),
 		nilIfEmpty(s.FileHash()),
 		nilIfZero(s.FileSize()),
@@ -105,12 +107,10 @@ func (r *Repository) List(ctx context.Context, f domainSubmission.ListFilters) (
 	return result, total, nil
 }
 
-// GetByID is an alias for FindByID, satisfying the judge.SubmissionUpdater port.
 func (r *Repository) GetByID(ctx context.Context, id string) (*domainSubmission.Submission, error) {
 	return r.FindByID(ctx, id)
 }
 
-// Update persists judging results (status, judged_at, scores, compile log).
 func (r *Repository) Update(ctx context.Context, s *domainSubmission.Submission) error {
 	q := infraPostgres.GetQuerier(ctx, r.db)
 	tag, err := q.Exec(ctx, `
@@ -173,7 +173,7 @@ func (r *Repository) ExistsByHashAndUserAndProblem(ctx context.Context, fileHash
 
 const selectCols = `
 	SELECT id, problem_id, user_id, contest_id, standing_id,
-	       language, compiler, status, source_code_path,
+	       language, compiler, status, visibility, source_code_path,
 	       file_hash, file_size, submitted_at,
 	       judged_at, time_ms, memory_kb, compile_log
 	FROM submissions`
@@ -184,18 +184,18 @@ type rowScanner interface {
 
 func scanRow(ctx context.Context, row rowScanner) (*domainSubmission.Submission, error) {
 	var (
-		id, problemID, userID, language, compiler, status, path string
-		contestID, standingID                                    *string
-		fileHash                                                 *string
-		fileSize                                                 *int
-		submittedAt                                              time.Time
-		judgedAt                                                 *time.Time
-		timeMs, memoryKb                                         *int
-		compileLog                                               *string
+		id, problemID, userID, language, compiler, status, visibility, path string
+		contestID, standingID                                                *string
+		fileHash                                                             *string
+		fileSize                                                             *int
+		submittedAt                                                          time.Time
+		judgedAt                                                             *time.Time
+		timeMs, memoryKb                                                     *int
+		compileLog                                                           *string
 	)
 	err := row.Scan(
 		&id, &problemID, &userID, &contestID, &standingID,
-		&language, &compiler, &status, &path,
+		&language, &compiler, &status, &visibility, &path,
 		&fileHash, &fileSize, &submittedAt,
 		&judgedAt, &timeMs, &memoryKb, &compileLog,
 	)
@@ -222,9 +222,25 @@ func scanRow(ctx context.Context, row rowScanner) (*domainSubmission.Submission,
 		domainSubmission.RestoreLanguage(language),
 		compiler,
 		domainSubmission.RestoreStatus(status),
+		domainSubmission.RestoreVisibility(visibility),
 		path, hash, size,
 		submittedAt, judgedAt, timeMs, memoryKb, compileLog,
 	), nil
+}
+
+func (r *Repository) UpdateVisibility(ctx context.Context, s *domainSubmission.Submission) error {
+	q := infraPostgres.GetQuerier(ctx, r.db)
+	tag, err := q.Exec(ctx, `
+		UPDATE submissions SET visibility = $2 WHERE id = $1
+	`, s.ID(), s.Visibility().String())
+	if err != nil {
+		slog.ErrorContext(ctx, "submission: failed to update visibility", "id", s.ID(), "error", err)
+		return apperror.NewInternal()
+	}
+	if tag.RowsAffected() == 0 {
+		return apperror.NewNotFound(domainSubmission.ErrCodeSubmissionNotFound, "submission not found")
+	}
+	return nil
 }
 
 func buildWhere(f domainSubmission.ListFilters) (string, []any) {

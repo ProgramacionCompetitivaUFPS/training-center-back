@@ -6,16 +6,26 @@ import (
 	"github.com/training-judge-center/backend/internal/adapter/http/handler"
 	"github.com/training-judge-center/backend/internal/adapter/http/middleware"
 	appshared "github.com/training-judge-center/backend/internal/application/shared"
-	appSubmission "github.com/training-judge-center/backend/internal/application/submission"
+	appsubmission "github.com/training-judge-center/backend/internal/application/submission"
 	"github.com/training-judge-center/backend/pkg/apperror"
 )
 
 type Handler struct {
-	submitSolution *appSubmission.SubmitSolutionUseCase
+	submitSolution           *appsubmission.SubmitSolutionUseCase
+	getSubmission            *appsubmission.GetSubmissionUseCase
+	updateSubmissionVisibility *appsubmission.UpdateSubmissionVisibilityUseCase
 }
 
-func NewHandler(submitSolution *appSubmission.SubmitSolutionUseCase) *Handler {
-	return &Handler{submitSolution: submitSolution}
+func NewHandler(
+	submitSolution *appsubmission.SubmitSolutionUseCase,
+	getSubmission *appsubmission.GetSubmissionUseCase,
+	updateSubmissionVisibility *appsubmission.UpdateSubmissionVisibilityUseCase,
+) *Handler {
+	return &Handler{
+		submitSolution:           submitSolution,
+		getSubmission:            getSubmission,
+		updateSubmissionVisibility: updateSubmissionVisibility,
+	}
 }
 
 func (h *Handler) requireCurrentUser(w http.ResponseWriter, r *http.Request) (*appshared.CurrentUser, bool) {

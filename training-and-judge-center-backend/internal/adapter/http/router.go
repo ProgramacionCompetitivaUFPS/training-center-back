@@ -127,6 +127,11 @@ func NewRouter(h *Handlers, s *Services, allowedOrigins []string) *chi.Mux {
 			})
 		})
 
+		r.Route("/submissions", func(r chi.Router) {
+			r.Get("/{submissionId}", h.Submission.GetSubmission)
+			r.Patch("/{submissionId}/visibility", h.Submission.UpdateVisibility)
+		})
+
 		r.Route("/problems", func(r chi.Router) {
 			r.Get("/", h.Problem.ListProblems)
 			r.Post("/", h.Problem.Create)

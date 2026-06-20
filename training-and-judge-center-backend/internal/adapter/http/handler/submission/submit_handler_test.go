@@ -6,8 +6,10 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	appSubmission "github.com/training-judge-center/backend/internal/application/submission"
-	domainSubmission "github.com/training-judge-center/backend/internal/domain/submission"
+	appsubmission "github.com/training-judge-center/backend/internal/application/submission"
+	domainshared "github.com/training-judge-center/backend/internal/domain/shared"
+	domainsubmission "github.com/training-judge-center/backend/internal/domain/submission"
+	domainuser "github.com/training-judge-center/backend/internal/domain/user"
 	"github.com/training-judge-center/backend/pkg/apperror"
 )
 
@@ -15,7 +17,7 @@ func TestSubmit_UnauthenticatedReturns401(t *testing.T) {
 	h := newHandlerWithSubmit(&mockProblemProvider{}, &mockSubmissionRepo{})
 	w := httptest.NewRecorder()
 	r := httptest.NewRequest(http.MethodPost, "/problems/p/two-sum/submissions", nil)
-	wrapAuth(http.HandlerFunc(h.Submit)).ServeHTTP(w, r)
+	wrapWithAuth(http.HandlerFunc(h.Submit), &domainuser.TokenClaims{UserID: testAuthorID, Role: domainshared.RoleContestant}).ServeHTTP(w, r)
 	if w.Code != http.StatusUnauthorized {
 		t.Fatalf("expected 401, got %d", w.Code)
 	}
@@ -27,7 +29,7 @@ func TestSubmit_MissingMultipartReturns400(t *testing.T) {
 	r := httptest.NewRequest(http.MethodPost, "/problems/p/two-sum/submissions", nil)
 	r.Header.Set("Authorization", "Bearer tok")
 	r.SetPathValue("slug", "two-sum")
-	wrapAuth(http.HandlerFunc(h.Submit)).ServeHTTP(w, r)
+	wrapWithAuth(http.HandlerFunc(h.Submit), &domainuser.TokenClaims{UserID: testAuthorID, Role: domainshared.RoleContestant}).ServeHTTP(w, r)
 	if w.Code != http.StatusBadRequest {
 		t.Fatalf("expected 400, got %d\nbody: %s", w.Code, w.Body.String())
 	}
@@ -38,7 +40,7 @@ func TestSubmit_InvalidLanguageReturns400(t *testing.T) {
 	w := httptest.NewRecorder()
 	r := multipartRequest("/problems/p/two-sum/submissions", "two-sum",
 		"cobol85", "cob", "solution.cbl", []byte("IDENTIFICATION DIVISION."))
-	wrapAuth(http.HandlerFunc(h.Submit)).ServeHTTP(w, r)
+	wrapWithAuth(http.HandlerFunc(h.Submit), &domainuser.TokenClaims{UserID: testAuthorID, Role: domainshared.RoleContestant}).ServeHTTP(w, r)
 	if w.Code != http.StatusBadRequest {
 		t.Fatalf("expected 400, got %d\nbody: %s", w.Code, w.Body.String())
 	}
@@ -56,7 +58,7 @@ func TestSubmit_CompilerMismatchReturns400(t *testing.T) {
 	w := httptest.NewRecorder()
 	r := multipartRequest("/problems/p/two-sum/submissions", "two-sum",
 		"cpp20", "javac", "solution.cpp", []byte("int main(){}"))
-	wrapAuth(http.HandlerFunc(h.Submit)).ServeHTTP(w, r)
+	wrapWithAuth(http.HandlerFunc(h.Submit), &domainuser.TokenClaims{UserID: testAuthorID, Role: domainshared.RoleContestant}).ServeHTTP(w, r)
 	if w.Code != http.StatusBadRequest {
 		t.Fatalf("expected 400, got %d\nbody: %s", w.Code, w.Body.String())
 	}
@@ -64,22 +66,22 @@ func TestSubmit_CompilerMismatchReturns400(t *testing.T) {
 	if err := json.NewDecoder(w.Body).Decode(&body); err != nil {
 		t.Fatalf("decode: %v", err)
 	}
-	if body.Code != domainSubmission.ErrCodeCompilerMismatch {
-		t.Errorf("expected %s, got %s", domainSubmission.ErrCodeCompilerMismatch, body.Code)
+	if body.Code != domainsubmission.ErrCodeCompilerMismatch {
+		t.Errorf("expected %s, got %s", domainsubmission.ErrCodeCompilerMismatch, body.Code)
 	}
 }
 
 func TestSubmit_ProblemNotFoundReturns404(t *testing.T) {
 	pp := &mockProblemProvider{
-		fn: func(_ string) (*appSubmission.ProblemInfo, error) {
-			return nil, apperror.NewNotFound(domainSubmission.ErrCodeSubmissionNotFound, "problem not found")
+		fn: func(_ string) (*appsubmission.ProblemInfo, error) {
+			return nil, apperror.NewNotFound(domainsubmission.ErrCodeSubmissionNotFound, "problem not found")
 		},
 	}
 	h := newHandlerWithSubmit(pp, &mockSubmissionRepo{})
 	w := httptest.NewRecorder()
 	r := multipartRequest("/problems/p/ghost/submissions", "ghost",
 		"cpp20", "g++", "solution.cpp", []byte("int main(){}"))
-	wrapAuth(http.HandlerFunc(h.Submit)).ServeHTTP(w, r)
+	wrapWithAuth(http.HandlerFunc(h.Submit), &domainuser.TokenClaims{UserID: testAuthorID, Role: domainshared.RoleContestant}).ServeHTTP(w, r)
 	if w.Code != http.StatusNotFound {
 		t.Fatalf("expected 404, got %d\nbody: %s", w.Code, w.Body.String())
 	}
@@ -87,8 +89,8 @@ func TestSubmit_ProblemNotFoundReturns404(t *testing.T) {
 
 func TestSubmit_UnpublishedProblemReturns400(t *testing.T) {
 	pp := &mockProblemProvider{
-		fn: func(slug string) (*appSubmission.ProblemInfo, error) {
-			return &appSubmission.ProblemInfo{
+		fn: func(slug string) (*appsubmission.ProblemInfo, error) {
+			return &appsubmission.ProblemInfo{
 				ID: "prob-001", Slug: slug, Title: "Draft",
 				IsPublished: false, IsPublic: true,
 			}, nil
@@ -98,7 +100,7 @@ func TestSubmit_UnpublishedProblemReturns400(t *testing.T) {
 	w := httptest.NewRecorder()
 	r := multipartRequest("/problems/p/draft/submissions", "draft",
 		"cpp20", "g++", "solution.cpp", []byte("int main(){}"))
-	wrapAuth(http.HandlerFunc(h.Submit)).ServeHTTP(w, r)
+	wrapWithAuth(http.HandlerFunc(h.Submit), &domainuser.TokenClaims{UserID: testAuthorID, Role: domainshared.RoleContestant}).ServeHTTP(w, r)
 	if w.Code != http.StatusBadRequest {
 		t.Fatalf("expected 400, got %d\nbody: %s", w.Code, w.Body.String())
 	}
@@ -106,15 +108,15 @@ func TestSubmit_UnpublishedProblemReturns400(t *testing.T) {
 	if err := json.NewDecoder(w.Body).Decode(&body); err != nil {
 		t.Fatalf("decode: %v", err)
 	}
-	if body.Code != domainSubmission.ErrCodeProblemNotPublished {
-		t.Errorf("expected %s, got %s", domainSubmission.ErrCodeProblemNotPublished, body.Code)
+	if body.Code != domainsubmission.ErrCodeProblemNotPublished {
+		t.Errorf("expected %s, got %s", domainsubmission.ErrCodeProblemNotPublished, body.Code)
 	}
 }
 
 func TestSubmit_PrivateProblemNonModifierReturns403(t *testing.T) {
 	pp := &mockProblemProvider{
-		fn: func(slug string) (*appSubmission.ProblemInfo, error) {
-			return &appSubmission.ProblemInfo{
+		fn: func(slug string) (*appsubmission.ProblemInfo, error) {
+			return &appsubmission.ProblemInfo{
 				ID: "prob-002", Slug: slug, Title: "Private",
 				IsPublished: true, IsPublic: false,
 				ModifierIDs: []string{"other-user"},
@@ -125,7 +127,7 @@ func TestSubmit_PrivateProblemNonModifierReturns403(t *testing.T) {
 	w := httptest.NewRecorder()
 	r := multipartRequest("/problems/p/private/submissions", "private",
 		"cpp20", "g++", "solution.cpp", []byte("int main(){}"))
-	wrapAuth(http.HandlerFunc(h.Submit)).ServeHTTP(w, r)
+	wrapWithAuth(http.HandlerFunc(h.Submit), &domainuser.TokenClaims{UserID: testAuthorID, Role: domainshared.RoleContestant}).ServeHTTP(w, r)
 	if w.Code != http.StatusForbidden {
 		t.Fatalf("expected 403, got %d\nbody: %s", w.Code, w.Body.String())
 	}
@@ -133,8 +135,8 @@ func TestSubmit_PrivateProblemNonModifierReturns403(t *testing.T) {
 	if err := json.NewDecoder(w.Body).Decode(&body); err != nil {
 		t.Fatalf("decode: %v", err)
 	}
-	if body.Code != domainSubmission.ErrCodeProblemNotAccessible {
-		t.Errorf("expected %s, got %s", domainSubmission.ErrCodeProblemNotAccessible, body.Code)
+	if body.Code != domainsubmission.ErrCodeProblemNotAccessible {
+		t.Errorf("expected %s, got %s", domainsubmission.ErrCodeProblemNotAccessible, body.Code)
 	}
 }
 
@@ -146,7 +148,7 @@ func TestSubmit_DuplicateFileReturns409(t *testing.T) {
 	w := httptest.NewRecorder()
 	r := multipartRequest("/problems/p/two-sum/submissions", "two-sum",
 		"cpp20", "g++", "solution.cpp", []byte("int main(){}"))
-	wrapAuth(http.HandlerFunc(h.Submit)).ServeHTTP(w, r)
+	wrapWithAuth(http.HandlerFunc(h.Submit), &domainuser.TokenClaims{UserID: testAuthorID, Role: domainshared.RoleContestant}).ServeHTTP(w, r)
 	if w.Code != http.StatusConflict {
 		t.Fatalf("expected 409, got %d\nbody: %s", w.Code, w.Body.String())
 	}
@@ -154,8 +156,8 @@ func TestSubmit_DuplicateFileReturns409(t *testing.T) {
 	if err := json.NewDecoder(w.Body).Decode(&body); err != nil {
 		t.Fatalf("decode: %v", err)
 	}
-	if body.Code != domainSubmission.ErrCodeDuplicateSubmission {
-		t.Errorf("expected %s, got %s", domainSubmission.ErrCodeDuplicateSubmission, body.Code)
+	if body.Code != domainsubmission.ErrCodeDuplicateSubmission {
+		t.Errorf("expected %s, got %s", domainsubmission.ErrCodeDuplicateSubmission, body.Code)
 	}
 }
 
@@ -165,7 +167,7 @@ func TestSubmit_ValidCppReturns201(t *testing.T) {
 	fileData := []byte("int main(){}")
 	r := multipartRequest("/problems/p/two-sum/submissions", "two-sum",
 		"cpp20", "g++", "solution.cpp", fileData)
-	wrapAuth(http.HandlerFunc(h.Submit)).ServeHTTP(w, r)
+	wrapWithAuth(http.HandlerFunc(h.Submit), &domainuser.TokenClaims{UserID: testAuthorID, Role: domainshared.RoleContestant}).ServeHTTP(w, r)
 	if w.Code != http.StatusCreated {
 		t.Fatalf("expected 201, got %d\nbody: %s", w.Code, w.Body.String())
 	}
@@ -204,7 +206,7 @@ func TestSubmit_ValidJavaReturns201(t *testing.T) {
 	w := httptest.NewRecorder()
 	r := multipartRequest("/problems/p/two-sum/submissions", "two-sum",
 		"java17", "javac", "Solution.java", []byte("class Solution {}"))
-	wrapAuth(http.HandlerFunc(h.Submit)).ServeHTTP(w, r)
+	wrapWithAuth(http.HandlerFunc(h.Submit), &domainuser.TokenClaims{UserID: testAuthorID, Role: domainshared.RoleContestant}).ServeHTTP(w, r)
 	if w.Code != http.StatusCreated {
 		t.Fatalf("expected 201, got %d\nbody: %s", w.Code, w.Body.String())
 	}
@@ -215,20 +217,20 @@ func TestSubmit_ValidPythonReturns201(t *testing.T) {
 	w := httptest.NewRecorder()
 	r := multipartRequest("/problems/p/two-sum/submissions", "two-sum",
 		"python310", "py", "solution.py", []byte("print('hello')"))
-	wrapAuth(http.HandlerFunc(h.Submit)).ServeHTTP(w, r)
+	wrapWithAuth(http.HandlerFunc(h.Submit), &domainuser.TokenClaims{UserID: testAuthorID, Role: domainshared.RoleContestant}).ServeHTTP(w, r)
 	if w.Code != http.StatusCreated {
 		t.Fatalf("expected 201, got %d\nbody: %s", w.Code, w.Body.String())
 	}
 }
 
 func TestSubmit_PrivateProblemModifierCanSubmit(t *testing.T) {
-	// mockTokenSvc returns UserID "user-001"; that user is a modifier.
+	// testAuthorID is the viewer (from wrapWithAuth) and is listed as a modifier.
 	pp := &mockProblemProvider{
-		fn: func(slug string) (*appSubmission.ProblemInfo, error) {
-			return &appSubmission.ProblemInfo{
+		fn: func(slug string) (*appsubmission.ProblemInfo, error) {
+			return &appsubmission.ProblemInfo{
 				ID: "prob-003", Slug: slug, Title: "Private",
 				IsPublished: true, IsPublic: false,
-				ModifierIDs: []string{"user-001"},
+				ModifierIDs: []string{testAuthorID},
 			}, nil
 		},
 	}
@@ -236,7 +238,7 @@ func TestSubmit_PrivateProblemModifierCanSubmit(t *testing.T) {
 	w := httptest.NewRecorder()
 	r := multipartRequest("/problems/p/private/submissions", "private",
 		"cpp20", "g++", "solution.cpp", []byte("int main(){}"))
-	wrapAuth(http.HandlerFunc(h.Submit)).ServeHTTP(w, r)
+	wrapWithAuth(http.HandlerFunc(h.Submit), &domainuser.TokenClaims{UserID: testAuthorID, Role: domainshared.RoleContestant}).ServeHTTP(w, r)
 	if w.Code != http.StatusCreated {
 		t.Fatalf("expected 201, got %d\nbody: %s", w.Code, w.Body.String())
 	}

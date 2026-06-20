@@ -20,4 +20,5 @@ type Repository interface {
 	List(ctx context.Context, filters ListFilters) ([]*Submission, int, error)
 	FindLastByUserAndProblem(ctx context.Context, userID, problemID string) (*Submission, error)
 	ExistsByHashAndUserAndProblem(ctx context.Context, fileHash, userID, problemID string) (bool, error)
+	UpdateVisibility(ctx context.Context, s *Submission) error
 }
