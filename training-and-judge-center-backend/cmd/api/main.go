@@ -35,6 +35,7 @@ import (
 	"github.com/training-judge-center/backend/internal/adapter/postgres"
 	"github.com/training-judge-center/backend/internal/adapter/problem"
 	"github.com/training-judge-center/backend/internal/adapter/ratelimit"
+	adapterqueue "github.com/training-judge-center/backend/internal/adapter/queue"
 	adaptersubmission "github.com/training-judge-center/backend/internal/adapter/submission"
 	adapterteam "github.com/training-judge-center/backend/internal/adapter/team"
 	"github.com/training-judge-center/backend/internal/adapter/user"
@@ -379,14 +380,29 @@ func main() {
 	submissionRepo := adaptersubmission.NewRepository(dbPool)
 	submissionProblemProvider := adaptersubmission.NewProblemProvider(dbPool)
 	submissionStorage := adaptersubmission.NewSourceStorage(fileStorage.UploadFile, fileStorage.DeleteFile)
-	noOpQueue := adaptersubmission.NoOpQueue{}
+
+	// submission queue — RabbitMQ when URL is set, no-op otherwise
+	var submissionQueue appsubmission.SubmissionQueue
+	if cfg.RabbitMQURL != "" {
+		rmq, err := adapterqueue.NewRabbitMQQueue(cfg.RabbitMQURL)
+		if err != nil {
+			slog.Error("failed to connect to RabbitMQ", "error", err)
+			os.Exit(1)
+		}
+		defer rmq.Close()
+		submissionQueue = rmq
+		slog.Info("using RabbitMQ submission queue")
+	} else {
+		submissionQueue = adaptersubmission.NoOpQueue{}
+		slog.Info("using no-op submission queue (RABBITMQ_URL not set)")
+	}
 
 	// submission use cases
 	submitSolutionUseCase := appsubmission.NewSubmitSolutionUseCase(
 		submissionProblemProvider,
 		submissionRepo,
 		submissionStorage,
-		noOpQueue,
+		submissionQueue,
 		1<<20, // 1 MB
 		1,     // 1 second rate limit
 	)

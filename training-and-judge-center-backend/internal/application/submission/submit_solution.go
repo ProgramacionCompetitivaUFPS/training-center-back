@@ -211,6 +211,13 @@ func (uc *SubmitSolutionUseCase) Execute(ctx context.Context, in SubmitSolutionI
 	if err := uc.submissionQueue.Publish(ctx, SubmissionQueueMessage{
 		SubmissionID: submissionID,
 		Priority:     QueuePriorityPractice,
+		EnqueuedAt:   in.SubmittedAt,
+		Metadata: SubmissionQueueMetadata{
+			ContestID: nil,
+			ProblemID: problem.ID,
+			UserID:    userID,
+			Language:  langVO.String(),
+		},
 	}); err != nil {
 		slog.ErrorContext(ctx, "failed to publish submission to queue", "submission_id", submissionID, "error", err)
 	}

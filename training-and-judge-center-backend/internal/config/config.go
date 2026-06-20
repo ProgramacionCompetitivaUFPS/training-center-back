@@ -29,6 +29,7 @@ type Config struct {
 	SMTPPassword       string
 	SMTPFrom           string
 	RedisURL           string
+	RabbitMQURL        string
 	AllowedOrigins     []string
 }
 
@@ -54,6 +55,7 @@ func Load() *Config {
 		SMTPPassword:       getEnv("SMTP_PASSWORD", ""),
 		SMTPFrom:           getEnv("SMTP_FROM", "noreply@trainingcenter.com"),
 		RedisURL:           getEnv("REDIS_URL", "localhost:6379"),
+		RabbitMQURL:        getEnv("RABBITMQ_URL", ""),
 		AllowedOrigins:     getEnvAsSlice("ALLOWED_ORIGINS", "http://localhost:5173"),
 	}
 }
