@@ -5,11 +5,13 @@ import (
 	"time"
 )
 
+// RabbitMQ delivers higher numeric priorities first (x-max-priority: 4).
+// Contest submissions must be processed before practice and bulk rejudges.
 const (
-	QueuePriorityContest     = 1
-	QueuePriorityPostContest = 2
-	QueuePriorityPractice    = 3
-	QueuePriorityRejudge     = 4
+	QueuePriorityContest     = 4
+	QueuePriorityPostContest = 3
+	QueuePriorityPractice    = 2
+	QueuePriorityRejudge     = 1
 )
 
 type SubmissionQueueMetadata struct {

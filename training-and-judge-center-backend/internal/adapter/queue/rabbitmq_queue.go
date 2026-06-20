@@ -51,6 +51,14 @@ func NewRabbitMQQueue(url string) (*RabbitMQQueue, error) {
 }
 
 func (q *RabbitMQQueue) connect() error {
+	// Close stale resources before overwriting to avoid connection leaks.
+	if q.ch != nil {
+		q.ch.Close()
+	}
+	if q.conn != nil {
+		q.conn.Close()
+	}
+
 	conn, err := amqp.Dial(q.url)
 	if err != nil {
 		return fmt.Errorf("rabbitmq: dial %s: %w", q.url, err)
@@ -77,7 +85,7 @@ func (q *RabbitMQQueue) connect() error {
 	return nil
 }
 
-func (q *RabbitMQQueue) Publish(_ context.Context, msg appsubmission.SubmissionQueueMessage) error {
+func (q *RabbitMQQueue) Publish(ctx context.Context, msg appsubmission.SubmissionQueueMessage) error {
 	body, err := json.Marshal(queueMessage{
 		SubmissionID: msg.SubmissionID,
 		Priority:     msg.Priority,
@@ -90,7 +98,7 @@ func (q *RabbitMQQueue) Publish(_ context.Context, msg appsubmission.SubmissionQ
 		},
 	})
 	if err != nil {
-		slog.Error("rabbitmq: marshal message", "error", err)
+		slog.ErrorContext(ctx, "rabbitmq: marshal message", "error", err)
 		return apperror.NewInternal()
 	}
 
@@ -98,13 +106,13 @@ func (q *RabbitMQQueue) Publish(_ context.Context, msg appsubmission.SubmissionQ
 	defer q.mu.Unlock()
 
 	if err := q.publishLocked(body, uint8(msg.Priority)); err != nil {
-		slog.Warn("rabbitmq: publish failed, reconnecting", "error", err)
+		slog.WarnContext(ctx, "rabbitmq: publish failed, reconnecting", "error", err)
 		if reconErr := q.connect(); reconErr != nil {
-			slog.Error("rabbitmq: reconnect failed", "error", reconErr)
+			slog.ErrorContext(ctx, "rabbitmq: reconnect failed", "error", reconErr)
 			return apperror.NewInternal()
 		}
 		if err := q.publishLocked(body, uint8(msg.Priority)); err != nil {
-			slog.Error("rabbitmq: publish failed after reconnect", "error", err)
+			slog.ErrorContext(ctx, "rabbitmq: publish failed after reconnect", "error", err)
 			return apperror.NewInternal()
 		}
 	}

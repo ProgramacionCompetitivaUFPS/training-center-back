@@ -135,6 +135,8 @@ services:
     environment:
       RABBITMQ_DEFAULT_USER: judge
       RABBITMQ_DEFAULT_PASS: judge
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
     healthcheck:
       test: ["CMD", "rabbitmq-diagnostics", "ping"]
       interval: 5s
@@ -144,6 +146,7 @@ services:
 volumes:
   postgres_data:
   problem_uploads:
+  rabbitmq_data:
   certbot_etc:
   certbot_var:
   certbot_webroot:
