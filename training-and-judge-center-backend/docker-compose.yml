@@ -94,6 +94,7 @@ services:
       SMTP_PASSWORD: ${SMTP_PASSWORD:-}
       SMTP_FROM: ${SMTP_FROM:-noreply@trainingcenter.com}
       REDIS_URL: redis://redis:6379
+      RABBITMQ_URL: ${RABBITMQ_URL:-amqp://judge:judge@rabbitmq:5672/}
       MOCK_AUTH: ${MOCK_AUTH:-0}
       VIRTUAL_OBJECT_CONFIG: /config/virtual_object.json
       STORAGE_BACKEND: ${STORAGE_BACKEND:-local}
@@ -107,6 +108,8 @@ services:
         condition: service_completed_successfully
       redis:
         condition: service_started
+      rabbitmq:
+        condition: service_healthy
       mailhog:
         condition: service_started
 
@@ -122,6 +125,21 @@ services:
     container_name: training-center-redis
     ports:
       - "6379:6379"
+
+  rabbitmq:
+    image: rabbitmq:3-management
+    container_name: training-center-rabbitmq
+    ports:
+      - "5672:5672"    # AMQP
+      - "15672:15672"  # Management UI
+    environment:
+      RABBITMQ_DEFAULT_USER: judge
+      RABBITMQ_DEFAULT_PASS: judge
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
 
 volumes:
   postgres_data:
