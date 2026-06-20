@@ -11,6 +11,7 @@ import (
 	"github.com/training-judge-center/backend/internal/adapter/http/handler/group"
 	handlerMaterial "github.com/training-judge-center/backend/internal/adapter/http/handler/material"
 	"github.com/training-judge-center/backend/internal/adapter/http/handler/problem"
+	handlerSubmission "github.com/training-judge-center/backend/internal/adapter/http/handler/submission"
 	handlerTeam "github.com/training-judge-center/backend/internal/adapter/http/handler/team"
 	handlerUser "github.com/training-judge-center/backend/internal/adapter/http/handler/user"
 	"github.com/training-judge-center/backend/internal/adapter/http/middleware"
@@ -19,13 +20,14 @@ import (
 )
 
 type Handlers struct {
-	Problem  *problem.Handler
-	User     *handlerUser.Handler
-	Auth     *handler2.AuthHandler
-	Group    *group.Handler
-	Material *handlerMaterial.Handler
-	Contest  *handlerContest.Handler
-	Team     *handlerTeam.Handler
+	Problem    *problem.Handler
+	User       *handlerUser.Handler
+	Auth       *handler2.AuthHandler
+	Group      *group.Handler
+	Material   *handlerMaterial.Handler
+	Contest    *handlerContest.Handler
+	Team       *handlerTeam.Handler
+	Submission *handlerSubmission.Handler
 }
 
 type Services struct {
@@ -136,6 +138,8 @@ func NewRouter(h *Handlers, s *Services, allowedOrigins []string) *chi.Mux {
 				r.Delete("/", h.Problem.DeleteProblem)
 				r.Post("/unpublish", h.Problem.Unpublish)
 				r.Patch("/accessibility", h.Problem.ChangeAccessibility)
+
+				r.Post("/submissions", h.Submission.Submit)
 
 				r.Route("/files", func(r chi.Router) {
 					r.Post("/", h.Problem.UploadFiles)

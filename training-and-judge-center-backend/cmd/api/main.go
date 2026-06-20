@@ -28,12 +28,14 @@ import (
 	handlerGroup "github.com/training-judge-center/backend/internal/adapter/http/handler/group"
 	handlerMaterial "github.com/training-judge-center/backend/internal/adapter/http/handler/material"
 	handlerProblem "github.com/training-judge-center/backend/internal/adapter/http/handler/problem"
+	handlersubmission "github.com/training-judge-center/backend/internal/adapter/http/handler/submission"
 	handlerteam "github.com/training-judge-center/backend/internal/adapter/http/handler/team"
 	handlerUser "github.com/training-judge-center/backend/internal/adapter/http/handler/user"
 	"github.com/training-judge-center/backend/internal/adapter/material"
 	"github.com/training-judge-center/backend/internal/adapter/postgres"
 	"github.com/training-judge-center/backend/internal/adapter/problem"
 	"github.com/training-judge-center/backend/internal/adapter/ratelimit"
+	adaptersubmission "github.com/training-judge-center/backend/internal/adapter/submission"
 	adapterteam "github.com/training-judge-center/backend/internal/adapter/team"
 	"github.com/training-judge-center/backend/internal/adapter/user"
 
@@ -41,6 +43,7 @@ import (
 	appGroup "github.com/training-judge-center/backend/internal/application/group"
 	appMaterial "github.com/training-judge-center/backend/internal/application/material"
 	appProblem "github.com/training-judge-center/backend/internal/application/problem"
+	appsubmission "github.com/training-judge-center/backend/internal/application/submission"
 	appteam "github.com/training-judge-center/backend/internal/application/team"
 	appuser "github.com/training-judge-center/backend/internal/application/user"
 	"github.com/training-judge-center/backend/internal/config"
@@ -372,14 +375,33 @@ func main() {
 		listTeamRegistrationsUseCase,
 	)
 
+	// submission adapters
+	submissionRepo := adaptersubmission.NewRepository(dbPool)
+	submissionProblemProvider := adaptersubmission.NewProblemProvider(dbPool)
+	submissionStorage := adaptersubmission.NewSourceStorage(fileStorage.UploadFile, fileStorage.DeleteFile)
+	noOpQueue := adaptersubmission.NoOpQueue{}
+
+	// submission use cases
+	submitSolutionUseCase := appsubmission.NewSubmitSolutionUseCase(
+		submissionProblemProvider,
+		submissionRepo,
+		submissionStorage,
+		noOpQueue,
+		1<<20, // 1 MB
+		1,     // 1 second rate limit
+	)
+
+	submissionHandler := handlersubmission.NewHandler(submitSolutionUseCase)
+
 	router := adapterhttp.NewRouter(&adapterhttp.Handlers{
-		Problem:  problemHandler,
-		User:     userHandler,
-		Auth:     authHandler,
-		Group:    groupHandler,
-		Material: materialHandler,
-		Contest:  contestHandler,
-		Team:     teamHandler,
+		Problem:    problemHandler,
+		User:       userHandler,
+		Auth:       authHandler,
+		Group:      groupHandler,
+		Material:   materialHandler,
+		Contest:    contestHandler,
+		Team:       teamHandler,
+		Submission: submissionHandler,
 	}, &adapterhttp.Services{
 		TokenService:       jwtService,
 		SessionInvalidator: sessionInvalidator,

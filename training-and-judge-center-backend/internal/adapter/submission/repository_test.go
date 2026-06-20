@@ -30,9 +30,13 @@ func pendingSubmission() *domainsubmission.Submission {
 		testProblemID,
 		shared.RestoreUserID(testUserID),
 		nil,
+		nil,
 		domainsubmission.RestoreLanguage("cpp20"),
+		"g++",
 		domainsubmission.RestoreStatus("PENDING"),
 		"gs://bucket/code.cpp",
+		"",
+		0,
 		testNow,
 		nil, nil, nil, nil,
 	)
@@ -106,18 +110,22 @@ func (m *mockRows) Conn() *pgx.Conn { return nil }
 // ── helper: scan fn para una submission pendiente ─────────────────────────────
 
 func submissionScanFn(dest ...any) error {
-	*(dest[0].(*string)) = testSubID
-	*(dest[1].(*string)) = testProblemID
-	*(dest[2].(*string)) = testUserID
-	*(dest[3].(**string)) = nil
-	*(dest[4].(*string)) = "cpp20"
-	*(dest[5].(*string)) = "PENDING"
-	*(dest[6].(*string)) = "gs://bucket/code.cpp"
-	*(dest[7].(*time.Time)) = testNow
-	*(dest[8].(**time.Time)) = nil
-	*(dest[9].(**int)) = nil
-	*(dest[10].(**int)) = nil
-	*(dest[11].(**string)) = nil
+	*(dest[0].(*string)) = testSubID              // id
+	*(dest[1].(*string)) = testProblemID          // problem_id
+	*(dest[2].(*string)) = testUserID             // user_id
+	*(dest[3].(**string)) = nil                    // contest_id
+	*(dest[4].(**string)) = nil                    // standing_id
+	*(dest[5].(*string)) = "cpp20"                // language
+	*(dest[6].(*string)) = "g++"                  // compiler
+	*(dest[7].(*string)) = "PENDING"              // status
+	*(dest[8].(*string)) = "gs://bucket/code.cpp" // source_code_path
+	*(dest[9].(**string)) = nil                    // file_hash
+	*(dest[10].(**int)) = nil                      // file_size
+	*(dest[11].(*time.Time)) = testNow            // submitted_at
+	*(dest[12].(**time.Time)) = nil                // judged_at
+	*(dest[13].(**int)) = nil                      // time_ms
+	*(dest[14].(**int)) = nil                      // memory_kb
+	*(dest[15].(**string)) = nil                   // compile_log
 	return nil
 }
 

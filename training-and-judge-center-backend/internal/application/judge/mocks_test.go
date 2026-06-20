@@ -168,10 +168,11 @@ func pendingSubmission() *submission.Submission {
 	return submission.RestoreSubmission(
 		submissionID, problemID,
 		shared.RestoreUserID(userID),
-		nil,
-		lang,
+		nil, nil,
+		lang, "g++",
 		submission.RestoreStatus("PENDING"),
 		"gs://bucket/code.cpp",
+		"", 0,
 		testNow, nil, nil, nil, nil,
 	)
 }
@@ -181,10 +182,11 @@ func pendingSubmissionInContest(cID string) *submission.Submission {
 	return submission.RestoreSubmission(
 		submissionID, problemID,
 		shared.RestoreUserID(userID),
-		&cID,
-		lang,
+		&cID, nil,
+		lang, "g++",
 		submission.RestoreStatus("PENDING"),
 		"gs://bucket/code.cpp",
+		"", 0,
 		testNow, nil, nil, nil, nil,
 	)
 }
