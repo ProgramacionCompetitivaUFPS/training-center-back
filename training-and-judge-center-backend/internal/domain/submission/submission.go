@@ -16,9 +16,13 @@ type Submission struct {
 	problemID      ProblemID
 	userID         shared.UserID
 	contestID      *ContestID
+	standingID     *string
 	language       Language
+	compiler       string
 	status         SubmissionStatus
 	sourceCodePath string
+	fileHash       string
+	fileSize       int
 
 	submittedAt time.Time
 	judgedAt    *time.Time
@@ -32,9 +36,13 @@ func (s *Submission) ID() SubmissionID              { return s.id }
 func (s *Submission) ProblemID() ProblemID          { return s.problemID }
 func (s *Submission) UserID() shared.UserID         { return s.userID }
 func (s *Submission) ContestID() *ContestID         { return s.contestID }
+func (s *Submission) StandingID() *string           { return s.standingID }
 func (s *Submission) Language() Language            { return s.language }
+func (s *Submission) Compiler() string              { return s.compiler }
 func (s *Submission) Status() SubmissionStatus      { return s.status }
 func (s *Submission) SourceCodePath() string        { return s.sourceCodePath }
+func (s *Submission) FileHash() string              { return s.fileHash }
+func (s *Submission) FileSize() int                 { return s.fileSize }
 func (s *Submission) SubmittedAt() time.Time        { return s.submittedAt }
 func (s *Submission) JudgedAt() *time.Time          { return s.judgedAt }
 func (s *Submission) TimeMs() *int                  { return s.timeMs }
@@ -46,8 +54,12 @@ func NewSubmission(
 	problemID ProblemID,
 	userID shared.UserID,
 	contestID *ContestID,
+	standingID *string,
 	lang Language,
+	compiler string,
 	sourceCodePath string,
+	fileHash string,
+	fileSize int,
 	now time.Time,
 ) (*Submission, error) {
 	if id == "" {
@@ -58,9 +70,13 @@ func NewSubmission(
 		problemID:      problemID,
 		userID:         userID,
 		contestID:      contestID,
+		standingID:     standingID,
 		language:       lang,
+		compiler:       compiler,
 		status:         newStatusPending(),
 		sourceCodePath: sourceCodePath,
+		fileHash:       fileHash,
+		fileSize:       fileSize,
 		submittedAt:    now.UTC(),
 	}, nil
 }
@@ -70,9 +86,13 @@ func RestoreSubmission(
 	problemID ProblemID,
 	userID shared.UserID,
 	contestID *ContestID,
+	standingID *string,
 	lang Language,
+	compiler string,
 	status SubmissionStatus,
 	sourceCodePath string,
+	fileHash string,
+	fileSize int,
 	submittedAt time.Time,
 	judgedAt *time.Time,
 	timeMs *int,
@@ -84,9 +104,13 @@ func RestoreSubmission(
 		problemID:      problemID,
 		userID:         userID,
 		contestID:      contestID,
+		standingID:     standingID,
 		language:       lang,
+		compiler:       compiler,
 		status:         status,
 		sourceCodePath: sourceCodePath,
+		fileHash:       fileHash,
+		fileSize:       fileSize,
 		submittedAt:    submittedAt,
 		judgedAt:       judgedAt,
 		timeMs:         timeMs,
