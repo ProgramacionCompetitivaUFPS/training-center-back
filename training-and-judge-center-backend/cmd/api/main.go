@@ -10,9 +10,11 @@ package main
 import (
 	"context"
 	"fmt"
+	"io"
 	"log/slog"
 	"net/http"
 	"os"
+	"path/filepath"
 	"time"
 
 	googleStorage "cloud.google.com/go/storage"
@@ -48,6 +50,7 @@ import (
 	appteam "github.com/training-judge-center/backend/internal/application/team"
 	appuser "github.com/training-judge-center/backend/internal/application/user"
 	"github.com/training-judge-center/backend/internal/config"
+	"github.com/training-judge-center/backend/pkg/apperror"
 )
 
 func main() {
@@ -93,6 +96,7 @@ func main() {
 
 	// File Storage
 	var fileStorage appProblem.ProblemFileRepository
+	var sourceCodeReadFn func(ctx context.Context, path string) ([]byte, error)
 	switch cfg.StorageBackend {
 	case "gcs":
 		if cfg.GCSBucket == "" {
@@ -106,6 +110,21 @@ func main() {
 		}
 		slog.Info("using GCS storage backend", "bucket", cfg.GCSBucket)
 		fileStorage = problem.NewGCSFileRepository(gcsClient, cfg.GCSBucket)
+		capturedClient, capturedBucket := gcsClient, cfg.GCSBucket
+		sourceCodeReadFn = func(ctx context.Context, path string) ([]byte, error) {
+			rc, err := capturedClient.Bucket(capturedBucket).Object(path).NewReader(ctx)
+			if err != nil {
+				slog.ErrorContext(ctx, "gcs: failed to open source code reader", "path", path, "error", err)
+				return nil, apperror.NewInternal()
+			}
+			defer rc.Close()
+			data, err := io.ReadAll(rc)
+			if err != nil {
+				slog.ErrorContext(ctx, "gcs: failed to read source code", "path", path, "error", err)
+				return nil, apperror.NewInternal()
+			}
+			return data, nil
+		}
 	default:
 		localDir := cfg.StorageLocalDir
 		localRepo, err := problem.NewLocalFileRepository(localDir)
@@ -115,6 +134,16 @@ func main() {
 		}
 		slog.Info("using local storage backend", "dir", localDir)
 		fileStorage = localRepo
+		capturedDir := localDir
+		sourceCodeReadFn = func(ctx context.Context, path string) ([]byte, error) {
+			fullPath := filepath.Join(capturedDir, path)
+			data, err := os.ReadFile(fullPath)
+			if err != nil {
+				slog.ErrorContext(ctx, "local: failed to read source code", "path", fullPath, "error", err)
+				return nil, apperror.NewInternal()
+			}
+			return data, nil
+		}
 	}
 
 	icpcParser := problem.NewICPCParser(
@@ -380,6 +409,12 @@ func main() {
 	submissionRepo := adaptersubmission.NewRepository(dbPool)
 	submissionProblemProvider := adaptersubmission.NewProblemProvider(dbPool)
 	submissionStorage := adaptersubmission.NewSourceStorage(fileStorage.UploadFile, fileStorage.DeleteFile)
+	submissionSourceReader := adaptersubmission.NewSourceCodeReader(sourceCodeReadFn)
+	submissionProblemDisplay := adaptersubmission.NewProblemDisplayProvider(dbPool)
+	submissionUserDisplay := adaptersubmission.NewUserProvider(dbPool)
+	submissionContestDisplay := adaptersubmission.NewContestProvider(dbPool)
+	submissionLeadChecker := adaptersubmission.NewLeadChecker(dbPool)
+	submissionTeamChecker := adaptersubmission.NewTeamMembershipChecker(dbPool)
 
 	// submission queue — RabbitMQ when URL is set, no-op otherwise
 	var submissionQueue appsubmission.SubmissionQueue
@@ -406,8 +441,36 @@ func main() {
 		1<<20, // 1 MB
 		1,     // 1 second rate limit
 	)
+	getSubmissionUseCase := appsubmission.NewGetSubmissionUseCase(
+		submissionRepo,
+		submissionSourceReader,
+		submissionProblemDisplay,
+		submissionUserDisplay,
+		submissionContestDisplay,
+		submissionTeamChecker,
+		submissionLeadChecker,
+	)
+	updateSubmissionVisibilityUseCase := appsubmission.NewUpdateSubmissionVisibilityUseCase(submissionRepo)
+	listMySubmissionsUseCase := appsubmission.NewListMySubmissionsUseCase(
+		submissionRepo,
+		submissionProblemDisplay,
+		submissionUserDisplay,
+		submissionContestDisplay,
+		submissionProblemProvider,
+	)
+	listProblemSubmissionsUseCase := appsubmission.NewListProblemSubmissionsUseCase(
+		submissionRepo,
+		submissionProblemProvider,
+		submissionUserDisplay,
+	)
 
-	submissionHandler := handlersubmission.NewHandler(submitSolutionUseCase)
+	submissionHandler := handlersubmission.NewHandler(
+		submitSolutionUseCase,
+		getSubmissionUseCase,
+		updateSubmissionVisibilityUseCase,
+		listMySubmissionsUseCase,
+		listProblemSubmissionsUseCase,
+	)
 
 	router := adapterhttp.NewRouter(&adapterhttp.Handlers{
 		Problem:    problemHandler,

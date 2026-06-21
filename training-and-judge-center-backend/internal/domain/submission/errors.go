@@ -4,6 +4,7 @@ const (
 	ErrCodeInvalidTransition  = "INVALID_STATUS_TRANSITION"
 	ErrCodeInvalidLanguage    = "INVALID_LANGUAGE"
 	ErrCodeSubmissionNotFound = "SUBMISSION_NOT_FOUND"
+	ErrCodeAccessDenied       = "ACCESS_DENIED"
 
 	ErrCodeProblemNotPublished  = "PROBLEM_NOT_PUBLISHED"
 	ErrCodeProblemNotAccessible = "PROBLEM_NOT_ACCESSIBLE"

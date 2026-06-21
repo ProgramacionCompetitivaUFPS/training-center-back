@@ -20,6 +20,7 @@ type Submission struct {
 	language       Language
 	compiler       string
 	status         SubmissionStatus
+	visibility     Visibility
 	sourceCodePath string
 	fileHash       string
 	fileSize       int
@@ -40,6 +41,7 @@ func (s *Submission) StandingID() *string           { return s.standingID }
 func (s *Submission) Language() Language            { return s.language }
 func (s *Submission) Compiler() string              { return s.compiler }
 func (s *Submission) Status() SubmissionStatus      { return s.status }
+func (s *Submission) Visibility() Visibility        { return s.visibility }
 func (s *Submission) SourceCodePath() string        { return s.sourceCodePath }
 func (s *Submission) FileHash() string              { return s.fileHash }
 func (s *Submission) FileSize() int                 { return s.fileSize }
@@ -48,6 +50,8 @@ func (s *Submission) JudgedAt() *time.Time          { return s.judgedAt }
 func (s *Submission) TimeMs() *int                  { return s.timeMs }
 func (s *Submission) MemoryKb() *int                { return s.memoryKb }
 func (s *Submission) CompileLog() *string           { return s.compileLog }
+
+func (s *Submission) SetVisibility(v Visibility) { s.visibility = v }
 
 func NewSubmission(
 	id SubmissionID,
@@ -74,6 +78,7 @@ func NewSubmission(
 		language:       lang,
 		compiler:       compiler,
 		status:         newStatusPending(),
+		visibility:     NewVisibilityPrivate(),
 		sourceCodePath: sourceCodePath,
 		fileHash:       fileHash,
 		fileSize:       fileSize,
@@ -90,6 +95,7 @@ func RestoreSubmission(
 	lang Language,
 	compiler string,
 	status SubmissionStatus,
+	visibility Visibility,
 	sourceCodePath string,
 	fileHash string,
 	fileSize int,
@@ -108,6 +114,7 @@ func RestoreSubmission(
 		language:       lang,
 		compiler:       compiler,
 		status:         status,
+		visibility:     visibility,
 		sourceCodePath: sourceCodePath,
 		fileHash:       fileHash,
 		fileSize:       fileSize,

@@ -127,6 +127,11 @@ func NewRouter(h *Handlers, s *Services, allowedOrigins []string) *chi.Mux {
 			})
 		})
 
+		r.Route("/submissions", func(r chi.Router) {
+			r.Get("/{submissionId}", h.Submission.GetSubmission)
+			r.Patch("/{submissionId}/visibility", h.Submission.UpdateVisibility)
+		})
+
 		r.Route("/problems", func(r chi.Router) {
 			r.Get("/", h.Problem.ListProblems)
 			r.Post("/", h.Problem.Create)
@@ -139,6 +144,7 @@ func NewRouter(h *Handlers, s *Services, allowedOrigins []string) *chi.Mux {
 				r.Post("/unpublish", h.Problem.Unpublish)
 				r.Patch("/accessibility", h.Problem.ChangeAccessibility)
 
+				r.Get("/submissions", h.Submission.ListProblemSubmissions)
 				r.Post("/submissions", h.Submission.Submit)
 
 				r.Route("/files", func(r chi.Router) {
@@ -172,6 +178,7 @@ func NewRouter(h *Handlers, s *Services, allowedOrigins []string) *chi.Mux {
 		r.Get("/users/me/groups", h.Group.ListMyGroups)
 		r.Get("/users/me/teams", h.Team.ListMyTeams)
 		r.Get("/users/me/team-invitations", h.Team.ListMyInvitations)
+		r.Get("/users/me/submissions", h.Submission.ListMySubmissions)
 		r.Get("/users/{nickname}", h.User.GetByNickname)
 		r.Put("/users", h.User.UpdateProfile)
 		r.Put("/users/password", h.User.UpdatePassword)

@@ -7,11 +7,15 @@ import (
 )
 
 type ListFilters struct {
-	UserID    *shared.UserID
-	ProblemID *ProblemID
-	ContestID *ContestID
-	Page      int
-	Limit     int
+	UserID         *shared.UserID
+	ProblemID      *ProblemID
+	ContestID      *ContestID
+	Status         *string
+	Language       *string
+	Visibility     *string
+	ExcludeContest bool
+	Page           int
+	Limit          int
 }
 
 type Repository interface {
@@ -20,4 +24,5 @@ type Repository interface {
 	List(ctx context.Context, filters ListFilters) ([]*Submission, int, error)
 	FindLastByUserAndProblem(ctx context.Context, userID, problemID string) (*Submission, error)
 	ExistsByHashAndUserAndProblem(ctx context.Context, fileHash, userID, problemID string) (bool, error)
+	UpdateVisibility(ctx context.Context, s *Submission) error
 }

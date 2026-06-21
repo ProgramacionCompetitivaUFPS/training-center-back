@@ -34,6 +34,7 @@ func pendingSubmission() *domainsubmission.Submission {
 		domainsubmission.RestoreLanguage("cpp20"),
 		"g++",
 		domainsubmission.RestoreStatus("PENDING"),
+		domainsubmission.RestoreVisibility("PRIVATE"),
 		"gs://bucket/code.cpp",
 		"",
 		0,
@@ -118,14 +119,15 @@ func submissionScanFn(dest ...any) error {
 	*(dest[5].(*string)) = "cpp20"                // language
 	*(dest[6].(*string)) = "g++"                  // compiler
 	*(dest[7].(*string)) = "PENDING"              // status
-	*(dest[8].(*string)) = "gs://bucket/code.cpp" // source_code_path
-	*(dest[9].(**string)) = nil                    // file_hash
-	*(dest[10].(**int)) = nil                      // file_size
-	*(dest[11].(*time.Time)) = testNow            // submitted_at
-	*(dest[12].(**time.Time)) = nil                // judged_at
-	*(dest[13].(**int)) = nil                      // time_ms
-	*(dest[14].(**int)) = nil                      // memory_kb
-	*(dest[15].(**string)) = nil                   // compile_log
+	*(dest[8].(*string)) = "PRIVATE"              // visibility
+	*(dest[9].(*string)) = "gs://bucket/code.cpp" // source_code_path
+	*(dest[10].(**string)) = nil                   // file_hash
+	*(dest[11].(**int)) = nil                      // file_size
+	*(dest[12].(*time.Time)) = testNow            // submitted_at
+	*(dest[13].(**time.Time)) = nil                // judged_at
+	*(dest[14].(**int)) = nil                      // time_ms
+	*(dest[15].(**int)) = nil                      // memory_kb
+	*(dest[16].(**string)) = nil                   // compile_log
 	return nil
 }
 
