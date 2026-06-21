@@ -42,7 +42,7 @@ func (s *mockGetRepo) FindByID(_ context.Context, _ string) (*domainContest.Cont
 		nil,
 		start, end,
 		domainContest.RestorePenalty(20),
-		0, false, false,
+		0, false, false, false,
 		shared.RestoreGroupID("g1"),
 		shared.RestoreUserID("u1"),
 		domainContest.RestoreParticipationMode("INDIVIDUAL"), domainContest.RestoreTeamSize(2, 5),

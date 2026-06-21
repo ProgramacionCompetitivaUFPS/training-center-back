@@ -13,7 +13,7 @@ func NewContestParticipantProvider(reg *RegistrationRepository) *ContestParticip
 }
 
 func (p *ContestParticipantProvider) IsRegistered(ctx context.Context, contestID, userID string) (bool, error) {
-	return p.reg.ExistsByContestAndUser(ctx, contestID, userID)
+	return p.reg.ExistsByContestAndUserOrTeam(ctx, contestID, userID)
 }
 
 func (p *ContestParticipantProvider) CountParticipants(ctx context.Context, contestID string) (int, error) {

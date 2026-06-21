@@ -19,6 +19,7 @@ type Contest struct {
 	freezeMinutes     int
 	enablePostContest bool
 	locked            bool
+	showTeamMembers   bool
 	groupID           shared.GroupID
 	ownerID           shared.UserID
 	participationMode ParticipationMode
@@ -87,6 +88,7 @@ func RestoreContest(
 	freezeMinutes int,
 	enablePostContest bool,
 	locked bool,
+	showTeamMembers bool,
 	groupID shared.GroupID,
 	ownerID shared.UserID,
 	participationMode ParticipationMode,
@@ -108,6 +110,7 @@ func RestoreContest(
 		freezeMinutes:     freezeMinutes,
 		enablePostContest: enablePostContest,
 		locked:            locked,
+		showTeamMembers:   showTeamMembers,
 		groupID:           groupID,
 		ownerID:           ownerID,
 		participationMode: participationMode,
@@ -273,22 +276,23 @@ func (c *Contest) SetProblems(problems []ContestProblem, now time.Time) {
 	c.updatedAt = &t
 }
 
-func (c *Contest) ID() string                        { return c.id }
-func (c *Contest) Name() ContestName                 { return c.name }
-func (c *Contest) Description() *string              { return c.description }
-func (c *Contest) StartTime() time.Time              { return c.startTime }
-func (c *Contest) EndTime() time.Time                { return c.endTime }
-func (c *Contest) Penalty() Penalty                  { return c.penalty }
-func (c *Contest) FreezeMinutes() int                { return c.freezeMinutes }
-func (c *Contest) EnablePostContest() bool           { return c.enablePostContest }
-func (c *Contest) Locked() bool                      { return c.locked }
-func (c *Contest) GroupID() shared.GroupID           { return c.groupID }
-func (c *Contest) OwnerID() shared.UserID            { return c.ownerID }
+func (c *Contest) ID() string                           { return c.id }
+func (c *Contest) Name() ContestName                    { return c.name }
+func (c *Contest) Description() *string                 { return c.description }
+func (c *Contest) StartTime() time.Time                 { return c.startTime }
+func (c *Contest) EndTime() time.Time                   { return c.endTime }
+func (c *Contest) Penalty() Penalty                     { return c.penalty }
+func (c *Contest) FreezeMinutes() int                   { return c.freezeMinutes }
+func (c *Contest) EnablePostContest() bool              { return c.enablePostContest }
+func (c *Contest) Locked() bool                         { return c.locked }
+func (c *Contest) ShowTeamMembers() bool                { return c.showTeamMembers }
+func (c *Contest) GroupID() shared.GroupID              { return c.groupID }
+func (c *Contest) OwnerID() shared.UserID               { return c.ownerID }
 func (c *Contest) ParticipationMode() ParticipationMode { return c.participationMode }
-func (c *Contest) TeamSize() TeamSize                { return c.teamSize }
-func (c *Contest) Problems() []ContestProblem        { return c.problems }
-func (c *Contest) CreatedAt() time.Time              { return c.createdAt }
-func (c *Contest) UpdatedAt() *time.Time             { return c.updatedAt }
+func (c *Contest) TeamSize() TeamSize                   { return c.teamSize }
+func (c *Contest) Problems() []ContestProblem           { return c.problems }
+func (c *Contest) CreatedAt() time.Time                 { return c.createdAt }
+func (c *Contest) UpdatedAt() *time.Time                { return c.updatedAt }
 
 func validateDescription(d *string) error {
 	if d == nil {

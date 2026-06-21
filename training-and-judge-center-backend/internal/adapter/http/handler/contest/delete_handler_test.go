@@ -19,7 +19,7 @@ func contestToDelete() *domainContest.Contest {
 		time.Now().Add(2*time.Hour),
 		time.Now().Add(4*time.Hour),
 		domainContest.RestorePenalty(20),
-		0, false, false,
+		0, false, false, false,
 		shared.RestoreGroupID("g1"),
 		shared.RestoreUserID("u1"),
 		domainContest.RestoreParticipationMode("INDIVIDUAL"), domainContest.RestoreTeamSize(2, 5),

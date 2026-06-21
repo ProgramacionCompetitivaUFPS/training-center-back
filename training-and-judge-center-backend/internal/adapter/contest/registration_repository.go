@@ -134,6 +134,31 @@ func (r *RegistrationRepository) ExistsByContestAndUser(ctx context.Context, con
 	return exists, nil
 }
 
+// ExistsByContestAndUserOrTeam returns true when the user is individually
+// registered or is a selected member of a team registered in the contest.
+func (r *RegistrationRepository) ExistsByContestAndUserOrTeam(ctx context.Context, contestID, userID string) (bool, error) {
+	q := infraPostgres.GetQuerier(ctx, r.db)
+	var exists bool
+	err := q.QueryRow(ctx, `
+		SELECT EXISTS(
+			SELECT 1 FROM contest_registrations
+			WHERE contest_id = $1 AND user_id = $2
+			UNION ALL
+			SELECT 1 FROM contest_team_participants ctp
+			JOIN team_members tm ON tm.team_id = ctp.team_id AND tm.user_id = $2
+			WHERE ctp.contest_id = $1
+			  AND ($2::uuid = ANY(ctp.selected_members) OR array_length(ctp.selected_members, 1) IS NULL)
+		)`,
+		contestID, userID,
+	).Scan(&exists)
+	if err != nil {
+		slog.ErrorContext(ctx, "failed to check contest participation",
+			"contest_id", contestID, "user_id", userID, "error", err)
+		return false, apperror.NewInternal()
+	}
+	return exists, nil
+}
+
 func (r *RegistrationRepository) CountByContest(ctx context.Context, contestID string) (int, error) {
 	q := infraPostgres.GetQuerier(ctx, r.db)
 	var count int

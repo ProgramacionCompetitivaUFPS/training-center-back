@@ -27,7 +27,12 @@ type SubmissionProblemDisplay struct {
 }
 
 type SubmissionSubmitterDisplay struct {
-	Nickname string
+	Type     string   // "INDIVIDUAL" or "TEAM"
+	Nickname string   // for INDIVIDUAL
+	Name     string   // for INDIVIDUAL
+	TeamID   string   // for TEAM
+	TeamName string   // for TEAM
+	Members  []string // for TEAM, populated when contest.ShowTeamMembers=true
 }
 
 type SubmissionDisplay struct {
@@ -65,6 +70,7 @@ type ListContestSubmissionsUseCase struct {
 	memberProvider      GroupMemberProvider
 	participantProvider ContestParticipantProvider
 	submissionsProvider ContestSubmissionProvider
+	standingProvider    CallerStandingProvider
 }
 
 func NewListContestSubmissionsUseCase(
@@ -73,6 +79,7 @@ func NewListContestSubmissionsUseCase(
 	memberProvider GroupMemberProvider,
 	participantProvider ContestParticipantProvider,
 	submissionsProvider ContestSubmissionProvider,
+	standingProvider CallerStandingProvider,
 ) *ListContestSubmissionsUseCase {
 	return &ListContestSubmissionsUseCase{
 		contestRepo:         contestRepo,
@@ -80,6 +87,7 @@ func NewListContestSubmissionsUseCase(
 		memberProvider:      memberProvider,
 		participantProvider: participantProvider,
 		submissionsProvider: submissionsProvider,
+		standingProvider:    standingProvider,
 	}
 }
 
@@ -152,19 +160,25 @@ func (uc *ListContestSubmissionsUseCase) Execute(ctx context.Context, in ListCon
 		return nil, err
 	}
 
-	callerID := in.CurrentUser.ID
+	callerStandingID := in.CurrentUser.ID
+	if !isAdmin && !isLead && freezeTime != nil {
+		if sid, found, err := uc.standingProvider.GetCallerStandingID(ctx, in.ContestID, in.CurrentUser.ID); err == nil && found {
+			callerStandingID = sid
+		}
+	}
+
 	showFullDetails := status == domainContest.StatusFinished || isLead || isAdmin
+	showMembers := contest.ShowTeamMembers()
 
 	var result []SubmissionDisplay
 	for _, sub := range subs {
-		// Freeze: leads/admins see all; participants see own always + others pre-freeze only.
-		if !isAdmin && !isLead && freezeTime != nil && sub.UserID != callerID {
+		// Freeze: leads/admins see all; participants see own standing always + others pre-freeze only.
+		if !isAdmin && !isLead && freezeTime != nil && sub.StandingID != callerStandingID {
 			if !sub.SubmittedAt.Before(*freezeTime) {
 				continue
 			}
 		}
 
-		// Phase filter.
 		if in.Phase == "competition" && sub.SubmittedAt.After(endTime) {
 			continue
 		}
@@ -172,10 +186,11 @@ func (uc *ListContestSubmissionsUseCase) Execute(ctx context.Context, in ListCon
 			continue
 		}
 
+		submitter := buildSubmitter(sub, showMembers)
 		d := SubmissionDisplay{
 			ID:          sub.ID,
 			Problem:     SubmissionProblemDisplay{Slug: sub.ProblemSlug, Title: sub.ProblemTitle, Order: sub.ProblemOrder},
-			SubmittedBy: SubmissionSubmitterDisplay{Nickname: sub.Nickname},
+			SubmittedBy: submitter,
 			Language:    sub.Language,
 			Status:      sub.Status,
 			SubmittedAt: sub.SubmittedAt,
@@ -222,4 +237,23 @@ func (uc *ListContestSubmissionsUseCase) Execute(ctx context.Context, in ListCon
 		Limit:       in.Limit,
 		Meta:        meta,
 	}, nil
+}
+
+func buildSubmitter(sub RichSubmissionData, showMembers bool) SubmissionSubmitterDisplay {
+	if sub.TeamID != nil {
+		s := SubmissionSubmitterDisplay{
+			Type:     "TEAM",
+			TeamID:   *sub.TeamID,
+			TeamName: *sub.TeamName,
+		}
+		if showMembers {
+			s.Members = sub.TeamMemberNicknames
+		}
+		return s
+	}
+	return SubmissionSubmitterDisplay{
+		Type:     "INDIVIDUAL",
+		Nickname: sub.Nickname,
+		Name:     sub.SubmitterName,
+	}
 }

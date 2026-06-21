@@ -250,6 +250,14 @@ func (m *mockContestSubmissionsProvider) ListByContest(_ context.Context, _ stri
 	return m.subs, nil
 }
 
+// ── CallerStandingProvider mock ───────────────────────────────────────────────
+
+type mockCallerStandingProvider struct{}
+
+func (m *mockCallerStandingProvider) GetCallerStandingID(_ context.Context, _, userID string) (string, bool, error) {
+	return userID, true, nil
+}
+
 // ── Contest fixture helpers ───────────────────────────────────────────────────
 
 func scheduledContest() *domainContest.Contest {
@@ -261,7 +269,7 @@ func scheduledContest() *domainContest.Contest {
 		nil,
 		start, end,
 		domainContest.RestorePenalty(20),
-		0, false, false,
+		0, false, false, false,
 		shared.RestoreGroupID("g1"),
 		shared.RestoreUserID("u1"),
 		domainContest.RestoreParticipationMode("INDIVIDUAL"), domainContest.RestoreTeamSize(2, 5),
@@ -279,7 +287,7 @@ func finishedContest() *domainContest.Contest {
 		time.Now().Add(-48*time.Hour),
 		time.Now().Add(-24*time.Hour),
 		domainContest.RestorePenalty(20),
-		0, false, false,
+		0, false, false, false,
 		shared.RestoreGroupID("g1"),
 		shared.RestoreUserID("u1"),
 		domainContest.RestoreParticipationMode("INDIVIDUAL"), domainContest.RestoreTeamSize(2, 5),
