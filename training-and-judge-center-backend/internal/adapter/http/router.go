@@ -112,6 +112,8 @@ func NewRouter(h *Handlers, s *Services, allowedOrigins []string) *chi.Mux {
 					r.Put("/{teamId}", h.Team.UpdateTeamRegistration)
 					r.Delete("/{teamId}", h.Team.UnregisterTeamFromContest)
 				})
+
+				r.Post("/{contestId}/problems/{problemSlug}/submissions", h.Submission.SubmitContest)
 			})
 
 			r.Route("/{groupId}/materials", func(r chi.Router) {

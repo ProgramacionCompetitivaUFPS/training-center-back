@@ -12,24 +12,15 @@ import (
 
 	"github.com/google/uuid"
 	appshared "github.com/training-judge-center/backend/internal/application/shared"
-	domainSubmission "github.com/training-judge-center/backend/internal/domain/submission"
 	"github.com/training-judge-center/backend/internal/domain/shared"
+	domainSubmission "github.com/training-judge-center/backend/internal/domain/submission"
 	"github.com/training-judge-center/backend/pkg/apperror"
 )
 
-// languageConfig defines the valid compiler and file extensions for each language.
-var languageConfig = map[string]struct {
-	compiler   string
-	extensions []string
-	ext        string // canonical extension for storage path
-}{
-	"cpp20":     {compiler: "g++", extensions: []string{".cpp", ".cc", ".cxx"}, ext: ".cpp"},
-	"java17":    {compiler: "javac", extensions: []string{".java"}, ext: ".java"},
-	"python310": {compiler: "py", extensions: []string{".py"}, ext: ".py"},
-}
-
-type SubmitSolutionInput struct {
+type SubmitContestSolutionInput struct {
 	CurrentUser appshared.CurrentUser
+	GroupID     string
+	ContestID   string
 	ProblemSlug string
 	Language    string
 	Compiler    string
@@ -38,19 +29,23 @@ type SubmitSolutionInput struct {
 	SubmittedAt time.Time
 }
 
-type SubmitSolutionOutput struct {
+type SubmitContestSolutionOutput struct {
 	ID           string
 	Status       string
 	SubmittedAt  time.Time
 	ProblemSlug  string
 	ProblemTitle string
+	ContestID    string
+	ContestName  string
 	Language     string
 	Compiler     string
 	FileSize     int
 	FileHash     string
 }
 
-type SubmitSolutionUseCase struct {
+type SubmitContestSolutionUseCase struct {
+	contestProvider  ContestSubmissionProvider
+	standingResolver StandingIDResolver
 	problemProvider  ProblemProvider
 	submissionRepo   domainSubmission.Repository
 	sourceStorage    SourceStorage
@@ -59,15 +54,19 @@ type SubmitSolutionUseCase struct {
 	rateLimitSeconds int
 }
 
-func NewSubmitSolutionUseCase(
+func NewSubmitContestSolutionUseCase(
+	contestProvider ContestSubmissionProvider,
+	standingResolver StandingIDResolver,
 	problemProvider ProblemProvider,
 	submissionRepo domainSubmission.Repository,
 	sourceStorage SourceStorage,
 	submissionQueue SubmissionQueue,
 	maxFileSizeBytes int64,
 	rateLimitSeconds int,
-) *SubmitSolutionUseCase {
-	return &SubmitSolutionUseCase{
+) *SubmitContestSolutionUseCase {
+	return &SubmitContestSolutionUseCase{
+		contestProvider:  contestProvider,
+		standingResolver: standingResolver,
 		problemProvider:  problemProvider,
 		submissionRepo:   submissionRepo,
 		sourceStorage:    sourceStorage,
@@ -77,7 +76,7 @@ func NewSubmitSolutionUseCase(
 	}
 }
 
-func (uc *SubmitSolutionUseCase) Execute(ctx context.Context, in SubmitSolutionInput) (*SubmitSolutionOutput, error) {
+func (uc *SubmitContestSolutionUseCase) Execute(ctx context.Context, in SubmitContestSolutionInput) (*SubmitContestSolutionOutput, error) {
 	// 1. Validate file size before anything else
 	if int64(len(in.FileData)) > uc.maxFileSizeBytes {
 		return nil, apperror.NewBadRequest(domainSubmission.ErrCodeFileTooLarge,
@@ -93,12 +92,10 @@ func (uc *SubmitSolutionUseCase) Execute(ctx context.Context, in SubmitSolutionI
 	// 3. Validate compiler and file extension match language
 	cfg, ok := languageConfig[in.Language]
 	if !ok {
-		return nil, apperror.NewBadRequest(domainSubmission.ErrCodeCompilerMismatch,
-			"unsupported language")
+		return nil, apperror.NewBadRequest(domainSubmission.ErrCodeCompilerMismatch, "unsupported language")
 	}
 	if in.Compiler != cfg.compiler {
-		return nil, apperror.NewBadRequest(domainSubmission.ErrCodeCompilerMismatch,
-			"compiler does not match the selected language")
+		return nil, apperror.NewBadRequest(domainSubmission.ErrCodeCompilerMismatch, "compiler does not match the selected language")
 	}
 	fileExt := strings.ToLower(filepath.Ext(in.FileName))
 	validExt := false
@@ -109,55 +106,84 @@ func (uc *SubmitSolutionUseCase) Execute(ctx context.Context, in SubmitSolutionI
 		}
 	}
 	if !validExt {
-		return nil, apperror.NewBadRequest(domainSubmission.ErrCodeCompilerMismatch,
-			"file extension does not match the selected language")
+		return nil, apperror.NewBadRequest(domainSubmission.ErrCodeCompilerMismatch, "file extension does not match the selected language")
 	}
 
-	// 4. Get problem
+	// 4. Get contest info (validates contest exists and belongs to the group)
+	contest, err := uc.contestProvider.GetContestForSubmission(ctx, in.GroupID, in.ContestID)
+	if err != nil {
+		return nil, err
+	}
+
+	// 5. Resolve standingID (validates registration)
+	standingID, registered, err := uc.standingResolver.ResolveStandingID(ctx, in.ContestID, in.CurrentUser.ID)
+	if err != nil {
+		return nil, err
+	}
+	if !registered {
+		return nil, apperror.NewForbidden(domainSubmission.ErrCodeNotRegistered,
+			"you must be registered to the contest to submit solutions")
+	}
+
+	// 6. Validate contest status using the captured submittedAt timestamp
+	var queuePriority int
+	if in.SubmittedAt.Before(contest.StartTime) {
+		return nil, apperror.NewBadRequest(domainSubmission.ErrCodeContestNotStarted,
+			"submissions are only allowed during ACTIVE contests or postcompetition")
+	}
+	if in.SubmittedAt.After(contest.EndTime) {
+		if !contest.EnablePostContest {
+			return nil, apperror.NewBadRequest(domainSubmission.ErrCodeContestFinished,
+				"the contest has ended and postcompetition is not enabled")
+		}
+		queuePriority = QueuePriorityPostContest
+	} else {
+		queuePriority = QueuePriorityContest
+	}
+
+	// 7. Get problem by slug
 	problem, err := uc.problemProvider.GetProblemBySlug(ctx, in.ProblemSlug)
 	if err != nil {
 		return nil, err
 	}
 
-	// 5. Problem must be PUBLISHED
+	// 8. Problem must be PUBLISHED
 	if !problem.IsPublished {
 		return nil, apperror.NewBadRequest(domainSubmission.ErrCodeProblemNotPublished,
 			"only PUBLISHED problems can receive submissions")
 	}
 
-	// 6. Accessibility check
-	if !problem.IsPublic {
-		isModifier := false
-		for _, mid := range problem.ModifierIDs {
-			if mid == in.CurrentUser.ID {
-				isModifier = true
-				break
-			}
+	// 9. Problem must be part of the contest
+	inContest := false
+	for _, pid := range contest.ProblemIDs {
+		if pid == problem.ID {
+			inContest = true
+			break
 		}
-		if !isModifier {
-			return nil, apperror.NewForbidden(domainSubmission.ErrCodeProblemNotAccessible,
-				"only modifiers can submit to PRIVATE problems")
-		}
+	}
+	if !inContest {
+		return nil, apperror.NewBadRequest(domainSubmission.ErrCodeProblemNotInContest,
+			"this problem is not part of this contest")
 	}
 
 	userID := in.CurrentUser.ID
 
-	// 7. Compute SHA256 hash
+	// 10. Compute SHA256 hash
 	sum := sha256.Sum256(in.FileData)
 	fileHash := fmt.Sprintf("%x", sum)
 
-	// 8. Duplicate check (same hash + user + problem)
-	isDup, err := uc.submissionRepo.ExistsByHashAndUserAndProblem(ctx, fileHash, userID, problem.ID, nil)
+	// 11. Duplicate check scoped to this contest
+	isDup, err := uc.submissionRepo.ExistsByHashAndUserAndProblem(ctx, fileHash, userID, problem.ID, &in.ContestID)
 	if err != nil {
 		return nil, err
 	}
 	if isDup {
 		return nil, apperror.NewConflict(domainSubmission.ErrCodeDuplicateSubmission,
-			"this file has already been submitted to this problem")
+			"this file has already been submitted to this contest problem")
 	}
 
-	// 9. Rate limit: last submission to same problem < rateLimitSeconds ago
-	last, err := uc.submissionRepo.FindLastByUserAndProblem(ctx, userID, problem.ID, nil)
+	// 12. Rate limit scoped to this contest
+	last, err := uc.submissionRepo.FindLastByUserAndProblem(ctx, userID, problem.ID, &in.ContestID)
 	if err != nil {
 		var ae *apperror.AppError
 		if !errors.As(err, &ae) || ae.Kind != apperror.KindNotFound {
@@ -173,21 +199,22 @@ func (uc *SubmitSolutionUseCase) Execute(ctx context.Context, in SubmitSolutionI
 		}
 	}
 
-	// 10. Build storage path and upload file
+	// 13. Upload to contest-specific storage path
 	submissionID := uuid.New().String()
-	storagePath := fmt.Sprintf("%s/%s/general/%s%s", problem.ID, userID, submissionID, cfg.ext)
+	storagePath := fmt.Sprintf("%s/%s/%s/%s%s", problem.ID, userID, in.ContestID, submissionID, cfg.ext)
 
 	if err := uc.sourceStorage.Upload(ctx, storagePath, in.FileData); err != nil {
 		return nil, err
 	}
 
-	// 11. Create and persist submission
+	// 14. Create and persist submission
+	contestID := in.ContestID
 	sub, err := domainSubmission.NewSubmission(
 		submissionID,
 		problem.ID,
 		shared.RestoreUserID(userID),
-		nil,
-		nil,
+		&contestID,
+		&standingID,
 		langVO,
 		in.Compiler,
 		storagePath,
@@ -207,27 +234,30 @@ func (uc *SubmitSolutionUseCase) Execute(ctx context.Context, in SubmitSolutionI
 		return nil, err
 	}
 
-	// 12. Publish to judging queue (fire-and-forget; log error but don't fail)
+	// 15. Publish to judging queue (fire-and-forget; log error but don't fail)
 	if err := uc.submissionQueue.Publish(ctx, SubmissionQueueMessage{
 		SubmissionID: submissionID,
-		Priority:     QueuePriorityPractice,
+		Priority:     queuePriority,
 		EnqueuedAt:   in.SubmittedAt,
 		Metadata: SubmissionQueueMetadata{
-			ContestID: nil,
+			ContestID: &contestID,
 			ProblemID: problem.ID,
 			UserID:    userID,
 			Language:  langVO.String(),
 		},
 	}); err != nil {
-		slog.ErrorContext(ctx, "failed to publish submission to queue", "submission_id", submissionID, "error", err)
+		slog.ErrorContext(ctx, "failed to publish contest submission to queue",
+			"submission_id", submissionID, "error", err)
 	}
 
-	return &SubmitSolutionOutput{
+	return &SubmitContestSolutionOutput{
 		ID:           submissionID,
 		Status:       sub.Status().String(),
 		SubmittedAt:  sub.SubmittedAt(),
 		ProblemSlug:  problem.Slug,
 		ProblemTitle: problem.Title,
+		ContestID:    contest.ID,
+		ContestName:  contest.Name,
 		Language:     langVO.String(),
 		Compiler:     in.Compiler,
 		FileSize:     len(in.FileData),

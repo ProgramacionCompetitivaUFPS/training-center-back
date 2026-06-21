@@ -3,6 +3,7 @@ package submission
 import (
 	"bytes"
 	"context"
+	"fmt"
 	"mime/multipart"
 	"net/http"
 	"net/http/httptest"
@@ -61,13 +62,13 @@ func (m *mockSubmissionRepo) List(_ context.Context, f domainsubmission.ListFilt
 	}
 	return []*domainsubmission.Submission{}, 0, nil
 }
-func (m *mockSubmissionRepo) FindLastByUserAndProblem(_ context.Context, userID, problemID string) (*domainsubmission.Submission, error) {
+func (m *mockSubmissionRepo) FindLastByUserAndProblem(_ context.Context, userID, problemID string, _ *string) (*domainsubmission.Submission, error) {
 	if m.findLastFn != nil {
 		return m.findLastFn(userID, problemID)
 	}
 	return nil, apperror.NewNotFound(domainsubmission.ErrCodeSubmissionNotFound, "none")
 }
-func (m *mockSubmissionRepo) ExistsByHashAndUserAndProblem(_ context.Context, hash, userID, problemID string) (bool, error) {
+func (m *mockSubmissionRepo) ExistsByHashAndUserAndProblem(_ context.Context, hash, userID, problemID string, _ *string) (bool, error) {
 	if m.existsByHashFn != nil {
 		return m.existsByHashFn(hash, userID, problemID)
 	}
@@ -98,7 +99,7 @@ func (m *mockQueue) Publish(_ context.Context, _ appsubmission.SubmissionQueueMe
 
 func newHandlerWithSubmit(pp appsubmission.ProblemProvider, repo domainsubmission.Repository) *Handler {
 	uc := appsubmission.NewSubmitSolutionUseCase(pp, repo, &mockStorage{}, &mockQueue{}, 1<<20, 1)
-	return NewHandler(uc, nil, nil, nil, nil)
+	return NewHandler(uc, nil, nil, nil, nil, nil)
 }
 
 // ── auth helpers ──────────────────────────────────────────────────────────────
@@ -194,6 +195,52 @@ func (m *mockLeadChecker) IsLeadOfContestGroup(_ context.Context, contestID, use
 	return false, nil
 }
 
+// ── mocks for contest submission ──────────────────────────────────────────────
+
+type mockContestSubmissionProvider struct {
+	fn func(groupID, contestID string) (*appsubmission.ContestSubmissionInfo, error)
+}
+
+func (m *mockContestSubmissionProvider) GetContestForSubmission(_ context.Context, groupID, contestID string) (*appsubmission.ContestSubmissionInfo, error) {
+	if m.fn != nil {
+		return m.fn(groupID, contestID)
+	}
+	// Default: ACTIVE contest with "problem-001"
+	return &appsubmission.ContestSubmissionInfo{
+		ID:                contestID,
+		Name:              "Weekly Contest #1",
+		GroupID:           groupID,
+		StartTime:         time.Now().Add(-1 * time.Hour),
+		EndTime:           time.Now().Add(1 * time.Hour),
+		EnablePostContest: false,
+		ProblemIDs:        []string{"problem-001"},
+	}, nil
+}
+
+type mockStandingIDResolver struct {
+	fn func(contestID, userID string) (string, bool, error)
+}
+
+func (m *mockStandingIDResolver) ResolveStandingID(_ context.Context, contestID, userID string) (string, bool, error) {
+	if m.fn != nil {
+		return m.fn(contestID, userID)
+	}
+	return userID, true, nil // default: registered individually
+}
+
+func newHandlerWithSubmitContest(
+	contestProvider appsubmission.ContestSubmissionProvider,
+	standingResolver appsubmission.StandingIDResolver,
+	problemProvider appsubmission.ProblemProvider,
+	repo domainsubmission.Repository,
+) *Handler {
+	uc := appsubmission.NewSubmitContestSolutionUseCase(
+		contestProvider, standingResolver, problemProvider, repo,
+		&mockStorage{}, &mockQueue{}, 1<<20, 1,
+	)
+	return NewHandler(nil, uc, nil, nil, nil, nil)
+}
+
 // ── fixtures ──────────────────────────────────────────────────────────────────
 
 const (
@@ -227,12 +274,12 @@ func newHandlerWithGetSubmission(repo *mockSubmissionRepo) *Handler {
 		&mockTeamChecker{},
 		&mockLeadChecker{},
 	)
-	return NewHandler(nil, uc, nil, nil, nil)
+	return NewHandler(nil, nil, uc, nil, nil, nil)
 }
 
 func newHandlerWithUpdateVisibility(repo *mockSubmissionRepo) *Handler {
 	uc := appsubmission.NewUpdateSubmissionVisibilityUseCase(repo)
-	return NewHandler(nil, nil, uc, nil, nil)
+	return NewHandler(nil, nil, nil, uc, nil, nil)
 }
 
 func newHandlerWithListMy(repo *mockSubmissionRepo) *Handler {
@@ -243,7 +290,7 @@ func newHandlerWithListMy(repo *mockSubmissionRepo) *Handler {
 		&mockContestDisplayProvider{},
 		&mockProblemProvider{},
 	)
-	return NewHandler(nil, nil, nil, uc, nil)
+	return NewHandler(nil, nil, nil, nil, uc, nil)
 }
 
 func newHandlerWithListProblem(repo *mockSubmissionRepo) *Handler {
@@ -252,10 +299,10 @@ func newHandlerWithListProblem(repo *mockSubmissionRepo) *Handler {
 		&mockProblemProvider{},
 		&mockUserDisplayProvider{},
 	)
-	return NewHandler(nil, nil, nil, nil, uc)
+	return NewHandler(nil, nil, nil, nil, nil, uc)
 }
 
-// ── multipart builder ─────────────────────────────────────────────────────────
+// ── multipart builders ────────────────────────────────────────────────────────
 
 func multipartRequest(target, slug, language, compiler, filename string, fileData []byte) *http.Request {
 	body := &bytes.Buffer{}
@@ -272,5 +319,26 @@ func multipartRequest(target, slug, language, compiler, filename string, fileDat
 	r.Header.Set("Authorization", "Bearer tok")
 	r.Header.Set("Content-Type", w.FormDataContentType())
 	r.SetPathValue("slug", slug)
+	return r
+}
+
+func contestMultipartRequest(groupID, contestID, problemSlug, language, compiler, filename string, fileData []byte) *http.Request {
+	target := fmt.Sprintf("/groups/%s/contests/%s/problems/%s/submissions", groupID, contestID, problemSlug)
+	body := &bytes.Buffer{}
+	w := multipart.NewWriter(body)
+
+	_ = w.WriteField("language", language)
+	_ = w.WriteField("compiler", compiler)
+
+	part, _ := w.CreateFormFile("file", filename)
+	_, _ = part.Write(fileData)
+	w.Close()
+
+	r := httptest.NewRequest(http.MethodPost, target, body)
+	r.Header.Set("Authorization", "Bearer tok")
+	r.Header.Set("Content-Type", w.FormDataContentType())
+	r.SetPathValue("groupId", groupID)
+	r.SetPathValue("contestId", contestID)
+	r.SetPathValue("problemSlug", problemSlug)
 	return r
 }
