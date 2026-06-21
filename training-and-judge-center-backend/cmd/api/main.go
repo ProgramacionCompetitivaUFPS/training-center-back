@@ -307,6 +307,7 @@ func main() {
 	contestSubmissionProvider      := adaptercontest.NewStandingsSubmissionProvider(dbPool)
 	contestSubmissionsProvider     := adaptercontest.NewContestSubmissionProvider(dbPool)
 	contestTeamParticipationRepo   := adaptercontest.NewTeamParticipationRepository(dbPool)
+	contestCallerStandingProvider  := adaptercontest.NewCallerStandingProvider(dbPool)
 
 	// contest use cases
 	createContestUseCase := appcontest.NewCreateContestUseCase(
@@ -345,6 +346,7 @@ func main() {
 	listContestSubmissionsUseCase := appcontest.NewListContestSubmissionsUseCase(
 		contestRepo, contestGroupProvider, contestMemberProvider,
 		contestParticipantProvider, contestSubmissionsProvider,
+		contestCallerStandingProvider,
 	)
 	deleteContestUseCase := appcontest.NewDeleteContestUseCase(
 		contestRepo, contestGroupProvider, contestMemberProvider, contestStandingsCache,

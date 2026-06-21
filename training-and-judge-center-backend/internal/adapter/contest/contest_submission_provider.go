@@ -11,8 +11,6 @@ import (
 	"github.com/training-judge-center/backend/pkg/apperror"
 )
 
-// ContestSubmissionProvider implements application/contest.ContestSubmissionProvider
-// by querying submissions with problem and user details from Postgres.
 type ContestSubmissionProvider struct {
 	db infraPostgres.Querier
 }
@@ -38,11 +36,23 @@ func (p *ContestSubmissionProvider) ListByContest(
 		n++
 	}
 	if filters.Nickname != nil {
-		where += fmt.Sprintf(" AND u.nickname = $%d", n)
+		// individual registrant OR selected team member with given nickname
+		where += fmt.Sprintf(`
+			AND (
+				(s.standing_id::text = s.user_id::text AND u.nickname = $%d)
+				OR EXISTS (
+					SELECT 1 FROM contest_team_participants ctp2
+					JOIN team_members tm ON tm.team_id = ctp2.team_id
+					JOIN users u2 ON u2.id = tm.user_id AND u2.nickname = $%d
+					WHERE ctp2.contest_id = s.contest_id AND ctp2.team_id::text = s.standing_id::text
+					  AND (u2.id = ANY(ctp2.selected_members) OR array_length(ctp2.selected_members, 1) IS NULL)
+				)
+			)`, n, n)
 		args = append(args, *filters.Nickname)
 		n++
 	}
 
+	// correlated subquery avoids multiple rows per submission from team joins
 	query := fmt.Sprintf(`
 		SELECT
 			s.id,
@@ -51,7 +61,19 @@ func (p *ContestSubmissionProvider) ListByContest(
 			p.title,
 			COALESCE(cp."order", 0),
 			s.user_id,
+			s.standing_id,
 			u.nickname,
+			u.name,
+			t.id,
+			t.name,
+			COALESCE(
+				(
+					SELECT ARRAY_AGG(u2.nickname ORDER BY u2.nickname)
+					FROM unnest(COALESCE(ctp.selected_members, ARRAY[]::uuid[])) AS mid
+					JOIN users u2 ON u2.id = mid
+				),
+				ARRAY[]::text[]
+			),
 			s.language,
 			s.status,
 			s.submitted_at,
@@ -62,6 +84,8 @@ func (p *ContestSubmissionProvider) ListByContest(
 		JOIN problems p ON p.id = s.problem_id
 		JOIN users u ON u.id = s.user_id
 		LEFT JOIN contest_problems cp ON cp.problem_id = s.problem_id AND cp.contest_id = s.contest_id
+		LEFT JOIN contest_team_participants ctp ON ctp.team_id::text = s.standing_id::text AND ctp.contest_id = s.contest_id
+		LEFT JOIN teams t ON t.id = ctp.team_id
 		WHERE s.contest_id = $1%s
 		ORDER BY s.submitted_at DESC, s.id`, where)
 
@@ -74,9 +98,15 @@ func (p *ContestSubmissionProvider) ListByContest(
 
 	var result []appContest.RichSubmissionData
 	for rows.Next() {
-		var d appContest.RichSubmissionData
-		var judgedAt *time.Time
-		var timeMs, memoryKb *int
+		var (
+			d               appContest.RichSubmissionData
+			standingID      *string
+			judgedAt        *time.Time
+			timeMs, memKb   *int
+			teamID          *string
+			teamName        *string
+			memberNicknames []string
+		)
 
 		if err := rows.Scan(
 			&d.ID,
@@ -85,20 +115,31 @@ func (p *ContestSubmissionProvider) ListByContest(
 			&d.ProblemTitle,
 			&d.ProblemOrder,
 			&d.UserID,
+			&standingID,
 			&d.Nickname,
+			&d.SubmitterName,
+			&teamID,
+			&teamName,
+			&memberNicknames,
 			&d.Language,
 			&d.Status,
 			&d.SubmittedAt,
 			&judgedAt,
 			&timeMs,
-			&memoryKb,
+			&memKb,
 		); err != nil {
 			slog.ErrorContext(ctx, "failed to scan contest submission row", "error", err)
 			return nil, apperror.NewInternal()
 		}
+		if standingID != nil {
+			d.StandingID = *standingID
+		}
 		d.JudgedAt = judgedAt
 		d.TimeMs = timeMs
-		d.MemoryKb = memoryKb
+		d.MemoryKb = memKb
+		d.TeamID = teamID
+		d.TeamName = teamName
+		d.TeamMemberNicknames = memberNicknames
 		result = append(result, d)
 	}
 	if err := rows.Err(); err != nil {

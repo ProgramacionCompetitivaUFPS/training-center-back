@@ -91,6 +91,14 @@ func (h *Handler) ListContestSubmissions(w http.ResponseWriter, r *http.Request)
 func toListSubmissionsResponse(out *appContest.ListContestSubmissionsOutput) listSubmissionsResponse {
 	items := make([]submissionItem, len(out.Submissions))
 	for i, s := range out.Submissions {
+		by := submissionSubmitter{
+			Type:     s.SubmittedBy.Type,
+			Nickname: s.SubmittedBy.Nickname,
+			Name:     s.SubmittedBy.Name,
+			TeamID:   s.SubmittedBy.TeamID,
+			TeamName: s.SubmittedBy.TeamName,
+			Members:  s.SubmittedBy.Members,
+		}
 		item := submissionItem{
 			ID: s.ID,
 			Problem: submissionProblem{
@@ -98,7 +106,7 @@ func toListSubmissionsResponse(out *appContest.ListContestSubmissionsOutput) lis
 				Title: s.Problem.Title,
 				Order: s.Problem.Order,
 			},
-			SubmittedBy: submissionSubmitter{Nickname: s.SubmittedBy.Nickname},
+			SubmittedBy: by,
 			Language:    s.Language,
 			Status:      s.Status,
 			SubmittedAt: s.SubmittedAt.UTC().Format(time.RFC3339),

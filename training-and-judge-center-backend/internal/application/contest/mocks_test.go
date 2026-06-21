@@ -384,6 +384,19 @@ func (m *mockContestSubmissionsProvider) ListByContest(ctx context.Context, cont
 	return nil, nil
 }
 
+// ── CallerStandingProvider mock ───────────────────────────────────────────────
+
+type mockCallerStandingProvider struct {
+	fn func(contestID, userID string) (string, bool, error)
+}
+
+func (m *mockCallerStandingProvider) GetCallerStandingID(_ context.Context, contestID, userID string) (string, bool, error) {
+	if m.fn != nil {
+		return m.fn(contestID, userID)
+	}
+	return userID, true, nil // default: individual, standingID = userID
+}
+
 // ── StandingsSubmissionProvider mock ─────────────────────────────────────────
 
 type mockStandingsSubmissionProvider struct {
@@ -475,6 +488,7 @@ func newTestContest(ownerID string) *domainContest.Contest {
 		0,
 		false,
 		false,
+		false,
 		shared.RestoreGroupID(testGroupID),
 		shared.RestoreUserID(ownerID),
 		domainContest.RestoreParticipationMode("INDIVIDUAL"), domainContest.RestoreTeamSize(2, 5),
@@ -493,6 +507,7 @@ func newFinishedContest(ownerID string) *domainContest.Contest {
 		time.Now().Add(-24*time.Hour),
 		domainContest.RestorePenalty(20),
 		0,
+		false,
 		false,
 		false,
 		shared.RestoreGroupID(testGroupID),

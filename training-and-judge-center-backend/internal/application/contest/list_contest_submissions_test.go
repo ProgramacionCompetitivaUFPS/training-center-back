@@ -24,6 +24,7 @@ func newListSubmissionsUseCase(
 		memberProvider,
 		participantProvider,
 		subsProvider,
+		&mockCallerStandingProvider{},
 	)
 }
 
@@ -49,7 +50,7 @@ func frozenActiveContest() *domainContest.Contest {
 		time.Now().Add(30*time.Minute),
 		domainContest.RestorePenalty(20),
 		60,
-		false, false,
+		false, false, false,
 		shared.RestoreGroupID(testGroupID),
 		shared.RestoreUserID(callerID),
 		domainContest.RestoreParticipationMode("INDIVIDUAL"), domainContest.RestoreTeamSize(2, 5),
@@ -66,6 +67,7 @@ func richSub(id, userID, status string, minutesAgo int) RichSubmissionData {
 		ProblemTitle: "Sum of Two Numbers",
 		ProblemOrder: 1,
 		UserID:       userID,
+		StandingID:   userID, // individual by default
 		Nickname:     "nick_" + userID,
 		Language:     "cpp20",
 		Status:       status,
@@ -81,10 +83,30 @@ func richSubWithTime(id, userID, status string, at time.Time) RichSubmissionData
 		ProblemTitle: "Sum of Two Numbers",
 		ProblemOrder: 1,
 		UserID:       userID,
+		StandingID:   userID, // individual by default
 		Nickname:     "nick_" + userID,
 		Language:     "cpp20",
 		Status:       status,
 		SubmittedAt:  at,
+	}
+}
+
+func teamSub(id, userID, teamID, teamName, status string, at time.Time, members []string) RichSubmissionData {
+	return RichSubmissionData{
+		ID:                  id,
+		ProblemID:           "prob-1",
+		ProblemSlug:         "sum",
+		ProblemTitle:        "Sum of Two Numbers",
+		ProblemOrder:        1,
+		UserID:              userID,
+		StandingID:          teamID,
+		Nickname:            "nick_" + userID,
+		TeamID:              &teamID,
+		TeamName:            &teamName,
+		TeamMemberNicknames: members,
+		Language:            "cpp20",
+		Status:              status,
+		SubmittedAt:         at,
 	}
 }
 
@@ -311,5 +333,103 @@ func TestListContestSubmissions_Meta_ContestContext(t *testing.T) {
 	}
 	if out.Meta.Status != "ACTIVE" {
 		t.Errorf("meta.Status=%q, want ACTIVE", out.Meta.Status)
+	}
+}
+
+func TestListContestSubmissions_TeamSubmission_ShowsTeamInfo(t *testing.T) {
+	teamID := "team-001"
+	teamName := "Team Alpha"
+	members := []string{"alice", "bob", "carol"}
+	sub := teamSub("s1", callerID, teamID, teamName, "ACCEPTED", time.Now().Add(-30*time.Minute), members)
+
+	uc := newListSubmissionsUseCase(activeContest(), visibleGroup(), isMemberNotLead(), registeredParticipant(), subsProvider([]RichSubmissionData{sub}))
+
+	out, err := uc.Execute(context.Background(), baseInput())
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(out.Submissions) != 1 {
+		t.Fatalf("len(submissions)=%d, want 1", len(out.Submissions))
+	}
+	by := out.Submissions[0].SubmittedBy
+	if by.Type != "TEAM" {
+		t.Errorf("type=%q, want TEAM", by.Type)
+	}
+	if by.TeamID != teamID {
+		t.Errorf("teamId=%q, want %q", by.TeamID, teamID)
+	}
+	if by.TeamName != teamName {
+		t.Errorf("teamName=%q, want %q", by.TeamName, teamName)
+	}
+	// showTeamMembers=false by default → members hidden
+	if len(by.Members) != 0 {
+		t.Errorf("members should be empty when showTeamMembers=false, got %v", by.Members)
+	}
+}
+
+func TestListContestSubmissions_TeamSubmission_ShowsMembersWhenEnabled(t *testing.T) {
+	teamID := "team-001"
+	teamName := "Team Alpha"
+	members := []string{"alice", "bob", "carol"}
+	sub := teamSub("s1", callerID, teamID, teamName, "ACCEPTED", time.Now().Add(-30*time.Minute), members)
+
+	// Contest with showTeamMembers=true
+	contest := domainContest.RestoreContest(
+		testContestID,
+		domainContest.RestoreContestName("Team Contest"),
+		nil,
+		time.Now().Add(-2*time.Hour),
+		time.Now().Add(2*time.Hour),
+		domainContest.RestorePenalty(20),
+		0, false, false, true, // showTeamMembers=true
+		shared.RestoreGroupID(testGroupID),
+		shared.RestoreUserID(callerID),
+		domainContest.RestoreParticipationMode("TEAM"), domainContest.RestoreTeamSize(2, 5),
+		[]domainContest.ContestProblem{},
+		testNow, nil,
+	)
+
+	uc := newListSubmissionsUseCase(contest, visibleGroup(), isMemberNotLead(), registeredParticipant(), subsProvider([]RichSubmissionData{sub}))
+
+	out, err := uc.Execute(context.Background(), baseInput())
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(out.Submissions) != 1 {
+		t.Fatalf("len(submissions)=%d, want 1", len(out.Submissions))
+	}
+	by := out.Submissions[0].SubmittedBy
+	if len(by.Members) != 3 {
+		t.Errorf("members len=%d, want 3 (showTeamMembers=true)", len(by.Members))
+	}
+}
+
+func TestListContestSubmissions_FreezePeriod_TeamOwnSubmissionsAlwaysVisible(t *testing.T) {
+	teamID := "team-001"
+	teamName := "Team Alpha"
+	// Team's post-freeze submission — caller is a member of this team
+	postFreeze := time.Now().Add(-20 * time.Minute)
+	sub := teamSub("s1", callerID, teamID, teamName, "ACCEPTED", postFreeze, nil)
+
+	// CallerStandingProvider returns teamID as the caller's standing
+	standingProvider := &mockCallerStandingProvider{
+		fn: func(_, _ string) (string, bool, error) { return teamID, true, nil },
+	}
+
+	uc := NewListContestSubmissionsUseCase(
+		repoWith(frozenActiveContest()),
+		&mockGroupProvider{findByIDFn: func(_ context.Context, _ string) (*GroupInfo, error) { return visibleGroup(), nil }},
+		isMemberNotLead(),
+		registeredParticipant(),
+		subsProvider([]RichSubmissionData{sub}),
+		standingProvider,
+	)
+
+	out, err := uc.Execute(context.Background(), baseInput())
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(out.Submissions) != 1 {
+		t.Errorf("len(submissions)=%d, want 1 (own team's post-freeze submission must appear)", len(out.Submissions))
 	}
 }

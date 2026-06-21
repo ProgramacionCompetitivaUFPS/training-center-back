@@ -59,11 +59,11 @@ func activeContest() *domainContest.Contest {
 		testContestID,
 		domainContest.RestoreContestName("Active Contest"),
 		nil,
-		time.Now().Add(-2*time.Hour),  // started 2h ago
-		time.Now().Add(2*time.Hour),   // ends in 2h
+		time.Now().Add(-2*time.Hour),
+		time.Now().Add(2*time.Hour),
 		domainContest.RestorePenalty(20),
-		0, // no freeze
-		false, false,
+		0,
+		false, false, false,
 		shared.RestoreGroupID(testGroupID),
 		shared.RestoreUserID(callerID),
 		domainContest.RestoreParticipationMode("INDIVIDUAL"), domainContest.RestoreTeamSize(2, 5),
@@ -80,7 +80,7 @@ func finishedContest() *domainContest.Contest {
 		time.Now().Add(-4*time.Hour),
 		time.Now().Add(-1*time.Hour),
 		domainContest.RestorePenalty(20),
-		0, false, false,
+		0, false, false, false,
 		shared.RestoreGroupID(testGroupID),
 		shared.RestoreUserID(callerID),
 		domainContest.RestoreParticipationMode("INDIVIDUAL"), domainContest.RestoreTeamSize(2, 5),
@@ -96,10 +96,10 @@ func frozenContest() *domainContest.Contest {
 		domainContest.RestoreContestName("Frozen Contest"),
 		nil,
 		time.Now().Add(-2*time.Hour),
-		time.Now().Add(30*time.Minute), // ends in 30m
+		time.Now().Add(30*time.Minute),
 		domainContest.RestorePenalty(20),
-		60, // freeze last 60 min → freeze started 30m ago
-		false, false,
+		60,
+		false, false, false,
 		shared.RestoreGroupID(testGroupID),
 		shared.RestoreUserID(callerID),
 		domainContest.RestoreParticipationMode("INDIVIDUAL"), domainContest.RestoreTeamSize(2, 5),

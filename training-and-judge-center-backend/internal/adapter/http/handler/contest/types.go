@@ -218,7 +218,12 @@ type submissionProblem struct {
 }
 
 type submissionSubmitter struct {
-	Nickname string `json:"nickname"`
+	Type     string   `json:"type"`
+	Nickname string   `json:"nickname,omitempty"`
+	Name     string   `json:"name,omitempty"`
+	TeamID   string   `json:"teamId,omitempty"`
+	TeamName string   `json:"teamName,omitempty"`
+	Members  []string `json:"members,omitempty"`
 }
 
 type submissionItem struct {

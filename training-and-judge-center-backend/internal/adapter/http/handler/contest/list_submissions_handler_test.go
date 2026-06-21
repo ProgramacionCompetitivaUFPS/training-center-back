@@ -64,7 +64,7 @@ func activeContestForSubmissions() *domainContest.Contest {
 		time.Now().Add(-2*time.Hour),
 		time.Now().Add(2*time.Hour),
 		domainContest.RestorePenalty(20),
-		0, false, false,
+		0, false, false, false,
 		shared.RestoreGroupID("g1"),
 		shared.RestoreUserID("u1"),
 		domainContest.RestoreParticipationMode("INDIVIDUAL"), domainContest.RestoreTeamSize(2, 5),
@@ -84,6 +84,7 @@ func defaultListSubmissionsUC(subs []appcontest.RichSubmissionData) *appcontest.
 		&mockMemberProvider{isLead: true, isMember: true},
 		&mockParticipantRegistered{},
 		&mockContestSubmissionsProvider{subs: subs},
+		&mockCallerStandingProvider{},
 	)
 }
 
@@ -106,15 +107,17 @@ func TestListContestSubmissions_Unauthenticated_Returns401(t *testing.T) {
 func TestListContestSubmissions_HappyPath_Returns200(t *testing.T) {
 	subs := []appcontest.RichSubmissionData{
 		{
-			ID:           "sub-1",
-			ProblemSlug:  "sum",
-			ProblemTitle: "Sum of Two Numbers",
-			ProblemOrder: 1,
-			UserID:       "u1",
-			Nickname:     "john_doe",
-			Language:     "cpp20",
-			Status:       "ACCEPTED",
-			SubmittedAt:  time.Now().Add(-30 * time.Minute),
+			ID:            "sub-1",
+			ProblemSlug:   "sum",
+			ProblemTitle:  "Sum of Two Numbers",
+			ProblemOrder:  1,
+			UserID:        "u1",
+			StandingID:    "u1",
+			Nickname:      "john_doe",
+			SubmitterName: "John Doe",
+			Language:      "cpp20",
+			Status:        "ACCEPTED",
+			SubmittedAt:   time.Now().Add(-30 * time.Minute),
 		},
 	}
 	h := newHandlerWithListSubmissions(defaultListSubmissionsUC(subs))
@@ -153,12 +156,13 @@ func TestListContestSubmissions_Pagination_Returns200(t *testing.T) {
 	subs := make([]appcontest.RichSubmissionData, 5)
 	for i := range subs {
 		subs[i] = appcontest.RichSubmissionData{
-			ID:          "sub-" + string(rune('1'+i)),
+			ID:         "sub-" + string(rune('1'+i)),
 			ProblemSlug: "sum",
-			UserID:      "u1",
-			Nickname:    "john_doe",
-			Language:    "cpp20",
-			Status:      "ACCEPTED",
+			UserID:     "u1",
+			StandingID: "u1",
+			Nickname:   "john_doe",
+			Language:   "cpp20",
+			Status:     "ACCEPTED",
 			SubmittedAt: time.Now().Add(-time.Duration(i+1) * 10 * time.Minute),
 		}
 	}

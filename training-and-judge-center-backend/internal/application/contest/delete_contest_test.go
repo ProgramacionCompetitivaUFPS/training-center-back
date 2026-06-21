@@ -28,7 +28,7 @@ func scheduledContestFixture() *domainContest.Contest {
 		time.Now().Add(2*time.Hour),
 		time.Now().Add(4*time.Hour),
 		domainContest.RestorePenalty(20),
-		0, false, false,
+		0, false, false, false,
 		shared.RestoreGroupID(testGroupID),
 		shared.RestoreUserID(callerID),
 		domainContest.RestoreParticipationMode("INDIVIDUAL"), domainContest.RestoreTeamSize(2, 5),
