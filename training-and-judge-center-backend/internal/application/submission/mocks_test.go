@@ -100,14 +100,14 @@ func (m *mockSubmissionRepo) List(_ context.Context, f domainsubmission.ListFilt
 	return []*domainsubmission.Submission{}, 0, nil
 }
 
-func (m *mockSubmissionRepo) FindLastByUserAndProblem(_ context.Context, userID, problemID string) (*domainsubmission.Submission, error) {
+func (m *mockSubmissionRepo) FindLastByUserAndProblem(_ context.Context, userID, problemID string, _ *string) (*domainsubmission.Submission, error) {
 	if m.lastFn != nil {
 		return m.lastFn(userID, problemID)
 	}
 	return nil, apperror.NewNotFound(domainsubmission.ErrCodeSubmissionNotFound, "none")
 }
 
-func (m *mockSubmissionRepo) ExistsByHashAndUserAndProblem(_ context.Context, hash, userID, problemID string) (bool, error) {
+func (m *mockSubmissionRepo) ExistsByHashAndUserAndProblem(_ context.Context, hash, userID, problemID string, _ *string) (bool, error) {
 	if m.existsDupFn != nil {
 		return m.existsDupFn(hash, userID, problemID)
 	}

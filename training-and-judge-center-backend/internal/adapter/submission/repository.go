@@ -139,11 +139,19 @@ func (r *Repository) Update(ctx context.Context, s *domainSubmission.Submission)
 	return nil
 }
 
-func (r *Repository) FindLastByUserAndProblem(ctx context.Context, userID, problemID string) (*domainSubmission.Submission, error) {
+func (r *Repository) FindLastByUserAndProblem(ctx context.Context, userID, problemID string, contestID *string) (*domainSubmission.Submission, error) {
 	q := infraPostgres.GetQuerier(ctx, r.db)
-	sub, err := scanRow(ctx, q.QueryRow(ctx,
-		selectCols+` WHERE user_id = $1 AND problem_id = $2 ORDER BY submitted_at DESC LIMIT 1`,
-		userID, problemID))
+	var sub *domainSubmission.Submission
+	var err error
+	if contestID == nil {
+		sub, err = scanRow(ctx, q.QueryRow(ctx,
+			selectCols+` WHERE user_id = $1 AND problem_id = $2 AND contest_id IS NULL ORDER BY submitted_at DESC LIMIT 1`,
+			userID, problemID))
+	} else {
+		sub, err = scanRow(ctx, q.QueryRow(ctx,
+			selectCols+` WHERE user_id = $1 AND problem_id = $2 AND contest_id = $3 ORDER BY submitted_at DESC LIMIT 1`,
+			userID, problemID, *contestID))
+	}
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, apperror.NewNotFound(domainSubmission.ErrCodeSubmissionNotFound, "no previous submission")
@@ -153,15 +161,19 @@ func (r *Repository) FindLastByUserAndProblem(ctx context.Context, userID, probl
 	return sub, nil
 }
 
-func (r *Repository) ExistsByHashAndUserAndProblem(ctx context.Context, fileHash, userID, problemID string) (bool, error) {
+func (r *Repository) ExistsByHashAndUserAndProblem(ctx context.Context, fileHash, userID, problemID string, contestID *string) (bool, error) {
 	q := infraPostgres.GetQuerier(ctx, r.db)
+	var query string
+	var args []any
+	if contestID == nil {
+		query = `SELECT EXISTS(SELECT 1 FROM submissions WHERE file_hash = $1 AND user_id = $2 AND problem_id = $3 AND contest_id IS NULL)`
+		args = []any{fileHash, userID, problemID}
+	} else {
+		query = `SELECT EXISTS(SELECT 1 FROM submissions WHERE file_hash = $1 AND user_id = $2 AND problem_id = $3 AND contest_id = $4)`
+		args = []any{fileHash, userID, problemID, *contestID}
+	}
 	var exists bool
-	err := q.QueryRow(ctx, `
-		SELECT EXISTS(
-			SELECT 1 FROM submissions
-			WHERE file_hash = $1 AND user_id = $2 AND problem_id = $3
-		)
-	`, fileHash, userID, problemID).Scan(&exists)
+	err := q.QueryRow(ctx, query, args...).Scan(&exists)
 	if err != nil {
 		slog.ErrorContext(ctx, "submission: failed to check hash existence", "error", err)
 		return false, apperror.NewInternal()

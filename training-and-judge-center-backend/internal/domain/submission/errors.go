@@ -13,4 +13,9 @@ const (
 	ErrCodeFileTooLarge         = "FILE_TOO_LARGE"
 	ErrCodeCompilerMismatch     = "COMPILER_MISMATCH"
 	ErrCodeNoTestCases          = "NO_TEST_CASES"
+
+	ErrCodeNotRegistered      = "NOT_REGISTERED"
+	ErrCodeProblemNotInContest = "PROBLEM_NOT_IN_CONTEST"
+	ErrCodeContestNotStarted  = "CONTEST_NOT_STARTED"
+	ErrCodeContestFinished    = "CONTEST_FINISHED"
 )

@@ -415,6 +415,8 @@ func main() {
 	submissionContestDisplay := adaptersubmission.NewContestProvider(dbPool)
 	submissionLeadChecker := adaptersubmission.NewLeadChecker(dbPool)
 	submissionTeamChecker := adaptersubmission.NewTeamMembershipChecker(dbPool)
+	submissionContestSubmissionProvider := adaptersubmission.NewContestSubmissionProvider(dbPool)
+	submissionStandingIDResolver := adaptersubmission.NewStandingIDResolver(dbPool)
 
 	// submission queue — RabbitMQ when URL is set, no-op otherwise
 	var submissionQueue appsubmission.SubmissionQueue
@@ -434,6 +436,16 @@ func main() {
 
 	// submission use cases
 	submitSolutionUseCase := appsubmission.NewSubmitSolutionUseCase(
+		submissionProblemProvider,
+		submissionRepo,
+		submissionStorage,
+		submissionQueue,
+		1<<20, // 1 MB
+		1,     // 1 second rate limit
+	)
+	submitContestSolutionUseCase := appsubmission.NewSubmitContestSolutionUseCase(
+		submissionContestSubmissionProvider,
+		submissionStandingIDResolver,
 		submissionProblemProvider,
 		submissionRepo,
 		submissionStorage,
@@ -466,6 +478,7 @@ func main() {
 
 	submissionHandler := handlersubmission.NewHandler(
 		submitSolutionUseCase,
+		submitContestSolutionUseCase,
 		getSubmissionUseCase,
 		updateSubmissionVisibilityUseCase,
 		listMySubmissionsUseCase,

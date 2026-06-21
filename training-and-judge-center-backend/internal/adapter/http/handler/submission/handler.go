@@ -12,6 +12,7 @@ import (
 
 type Handler struct {
 	submitSolution             *appsubmission.SubmitSolutionUseCase
+	submitContestSolution      *appsubmission.SubmitContestSolutionUseCase
 	getSubmission              *appsubmission.GetSubmissionUseCase
 	updateSubmissionVisibility *appsubmission.UpdateSubmissionVisibilityUseCase
 	listMySubmissions          *appsubmission.ListMySubmissionsUseCase
@@ -20,6 +21,7 @@ type Handler struct {
 
 func NewHandler(
 	submitSolution *appsubmission.SubmitSolutionUseCase,
+	submitContestSolution *appsubmission.SubmitContestSolutionUseCase,
 	getSubmission *appsubmission.GetSubmissionUseCase,
 	updateSubmissionVisibility *appsubmission.UpdateSubmissionVisibilityUseCase,
 	listMySubmissions *appsubmission.ListMySubmissionsUseCase,
@@ -27,6 +29,7 @@ func NewHandler(
 ) *Handler {
 	return &Handler{
 		submitSolution:             submitSolution,
+		submitContestSolution:      submitContestSolution,
 		getSubmission:              getSubmission,
 		updateSubmissionVisibility: updateSubmissionVisibility,
 		listMySubmissions:          listMySubmissions,
