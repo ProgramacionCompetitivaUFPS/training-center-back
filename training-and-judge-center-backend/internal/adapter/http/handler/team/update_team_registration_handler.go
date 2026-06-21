@@ -3,6 +3,7 @@ package team
 import (
 	"encoding/json"
 	"net/http"
+	"time"
 
 	"github.com/training-judge-center/backend/internal/adapter/http/handler"
 	appTeam "github.com/training-judge-center/backend/internal/application/team"
@@ -76,6 +77,6 @@ func (h *Handler) UpdateTeamRegistration(w http.ResponseWriter, r *http.Request)
 		TeamID:          out.TeamID,
 		TeamName:        out.TeamName,
 		SelectedMembers: members,
-		RegisteredAt:    out.RegisteredAt.UTC().Format("2006-01-02T15:04:05Z"),
+		RegisteredAt:    out.RegisteredAt.UTC().Format(time.RFC3339),
 	})
 }
