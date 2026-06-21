@@ -1,5 +1,7 @@
 package submission
 
+import "github.com/training-judge-center/backend/pkg/apperror"
+
 const (
 	statusPending             = "PENDING"
 	statusRunning             = "RUNNING"
@@ -14,6 +16,19 @@ const (
 
 type SubmissionStatus struct {
 	value string
+}
+
+func NewStatus(raw string) (SubmissionStatus, error) {
+	switch raw {
+	case statusPending, statusRunning, statusAccepted, statusWrongAnswer,
+		statusTimeLimitExceeded, statusMemoryLimitExceeded,
+		statusRuntimeError, statusCompilationError, statusSystemError:
+		return SubmissionStatus{value: raw}, nil
+	default:
+		return SubmissionStatus{}, apperror.NewValidation([]apperror.FieldError{
+			{Field: "status", Message: "invalid status value"},
+		})
+	}
 }
 
 func RestoreStatus(value string) SubmissionStatus {

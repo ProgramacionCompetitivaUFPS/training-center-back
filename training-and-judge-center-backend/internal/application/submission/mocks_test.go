@@ -79,6 +79,7 @@ type mockSubmissionRepo struct {
 	lastFn       func(userID, problemID string) (*domainsubmission.Submission, error)
 	findByIDFn   func(id string) (*domainsubmission.Submission, error)
 	updateVisFn  func(s *domainsubmission.Submission) error
+	listFn       func(f domainsubmission.ListFilters) ([]*domainsubmission.Submission, int, error)
 }
 
 func (m *mockSubmissionRepo) Save(_ context.Context, _ *domainsubmission.Submission) error {
@@ -92,8 +93,11 @@ func (m *mockSubmissionRepo) FindByID(_ context.Context, id string) (*domainsubm
 	return nil, apperror.NewNotFound(domainsubmission.ErrCodeSubmissionNotFound, "not found")
 }
 
-func (m *mockSubmissionRepo) List(_ context.Context, _ domainsubmission.ListFilters) ([]*domainsubmission.Submission, int, error) {
-	return nil, 0, nil
+func (m *mockSubmissionRepo) List(_ context.Context, f domainsubmission.ListFilters) ([]*domainsubmission.Submission, int, error) {
+	if m.listFn != nil {
+		return m.listFn(f)
+	}
+	return []*domainsubmission.Submission{}, 0, nil
 }
 
 func (m *mockSubmissionRepo) FindLastByUserAndProblem(_ context.Context, userID, problemID string) (*domainsubmission.Submission, error) {
@@ -311,4 +315,40 @@ func newGetUseCase(
 
 func newUpdateVisUseCase(repo *mockSubmissionRepo) *UpdateSubmissionVisibilityUseCase {
 	return NewUpdateSubmissionVisibilityUseCase(repo)
+}
+
+func newListMyUseCase(
+	repo *mockSubmissionRepo,
+	prob *mockProblemDisplayProvider,
+	usr *mockUserProvider,
+	cont *mockContestProvider,
+	bySlug *mockProblemProvider,
+) *ListMySubmissionsUseCase {
+	if prob == nil {
+		prob = &mockProblemDisplayProvider{}
+	}
+	if usr == nil {
+		usr = &mockUserProvider{}
+	}
+	if cont == nil {
+		cont = &mockContestProvider{}
+	}
+	if bySlug == nil {
+		bySlug = &mockProblemProvider{}
+	}
+	return NewListMySubmissionsUseCase(repo, prob, usr, cont, bySlug)
+}
+
+func newListProblemSubmissionsUseCase(
+	repo *mockSubmissionRepo,
+	bySlug *mockProblemProvider,
+	usr *mockUserProvider,
+) *ListProblemSubmissionsUseCase {
+	if bySlug == nil {
+		bySlug = &mockProblemProvider{}
+	}
+	if usr == nil {
+		usr = &mockUserProvider{}
+	}
+	return NewListProblemSubmissionsUseCase(repo, bySlug, usr)
 }

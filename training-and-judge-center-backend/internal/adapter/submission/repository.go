@@ -262,6 +262,24 @@ func buildWhere(f domainSubmission.ListFilters) (string, []any) {
 		args = append(args, *f.ContestID)
 		i++
 	}
+	if f.Status != nil {
+		where += fmt.Sprintf(" AND status = $%d", i)
+		args = append(args, *f.Status)
+		i++
+	}
+	if f.Language != nil {
+		where += fmt.Sprintf(" AND language = $%d", i)
+		args = append(args, *f.Language)
+		i++
+	}
+	if f.Visibility != nil {
+		where += fmt.Sprintf(" AND visibility = $%d", i)
+		args = append(args, *f.Visibility)
+		i++
+	}
+	if f.ExcludeContest {
+		where += " AND contest_id IS NULL"
+	}
 	return where, args
 }
 

@@ -25,21 +25,6 @@ type getSubmissionResponse struct {
 	SourceCode    string          `json:"sourceCode"`
 }
 
-type problemSummary struct {
-	Slug  string `json:"slug"`
-	Title string `json:"title"`
-}
-
-type contestSummary struct {
-	ID   string `json:"id"`
-	Name string `json:"name"`
-}
-
-type userSummary struct {
-	ID       string `json:"id"`
-	Nickname string `json:"nickname"`
-}
-
 // GetSubmission handles GET /submissions/{submissionId}
 //
 // @Summary      Get submission

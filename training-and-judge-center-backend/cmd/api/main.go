@@ -451,11 +451,25 @@ func main() {
 		submissionLeadChecker,
 	)
 	updateSubmissionVisibilityUseCase := appsubmission.NewUpdateSubmissionVisibilityUseCase(submissionRepo)
+	listMySubmissionsUseCase := appsubmission.NewListMySubmissionsUseCase(
+		submissionRepo,
+		submissionProblemDisplay,
+		submissionUserDisplay,
+		submissionContestDisplay,
+		submissionProblemProvider,
+	)
+	listProblemSubmissionsUseCase := appsubmission.NewListProblemSubmissionsUseCase(
+		submissionRepo,
+		submissionProblemProvider,
+		submissionUserDisplay,
+	)
 
 	submissionHandler := handlersubmission.NewHandler(
 		submitSolutionUseCase,
 		getSubmissionUseCase,
 		updateSubmissionVisibilityUseCase,
+		listMySubmissionsUseCase,
+		listProblemSubmissionsUseCase,
 	)
 
 	router := adapterhttp.NewRouter(&adapterhttp.Handlers{
