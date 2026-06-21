@@ -146,6 +146,8 @@ func NewRouter(h *Handlers, s *Services, allowedOrigins []string) *chi.Mux {
 				r.Post("/unpublish", h.Problem.Unpublish)
 				r.Patch("/accessibility", h.Problem.ChangeAccessibility)
 
+				r.Get("/statistics", h.Problem.GetStatistics)
+
 				r.Get("/submissions", h.Submission.ListProblemSubmissions)
 				r.Post("/submissions", h.Submission.Submit)
 
