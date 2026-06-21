@@ -9,4 +9,5 @@ const (
 	ErrCodeUserNotFound               = "USER_NOT_FOUND"
 	ErrCodeInsufficientPermissions    = "INSUFFICIENT_PERMISSIONS"
 	ErrCodeFileNameNotApplicable      = "FILE_NAME_NOT_APPLICABLE"
+	ErrCodeProblemNotPublished        = "PROBLEM_NOT_PUBLISHED"
 )

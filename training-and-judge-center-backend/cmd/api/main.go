@@ -157,6 +157,7 @@ func main() {
 	packageParser := problem.NewICPCPackageParser(icpcParser)
 
 	userProvider := problem.NewUserProvider(dbPool)
+	problemStatisticsProvider := problem.NewStatisticsProvider(dbPool)
 
 	// Problem use cases
 	createProblemUseCase := appProblem.NewCreateProblemUseCase(problemRepo, settingsProvider)
@@ -172,6 +173,7 @@ func main() {
 	unpublishProblemUseCase := appProblem.NewUnpublishProblemUseCase(problemRepo)
 	changeAccessibilityUseCase := appProblem.NewChangeAccessibilityUseCase(problemRepo)
 	deleteProblemUseCase := appProblem.NewDeleteProblemUseCase(problemRepo, fileStorage)
+	getProblemStatisticsUseCase := appProblem.NewGetProblemStatisticsUseCase(problemRepo, problemStatisticsProvider)
 
 	problemHandler := handlerProblem.NewHandler(
 		createProblemUseCase,
@@ -187,6 +189,7 @@ func main() {
 		unpublishProblemUseCase,
 		changeAccessibilityUseCase,
 		deleteProblemUseCase,
+		getProblemStatisticsUseCase,
 		userProvider,
 		settingsProvider,
 	)
