@@ -263,6 +263,7 @@ func main() {
 	listMembersUseCase := appGroup.NewListMembersUseCase(groupRepo, groupMemberRepo, groupUserProvider)
 	groupStandingsCache := adaptercontest.NewStandingsCache(redisClient)
 	deleteGroupUseCase := appGroup.NewDeleteGroupUseCase(groupRepo, groupMemberRepo, groupDeletionProvider, groupStandingsCache, groupTxManager)
+	updateGroupUseCase := appGroup.NewUpdateGroupUseCase(groupRepo, groupMemberRepo, joinRequestRepo, groupTxManager)
 
 	groupHandler := handlerGroup.NewHandler(
 		createGroupUseCase, listGroupsUseCase, getGroupUseCase, listMyGroupsUseCase,
@@ -272,6 +273,7 @@ func main() {
 		generateInviteUseCase, acceptInviteUseCase,
 		addMemberUseCase, removeMemberUseCase, changeRoleUseCase, leaveGroupUseCase, listMembersUseCase,
 		deleteGroupUseCase,
+		updateGroupUseCase,
 	)
 
 	// Material platform adapters

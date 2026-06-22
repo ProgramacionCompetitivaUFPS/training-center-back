@@ -26,7 +26,8 @@ type mockGroupRepository struct {
 	saveErr        error
 }
 
-func (m *mockGroupRepository) Save(ctx context.Context, g *domainGroup.Group) error { return m.saveErr }
+func (m *mockGroupRepository) Save(ctx context.Context, g *domainGroup.Group) error   { return m.saveErr }
+func (m *mockGroupRepository) Update(ctx context.Context, g *domainGroup.Group) error { return m.saveErr }
 func (m *mockGroupRepository) FindByID(ctx context.Context, id string) (*domainGroup.Group, error) {
 	for _, g := range m.groups {
 		if g.ID() == id {

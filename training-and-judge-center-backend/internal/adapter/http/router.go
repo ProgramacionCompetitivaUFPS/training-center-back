@@ -70,6 +70,7 @@ func NewRouter(h *Handlers, s *Services, allowedOrigins []string) *chi.Mux {
 			r.Post("/", h.Group.Create)
 			r.Get("/", h.Group.ListGroups)
 			r.Get("/{groupId}", h.Group.GetGroup)
+			r.Patch("/{groupId}", h.Group.UpdateGroup)
 			r.Delete("/{groupId}", h.Group.DeleteGroup)
 			r.Post("/{groupId}/join", h.Group.Join)
 

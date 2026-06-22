@@ -150,6 +150,33 @@ type listMembersResp struct {
 	Pagination paginationResp       `json:"pagination"`
 }
 
+// ── Update group endpoint ─────────────────────────────────────────────────────
+
+type updateGroupReq struct {
+	Name        *string `json:"name"`
+	Description *string `json:"description"`
+	Visibility  *string `json:"visibility"`
+	JoinPolicy  *string `json:"join_policy"`
+}
+
+type policyChangeEffectsResp struct {
+	RequestsAutoApproved int `json:"requestsAutoApproved"`
+	RequestsAutoRejected int `json:"requestsAutoRejected"`
+}
+
+type updateGroupResp struct {
+	ID                  string                   `json:"id"`
+	Name                string                   `json:"name"`
+	Description         *string                  `json:"description"`
+	Visibility          string                   `json:"visibility"`
+	JoinPolicy          string                   `json:"joinPolicy"`
+	CreatedBy           string                   `json:"createdBy"`
+	CreatedAt           string                   `json:"createdAt"`
+	UpdatedAt           string                   `json:"updatedAt"`
+	MembersCount        int                      `json:"membersCount"`
+	PolicyChangeEffects *policyChangeEffectsResp `json:"policyChangeEffects,omitempty"`
+}
+
 // ── Delete group endpoint ─────────────────────────────────────────────────────
 
 type deleteGroupReq struct {
