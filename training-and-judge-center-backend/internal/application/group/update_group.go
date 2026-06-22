@@ -135,24 +135,28 @@ func (uc *UpdateGroupUseCase) Execute(ctx context.Context, in UpdateGroupInput) 
 	autoApproved := 0
 	autoRejected := 0
 
-	var pendingRequests []*domainGroup.JoinRequest
-	needPending := (newVisibility != nil && *newVisibility == domainGroup.VisibilityNotVisible) ||
-		(newJoinPolicy != nil && oldPolicy == domainGroup.JoinPolicyRequest)
+	// policyActuallyChanges is true only when the new join policy differs from the current one.
+	// This prevents loading and processing pending requests on a no-op (e.g. REQUEST→REQUEST).
+	policyActuallyChanges := newJoinPolicy != nil && *newJoinPolicy != oldPolicy
 
-	if needPending {
-		pending := domainGroup.JoinRequestStatusPending
-		reqs, _, err := uc.reqRepo.FindByGroup(ctx, in.GroupID, domainGroup.JoinRequestFilters{
-			Status: &pending,
-			Page:   1,
-			Limit:  10000,
-		})
-		if err != nil {
-			return nil, err
-		}
-		pendingRequests = reqs
-	}
+	needPending := (newVisibility != nil && *newVisibility == domainGroup.VisibilityNotVisible) ||
+		(policyActuallyChanges && oldPolicy == domainGroup.JoinPolicyRequest)
 
 	if err := uc.txManager.WithTx(ctx, func(txCtx context.Context) error {
+		var pendingRequests []*domainGroup.JoinRequest
+		if needPending {
+			pending := domainGroup.JoinRequestStatusPending
+			reqs, _, err := uc.reqRepo.FindByGroup(txCtx, in.GroupID, domainGroup.JoinRequestFilters{
+				Status: &pending,
+				Page:   1,
+				Limit:  10000,
+			})
+			if err != nil {
+				return err
+			}
+			pendingRequests = reqs
+		}
+
 		if newVisibility != nil && *newVisibility == domainGroup.VisibilityNotVisible {
 			for _, req := range pendingRequests {
 				if err := req.Reject(); err != nil {
@@ -163,7 +167,7 @@ func (uc *UpdateGroupUseCase) Execute(ctx context.Context, in UpdateGroupInput) 
 				}
 				autoRejected++
 			}
-		} else if newJoinPolicy != nil && oldPolicy == domainGroup.JoinPolicyRequest {
+		} else if policyActuallyChanges && oldPolicy == domainGroup.JoinPolicyRequest {
 			if *newJoinPolicy == domainGroup.JoinPolicyOpen {
 				for _, req := range pendingRequests {
 					existing, err := uc.memberRepo.FindByGroupAndUser(txCtx, in.GroupID, req.RequesterUserID())

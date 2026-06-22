@@ -4,12 +4,27 @@ import (
 	"encoding/json"
 	"io"
 	"net/http"
+	"time"
 
 	"github.com/training-judge-center/backend/internal/adapter/http/handler"
 	appGroup "github.com/training-judge-center/backend/internal/application/group"
 	"github.com/training-judge-center/backend/pkg/apperror"
 )
 
+// @Summary      Update group
+// @Tags         groups
+// @Accept       json
+// @Produce      json
+// @Security     BearerAuth
+// @Param        groupId path string        true "Group ID"
+// @Param        body    body updateGroupReq true "Fields to update (all optional)"
+// @Success      200 {object} updateGroupResp
+// @Failure      400 {object} apperror.AppError
+// @Failure      401 {object} apperror.AppError
+// @Failure      403 {object} apperror.AppError
+// @Failure      404 {object} apperror.AppError
+// @Failure      409 {object} apperror.AppError
+// @Router       /groups/{groupId} [patch]
 func (h *Handler) UpdateGroup(w http.ResponseWriter, r *http.Request) {
 	currentUser, ok := h.requireCurrentUser(w, r)
 	if !ok {
@@ -48,8 +63,8 @@ func buildUpdateGroupResp(out *appGroup.UpdateGroupOutput) updateGroupResp {
 		Visibility:  out.Visibility,
 		JoinPolicy:  out.JoinPolicy,
 		CreatedBy:   out.CreatedBy,
-		CreatedAt:   out.CreatedAt.UTC().Format("2006-01-02T15:04:05Z"),
-		UpdatedAt:   out.UpdatedAt.UTC().Format("2006-01-02T15:04:05Z"),
+		CreatedAt:   out.CreatedAt.UTC().Format(time.RFC3339),
+		UpdatedAt:   out.UpdatedAt.UTC().Format(time.RFC3339),
 		MembersCount: out.MembersCount,
 	}
 	if out.RequestsAutoApproved > 0 || out.RequestsAutoRejected > 0 {

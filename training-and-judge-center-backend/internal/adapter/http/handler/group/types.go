@@ -156,7 +156,7 @@ type updateGroupReq struct {
 	Name        *string `json:"name"`
 	Description *string `json:"description"`
 	Visibility  *string `json:"visibility"`
-	JoinPolicy  *string `json:"join_policy"`
+	JoinPolicy  *string `json:"joinPolicy"`
 }
 
 type policyChangeEffectsResp struct {
