@@ -9,7 +9,7 @@ import (
 )
 
 func newRemoveMemberUC(groupRepo *mockGroupRepository, memberRepo *mockMemberRepository, resolver *mockNicknameResolver) *RemoveMemberUseCase {
-	return NewRemoveMemberUseCase(groupRepo, memberRepo, resolver)
+	return NewRemoveMemberUseCase(groupRepo, memberRepo, resolver, &mockContestRegistrationCleaner{}, &mockTransactionManager{})
 }
 
 func TestRemoveMember_NonLeadReturns403(t *testing.T) {
@@ -98,6 +98,27 @@ func TestRemoveMember_LastLeadReturns400(t *testing.T) {
 	ae, ok := err.(*apperror.AppError)
 	if !ok || ae.Code != domainGroup.ErrCodeCannotRemoveLastLead {
 		t.Fatalf("expected CANNOT_REMOVE_LAST_LEAD, got %v", err)
+	}
+}
+
+func TestRemoveMember_SuccessUnregistersFromScheduledContests(t *testing.T) {
+	g := mustGroup(t, "g1", "Club", domainGroup.VisibilityVisible, domainGroup.JoinPolicyOpen)
+	resolver := &mockNicknameResolver{user: &UserDisplay{ID: "u2", Nickname: "member2"}}
+	memberRepo := leadMemberRepo("g1", "lead")
+	member2, _ := domainGroup.NewGroupMember("m2", "g1", mustUID("u2"), domainGroup.MemberRoleMember, domainGroup.JoinMethodOpenJoin, nil, testNow)
+	memberRepo.memberships[keyOf("g1", mustUID("u2"))] = member2
+
+	cleaner := &mockContestRegistrationCleaner{}
+	uc := NewRemoveMemberUseCase(
+		&mockGroupRepository{groups: []*domainGroup.Group{g}},
+		memberRepo, resolver, cleaner, &mockTransactionManager{},
+	)
+	if err := uc.Execute(context.Background(), RemoveMemberInput{
+		GroupID:     "g1",
+		Nickname:    "member2",
+		CurrentUser: asCoach("lead"),
+	}); err != nil {
+		t.Fatalf("unexpected error: %v", err)
 	}
 }
 
