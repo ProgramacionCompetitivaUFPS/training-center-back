@@ -620,6 +620,8 @@ Group or contest not found.
 
 ## Data Architecture *(mandatory)*
 
+> ⚠️ **SUPERSEDED (2026-06-21)** — Esta sección describe un diseño NoSQL (una colección por contest, documentos de standing con operaciones atómicas y snapshot final) que **NO** corresponde a la implementación real. El backend implementa registros y standings en **PostgreSQL**: tabla relacional `contest_registrations` + standings **computados on-the-fly desde `submissions` con cache** (ranking ICPC). Decisión consciente para no introducir un segundo motor de datos. Los criterios SC-RC-016..020 (colecciones NoSQL, snapshot, updates atómicos de documento) no aplican. Ver `.agent/audit/03-contest-management.md`.
+
 ### NoSQL Document Structure
 
 Registration and Standing data are stored together in a NoSQL document database (e.g., MongoDB, DynamoDB) using a **one collection per contest** approach for optimal performance.

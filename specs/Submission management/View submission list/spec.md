@@ -66,6 +66,8 @@ As a user, I want to see public submissions for a problem so that I can learn fr
 
 ### User Story 3 - View submissions in a contest (Priority: P1)
 
+> ⚠️ **SUPERSEDED (2026-06-21)** — El modelo de parámetro `scope` (`mine`/`team`/`public`/`all`) y el error `SCOPE_NOT_ALLOWED` descritos en esta historia y en su contrato (`GET /api/groups/{groupId}/contests/{contestId}/submissions`, ver más abajo) **NO** se implementaron. El endpoint sigue la spec **`Contest management/View contest submissions`**, que usa lógica de *freeze* + filtros `problemSlug`/`nickname`/`phase` en lugar de `scope`. Esta sección queda reemplazada por esa spec. Ver `.agent/audit/01-submission-management.md` §3.
+
 As a contest participant, I want to see submissions in a contest so that I can review my and my team's progress.
 
 **Why this priority**: Contest submission visibility is essential for team coordination and post-contest analysis.
@@ -261,6 +263,8 @@ List public submissions for a problem (outside contests).
 ---
 
 ### GET /api/groups/{groupId}/contests/{contestId}/submissions
+
+> ⚠️ **SUPERSEDED** — El parámetro `scope` y el error `SCOPE_NOT_ALLOWED` de abajo no se implementaron. Ver la spec vigente `Contest management/View contest submissions` (freeze + `problemSlug`/`nickname`/`phase`).
 
 List submissions in a contest.
 
