@@ -107,4 +107,11 @@ adapter/ratelimit/ ← driven adapter: rate limiting (transversal)
 
 **Adapter double-logging:** the adapter logs the raw error before returning `apperror.NewInternal()`. The application layer must NOT log errors that come from adapters — they were already logged at the boundary.
 
-**Estado de los dominios:** todos los dominios del backend (`user`, `problem`, `group`, `material`, `contest`, `team`, `submission`) tienen capa de dominio, `application/` y handlers HTTP implementados. La excepción es el **Judge System** (lo cubre otro dev). Para el detalle de qué endpoints faltan o divergen de las specs, ver la auditoría en `.agent/audit/`.
+**Estado de los dominios:** todos los dominios del backend (`user`, `problem`, `group`, `material`, `contest`, `team`, `submission`) tienen capa de dominio, `application/` y handlers HTTP implementados. La excepción es el **Judge System** (lo cubre otro dev).
+
+**Endpoints pendientes principales:**
+- `POST /problems/p/{slug}/publish` — requiere Judge System; bloquea DRAFT→PUBLISHED por API.
+- `PATCH /groups/{groupId}` — Update group (name/description), no implementado.
+- `POST /problems/p/{slug}/rejudge` — depende de la cola/judge (misc-2).
+- `GET /groups/{groupId}/materials?q=...` — búsqueda full-text de materiales (misc-3).
+- `GET /users/me/dashboard` — dashboard de actividad cross-domain (misc-4).
