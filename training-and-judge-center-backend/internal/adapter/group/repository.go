@@ -108,6 +108,31 @@ func (r *Repository) FindDefault(ctx context.Context) (*domainGroup.Group, error
 	return g, nil
 }
 
+func (r *Repository) Update(ctx context.Context, g *domainGroup.Group) error {
+	const q = `
+		UPDATE groups
+		SET name = $1, description = $2, visibility = $3, join_policy = $4, updated_at = $5
+		WHERE id = $6
+	`
+	_, err := infraPostgres.GetQuerier(ctx, r.db).Exec(ctx, q,
+		g.Name().Value(),
+		g.Description(),
+		g.Visibility().String(),
+		g.JoinPolicy().String(),
+		g.UpdatedAt(),
+		g.ID(),
+	)
+	if err != nil {
+		var pgErr *pgconn.PgError
+		if errors.As(err, &pgErr) && pgErr.Code == infraPostgres.UniqueViolation {
+			return apperror.NewConflict(domainGroup.ErrCodeNameAlreadyExists, "a group with this name already exists")
+		}
+		slog.ErrorContext(ctx, "failed to update group", "error", err, "group_id", g.ID())
+		return apperror.NewInternal()
+	}
+	return nil
+}
+
 func (r *Repository) Delete(ctx context.Context, id string) error {
 	tag, err := infraPostgres.GetQuerier(ctx, r.db).Exec(ctx, `DELETE FROM groups WHERE id = $1`, id)
 	if err != nil {

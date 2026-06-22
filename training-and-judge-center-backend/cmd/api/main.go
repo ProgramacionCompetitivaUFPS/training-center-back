@@ -237,16 +237,14 @@ func main() {
 	groupNicknameResolver := group.NewNicknameResolver(dbPool)
 	joinRequestRepo := group.NewJoinRequestRepository(dbPool)
 	groupDeletionProvider := group.NewDeletionProvider(dbPool)
-	groupTxManager := postgres.NewTransactionManager(dbPool)
-
 	// Group use cases
-	createGroupUseCase := appGroup.NewCreateGroupUseCase(groupRepo, groupMemberRepo, groupTxManager)
+	createGroupUseCase := appGroup.NewCreateGroupUseCase(groupRepo, groupMemberRepo, txManager)
 	listGroupsUseCase := appGroup.NewListGroupsUseCase(groupRepo, groupMemberRepo)
 	getGroupUseCase := appGroup.NewGetGroupUseCase(groupRepo, groupMemberRepo, groupUserProvider)
 	listMyGroupsUseCase := appGroup.NewListMyGroupsUseCase(groupRepo, groupMemberRepo, groupPrefsReader)
 	joinGroupUseCase := appGroup.NewJoinGroupUseCase(groupRepo, groupMemberRepo)
 	requestJoinUseCase := appGroup.NewRequestJoinUseCase(groupRepo, groupMemberRepo, joinRequestRepo)
-	approveRequestUseCase := appGroup.NewApproveRequestUseCase(groupMemberRepo, joinRequestRepo, groupTxManager)
+	approveRequestUseCase := appGroup.NewApproveRequestUseCase(groupMemberRepo, joinRequestRepo, txManager)
 	rejectRequestUseCase := appGroup.NewRejectRequestUseCase(groupMemberRepo, joinRequestRepo)
 	listJoinRequestsUseCase := appGroup.NewListJoinRequestsUseCase(groupMemberRepo, joinRequestRepo, groupUserProvider)
 	getMyRequestUseCase := appGroup.NewGetMyRequestUseCase(joinRequestRepo)
@@ -262,7 +260,8 @@ func main() {
 	leaveGroupUseCase := appGroup.NewLeaveGroupUseCase(groupRepo, groupMemberRepo)
 	listMembersUseCase := appGroup.NewListMembersUseCase(groupRepo, groupMemberRepo, groupUserProvider)
 	groupStandingsCache := adaptercontest.NewStandingsCache(redisClient)
-	deleteGroupUseCase := appGroup.NewDeleteGroupUseCase(groupRepo, groupMemberRepo, groupDeletionProvider, groupStandingsCache, groupTxManager)
+	deleteGroupUseCase := appGroup.NewDeleteGroupUseCase(groupRepo, groupMemberRepo, groupDeletionProvider, groupStandingsCache, txManager)
+	updateGroupUseCase := appGroup.NewUpdateGroupUseCase(groupRepo, groupMemberRepo, joinRequestRepo, txManager)
 
 	groupHandler := handlerGroup.NewHandler(
 		createGroupUseCase, listGroupsUseCase, getGroupUseCase, listMyGroupsUseCase,
@@ -272,6 +271,7 @@ func main() {
 		generateInviteUseCase, acceptInviteUseCase,
 		addMemberUseCase, removeMemberUseCase, changeRoleUseCase, leaveGroupUseCase, listMembersUseCase,
 		deleteGroupUseCase,
+		updateGroupUseCase,
 	)
 
 	// Material platform adapters

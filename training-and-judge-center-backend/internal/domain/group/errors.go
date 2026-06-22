@@ -20,5 +20,7 @@ const (
 	ErrCodeCannotLeaveGlobalGroup          = "CANNOT_LEAVE_GLOBAL_GROUP"
 	ErrCodeCannotLeaveAsLastLead           = "CANNOT_LEAVE_AS_LAST_LEAD"
 
-	ErrCodeCannotDeleteGlobalGroup = "CANNOT_DELETE_GLOBAL_GROUP"
+	ErrCodeCannotDeleteGlobalGroup  = "CANNOT_DELETE_GLOBAL_GROUP"
+	ErrCodeCannotModifyGlobalGroup  = "CANNOT_MODIFY_GLOBAL_GROUP"
+	ErrCodeInvalidPolicyCombination = "INVALID_POLICY_COMBINATION"
 )
