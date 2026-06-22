@@ -15,15 +15,24 @@ type LeaveGroupInput struct {
 }
 
 type LeaveGroupUseCase struct {
-	groupRepo  domainGroup.Repository
-	memberRepo domainGroup.MemberRepository
+	groupRepo      domainGroup.Repository
+	memberRepo     domainGroup.MemberRepository
+	contestCleaner ContestRegistrationCleaner
+	txManager      appshared.TransactionManager
 }
 
 func NewLeaveGroupUseCase(
 	groupRepo domainGroup.Repository,
 	memberRepo domainGroup.MemberRepository,
+	contestCleaner ContestRegistrationCleaner,
+	txManager appshared.TransactionManager,
 ) *LeaveGroupUseCase {
-	return &LeaveGroupUseCase{groupRepo: groupRepo, memberRepo: memberRepo}
+	return &LeaveGroupUseCase{
+		groupRepo:      groupRepo,
+		memberRepo:     memberRepo,
+		contestCleaner: contestCleaner,
+		txManager:      txManager,
+	}
 }
 
 func (uc *LeaveGroupUseCase) Execute(ctx context.Context, input LeaveGroupInput) error {
@@ -55,5 +64,10 @@ func (uc *LeaveGroupUseCase) Execute(ctx context.Context, input LeaveGroupInput)
 		}
 	}
 
-	return uc.memberRepo.Delete(ctx, input.GroupID, callerID)
+	return uc.txManager.WithTx(ctx, func(txCtx context.Context) error {
+		if _, err := uc.contestCleaner.DeleteScheduledByGroupAndUser(txCtx, input.GroupID, callerID.Value()); err != nil {
+			return err
+		}
+		return uc.memberRepo.Delete(txCtx, input.GroupID, callerID)
+	})
 }

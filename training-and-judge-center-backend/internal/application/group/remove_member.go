@@ -58,7 +58,7 @@ func (uc *RemoveMemberUseCase) Execute(ctx context.Context, input RemoveMemberIn
 		return err
 	}
 	if target == nil {
-		return apperror.NewNotFound("NICKNAME_NOT_FOUND", "the specified nickname does not exist")
+		return apperror.NewNotFound(ErrCodeNicknameNotFound, "the specified nickname does not exist")
 	}
 
 	targetID := shared.RestoreUserID(target.ID)

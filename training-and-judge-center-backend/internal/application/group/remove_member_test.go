@@ -120,6 +120,9 @@ func TestRemoveMember_SuccessUnregistersFromScheduledContests(t *testing.T) {
 	}); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
+	if !cleaner.called {
+		t.Error("expected contestCleaner.DeleteScheduledByGroupAndUser to be called")
+	}
 }
 
 func TestRemoveMember_SuccessRegularMember(t *testing.T) {

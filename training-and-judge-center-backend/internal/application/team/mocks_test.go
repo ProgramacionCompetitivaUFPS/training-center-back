@@ -349,8 +349,10 @@ func validInput(cu appshared.CurrentUser) CreateTeamInput {
 type mockScheduledParticipationCleaner struct {
 	removedCount int
 	err          error
+	called       bool
 }
 
 func (m *mockScheduledParticipationCleaner) RemoveUserFromScheduledParticipations(_ context.Context, _, _ string) (int, error) {
+	m.called = true
 	return m.removedCount, m.err
 }

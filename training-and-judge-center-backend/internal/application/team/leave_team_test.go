@@ -60,6 +60,9 @@ func TestLeaveTeam_SuccessRemovesFromScheduledParticipations(t *testing.T) {
 	}); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
+	if !cleaner.called {
+		t.Error("expected participationCleaner.RemoveUserFromScheduledParticipations to be called")
+	}
 }
 
 func TestLeaveTeam_SuccessDeletes(t *testing.T) {

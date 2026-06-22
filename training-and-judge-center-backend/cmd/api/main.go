@@ -258,7 +258,7 @@ func main() {
 	groupContestCleaner := group.NewContestRegistrationCleaner(dbPool)
 	removeMemberUseCase := appGroup.NewRemoveMemberUseCase(groupRepo, groupMemberRepo, groupNicknameResolver, groupContestCleaner, txManager)
 	changeRoleUseCase := appGroup.NewChangeRoleUseCase(groupRepo, groupMemberRepo, groupNicknameResolver)
-	leaveGroupUseCase := appGroup.NewLeaveGroupUseCase(groupRepo, groupMemberRepo)
+	leaveGroupUseCase := appGroup.NewLeaveGroupUseCase(groupRepo, groupMemberRepo, groupContestCleaner, txManager)
 	listMembersUseCase := appGroup.NewListMembersUseCase(groupRepo, groupMemberRepo, groupUserProvider)
 	groupStandingsCache := adaptercontest.NewStandingsCache(redisClient)
 	deleteGroupUseCase := appGroup.NewDeleteGroupUseCase(groupRepo, groupMemberRepo, groupDeletionProvider, groupStandingsCache, txManager)
