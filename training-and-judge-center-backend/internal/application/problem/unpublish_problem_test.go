@@ -10,7 +10,7 @@ import (
 
 func TestUnpublishProblem_Success_Author(t *testing.T) {
 	repo := repoWith(newPublishedProblem())
-	uc := NewUnpublishProblemUseCase(repo)
+	uc := NewUnpublishProblemUseCase(repo, &mockActiveContestChecker{})
 
 	out, err := uc.Execute(context.Background(), UnpublishProblemInput{
 		Slug:        testSlug,
@@ -26,7 +26,7 @@ func TestUnpublishProblem_Success_Author(t *testing.T) {
 
 func TestUnpublishProblem_Success_Admin(t *testing.T) {
 	repo := repoWith(newPublishedProblem())
-	uc := NewUnpublishProblemUseCase(repo)
+	uc := NewUnpublishProblemUseCase(repo, &mockActiveContestChecker{})
 
 	_, err := uc.Execute(context.Background(), UnpublishProblemInput{
 		Slug:        testSlug,
@@ -39,7 +39,7 @@ func TestUnpublishProblem_Success_Admin(t *testing.T) {
 
 func TestUnpublishProblem_Success_Modifier(t *testing.T) {
 	repo := repoWith(newPublishedProblemWithModifier())
-	uc := NewUnpublishProblemUseCase(repo)
+	uc := NewUnpublishProblemUseCase(repo, &mockActiveContestChecker{})
 
 	_, err := uc.Execute(context.Background(), UnpublishProblemInput{
 		Slug:        testSlug,
@@ -50,9 +50,29 @@ func TestUnpublishProblem_Success_Modifier(t *testing.T) {
 	}
 }
 
+func TestUnpublishProblem_ProblemInActiveContest(t *testing.T) {
+	repo := repoWith(newPublishedProblem())
+	uc := NewUnpublishProblemUseCase(repo, &mockActiveContestChecker{inActive: true})
+
+	_, err := uc.Execute(context.Background(), UnpublishProblemInput{
+		Slug:        testSlug,
+		CurrentUser: asCoach(authorID),
+	})
+	if err == nil {
+		t.Fatal("expected error when problem is in active contest, got nil")
+	}
+	appErr, ok := err.(*apperror.AppError)
+	if !ok {
+		t.Fatalf("expected *apperror.AppError, got %T", err)
+	}
+	if appErr.Code != domainProblem.ErrCodeProblemInActiveContest {
+		t.Errorf("expected %q, got %q", domainProblem.ErrCodeProblemInActiveContest, appErr.Code)
+	}
+}
+
 func TestUnpublishProblem_Forbidden_Stranger(t *testing.T) {
 	repo := repoWith(newPublishedProblem())
-	uc := NewUnpublishProblemUseCase(repo)
+	uc := NewUnpublishProblemUseCase(repo, &mockActiveContestChecker{})
 
 	_, err := uc.Execute(context.Background(), UnpublishProblemInput{
 		Slug:        testSlug,
@@ -73,7 +93,7 @@ func TestUnpublishProblem_Forbidden_Stranger(t *testing.T) {
 
 func TestUnpublishProblem_AlreadyDraft(t *testing.T) {
 	repo := repoWith(newDraftProblem())
-	uc := NewUnpublishProblemUseCase(repo)
+	uc := NewUnpublishProblemUseCase(repo, &mockActiveContestChecker{})
 
 	_, err := uc.Execute(context.Background(), UnpublishProblemInput{
 		Slug:        testSlug,

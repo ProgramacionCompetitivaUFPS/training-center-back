@@ -26,6 +26,8 @@ func (m *mockTokenSvc) ValidateToken(_ string) (*domainUser.TokenClaims, error) 
 	return &domainUser.TokenClaims{UserID: shared.RestoreUserID("u1").Value(), Role: shared.RoleCoach}, nil
 }
 
+func mustJSON(s string) []byte { return []byte(s) }
+
 func authedRequest(method, target string, body []byte) *http.Request {
 	var r *http.Request
 	if body != nil {
@@ -74,10 +76,41 @@ func (m *mockStatsProvider) GetByProblemID(_ context.Context, _ string) (*appPro
 	return m.stats, m.err
 }
 
+// ── FileStorage mock ─────────────────────────────────────────────────────────
+
+type mockFileStorageH struct{}
+
+func (m *mockFileStorageH) UploadFile(_ context.Context, _ string, _ []byte) error { return nil }
+func (m *mockFileStorageH) DeleteFile(_ context.Context, _ string) error            { return nil }
+func (m *mockFileStorageH) DeleteFilesWithPrefix(_ context.Context, _ string) error { return nil }
+
+// ── ActiveContestChecker mock ────────────────────────────────────────────────
+
+type mockActiveContestCheckerH struct {
+	inActive bool
+	err      error
+}
+
+func (m *mockActiveContestCheckerH) IsProblemInActiveContest(_ context.Context, _ string) (bool, error) {
+	return m.inActive, m.err
+}
+
 // ── Handler constructor helpers ──────────────────────────────────────────────
 
 func newHandlerWithStatistics(uc *appProblem.GetProblemStatisticsUseCase) *Handler {
 	return &Handler{getStatisticsUC: uc}
+}
+
+func newHandlerWithUnpublish(repo domainProblem.Repository, checker appProblem.ActiveContestChecker) *Handler {
+	return &Handler{unpublishUC: appProblem.NewUnpublishProblemUseCase(repo, checker)}
+}
+
+func newHandlerWithDeleteProblem(repo domainProblem.Repository, checker appProblem.ActiveContestChecker) *Handler {
+	return &Handler{deleteProblemUC: appProblem.NewDeleteProblemUseCase(repo, &mockFileStorageH{}, checker)}
+}
+
+func newHandlerWithChangeAccessibility(repo domainProblem.Repository) *Handler {
+	return &Handler{changeAccessibilityUC: appProblem.NewChangeAccessibilityUseCase(repo)}
 }
 
 // ── Problem fixtures ─────────────────────────────────────────────────────────

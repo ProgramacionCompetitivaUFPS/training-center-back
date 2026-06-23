@@ -158,6 +158,7 @@ func main() {
 
 	userProvider := problem.NewUserProvider(dbPool)
 	problemStatisticsProvider := problem.NewStatisticsProvider(dbPool)
+	problemActiveContestChecker := problem.NewActiveContestChecker(dbPool)
 
 	// Problem use cases
 	createProblemUseCase := appProblem.NewCreateProblemUseCase(problemRepo, settingsProvider)
@@ -170,9 +171,9 @@ func main() {
 	listModifiersUseCase := appProblem.NewListModifiersUseCase(problemRepo)
 	getProblemUseCase := appProblem.NewGetProblemUseCase(problemRepo, userProvider)
 	listProblemsUseCase := appProblem.NewListProblemsUseCase(problemRepo, userProvider)
-	unpublishProblemUseCase := appProblem.NewUnpublishProblemUseCase(problemRepo)
+	unpublishProblemUseCase := appProblem.NewUnpublishProblemUseCase(problemRepo, problemActiveContestChecker)
 	changeAccessibilityUseCase := appProblem.NewChangeAccessibilityUseCase(problemRepo)
-	deleteProblemUseCase := appProblem.NewDeleteProblemUseCase(problemRepo, fileStorage)
+	deleteProblemUseCase := appProblem.NewDeleteProblemUseCase(problemRepo, fileStorage, problemActiveContestChecker)
 	getProblemStatisticsUseCase := appProblem.NewGetProblemStatisticsUseCase(problemRepo, problemStatisticsProvider)
 
 	problemHandler := handlerProblem.NewHandler(

@@ -10,7 +10,7 @@ import (
 
 func TestDeleteProblem_Success_Author(t *testing.T) {
 	repo := repoWith(newDraftProblem())
-	uc := NewDeleteProblemUseCase(repo, &mockFileStorage{})
+	uc := NewDeleteProblemUseCase(repo, &mockFileStorage{}, &mockActiveContestChecker{})
 
 	err := uc.Execute(context.Background(), DeleteProblemInput{
 		Slug:        testSlug,
@@ -24,7 +24,7 @@ func TestDeleteProblem_Success_Author(t *testing.T) {
 
 func TestDeleteProblem_Success_Admin(t *testing.T) {
 	repo := repoWith(newDraftProblem())
-	uc := NewDeleteProblemUseCase(repo, &mockFileStorage{})
+	uc := NewDeleteProblemUseCase(repo, &mockFileStorage{}, &mockActiveContestChecker{})
 
 	err := uc.Execute(context.Background(), DeleteProblemInput{
 		Slug:        testSlug,
@@ -36,9 +36,30 @@ func TestDeleteProblem_Success_Admin(t *testing.T) {
 	}
 }
 
+func TestDeleteProblem_ProblemInActiveContest(t *testing.T) {
+	repo := repoWith(newPublishedProblem())
+	uc := NewDeleteProblemUseCase(repo, &mockFileStorage{}, &mockActiveContestChecker{inActive: true})
+
+	err := uc.Execute(context.Background(), DeleteProblemInput{
+		Slug:        testSlug,
+		ConfirmSlug: testSlug,
+		CurrentUser: asCoach(authorID),
+	})
+	if err == nil {
+		t.Fatal("expected error when problem is in active contest, got nil")
+	}
+	appErr, ok := err.(*apperror.AppError)
+	if !ok {
+		t.Fatalf("expected *apperror.AppError, got %T", err)
+	}
+	if appErr.Code != domainProblem.ErrCodeProblemInActiveContest {
+		t.Errorf("expected %q, got %q", domainProblem.ErrCodeProblemInActiveContest, appErr.Code)
+	}
+}
+
 func TestDeleteProblem_Forbidden_Stranger(t *testing.T) {
 	repo := repoWith(newDraftProblem())
-	uc := NewDeleteProblemUseCase(repo, &mockFileStorage{})
+	uc := NewDeleteProblemUseCase(repo, &mockFileStorage{}, &mockActiveContestChecker{})
 
 	err := uc.Execute(context.Background(), DeleteProblemInput{
 		Slug:        testSlug,
@@ -60,7 +81,7 @@ func TestDeleteProblem_Forbidden_Stranger(t *testing.T) {
 
 func TestDeleteProblem_ConfirmSlugMismatch(t *testing.T) {
 	repo := repoWith(newDraftProblem())
-	uc := NewDeleteProblemUseCase(repo, &mockFileStorage{})
+	uc := NewDeleteProblemUseCase(repo, &mockFileStorage{}, &mockActiveContestChecker{})
 
 	err := uc.Execute(context.Background(), DeleteProblemInput{
 		Slug:        testSlug,
@@ -82,23 +103,23 @@ func TestDeleteProblem_ConfirmSlugMismatch(t *testing.T) {
 
 func TestDeleteProblem_EmptyConfirmSlug(t *testing.T) {
 	repo := repoWith(newDraftProblem())
-	uc := NewDeleteProblemUseCase(repo, &mockFileStorage{})
+	uc := NewDeleteProblemUseCase(repo, &mockFileStorage{}, &mockActiveContestChecker{})
 
 	err := uc.Execute(context.Background(), DeleteProblemInput{
 		Slug:        testSlug,
-		ConfirmSlug: "", // empty
+		ConfirmSlug: "",
 		CurrentUser: asCoach(authorID),
 	})
 	if err == nil {
-		t.Fatal("empty confirm slug should return validation error, got nil")
+		t.Fatal("empty confirm slug should return error, got nil")
 	}
 
 	appErr, ok := err.(*apperror.AppError)
 	if !ok {
 		t.Fatalf("expected *apperror.AppError, got %T", err)
 	}
-	if appErr.Code != apperror.ErrCodeValidationError {
-		t.Errorf("expected VALIDATION_ERROR, got %q", appErr.Code)
+	if appErr.Code != domainProblem.ErrCodeSlugMismatch {
+		t.Errorf("expected %q, got %q", domainProblem.ErrCodeSlugMismatch, appErr.Code)
 	}
 }
 
@@ -108,7 +129,7 @@ func TestDeleteProblem_NotFound(t *testing.T) {
 			return nil, apperror.NewNotFound(apperror.ErrCodeNotFound, "problem not found")
 		},
 	}
-	uc := NewDeleteProblemUseCase(repo, &mockFileStorage{})
+	uc := NewDeleteProblemUseCase(repo, &mockFileStorage{}, &mockActiveContestChecker{})
 
 	err := uc.Execute(context.Background(), DeleteProblemInput{
 		Slug:        testSlug,
