@@ -21,6 +21,10 @@ UPDATE submissions s
 
 -- +goose Down
 
+-- WARNING: this permanently deletes every submission whose problem was deleted
+-- after the UP migration ran (problem_id set to NULL by ON DELETE SET NULL).
+-- There is no recovery path. Do not run this in production unless those rows
+-- are acceptable to lose.
 DELETE FROM submissions WHERE problem_id IS NULL;
 
 ALTER TABLE submissions ALTER COLUMN problem_id SET NOT NULL;

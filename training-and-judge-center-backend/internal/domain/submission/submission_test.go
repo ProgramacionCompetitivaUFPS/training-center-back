@@ -19,7 +19,7 @@ const (
 func newRunningSubmission(t *testing.T) *submission.Submission {
 	t.Helper()
 	lang := submission.RestoreLanguage("cpp20")
-	s, err := submission.NewSubmission(testSubmissionID, testProblemID, shared.RestoreUserID(testUserID), nil, nil, lang, "g++", "gs://bucket/code.cpp", "abc123", 512, testNow, "", "")
+	s, err := submission.NewSubmission(testSubmissionID, testProblemID, shared.RestoreUserID(testUserID), nil, nil, lang, "g++", "gs://bucket/code.cpp", "abc123", 512, "", "", testNow)
 	if err != nil {
 		t.Fatalf("NewSubmission: %v", err)
 	}
@@ -31,7 +31,7 @@ func newRunningSubmission(t *testing.T) *submission.Submission {
 
 func TestNewSubmission_EmptyID_ReturnsError(t *testing.T) {
 	lang := submission.RestoreLanguage("cpp20")
-	_, err := submission.NewSubmission("", testProblemID, shared.RestoreUserID(testUserID), nil, nil, lang, "g++", "gs://bucket/code.cpp", "abc123", 512, testNow, "", "")
+	_, err := submission.NewSubmission("", testProblemID, shared.RestoreUserID(testUserID), nil, nil, lang, "g++", "gs://bucket/code.cpp", "abc123", 512, "", "", testNow)
 	if err == nil {
 		t.Error("expected error for empty id, got nil")
 	}
@@ -39,7 +39,7 @@ func TestNewSubmission_EmptyID_ReturnsError(t *testing.T) {
 
 func TestNewSubmission_SetsInitialState(t *testing.T) {
 	lang := submission.RestoreLanguage("cpp20")
-	s, err := submission.NewSubmission(testSubmissionID, testProblemID, shared.RestoreUserID(testUserID), nil, nil, lang, "g++", "gs://bucket/code.cpp", "abc123", 512, testNow, "", "")
+	s, err := submission.NewSubmission(testSubmissionID, testProblemID, shared.RestoreUserID(testUserID), nil, nil, lang, "g++", "gs://bucket/code.cpp", "abc123", 512, "", "", testNow)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -66,7 +66,7 @@ func TestNewSubmission_SetsInitialState(t *testing.T) {
 
 func TestSubmission_Start_FromPending_Succeeds(t *testing.T) {
 	lang := submission.RestoreLanguage("cpp20")
-	s, _ := submission.NewSubmission(testSubmissionID, testProblemID, shared.RestoreUserID(testUserID), nil, nil, lang, "g++", "path", "abc123", 512, testNow, "", "")
+	s, _ := submission.NewSubmission(testSubmissionID, testProblemID, shared.RestoreUserID(testUserID), nil, nil, lang, "g++", "path", "abc123", 512, "", "", testNow)
 
 	if err := s.Start(testNow); err != nil {
 		t.Errorf("unexpected error: %v", err)
@@ -107,7 +107,7 @@ func TestSubmission_MarkAccepted_FromRunning_Succeeds(t *testing.T) {
 
 func TestSubmission_MarkAccepted_FromPending_Fails(t *testing.T) {
 	lang := submission.RestoreLanguage("cpp20")
-	s, _ := submission.NewSubmission(testSubmissionID, testProblemID, shared.RestoreUserID(testUserID), nil, nil, lang, "g++", "path", "abc123", 512, testNow, "", "")
+	s, _ := submission.NewSubmission(testSubmissionID, testProblemID, shared.RestoreUserID(testUserID), nil, nil, lang, "g++", "path", "abc123", 512, "", "", testNow)
 	if err := s.MarkAccepted(150, 4096, testNow); err == nil {
 		t.Error("expected error when marking ACCEPTED from PENDING, got nil")
 	}

@@ -68,9 +68,9 @@ func NewSubmission(
 	sourceCodePath string,
 	fileHash string,
 	fileSize int,
-	now time.Time,
 	problemTitle string,
 	problemSlug string,
+	now time.Time,
 ) (*Submission, error) {
 	if id == "" {
 		return nil, apperror.NewInternal()

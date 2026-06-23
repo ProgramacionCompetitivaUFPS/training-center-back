@@ -32,11 +32,13 @@ func (r *Repository) Save(ctx context.Context, s *domainSubmission.Submission) e
 			problem_title, problem_slug
 		) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)
 		ON CONFLICT (id) DO UPDATE SET
-			status     = EXCLUDED.status,
-			visibility = EXCLUDED.visibility,
-			compiler   = EXCLUDED.compiler,
-			file_hash  = EXCLUDED.file_hash,
-			file_size  = EXCLUDED.file_size
+			status        = EXCLUDED.status,
+			visibility    = EXCLUDED.visibility,
+			compiler      = EXCLUDED.compiler,
+			file_hash     = EXCLUDED.file_hash,
+			file_size     = EXCLUDED.file_size,
+			problem_title = EXCLUDED.problem_title,
+			problem_slug  = EXCLUDED.problem_slug
 	`,
 		s.ID(),
 		nilIfEmpty(s.ProblemID()),
