@@ -255,9 +255,10 @@ func main() {
 	acceptInviteUseCase := appGroup.NewAcceptInviteUseCase(groupRepo, groupMemberRepo, groupInvitationJWTSvc)
 
 	addMemberUseCase := appGroup.NewAddMemberUseCase(groupRepo, groupMemberRepo, groupNicknameResolver)
-	removeMemberUseCase := appGroup.NewRemoveMemberUseCase(groupRepo, groupMemberRepo, groupNicknameResolver)
+	groupContestCleaner := group.NewContestRegistrationCleaner(dbPool)
+	removeMemberUseCase := appGroup.NewRemoveMemberUseCase(groupRepo, groupMemberRepo, groupNicknameResolver, groupContestCleaner, txManager)
 	changeRoleUseCase := appGroup.NewChangeRoleUseCase(groupRepo, groupMemberRepo, groupNicknameResolver)
-	leaveGroupUseCase := appGroup.NewLeaveGroupUseCase(groupRepo, groupMemberRepo)
+	leaveGroupUseCase := appGroup.NewLeaveGroupUseCase(groupRepo, groupMemberRepo, groupContestCleaner, txManager)
 	listMembersUseCase := appGroup.NewListMembersUseCase(groupRepo, groupMemberRepo, groupUserProvider)
 	groupStandingsCache := adaptercontest.NewStandingsCache(redisClient)
 	deleteGroupUseCase := appGroup.NewDeleteGroupUseCase(groupRepo, groupMemberRepo, groupDeletionProvider, groupStandingsCache, txManager)
@@ -379,7 +380,8 @@ func main() {
 	listMyInvitationsUseCase := appteam.NewListMyInvitationsUseCase(teamInvitationRepo, teamRepo, teamUserProvider)
 	acceptInvitationUseCase := appteam.NewAcceptInvitationUseCase(teamInvitationRepo, teamMemberRepo, txManager)
 	rejectInvitationUseCase := appteam.NewRejectInvitationUseCase(teamInvitationRepo)
-	leaveTeamUseCase := appteam.NewLeaveTeamUseCase(teamMemberRepo, teamContestParticipationChecker)
+	teamScheduledCleaner := adapterteam.NewScheduledParticipationCleaner(dbPool)
+	leaveTeamUseCase := appteam.NewLeaveTeamUseCase(teamMemberRepo, teamContestParticipationChecker, teamScheduledCleaner, txManager)
 	registerTeamToContestUseCase := appteam.NewRegisterTeamToContestUseCase(
 		teamMemberRepo, teamRepo, teamContestProvider, contestTeamParticipationRepo,
 		teamIndivChecker, teamGroupMemberChecker, teamUserProvider, txManager,

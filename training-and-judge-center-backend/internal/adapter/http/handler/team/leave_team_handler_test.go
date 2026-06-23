@@ -14,7 +14,7 @@ import (
 )
 
 func newHandlerWithLeave(memberRepo domainTeam.MemberRepository) *Handler {
-	return &Handler{leaveTeam: appTeam.NewLeaveTeamUseCase(memberRepo, &mockContestCheckerHandler{})}
+	return &Handler{leaveTeam: appTeam.NewLeaveTeamUseCase(memberRepo, &mockContestCheckerHandler{}, &mockScheduledParticipationCleanerHandler{}, &mockTxManager{})}
 }
 
 func TestLeaveTeam_UnauthenticatedReturns401(t *testing.T) {
@@ -47,7 +47,7 @@ func TestLeaveTeam_ActiveContestReturns409(t *testing.T) {
 	checker := &mockContestCheckerHandler{
 		inActiveFn: func(_, _ string) (bool, error) { return true, nil },
 	}
-	h := &Handler{leaveTeam: appTeam.NewLeaveTeamUseCase(memberRepo, checker)}
+	h := &Handler{leaveTeam: appTeam.NewLeaveTeamUseCase(memberRepo, checker, &mockScheduledParticipationCleanerHandler{}, &mockTxManager{})}
 	w := httptest.NewRecorder()
 	r := authedGetRequest("/teams/t1/members/me")
 	r.Method = "DELETE"

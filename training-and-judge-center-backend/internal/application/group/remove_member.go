@@ -19,17 +19,23 @@ type RemoveMemberUseCase struct {
 	groupRepo        domainGroup.Repository
 	memberRepo       domainGroup.MemberRepository
 	nicknameResolver NicknameResolver
+	contestCleaner   ContestRegistrationCleaner
+	txManager        appshared.TransactionManager
 }
 
 func NewRemoveMemberUseCase(
 	groupRepo domainGroup.Repository,
 	memberRepo domainGroup.MemberRepository,
 	nicknameResolver NicknameResolver,
+	contestCleaner ContestRegistrationCleaner,
+	txManager appshared.TransactionManager,
 ) *RemoveMemberUseCase {
 	return &RemoveMemberUseCase{
 		groupRepo:        groupRepo,
 		memberRepo:       memberRepo,
 		nicknameResolver: nicknameResolver,
+		contestCleaner:   contestCleaner,
+		txManager:        txManager,
 	}
 }
 
@@ -52,7 +58,7 @@ func (uc *RemoveMemberUseCase) Execute(ctx context.Context, input RemoveMemberIn
 		return err
 	}
 	if target == nil {
-		return apperror.NewNotFound("NICKNAME_NOT_FOUND", "the specified nickname does not exist")
+		return apperror.NewNotFound(ErrCodeNicknameNotFound, "the specified nickname does not exist")
 	}
 
 	targetID := shared.RestoreUserID(target.ID)
@@ -74,5 +80,10 @@ func (uc *RemoveMemberUseCase) Execute(ctx context.Context, input RemoveMemberIn
 		}
 	}
 
-	return uc.memberRepo.Delete(ctx, input.GroupID, targetID)
+	return uc.txManager.WithTx(ctx, func(txCtx context.Context) error {
+		if _, err := uc.contestCleaner.DeleteScheduledByGroupAndUser(txCtx, input.GroupID, targetID.Value()); err != nil {
+			return err
+		}
+		return uc.memberRepo.Delete(txCtx, input.GroupID, targetID)
+	})
 }

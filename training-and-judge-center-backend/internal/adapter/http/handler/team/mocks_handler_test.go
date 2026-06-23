@@ -172,3 +172,11 @@ func (m *mockGroupChecker) AreUsersGroupMembers(_ context.Context, groupID strin
 	}
 	return result, nil
 }
+
+// ── mockScheduledParticipationCleanerHandler ──────────────────────────────────
+
+type mockScheduledParticipationCleanerHandler struct{}
+
+func (m *mockScheduledParticipationCleanerHandler) RemoveUserFromScheduledParticipations(_ context.Context, _, _ string) (int, error) {
+	return 0, nil
+}

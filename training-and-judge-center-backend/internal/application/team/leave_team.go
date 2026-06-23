@@ -15,15 +15,24 @@ type LeaveTeamInput struct {
 }
 
 type LeaveTeamUseCase struct {
-	memberRepo       domainTeam.MemberRepository
-	contestChecker   ContestParticipationChecker
+	memberRepo          domainTeam.MemberRepository
+	contestChecker      ContestParticipationChecker
+	participationCleaner ScheduledParticipationCleaner
+	txManager           appShared.TransactionManager
 }
 
 func NewLeaveTeamUseCase(
 	memberRepo domainTeam.MemberRepository,
 	contestChecker ContestParticipationChecker,
+	participationCleaner ScheduledParticipationCleaner,
+	txManager appShared.TransactionManager,
 ) *LeaveTeamUseCase {
-	return &LeaveTeamUseCase{memberRepo: memberRepo, contestChecker: contestChecker}
+	return &LeaveTeamUseCase{
+		memberRepo:          memberRepo,
+		contestChecker:      contestChecker,
+		participationCleaner: participationCleaner,
+		txManager:           txManager,
+	}
 }
 
 func (uc *LeaveTeamUseCase) Execute(ctx context.Context, in LeaveTeamInput) error {
@@ -44,5 +53,10 @@ func (uc *LeaveTeamUseCase) Execute(ctx context.Context, in LeaveTeamInput) erro
 		return apperror.NewConflict(domainTeam.ErrCodeCannotLeaveDuringActiveContest, "You are selected to participate in an active contest with this team")
 	}
 
-	return uc.memberRepo.DeleteByTeamAndUser(ctx, in.TeamID, userID)
+	return uc.txManager.WithTx(ctx, func(txCtx context.Context) error {
+		if _, err := uc.participationCleaner.RemoveUserFromScheduledParticipations(txCtx, in.TeamID, in.CurrentUser.ID); err != nil {
+			return err
+		}
+		return uc.memberRepo.DeleteByTeamAndUser(txCtx, in.TeamID, userID)
+	})
 }

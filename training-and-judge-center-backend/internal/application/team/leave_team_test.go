@@ -10,7 +10,7 @@ import (
 )
 
 func TestLeaveTeam_NonMemberReturns404(t *testing.T) {
-	uc := NewLeaveTeamUseCase(&mockMemberRepository{}, &mockContestChecker{})
+	uc := NewLeaveTeamUseCase(&mockMemberRepository{}, &mockContestChecker{}, &mockScheduledParticipationCleaner{}, &mockTxManager{})
 	err := uc.Execute(ctx(), LeaveTeamInput{
 		CurrentUser: asContestant("u1"),
 		TeamID:      "t1",
@@ -31,7 +31,7 @@ func TestLeaveTeam_ActiveContestReturns409(t *testing.T) {
 	checker := &mockContestChecker{
 		inActiveFn: func(_, _ string) (bool, error) { return true, nil },
 	}
-	uc := NewLeaveTeamUseCase(memberRepo, checker)
+	uc := NewLeaveTeamUseCase(memberRepo, checker, &mockScheduledParticipationCleaner{}, &mockTxManager{})
 	err := uc.Execute(ctx(), LeaveTeamInput{
 		CurrentUser: asContestant("u1"),
 		TeamID:      "t1",
@@ -43,6 +43,25 @@ func TestLeaveTeam_ActiveContestReturns409(t *testing.T) {
 	}
 	if ae.Code != domainTeam.ErrCodeCannotLeaveDuringActiveContest {
 		t.Errorf("expected %s, got %s", domainTeam.ErrCodeCannotLeaveDuringActiveContest, ae.Code)
+	}
+}
+
+func TestLeaveTeam_SuccessRemovesFromScheduledParticipations(t *testing.T) {
+	memberRepo := &mockMemberRepository{
+		findByTeamAndUserFn: func(_ string, userID domainShared.UserID) (*domainTeam.TeamMember, error) {
+			return makeMember("m1", "t1", userID.Value(), time.Now()), nil
+		},
+	}
+	cleaner := &mockScheduledParticipationCleaner{}
+	uc := NewLeaveTeamUseCase(memberRepo, &mockContestChecker{}, cleaner, &mockTxManager{})
+	if err := uc.Execute(ctx(), LeaveTeamInput{
+		CurrentUser: asContestant("u1"),
+		TeamID:      "t1",
+	}); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !cleaner.called {
+		t.Error("expected participationCleaner.RemoveUserFromScheduledParticipations to be called")
 	}
 }
 
@@ -58,7 +77,7 @@ func TestLeaveTeam_SuccessDeletes(t *testing.T) {
 			return nil
 		},
 	}
-	uc := NewLeaveTeamUseCase(memberRepo, &mockContestChecker{})
+	uc := NewLeaveTeamUseCase(memberRepo, &mockContestChecker{}, &mockScheduledParticipationCleaner{}, &mockTxManager{})
 	if err := uc.Execute(ctx(), LeaveTeamInput{
 		CurrentUser: asContestant("u1"),
 		TeamID:      "t1",

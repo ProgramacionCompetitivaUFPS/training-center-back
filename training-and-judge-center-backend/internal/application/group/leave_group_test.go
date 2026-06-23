@@ -9,7 +9,7 @@ import (
 )
 
 func newLeaveGroupUC(groupRepo *mockGroupRepository, memberRepo *mockMemberRepository) *LeaveGroupUseCase {
-	return NewLeaveGroupUseCase(groupRepo, memberRepo)
+	return NewLeaveGroupUseCase(groupRepo, memberRepo, &mockContestRegistrationCleaner{}, &mockTransactionManager{})
 }
 
 func TestLeaveGroup_GlobalGroupReturns400(t *testing.T) {
@@ -88,5 +88,28 @@ func TestLeaveGroup_LeadWithOtherLeadsSucceeds(t *testing.T) {
 	})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestLeaveGroup_SuccessUnregistersFromScheduledContests(t *testing.T) {
+	g := mustGroup(t, "g1", "Club", domainGroup.VisibilityVisible, domainGroup.JoinPolicyOpen)
+	uid := mustUID("u1")
+	m, _ := domainGroup.NewGroupMember("m1", "g1", uid, domainGroup.MemberRoleMember, domainGroup.JoinMethodOpenJoin, nil, testNow)
+	memberRepo := &mockMemberRepository{
+		memberships: map[string]*domainGroup.GroupMember{keyOf("g1", uid): m},
+	}
+	cleaner := &mockContestRegistrationCleaner{}
+	uc := NewLeaveGroupUseCase(
+		&mockGroupRepository{groups: []*domainGroup.Group{g}},
+		memberRepo, cleaner, &mockTransactionManager{},
+	)
+	if err := uc.Execute(context.Background(), LeaveGroupInput{
+		GroupID:     "g1",
+		CurrentUser: asContestant("u1"),
+	}); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !cleaner.called {
+		t.Error("expected contestCleaner.DeleteScheduledByGroupAndUser to be called")
 	}
 }

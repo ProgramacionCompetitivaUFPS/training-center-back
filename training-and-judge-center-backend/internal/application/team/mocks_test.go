@@ -343,3 +343,16 @@ func newCreateTeamUseCase(teamRepo *mockTeamRepository, memberRepo *mockMemberRe
 func validInput(cu appshared.CurrentUser) CreateTeamInput {
 	return CreateTeamInput{Name: "Alpha Team", CurrentUser: cu}
 }
+
+// ── mockScheduledParticipationCleaner ─────────────────────────────────────────
+
+type mockScheduledParticipationCleaner struct {
+	removedCount int
+	err          error
+	called       bool
+}
+
+func (m *mockScheduledParticipationCleaner) RemoveUserFromScheduledParticipations(_ context.Context, _, _ string) (int, error) {
+	m.called = true
+	return m.removedCount, m.err
+}

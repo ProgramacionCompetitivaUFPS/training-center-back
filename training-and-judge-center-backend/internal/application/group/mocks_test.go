@@ -339,3 +339,16 @@ type mockNicknameResolver struct {
 func (m *mockNicknameResolver) ResolveByNickname(_ context.Context, _ string) (*UserDisplay, error) {
 	return m.user, m.err
 }
+
+// ── mockContestRegistrationCleaner ────────────────────────────────────────────
+
+type mockContestRegistrationCleaner struct {
+	deletedCount int
+	err          error
+	called       bool
+}
+
+func (m *mockContestRegistrationCleaner) DeleteScheduledByGroupAndUser(_ context.Context, _, _ string) (int, error) {
+	m.called = true
+	return m.deletedCount, m.err
+}
