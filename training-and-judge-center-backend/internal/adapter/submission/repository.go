@@ -28,8 +28,9 @@ func (r *Repository) Save(ctx context.Context, s *domainSubmission.Submission) e
 		INSERT INTO submissions (
 			id, problem_id, user_id, contest_id, standing_id,
 			language, compiler, status, visibility, source_code_path,
-			file_hash, file_size, submitted_at
-		) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)
+			file_hash, file_size, submitted_at,
+			problem_title, problem_slug
+		) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)
 		ON CONFLICT (id) DO UPDATE SET
 			status     = EXCLUDED.status,
 			visibility = EXCLUDED.visibility,
@@ -38,7 +39,7 @@ func (r *Repository) Save(ctx context.Context, s *domainSubmission.Submission) e
 			file_size  = EXCLUDED.file_size
 	`,
 		s.ID(),
-		s.ProblemID(),
+		nilIfEmpty(s.ProblemID()),
 		s.UserID().String(),
 		s.ContestID(),
 		s.StandingID(),
@@ -50,6 +51,8 @@ func (r *Repository) Save(ctx context.Context, s *domainSubmission.Submission) e
 		nilIfEmpty(s.FileHash()),
 		nilIfZero(s.FileSize()),
 		s.SubmittedAt(),
+		nilIfEmpty(s.ProblemTitle()),
+		nilIfEmpty(s.ProblemSlug()),
 	)
 	if err != nil {
 		slog.ErrorContext(ctx, "submission: failed to save", "id", s.ID(), "error", err)
@@ -187,7 +190,8 @@ const selectCols = `
 	SELECT id, problem_id, user_id, contest_id, standing_id,
 	       language, compiler, status, visibility, source_code_path,
 	       file_hash, file_size, submitted_at,
-	       judged_at, time_ms, memory_kb, compile_log
+	       judged_at, time_ms, memory_kb, compile_log,
+	       COALESCE(problem_title, ''), COALESCE(problem_slug, '')
 	FROM submissions`
 
 type rowScanner interface {
@@ -196,20 +200,23 @@ type rowScanner interface {
 
 func scanRow(ctx context.Context, row rowScanner) (*domainSubmission.Submission, error) {
 	var (
-		id, problemID, userID, language, compiler, status, visibility, path string
-		contestID, standingID                                                *string
-		fileHash                                                             *string
-		fileSize                                                             *int
-		submittedAt                                                          time.Time
-		judgedAt                                                             *time.Time
-		timeMs, memoryKb                                                     *int
-		compileLog                                                           *string
+		id, userID, language, compiler, status, visibility, path string
+		problemIDPtr                                              *string
+		contestID, standingID                                     *string
+		fileHash                                                  *string
+		fileSize                                                  *int
+		submittedAt                                               time.Time
+		judgedAt                                                  *time.Time
+		timeMs, memoryKb                                          *int
+		compileLog                                                *string
+		problemTitle, problemSlug                                 string
 	)
 	err := row.Scan(
-		&id, &problemID, &userID, &contestID, &standingID,
+		&id, &problemIDPtr, &userID, &contestID, &standingID,
 		&language, &compiler, &status, &visibility, &path,
 		&fileHash, &fileSize, &submittedAt,
 		&judgedAt, &timeMs, &memoryKb, &compileLog,
+		&problemTitle, &problemSlug,
 	)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
@@ -219,6 +226,10 @@ func scanRow(ctx context.Context, row rowScanner) (*domainSubmission.Submission,
 		return nil, apperror.NewInternal()
 	}
 
+	problemID := ""
+	if problemIDPtr != nil {
+		problemID = *problemIDPtr
+	}
 	hash := ""
 	if fileHash != nil {
 		hash = *fileHash
@@ -237,6 +248,7 @@ func scanRow(ctx context.Context, row rowScanner) (*domainSubmission.Submission,
 		domainSubmission.RestoreVisibility(visibility),
 		path, hash, size,
 		submittedAt, judgedAt, timeMs, memoryKb, compileLog,
+		problemTitle, problemSlug,
 	), nil
 }
 

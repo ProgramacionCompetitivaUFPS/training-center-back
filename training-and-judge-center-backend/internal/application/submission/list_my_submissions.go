@@ -105,7 +105,7 @@ func (uc *ListMySubmissionsUseCase) Execute(ctx context.Context, in ListMySubmis
 
 	summaries := make([]SubmissionSummary, 0, len(subs))
 	for _, s := range subs {
-		problem, err := uc.problemDisplay.GetProblemByID(ctx, s.ProblemID())
+		problem, err := resolveProblemDisplay(ctx, uc.problemDisplay, s)
 		if err != nil {
 			return nil, err
 		}

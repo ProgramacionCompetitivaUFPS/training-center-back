@@ -14,6 +14,8 @@ type ContestID = string
 type Submission struct {
 	id             SubmissionID
 	problemID      ProblemID
+	problemTitle   string
+	problemSlug    string
 	userID         shared.UserID
 	contestID      *ContestID
 	standingID     *string
@@ -35,6 +37,8 @@ type Submission struct {
 
 func (s *Submission) ID() SubmissionID              { return s.id }
 func (s *Submission) ProblemID() ProblemID          { return s.problemID }
+func (s *Submission) ProblemTitle() string          { return s.problemTitle }
+func (s *Submission) ProblemSlug() string           { return s.problemSlug }
 func (s *Submission) UserID() shared.UserID         { return s.userID }
 func (s *Submission) ContestID() *ContestID         { return s.contestID }
 func (s *Submission) StandingID() *string           { return s.standingID }
@@ -65,6 +69,8 @@ func NewSubmission(
 	fileHash string,
 	fileSize int,
 	now time.Time,
+	problemTitle string,
+	problemSlug string,
 ) (*Submission, error) {
 	if id == "" {
 		return nil, apperror.NewInternal()
@@ -72,6 +78,8 @@ func NewSubmission(
 	return &Submission{
 		id:             id,
 		problemID:      problemID,
+		problemTitle:   problemTitle,
+		problemSlug:    problemSlug,
 		userID:         userID,
 		contestID:      contestID,
 		standingID:     standingID,
@@ -104,10 +112,14 @@ func RestoreSubmission(
 	timeMs *int,
 	memoryKb *int,
 	compileLog *string,
+	problemTitle string,
+	problemSlug string,
 ) *Submission {
 	return &Submission{
 		id:             id,
 		problemID:      problemID,
+		problemTitle:   problemTitle,
+		problemSlug:    problemSlug,
 		userID:         userID,
 		contestID:      contestID,
 		standingID:     standingID,

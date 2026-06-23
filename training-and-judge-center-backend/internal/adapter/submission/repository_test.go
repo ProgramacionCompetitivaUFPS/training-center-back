@@ -39,7 +39,7 @@ func pendingSubmission() *domainsubmission.Submission {
 		"",
 		0,
 		testNow,
-		nil, nil, nil, nil,
+		nil, nil, nil, nil, "", "",
 	)
 }
 
@@ -111,23 +111,26 @@ func (m *mockRows) Conn() *pgx.Conn { return nil }
 // ── helper: scan fn para una submission pendiente ─────────────────────────────
 
 func submissionScanFn(dest ...any) error {
+	pid := testProblemID
 	*(dest[0].(*string)) = testSubID              // id
-	*(dest[1].(*string)) = testProblemID          // problem_id
+	*(dest[1].(**string)) = &pid                  // problem_id (nullable)
 	*(dest[2].(*string)) = testUserID             // user_id
-	*(dest[3].(**string)) = nil                    // contest_id
-	*(dest[4].(**string)) = nil                    // standing_id
-	*(dest[5].(*string)) = "cpp20"                // language
-	*(dest[6].(*string)) = "g++"                  // compiler
-	*(dest[7].(*string)) = "PENDING"              // status
-	*(dest[8].(*string)) = "PRIVATE"              // visibility
+	*(dest[3].(**string)) = nil                   // contest_id
+	*(dest[4].(**string)) = nil                   // standing_id
+	*(dest[5].(*string)) = "cpp20"               // language
+	*(dest[6].(*string)) = "g++"                 // compiler
+	*(dest[7].(*string)) = "PENDING"             // status
+	*(dest[8].(*string)) = "PRIVATE"             // visibility
 	*(dest[9].(*string)) = "gs://bucket/code.cpp" // source_code_path
-	*(dest[10].(**string)) = nil                   // file_hash
-	*(dest[11].(**int)) = nil                      // file_size
-	*(dest[12].(*time.Time)) = testNow            // submitted_at
-	*(dest[13].(**time.Time)) = nil                // judged_at
-	*(dest[14].(**int)) = nil                      // time_ms
-	*(dest[15].(**int)) = nil                      // memory_kb
-	*(dest[16].(**string)) = nil                   // compile_log
+	*(dest[10].(**string)) = nil                  // file_hash
+	*(dest[11].(**int)) = nil                     // file_size
+	*(dest[12].(*time.Time)) = testNow           // submitted_at
+	*(dest[13].(**time.Time)) = nil               // judged_at
+	*(dest[14].(**int)) = nil                     // time_ms
+	*(dest[15].(**int)) = nil                     // memory_kb
+	*(dest[16].(**string)) = nil                  // compile_log
+	*(dest[17].(*string)) = "Test Problem"        // problem_title
+	*(dest[18].(*string)) = "test-problem"        // problem_slug
 	return nil
 }
 

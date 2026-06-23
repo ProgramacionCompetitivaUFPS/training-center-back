@@ -194,6 +194,8 @@ func (uc *SubmitSolutionUseCase) Execute(ctx context.Context, in SubmitSolutionI
 		fileHash,
 		len(in.FileData),
 		in.SubmittedAt,
+		problem.Title,
+		problem.Slug,
 	)
 	if err != nil {
 		return nil, err
