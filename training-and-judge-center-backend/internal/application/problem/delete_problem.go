@@ -17,8 +17,9 @@ type DeleteProblemInput struct {
 }
 
 type DeleteProblemUseCase struct {
-	repo        problem.Repository
-	fileStorage ProblemFileRepository
+	repo           problem.Repository
+	fileStorage    ProblemFileRepository
+	contestChecker ActiveContestChecker
 }
 
 // maxRetries is the number of retry attempts for storage cleanup operations after
@@ -26,8 +27,8 @@ type DeleteProblemUseCase struct {
 // without blocking the response indefinitely.
 const maxRetries = 3
 
-func NewDeleteProblemUseCase(repo problem.Repository, fileStorage ProblemFileRepository) *DeleteProblemUseCase {
-	return &DeleteProblemUseCase{repo: repo, fileStorage: fileStorage}
+func NewDeleteProblemUseCase(repo problem.Repository, fileStorage ProblemFileRepository, contestChecker ActiveContestChecker) *DeleteProblemUseCase {
+	return &DeleteProblemUseCase{repo: repo, fileStorage: fileStorage, contestChecker: contestChecker}
 }
 
 func (uc *DeleteProblemUseCase) Execute(ctx context.Context, in DeleteProblemInput) error {
@@ -55,6 +56,14 @@ func (uc *DeleteProblemUseCase) Execute(ctx context.Context, in DeleteProblemInp
 	isAdmin := in.CurrentUser.IsAdmin()
 	if p.AuthorID() != viewerID && !isAdmin {
 		return apperror.NewForbidden(ErrCodeInsufficientPermissions, "Only the problem author or Admin can delete this problem")
+	}
+
+	inActive, err := uc.contestChecker.IsProblemInActiveContest(ctx, p.ID())
+	if err != nil {
+		return err
+	}
+	if inActive {
+		return apperror.NewConflict(problem.ErrCodeProblemInActiveContest, "Cannot delete a problem that is currently being used in an active contest")
 	}
 
 	if err := uc.repo.Delete(ctx, p.ID()); err != nil {

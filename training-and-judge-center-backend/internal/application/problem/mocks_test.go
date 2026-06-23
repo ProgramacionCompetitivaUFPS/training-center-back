@@ -117,6 +117,17 @@ func (m *mockFileStorage) DeleteFilesWithPrefix(ctx context.Context, prefix stri
 	return nil
 }
 
+// ── ActiveContestChecker mock ────────────────────────────────────────────────
+
+type mockActiveContestChecker struct {
+	inActive bool
+	err      error
+}
+
+func (m *mockActiveContestChecker) IsProblemInActiveContest(_ context.Context, _ string) (bool, error) {
+	return m.inActive, m.err
+}
+
 // ── PlatformSettings default ─────────────────────────────────────────────────
 
 func newDefaultSettings() domainProblem.PlatformSettings {

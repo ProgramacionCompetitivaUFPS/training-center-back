@@ -10,4 +10,5 @@ const (
 	ErrCodeAlreadyPublished      = "ALREADY_PUBLISHED"
 	ErrCodeSlugMismatch          = "SLUG_MISMATCH"
 	ErrCodeProblemNotFound       = "PROBLEM_NOT_FOUND"
+	ErrCodeProblemInActiveContest = "PROBLEM_IN_ACTIVE_CONTEST"
 )
