@@ -107,19 +107,19 @@ func TestDeleteProblem_EmptyConfirmSlug(t *testing.T) {
 
 	err := uc.Execute(context.Background(), DeleteProblemInput{
 		Slug:        testSlug,
-		ConfirmSlug: "", // empty
+		ConfirmSlug: "",
 		CurrentUser: asCoach(authorID),
 	})
 	if err == nil {
-		t.Fatal("empty confirm slug should return validation error, got nil")
+		t.Fatal("empty confirm slug should return error, got nil")
 	}
 
 	appErr, ok := err.(*apperror.AppError)
 	if !ok {
 		t.Fatalf("expected *apperror.AppError, got %T", err)
 	}
-	if appErr.Code != apperror.ErrCodeValidationError {
-		t.Errorf("expected VALIDATION_ERROR, got %q", appErr.Code)
+	if appErr.Code != domainProblem.ErrCodeSlugMismatch {
+		t.Errorf("expected %q, got %q", domainProblem.ErrCodeSlugMismatch, appErr.Code)
 	}
 }
 

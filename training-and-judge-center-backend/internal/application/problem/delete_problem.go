@@ -32,12 +32,6 @@ func NewDeleteProblemUseCase(repo problem.Repository, fileStorage ProblemFileRep
 }
 
 func (uc *DeleteProblemUseCase) Execute(ctx context.Context, in DeleteProblemInput) error {
-	if in.ConfirmSlug == "" {
-		return apperror.NewValidation([]apperror.FieldError{
-			{Field: "confirmSlug", Message: "Must match the problem slug exactly"},
-		})
-	}
-
 	slug, err := problem.NewSlug(in.Slug)
 	if err != nil {
 		return err

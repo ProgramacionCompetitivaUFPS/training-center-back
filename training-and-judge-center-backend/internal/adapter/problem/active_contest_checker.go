@@ -27,7 +27,7 @@ func (c *ActiveContestChecker) IsProblemInActiveContest(ctx context.Context, pro
 			JOIN contests co ON co.id = cp.contest_id
 			WHERE cp.problem_id = $1::uuid
 			  AND co.start_time <= NOW()
-			  AND co.end_time > NOW()
+			  AND co.end_time >= NOW()
 		)`, problemID,
 	).Scan(&exists)
 	if err != nil {
