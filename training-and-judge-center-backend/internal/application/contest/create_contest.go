@@ -97,9 +97,11 @@ func (uc *CreateContestUseCase) Execute(ctx context.Context, in CreateContestInp
 		return nil, apperror.NewValidation(fieldErrs)
 	}
 
-	freezeMinutes := 0
+	var freezeMinutes int
 	if in.FreezeMinutes != nil {
 		freezeMinutes = *in.FreezeMinutes
+	} else if in.EndTime.Sub(in.StartTime) >= 4*time.Hour {
+		freezeMinutes = 60
 	}
 
 	// Resolve and validate problems.

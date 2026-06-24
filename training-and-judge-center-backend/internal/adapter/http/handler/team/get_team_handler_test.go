@@ -13,12 +13,12 @@ import (
 	"github.com/training-judge-center/backend/pkg/apperror"
 )
 
-func newHandlerWithGetTeam(teamRepo domainTeam.Repository, memberRepo domainTeam.MemberRepository, userProvider appTeam.UserProvider) *Handler {
-	return &Handler{getTeam: appTeam.NewGetTeamUseCase(teamRepo, memberRepo, userProvider)}
+func newHandlerWithGetTeam(teamRepo domainTeam.Repository, memberRepo domainTeam.MemberRepository, invRepo domainTeam.InvitationRepository, userProvider appTeam.UserProvider) *Handler {
+	return &Handler{getTeam: appTeam.NewGetTeamUseCase(teamRepo, memberRepo, invRepo, userProvider)}
 }
 
 func TestGetTeam_UnauthenticatedReturns401(t *testing.T) {
-	h := newHandlerWithGetTeam(&mockTeamRepo{}, &mockMemberRepo{}, &mockUserProvider{})
+	h := newHandlerWithGetTeam(&mockTeamRepo{}, &mockMemberRepo{}, &mockInvitationRepo{}, &mockUserProvider{})
 	w := httptest.NewRecorder()
 	r := httptest.NewRequest("GET", "/teams/t1", nil)
 	wrapAuth(http.HandlerFunc(h.GetTeam)).ServeHTTP(w, r)
@@ -33,7 +33,7 @@ func TestGetTeam_NotFoundReturns404(t *testing.T) {
 			return nil, apperror.NewNotFound(domainTeam.ErrCodeTeamNotFound, "team not found")
 		},
 	}
-	h := newHandlerWithGetTeam(teamRepo, &mockMemberRepo{}, &mockUserProvider{})
+	h := newHandlerWithGetTeam(teamRepo, &mockMemberRepo{}, &mockInvitationRepo{}, &mockUserProvider{})
 	w := httptest.NewRecorder()
 	r := authedGetRequest("/teams/missing")
 	wrapAuth(http.HandlerFunc(h.GetTeam)).ServeHTTP(w, r)
@@ -66,7 +66,7 @@ func TestGetTeam_AnyAuthenticatedUserCanView(t *testing.T) {
 		},
 	}
 
-	h := newHandlerWithGetTeam(teamRepo, memberRepo, userProv)
+	h := newHandlerWithGetTeam(teamRepo, memberRepo, &mockInvitationRepo{}, userProv)
 	w := httptest.NewRecorder()
 	r := authedGetRequest("/teams/t1")
 	wrapAuth(http.HandlerFunc(h.GetTeam)).ServeHTTP(w, r)

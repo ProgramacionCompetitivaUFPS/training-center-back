@@ -55,6 +55,32 @@ func (r *InvitationRepository) FindByID(ctx context.Context, id string) (*domain
 	return domainTeam.RestoreTeamInvitation(invID, teamID, shared.RestoreUserID(inviteeID), shared.RestoreUserID(invitedBy), createdAt), nil
 }
 
+func (r *InvitationRepository) FindByTeam(ctx context.Context, teamID string) ([]*domainTeam.TeamInvitation, error) {
+	const q = `SELECT id, team_id, invitee_id, invited_by, created_at FROM team_invitations WHERE team_id = $1 ORDER BY created_at DESC`
+	rows, err := infraPostgres.GetQuerier(ctx, r.db).Query(ctx, q, teamID)
+	if err != nil {
+		slog.ErrorContext(ctx, "failed to query invitations by team", "error", err, "team_id", teamID)
+		return nil, apperror.NewInternal()
+	}
+	defer rows.Close()
+
+	invitations := make([]*domainTeam.TeamInvitation, 0)
+	for rows.Next() {
+		var id, tID, iID, invBy string
+		var createdAt time.Time
+		if err := rows.Scan(&id, &tID, &iID, &invBy, &createdAt); err != nil {
+			slog.ErrorContext(ctx, "failed to scan invitation row", "error", err)
+			return nil, apperror.NewInternal()
+		}
+		invitations = append(invitations, domainTeam.RestoreTeamInvitation(id, tID, shared.RestoreUserID(iID), shared.RestoreUserID(invBy), createdAt))
+	}
+	if err := rows.Err(); err != nil {
+		slog.ErrorContext(ctx, "invitations by team rows error", "error", err)
+		return nil, apperror.NewInternal()
+	}
+	return invitations, nil
+}
+
 func (r *InvitationRepository) FindByTeamAndInvitee(ctx context.Context, teamID string, inviteeID shared.UserID) (*domainTeam.TeamInvitation, error) {
 	const q = `SELECT id, team_id, invitee_id, invited_by, created_at FROM team_invitations WHERE team_id = $1 AND invitee_id = $2`
 	var invID, tID, iID, invBy string

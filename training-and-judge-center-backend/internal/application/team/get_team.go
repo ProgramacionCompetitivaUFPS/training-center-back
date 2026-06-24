@@ -4,11 +4,13 @@ import (
 	"context"
 	"time"
 
+	appshared "github.com/training-judge-center/backend/internal/application/shared"
 	domainTeam "github.com/training-judge-center/backend/internal/domain/team"
 )
 
 type GetTeamInput struct {
-	TeamID string
+	CurrentUser appshared.CurrentUser
+	TeamID      string
 }
 
 type TeamMemberOutput struct {
@@ -22,22 +24,41 @@ type TeamCreatorOutput struct {
 	Nickname string
 }
 
-type GetTeamOutput struct {
+type PendingInvitationOutput struct {
 	ID        string
-	Name      string
-	CreatedBy TeamCreatorOutput
-	CreatedAt time.Time
-	Members   []TeamMemberOutput
+	Invitee   UserDisplay
+	InvitedBy UserDisplay
+	InvitedAt time.Time
+}
+
+type GetTeamOutput struct {
+	ID                 string
+	Name               string
+	CreatedBy          TeamCreatorOutput
+	CreatedAt          time.Time
+	Members            []TeamMemberOutput
+	PendingInvitations []PendingInvitationOutput
 }
 
 type GetTeamUseCase struct {
-	teamRepo     domainTeam.Repository
-	memberRepo   domainTeam.MemberRepository
-	userProvider UserProvider
+	teamRepo       domainTeam.Repository
+	memberRepo     domainTeam.MemberRepository
+	invitationRepo domainTeam.InvitationRepository
+	userProvider   UserProvider
 }
 
-func NewGetTeamUseCase(teamRepo domainTeam.Repository, memberRepo domainTeam.MemberRepository, userProvider UserProvider) *GetTeamUseCase {
-	return &GetTeamUseCase{teamRepo: teamRepo, memberRepo: memberRepo, userProvider: userProvider}
+func NewGetTeamUseCase(
+	teamRepo domainTeam.Repository,
+	memberRepo domainTeam.MemberRepository,
+	invitationRepo domainTeam.InvitationRepository,
+	userProvider UserProvider,
+) *GetTeamUseCase {
+	return &GetTeamUseCase{
+		teamRepo:       teamRepo,
+		memberRepo:     memberRepo,
+		invitationRepo: invitationRepo,
+		userProvider:   userProvider,
+	}
 }
 
 func (uc *GetTeamUseCase) Execute(ctx context.Context, in GetTeamInput) (*GetTeamOutput, error) {
@@ -49,6 +70,14 @@ func (uc *GetTeamUseCase) Execute(ctx context.Context, in GetTeamInput) (*GetTea
 	members, err := uc.memberRepo.FindByTeam(ctx, team.ID())
 	if err != nil {
 		return nil, err
+	}
+
+	isMember := in.CurrentUser.ID == team.CreatedBy().Value()
+	for _, m := range members {
+		if m.UserID().Value() == in.CurrentUser.ID {
+			isMember = true
+			break
+		}
 	}
 
 	seen := make(map[string]struct{}, len(members)+1)
@@ -64,25 +93,47 @@ func (uc *GetTeamUseCase) Execute(ctx context.Context, in GetTeamInput) (*GetTea
 		addID(m.UserID().Value())
 	}
 
+	var invitations []*domainTeam.TeamInvitation
+	if isMember {
+		invitations, err = uc.invitationRepo.FindByTeam(ctx, team.ID())
+		if err != nil {
+			return nil, err
+		}
+		for _, inv := range invitations {
+			addID(inv.InviteeID().Value())
+			addID(inv.InvitedBy().Value())
+		}
+	}
+
 	displays, err := uc.userProvider.GetDisplays(ctx, userIDs)
 	if err != nil {
 		return nil, err
 	}
 
-	nickname := func(uid string) string {
+	display := func(uid string) UserDisplay {
 		if d := displays[uid]; d != nil {
-			return d.Nickname
+			return *d
 		}
-		return ""
+		return UserDisplay{ID: uid}
 	}
 
 	memberOutputs := make([]TeamMemberOutput, len(members))
 	for i, m := range members {
 		memberOutputs[i] = TeamMemberOutput{
 			UserID:   m.UserID().Value(),
-			Nickname: nickname(m.UserID().Value()),
+			Nickname: display(m.UserID().Value()).Nickname,
 			JoinedAt: m.JoinedAt(),
 		}
+	}
+
+	invOutputs := make([]PendingInvitationOutput, 0, len(invitations))
+	for _, inv := range invitations {
+		invOutputs = append(invOutputs, PendingInvitationOutput{
+			ID:        inv.ID(),
+			Invitee:   display(inv.InviteeID().Value()),
+			InvitedBy: display(inv.InvitedBy().Value()),
+			InvitedAt: inv.CreatedAt(),
+		})
 	}
 
 	creatorID := team.CreatedBy().Value()
@@ -91,10 +142,10 @@ func (uc *GetTeamUseCase) Execute(ctx context.Context, in GetTeamInput) (*GetTea
 		Name: team.Name().Value(),
 		CreatedBy: TeamCreatorOutput{
 			UserID:   creatorID,
-			Nickname: nickname(creatorID),
+			Nickname: display(creatorID).Nickname,
 		},
-		CreatedAt: team.CreatedAt(),
-		Members:   memberOutputs,
+		CreatedAt:          team.CreatedAt(),
+		Members:            memberOutputs,
+		PendingInvitations: invOutputs,
 	}, nil
 }
-

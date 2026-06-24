@@ -306,6 +306,17 @@ func buildWhere(f domainSubmission.ListFilters) (string, []any) {
 	if f.ExcludeContest {
 		where += " AND contest_id IS NULL"
 	}
+	if f.SubmittedFrom != nil {
+		where += fmt.Sprintf(" AND submitted_at >= $%d", i)
+		args = append(args, *f.SubmittedFrom)
+		i++
+	}
+	if f.SubmittedBefore != nil {
+		where += fmt.Sprintf(" AND submitted_at < $%d", i)
+		args = append(args, *f.SubmittedBefore)
+		i++
+	}
+	_ = i
 	return where, args
 }
 
