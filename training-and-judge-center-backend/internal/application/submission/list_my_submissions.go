@@ -2,6 +2,7 @@ package submission
 
 import (
 	"context"
+	"time"
 
 	appshared "github.com/training-judge-center/backend/internal/application/shared"
 	domainsubmission "github.com/training-judge-center/backend/internal/domain/submission"
@@ -9,12 +10,14 @@ import (
 )
 
 type ListMySubmissionsInput struct {
-	CurrentUser appshared.CurrentUser
-	Status      *string
-	Language    *string
-	ProblemSlug *string
-	Page        int
-	Limit       int
+	CurrentUser     appshared.CurrentUser
+	Status          *string
+	Language        *string
+	ProblemSlug     *string
+	SubmittedFrom   *time.Time
+	SubmittedBefore *time.Time
+	Page            int
+	Limit           int
 }
 
 type ListMySubmissionsOutput struct {
@@ -68,11 +71,13 @@ func (uc *ListMySubmissionsUseCase) Execute(ctx context.Context, in ListMySubmis
 	uid := shared.RestoreUserID(in.CurrentUser.ID)
 
 	f := domainsubmission.ListFilters{
-		UserID:   &uid,
-		Status:   in.Status,
-		Language: in.Language,
-		Page:     in.Page,
-		Limit:    in.Limit,
+		UserID:          &uid,
+		Status:          in.Status,
+		Language:        in.Language,
+		SubmittedFrom:   in.SubmittedFrom,
+		SubmittedBefore: in.SubmittedBefore,
+		Page:            in.Page,
+		Limit:           in.Limit,
 	}
 
 	if in.ProblemSlug != nil {

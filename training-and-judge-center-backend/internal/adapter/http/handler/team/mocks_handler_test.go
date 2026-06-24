@@ -36,6 +36,10 @@ func (m *mockInvitationRepo) FindByTeamAndInvitee(_ context.Context, teamID stri
 	}
 	return nil, apperror.NewNotFound(domainTeam.ErrCodeInvitationNotFound, "invitation not found")
 }
+func (m *mockInvitationRepo) FindByTeam(_ context.Context, _ string) ([]*domainTeam.TeamInvitation, error) {
+	return []*domainTeam.TeamInvitation{}, nil
+}
+
 func (m *mockInvitationRepo) FindByInvitee(_ context.Context, inviteeID domainShared.UserID) ([]*domainTeam.TeamInvitation, error) {
 	if m.findByInviteeFn != nil {
 		return m.findByInviteeFn(inviteeID)

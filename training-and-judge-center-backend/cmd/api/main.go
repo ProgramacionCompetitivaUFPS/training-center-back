@@ -376,7 +376,7 @@ func main() {
 	// team use cases
 	createTeamUseCase := appteam.NewCreateTeamUseCase(teamRepo, teamMemberRepo, teamUserProvider, txManager)
 	listMyTeamsUseCase := appteam.NewListMyTeamsUseCase(teamRepo, teamMemberRepo)
-	getTeamUseCase := appteam.NewGetTeamUseCase(teamRepo, teamMemberRepo, teamUserProvider)
+	getTeamUseCase := appteam.NewGetTeamUseCase(teamRepo, teamMemberRepo, teamInvitationRepo, teamUserProvider)
 	inviteToTeamUseCase := appteam.NewInviteToTeamUseCase(teamRepo, teamMemberRepo, teamInvitationRepo, teamUserProvider)
 	listMyInvitationsUseCase := appteam.NewListMyInvitationsUseCase(teamInvitationRepo, teamRepo, teamUserProvider)
 	acceptInvitationUseCase := appteam.NewAcceptInvitationUseCase(teamInvitationRepo, teamMemberRepo, txManager)

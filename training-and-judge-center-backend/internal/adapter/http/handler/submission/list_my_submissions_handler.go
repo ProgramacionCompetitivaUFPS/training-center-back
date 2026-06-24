@@ -2,9 +2,11 @@ package submission
 
 import (
 	"net/http"
+	"time"
 
 	"github.com/training-judge-center/backend/internal/adapter/http/handler"
 	appsubmission "github.com/training-judge-center/backend/internal/application/submission"
+	"github.com/training-judge-center/backend/pkg/apperror"
 )
 
 // ListMySubmissions handles GET /users/me/submissions
@@ -37,6 +39,23 @@ func (h *Handler) ListMySubmissions(w http.ResponseWriter, r *http.Request) {
 		ProblemSlug: queryParamPtr(r, "problemSlug"),
 		Page:        page,
 		Limit:       limit,
+	}
+
+	if v := r.URL.Query().Get("from"); v != "" {
+		t, err := time.Parse(time.RFC3339, v)
+		if err != nil {
+			handler.WriteError(r.Context(), w, apperror.NewBadRequest(apperror.ErrCodeBadRequest, "invalid 'from' date: use RFC3339 format"))
+			return
+		}
+		in.SubmittedFrom = &t
+	}
+	if v := r.URL.Query().Get("to"); v != "" {
+		t, err := time.Parse(time.RFC3339, v)
+		if err != nil {
+			handler.WriteError(r.Context(), w, apperror.NewBadRequest(apperror.ErrCodeBadRequest, "invalid 'to' date: use RFC3339 format"))
+			return
+		}
+		in.SubmittedBefore = &t
 	}
 
 	out, err := h.listMySubmissions.Execute(r.Context(), in)

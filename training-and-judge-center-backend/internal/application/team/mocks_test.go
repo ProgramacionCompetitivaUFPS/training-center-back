@@ -160,6 +160,7 @@ func (m *mockUserProvider) FindByNickname(_ context.Context, nickname string) (*
 type mockInvitationRepository struct {
 	saveErr                 error
 	findByIDFn              func(id string) (*domainTeam.TeamInvitation, error)
+	findByTeamFn            func(teamID string) ([]*domainTeam.TeamInvitation, error)
 	findByTeamAndInviteeFn  func(teamID string, inviteeID shared.UserID) (*domainTeam.TeamInvitation, error)
 	findByInviteeFn         func(inviteeID shared.UserID) ([]*domainTeam.TeamInvitation, error)
 	deleteFn                func(id string) error
@@ -182,6 +183,13 @@ func (m *mockInvitationRepository) FindByTeamAndInvitee(_ context.Context, teamI
 		return m.findByTeamAndInviteeFn(teamID, inviteeID)
 	}
 	return nil, apperror.NewNotFound(domainTeam.ErrCodeInvitationNotFound, "invitation not found")
+}
+
+func (m *mockInvitationRepository) FindByTeam(_ context.Context, teamID string) ([]*domainTeam.TeamInvitation, error) {
+	if m.findByTeamFn != nil {
+		return m.findByTeamFn(teamID)
+	}
+	return []*domainTeam.TeamInvitation{}, nil
 }
 
 func (m *mockInvitationRepository) FindByInvitee(_ context.Context, inviteeID shared.UserID) ([]*domainTeam.TeamInvitation, error) {

@@ -2,20 +2,23 @@ package submission
 
 import (
 	"context"
+	"time"
 
 	"github.com/training-judge-center/backend/internal/domain/shared"
 )
 
 type ListFilters struct {
-	UserID         *shared.UserID
-	ProblemID      *ProblemID
-	ContestID      *ContestID
-	Status         *string
-	Language       *string
-	Visibility     *string
-	ExcludeContest bool
-	Page           int
-	Limit          int
+	UserID          *shared.UserID
+	ProblemID       *ProblemID
+	ContestID       *ContestID
+	Status          *string
+	Language        *string
+	Visibility      *string
+	ExcludeContest  bool
+	SubmittedFrom   *time.Time
+	SubmittedBefore *time.Time
+	Page            int
+	Limit           int
 }
 
 type Repository interface {

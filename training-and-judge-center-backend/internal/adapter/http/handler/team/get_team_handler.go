@@ -20,12 +20,25 @@ type teamCreator struct {
 	Nickname string `json:"nickname"`
 }
 
+type teamUserRef struct {
+	ID       string `json:"id"`
+	Nickname string `json:"nickname"`
+}
+
+type pendingInvitationItem struct {
+	ID        string      `json:"id"`
+	Invitee   teamUserRef `json:"invitee"`
+	InvitedBy teamUserRef `json:"invitedBy"`
+	InvitedAt string      `json:"invitedAt"`
+}
+
 type getTeamResponse struct {
-	ID        string           `json:"id"`
-	Name      string           `json:"name"`
-	CreatedBy teamCreator      `json:"createdBy"`
-	CreatedAt string           `json:"createdAt"`
-	Members   []teamMemberItem `json:"members"`
+	ID                 string                  `json:"id"`
+	Name               string                  `json:"name"`
+	CreatedBy          teamCreator             `json:"createdBy"`
+	CreatedAt          string                  `json:"createdAt"`
+	Members            []teamMemberItem        `json:"members"`
+	PendingInvitations []pendingInvitationItem `json:"pendingInvitations"`
 }
 
 // @Summary      Get team details
@@ -38,7 +51,7 @@ type getTeamResponse struct {
 // @Failure      404 {object} apperror.AppError
 // @Router       /teams/{teamId} [get]
 func (h *Handler) GetTeam(w http.ResponseWriter, r *http.Request) {
-	_, ok := h.requireCurrentUser(w, r)
+	cu, ok := h.requireCurrentUser(w, r)
 	if !ok {
 		return
 	}
@@ -46,7 +59,8 @@ func (h *Handler) GetTeam(w http.ResponseWriter, r *http.Request) {
 	teamID := chi.URLParam(r, "teamId")
 
 	out, err := h.getTeam.Execute(r.Context(), appTeam.GetTeamInput{
-		TeamID: teamID,
+		CurrentUser: *cu,
+		TeamID:      teamID,
 	})
 	if err != nil {
 		handler.WriteError(r.Context(), w, err)
@@ -62,6 +76,16 @@ func (h *Handler) GetTeam(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	invitations := make([]pendingInvitationItem, len(out.PendingInvitations))
+	for i, inv := range out.PendingInvitations {
+		invitations[i] = pendingInvitationItem{
+			ID:        inv.ID,
+			Invitee:   teamUserRef{ID: inv.Invitee.ID, Nickname: inv.Invitee.Nickname},
+			InvitedBy: teamUserRef{ID: inv.InvitedBy.ID, Nickname: inv.InvitedBy.Nickname},
+			InvitedAt: inv.InvitedAt.UTC().Format(time.RFC3339),
+		}
+	}
+
 	handler.WriteJSON(r.Context(), w, http.StatusOK, getTeamResponse{
 		ID:   out.ID,
 		Name: out.Name,
@@ -69,7 +93,8 @@ func (h *Handler) GetTeam(w http.ResponseWriter, r *http.Request) {
 			ID:       out.CreatedBy.UserID,
 			Nickname: out.CreatedBy.Nickname,
 		},
-		CreatedAt: out.CreatedAt.UTC().Format(time.RFC3339),
-		Members:   members,
+		CreatedAt:          out.CreatedAt.UTC().Format(time.RFC3339),
+		Members:            members,
+		PendingInvitations: invitations,
 	})
 }
