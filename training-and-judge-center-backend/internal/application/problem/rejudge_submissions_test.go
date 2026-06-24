@@ -115,7 +115,7 @@ func TestRejudgeSubmissions_Execute(t *testing.T) {
 			wantErrCode: ErrCodeInsufficientPermissions,
 		},
 		{
-			name:        "partial failure — one rejudge fails, count reflects only successes",
+			name:        "all submissions fail to enqueue — none queued",
 			problem:     newProblemWithJudgingUpdated(),
 			user:        asContestant,
 			userID:      authorID,
@@ -165,5 +165,41 @@ func TestRejudgeSubmissions_Execute(t *testing.T) {
 				t.Errorf("ProblemSlug = %q, want %q", out.ProblemSlug, testSlug)
 			}
 		})
+	}
+}
+
+func TestRejudgeSubmissions_PartialFailure_ContinuesAndCountsSuccesses(t *testing.T) {
+	sub1 := SubmissionRejudgeInfo{ID: "sub-001", UserID: authorID, Language: "cpp20"}
+	sub2 := SubmissionRejudgeInfo{ID: "sub-002", UserID: authorID, Language: "java17"}
+
+	callCount := 0
+	rejudger := &mockSubmissionRejudger{
+		listFn: func(_ context.Context, _ string, _ time.Time) ([]SubmissionRejudgeInfo, error) {
+			return []SubmissionRejudgeInfo{sub1, sub2}, nil
+		},
+		rejudgeOneFn: func(_ context.Context, _ SubmissionRejudgeInfo, _ string, _ time.Time) error {
+			callCount++
+			if callCount == 1 {
+				return errors.New("queue down")
+			}
+			return nil
+		},
+	}
+
+	uc := NewRejudgeSubmissionsUseCase(repoWith(newProblemWithJudgingUpdated()), rejudger)
+	out, err := uc.Execute(context.Background(), RejudgeSubmissionsInput{
+		Slug:        testSlug,
+		CurrentUser: asContestant(authorID),
+		Now:         testNow,
+	})
+
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if out.SubmissionsQueued != 1 {
+		t.Errorf("SubmissionsQueued = %d, want 1 (first fails, second succeeds)", out.SubmissionsQueued)
+	}
+	if callCount != 2 {
+		t.Errorf("RejudgeOne called %d times, want 2 (loop must continue on error)", callCount)
 	}
 }

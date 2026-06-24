@@ -27,6 +27,7 @@ func (r *Rejudger) ListByProblemBefore(ctx context.Context, problemID string, be
 		SELECT id, user_id, contest_id, language
 		FROM submissions
 		WHERE problem_id = $1 AND submitted_at < $2
+		  AND status NOT IN ('PENDING', 'RUNNING')
 	`, problemID, before)
 	if err != nil {
 		slog.ErrorContext(ctx, "rejudger: failed to list submissions", "problem_id", problemID, "error", err)
@@ -51,20 +52,6 @@ func (r *Rejudger) ListByProblemBefore(ctx context.Context, problemID string, be
 }
 
 func (r *Rejudger) RejudgeOne(ctx context.Context, info appProblem.SubmissionRejudgeInfo, problemID string, now time.Time) error {
-	q := infraPostgres.GetQuerier(ctx, r.db)
-	tag, err := q.Exec(ctx, `
-		UPDATE submissions
-		SET status = 'PENDING', judged_at = NULL, time_ms = NULL, memory_kb = NULL, compile_log = NULL
-		WHERE id = $1
-	`, info.ID)
-	if err != nil {
-		slog.ErrorContext(ctx, "rejudger: failed to reset submission", "submission_id", info.ID, "error", err)
-		return apperror.NewInternal()
-	}
-	if tag.RowsAffected() == 0 {
-		return apperror.NewInternal()
-	}
-
 	if err := r.queue.Publish(ctx, appSubmission.SubmissionQueueMessage{
 		SubmissionID: info.ID,
 		Priority:     appSubmission.QueuePriorityRejudge,
@@ -77,7 +64,21 @@ func (r *Rejudger) RejudgeOne(ctx context.Context, info appProblem.SubmissionRej
 		},
 	}); err != nil {
 		slog.ErrorContext(ctx, "rejudger: failed to enqueue submission", "submission_id", info.ID, "error", err)
-		return err
+		return apperror.NewInternal()
+	}
+
+	q := infraPostgres.GetQuerier(ctx, r.db)
+	tag, err := q.Exec(ctx, `
+		UPDATE submissions
+		SET status = 'PENDING', judged_at = NULL, time_ms = NULL, memory_kb = NULL, compile_log = NULL
+		WHERE id = $1 AND status NOT IN ('PENDING', 'RUNNING')
+	`, info.ID)
+	if err != nil {
+		slog.ErrorContext(ctx, "rejudger: failed to reset submission after enqueue", "submission_id", info.ID, "error", err)
+		return nil // message already in queue; judge handles it
+	}
+	if tag.RowsAffected() == 0 {
+		slog.WarnContext(ctx, "rejudger: submission already in progress, db reset skipped", "submission_id", info.ID)
 	}
 	return nil
 }

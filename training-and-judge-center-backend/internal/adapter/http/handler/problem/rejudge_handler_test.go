@@ -16,16 +16,17 @@ import (
 // ── mock SubmissionRejudger ──────────────────────────────────────────────────
 
 type mockSubmissionRejudgerH struct {
-	subs []appProblem.SubmissionRejudgeInfo
-	err  error
+	subs       []appProblem.SubmissionRejudgeInfo
+	listErr    error
+	rejudgeErr error
 }
 
 func (m *mockSubmissionRejudgerH) ListByProblemBefore(_ context.Context, _ string, _ time.Time) ([]appProblem.SubmissionRejudgeInfo, error) {
-	return m.subs, m.err
+	return m.subs, m.listErr
 }
 
 func (m *mockSubmissionRejudgerH) RejudgeOne(_ context.Context, _ appProblem.SubmissionRejudgeInfo, _ string, _ time.Time) error {
-	return m.err
+	return m.rejudgeErr
 }
 
 // ── fixtures ─────────────────────────────────────────────────────────────────
@@ -45,7 +46,36 @@ func publishedProblemWithJudging() *domainProblem.Problem {
 	)
 }
 
+func publishedProblemWithJudgingByOtherAuthor() *domainProblem.Problem {
+	ts := time.Now().Add(-time.Hour)
+	return domainProblem.RestoreProblem(
+		"p1", "test-problem", "Test Problem",
+		nil, nil, nil, []string{},
+		"PUBLISHED", "PUBLIC",
+		shared.RestoreUserID("u2"), // wrapAuth always creates "u1"
+		[]shared.UserID{},
+		[]domainProblem.LanguageOverride{},
+		nil, []domainProblem.JudgingFile{},
+		nil, nil, &ts,
+		testNow, testNow,
+	)
+}
+
 // ── tests ─────────────────────────────────────────────────────────────────────
+
+func TestRejudge_Forbidden_Returns403(t *testing.T) {
+	h := newHandlerWithRejudge(repoReturning(publishedProblemWithJudgingByOtherAuthor()), &mockSubmissionRejudgerH{})
+
+	r := authedRequest(http.MethodPost, "/problems/p/test-problem/rejudge", nil)
+	r.SetPathValue("slug", "test-problem")
+	w := httptest.NewRecorder()
+
+	wrapAuth(http.HandlerFunc(h.Rejudge)).ServeHTTP(w, r)
+
+	if w.Code != http.StatusForbidden {
+		t.Fatalf("expected 403, got %d: %s", w.Code, w.Body.String())
+	}
+}
 
 func TestRejudge_Unauthenticated_Returns401(t *testing.T) {
 	h := newHandlerWithRejudge(repoReturning(publishedProblemWithJudging()), &mockSubmissionRejudgerH{})
