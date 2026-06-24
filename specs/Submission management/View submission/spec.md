@@ -81,7 +81,7 @@ As a user, I want to view the details of my own submission so that I can review 
 
 * **FR-VS-005**: System MUST return the submission verdict (ACCEPTED, WRONG_ANSWER, etc.).
 * **FR-VS-006**: System MUST return execution time in milliseconds.
-* **FR-VS-007**: System MUST return memory used in MiB.
+* **FR-VS-007**: System MUST return memory used in KB.
 * **FR-VS-008**: System MUST return the source code content.
 * **FR-VS-009**: System MUST return problem information (slug, title).
 * **FR-VS-010**: System MUST return contest information if submission is associated with a contest.
@@ -151,7 +151,7 @@ Retrieve details of a specific submission.
   "language": "cpp20",
   "compiler": "g++",
   "executionTime": 45,
-  "memoryUsed": 12,
+  "memoryKb": 12288,
   "sourceCode": "#include <iostream>\nint main() { ... }"
 }
 ```
@@ -171,7 +171,7 @@ Retrieve details of a specific submission.
 | language | string | Language identifier |
 | compiler | string | Compiler used |
 | executionTime | integer | Execution time in milliseconds (null if not judged) |
-| memoryUsed | integer | Memory used in MiB (null if not judged) |
+| memoryKb | integer | Memory used in KB (null if not judged) |
 | sourceCode | string | Full source code content |
 
 **Error Responses**:

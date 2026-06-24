@@ -154,7 +154,7 @@ Each submission in list view contains:
 * `submittedBy` ({ id, nickname })
 * `language` (string)
 * `executionTime` (integer, nullable)
-* `memoryUsed` (integer, nullable)
+* `memoryKb` (integer, nullable)
 
 **Note**: Source code is NOT included in list view for performance.
 
@@ -206,7 +206,7 @@ List all submissions from the authenticated user.
       },
       "language": "cpp20",
       "executionTime": 45,
-      "memoryUsed": 12
+      "memoryKb": 12288
     }
   ],
   "pagination": {

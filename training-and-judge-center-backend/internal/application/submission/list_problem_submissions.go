@@ -110,7 +110,7 @@ func (uc *ListProblemSubmissionsUseCase) Execute(ctx context.Context, in ListPro
 			SubmittedBy:   *user,
 			Language:      s.Language().String(),
 			ExecutionTime: s.TimeMs(),
-			MemoryUsed:    s.MemoryKb(),
+			MemoryKb:      s.MemoryKb(),
 		})
 	}
 

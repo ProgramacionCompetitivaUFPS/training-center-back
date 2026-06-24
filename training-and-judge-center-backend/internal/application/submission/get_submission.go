@@ -27,7 +27,7 @@ type GetSubmissionOutput struct {
 	Language      string
 	Compiler      string
 	ExecutionTime *int
-	MemoryUsed    *int
+	MemoryKb      *int
 	SourceCode    string
 }
 
@@ -133,7 +133,7 @@ func (uc *GetSubmissionUseCase) Execute(ctx context.Context, in GetSubmissionInp
 		Language:      sub.Language().String(),
 		Compiler:      sub.Compiler(),
 		ExecutionTime: sub.TimeMs(),
-		MemoryUsed:    sub.MemoryKb(),
+		MemoryKb:      sub.MemoryKb(),
 		SourceCode:    string(sourceCode),
 	}, nil
 }
