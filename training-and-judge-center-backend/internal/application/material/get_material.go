@@ -72,11 +72,10 @@ func (uc *GetMaterialUseCase) Execute(ctx context.Context, in GetMaterialInput) 
 
 	data := toMaterialData(m)
 	displays, err := uc.authorProvider.GetDisplays(ctx, []string{m.AuthorID().Value()})
-	if err != nil {
-		return nil, err
-	}
-	if disp := displays[m.AuthorID().Value()]; disp != nil {
-		data.Author = &AuthorDTO{Nickname: disp.Nickname, Name: disp.Name}
+	if err == nil {
+		if disp := displays[m.AuthorID().Value()]; disp != nil {
+			data.Author = &AuthorDTO{Nickname: disp.Nickname, Name: disp.Name}
+		}
 	}
 
 	return &GetMaterialOutput{Material: data}, nil

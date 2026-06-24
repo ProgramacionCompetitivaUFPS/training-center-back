@@ -82,15 +82,14 @@ func (uc *ListMaterialsUseCase) Execute(ctx context.Context, in ListMaterialsInp
 
 	authorIDs := uniqueAuthorIDs(materials)
 	displays, err := uc.authorProvider.GetDisplays(ctx, authorIDs)
-	if err != nil {
-		return nil, err
-	}
 
 	items := make([]MaterialData, 0, len(materials))
 	for _, m := range materials {
 		d := toMaterialData(m)
-		if disp := displays[m.AuthorID().Value()]; disp != nil {
-			d.Author = &AuthorDTO{Nickname: disp.Nickname, Name: disp.Name}
+		if err == nil {
+			if disp := displays[m.AuthorID().Value()]; disp != nil {
+				d.Author = &AuthorDTO{Nickname: disp.Nickname, Name: disp.Name}
+			}
 		}
 		items = append(items, d)
 	}
