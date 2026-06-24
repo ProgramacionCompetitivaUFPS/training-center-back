@@ -258,7 +258,7 @@ func aSubmission(authorID, visibility string, contestID *string) *domainsubmissi
 		domainsubmission.RestoreStatus("PENDING"),
 		domainsubmission.RestoreVisibility(visibility),
 		"gs://bucket/code.cpp", "hash", 100,
-		testNow, nil, nil, nil, nil,
+		testNow, nil, nil, nil, nil, "", "",
 	)
 }
 

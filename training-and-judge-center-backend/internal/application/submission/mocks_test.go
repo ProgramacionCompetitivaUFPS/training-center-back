@@ -176,7 +176,7 @@ func recentSubmission(at time.Time) *domainsubmission.Submission {
 		"sub-001", testProblemID, shared.RestoreUserID(testUserID), nil, nil,
 		lang, "g++", domainsubmission.RestoreStatus("PENDING"),
 		domainsubmission.RestoreVisibility("PRIVATE"),
-		"path/to/file.cpp", "abc123", 100, at, nil, nil, nil, nil,
+		"path/to/file.cpp", "abc123", 100, at, nil, nil, nil, nil, "", "",
 	)
 }
 
@@ -199,7 +199,7 @@ func aSubmission(authorID, visibility string, contestID *string) *domainsubmissi
 		domainsubmission.RestoreStatus("PENDING"),
 		domainsubmission.RestoreVisibility(visibility),
 		testSourcePath, "hash", 100,
-		testNow, nil, nil, nil, nil,
+		testNow, nil, nil, nil, nil, "", "",
 	)
 }
 

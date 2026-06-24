@@ -102,7 +102,7 @@ func (uc *GetSubmissionUseCase) Execute(ctx context.Context, in GetSubmissionInp
 		return nil, err
 	}
 
-	problem, err := uc.problemDisplay.GetProblemByID(ctx, sub.ProblemID())
+	problem, err := resolveProblemDisplay(ctx, uc.problemDisplay, sub)
 	if err != nil {
 		return nil, err
 	}

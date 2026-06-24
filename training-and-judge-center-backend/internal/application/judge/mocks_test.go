@@ -174,7 +174,7 @@ func pendingSubmission() *submission.Submission {
 		submission.RestoreVisibility("PRIVATE"),
 		"gs://bucket/code.cpp",
 		"", 0,
-		testNow, nil, nil, nil, nil,
+		testNow, nil, nil, nil, nil, "", "",
 	)
 }
 
@@ -189,7 +189,7 @@ func pendingSubmissionInContest(cID string) *submission.Submission {
 		submission.RestoreVisibility("PRIVATE"),
 		"gs://bucket/code.cpp",
 		"", 0,
-		testNow, nil, nil, nil, nil,
+		testNow, nil, nil, nil, nil, "", "",
 	)
 }
 

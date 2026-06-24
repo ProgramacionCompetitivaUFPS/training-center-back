@@ -193,6 +193,8 @@ func (uc *SubmitSolutionUseCase) Execute(ctx context.Context, in SubmitSolutionI
 		storagePath,
 		fileHash,
 		len(in.FileData),
+		problem.Title,
+		problem.Slug,
 		in.SubmittedAt,
 	)
 	if err != nil {

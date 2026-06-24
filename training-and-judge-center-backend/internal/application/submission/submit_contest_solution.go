@@ -220,6 +220,8 @@ func (uc *SubmitContestSolutionUseCase) Execute(ctx context.Context, in SubmitCo
 		storagePath,
 		fileHash,
 		len(in.FileData),
+		problem.Title,
+		problem.Slug,
 		in.SubmittedAt,
 	)
 	if err != nil {
