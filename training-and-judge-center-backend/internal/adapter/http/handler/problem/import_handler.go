@@ -77,7 +77,7 @@ func (h *Handler) Import(w http.ResponseWriter, r *http.Request) {
 
 	currentUser := shared.CurrentUser{ID: claims.UserID, Role: claims.Role}
 
-	result, ucErr := h.importUC.Execute(r.Context(), appProblem.ImportProblemInput{
+	result, ucErr := h.importProblem.Execute(r.Context(), appProblem.ImportProblemInput{
 		Slug:        slug,
 		ZipData:     zipData,
 		CurrentUser: currentUser,

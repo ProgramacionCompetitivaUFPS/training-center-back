@@ -98,19 +98,23 @@ func (m *mockActiveContestCheckerH) IsProblemInActiveContest(_ context.Context, 
 // ── Handler constructor helpers ──────────────────────────────────────────────
 
 func newHandlerWithStatistics(uc *appProblem.GetProblemStatisticsUseCase) *Handler {
-	return &Handler{getStatisticsUC: uc}
+	return &Handler{getProblemStatistics: uc}
 }
 
 func newHandlerWithUnpublish(repo domainProblem.Repository, checker appProblem.ActiveContestChecker) *Handler {
-	return &Handler{unpublishUC: appProblem.NewUnpublishProblemUseCase(repo, checker)}
+	return &Handler{unpublishProblem: appProblem.NewUnpublishProblemUseCase(repo, checker)}
 }
 
 func newHandlerWithDeleteProblem(repo domainProblem.Repository, checker appProblem.ActiveContestChecker) *Handler {
-	return &Handler{deleteProblemUC: appProblem.NewDeleteProblemUseCase(repo, &mockFileStorageH{}, checker)}
+	return &Handler{deleteProblem: appProblem.NewDeleteProblemUseCase(repo, &mockFileStorageH{}, checker)}
 }
 
 func newHandlerWithChangeAccessibility(repo domainProblem.Repository) *Handler {
-	return &Handler{changeAccessibilityUC: appProblem.NewChangeAccessibilityUseCase(repo)}
+	return &Handler{changeAccessibility: appProblem.NewChangeAccessibilityUseCase(repo)}
+}
+
+func newHandlerWithRejudge(repo domainProblem.Repository, rejudger appProblem.SubmissionRejudger) *Handler {
+	return &Handler{rejudgeSubmissions: appProblem.NewRejudgeSubmissionsUseCase(repo, rejudger)}
 }
 
 // ── Problem fixtures ─────────────────────────────────────────────────────────

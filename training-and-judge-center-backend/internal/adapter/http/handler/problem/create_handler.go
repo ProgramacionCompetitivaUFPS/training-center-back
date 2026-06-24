@@ -54,7 +54,7 @@ func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
 	langOverrides := convertLangOverrides(body.LangOverrides)
 	currentUser := shared.CurrentUser{ID: claims.UserID, Role: claims.Role}
 
-	result, ucErr := h.createUC.Execute(r.Context(), appProblem.CreateProblemInput{
+	result, ucErr := h.createProblem.Execute(r.Context(), appProblem.CreateProblemInput{
 		Slug:          body.Slug,
 		Title:         body.Title,
 		Statement:     body.Statement,

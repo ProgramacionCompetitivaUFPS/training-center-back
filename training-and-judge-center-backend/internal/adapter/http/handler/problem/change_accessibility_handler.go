@@ -51,7 +51,7 @@ func (h *Handler) ChangeAccessibility(w http.ResponseWriter, r *http.Request) {
 
 	currentUser := shared.CurrentUser{ID: claims.UserID, Role: claims.Role}
 
-	out, err := h.changeAccessibilityUC.Execute(r.Context(), appProblem.ChangeAccessibilityInput{
+	out, err := h.changeAccessibility.Execute(r.Context(), appProblem.ChangeAccessibilityInput{
 		Slug:          slug,
 		Accessibility: req.Accessibility,
 		CurrentUser:   currentUser,

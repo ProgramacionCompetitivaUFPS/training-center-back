@@ -93,7 +93,7 @@ func (h *Handler) UploadFiles(w http.ResponseWriter, r *http.Request) {
 
 	currentUser := shared.CurrentUser{ID: claims.UserID, Role: claims.Role}
 
-	res, ucErr := h.uploadUC.Execute(ctx, appProblem.UploadProblemFilesInput{
+	res, ucErr := h.uploadProblemFiles.Execute(ctx, appProblem.UploadProblemFilesInput{
 		Slug:        slug,
 		FileType:    fileType,
 		FileName:    fileHeader.Filename,

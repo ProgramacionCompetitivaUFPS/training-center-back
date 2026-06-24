@@ -44,7 +44,7 @@ func (h *Handler) DeleteProblem(w http.ResponseWriter, r *http.Request) {
 
 	currentUser := shared.CurrentUser{ID: claims.UserID, Role: claims.Role}
 
-	err := h.deleteProblemUC.Execute(r.Context(), appProblem.DeleteProblemInput{
+	err := h.deleteProblem.Execute(r.Context(), appProblem.DeleteProblemInput{
 		Slug:        slug,
 		ConfirmSlug: req.ConfirmSlug,
 		CurrentUser: currentUser,

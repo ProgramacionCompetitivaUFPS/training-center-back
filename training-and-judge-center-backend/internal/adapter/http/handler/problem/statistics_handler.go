@@ -56,7 +56,7 @@ func (h *Handler) GetStatistics(w http.ResponseWriter, r *http.Request) {
 
 	slug := r.PathValue("slug")
 
-	out, err := h.getStatisticsUC.Execute(r.Context(), appProblem.GetProblemStatisticsInput{Slug: slug})
+	out, err := h.getProblemStatistics.Execute(r.Context(), appProblem.GetProblemStatisticsInput{Slug: slug})
 	if err != nil {
 		handler.WriteError(r.Context(), w, err)
 		return

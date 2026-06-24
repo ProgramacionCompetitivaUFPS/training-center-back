@@ -69,7 +69,7 @@ func (h *Handler) ListProblems(w http.ResponseWriter, r *http.Request) {
 		Limit:          limit,
 	}
 
-	out, ucErr := h.listProblemsUC.Execute(r.Context(), in)
+	out, ucErr := h.listProblems.Execute(r.Context(), in)
 	if ucErr != nil {
 		handler.WriteError(r.Context(), w, ucErr)
 		return

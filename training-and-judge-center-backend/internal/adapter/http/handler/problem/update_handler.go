@@ -60,7 +60,7 @@ func (h *Handler) Update(w http.ResponseWriter, r *http.Request) {
 
 	currentUser := shared.CurrentUser{ID: claims.UserID, Role: claims.Role}
 
-	result, ucErr := h.updateUC.Execute(r.Context(), appProblem.UpdateProblemInput{
+	result, ucErr := h.updateProblem.Execute(r.Context(), appProblem.UpdateProblemInput{
 		Slug:          slug,
 		Title:         body.Title,
 		Statement:     body.Statement,
