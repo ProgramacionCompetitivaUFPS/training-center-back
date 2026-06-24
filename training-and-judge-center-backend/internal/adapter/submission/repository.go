@@ -316,7 +316,6 @@ func buildWhere(f domainSubmission.ListFilters) (string, []any) {
 		args = append(args, *f.SubmittedBefore)
 		i++
 	}
-	_ = i
 	return where, args
 }
 
