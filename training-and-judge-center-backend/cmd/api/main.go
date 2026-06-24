@@ -176,25 +176,6 @@ func main() {
 	deleteProblemUseCase := appProblem.NewDeleteProblemUseCase(problemRepo, fileStorage, problemActiveContestChecker)
 	getProblemStatisticsUseCase := appProblem.NewGetProblemStatisticsUseCase(problemRepo, problemStatisticsProvider)
 
-	problemHandler := handlerProblem.NewHandler(
-		createProblemUseCase,
-		importProblemUseCase,
-		updateProblemUseCase,
-		uploadProblemFilesUseCase,
-		deleteProblemFileUseCase,
-		addModifierUseCase,
-		removeModifierUseCase,
-		listModifiersUseCase,
-		getProblemUseCase,
-		listProblemsUseCase,
-		unpublishProblemUseCase,
-		changeAccessibilityUseCase,
-		deleteProblemUseCase,
-		getProblemStatisticsUseCase,
-		userProvider,
-		settingsProvider,
-	)
-
 	// User platform adapters
 	userRepo := user.NewRepository(dbPool)
 	passwordRecoveryRepo := user.NewPasswordRecoveryRepository(dbPool)
@@ -441,6 +422,29 @@ func main() {
 		submissionQueue = adaptersubmission.NoOpQueue{}
 		slog.Info("using no-op submission queue (RABBITMQ_URL not set)")
 	}
+
+	submissionRejudger := adaptersubmission.NewRejudger(dbPool, submissionQueue)
+	rejudgeSubmissionsUseCase := appProblem.NewRejudgeSubmissionsUseCase(problemRepo, submissionRejudger)
+
+	problemHandler := handlerProblem.NewHandler(
+		createProblemUseCase,
+		importProblemUseCase,
+		updateProblemUseCase,
+		uploadProblemFilesUseCase,
+		deleteProblemFileUseCase,
+		addModifierUseCase,
+		removeModifierUseCase,
+		listModifiersUseCase,
+		getProblemUseCase,
+		listProblemsUseCase,
+		unpublishProblemUseCase,
+		changeAccessibilityUseCase,
+		deleteProblemUseCase,
+		getProblemStatisticsUseCase,
+		rejudgeSubmissionsUseCase,
+		userProvider,
+		settingsProvider,
+	)
 
 	// submission use cases
 	submitSolutionUseCase := appsubmission.NewSubmitSolutionUseCase(

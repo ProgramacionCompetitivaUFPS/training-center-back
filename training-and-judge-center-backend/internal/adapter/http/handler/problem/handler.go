@@ -6,58 +6,61 @@ import (
 )
 
 type Handler struct {
-	createUC              *appProblem.CreateProblemUseCase
-	importUC              *appProblem.ImportProblemUseCase
-	updateUC              *appProblem.UpdateProblemUseCase
-	uploadUC              *appProblem.UploadProblemFilesUseCase
-	deleteFileUC          *appProblem.DeleteProblemFileUseCase
-	addModifierUC         *appProblem.AddModifierUseCase
-	removeModifierUC      *appProblem.RemoveModifierUseCase
-	listModifiersUC       *appProblem.ListModifiersUseCase
-	getProblemUC          *appProblem.GetProblemUseCase
-	listProblemsUC        *appProblem.ListProblemsUseCase
-	unpublishUC           *appProblem.UnpublishProblemUseCase
-	changeAccessibilityUC *appProblem.ChangeAccessibilityUseCase
-	deleteProblemUC       *appProblem.DeleteProblemUseCase
-	getStatisticsUC       *appProblem.GetProblemStatisticsUseCase
-	userProvider          appProblem.UserProvider
-	settings              domainProblem.PlatformSettings
+	createProblem        *appProblem.CreateProblemUseCase
+	importProblem        *appProblem.ImportProblemUseCase
+	updateProblem        *appProblem.UpdateProblemUseCase
+	uploadProblemFiles   *appProblem.UploadProblemFilesUseCase
+	deleteProblemFile    *appProblem.DeleteProblemFileUseCase
+	addModifier          *appProblem.AddModifierUseCase
+	removeModifier       *appProblem.RemoveModifierUseCase
+	listModifiers        *appProblem.ListModifiersUseCase
+	getProblem           *appProblem.GetProblemUseCase
+	listProblems         *appProblem.ListProblemsUseCase
+	unpublishProblem     *appProblem.UnpublishProblemUseCase
+	changeAccessibility  *appProblem.ChangeAccessibilityUseCase
+	deleteProblem        *appProblem.DeleteProblemUseCase
+	getProblemStatistics *appProblem.GetProblemStatisticsUseCase
+	rejudgeSubmissions   *appProblem.RejudgeSubmissionsUseCase
+	userProvider         appProblem.UserProvider
+	settings             domainProblem.PlatformSettings
 }
 
 func NewHandler(
-	createUC *appProblem.CreateProblemUseCase,
-	importUC *appProblem.ImportProblemUseCase,
-	updateUC *appProblem.UpdateProblemUseCase,
-	uploadUC *appProblem.UploadProblemFilesUseCase,
-	deleteFileUC *appProblem.DeleteProblemFileUseCase,
-	addModifierUC *appProblem.AddModifierUseCase,
-	removeModifierUC *appProblem.RemoveModifierUseCase,
-	listModifiersUC *appProblem.ListModifiersUseCase,
-	getProblemUC *appProblem.GetProblemUseCase,
-	listProblemsUC *appProblem.ListProblemsUseCase,
-	unpublishUC *appProblem.UnpublishProblemUseCase,
-	changeAccessibilityUC *appProblem.ChangeAccessibilityUseCase,
-	deleteProblemUC *appProblem.DeleteProblemUseCase,
-	getStatisticsUC *appProblem.GetProblemStatisticsUseCase,
+	createProblem *appProblem.CreateProblemUseCase,
+	importProblem *appProblem.ImportProblemUseCase,
+	updateProblem *appProblem.UpdateProblemUseCase,
+	uploadProblemFiles *appProblem.UploadProblemFilesUseCase,
+	deleteProblemFile *appProblem.DeleteProblemFileUseCase,
+	addModifier *appProblem.AddModifierUseCase,
+	removeModifier *appProblem.RemoveModifierUseCase,
+	listModifiers *appProblem.ListModifiersUseCase,
+	getProblem *appProblem.GetProblemUseCase,
+	listProblems *appProblem.ListProblemsUseCase,
+	unpublishProblem *appProblem.UnpublishProblemUseCase,
+	changeAccessibility *appProblem.ChangeAccessibilityUseCase,
+	deleteProblem *appProblem.DeleteProblemUseCase,
+	getProblemStatistics *appProblem.GetProblemStatisticsUseCase,
+	rejudgeSubmissions *appProblem.RejudgeSubmissionsUseCase,
 	userProvider appProblem.UserProvider,
 	settings domainProblem.PlatformSettings,
 ) *Handler {
 	return &Handler{
-		createUC:              createUC,
-		importUC:              importUC,
-		updateUC:              updateUC,
-		uploadUC:              uploadUC,
-		deleteFileUC:          deleteFileUC,
-		addModifierUC:         addModifierUC,
-		removeModifierUC:      removeModifierUC,
-		listModifiersUC:       listModifiersUC,
-		getProblemUC:          getProblemUC,
-		listProblemsUC:        listProblemsUC,
-		unpublishUC:           unpublishUC,
-		changeAccessibilityUC: changeAccessibilityUC,
-		deleteProblemUC:       deleteProblemUC,
-		getStatisticsUC:       getStatisticsUC,
-		userProvider:          userProvider,
-		settings:              settings,
+		createProblem:        createProblem,
+		importProblem:        importProblem,
+		updateProblem:        updateProblem,
+		uploadProblemFiles:   uploadProblemFiles,
+		deleteProblemFile:    deleteProblemFile,
+		addModifier:          addModifier,
+		removeModifier:       removeModifier,
+		listModifiers:        listModifiers,
+		getProblem:           getProblem,
+		listProblems:         listProblems,
+		unpublishProblem:     unpublishProblem,
+		changeAccessibility:  changeAccessibility,
+		deleteProblem:        deleteProblem,
+		getProblemStatistics: getProblemStatistics,
+		rejudgeSubmissions:   rejudgeSubmissions,
+		userProvider:         userProvider,
+		settings:             settings,
 	}
 }
