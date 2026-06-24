@@ -160,7 +160,7 @@ func assertErrCode(t *testing.T, err error, code string) {
 	}
 }
 
-func TestGetMaterial_AuthorProviderError_Returns500(t *testing.T) {
+func TestGetMaterial_AuthorProviderError_ReturnsNilAuthor(t *testing.T) {
 	repo := repoWith(newPublishedMaterial())
 	authorProvider := &mockAuthorProvider{
 		getDisplaysFn: func(_ context.Context, _ []string) (map[string]*AuthorDisplay, error) {
@@ -169,18 +169,21 @@ func TestGetMaterial_AuthorProviderError_Returns500(t *testing.T) {
 	}
 	uc := NewGetMaterialUseCase(repo, visibleGroup(), isMemberNotLead(), authorProvider)
 
-	_, err := uc.Execute(context.Background(), GetMaterialInput{
+	out, err := uc.Execute(context.Background(), GetMaterialInput{
 		CurrentUser: asCoach(testOtherID),
 		GroupID:     testGroupID,
 		MaterialID:  testMaterialID,
 	})
 
-	if err == nil {
-		t.Fatal("expected error on author provider failure, got nil")
+	if err != nil {
+		t.Fatalf("expected no error on author provider failure, got %v", err)
+	}
+	if out.Material.Author != nil {
+		t.Errorf("expected nil author on provider failure, got %+v", out.Material.Author)
 	}
 }
 
-func TestListMaterials_AuthorProviderError_Returns500(t *testing.T) {
+func TestListMaterials_AuthorProviderError_ReturnsNilAuthor(t *testing.T) {
 	authorProvider := &mockAuthorProvider{
 		getDisplaysFn: func(_ context.Context, _ []string) (map[string]*AuthorDisplay, error) {
 			return nil, apperror.NewInternal()
@@ -188,10 +191,16 @@ func TestListMaterials_AuthorProviderError_Returns500(t *testing.T) {
 	}
 	uc := NewListMaterialsUseCase(repoWithList([]*domainMaterial.Material{newPublishedMaterial()}), visibleGroup(), isMemberNotLead(), authorProvider)
 
-	_, err := uc.Execute(context.Background(), defaultListInput())
+	out, err := uc.Execute(context.Background(), defaultListInput())
 
-	if err == nil {
-		t.Fatal("expected error on author provider failure, got nil")
+	if err != nil {
+		t.Fatalf("expected no error on author provider failure, got %v", err)
+	}
+	if len(out.Materials) == 0 {
+		t.Fatal("expected at least one material")
+	}
+	if out.Materials[0].Author != nil {
+		t.Errorf("expected nil author on provider failure, got %+v", out.Materials[0].Author)
 	}
 }
 
