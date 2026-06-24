@@ -21,7 +21,7 @@ type getSubmissionResponse struct {
 	Language      string          `json:"language"`
 	Compiler      string          `json:"compiler"`
 	ExecutionTime *int            `json:"executionTime"`
-	MemoryUsed    *int            `json:"memoryUsed"`
+	MemoryKb      *int            `json:"memoryKb"`
 	SourceCode    string          `json:"sourceCode"`
 }
 
@@ -68,7 +68,7 @@ func (h *Handler) GetSubmission(w http.ResponseWriter, r *http.Request) {
 		Language:    out.Language,
 		Compiler:    out.Compiler,
 		ExecutionTime: out.ExecutionTime,
-		MemoryUsed:    out.MemoryUsed,
+		MemoryKb:      out.MemoryKb,
 		SourceCode:  out.SourceCode,
 	}
 

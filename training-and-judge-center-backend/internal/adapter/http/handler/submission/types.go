@@ -44,7 +44,7 @@ type submissionSummaryResponse struct {
 	SubmittedBy   userSummary     `json:"submittedBy"`
 	Language      string          `json:"language"`
 	ExecutionTime *int            `json:"executionTime"`
-	MemoryUsed    *int            `json:"memoryUsed"`
+	MemoryKb      *int            `json:"memoryKb"`
 }
 
 type pagination struct {
@@ -91,7 +91,7 @@ func toSummaryResponse(s appsubmission.SubmissionSummary) submissionSummaryRespo
 		SubmittedBy:   userSummary{ID: s.SubmittedBy.ID, Nickname: s.SubmittedBy.Nickname},
 		Language:      s.Language,
 		ExecutionTime: s.ExecutionTime,
-		MemoryUsed:    s.MemoryUsed,
+		MemoryKb:      s.MemoryKb,
 	}
 	if s.JudgedAt != nil {
 		t := s.JudgedAt.UTC().Format(time.RFC3339)

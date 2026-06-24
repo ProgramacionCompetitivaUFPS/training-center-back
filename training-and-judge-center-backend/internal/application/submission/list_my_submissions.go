@@ -130,7 +130,7 @@ func (uc *ListMySubmissionsUseCase) Execute(ctx context.Context, in ListMySubmis
 			SubmittedBy:   *me,
 			Language:      s.Language().String(),
 			ExecutionTime: s.TimeMs(),
-			MemoryUsed:    s.MemoryKb(),
+			MemoryKb:      s.MemoryKb(),
 		})
 	}
 

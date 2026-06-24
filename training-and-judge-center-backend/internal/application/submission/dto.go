@@ -16,5 +16,5 @@ type SubmissionSummary struct {
 	SubmittedBy   UserDisplay
 	Language      string
 	ExecutionTime *int
-	MemoryUsed    *int
+	MemoryKb      *int
 }
