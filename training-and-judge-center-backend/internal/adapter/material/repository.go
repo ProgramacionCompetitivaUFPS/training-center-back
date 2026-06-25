@@ -9,19 +9,19 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgxpool"
 	"golang.org/x/sync/errgroup"
 
+	infraPostgres "github.com/training-judge-center/backend/internal/adapter/postgres"
 	"github.com/training-judge-center/backend/internal/domain/material"
 	"github.com/training-judge-center/backend/internal/domain/shared"
 	"github.com/training-judge-center/backend/pkg/apperror"
 )
 
 type Repository struct {
-	db *pgxpool.Pool
+	db infraPostgres.Querier
 }
 
-func NewRepository(db *pgxpool.Pool) *Repository {
+func NewRepository(db infraPostgres.Querier) *Repository {
 	return &Repository{db: db}
 }
 
@@ -43,7 +43,8 @@ func (r *Repository) Save(ctx context.Context, m *material.Material) error {
 			published_at = EXCLUDED.published_at
 	`
 
-	_, err := r.db.Exec(ctx, query,
+	q := infraPostgres.GetQuerier(ctx, r.db)
+	_, err := q.Exec(ctx, query,
 		m.ID(),
 		m.GroupID(),
 		m.AuthorID().Value(),
@@ -71,7 +72,8 @@ func (r *Repository) FindByID(ctx context.Context, id string) (*material.Materia
 		FROM materials
 		WHERE id = $1
 	`
-	row := r.db.QueryRow(ctx, query, id)
+	q := infraPostgres.GetQuerier(ctx, r.db)
+	row := q.QueryRow(ctx, query, id)
 	m, err := scanMaterial(ctx, row)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
@@ -162,13 +164,15 @@ func (r *Repository) List(ctx context.Context, groupID string, filters material.
 
 	countQuery := fmt.Sprintf("SELECT COUNT(*) FROM materials %s", where)
 
+	// Obtain the querier before spawning goroutines so both share the same tx if active.
+	q := infraPostgres.GetQuerier(ctx, r.db)
 	g, gCtx := errgroup.WithContext(ctx)
 
 	var result []*material.Material
 	var total int
 
 	g.Go(func() error {
-		rows, queryErr := r.db.Query(gCtx, selectQuery, args...)
+		rows, queryErr := q.Query(gCtx, selectQuery, args...)
 		if queryErr != nil {
 			return queryErr
 		}
@@ -184,7 +188,7 @@ func (r *Repository) List(ctx context.Context, groupID string, filters material.
 	})
 
 	g.Go(func() error {
-		return r.db.QueryRow(gCtx, countQuery, countArgs...).Scan(&total)
+		return q.QueryRow(gCtx, countQuery, countArgs...).Scan(&total)
 	})
 
 	if err := g.Wait(); err != nil {
@@ -224,7 +228,8 @@ func listOrderBy(sortBy material.SortField, ftsRef, ftsVector string) string {
 }
 
 func (r *Repository) Delete(ctx context.Context, id string) error {
-	tag, err := r.db.Exec(ctx, `DELETE FROM materials WHERE id = $1`, id)
+	q := infraPostgres.GetQuerier(ctx, r.db)
+	tag, err := q.Exec(ctx, `DELETE FROM materials WHERE id = $1`, id)
 	if err != nil {
 		slog.ErrorContext(ctx, "database error in Delete", "error", err, "material_id", id)
 		return apperror.NewInternal()

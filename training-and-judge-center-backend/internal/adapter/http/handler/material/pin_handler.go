@@ -24,7 +24,7 @@ func (h *Handler) Pin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	out, err := h.pinUC.Execute(r.Context(), appMaterial.PinMaterialInput{
+	out, err := h.pinMaterial.Execute(r.Context(), appMaterial.PinMaterialInput{
 		CurrentUser: *currentUser,
 		GroupID:     r.PathValue("groupId"),
 		MaterialID:  r.PathValue("materialId"),

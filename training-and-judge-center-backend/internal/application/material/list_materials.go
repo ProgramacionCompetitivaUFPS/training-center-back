@@ -2,6 +2,7 @@ package material
 
 import (
 	"context"
+	"log/slog"
 	"strings"
 	"time"
 
@@ -79,12 +80,18 @@ func (uc *ListMaterialsUseCase) Execute(ctx context.Context, in ListMaterialsInp
 		return nil, err
 	}
 
-	// Resolve author nickname → userID. Unknown nickname → empty result set.
-	var authorID *string
+	// Validate sort/date params and determine status visibility before any author I/O,
+	// so invalid params always return 400 regardless of whether the author exists.
+	filters, err := uc.buildFilters(ctx, in, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	// Resolve author nickname → userID. Unknown nickname → validated empty result.
 	if in.Author != "" {
-		id, found, err := uc.authorIDProvider.FindIDByNickname(ctx, in.Author)
-		if err != nil {
-			return nil, err
+		id, found, lookupErr := uc.authorIDProvider.FindIDByNickname(ctx, in.Author)
+		if lookupErr != nil {
+			return nil, lookupErr
 		}
 		if !found {
 			return &ListMaterialsOutput{
@@ -97,12 +104,7 @@ func (uc *ListMaterialsUseCase) Execute(ctx context.Context, in ListMaterialsInp
 				},
 			}, nil
 		}
-		authorID = &id
-	}
-
-	filters, err := uc.buildFilters(ctx, in, authorID)
-	if err != nil {
-		return nil, err
+		filters.AuthorID = &id
 	}
 
 	materials, total, err := uc.repo.List(ctx, in.GroupID, filters)
@@ -110,12 +112,15 @@ func (uc *ListMaterialsUseCase) Execute(ctx context.Context, in ListMaterialsInp
 		return nil, err
 	}
 
-	displays, err := uc.authorProvider.GetDisplays(ctx, uniqueAuthorIDs(materials))
+	displays, displayErr := uc.authorProvider.GetDisplays(ctx, uniqueAuthorIDs(materials))
+	if displayErr != nil {
+		slog.WarnContext(ctx, "list_materials: author enrichment degraded", "error", displayErr)
+	}
 
 	items := make([]MaterialData, 0, len(materials))
 	for _, m := range materials {
 		d := toMaterialData(m)
-		if err == nil {
+		if displayErr == nil {
 			if disp := displays[m.AuthorID().Value()]; disp != nil {
 				d.Author = &AuthorDTO{Nickname: disp.Nickname, Name: disp.Name}
 			}
@@ -188,6 +193,9 @@ func resolveSortBy(sort, query string) (domainMaterial.SortField, error) {
 		}
 		return domainMaterial.SortByPublishedAt, nil
 	case "relevance":
+		if strings.TrimSpace(query) == "" {
+			return "", apperror.NewBadRequest(ErrCodeInvalidSort, "sort=relevance requires a non-empty q parameter")
+		}
 		return domainMaterial.SortByRelevance, nil
 	case "publishedAt":
 		return domainMaterial.SortByPublishedAt, nil

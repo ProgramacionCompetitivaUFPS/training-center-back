@@ -237,6 +237,15 @@ func TestListMaterials_InvalidSort_Returns400(t *testing.T) {
 	assertErrCode(t, err, ErrCodeInvalidSort)
 }
 
+func TestListMaterials_RelevanceSortWithoutQuery_Returns400(t *testing.T) {
+	uc := newListMaterialsUseCase(&mockMaterialRepository{}, visibleGroup(), isLead())
+	in := defaultListInput()
+	in.Sort = "relevance"
+	// in.Query is "" by default
+	_, err := uc.Execute(context.Background(), in)
+	assertErrCode(t, err, ErrCodeInvalidSort)
+}
+
 func TestListMaterials_InvalidDateRange_Returns400(t *testing.T) {
 	uc := newListMaterialsUseCase(&mockMaterialRepository{}, visibleGroup(), isLead())
 	in := defaultListInput()

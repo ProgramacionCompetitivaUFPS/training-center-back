@@ -1,4 +1,4 @@
-﻿package material
+package material
 
 import (
 	"net/http"
@@ -11,38 +11,38 @@ import (
 )
 
 type Handler struct {
-	createUC    *appMaterial.CreateMaterialUseCase
-	updateUC    *appMaterial.UpdateMaterialUseCase
-	getUC       *appMaterial.GetMaterialUseCase
-	listUC      *appMaterial.ListMaterialsUseCase
-	publishUC   *appMaterial.PublishMaterialUseCase
-	unpublishUC *appMaterial.UnpublishMaterialUseCase
-	pinUC       *appMaterial.PinMaterialUseCase
-	unpinUC     *appMaterial.UnpinMaterialUseCase
-	deleteUC    *appMaterial.DeleteMaterialUseCase
+	createMaterial    *appMaterial.CreateMaterialUseCase
+	updateMaterial    *appMaterial.UpdateMaterialUseCase
+	getMaterial       *appMaterial.GetMaterialUseCase
+	listMaterials     *appMaterial.ListMaterialsUseCase
+	publishMaterial   *appMaterial.PublishMaterialUseCase
+	unpublishMaterial *appMaterial.UnpublishMaterialUseCase
+	pinMaterial       *appMaterial.PinMaterialUseCase
+	unpinMaterial     *appMaterial.UnpinMaterialUseCase
+	deleteMaterial    *appMaterial.DeleteMaterialUseCase
 }
 
 func NewHandler(
-	createUC *appMaterial.CreateMaterialUseCase,
-	updateUC *appMaterial.UpdateMaterialUseCase,
-	getUC *appMaterial.GetMaterialUseCase,
-	listUC *appMaterial.ListMaterialsUseCase,
-	publishUC *appMaterial.PublishMaterialUseCase,
-	unpublishUC *appMaterial.UnpublishMaterialUseCase,
-	pinUC *appMaterial.PinMaterialUseCase,
-	unpinUC *appMaterial.UnpinMaterialUseCase,
-	deleteUC *appMaterial.DeleteMaterialUseCase,
+	createMaterial *appMaterial.CreateMaterialUseCase,
+	updateMaterial *appMaterial.UpdateMaterialUseCase,
+	getMaterial *appMaterial.GetMaterialUseCase,
+	listMaterials *appMaterial.ListMaterialsUseCase,
+	publishMaterial *appMaterial.PublishMaterialUseCase,
+	unpublishMaterial *appMaterial.UnpublishMaterialUseCase,
+	pinMaterial *appMaterial.PinMaterialUseCase,
+	unpinMaterial *appMaterial.UnpinMaterialUseCase,
+	deleteMaterial *appMaterial.DeleteMaterialUseCase,
 ) *Handler {
 	return &Handler{
-		createUC:    createUC,
-		updateUC:    updateUC,
-		getUC:       getUC,
-		listUC:      listUC,
-		publishUC:   publishUC,
-		unpublishUC: unpublishUC,
-		pinUC:       pinUC,
-		unpinUC:     unpinUC,
-		deleteUC:    deleteUC,
+		createMaterial:    createMaterial,
+		updateMaterial:    updateMaterial,
+		getMaterial:       getMaterial,
+		listMaterials:     listMaterials,
+		publishMaterial:   publishMaterial,
+		unpublishMaterial: unpublishMaterial,
+		pinMaterial:       pinMaterial,
+		unpinMaterial:     unpinMaterial,
+		deleteMaterial:    deleteMaterial,
 	}
 }
 

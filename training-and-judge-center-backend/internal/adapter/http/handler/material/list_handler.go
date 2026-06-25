@@ -73,7 +73,7 @@ func (h *Handler) List(w http.ResponseWriter, r *http.Request) {
 
 	query := strings.TrimSpace(q.Get("q"))
 	author := strings.TrimSpace(q.Get("author"))
-	sort := q.Get("sort")
+	sort := strings.TrimSpace(q.Get("sort"))
 
 	parseDate := func(field, raw string) (*time.Time, bool) {
 		if raw == "" {
@@ -98,7 +98,7 @@ func (h *Handler) List(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	out, err := h.listUC.Execute(r.Context(), appMaterial.ListMaterialsInput{
+	out, err := h.listMaterials.Execute(r.Context(), appMaterial.ListMaterialsInput{
 		CurrentUser:   *currentUser,
 		GroupID:       groupID,
 		Query:         query,

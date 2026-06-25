@@ -24,7 +24,7 @@ func (h *Handler) Unpublish(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	out, err := h.unpublishUC.Execute(r.Context(), appMaterial.UnpublishMaterialInput{
+	out, err := h.unpublishMaterial.Execute(r.Context(), appMaterial.UnpublishMaterialInput{
 		CurrentUser: *currentUser,
 		GroupID:     r.PathValue("groupId"),
 		MaterialID:  r.PathValue("materialId"),
