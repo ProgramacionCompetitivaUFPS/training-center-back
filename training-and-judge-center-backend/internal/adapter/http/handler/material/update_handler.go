@@ -40,7 +40,7 @@ func (h *Handler) Update(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	out, err := h.updateUC.Execute(r.Context(), appMaterial.UpdateMaterialInput{
+	out, err := h.updateMaterial.Execute(r.Context(), appMaterial.UpdateMaterialInput{
 		CurrentUser: *currentUser,
 		GroupID:     groupID,
 		MaterialID:  materialID,

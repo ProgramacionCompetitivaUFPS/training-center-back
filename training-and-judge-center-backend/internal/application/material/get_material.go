@@ -2,6 +2,7 @@
 
 import (
 	"context"
+	"log/slog"
 
 	domainMaterial "github.com/training-judge-center/backend/internal/domain/material"
 	appshared "github.com/training-judge-center/backend/internal/application/shared"
@@ -71,11 +72,11 @@ func (uc *GetMaterialUseCase) Execute(ctx context.Context, in GetMaterialInput) 
 	}
 
 	data := toMaterialData(m)
-	displays, err := uc.authorProvider.GetDisplays(ctx, []string{m.AuthorID().Value()})
-	if err == nil {
-		if disp := displays[m.AuthorID().Value()]; disp != nil {
-			data.Author = &AuthorDTO{Nickname: disp.Nickname, Name: disp.Name}
-		}
+	displays, displayErr := uc.authorProvider.GetDisplays(ctx, []string{m.AuthorID().Value()})
+	if displayErr != nil {
+		slog.WarnContext(ctx, "get_material: author enrichment degraded", "error", displayErr)
+	} else if disp := displays[m.AuthorID().Value()]; disp != nil {
+		data.Author = &AuthorDTO{Nickname: disp.Nickname, Name: disp.Name}
 	}
 
 	return &GetMaterialOutput{Material: data}, nil

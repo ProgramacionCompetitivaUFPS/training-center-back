@@ -1,6 +1,9 @@
 package material
 
-import "context"
+import (
+	"context"
+	"time"
+)
 
 type SortField string
 
@@ -17,15 +20,17 @@ const (
 // Limit must be between 1 and 100; enforcement is the responsibility of the use case layer.
 type ListFilters struct {
 	// Statuses filters by status; empty means no status constraint (all statuses returned).
-	Statuses    []Status
-	ViewerID    *string
-	AuthorID    *string
-	Tags        []string
-	Pinned      *bool
-	SearchQuery *string
-	SortBy      SortField
-	Page        int
-	Limit       int
+	Statuses      []Status
+	ViewerID      *string
+	AuthorID      *string
+	Tags          []string
+	Pinned        *bool
+	SearchQuery   *string
+	PublishedFrom *time.Time
+	PublishedTo   *time.Time
+	SortBy        SortField
+	Page          int
+	Limit         int
 }
 
 type Repository interface {

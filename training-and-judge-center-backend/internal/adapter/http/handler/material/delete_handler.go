@@ -23,7 +23,7 @@ func (h *Handler) Delete(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	err := h.deleteUC.Execute(r.Context(), appMaterial.DeleteMaterialInput{
+	err := h.deleteMaterial.Execute(r.Context(), appMaterial.DeleteMaterialInput{
 		CurrentUser: *currentUser,
 		GroupID:     r.PathValue("groupId"),
 		MaterialID:  r.PathValue("materialId"),

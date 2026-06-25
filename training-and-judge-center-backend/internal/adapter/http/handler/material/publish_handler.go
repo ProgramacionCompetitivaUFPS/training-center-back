@@ -24,7 +24,7 @@ func (h *Handler) Publish(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	out, err := h.publishUC.Execute(r.Context(), appMaterial.PublishMaterialInput{
+	out, err := h.publishMaterial.Execute(r.Context(), appMaterial.PublishMaterialInput{
 		CurrentUser: *currentUser,
 		GroupID:     r.PathValue("groupId"),
 		MaterialID:  r.PathValue("materialId"),

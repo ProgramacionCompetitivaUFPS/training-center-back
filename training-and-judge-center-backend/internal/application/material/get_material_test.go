@@ -189,7 +189,7 @@ func TestListMaterials_AuthorProviderError_ReturnsNilAuthor(t *testing.T) {
 			return nil, apperror.NewInternal()
 		},
 	}
-	uc := NewListMaterialsUseCase(repoWithList([]*domainMaterial.Material{newPublishedMaterial()}), visibleGroup(), isMemberNotLead(), authorProvider)
+	uc := NewListMaterialsUseCase(repoWithList([]*domainMaterial.Material{newPublishedMaterial()}), visibleGroup(), isMemberNotLead(), authorProvider, stubAuthorIDProvider())
 
 	out, err := uc.Execute(context.Background(), defaultListInput())
 

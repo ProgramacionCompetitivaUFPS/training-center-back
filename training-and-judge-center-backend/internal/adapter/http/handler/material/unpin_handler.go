@@ -24,7 +24,7 @@ func (h *Handler) Unpin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	out, err := h.unpinUC.Execute(r.Context(), appMaterial.UnpinMaterialInput{
+	out, err := h.unpinMaterial.Execute(r.Context(), appMaterial.UnpinMaterialInput{
 		CurrentUser: *currentUser,
 		GroupID:     r.PathValue("groupId"),
 		MaterialID:  r.PathValue("materialId"),

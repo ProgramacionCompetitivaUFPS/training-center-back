@@ -31,7 +31,7 @@ func (h *Handler) Get(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	out, err := h.getUC.Execute(r.Context(), appMaterial.GetMaterialInput{
+	out, err := h.getMaterial.Execute(r.Context(), appMaterial.GetMaterialInput{
 		CurrentUser: *currentUser,
 		GroupID:     groupID,
 		MaterialID:  materialID,

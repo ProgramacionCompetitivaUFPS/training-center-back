@@ -180,8 +180,8 @@ func main() {
 	userRepo := user.NewRepository(dbPool)
 	passwordRecoveryRepo := user.NewPasswordRecoveryRepository(dbPool)
 	emailChangeRepo := user.NewEmailChangeRepository(dbPool)
-	deactRepo := user.NewDeactivationRequestRepository(dbPool)
-	auditRepo := user.NewDeactivationAuditLogRepository(dbPool)
+	deactivationRequestRepo := user.NewDeactivationRequestRepository(dbPool)
+	deactivationAuditLogRepo := user.NewDeactivationAuditLogRepository(dbPool)
 
 	// Infrastructure and cross-cutting services
 	txManager := postgres.NewTransactionManager(dbPool)
@@ -191,25 +191,25 @@ func main() {
 	sessionInvalidator := auth.NewRedisSessionInvalidator(redisClient, time.Duration(cfg.JWTExpirationHours)*time.Hour)
 
 	// User use cases
-	createUserUC := appuser.NewCreateUserUseCase(userRepo)
-	loginUC := appuser.NewLoginUseCase(userRepo, jwtService)
-	getMyProfileUC := appuser.NewGetMyProfileUseCase(userRepo)
-	getUserByNicknameUC := appuser.NewGetUserByNicknameUseCase(userRepo)
-	updateUserUC := appuser.NewUpdateUserUseCase(userRepo)
-	updatePasswordUC := appuser.NewUpdatePasswordUseCase(userRepo, emailSender, sessionInvalidator, redisRateLimiter)
-	adminUpdateUserUC := appuser.NewAdminUpdateUserUseCase(userRepo)
-	adminDeactivateUserUC := appuser.NewAdminDeactivateUserUseCase(userRepo, sessionInvalidator)
-	listUsersUC := appuser.NewListUsersUseCase(userRepo)
-	requestEmailChangeUC := appuser.NewRequestEmailChangeUseCase(userRepo, emailChangeRepo, emailSender, redisRateLimiter)
-	confirmEmailChangeUC := appuser.NewConfirmEmailChangeUseCase(userRepo, emailChangeRepo, emailSender, txManager)
-	requestPasswordRecoveryUC := appuser.NewRequestPasswordRecoveryUseCase(userRepo, passwordRecoveryRepo, emailSender, redisRateLimiter)
-	resetPasswordUC := appuser.NewResetPasswordUseCase(userRepo, passwordRecoveryRepo, sessionInvalidator, txManager)
-	requestDeactUC := appuser.NewRequestDeactivationUseCase(userRepo, deactRepo, emailSender)
-	confirmDeactUC := appuser.NewConfirmDeactivationUseCase(userRepo, deactRepo, auditRepo, emailSender, sessionInvalidator, txManager)
+	createUserUseCase := appuser.NewCreateUserUseCase(userRepo)
+	loginUseCase := appuser.NewLoginUseCase(userRepo, jwtService)
+	getMyProfileUseCase := appuser.NewGetMyProfileUseCase(userRepo)
+	getUserByNicknameUseCase := appuser.NewGetUserByNicknameUseCase(userRepo)
+	updateUserUseCase := appuser.NewUpdateUserUseCase(userRepo)
+	updatePasswordUseCase := appuser.NewUpdatePasswordUseCase(userRepo, emailSender, sessionInvalidator, redisRateLimiter)
+	adminUpdateUserUseCase := appuser.NewAdminUpdateUserUseCase(userRepo)
+	adminDeactivateUserUseCase := appuser.NewAdminDeactivateUserUseCase(userRepo, sessionInvalidator)
+	listUsersUseCase := appuser.NewListUsersUseCase(userRepo)
+	requestEmailChangeUseCase := appuser.NewRequestEmailChangeUseCase(userRepo, emailChangeRepo, emailSender, redisRateLimiter)
+	confirmEmailChangeUseCase := appuser.NewConfirmEmailChangeUseCase(userRepo, emailChangeRepo, emailSender, txManager)
+	requestPasswordRecoveryUseCase := appuser.NewRequestPasswordRecoveryUseCase(userRepo, passwordRecoveryRepo, emailSender, redisRateLimiter)
+	resetPasswordUseCase := appuser.NewResetPasswordUseCase(userRepo, passwordRecoveryRepo, sessionInvalidator, txManager)
+	requestDeactivationUseCase := appuser.NewRequestDeactivationUseCase(userRepo, deactivationRequestRepo, emailSender)
+	confirmDeactivationUseCase := appuser.NewConfirmDeactivationUseCase(userRepo, deactivationRequestRepo, deactivationAuditLogRepo, emailSender, sessionInvalidator, txManager)
 
 	// Handlers
-	userHandler := handlerUser.NewHandler(createUserUC, getMyProfileUC, getUserByNicknameUC, updateUserUC, updatePasswordUC, adminUpdateUserUC, adminDeactivateUserUC, listUsersUC, requestEmailChangeUC, confirmEmailChangeUC, requestPasswordRecoveryUC, resetPasswordUC, requestDeactUC, confirmDeactUC)
-	authHandler := handler.NewAuthHandler(loginUC)
+	userHandler := handlerUser.NewHandler(createUserUseCase, getMyProfileUseCase, getUserByNicknameUseCase, updateUserUseCase, updatePasswordUseCase, adminUpdateUserUseCase, adminDeactivateUserUseCase, listUsersUseCase, requestEmailChangeUseCase, confirmEmailChangeUseCase, requestPasswordRecoveryUseCase, resetPasswordUseCase, requestDeactivationUseCase, confirmDeactivationUseCase)
+	authHandler := handler.NewAuthHandler(loginUseCase)
 
 	// Group repositories & platform adapters
 	groupRepo := group.NewRepository(dbPool)
@@ -262,22 +262,23 @@ func main() {
 	groupProvider := material.NewGroupProvider(dbPool)
 	groupMemberProvider := material.NewGroupMemberProvider(dbPool)
 	authorProvider := material.NewAuthorProvider(dbPool)
+	authorIDProvider := material.NewAuthorIDProvider(dbPool)
 
 	// Material use cases
-	createMaterialUC := appMaterial.NewCreateMaterialUseCase(materialRepo, groupProvider, groupMemberProvider, authorProvider)
-	updateMaterialUC := appMaterial.NewUpdateMaterialUseCase(materialRepo, groupProvider, authorProvider)
-	getMaterialUC := appMaterial.NewGetMaterialUseCase(materialRepo, groupProvider, groupMemberProvider, authorProvider)
-	listMaterialsUC := appMaterial.NewListMaterialsUseCase(materialRepo, groupProvider, groupMemberProvider, authorProvider)
-	publishMaterialUC := appMaterial.NewPublishMaterialUseCase(materialRepo, groupProvider, authorProvider)
-	unpublishMaterialUC := appMaterial.NewUnpublishMaterialUseCase(materialRepo, groupProvider, authorProvider)
-	pinMaterialUC := appMaterial.NewPinMaterialUseCase(materialRepo, groupProvider, groupMemberProvider, authorProvider)
-	unpinMaterialUC := appMaterial.NewUnpinMaterialUseCase(materialRepo, groupProvider, groupMemberProvider, authorProvider)
-	deleteMaterialUC := appMaterial.NewDeleteMaterialUseCase(materialRepo, groupProvider)
+	createMaterialUseCase := appMaterial.NewCreateMaterialUseCase(materialRepo, groupProvider, groupMemberProvider, authorProvider)
+	updateMaterialUseCase := appMaterial.NewUpdateMaterialUseCase(materialRepo, groupProvider, authorProvider)
+	getMaterialUseCase := appMaterial.NewGetMaterialUseCase(materialRepo, groupProvider, groupMemberProvider, authorProvider)
+	listMaterialsUseCase := appMaterial.NewListMaterialsUseCase(materialRepo, groupProvider, groupMemberProvider, authorProvider, authorIDProvider)
+	publishMaterialUseCase := appMaterial.NewPublishMaterialUseCase(materialRepo, groupProvider, authorProvider)
+	unpublishMaterialUseCase := appMaterial.NewUnpublishMaterialUseCase(materialRepo, groupProvider, authorProvider)
+	pinMaterialUseCase := appMaterial.NewPinMaterialUseCase(materialRepo, groupProvider, groupMemberProvider, authorProvider)
+	unpinMaterialUseCase := appMaterial.NewUnpinMaterialUseCase(materialRepo, groupProvider, groupMemberProvider, authorProvider)
+	deleteMaterialUseCase := appMaterial.NewDeleteMaterialUseCase(materialRepo, groupProvider)
 
 	materialHandler := handlerMaterial.NewHandler(
-		createMaterialUC, updateMaterialUC, getMaterialUC, listMaterialsUC,
-		publishMaterialUC, unpublishMaterialUC, pinMaterialUC, unpinMaterialUC,
-		deleteMaterialUC,
+		createMaterialUseCase, updateMaterialUseCase, getMaterialUseCase, listMaterialsUseCase,
+		publishMaterialUseCase, unpublishMaterialUseCase, pinMaterialUseCase, unpinMaterialUseCase,
+		deleteMaterialUseCase,
 	)
 
 	// contest adapters

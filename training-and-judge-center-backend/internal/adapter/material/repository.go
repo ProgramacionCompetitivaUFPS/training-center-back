@@ -9,19 +9,19 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgxpool"
 	"golang.org/x/sync/errgroup"
 
+	infraPostgres "github.com/training-judge-center/backend/internal/adapter/postgres"
 	"github.com/training-judge-center/backend/internal/domain/material"
 	"github.com/training-judge-center/backend/internal/domain/shared"
 	"github.com/training-judge-center/backend/pkg/apperror"
 )
 
 type Repository struct {
-	db *pgxpool.Pool
+	db infraPostgres.Querier
 }
 
-func NewRepository(db *pgxpool.Pool) *Repository {
+func NewRepository(db infraPostgres.Querier) *Repository {
 	return &Repository{db: db}
 }
 
@@ -43,7 +43,8 @@ func (r *Repository) Save(ctx context.Context, m *material.Material) error {
 			published_at = EXCLUDED.published_at
 	`
 
-	_, err := r.db.Exec(ctx, query,
+	q := infraPostgres.GetQuerier(ctx, r.db)
+	_, err := q.Exec(ctx, query,
 		m.ID(),
 		m.GroupID(),
 		m.AuthorID().Value(),
@@ -71,7 +72,8 @@ func (r *Repository) FindByID(ctx context.Context, id string) (*material.Materia
 		FROM materials
 		WHERE id = $1
 	`
-	row := r.db.QueryRow(ctx, query, id)
+	q := infraPostgres.GetQuerier(ctx, r.db)
+	row := q.QueryRow(ctx, query, id)
 	m, err := scanMaterial(ctx, row)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
@@ -122,6 +124,24 @@ func (r *Repository) List(ctx context.Context, groupID string, filters material.
 		conds = append(conds, fmt.Sprintf("pinned = %s", nextArg(*filters.Pinned)))
 	}
 
+	if filters.PublishedFrom != nil {
+		conds = append(conds, fmt.Sprintf("published_at >= %s", nextArg(*filters.PublishedFrom)))
+	}
+
+	if filters.PublishedTo != nil {
+		// Add 1 day so the upper bound covers the entire boundary date (inclusive spec).
+		to := filters.PublishedTo.AddDate(0, 0, 1)
+		conds = append(conds, fmt.Sprintf("published_at < %s", nextArg(to)))
+	}
+
+	// FTS: store the $N ref so it can be reused in ORDER BY without a second parameter.
+	var ftsRef string
+	const ftsVector = `(setweight(to_tsvector('simple', title), 'A') || setweight(to_tsvector('simple', COALESCE(content, '')), 'B'))`
+	if filters.SearchQuery != nil && *filters.SearchQuery != "" {
+		ftsRef = nextArg(*filters.SearchQuery)
+		conds = append(conds, fmt.Sprintf("%s @@ plainto_tsquery('simple', %s)", ftsVector, ftsRef))
+	}
+
 	where := "WHERE " + strings.Join(conds, " AND ")
 
 	countArgs := make([]any, len(args))
@@ -131,24 +151,28 @@ func (r *Repository) List(ctx context.Context, groupID string, filters material.
 	limitArg := nextArg(filters.Limit)
 	offsetArg := nextArg(offset)
 
+	orderBy := listOrderBy(filters.SortBy, ftsRef, ftsVector)
+
 	selectQuery := fmt.Sprintf(`
 		SELECT id, group_id, author_id, title, content, tags,
 		       status, pinned, pinned_at, created_at, updated_at, published_at
 		FROM materials
 		%s
-		ORDER BY pinned DESC, pinned_at DESC NULLS LAST, published_at DESC NULLS LAST, created_at DESC
+		ORDER BY %s
 		LIMIT %s OFFSET %s
-	`, where, limitArg, offsetArg)
+	`, where, orderBy, limitArg, offsetArg)
 
 	countQuery := fmt.Sprintf("SELECT COUNT(*) FROM materials %s", where)
 
+	// Obtain the querier before spawning goroutines so both share the same tx if active.
+	q := infraPostgres.GetQuerier(ctx, r.db)
 	g, gCtx := errgroup.WithContext(ctx)
 
 	var result []*material.Material
 	var total int
 
 	g.Go(func() error {
-		rows, queryErr := r.db.Query(gCtx, selectQuery, args...)
+		rows, queryErr := q.Query(gCtx, selectQuery, args...)
 		if queryErr != nil {
 			return queryErr
 		}
@@ -164,7 +188,7 @@ func (r *Repository) List(ctx context.Context, groupID string, filters material.
 	})
 
 	g.Go(func() error {
-		return r.db.QueryRow(gCtx, countQuery, countArgs...).Scan(&total)
+		return q.QueryRow(gCtx, countQuery, countArgs...).Scan(&total)
 	})
 
 	if err := g.Wait(); err != nil {
@@ -179,8 +203,33 @@ func (r *Repository) List(ctx context.Context, groupID string, filters material.
 	return result, total, nil
 }
 
+// listOrderBy builds the ORDER BY clause.
+// When a search query is active, pinned boost is suppressed (FR-032).
+func listOrderBy(sortBy material.SortField, ftsRef, ftsVector string) string {
+	switch sortBy {
+	case material.SortByRelevance:
+		if ftsRef != "" {
+			return fmt.Sprintf(
+				"ts_rank(%s, plainto_tsquery('simple', %s)) DESC, published_at DESC NULLS LAST, created_at DESC",
+				ftsVector, ftsRef,
+			)
+		}
+		// relevance without query → traditional order
+		return "pinned DESC, pinned_at DESC NULLS LAST, published_at DESC NULLS LAST, created_at DESC"
+	case material.SortByTitle:
+		return "title ASC, published_at DESC NULLS LAST, created_at DESC"
+	default: // SortByPublishedAt
+		if ftsRef != "" {
+			// Searching: no pinned boost (FR-032)
+			return "published_at DESC NULLS LAST, created_at DESC"
+		}
+		return "pinned DESC, pinned_at DESC NULLS LAST, published_at DESC NULLS LAST, created_at DESC"
+	}
+}
+
 func (r *Repository) Delete(ctx context.Context, id string) error {
-	tag, err := r.db.Exec(ctx, `DELETE FROM materials WHERE id = $1`, id)
+	q := infraPostgres.GetQuerier(ctx, r.db)
+	tag, err := q.Exec(ctx, `DELETE FROM materials WHERE id = $1`, id)
 	if err != nil {
 		slog.ErrorContext(ctx, "database error in Delete", "error", err, "material_id", id)
 		return apperror.NewInternal()

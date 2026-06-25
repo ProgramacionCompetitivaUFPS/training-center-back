@@ -38,7 +38,7 @@ func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	out, err := h.createUC.Execute(r.Context(), appMaterial.CreateMaterialInput{
+	out, err := h.createMaterial.Execute(r.Context(), appMaterial.CreateMaterialInput{
 		CurrentUser: *currentUser,
 		GroupID:     groupID,
 		Title:       body.Title,
