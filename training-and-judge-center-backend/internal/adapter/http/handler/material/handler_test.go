@@ -88,6 +88,12 @@ func (s *stubAuthorProvider) GetDisplays(_ context.Context, ids []string) (map[s
 	return out, nil
 }
 
+type stubAuthorIDProvider struct{}
+
+func (s *stubAuthorIDProvider) FindIDByNickname(_ context.Context, _ string) (string, bool, error) {
+	return "", false, nil
+}
+
 func stubHandler() *Handler {
 	return handlerWithRepo(&stubMaterialRepo{})
 }
@@ -97,7 +103,7 @@ func handlerWithRepo(repo domainMaterial.Repository) *Handler {
 		appMaterial.NewCreateMaterialUseCase(repo, &stubGroupProvider{}, &stubGroupMemberProvider{}, &stubAuthorProvider{}),
 		appMaterial.NewUpdateMaterialUseCase(repo, &stubGroupProvider{}, &stubAuthorProvider{}),
 		appMaterial.NewGetMaterialUseCase(repo, &stubGroupVisibilityProvider{}, &stubGroupMemberProvider{}, &stubAuthorProvider{}),
-		appMaterial.NewListMaterialsUseCase(repo, &stubGroupVisibilityProvider{}, &stubGroupMemberProvider{}, &stubAuthorProvider{}),
+		appMaterial.NewListMaterialsUseCase(repo, &stubGroupVisibilityProvider{}, &stubGroupMemberProvider{}, &stubAuthorProvider{}, &stubAuthorIDProvider{}),
 		appMaterial.NewPublishMaterialUseCase(repo, &stubGroupProvider{}, &stubAuthorProvider{}),
 		appMaterial.NewUnpublishMaterialUseCase(repo, &stubGroupProvider{}, &stubAuthorProvider{}),
 		appMaterial.NewPinMaterialUseCase(repo, &stubGroupProvider{}, &stubGroupMemberProvider{}, &stubAuthorProvider{}),
@@ -215,7 +221,7 @@ func TestCreateMaterial_Forbidden_Returns403(t *testing.T) {
 		appMaterial.NewCreateMaterialUseCase(&stubMaterialRepo{}, &stubGroupProvider{}, &stubNotLeadMemberProvider{}, &stubAuthorProvider{}),
 		appMaterial.NewUpdateMaterialUseCase(&stubMaterialRepo{}, &stubGroupProvider{}, &stubAuthorProvider{}),
 		appMaterial.NewGetMaterialUseCase(&stubMaterialRepo{}, &stubGroupVisibilityProvider{}, &stubGroupMemberProvider{}, &stubAuthorProvider{}),
-		appMaterial.NewListMaterialsUseCase(&stubMaterialRepo{}, &stubGroupVisibilityProvider{}, &stubGroupMemberProvider{}, &stubAuthorProvider{}),
+		appMaterial.NewListMaterialsUseCase(&stubMaterialRepo{}, &stubGroupVisibilityProvider{}, &stubGroupMemberProvider{}, &stubAuthorProvider{}, &stubAuthorIDProvider{}),
 		appMaterial.NewPublishMaterialUseCase(&stubMaterialRepo{}, &stubGroupProvider{}, &stubAuthorProvider{}),
 		appMaterial.NewUnpublishMaterialUseCase(&stubMaterialRepo{}, &stubGroupProvider{}, &stubAuthorProvider{}),
 		appMaterial.NewPinMaterialUseCase(&stubMaterialRepo{}, &stubGroupProvider{}, &stubGroupMemberProvider{}, &stubAuthorProvider{}),
@@ -257,7 +263,7 @@ func TestUpdateMaterial_ValidRequest_Returns200(t *testing.T) {
 			},
 		}, &stubGroupProvider{}, &stubAuthorProvider{}),
 		appMaterial.NewGetMaterialUseCase(&stubMaterialRepo{}, &stubGroupVisibilityProvider{}, &stubGroupMemberProvider{}, &stubAuthorProvider{}),
-		appMaterial.NewListMaterialsUseCase(&stubMaterialRepo{}, &stubGroupVisibilityProvider{}, &stubGroupMemberProvider{}, &stubAuthorProvider{}),
+		appMaterial.NewListMaterialsUseCase(&stubMaterialRepo{}, &stubGroupVisibilityProvider{}, &stubGroupMemberProvider{}, &stubAuthorProvider{}, &stubAuthorIDProvider{}),
 		appMaterial.NewPublishMaterialUseCase(&stubMaterialRepo{}, &stubGroupProvider{}, &stubAuthorProvider{}),
 		appMaterial.NewUnpublishMaterialUseCase(&stubMaterialRepo{}, &stubGroupProvider{}, &stubAuthorProvider{}),
 		appMaterial.NewPinMaterialUseCase(&stubMaterialRepo{}, &stubGroupProvider{}, &stubGroupMemberProvider{}, &stubAuthorProvider{}),
@@ -412,7 +418,7 @@ func TestGetMaterial_ValidRequest_Returns200(t *testing.T) {
 		appMaterial.NewCreateMaterialUseCase(repo, &stubGroupProvider{}, &stubGroupMemberProvider{}, &stubAuthorProvider{}),
 		appMaterial.NewUpdateMaterialUseCase(repo, &stubGroupProvider{}, &stubAuthorProvider{}),
 		appMaterial.NewGetMaterialUseCase(repo, &stubGroupVisibilityProvider{}, &stubGroupMemberProvider{}, &stubAuthorProvider{}),
-		appMaterial.NewListMaterialsUseCase(repo, &stubGroupVisibilityProvider{}, &stubGroupMemberProvider{}, &stubAuthorProvider{}),
+		appMaterial.NewListMaterialsUseCase(repo, &stubGroupVisibilityProvider{}, &stubGroupMemberProvider{}, &stubAuthorProvider{}, &stubAuthorIDProvider{}),
 		appMaterial.NewPublishMaterialUseCase(repo, &stubGroupProvider{}, &stubAuthorProvider{}),
 		appMaterial.NewUnpublishMaterialUseCase(repo, &stubGroupProvider{}, &stubAuthorProvider{}),
 		appMaterial.NewPinMaterialUseCase(repo, &stubGroupProvider{}, &stubGroupMemberProvider{}, &stubAuthorProvider{}),
@@ -447,7 +453,7 @@ func TestGetMaterial_Forbidden_Returns403(t *testing.T) {
 		appMaterial.NewCreateMaterialUseCase(&stubMaterialRepo{}, &stubGroupProvider{}, &stubGroupMemberProvider{}, &stubAuthorProvider{}),
 		appMaterial.NewUpdateMaterialUseCase(&stubMaterialRepo{}, &stubGroupProvider{}, &stubAuthorProvider{}),
 		appMaterial.NewGetMaterialUseCase(&stubMaterialRepo{}, &stubNotVisibleGroupVisibilityProvider{}, &stubNonMemberProvider{}, &stubAuthorProvider{}),
-		appMaterial.NewListMaterialsUseCase(&stubMaterialRepo{}, &stubGroupVisibilityProvider{}, &stubGroupMemberProvider{}, &stubAuthorProvider{}),
+		appMaterial.NewListMaterialsUseCase(&stubMaterialRepo{}, &stubGroupVisibilityProvider{}, &stubGroupMemberProvider{}, &stubAuthorProvider{}, &stubAuthorIDProvider{}),
 		appMaterial.NewPublishMaterialUseCase(&stubMaterialRepo{}, &stubGroupProvider{}, &stubAuthorProvider{}),
 		appMaterial.NewUnpublishMaterialUseCase(&stubMaterialRepo{}, &stubGroupProvider{}, &stubAuthorProvider{}),
 		appMaterial.NewPinMaterialUseCase(&stubMaterialRepo{}, &stubGroupProvider{}, &stubGroupMemberProvider{}, &stubAuthorProvider{}),

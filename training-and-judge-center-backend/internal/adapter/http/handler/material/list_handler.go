@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/training-judge-center/backend/internal/adapter/http/handler"
 	appMaterial "github.com/training-judge-center/backend/internal/application/material"
@@ -70,13 +71,45 @@ func (h *Handler) List(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	query := strings.TrimSpace(q.Get("q"))
+	author := strings.TrimSpace(q.Get("author"))
+	sort := q.Get("sort")
+
+	parseDate := func(field, raw string) (*time.Time, bool) {
+		if raw == "" {
+			return nil, true
+		}
+		t, err := time.Parse("2006-01-02", raw)
+		if err != nil {
+			handler.WriteError(r.Context(), w, apperror.NewValidation([]apperror.FieldError{
+				{Field: field, Message: field + " must be a date in YYYY-MM-DD format"},
+			}))
+			return nil, false
+		}
+		return &t, true
+	}
+
+	publishedFrom, ok2 := parseDate("publishedFrom", q.Get("publishedFrom"))
+	if !ok2 {
+		return
+	}
+	publishedTo, ok3 := parseDate("publishedTo", q.Get("publishedTo"))
+	if !ok3 {
+		return
+	}
+
 	out, err := h.listUC.Execute(r.Context(), appMaterial.ListMaterialsInput{
-		CurrentUser: *currentUser,
-		GroupID:     groupID,
-		Pinned:      pinned,
-		Tags:        tags,
-		Page:        page,
-		Limit:       limit,
+		CurrentUser:   *currentUser,
+		GroupID:       groupID,
+		Query:         query,
+		Author:        author,
+		PublishedFrom: publishedFrom,
+		PublishedTo:   publishedTo,
+		Pinned:        pinned,
+		Tags:          tags,
+		Sort:          sort,
+		Page:          page,
+		Limit:         limit,
 	})
 	if err != nil {
 		handler.WriteError(r.Context(), w, err)

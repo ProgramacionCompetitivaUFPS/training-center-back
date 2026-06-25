@@ -262,12 +262,13 @@ func main() {
 	groupProvider := material.NewGroupProvider(dbPool)
 	groupMemberProvider := material.NewGroupMemberProvider(dbPool)
 	authorProvider := material.NewAuthorProvider(dbPool)
+	authorIDProvider := material.NewAuthorIDProvider(dbPool)
 
 	// Material use cases
 	createMaterialUC := appMaterial.NewCreateMaterialUseCase(materialRepo, groupProvider, groupMemberProvider, authorProvider)
 	updateMaterialUC := appMaterial.NewUpdateMaterialUseCase(materialRepo, groupProvider, authorProvider)
 	getMaterialUC := appMaterial.NewGetMaterialUseCase(materialRepo, groupProvider, groupMemberProvider, authorProvider)
-	listMaterialsUC := appMaterial.NewListMaterialsUseCase(materialRepo, groupProvider, groupMemberProvider, authorProvider)
+	listMaterialsUC := appMaterial.NewListMaterialsUseCase(materialRepo, groupProvider, groupMemberProvider, authorProvider, authorIDProvider)
 	publishMaterialUC := appMaterial.NewPublishMaterialUseCase(materialRepo, groupProvider, authorProvider)
 	unpublishMaterialUC := appMaterial.NewUnpublishMaterialUseCase(materialRepo, groupProvider, authorProvider)
 	pinMaterialUC := appMaterial.NewPinMaterialUseCase(materialRepo, groupProvider, groupMemberProvider, authorProvider)

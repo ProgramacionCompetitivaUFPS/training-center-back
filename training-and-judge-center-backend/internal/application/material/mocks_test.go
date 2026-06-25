@@ -153,6 +153,21 @@ func (m *mockAuthorProvider) GetDisplays(ctx context.Context, userIDs []string) 
 
 func stubAuthorProvider() *mockAuthorProvider { return &mockAuthorProvider{} }
 
+// ── AuthorIDProvider mock ────────────────────────────────────────────────────
+
+type mockAuthorIDProvider struct {
+	findFn func(ctx context.Context, nickname string) (string, bool, error)
+}
+
+func (m *mockAuthorIDProvider) FindIDByNickname(ctx context.Context, nickname string) (string, bool, error) {
+	if m.findFn != nil {
+		return m.findFn(ctx, nickname)
+	}
+	return "", false, nil
+}
+
+func stubAuthorIDProvider() *mockAuthorIDProvider { return &mockAuthorIDProvider{} }
+
 // ── CurrentUser helpers ──────────────────────────────────────────────────────
 
 var (

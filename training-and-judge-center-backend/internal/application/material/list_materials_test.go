@@ -3,13 +3,14 @@ package material
 import (
 	"context"
 	"testing"
+	"time"
 
 	domainMaterial "github.com/training-judge-center/backend/internal/domain/material"
 	"github.com/training-judge-center/backend/pkg/apperror"
 )
 
 func newListMaterialsUseCase(repo *mockMaterialRepository, vis *mockGroupVisibilityProvider, mem *mockGroupMemberProvider) *ListMaterialsUseCase {
-	return NewListMaterialsUseCase(repo, vis, mem, stubAuthorProvider())
+	return NewListMaterialsUseCase(repo, vis, mem, stubAuthorProvider(), stubAuthorIDProvider())
 }
 
 func defaultListInput() ListMaterialsInput {
@@ -212,7 +213,7 @@ func TestListMaterials_LeadCheckError_Returns500(t *testing.T) {
 			return true, nil
 		},
 	}
-	uc := NewListMaterialsUseCase(&mockMaterialRepository{}, visibleGroup(), mem, stubAuthorProvider())
+	uc := NewListMaterialsUseCase(&mockMaterialRepository{}, visibleGroup(), mem, stubAuthorProvider(), stubAuthorIDProvider())
 	_, err := uc.Execute(context.Background(), defaultListInput())
 	assertErrCode(t, err, apperror.ErrCodeInternalError)
 }
@@ -226,4 +227,109 @@ func TestListMaterials_RepoError_Returns500(t *testing.T) {
 	uc := newListMaterialsUseCase(repo, visibleGroup(), isMemberNotLead())
 	_, err := uc.Execute(context.Background(), defaultListInput())
 	assertErrCode(t, err, apperror.ErrCodeInternalError)
+}
+
+func TestListMaterials_InvalidSort_Returns400(t *testing.T) {
+	uc := newListMaterialsUseCase(&mockMaterialRepository{}, visibleGroup(), isLead())
+	in := defaultListInput()
+	in.Sort = "invalid"
+	_, err := uc.Execute(context.Background(), in)
+	assertErrCode(t, err, ErrCodeInvalidSort)
+}
+
+func TestListMaterials_InvalidDateRange_Returns400(t *testing.T) {
+	uc := newListMaterialsUseCase(&mockMaterialRepository{}, visibleGroup(), isLead())
+	in := defaultListInput()
+	from := time.Date(2026, 6, 10, 0, 0, 0, 0, time.UTC)
+	to := time.Date(2026, 6, 1, 0, 0, 0, 0, time.UTC)
+	in.PublishedFrom = &from
+	in.PublishedTo = &to
+	_, err := uc.Execute(context.Background(), in)
+	assertErrCode(t, err, ErrCodeInvalidDateRange)
+}
+
+func TestListMaterials_SearchQuery_PropagatedToFilters(t *testing.T) {
+	var capturedFilters domainMaterial.ListFilters
+	repo := &mockMaterialRepository{
+		listFn: func(_ context.Context, _ string, f domainMaterial.ListFilters) ([]*domainMaterial.Material, int, error) {
+			capturedFilters = f
+			return nil, 0, nil
+		},
+	}
+	uc := newListMaterialsUseCase(repo, visibleGroup(), isLead())
+	in := defaultListInput()
+	in.Query = "hello world"
+
+	if _, err := uc.Execute(context.Background(), in); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if capturedFilters.SearchQuery == nil || *capturedFilters.SearchQuery != "hello world" {
+		t.Errorf("expected SearchQuery='hello world', got %v", capturedFilters.SearchQuery)
+	}
+	if capturedFilters.SortBy != domainMaterial.SortByRelevance {
+		t.Errorf("expected default sort=relevance when q is set, got %v", capturedFilters.SortBy)
+	}
+}
+
+func TestListMaterials_AuthorFilter_UnknownNickname_ReturnsEmpty(t *testing.T) {
+	authorID := &mockAuthorIDProvider{
+		findFn: func(_ context.Context, _ string) (string, bool, error) { return "", false, nil },
+	}
+	uc := NewListMaterialsUseCase(&mockMaterialRepository{}, visibleGroup(), isLead(), stubAuthorProvider(), authorID)
+	in := defaultListInput()
+	in.Author = "nobody"
+
+	out, err := uc.Execute(context.Background(), in)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(out.Materials) != 0 {
+		t.Errorf("expected empty result for unknown author, got %d items", len(out.Materials))
+	}
+}
+
+func TestListMaterials_AuthorFilter_KnownNickname_PropagatedToFilters(t *testing.T) {
+	const resolvedID = "ffffffff-0000-0000-0000-000000000099"
+	authorID := &mockAuthorIDProvider{
+		findFn: func(_ context.Context, _ string) (string, bool, error) { return resolvedID, true, nil },
+	}
+	var capturedFilters domainMaterial.ListFilters
+	repo := &mockMaterialRepository{
+		listFn: func(_ context.Context, _ string, f domainMaterial.ListFilters) ([]*domainMaterial.Material, int, error) {
+			capturedFilters = f
+			return nil, 0, nil
+		},
+	}
+	uc := NewListMaterialsUseCase(repo, visibleGroup(), isLead(), stubAuthorProvider(), authorID)
+	in := defaultListInput()
+	in.Author = "somecoach"
+
+	if _, err := uc.Execute(context.Background(), in); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if capturedFilters.AuthorID == nil || *capturedFilters.AuthorID != resolvedID {
+		t.Errorf("expected AuthorID=%s, got %v", resolvedID, capturedFilters.AuthorID)
+	}
+}
+
+func TestListMaterials_ListAuthorProviderError_ReturnsNilAuthor(t *testing.T) {
+	authorProv := &mockAuthorProvider{
+		getDisplaysFn: func(_ context.Context, _ []string) (map[string]*AuthorDisplay, error) {
+			return nil, apperror.NewInternal()
+		},
+	}
+	uc := NewListMaterialsUseCase(
+		repoWithList([]*domainMaterial.Material{newPublishedMaterial()}),
+		visibleGroup(), isMemberNotLead(), authorProv, stubAuthorIDProvider(),
+	)
+	out, err := uc.Execute(context.Background(), defaultListInput())
+	if err != nil {
+		t.Fatalf("expected no error on author provider failure, got %v", err)
+	}
+	if len(out.Materials) == 0 {
+		t.Fatal("expected at least one material")
+	}
+	if out.Materials[0].Author != nil {
+		t.Error("expected Author=nil when provider fails")
+	}
 }
