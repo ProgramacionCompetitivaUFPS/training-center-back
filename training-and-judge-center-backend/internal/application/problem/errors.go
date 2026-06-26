@@ -13,4 +13,5 @@ const (
 	ErrCodeProblemNotInContest        = "PROBLEM_NOT_IN_CONTEST"
 	ErrCodeContestNotFound            = "CONTEST_NOT_FOUND"
 	ErrCodeContestNotActive           = "CONTEST_NOT_ACTIVE"
+	ErrCodeNoSubmissionsToRejudge     = "NO_SUBMISSIONS_TO_REJUDGE"
 )

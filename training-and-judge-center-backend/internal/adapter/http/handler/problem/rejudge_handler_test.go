@@ -140,7 +140,7 @@ func TestRejudge_Success_Returns200WithCount(t *testing.T) {
 	}
 }
 
-func TestRejudge_NoJudgingUpdatedAt_Returns200WithZero(t *testing.T) {
+func TestRejudge_NoJudgingUpdatedAt_Returns400(t *testing.T) {
 	h := newHandlerWithRejudge(
 		repoReturning(publishedProblem()),
 		&mockSubmissionRejudgerH{},
@@ -152,14 +152,7 @@ func TestRejudge_NoJudgingUpdatedAt_Returns200WithZero(t *testing.T) {
 
 	wrapAuth(http.HandlerFunc(h.Rejudge)).ServeHTTP(w, r)
 
-	if w.Code != http.StatusOK {
-		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
-	}
-	var resp rejudgeResponse
-	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
-		t.Fatalf("could not decode response: %v", err)
-	}
-	if resp.SubmissionsQueued != 0 {
-		t.Errorf("SubmissionsQueued = %d, want 0", resp.SubmissionsQueued)
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400, got %d: %s", w.Code, w.Body.String())
 	}
 }

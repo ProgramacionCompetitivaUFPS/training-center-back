@@ -104,12 +104,12 @@ func TestRejudgeSubmissions_Execute(t *testing.T) {
 			wantQueued:  1,
 		},
 		{
-			name:        "no judgingUpdatedAt — returns 0 queued without calling rejudger",
+			name:        "no judgingUpdatedAt — returns NO_SUBMISSIONS_TO_REJUDGE",
 			problem:     newProblemNoJudgingUpdated(),
 			user:        asContestant,
 			userID:      authorID,
 			submissions: nil,
-			wantQueued:  0,
+			wantErrCode: ErrCodeNoSubmissionsToRejudge,
 		},
 		{
 			name:        "stranger forbidden",

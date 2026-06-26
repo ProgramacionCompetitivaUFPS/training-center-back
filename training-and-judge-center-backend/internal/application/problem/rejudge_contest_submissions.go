@@ -86,16 +86,17 @@ func (uc *RejudgeContestSubmissionsUseCase) Execute(ctx context.Context, in Reju
 	}
 
 	if p.JudgingUpdatedAt() == nil {
-		return &RejudgeContestSubmissionsOutput{
-			ContestID:         in.ContestID,
-			ProblemSlug:       p.Slug().String(),
-			SubmissionsQueued: 0,
-		}, nil
+		return nil, apperror.NewBadRequest(ErrCodeNoSubmissionsToRejudge,
+			"no judging updates have been recorded for this problem; nothing to rejudge")
 	}
 
 	submissions, err := uc.rejudger.ListByProblemAndContestBefore(ctx, p.ID(), in.ContestID, *p.JudgingUpdatedAt())
 	if err != nil {
 		return nil, err
+	}
+	if len(submissions) == 0 {
+		return nil, apperror.NewBadRequest(ErrCodeNoSubmissionsToRejudge,
+			"no contest submissions predate the last judging update; nothing to rejudge")
 	}
 
 	queued := 0
