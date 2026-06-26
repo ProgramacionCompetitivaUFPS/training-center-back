@@ -16,11 +16,12 @@ type RemoveMemberInput struct {
 }
 
 type RemoveMemberUseCase struct {
-	groupRepo        domainGroup.Repository
-	memberRepo       domainGroup.MemberRepository
-	nicknameResolver NicknameResolver
-	contestCleaner   ContestRegistrationCleaner
-	txManager        appshared.TransactionManager
+	groupRepo            domainGroup.Repository
+	memberRepo           domainGroup.MemberRepository
+	nicknameResolver     NicknameResolver
+	contestCleaner       ContestRegistrationCleaner
+	teamSelectionCleaner TeamSelectionCleaner
+	txManager            appshared.TransactionManager
 }
 
 func NewRemoveMemberUseCase(
@@ -28,14 +29,16 @@ func NewRemoveMemberUseCase(
 	memberRepo domainGroup.MemberRepository,
 	nicknameResolver NicknameResolver,
 	contestCleaner ContestRegistrationCleaner,
+	teamSelectionCleaner TeamSelectionCleaner,
 	txManager appshared.TransactionManager,
 ) *RemoveMemberUseCase {
 	return &RemoveMemberUseCase{
-		groupRepo:        groupRepo,
-		memberRepo:       memberRepo,
-		nicknameResolver: nicknameResolver,
-		contestCleaner:   contestCleaner,
-		txManager:        txManager,
+		groupRepo:            groupRepo,
+		memberRepo:           memberRepo,
+		nicknameResolver:     nicknameResolver,
+		contestCleaner:       contestCleaner,
+		teamSelectionCleaner: teamSelectionCleaner,
+		txManager:            txManager,
 	}
 }
 
@@ -82,6 +85,9 @@ func (uc *RemoveMemberUseCase) Execute(ctx context.Context, input RemoveMemberIn
 
 	return uc.txManager.WithTx(ctx, func(txCtx context.Context) error {
 		if _, err := uc.contestCleaner.DeleteScheduledByGroupAndUser(txCtx, input.GroupID, targetID.Value()); err != nil {
+			return err
+		}
+		if err := uc.teamSelectionCleaner.RemoveFromScheduledByGroupAndUser(txCtx, input.GroupID, targetID.Value()); err != nil {
 			return err
 		}
 		return uc.memberRepo.Delete(txCtx, input.GroupID, targetID)

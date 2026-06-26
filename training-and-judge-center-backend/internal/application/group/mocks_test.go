@@ -352,3 +352,15 @@ func (m *mockContestRegistrationCleaner) DeleteScheduledByGroupAndUser(_ context
 	m.called = true
 	return m.deletedCount, m.err
 }
+
+// ── mockTeamSelectionCleaner ──────────────────────────────────────────────────
+
+type mockTeamSelectionCleaner struct {
+	err    error
+	called bool
+}
+
+func (m *mockTeamSelectionCleaner) RemoveFromScheduledByGroupAndUser(_ context.Context, _, _ string) error {
+	m.called = true
+	return m.err
+}

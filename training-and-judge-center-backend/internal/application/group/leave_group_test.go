@@ -9,7 +9,7 @@ import (
 )
 
 func newLeaveGroupUC(groupRepo *mockGroupRepository, memberRepo *mockMemberRepository) *LeaveGroupUseCase {
-	return NewLeaveGroupUseCase(groupRepo, memberRepo, &mockContestRegistrationCleaner{}, &mockTransactionManager{})
+	return NewLeaveGroupUseCase(groupRepo, memberRepo, &mockContestRegistrationCleaner{}, &mockTeamSelectionCleaner{}, &mockTransactionManager{})
 }
 
 func TestLeaveGroup_GlobalGroupReturns400(t *testing.T) {
@@ -101,7 +101,7 @@ func TestLeaveGroup_SuccessUnregistersFromScheduledContests(t *testing.T) {
 	cleaner := &mockContestRegistrationCleaner{}
 	uc := NewLeaveGroupUseCase(
 		&mockGroupRepository{groups: []*domainGroup.Group{g}},
-		memberRepo, cleaner, &mockTransactionManager{},
+		memberRepo, cleaner, &mockTeamSelectionCleaner{}, &mockTransactionManager{},
 	)
 	if err := uc.Execute(context.Background(), LeaveGroupInput{
 		GroupID:     "g1",
@@ -111,5 +111,28 @@ func TestLeaveGroup_SuccessUnregistersFromScheduledContests(t *testing.T) {
 	}
 	if !cleaner.called {
 		t.Error("expected contestCleaner.DeleteScheduledByGroupAndUser to be called")
+	}
+}
+
+func TestLeaveGroup_SuccessRemovesTeamSelection(t *testing.T) {
+	g := mustGroup(t, "g1", "Club", domainGroup.VisibilityVisible, domainGroup.JoinPolicyOpen)
+	uid := mustUID("u1")
+	m, _ := domainGroup.NewGroupMember("m1", "g1", uid, domainGroup.MemberRoleMember, domainGroup.JoinMethodOpenJoin, nil, testNow)
+	memberRepo := &mockMemberRepository{
+		memberships: map[string]*domainGroup.GroupMember{keyOf("g1", uid): m},
+	}
+	teamCleaner := &mockTeamSelectionCleaner{}
+	uc := NewLeaveGroupUseCase(
+		&mockGroupRepository{groups: []*domainGroup.Group{g}},
+		memberRepo, &mockContestRegistrationCleaner{}, teamCleaner, &mockTransactionManager{},
+	)
+	if err := uc.Execute(context.Background(), LeaveGroupInput{
+		GroupID:     "g1",
+		CurrentUser: asContestant("u1"),
+	}); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !teamCleaner.called {
+		t.Error("expected teamSelectionCleaner.RemoveFromScheduledByGroupAndUser to be called")
 	}
 }
