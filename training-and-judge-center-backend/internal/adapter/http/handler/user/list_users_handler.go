@@ -1,7 +1,6 @@
 package user
 
 import (
-	"math"
 	"net/http"
 	"strconv"
 	"strings"
@@ -28,10 +27,12 @@ type listUserItem struct {
 }
 
 type paginationMeta struct {
-	TotalCount   int `json:"totalCount"`
-	CurrentPage  int `json:"currentPage"`
-	TotalPages   int `json:"totalPages"`
-	ItemsPerPage int `json:"itemsPerPage"`
+	Page        int  `json:"page"`
+	Limit       int  `json:"limit"`
+	Total       int  `json:"total"`
+	TotalPages  int  `json:"totalPages"`
+	HasNextPage bool `json:"hasNextPage"`
+	HasPrevPage bool `json:"hasPrevPage"`
 }
 
 type listUsersResponse struct {
@@ -132,16 +133,18 @@ func (h *Handler) ListUsers(w http.ResponseWriter, r *http.Request) {
 
 	totalPages := 1
 	if out.Limit > 0 && out.TotalCount > 0 {
-		totalPages = int(math.Ceil(float64(out.TotalCount) / float64(out.Limit)))
+		totalPages = (out.TotalCount + out.Limit - 1) / out.Limit
 	}
 
 	handler.WriteJSON(r.Context(), w, http.StatusOK, listUsersResponse{
 		Users: items,
 		Pagination: paginationMeta{
-			TotalCount:   out.TotalCount,
-			CurrentPage:  out.Page,
-			TotalPages:   totalPages,
-			ItemsPerPage: out.Limit,
+			Page:        out.Page,
+			Limit:       out.Limit,
+			Total:       out.TotalCount,
+			TotalPages:  totalPages,
+			HasNextPage: out.Page < totalPages,
+			HasPrevPage: out.Page > 1,
 		},
 	})
 }

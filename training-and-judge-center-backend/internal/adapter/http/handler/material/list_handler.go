@@ -124,10 +124,12 @@ func (h *Handler) List(w http.ResponseWriter, r *http.Request) {
 	handler.WriteJSON(r.Context(), w, http.StatusOK, listMaterialsResponse{
 		Materials: items,
 		Pagination: paginationResp{
-			TotalCount:   out.Pagination.TotalCount,
-			CurrentPage:  out.Pagination.CurrentPage,
-			TotalPages:   out.Pagination.TotalPages,
-			ItemsPerPage: out.Pagination.ItemsPerPage,
+			Page:        out.Pagination.CurrentPage,
+			Limit:       out.Pagination.ItemsPerPage,
+			Total:       out.Pagination.TotalCount,
+			TotalPages:  out.Pagination.TotalPages,
+			HasNextPage: out.Pagination.CurrentPage < out.Pagination.TotalPages,
+			HasPrevPage: out.Pagination.CurrentPage > 1,
 		},
 	})
 }

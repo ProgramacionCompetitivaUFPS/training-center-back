@@ -78,10 +78,12 @@ type listModifiersResponse struct {
 }
 
 type paginationResp struct {
-	TotalCount   int `json:"totalCount"`
-	CurrentPage  int `json:"currentPage"`
-	TotalPages   int `json:"totalPages"`
-	ItemsPerPage int `json:"itemsPerPage"`
+	Page        int  `json:"page"`
+	Limit       int  `json:"limit"`
+	Total       int  `json:"total"`
+	TotalPages  int  `json:"totalPages"`
+	HasNextPage bool `json:"hasNextPage"`
+	HasPrevPage bool `json:"hasPrevPage"`
 }
 
 type listProblemsResponse struct {

@@ -94,10 +94,12 @@ func (h *Handler) ListProblems(w http.ResponseWriter, r *http.Request) {
 	handler.WriteJSON(r.Context(), w, http.StatusOK, listProblemsResponse{
 		Problems: items,
 		Pagination: paginationResp{
-			TotalCount:   out.TotalCount,
-			CurrentPage:  out.Page,
-			TotalPages:   out.TotalPages,
-			ItemsPerPage: out.Limit,
+			Page:        out.Page,
+			Limit:       out.Limit,
+			Total:       out.TotalCount,
+			TotalPages:  out.TotalPages,
+			HasNextPage: out.Page < out.TotalPages,
+			HasPrevPage: out.Page > 1,
 		},
 	})
 }
