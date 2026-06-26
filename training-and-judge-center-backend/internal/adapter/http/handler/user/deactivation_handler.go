@@ -17,15 +17,15 @@ import (
 // @Failure      401 {object} apperror.AppError
 // @Router       /users/deactivation [post]
 func (h *Handler) RequestDeactivation(w http.ResponseWriter, r *http.Request) {
-	claims := middleware.GetClaims(r.Context())
-	if claims == nil {
+	cu, ok := middleware.GetCurrentUser(r.Context())
+	if !ok {
 		handler.WriteJSON(r.Context(), w, http.StatusUnauthorized, map[string]string{
 			"error":   "UNAUTHORIZED",
 			"message": "Invalid or missing authentication token",
 		})
 		return
 	}
-	userID := claims.UserID
+	userID := cu.ID
 	ctx := r.Context()
 
 	if err := h.requestDeactivation.Execute(ctx, appuser.RequestDeactivationInput{UserID: userID}); err != nil {
@@ -53,15 +53,15 @@ type confirmDeactivationBody struct {
 // @Failure      401 {object} apperror.AppError
 // @Router       /users/deactivation/confirm [post]
 func (h *Handler) ConfirmDeactivation(w http.ResponseWriter, r *http.Request) {
-	claims := middleware.GetClaims(r.Context())
-	if claims == nil {
+	cu, ok := middleware.GetCurrentUser(r.Context())
+	if !ok {
 		handler.WriteJSON(r.Context(), w, http.StatusUnauthorized, map[string]string{
 			"error":   "UNAUTHORIZED",
 			"message": "Invalid or missing authentication token",
 		})
 		return
 	}
-	userID := claims.UserID
+	userID := cu.ID
 	ctx := r.Context()
 
 	var body confirmDeactivationBody

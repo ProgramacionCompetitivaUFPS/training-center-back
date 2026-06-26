@@ -37,8 +37,8 @@ type publicUserResponse struct {
 // @Failure      401 {object} apperror.AppError
 // @Router       /users/me [get]
 func (h *Handler) GetMyProfile(w http.ResponseWriter, r *http.Request) {
-	claims := middleware.GetClaims(r.Context())
-	if claims == nil {
+	cu, ok := middleware.GetCurrentUser(r.Context())
+	if !ok {
 		handler.WriteJSON(r.Context(), w, http.StatusUnauthorized, map[string]string{
 			"error":   "UNAUTHORIZED",
 			"message": "Invalid or missing authentication token",
@@ -46,7 +46,7 @@ func (h *Handler) GetMyProfile(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	out, err := h.getMyProfile.Execute(r.Context(), appuser.GetMyProfileInput{UserID: claims.UserID})
+	out, err := h.getMyProfile.Execute(r.Context(), appuser.GetMyProfileInput{UserID: cu.ID})
 	if err != nil {
 		handler.WriteError(r.Context(), w, err)
 		return
@@ -65,8 +65,8 @@ func (h *Handler) GetMyProfile(w http.ResponseWriter, r *http.Request) {
 // @Failure      404 {object} apperror.AppError
 // @Router       /users/{nickname} [get]
 func (h *Handler) GetByNickname(w http.ResponseWriter, r *http.Request) {
-	claims := middleware.GetClaims(r.Context())
-	if claims == nil {
+	cu, ok := middleware.GetCurrentUser(r.Context())
+	if !ok {
 		handler.WriteJSON(r.Context(), w, http.StatusUnauthorized, map[string]string{
 			"error":   "UNAUTHORIZED",
 			"message": "Invalid or missing authentication token",
@@ -77,8 +77,8 @@ func (h *Handler) GetByNickname(w http.ResponseWriter, r *http.Request) {
 	nickname := chi.URLParam(r, "nickname")
 
 	out, err := h.getUserByNickname.Execute(r.Context(), appuser.GetUserByNicknameInput{
-		RequesterID:   claims.UserID,
-		RequesterRole: claims.Role,
+		RequesterID:   cu.ID,
+		RequesterRole: cu.Role,
 		Nickname:      nickname,
 	})
 	if err != nil {

@@ -28,8 +28,8 @@ type updateUserRequest struct {
 // @Failure      401 {object} apperror.AppError
 // @Router       /users [put]
 func (h *Handler) UpdateProfile(w http.ResponseWriter, r *http.Request) {
-	claims := middleware.GetClaims(r.Context())
-	if claims == nil {
+	cu, ok := middleware.GetCurrentUser(r.Context())
+	if !ok {
 		handler.WriteJSON(r.Context(), w, http.StatusUnauthorized, map[string]string{
 			"error":   "UNAUTHORIZED",
 			"message": "Invalid or missing authentication token",
@@ -47,7 +47,7 @@ func (h *Handler) UpdateProfile(w http.ResponseWriter, r *http.Request) {
 	}
 
 	out, err := h.updateUser.Execute(r.Context(), appuser.UpdateUserInput{
-		UserID:      claims.UserID,
+		UserID:      cu.ID,
 		Name:        req.Name,
 		Nickname:    req.Nickname,
 		Institution: req.Institution,

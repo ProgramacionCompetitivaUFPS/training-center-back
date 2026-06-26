@@ -80,11 +80,10 @@ func NewHandler(
 }
 
 func (h *Handler) requireCurrentUser(w http.ResponseWriter, r *http.Request) (*shared.CurrentUser, bool) {
-	claims := middleware.GetClaims(r.Context())
-	if claims == nil {
+	cu, ok := middleware.GetCurrentUser(r.Context())
+	if !ok {
 		handler.WriteError(r.Context(), w, apperror.NewUnauthorized(apperror.ErrCodeUnauthorized, "Invalid or missing authentication token"))
 		return nil, false
 	}
-	u := shared.CurrentUser{ID: claims.UserID, Role: claims.Role}
-	return &u, true
+	return &cu, true
 }

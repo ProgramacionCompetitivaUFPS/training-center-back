@@ -19,8 +19,8 @@ import (
 // @Failure      403 {object} apperror.AppError
 // @Router       /admin/users/{id}/deactivate [post]
 func (h *Handler) AdminDeactivateUser(w http.ResponseWriter, r *http.Request) {
-	claims := middleware.GetClaims(r.Context())
-	if claims == nil {
+	cu, ok := middleware.GetCurrentUser(r.Context())
+	if !ok {
 		handler.WriteJSON(r.Context(), w, http.StatusUnauthorized, map[string]string{
 			"error":   "UNAUTHORIZED",
 			"message": "Invalid or missing authentication token",
@@ -31,7 +31,7 @@ func (h *Handler) AdminDeactivateUser(w http.ResponseWriter, r *http.Request) {
 	targetID := chi.URLParam(r, "id")
 
 	if err := h.adminDeactivateUser.Execute(r.Context(), appuser.AdminDeactivateUserInput{
-		RequesterID: claims.UserID,
+		RequesterID: cu.ID,
 		TargetID:    targetID,
 	}); err != nil {
 		handler.WriteError(r.Context(), w, err)
