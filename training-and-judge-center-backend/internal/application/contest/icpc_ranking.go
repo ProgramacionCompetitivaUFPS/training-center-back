@@ -23,8 +23,9 @@ func RankStandings(
 
 	for _, p := range participants {
 		entry := RankedEntry{
-			ContestantID: p.ContestantID,
-			Problems:     make(map[string]RankedProblem, len(p.Problems)),
+			ContestantID:    p.ContestantID,
+			ParticipantType: p.ParticipantType,
+			Problems:        make(map[string]RankedProblem, len(p.Problems)),
 		}
 
 		var lastAccepted *time.Time

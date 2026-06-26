@@ -2,6 +2,7 @@ package contest
 
 import (
 	"context"
+	"time"
 
 	appshared "github.com/training-judge-center/backend/internal/application/shared"
 	domainContest "github.com/training-judge-center/backend/internal/domain/contest"
@@ -12,6 +13,7 @@ type DeleteContestInput struct {
 	CurrentUser appshared.CurrentUser
 	GroupID     string
 	ContestID   string
+	Now         time.Time
 }
 
 type DeleteContestUseCase struct {
@@ -50,6 +52,10 @@ func (uc *DeleteContestUseCase) Execute(ctx context.Context, in DeleteContestInp
 	}
 	if group == nil {
 		return apperror.NewNotFound(ErrCodeGroupNotFound, "group not found")
+	}
+
+	if contest.Status(in.Now) == domainContest.StatusActive {
+		return apperror.NewConflict(domainContest.ErrCodeContestIsActive, "cannot delete an active contest")
 	}
 
 	isAdmin := in.CurrentUser.IsAdmin()

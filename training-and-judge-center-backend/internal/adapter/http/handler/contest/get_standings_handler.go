@@ -89,11 +89,12 @@ func toGetStandingsResponse(out *appContest.GetStandingsOutput) getStandingsResp
 		}
 
 		entry := rankedEntry{
-			Rank:           e.Rank,
-			ContestantID:   e.ContestantID,
-			ProblemsSolved: e.ProblemsSolved,
-			TotalPenalty:   e.TotalPenalty,
-			Problems:       probs,
+			Rank:            e.Rank,
+			ContestantID:    e.ContestantID,
+			ParticipantType: e.ParticipantType,
+			ProblemsSolved:  e.ProblemsSolved,
+			TotalPenalty:    e.TotalPenalty,
+			Problems:        probs,
 		}
 		if e.LastAcceptedAt != nil {
 			s := e.LastAcceptedAt.UTC().Format(time.RFC3339)

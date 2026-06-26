@@ -145,6 +145,35 @@ func (r *TeamParticipationRepository) List(ctx context.Context, contestID string
 	return result, total, nil
 }
 
+func (r *TeamParticipationRepository) ListSelectedMembersByContest(ctx context.Context, contestID string) (map[string][]string, error) {
+	q := infraPostgres.GetQuerier(ctx, r.db)
+	rows, err := q.Query(ctx,
+		`SELECT team_id, selected_members FROM contest_team_participants WHERE contest_id = $1`,
+		contestID,
+	)
+	if err != nil {
+		slog.ErrorContext(ctx, "failed to list team participants for standings", "contest_id", contestID, "error", err)
+		return nil, apperror.NewInternal()
+	}
+	defer rows.Close()
+
+	result := make(map[string][]string)
+	for rows.Next() {
+		var teamID string
+		var members []string
+		if err := rows.Scan(&teamID, &members); err != nil {
+			slog.ErrorContext(ctx, "failed to scan team participant row", "error", err)
+			return nil, apperror.NewInternal()
+		}
+		result[teamID] = members
+	}
+	if err := rows.Err(); err != nil {
+		slog.ErrorContext(ctx, "team participants rows error", "contest_id", contestID, "error", err)
+		return nil, apperror.NewInternal()
+	}
+	return result, nil
+}
+
 func (r *TeamParticipationRepository) AreUsersSelectedInAnyTeam(ctx context.Context, contestID string, userIDs []string, excludeTeamID string) (map[string]bool, error) {
 	result := make(map[string]bool, len(userIDs))
 	for _, id := range userIDs {

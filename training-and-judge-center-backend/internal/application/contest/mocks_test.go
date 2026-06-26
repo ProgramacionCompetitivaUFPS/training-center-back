@@ -410,6 +410,19 @@ func (m *mockStandingsSubmissionProvider) ListByContest(ctx context.Context, con
 	return nil, nil
 }
 
+// ── TeamParticipantProvider mock ─────────────────────────────────────────────
+
+type mockTeamParticipantProvider struct {
+	listSelectedMembersFn func(ctx context.Context, contestID string) (map[string][]string, error)
+}
+
+func (m *mockTeamParticipantProvider) ListSelectedMembersByContest(ctx context.Context, contestID string) (map[string][]string, error) {
+	if m.listSelectedMembersFn != nil {
+		return m.listSelectedMembersFn(ctx, contestID)
+	}
+	return map[string][]string{}, nil
+}
+
 // ── TransactionManager mock ──────────────────────────────────────────────────
 
 type mockTransactionManager struct {

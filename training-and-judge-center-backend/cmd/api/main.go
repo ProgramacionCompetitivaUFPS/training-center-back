@@ -335,6 +335,7 @@ func main() {
 	)
 	getStandingsUseCase := appcontest.NewGetStandingsUseCase(
 		contestRepo, contestRegistrationRepo, contestSubmissionProvider,
+		contestTeamParticipationRepo,
 		contestGroupProvider, contestMemberProvider,
 		contestStandingsCache,
 		30*time.Second,

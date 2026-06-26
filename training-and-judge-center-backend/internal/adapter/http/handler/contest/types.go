@@ -181,12 +181,13 @@ type rankedProblem struct {
 }
 
 type rankedEntry struct {
-	Rank           int                      `json:"rank"`
-	ContestantID   string                   `json:"contestantId"`
-	ProblemsSolved int                      `json:"problemsSolved"`
-	TotalPenalty   int                      `json:"totalPenalty"`
-	LastAcceptedAt *string                  `json:"lastAcceptedAt,omitempty"`
-	Problems       map[string]rankedProblem `json:"problems"`
+	Rank            int                      `json:"rank"`
+	ContestantID    string                   `json:"contestantId"`
+	ParticipantType string                   `json:"participantType"`
+	ProblemsSolved  int                      `json:"problemsSolved"`
+	TotalPenalty    int                      `json:"totalPenalty"`
+	LastAcceptedAt  *string                  `json:"lastAcceptedAt,omitempty"`
+	Problems        map[string]rankedProblem `json:"problems"`
 }
 
 type standingsMeta struct {
