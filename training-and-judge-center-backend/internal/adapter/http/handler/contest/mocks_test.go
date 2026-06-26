@@ -256,6 +256,14 @@ func (m *mockContestSubmissionsProvider) ListByContest(_ context.Context, _ stri
 	return m.subs, nil
 }
 
+// ── TeamSelectionChecker no-op ───────────────────────────────────────────────
+
+type noopTeamSelectionChecker struct{}
+
+func (n *noopTeamSelectionChecker) IsUserSelectedInAnyTeam(_ context.Context, _, _ string) (bool, error) {
+	return false, nil
+}
+
 // ── CallerStandingProvider mock ───────────────────────────────────────────────
 
 type mockCallerStandingProvider struct{}
