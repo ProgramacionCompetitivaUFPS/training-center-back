@@ -17,6 +17,7 @@ type Handler struct {
 	updateSubmissionVisibility *appsubmission.UpdateSubmissionVisibilityUseCase
 	listMySubmissions          *appsubmission.ListMySubmissionsUseCase
 	listProblemSubmissions     *appsubmission.ListProblemSubmissionsUseCase
+	rejudgeSubmission          *appsubmission.RejudgeSubmissionUseCase
 }
 
 func NewHandler(
@@ -26,6 +27,7 @@ func NewHandler(
 	updateSubmissionVisibility *appsubmission.UpdateSubmissionVisibilityUseCase,
 	listMySubmissions *appsubmission.ListMySubmissionsUseCase,
 	listProblemSubmissions *appsubmission.ListProblemSubmissionsUseCase,
+	rejudgeSubmission *appsubmission.RejudgeSubmissionUseCase,
 ) *Handler {
 	return &Handler{
 		submitSolution:             submitSolution,
@@ -34,6 +36,7 @@ func NewHandler(
 		updateSubmissionVisibility: updateSubmissionVisibility,
 		listMySubmissions:          listMySubmissions,
 		listProblemSubmissions:     listProblemSubmissions,
+		rejudgeSubmission:          rejudgeSubmission,
 	}
 }
 

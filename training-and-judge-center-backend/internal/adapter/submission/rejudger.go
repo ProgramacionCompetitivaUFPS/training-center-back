@@ -51,6 +51,46 @@ func (r *Rejudger) ListByProblemBefore(ctx context.Context, problemID string, be
 	return result, nil
 }
 
+func (r *Rejudger) ListByProblemAndContestBefore(ctx context.Context, problemID, contestID string, before time.Time) ([]appProblem.SubmissionRejudgeInfo, error) {
+	q := infraPostgres.GetQuerier(ctx, r.db)
+	rows, err := q.Query(ctx, `
+		SELECT id, user_id, contest_id, language
+		FROM submissions
+		WHERE problem_id = $1 AND contest_id = $2 AND submitted_at < $3
+		  AND status NOT IN ('PENDING', 'RUNNING')
+	`, problemID, contestID, before)
+	if err != nil {
+		slog.ErrorContext(ctx, "rejudger: failed to list contest submissions", "problem_id", problemID, "contest_id", contestID, "error", err)
+		return nil, apperror.NewInternal()
+	}
+	defer rows.Close()
+
+	var result []appProblem.SubmissionRejudgeInfo
+	for rows.Next() {
+		var info appProblem.SubmissionRejudgeInfo
+		if err := rows.Scan(&info.ID, &info.UserID, &info.ContestID, &info.Language); err != nil {
+			slog.ErrorContext(ctx, "rejudger: failed to scan row", "error", err)
+			return nil, apperror.NewInternal()
+		}
+		result = append(result, info)
+	}
+	if rows.Err() != nil {
+		slog.ErrorContext(ctx, "rejudger: error iterating rows", "error", rows.Err())
+		return nil, apperror.NewInternal()
+	}
+	return result, nil
+}
+
+func (r *Rejudger) RejudgeByID(ctx context.Context, submissionID, problemID, userID string, contestID *string, language string, now time.Time) error {
+	info := appProblem.SubmissionRejudgeInfo{
+		ID:        submissionID,
+		UserID:    userID,
+		ContestID: contestID,
+		Language:  language,
+	}
+	return r.RejudgeOne(ctx, info, problemID, now)
+}
+
 func (r *Rejudger) RejudgeOne(ctx context.Context, info appProblem.SubmissionRejudgeInfo, problemID string, now time.Time) error {
 	if err := r.queue.Publish(ctx, appSubmission.SubmissionQueueMessage{
 		SubmissionID: info.ID,

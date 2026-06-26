@@ -31,7 +31,7 @@ func TestListProblemSubmissions_ProblemNotFound_Returns404(t *testing.T) {
 		},
 	}
 	uc := appsubmission.NewListProblemSubmissionsUseCase(&mockSubmissionRepo{}, pp, &mockUserDisplayProvider{})
-	h := NewHandler(nil, nil, nil, nil, nil, uc)
+	h := NewHandler(nil, nil, nil, nil, nil, uc, nil)
 	w := httptest.NewRecorder()
 	r := httptest.NewRequest(http.MethodGet, "/problems/p/ghost/submissions", nil)
 	r.Header.Set("Authorization", "Bearer tok")
