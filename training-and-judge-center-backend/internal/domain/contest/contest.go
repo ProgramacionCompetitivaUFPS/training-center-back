@@ -49,15 +49,15 @@ func NewContest(
 	if err := validateDescription(description); err != nil {
 		return nil, err
 	}
-	if err := validateFreezeMinutes(freezeMinutes); err != nil {
-		return nil, err
-	}
 	t := now.UTC()
 	if !startTime.After(t) {
 		return nil, apperror.NewBadRequest(ErrCodeStartTimeInPast, "start time must be in the future")
 	}
 	if !endTime.After(startTime) {
 		return nil, apperror.NewBadRequest(ErrCodeInvalidTimeRange, "end time must be after start time")
+	}
+	if err := validateFreezeMinutes(freezeMinutes, int(endTime.Sub(startTime).Minutes())); err != nil {
+		return nil, err
 	}
 
 	return &Contest{
@@ -126,7 +126,7 @@ func (c *Contest) Status(now time.Time) Status {
 	if now.Before(c.startTime) {
 		return StatusScheduled
 	}
-	if now.After(c.endTime) {
+	if !now.Before(c.endTime) {
 		return StatusFinished
 	}
 	return StatusActive
@@ -210,7 +210,8 @@ func (c *Contest) Update(
 	}
 
 	if freezeMinutes != nil {
-		if err := validateFreezeMinutes(*freezeMinutes); err != nil {
+		effDuration := int(effEnd.Sub(effStart).Minutes())
+		if err := validateFreezeMinutes(*freezeMinutes, effDuration); err != nil {
 			return err
 		}
 	}
@@ -306,10 +307,15 @@ func validateDescription(d *string) error {
 	return nil
 }
 
-func validateFreezeMinutes(v int) error {
+func validateFreezeMinutes(v, durationMinutes int) error {
 	if v < 0 {
 		return apperror.NewValidation([]apperror.FieldError{
 			{Field: "freezeMinutes", Message: "freeze minutes cannot be negative"},
+		})
+	}
+	if v > 0 && v >= durationMinutes {
+		return apperror.NewValidation([]apperror.FieldError{
+			{Field: "freezeMinutes", Message: "freeze time must be shorter than the contest duration"},
 		})
 	}
 	return nil

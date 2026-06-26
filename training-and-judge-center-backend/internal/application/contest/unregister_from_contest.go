@@ -50,11 +50,11 @@ func (uc *UnregisterFromContestUseCase) Execute(ctx context.Context, in Unregist
 		return apperror.NewBadRequest(domainContest.ErrCodeCannotUnregisterAfterStart, "unregistration is only allowed before the contest starts")
 	}
 
-	isMember, err := uc.memberProvider.IsMemberOfGroup(ctx, in.CurrentUser.ID, in.GroupID)
+	role, err := uc.memberProvider.GetMemberRole(ctx, in.CurrentUser.ID, in.GroupID)
 	if err != nil {
 		return err
 	}
-	if !isMember {
+	if role == nil {
 		return apperror.NewForbidden(ErrCodeNotGroupMember, "only group members can unregister from this contest")
 	}
 

@@ -56,11 +56,11 @@ func (uc *DeleteContestUseCase) Execute(ctx context.Context, in DeleteContestInp
 
 	isAdmin := in.CurrentUser.IsAdmin()
 	if !isAdmin {
-		isLead, err := uc.memberProvider.IsLeadOfGroup(ctx, in.CurrentUser.ID, in.GroupID)
+		role, err := uc.memberProvider.GetMemberRole(ctx, in.CurrentUser.ID, in.GroupID)
 		if err != nil {
 			return err
 		}
-		if !isLead {
+		if role == nil || *role != "LEAD" {
 			return apperror.NewForbidden(ErrCodeInsufficientPermissions, "only leads and admins can delete contests")
 		}
 	}

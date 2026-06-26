@@ -144,8 +144,8 @@ func TestRegisterToContest_RepoFindError_Propagates(t *testing.T) {
 
 func TestRegisterToContest_MemberProviderError_Propagates(t *testing.T) {
 	member := &mockGroupMemberProvider{
-		isMemberFn: func(_ context.Context, _, _ string) (bool, error) {
-			return false, apperror.NewInternal()
+		getRoleFn: func(_ context.Context, _, _ string) (*string, error) {
+			return nil, apperror.NewInternal()
 		},
 	}
 	uc := newRegisterUseCase(repoWith(newTestContest(otherID)), mockRegistrations(), member)
@@ -153,7 +153,7 @@ func TestRegisterToContest_MemberProviderError_Propagates(t *testing.T) {
 	err := uc.Execute(context.Background(), validRegisterInput())
 
 	if err == nil {
-		t.Fatal("expected error from failed IsMemberOfGroup")
+		t.Fatal("expected error from failed GetMemberRole")
 	}
 }
 

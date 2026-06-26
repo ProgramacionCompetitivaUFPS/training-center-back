@@ -59,19 +59,14 @@ func (uc *RegisterToContestUseCase) Execute(ctx context.Context, in RegisterToCo
 		return apperror.NewForbidden(ErrCodeAdminsCannotRegister, "admins cannot register to contests")
 	}
 
-	isLead, err := uc.memberProvider.IsLeadOfGroup(ctx, in.CurrentUser.ID, in.GroupID)
+	role, err := uc.memberProvider.GetMemberRole(ctx, in.CurrentUser.ID, in.GroupID)
 	if err != nil {
 		return err
 	}
-	if isLead {
+	if role != nil && *role == "LEAD" {
 		return apperror.NewForbidden(ErrCodeLeadsCannotRegister, "leads cannot register to contests")
 	}
-
-	isMember, err := uc.memberProvider.IsMemberOfGroup(ctx, in.CurrentUser.ID, in.GroupID)
-	if err != nil {
-		return err
-	}
-	if !isMember {
+	if role == nil {
 		return apperror.NewForbidden(ErrCodeNotGroupMember, "only group members can register to this contest")
 	}
 

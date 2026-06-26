@@ -111,14 +111,12 @@ func (uc *ListContestSubmissionsUseCase) Execute(ctx context.Context, in ListCon
 	isAdmin := in.CurrentUser.IsAdmin()
 	isLead, isMember := false, false
 	if !isAdmin {
-		isMember, err = uc.memberProvider.IsMemberOfGroup(ctx, in.CurrentUser.ID, in.GroupID)
+		role, err := uc.memberProvider.GetMemberRole(ctx, in.CurrentUser.ID, in.GroupID)
 		if err != nil {
 			return nil, err
 		}
-		isLead, err = uc.memberProvider.IsLeadOfGroup(ctx, in.CurrentUser.ID, in.GroupID)
-		if err != nil {
-			return nil, err
-		}
+		isMember = role != nil
+		isLead = role != nil && *role == "LEAD"
 	}
 
 	if !group.IsVisible && !isMember && !isLead && !isAdmin {
