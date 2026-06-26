@@ -2,7 +2,6 @@ package problem
 
 import (
 	"context"
-	"log/slog"
 	"time"
 
 	appshared "github.com/training-judge-center/backend/internal/application/shared"
@@ -63,13 +62,9 @@ func (uc *RejudgeSubmissionsUseCase) Execute(ctx context.Context, in RejudgeSubm
 			"no submissions predate the last judging update; nothing to rejudge")
 	}
 
-	queued := 0
-	for _, sub := range submissions {
-		if err := uc.rejudger.RejudgeOne(ctx, sub, p.ID(), in.Now); err != nil {
-			slog.ErrorContext(ctx, "rejudge: failed to rejudge submission", "submission_id", sub.ID, "error", err)
-			continue
-		}
-		queued++
+	queued, err := uc.rejudger.RejudgeBatch(ctx, submissions, p.ID(), in.Now)
+	if err != nil {
+		return nil, err
 	}
 
 	return &RejudgeSubmissionsOutput{
