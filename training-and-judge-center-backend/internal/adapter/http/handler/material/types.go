@@ -39,10 +39,12 @@ type materialResponse struct {
 }
 
 type paginationResp struct {
-	TotalCount   int `json:"totalCount"`
-	CurrentPage  int `json:"currentPage"`
-	TotalPages   int `json:"totalPages"`
-	ItemsPerPage int `json:"itemsPerPage"`
+	Page        int  `json:"page"`
+	Limit       int  `json:"limit"`
+	Total       int  `json:"total"`
+	TotalPages  int  `json:"totalPages"`
+	HasNextPage bool `json:"hasNextPage"`
+	HasPrevPage bool `json:"hasPrevPage"`
 }
 
 type listMaterialsResponse struct {
@@ -65,8 +67,8 @@ func buildResponse(m appMaterial.MaterialData) materialResponse {
 		Pinned:      m.Pinned,
 		PinnedAt:    formatTimePtr(m.PinnedAt),
 		Author:      author,
-		CreatedAt:   m.CreatedAt.Format(time.RFC3339Nano),
-		UpdatedAt:   m.UpdatedAt.Format(time.RFC3339Nano),
+		CreatedAt:   m.CreatedAt.UTC().Format(time.RFC3339),
+		UpdatedAt:   m.UpdatedAt.UTC().Format(time.RFC3339),
 		PublishedAt: formatTimePtr(m.PublishedAt),
 	}
 }
@@ -75,6 +77,6 @@ func formatTimePtr(t *time.Time) *string {
 	if t == nil {
 		return nil
 	}
-	s := t.Format(time.RFC3339Nano)
+	s := t.UTC().Format(time.RFC3339)
 	return &s
 }

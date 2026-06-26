@@ -14,7 +14,7 @@ func newRegisterUseCase(
 	reg *mockRegistrationRepository,
 	member *mockGroupMemberProvider,
 ) *RegisterToContestUseCase {
-	return NewRegisterToContestUseCase(repo, reg, member)
+	return NewRegisterToContestUseCase(repo, reg, member, mockTeamSelection())
 }
 
 func validRegisterInput() RegisterToContestInput {
@@ -169,6 +169,33 @@ func TestRegisterToContest_RegistrationCheckError_Propagates(t *testing.T) {
 
 	if err == nil {
 		t.Fatal("expected error from failed registration check")
+	}
+}
+
+func TestRegisterToContest_AlreadyInTeam_Returns409(t *testing.T) {
+	checker := &mockTeamSelectionChecker{
+		fn: func(_, _ string) (bool, error) { return true, nil },
+	}
+	uc := NewRegisterToContestUseCase(repoWith(newTestContest(otherID)), mockRegistrations(), isMemberNotLead(), checker)
+
+	err := uc.Execute(context.Background(), validRegisterInput())
+
+	var appErr *apperror.AppError
+	if !errors.As(err, &appErr) || appErr.Code != ErrCodeAlreadyInTeam {
+		t.Errorf("expected ALREADY_IN_TEAM, got %v", err)
+	}
+}
+
+func TestRegisterToContest_TeamSelectionCheckerError_Propagates(t *testing.T) {
+	checker := &mockTeamSelectionChecker{
+		fn: func(_, _ string) (bool, error) { return false, apperror.NewInternal() },
+	}
+	uc := NewRegisterToContestUseCase(repoWith(newTestContest(otherID)), mockRegistrations(), isMemberNotLead(), checker)
+
+	err := uc.Execute(context.Background(), validRegisterInput())
+
+	if err == nil {
+		t.Fatal("expected error from failed team selection check")
 	}
 }
 

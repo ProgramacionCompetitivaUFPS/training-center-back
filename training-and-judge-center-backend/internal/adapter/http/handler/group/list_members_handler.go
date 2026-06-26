@@ -2,10 +2,10 @@ package group
 
 import (
 	"net/http"
+	"time"
 
 	"github.com/training-judge-center/backend/internal/adapter/http/handler"
 	appGroup "github.com/training-judge-center/backend/internal/application/group"
-	"github.com/training-judge-center/backend/pkg/timeutil"
 )
 
 // @Summary      List group members
@@ -57,7 +57,7 @@ func (h *Handler) ListMembers(w http.ResponseWriter, r *http.Request) {
 			Nickname: m.Nickname,
 			Name:     m.Name,
 			Role:     m.Role,
-			JoinedAt: m.JoinedAt.Format(timeutil.RFC3339UTC),
+			JoinedAt: m.JoinedAt.UTC().Format(time.RFC3339),
 		})
 	}
 

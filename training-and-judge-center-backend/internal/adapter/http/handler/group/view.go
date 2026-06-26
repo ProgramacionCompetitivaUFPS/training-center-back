@@ -2,10 +2,10 @@ package group
 
 import (
 	"net/http"
+	"time"
 
 	"github.com/training-judge-center/backend/internal/adapter/http/handler"
 	appGroup "github.com/training-judge-center/backend/internal/application/group"
-	"github.com/training-judge-center/backend/pkg/timeutil"
 )
 
 // @Summary      Get group
@@ -40,7 +40,7 @@ func (h *Handler) GetGroup(w http.ResponseWriter, r *http.Request) {
 
 	var joinedAt *string
 	if out.Membership.JoinedAt != nil {
-		s := out.Membership.JoinedAt.Format(timeutil.RFC3339UTC)
+		s := out.Membership.JoinedAt.UTC().Format(time.RFC3339)
 		joinedAt = &s
 	}
 	um := userMembershipResp{
@@ -59,8 +59,8 @@ func (h *Handler) GetGroup(w http.ResponseWriter, r *http.Request) {
 		Statistics:     statisticsResp{MemberCount: out.Statistics.MemberCount, LeadCount: out.Statistics.LeadCount},
 		Leads:          leads,
 		UserMembership: um,
-		CreatedAt:      g.CreatedAt.Format(timeutil.RFC3339UTC),
-		UpdatedAt:      g.UpdatedAt.Format(timeutil.RFC3339UTC),
+		CreatedAt:      g.CreatedAt.UTC().Format(time.RFC3339),
+		UpdatedAt:      g.UpdatedAt.UTC().Format(time.RFC3339),
 	}
 
 	handler.WriteJSON(r.Context(), w, http.StatusOK, resp)

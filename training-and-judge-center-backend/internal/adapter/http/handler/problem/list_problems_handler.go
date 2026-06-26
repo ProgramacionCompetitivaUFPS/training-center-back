@@ -4,6 +4,7 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/training-judge-center/backend/internal/adapter/http/handler"
 	"github.com/training-judge-center/backend/internal/adapter/http/middleware"
@@ -85,18 +86,20 @@ func (h *Handler) ListProblems(w http.ResponseWriter, r *http.Request) {
 			Status:        p.Status,
 			Accessibility: p.Accessibility,
 			Author:        authorResp{Nickname: s.Author.Nickname, Name: s.Author.Name},
-			CreatedAt:     p.CreatedAt.Format("2006-01-02T15:04:05Z"),
-			UpdatedAt:     p.UpdatedAt.Format("2006-01-02T15:04:05Z"),
+			CreatedAt:     p.CreatedAt.UTC().Format(time.RFC3339),
+			UpdatedAt:     p.UpdatedAt.UTC().Format(time.RFC3339),
 		})
 	}
 
 	handler.WriteJSON(r.Context(), w, http.StatusOK, listProblemsResponse{
 		Problems: items,
 		Pagination: paginationResp{
-			TotalCount:   out.TotalCount,
-			CurrentPage:  out.Page,
-			TotalPages:   out.TotalPages,
-			ItemsPerPage: out.Limit,
+			Page:        out.Page,
+			Limit:       out.Limit,
+			Total:       out.TotalCount,
+			TotalPages:  out.TotalPages,
+			HasNextPage: out.Page < out.TotalPages,
+			HasPrevPage: out.Page > 1,
 		},
 	})
 }

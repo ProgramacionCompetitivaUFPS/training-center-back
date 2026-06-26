@@ -1,10 +1,10 @@
 package group
 
 type paginationResp struct {
-	TotalCount   int  `json:"totalCount"`
-	CurrentPage  int  `json:"currentPage"`
+	TotalCount   int  `json:"total"`
+	CurrentPage  int  `json:"page"`
 	TotalPages   int  `json:"totalPages"`
-	ItemsPerPage int  `json:"itemsPerPage"`
+	ItemsPerPage int  `json:"limit"`
 	HasNextPage  bool `json:"hasNextPage"`
 	HasPrevPage  bool `json:"hasPrevPage"`
 }

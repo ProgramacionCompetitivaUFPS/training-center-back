@@ -2,6 +2,7 @@ package contest
 
 import (
 	"net/http"
+	"time"
 
 	"github.com/training-judge-center/backend/internal/adapter/http/handler"
 	appContest "github.com/training-judge-center/backend/internal/application/contest"
@@ -35,6 +36,7 @@ func (h *Handler) Delete(w http.ResponseWriter, r *http.Request) {
 		CurrentUser: *caller,
 		GroupID:     groupID,
 		ContestID:   contestID,
+		Now:         time.Now().UTC(),
 	})
 	if err != nil {
 		handler.WriteError(r.Context(), w, err)

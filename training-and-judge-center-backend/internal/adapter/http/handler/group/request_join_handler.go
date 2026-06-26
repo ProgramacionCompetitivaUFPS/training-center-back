@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"io"
 	"net/http"
+	"time"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/training-judge-center/backend/internal/adapter/http/handler"
@@ -64,7 +65,7 @@ func buildJoinRequestResp(req appGroup.JoinRequestDTO, display *appGroup.UserDis
 		GroupID:   req.GroupID,
 		Status:    req.Status,
 		Message:   req.Message,
-		CreatedAt: req.CreatedAt.Format("2006-01-02T15:04:05Z"),
+		CreatedAt: req.CreatedAt.UTC().Format(time.RFC3339),
 	}
 	if display != nil {
 		resp.Requester = &requesterResp{

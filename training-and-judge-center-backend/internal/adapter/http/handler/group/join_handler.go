@@ -2,10 +2,10 @@ package group
 
 import (
 	"net/http"
+	"time"
 
 	"github.com/training-judge-center/backend/internal/adapter/http/handler"
 	appGroup "github.com/training-judge-center/backend/internal/application/group"
-	"github.com/training-judge-center/backend/pkg/timeutil"
 )
 
 type joinGroupResponse struct {
@@ -40,6 +40,6 @@ func (h *Handler) Join(w http.ResponseWriter, r *http.Request) {
 	m := out.Member
 	handler.WriteJSON(r.Context(), w, http.StatusCreated, joinGroupResponse{
 		Role:     m.Role,
-		JoinedAt: m.JoinedAt.Format(timeutil.RFC3339UTC),
+		JoinedAt: m.JoinedAt.UTC().Format(time.RFC3339),
 	})
 }

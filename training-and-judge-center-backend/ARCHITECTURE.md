@@ -1380,6 +1380,19 @@ type requestJoinBody struct { ... }  // sufijo incorrecto
 
 Si al quitar el sufijo de un sub-componente el nombre queda ambiguo o poco descriptivo, se usa un nombre más específico — no es una excepción a la regla, sino una decisión de naming. `langOverrideRequest` y `langOverrideResp` son casi idénticos: se fusionan en `langOverride` (un solo tipo).
 
+**Sub-componente de paginación canónico.** Todas las respuestas de lista usan la misma forma. El nombre del tipo es `pagination` (sin sufijo) y el campo en la respuesta se llama `"pagination"`:
+
+```go
+type pagination struct {
+    Page        int  `json:"page"`
+    Limit       int  `json:"limit"`
+    Total       int  `json:"total"`
+    TotalPages  int  `json:"totalPages"`
+    HasNextPage bool `json:"hasNextPage"`
+    HasPrevPage bool `json:"hasPrevPage"`
+}
+```
+
 El sufijo `*Body` no existe en este proyecto.
 
 ### Ad8 — Lógica compartida entre handler packages vive en `adapter/http/handler/`

@@ -140,6 +140,12 @@ func (s *mockTransactionManager) WithTx(_ context.Context, fn func(context.Conte
 	return fn(context.Background())
 }
 
+type mockTeamParticipantProvider struct{}
+
+func (m *mockTeamParticipantProvider) ListSelectedMembersByContest(_ context.Context, _ string) (map[string][]string, error) {
+	return map[string][]string{}, nil
+}
+
 type mockTeamParticipRepo struct{}
 
 func (s *mockTeamParticipRepo) Save(_ context.Context, _ *domainContest.ContestTeamParticipation) error {
@@ -248,6 +254,14 @@ type mockContestSubmissionsProvider struct {
 
 func (m *mockContestSubmissionsProvider) ListByContest(_ context.Context, _ string, _ appcontest.ContestSubmissionFilters) ([]appcontest.RichSubmissionData, error) {
 	return m.subs, nil
+}
+
+// ── TeamSelectionChecker no-op ───────────────────────────────────────────────
+
+type noopTeamSelectionChecker struct{}
+
+func (n *noopTeamSelectionChecker) IsUserSelectedInAnyTeam(_ context.Context, _, _ string) (bool, error) {
+	return false, nil
 }
 
 // ── CallerStandingProvider mock ───────────────────────────────────────────────

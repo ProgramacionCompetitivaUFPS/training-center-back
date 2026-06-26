@@ -2,10 +2,10 @@ package group
 
 import (
 	"net/http"
+	"time"
 
 	"github.com/training-judge-center/backend/internal/adapter/http/handler"
 	appGroup "github.com/training-judge-center/backend/internal/application/group"
-	"github.com/training-judge-center/backend/pkg/timeutil"
 )
 
 // @Summary      List my groups
@@ -57,9 +57,9 @@ func (h *Handler) ListMyGroups(w http.ResponseWriter, r *http.Request) {
 			JoinPolicy:  g.JoinPolicy,
 			IsGlobal:    g.IsDefault,
 			MyRole:      mg.MyRole,
-			JoinedAt:    mg.JoinedAt.Format(timeutil.RFC3339UTC),
+			JoinedAt:    mg.JoinedAt.UTC().Format(time.RFC3339),
 			MemberCount: mg.MemberCount,
-			CreatedAt:   g.CreatedAt.Format(timeutil.RFC3339UTC),
+			CreatedAt:   g.CreatedAt.UTC().Format(time.RFC3339),
 		})
 	}
 

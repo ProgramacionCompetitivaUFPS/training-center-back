@@ -3,6 +3,7 @@ package handler
 import (
 	"encoding/json"
 	"net/http"
+	"time"
 
 	appuser "github.com/training-judge-center/backend/internal/application/user"
 )
@@ -78,7 +79,7 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 			City:        out.User.City,
 			Institution: out.User.Institution,
 			Role:        out.User.Role,
-			CreatedAt:   out.User.CreatedAt.Format("2006-01-02T15:04:05Z"),
+			CreatedAt:   out.User.CreatedAt.UTC().Format(time.RFC3339),
 		},
 	})
 }

@@ -3,11 +3,11 @@ package group
 import (
 	"encoding/json"
 	"net/http"
+	"time"
 
 	"github.com/training-judge-center/backend/internal/adapter/http/handler"
 	appGroup "github.com/training-judge-center/backend/internal/application/group"
 	"github.com/training-judge-center/backend/pkg/apperror"
-	"github.com/training-judge-center/backend/pkg/timeutil"
 )
 
 type acceptInviteRequest struct {
@@ -52,6 +52,6 @@ func (h *Handler) AcceptInvite(w http.ResponseWriter, r *http.Request) {
 	m := out.Member
 	handler.WriteJSON(r.Context(), w, http.StatusCreated, joinGroupResponse{
 		Role:     m.Role,
-		JoinedAt: m.JoinedAt.Format(timeutil.RFC3339UTC),
+		JoinedAt: m.JoinedAt.UTC().Format(time.RFC3339),
 	})
 }

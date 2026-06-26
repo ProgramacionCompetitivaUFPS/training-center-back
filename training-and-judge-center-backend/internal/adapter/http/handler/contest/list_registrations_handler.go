@@ -78,11 +78,12 @@ func (h *Handler) ListRegistrations(w http.ResponseWriter, r *http.Request) {
 	handler.WriteJSON(r.Context(), w, http.StatusOK, listRegistrationsResponse{
 		Registrations: items,
 		Pagination: registrationsPagination{
-			Page:       out.Page,
-			Limit:      out.Limit,
-			Total:      out.Total,
-			TotalPages: totalPages,
-			HasMore:    hasMore,
+			Page:        out.Page,
+			Limit:       out.Limit,
+			Total:       out.Total,
+			TotalPages:  totalPages,
+			HasNextPage: hasMore,
+			HasPrevPage: out.Page > 1 && totalPages > 0,
 		},
 	})
 }

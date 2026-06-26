@@ -48,6 +48,7 @@ func newGetStandingsUseCase(
 	}
 	return NewGetStandingsUseCase(
 		contestRepo, regRepo, subProvider,
+		&mockTeamParticipantProvider{},
 		groupProvider, memberProvider,
 		cache,
 		testStaleness,

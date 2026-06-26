@@ -89,11 +89,12 @@ func toGetStandingsResponse(out *appContest.GetStandingsOutput) getStandingsResp
 		}
 
 		entry := rankedEntry{
-			Rank:           e.Rank,
-			ContestantID:   e.ContestantID,
-			ProblemsSolved: e.ProblemsSolved,
-			TotalPenalty:   e.TotalPenalty,
-			Problems:       probs,
+			Rank:            e.Rank,
+			ContestantID:    e.ContestantID,
+			ParticipantType: e.ParticipantType,
+			ProblemsSolved:  e.ProblemsSolved,
+			TotalPenalty:    e.TotalPenalty,
+			Problems:        probs,
 		}
 		if e.LastAcceptedAt != nil {
 			s := e.LastAcceptedAt.UTC().Format(time.RFC3339)
@@ -120,10 +121,12 @@ func toGetStandingsResponse(out *appContest.GetStandingsOutput) getStandingsResp
 	return getStandingsResponse{
 		Entries: entries,
 		Pagination: standingsPagination{
-			Page:       out.Page,
-			Limit:      out.Limit,
-			Total:      out.Total,
-			TotalPages: totalPages,
+			Page:        out.Page,
+			Limit:       out.Limit,
+			Total:       out.Total,
+			TotalPages:  totalPages,
+			HasNextPage: out.Page < totalPages,
+			HasPrevPage: out.Page > 1 && totalPages > 0,
 		},
 		Meta: meta,
 	}

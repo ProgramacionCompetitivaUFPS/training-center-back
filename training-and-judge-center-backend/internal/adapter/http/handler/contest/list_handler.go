@@ -101,10 +101,12 @@ func toListContestsResponse(out *appContest.ListContestsOutput) listContestsResp
 	return listContestsResponse{
 		Items: items,
 		Pagination: pagination{
-			Page:       out.Pagination.Page,
-			Limit:      out.Pagination.Limit,
-			Total:      out.Pagination.Total,
-			TotalPages: out.Pagination.TotalPages,
+			Page:        out.Pagination.Page,
+			Limit:       out.Pagination.Limit,
+			Total:       out.Pagination.Total,
+			TotalPages:  out.Pagination.TotalPages,
+			HasNextPage: out.Pagination.Page < out.Pagination.TotalPages,
+			HasPrevPage: out.Pagination.Page > 1 && out.Pagination.TotalPages > 0,
 		},
 	}
 }

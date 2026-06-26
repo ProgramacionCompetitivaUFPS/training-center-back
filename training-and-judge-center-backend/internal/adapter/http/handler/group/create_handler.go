@@ -3,6 +3,7 @@
 import (
 	"encoding/json"
 	"net/http"
+	"time"
 
 	"github.com/training-judge-center/backend/internal/adapter/http/handler"
 	"github.com/training-judge-center/backend/internal/adapter/http/middleware"
@@ -81,7 +82,7 @@ func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
 		Visibility:  out.Visibility,
 		IsDefault:   out.IsDefault,
 		CreatedBy:   out.CreatedBy,
-		CreatedAt:   out.CreatedAt.Format("2006-01-02T15:04:05Z"),
-		UpdatedAt:   out.UpdatedAt.Format("2006-01-02T15:04:05Z"),
+		CreatedAt:   out.CreatedAt.UTC().Format(time.RFC3339),
+		UpdatedAt:   out.UpdatedAt.UTC().Format(time.RFC3339),
 	})
 }

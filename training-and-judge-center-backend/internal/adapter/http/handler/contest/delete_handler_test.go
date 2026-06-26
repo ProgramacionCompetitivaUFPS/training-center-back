@@ -69,6 +69,40 @@ func TestDeleteContest_Lead_Returns204(t *testing.T) {
 	}
 }
 
+func TestDeleteContest_ActiveContest_Returns409(t *testing.T) {
+	activeContest := domainContest.RestoreContest(
+		"c1",
+		domainContest.RestoreContestName("Active Contest"),
+		nil,
+		time.Now().Add(-1*time.Hour),
+		time.Now().Add(1*time.Hour),
+		domainContest.RestorePenalty(20),
+		0, false, false, false,
+		shared.RestoreGroupID("g1"),
+		shared.RestoreUserID("u1"),
+		domainContest.RestoreParticipationMode("INDIVIDUAL"), domainContest.RestoreTeamSize(2, 5),
+		[]domainContest.ContestProblem{},
+		time.Now(), nil,
+	)
+	uc := appcontest.NewDeleteContestUseCase(
+		&mockRepoReturning{contest: activeContest},
+		&mockGroupProvider{},
+		&mockMemberProvider{isLead: true, isMember: true},
+		&mockStandingsCache{},
+	)
+	h := newHandlerWithDelete(uc)
+	r := authedRequest(http.MethodDelete, "/groups/g1/contests/c1", nil)
+	r.SetPathValue("groupId", "g1")
+	r.SetPathValue("contestId", "c1")
+	w := httptest.NewRecorder()
+
+	wrapAuth(http.HandlerFunc(h.Delete)).ServeHTTP(w, r)
+
+	if w.Code != http.StatusConflict {
+		t.Fatalf("expected 409, got %d: %s", w.Code, w.Body.String())
+	}
+}
+
 func TestDeleteContest_ContestNotFound_Returns404(t *testing.T) {
 	uc := appcontest.NewDeleteContestUseCase(
 		&mockRepoReturning{contest: nil},

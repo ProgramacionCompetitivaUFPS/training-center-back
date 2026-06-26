@@ -15,6 +15,7 @@ type ProblemAttempt struct {
 // ParticipantStanding is the per-participant projection cached in Redis.
 // It is the input to RankStandings.
 type ParticipantStanding struct {
-	ContestantID string
-	Problems     map[string]ProblemAttempt // key: problemID
+	ContestantID    string
+	ParticipantType string // "INDIVIDUAL" or "TEAM"
+	Problems        map[string]ProblemAttempt // key: problemID
 }

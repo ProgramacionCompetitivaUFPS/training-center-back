@@ -1,6 +1,8 @@
 package problem
 
 import (
+	"time"
+
 	appProblem "github.com/training-judge-center/backend/internal/application/problem"
 )
 
@@ -76,10 +78,12 @@ type listModifiersResponse struct {
 }
 
 type paginationResp struct {
-	TotalCount   int `json:"totalCount"`
-	CurrentPage  int `json:"currentPage"`
-	TotalPages   int `json:"totalPages"`
-	ItemsPerPage int `json:"itemsPerPage"`
+	Page        int  `json:"page"`
+	Limit       int  `json:"limit"`
+	Total       int  `json:"total"`
+	TotalPages  int  `json:"totalPages"`
+	HasNextPage bool `json:"hasNextPage"`
+	HasPrevPage bool `json:"hasPrevPage"`
 }
 
 type listProblemsResponse struct {
@@ -116,7 +120,7 @@ func buildResponse(p appProblem.ProblemDTO, display *appProblem.UserDisplay) get
 
 	var judgingUpdatedAt *string
 	if p.JudgingUpdatedAt != nil {
-		s := p.JudgingUpdatedAt.Format("2006-01-02T15:04:05Z")
+		s := p.JudgingUpdatedAt.UTC().Format(time.RFC3339)
 		judgingUpdatedAt = &s
 	}
 
@@ -146,7 +150,7 @@ func buildResponse(p appProblem.ProblemDTO, display *appProblem.UserDisplay) get
 			Validator: p.ValidatorLoaded,
 		},
 		ProblemJudgingUpdatedAt: judgingUpdatedAt,
-		CreatedAt:               p.CreatedAt.Format("2006-01-02T15:04:05Z"),
-		UpdatedAt:               p.UpdatedAt.Format("2006-01-02T15:04:05Z"),
+		CreatedAt:               p.CreatedAt.UTC().Format(time.RFC3339),
+		UpdatedAt:               p.UpdatedAt.UTC().Format(time.RFC3339),
 	}
 }

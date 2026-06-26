@@ -5,6 +5,8 @@ import (
 	"log/slog"
 	"time"
 
+	"golang.org/x/sync/errgroup"
+
 	appshared "github.com/training-judge-center/backend/internal/application/shared"
 	domainContest "github.com/training-judge-center/backend/internal/domain/contest"
 	"github.com/training-judge-center/backend/pkg/apperror"
@@ -21,12 +23,13 @@ type RankedProblem struct {
 
 // RankedEntry is one row in the standings table.
 type RankedEntry struct {
-	Rank           int
-	ContestantID   string
-	ProblemsSolved int
-	TotalPenalty   int
-	LastAcceptedAt *time.Time
-	Problems       map[string]RankedProblem // key: problemID
+	Rank            int
+	ContestantID    string
+	ParticipantType string // "INDIVIDUAL" or "TEAM"
+	ProblemsSolved  int
+	TotalPenalty    int
+	LastAcceptedAt  *time.Time
+	Problems        map[string]RankedProblem // key: problemID
 }
 
 type GetStandingsInput struct {
@@ -54,34 +57,37 @@ type GetStandingsOutput struct {
 }
 
 type GetStandingsUseCase struct {
-	contestRepo        domainContest.Repository
-	registrationRepo   domainContest.RegistrationRepository
-	submissionProvider StandingsSubmissionProvider
-	groupProvider      GroupProvider
-	memberProvider     GroupMemberProvider
-	standingsCache     StandingsCache
-	staleness          time.Duration
-	lockTTL            time.Duration
+	contestRepo          domainContest.Repository
+	registrationRepo     domainContest.RegistrationRepository
+	submissionProvider   StandingsSubmissionProvider
+	teamParticipProvider TeamParticipantProvider
+	groupProvider        GroupProvider
+	memberProvider       GroupMemberProvider
+	standingsCache       StandingsCache
+	staleness            time.Duration
+	lockTTL              time.Duration
 }
 
 func NewGetStandingsUseCase(
 	contestRepo domainContest.Repository,
 	registrationRepo domainContest.RegistrationRepository,
 	submissionProvider StandingsSubmissionProvider,
+	teamParticipProvider TeamParticipantProvider,
 	groupProvider GroupProvider,
 	memberProvider GroupMemberProvider,
 	standingsCache StandingsCache,
 	staleness time.Duration,
 ) *GetStandingsUseCase {
 	return &GetStandingsUseCase{
-		contestRepo:        contestRepo,
-		registrationRepo:   registrationRepo,
-		submissionProvider: submissionProvider,
-		groupProvider:      groupProvider,
-		memberProvider:     memberProvider,
-		standingsCache:     standingsCache,
-		staleness:          staleness,
-		lockTTL:            staleness * 2,
+		contestRepo:          contestRepo,
+		registrationRepo:     registrationRepo,
+		submissionProvider:   submissionProvider,
+		teamParticipProvider: teamParticipProvider,
+		groupProvider:        groupProvider,
+		memberProvider:       memberProvider,
+		standingsCache:       standingsCache,
+		staleness:            staleness,
+		lockTTL:              staleness * 2,
 	}
 }
 
@@ -161,29 +167,70 @@ func (uc *GetStandingsUseCase) Execute(ctx context.Context, in GetStandingsInput
 }
 
 func (uc *GetStandingsUseCase) rebuild(ctx context.Context, contestID string) (*CachedStandings, error) {
-	regs, _, err := uc.registrationRepo.ListByContest(ctx, contestID, 1, maxStandingsParticipants)
-	if err != nil {
+	g, gctx := errgroup.WithContext(ctx)
+
+	var regs []*domainContest.ContestRegistration
+	var teamMembers map[string][]string
+	var subs []ContestSubmissionData
+
+	g.Go(func() error {
+		var err error
+		regs, _, err = uc.registrationRepo.ListByContest(gctx, contestID, 1, maxStandingsParticipants)
+		return err
+	})
+	g.Go(func() error {
+		var err error
+		teamMembers, err = uc.teamParticipProvider.ListSelectedMembersByContest(gctx, contestID)
+		return err
+	})
+	g.Go(func() error {
+		var err error
+		subs, err = uc.submissionProvider.ListByContest(gctx, contestID)
+		return err
+	})
+
+	if err := g.Wait(); err != nil {
 		return nil, err
 	}
 
-	subs, err := uc.submissionProvider.ListByContest(ctx, contestID)
-	if err != nil {
-		return nil, err
-	}
+	// userToContestant maps submitter userID → contestantID.
+	// For individual participants: userID → userID.
+	// For team members: userID → teamID (all members submit under the team).
+	// Teams are processed first so that in MIXED contests, team membership takes
+	// precedence: a user who is both individually registered and a selected team
+	// member has their submissions attributed to the team only.
+	userToContestant := make(map[string]string, len(regs)+len(teamMembers)*3)
+	standings := make(map[string]*domainContest.ParticipantStanding, len(regs)+len(teamMembers))
 
-	standings := make(map[string]*domainContest.ParticipantStanding, len(regs))
-	for _, reg := range regs {
-		standings[reg.UserID()] = &domainContest.ParticipantStanding{
-			ContestantID: reg.UserID(),
-			Problems:     make(map[string]domainContest.ProblemAttempt),
+	for teamID, members := range teamMembers {
+		standings[teamID] = &domainContest.ParticipantStanding{
+			ContestantID:    teamID,
+			ParticipantType: "TEAM",
+			Problems:        make(map[string]domainContest.ProblemAttempt),
 		}
+		for _, memberID := range members {
+			userToContestant[memberID] = teamID
+		}
+	}
+
+	for _, reg := range regs {
+		if _, onTeam := userToContestant[reg.UserID()]; onTeam {
+			continue // MIXED: user is a selected team member; submissions count for the team
+		}
+		standings[reg.UserID()] = &domainContest.ParticipantStanding{
+			ContestantID:    reg.UserID(),
+			ParticipantType: "INDIVIDUAL",
+			Problems:        make(map[string]domainContest.ProblemAttempt),
+		}
+		userToContestant[reg.UserID()] = reg.UserID()
 	}
 
 	for _, sub := range subs {
-		p, ok := standings[sub.UserID]
+		contestantID, ok := userToContestant[sub.UserID]
 		if !ok {
 			continue
 		}
+		p := standings[contestantID]
 		attempt := p.Problems[sub.ProblemID]
 		if attempt.AcceptedAt != nil {
 			continue // already solved; ignore later submissions
