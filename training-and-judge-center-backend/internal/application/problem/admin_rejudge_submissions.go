@@ -52,7 +52,8 @@ func (uc *AdminRejudgeSubmissionsUseCase) Execute(ctx context.Context, in AdminR
 	}
 
 	if p.JudgingUpdatedAt() == nil {
-		return &AdminRejudgeSubmissionsOutput{ProblemSlug: p.Slug().String(), SubmissionsQueued: 0}, nil
+		return nil, apperror.NewBadRequest(ErrCodeNoSubmissionsToRejudge,
+			"no judging updates have been recorded for this problem; nothing to rejudge")
 	}
 
 	var submissions []SubmissionRejudgeInfo
@@ -77,6 +78,11 @@ func (uc *AdminRejudgeSubmissionsUseCase) Execute(ctx context.Context, in AdminR
 		if err != nil {
 			return nil, err
 		}
+	}
+
+	if len(submissions) == 0 {
+		return nil, apperror.NewBadRequest(ErrCodeNoSubmissionsToRejudge,
+			"no submissions predate the last judging update; nothing to rejudge")
 	}
 
 	queued := 0
