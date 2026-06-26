@@ -8,6 +8,8 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5"
+	"golang.org/x/sync/errgroup"
+
 	infraPostgres "github.com/training-judge-center/backend/internal/adapter/postgres"
 	domainSubmission "github.com/training-judge-center/backend/internal/domain/submission"
 	"github.com/training-judge-center/backend/internal/domain/shared"
@@ -76,38 +78,54 @@ func (r *Repository) FindByID(ctx context.Context, id string) (*domainSubmission
 }
 
 func (r *Repository) List(ctx context.Context, f domainSubmission.ListFilters) ([]*domainSubmission.Submission, int, error) {
-	q := infraPostgres.GetQuerier(ctx, r.db)
 	where, args := buildWhere(f)
 
-	var total int
-	if err := q.QueryRow(ctx, "SELECT COUNT(*) FROM submissions"+where, args...).Scan(&total); err != nil {
-		slog.ErrorContext(ctx, "submission: failed to count", "error", err)
-		return nil, 0, apperror.NewInternal()
-	}
-
 	li, oi := len(args)+1, len(args)+2
-	args = append(args, f.Limit, (f.Page-1)*f.Limit)
+	dataArgs := append(append([]any(nil), args...), f.Limit, (f.Page-1)*f.Limit)
+	dataQuery := selectCols + where + fmt.Sprintf(" ORDER BY submitted_at DESC LIMIT $%d OFFSET $%d", li, oi)
 
-	rows, err := q.Query(ctx,
-		selectCols+where+fmt.Sprintf(" ORDER BY submitted_at DESC LIMIT $%d OFFSET $%d", li, oi),
-		args...)
-	if err != nil {
-		slog.ErrorContext(ctx, "submission: failed to list", "error", err)
-		return nil, 0, apperror.NewInternal()
-	}
-	defer rows.Close()
+	// Obtain the querier before spawning goroutines so both share the same tx if active.
+	q := infraPostgres.GetQuerier(ctx, r.db)
+	g, gCtx := errgroup.WithContext(ctx)
 
-	result := make([]*domainSubmission.Submission, 0)
-	for rows.Next() {
-		sub, err := scanRow(ctx, rows)
-		if err != nil {
-			return nil, 0, err
+	var total int
+	var result []*domainSubmission.Submission
+
+	g.Go(func() error {
+		if err := q.QueryRow(gCtx, "SELECT COUNT(*) FROM submissions"+where, args...).Scan(&total); err != nil {
+			slog.ErrorContext(gCtx, "submission: failed to count", "error", err)
+			return apperror.NewInternal()
 		}
-		result = append(result, sub)
+		return nil
+	})
+
+	g.Go(func() error {
+		rows, err := q.Query(gCtx, dataQuery, dataArgs...)
+		if err != nil {
+			slog.ErrorContext(gCtx, "submission: failed to list", "error", err)
+			return apperror.NewInternal()
+		}
+		defer rows.Close()
+
+		for rows.Next() {
+			sub, err := scanRow(gCtx, rows)
+			if err != nil {
+				return err
+			}
+			result = append(result, sub)
+		}
+		if rows.Err() != nil {
+			slog.ErrorContext(gCtx, "submission: error iterating rows", "error", rows.Err())
+			return apperror.NewInternal()
+		}
+		return nil
+	})
+
+	if err := g.Wait(); err != nil {
+		return nil, 0, err
 	}
-	if rows.Err() != nil {
-		slog.ErrorContext(ctx, "submission: error iterating rows", "error", rows.Err())
-		return nil, 0, apperror.NewInternal()
+	if result == nil {
+		result = []*domainSubmission.Submission{}
 	}
 	return result, total, nil
 }
