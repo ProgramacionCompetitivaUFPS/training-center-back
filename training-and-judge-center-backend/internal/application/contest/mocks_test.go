@@ -410,6 +410,21 @@ func (m *mockStandingsSubmissionProvider) ListByContest(ctx context.Context, con
 	return nil, nil
 }
 
+// ── TeamSelectionChecker mock ────────────────────────────────────────────────
+
+type mockTeamSelectionChecker struct {
+	fn func(contestID, userID string) (bool, error)
+}
+
+func (m *mockTeamSelectionChecker) IsUserSelectedInAnyTeam(_ context.Context, contestID, userID string) (bool, error) {
+	if m.fn != nil {
+		return m.fn(contestID, userID)
+	}
+	return false, nil
+}
+
+func mockTeamSelection() *mockTeamSelectionChecker { return &mockTeamSelectionChecker{} }
+
 // ── TeamParticipantProvider mock ─────────────────────────────────────────────
 
 type mockTeamParticipantProvider struct {

@@ -321,8 +321,9 @@ func main() {
 	listContestsUseCase := appcontest.NewListContestsUseCase(
 		contestRepo, contestGroupProvider, contestMemberProvider, contestParticipantProvider,
 	)
+	contestTeamSelectionChecker := adaptercontest.NewTeamSelectionChecker(dbPool)
 	registerToContestUseCase := appcontest.NewRegisterToContestUseCase(
-		contestRepo, contestRegistrationRepo, contestMemberProvider,
+		contestRepo, contestRegistrationRepo, contestMemberProvider, contestTeamSelectionChecker,
 	)
 	unregisterFromContestUseCase := appcontest.NewUnregisterFromContestUseCase(
 		contestRepo, contestRegistrationRepo, contestMemberProvider,

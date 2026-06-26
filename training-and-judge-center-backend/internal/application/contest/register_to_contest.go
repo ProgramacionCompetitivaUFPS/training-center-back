@@ -17,20 +17,23 @@ type RegisterToContestInput struct {
 }
 
 type RegisterToContestUseCase struct {
-	repo             domainContest.Repository
-	registrationRepo domainContest.RegistrationRepository
-	memberProvider   GroupMemberProvider
+	repo                 domainContest.Repository
+	registrationRepo     domainContest.RegistrationRepository
+	memberProvider       GroupMemberProvider
+	teamSelectionChecker TeamSelectionChecker
 }
 
 func NewRegisterToContestUseCase(
 	repo domainContest.Repository,
 	registrationRepo domainContest.RegistrationRepository,
 	memberProvider GroupMemberProvider,
+	teamSelectionChecker TeamSelectionChecker,
 ) *RegisterToContestUseCase {
 	return &RegisterToContestUseCase{
-		repo:             repo,
-		registrationRepo: registrationRepo,
-		memberProvider:   memberProvider,
+		repo:                 repo,
+		registrationRepo:     registrationRepo,
+		memberProvider:       memberProvider,
+		teamSelectionChecker: teamSelectionChecker,
 	}
 }
 
@@ -78,6 +81,14 @@ func (uc *RegisterToContestUseCase) Execute(ctx context.Context, in RegisterToCo
 	}
 	if exists {
 		return nil
+	}
+
+	inTeam, err := uc.teamSelectionChecker.IsUserSelectedInAnyTeam(ctx, in.ContestID, in.CurrentUser.ID)
+	if err != nil {
+		return err
+	}
+	if inTeam {
+		return apperror.NewConflict(ErrCodeAlreadyInTeam, "you are already registered to this contest as a selected team member")
 	}
 
 	reg, err := domainContest.NewContestRegistration(uuid.New().String(), in.ContestID, in.CurrentUser.ID, now)
