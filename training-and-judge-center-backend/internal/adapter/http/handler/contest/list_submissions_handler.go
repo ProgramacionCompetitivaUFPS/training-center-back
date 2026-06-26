@@ -138,10 +138,12 @@ func toListSubmissionsResponse(out *appContest.ListContestSubmissionsOutput) lis
 		Contest:     meta,
 		Submissions: items,
 		Pagination: standingsPagination{
-			Page:       out.Page,
-			Limit:      out.Limit,
-			Total:      out.Total,
-			TotalPages: totalPages,
+			Page:        out.Page,
+			Limit:       out.Limit,
+			Total:       out.Total,
+			TotalPages:  totalPages,
+			HasNextPage: out.Page < totalPages,
+			HasPrevPage: out.Page > 1 && totalPages > 0,
 		},
 	}
 }

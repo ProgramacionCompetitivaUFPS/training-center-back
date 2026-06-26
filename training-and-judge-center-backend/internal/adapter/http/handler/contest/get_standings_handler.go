@@ -121,10 +121,12 @@ func toGetStandingsResponse(out *appContest.GetStandingsOutput) getStandingsResp
 	return getStandingsResponse{
 		Entries: entries,
 		Pagination: standingsPagination{
-			Page:       out.Page,
-			Limit:      out.Limit,
-			Total:      out.Total,
-			TotalPages: totalPages,
+			Page:        out.Page,
+			Limit:       out.Limit,
+			Total:       out.Total,
+			TotalPages:  totalPages,
+			HasNextPage: out.Page < totalPages,
+			HasPrevPage: out.Page > 1 && totalPages > 0,
 		},
 		Meta: meta,
 	}

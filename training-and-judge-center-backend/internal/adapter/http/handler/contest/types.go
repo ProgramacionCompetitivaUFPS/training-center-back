@@ -133,10 +133,12 @@ type contestListItem struct {
 }
 
 type pagination struct {
-	Page       int `json:"page"`
-	Limit      int `json:"limit"`
-	Total      int `json:"total"`
-	TotalPages int `json:"totalPages"`
+	Page        int  `json:"page"`
+	Limit       int  `json:"limit"`
+	Total       int  `json:"total"`
+	TotalPages  int  `json:"totalPages"`
+	HasNextPage bool `json:"hasNextPage"`
+	HasPrevPage bool `json:"hasPrevPage"`
 }
 
 type listContestsResponse struct {
@@ -159,11 +161,12 @@ type registrationItem struct {
 }
 
 type registrationsPagination struct {
-	Page       int  `json:"page"`
-	Limit      int  `json:"limit"`
-	Total      int  `json:"total"`
-	TotalPages int  `json:"totalPages"`
-	HasMore    bool `json:"hasMore"`
+	Page        int  `json:"page"`
+	Limit       int  `json:"limit"`
+	Total       int  `json:"total"`
+	TotalPages  int  `json:"totalPages"`
+	HasNextPage bool `json:"hasNextPage"`
+	HasPrevPage bool `json:"hasPrevPage"`
 }
 
 type listRegistrationsResponse struct {
@@ -198,10 +201,12 @@ type standingsMeta struct {
 }
 
 type standingsPagination struct {
-	Page       int `json:"page"`
-	Limit      int `json:"limit"`
-	Total      int `json:"total"`
-	TotalPages int `json:"totalPages"`
+	Page        int  `json:"page"`
+	Limit       int  `json:"limit"`
+	Total       int  `json:"total"`
+	TotalPages  int  `json:"totalPages"`
+	HasNextPage bool `json:"hasNextPage"`
+	HasPrevPage bool `json:"hasPrevPage"`
 }
 
 type getStandingsResponse struct {

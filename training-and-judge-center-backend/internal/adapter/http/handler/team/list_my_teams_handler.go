@@ -23,10 +23,12 @@ type listMyTeamsResponse struct {
 }
 
 type paginationMeta struct {
-	Page       int `json:"page"`
-	Limit      int `json:"limit"`
-	Total      int `json:"total"`
-	TotalPages int `json:"totalPages"`
+	Page        int  `json:"page"`
+	Limit       int  `json:"limit"`
+	Total       int  `json:"total"`
+	TotalPages  int  `json:"totalPages"`
+	HasNextPage bool `json:"hasNextPage"`
+	HasPrevPage bool `json:"hasPrevPage"`
 }
 
 // @Summary      List my teams
@@ -71,10 +73,12 @@ func (h *Handler) ListMyTeams(w http.ResponseWriter, r *http.Request) {
 	handler.WriteJSON(r.Context(), w, http.StatusOK, listMyTeamsResponse{
 		Teams: items,
 		Pagination: paginationMeta{
-			Page:       out.Page,
-			Limit:      out.Limit,
-			Total:      out.TotalCount,
-			TotalPages: out.TotalPages,
+			Page:        out.Page,
+			Limit:       out.Limit,
+			Total:       out.TotalCount,
+			TotalPages:  out.TotalPages,
+			HasNextPage: out.Page < out.TotalPages,
+			HasPrevPage: out.Page > 1 && out.TotalPages > 0,
 		},
 	})
 }
