@@ -12,10 +12,12 @@ import (
 )
 
 type rejudgeContestResponse struct {
-	ContestID         string `json:"contestId"`
-	ProblemSlug       string `json:"problemSlug"`
-	SubmissionsQueued int    `json:"submissionsQueued"`
-	Message           string `json:"message"`
+	ContestID          string `json:"contestId"`
+	ProblemSlug        string `json:"problemSlug"`
+	SubmissionsQueued  int    `json:"submissionsQueued"`
+	ContestStatus      string `json:"contestStatus"`
+	StandingWillUpdate bool   `json:"standingWillUpdate"`
+	Message            string `json:"message"`
 }
 
 // @Summary      Rejudge contest submissions
@@ -52,9 +54,11 @@ func (h *Handler) RejudgeContest(w http.ResponseWriter, r *http.Request) {
 	}
 
 	handler.WriteJSON(r.Context(), w, http.StatusOK, rejudgeContestResponse{
-		ContestID:         out.ContestID,
-		ProblemSlug:       out.ProblemSlug,
-		SubmissionsQueued: out.SubmissionsQueued,
-		Message:           "Rejudge initiated successfully",
+		ContestID:          out.ContestID,
+		ProblemSlug:        out.ProblemSlug,
+		SubmissionsQueued:  out.SubmissionsQueued,
+		ContestStatus:      out.ContestStatus,
+		StandingWillUpdate: out.StandingWillUpdate,
+		Message:            "Rejudge initiated successfully",
 	})
 }

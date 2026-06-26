@@ -17,14 +17,26 @@ type AdminRejudgeSubmissionsInput struct {
 }
 
 type AdminRejudgeSubmissionsOutput struct {
-	ProblemSlug       string
-	SubmissionsQueued int
+	ProblemSlug        string
+	SubmissionsQueued  int
+	ContestStatus      *string // non-nil only when contestID was specified
+	StandingWillUpdate *bool   // non-nil only when contestID was specified
 }
 
 type AdminRejudgeSubmissionsUseCase struct {
 	repo            problem.Repository
 	rejudger        SubmissionRejudger
 	contestProvider ContestRejudgeProvider
+}
+
+func contestStatusString(now, start, end time.Time) string {
+	if now.Before(start) {
+		return "SCHEDULED"
+	}
+	if !now.Before(end) {
+		return "FINISHED"
+	}
+	return "ACTIVE"
 }
 
 func NewAdminRejudgeSubmissionsUseCase(
@@ -56,9 +68,12 @@ func (uc *AdminRejudgeSubmissionsUseCase) Execute(ctx context.Context, in AdminR
 	}
 
 	var submissions []SubmissionRejudgeInfo
+	var contestStatus *string
+	var standingWillUpdate *bool
 
 	if in.ContestID != nil {
-		if _, err := uc.contestProvider.GetContestForRejudge(ctx, *in.ContestID); err != nil {
+		contest, err := uc.contestProvider.GetContestForRejudge(ctx, *in.ContestID)
+		if err != nil {
 			return nil, err
 		}
 		inContest, err := uc.contestProvider.IsProblemInContest(ctx, *in.ContestID, p.ID())
@@ -72,6 +87,8 @@ func (uc *AdminRejudgeSubmissionsUseCase) Execute(ctx context.Context, in AdminR
 		if err != nil {
 			return nil, err
 		}
+		status := contestStatusString(in.Now, contest.StartTime, contest.EndTime)
+		contestStatus = &status
 	} else {
 		submissions, err = uc.rejudger.ListByProblemBefore(ctx, p.ID(), *p.JudgingUpdatedAt())
 		if err != nil {
@@ -89,8 +106,15 @@ func (uc *AdminRejudgeSubmissionsUseCase) Execute(ctx context.Context, in AdminR
 		return nil, err
 	}
 
+	if contestStatus != nil {
+		willUpdate := queued > 0 && *contestStatus == "ACTIVE"
+		standingWillUpdate = &willUpdate
+	}
+
 	return &AdminRejudgeSubmissionsOutput{
-		ProblemSlug:       p.Slug().String(),
-		SubmissionsQueued: queued,
+		ProblemSlug:        p.Slug().String(),
+		SubmissionsQueued:  queued,
+		ContestStatus:      contestStatus,
+		StandingWillUpdate: standingWillUpdate,
 	}, nil
 }

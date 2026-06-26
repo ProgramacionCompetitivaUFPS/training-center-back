@@ -20,6 +20,8 @@ type RejudgeContestSubmissionsOutput struct {
 	ContestID         string
 	ProblemSlug       string
 	SubmissionsQueued int
+	ContestStatus     string
+	StandingWillUpdate bool
 }
 
 type RejudgeContestSubmissionsUseCase struct {
@@ -104,8 +106,10 @@ func (uc *RejudgeContestSubmissionsUseCase) Execute(ctx context.Context, in Reju
 	}
 
 	return &RejudgeContestSubmissionsOutput{
-		ContestID:         in.ContestID,
-		ProblemSlug:       p.Slug().String(),
-		SubmissionsQueued: queued,
+		ContestID:          in.ContestID,
+		ProblemSlug:        p.Slug().String(),
+		SubmissionsQueued:  queued,
+		ContestStatus:      "ACTIVE", // validated above: only allowed during active contests
+		StandingWillUpdate: queued > 0,
 	}, nil
 }

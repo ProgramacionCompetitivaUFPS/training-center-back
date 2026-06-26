@@ -12,9 +12,11 @@ import (
 )
 
 type adminRejudgeResponse struct {
-	ProblemSlug       string `json:"problemSlug"`
-	SubmissionsQueued int    `json:"submissionsQueued"`
-	Message           string `json:"message"`
+	ProblemSlug        string  `json:"problemSlug"`
+	SubmissionsQueued  int     `json:"submissionsQueued"`
+	ContestStatus      *string `json:"contestStatus,omitempty"`
+	StandingWillUpdate *bool   `json:"standingWillUpdate,omitempty"`
+	Message            string  `json:"message"`
 }
 
 // @Summary      Admin rejudge problem submissions
@@ -55,8 +57,10 @@ func (h *Handler) AdminRejudge(w http.ResponseWriter, r *http.Request) {
 	}
 
 	handler.WriteJSON(r.Context(), w, http.StatusOK, adminRejudgeResponse{
-		ProblemSlug:       out.ProblemSlug,
-		SubmissionsQueued: out.SubmissionsQueued,
-		Message:           "Admin rejudge initiated successfully",
+		ProblemSlug:        out.ProblemSlug,
+		SubmissionsQueued:  out.SubmissionsQueued,
+		ContestStatus:      out.ContestStatus,
+		StandingWillUpdate: out.StandingWillUpdate,
+		Message:            "Admin rejudge initiated successfully",
 	})
 }
