@@ -207,8 +207,17 @@ func main() {
 	requestDeactivationUseCase := appuser.NewRequestDeactivationUseCase(userRepo, deactivationRequestRepo, emailSender)
 	confirmDeactivationUseCase := appuser.NewConfirmDeactivationUseCase(userRepo, deactivationRequestRepo, deactivationAuditLogRepo, emailSender, sessionInvalidator, txManager)
 
+	// user dashboard adapters
+	dashboardSubmissionProvider := adaptersubmission.NewDashboardProvider(dbPool)
+	dashboardContestProvider    := adaptercontest.NewDashboardProvider(dbPool)
+	dashboardMaterialProvider   := material.NewDashboardProvider(dbPool)
+	dashboardRankingProvider    := user.NewDashboardRankingProvider(dbPool)
+
+	// user dashboard use case
+	getDashboardUseCase := appuser.NewGetDashboardUseCase(dashboardSubmissionProvider, dashboardContestProvider, dashboardMaterialProvider, dashboardRankingProvider)
+
 	// Handlers
-	userHandler := handlerUser.NewHandler(createUserUseCase, getMyProfileUseCase, getUserByNicknameUseCase, updateUserUseCase, updatePasswordUseCase, adminUpdateUserUseCase, adminDeactivateUserUseCase, listUsersUseCase, requestEmailChangeUseCase, confirmEmailChangeUseCase, requestPasswordRecoveryUseCase, resetPasswordUseCase, requestDeactivationUseCase, confirmDeactivationUseCase)
+	userHandler := handlerUser.NewHandler(createUserUseCase, getMyProfileUseCase, getUserByNicknameUseCase, updateUserUseCase, updatePasswordUseCase, adminUpdateUserUseCase, adminDeactivateUserUseCase, listUsersUseCase, requestEmailChangeUseCase, confirmEmailChangeUseCase, requestPasswordRecoveryUseCase, resetPasswordUseCase, requestDeactivationUseCase, confirmDeactivationUseCase, getDashboardUseCase)
 	authHandler := handler.NewAuthHandler(loginUseCase)
 
 	// Group repositories & platform adapters

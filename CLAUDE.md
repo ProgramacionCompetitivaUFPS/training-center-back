@@ -111,6 +111,4 @@ adapter/ratelimit/ ← driven adapter: rate limiting (transversal)
 
 **Endpoints pendientes principales:**
 - `POST /problems/p/{slug}/publish` — requiere Judge System; bloquea DRAFT→PUBLISHED por API.
-- `POST /problems/p/{slug}/rejudge` — depende de la cola/judge (misc-2).
-- `GET /groups/{groupId}/materials?q=...` — búsqueda full-text de materiales (misc-3).
 - `GET /users/me/dashboard` — dashboard de actividad cross-domain (misc-4).

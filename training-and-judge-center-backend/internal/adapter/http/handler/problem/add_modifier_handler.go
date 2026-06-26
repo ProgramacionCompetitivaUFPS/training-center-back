@@ -23,8 +23,8 @@ import (
 // @Failure      401 {object} apperror.AppError
 // @Router       /problems/p/{slug}/modifiers [post]
 func (h *Handler) AddModifier(w http.ResponseWriter, r *http.Request) {
-	claims := middleware.GetClaims(r.Context())
-	if claims == nil {
+	cu, ok := middleware.GetCurrentUser(r.Context())
+	if !ok {
 		handler.WriteJSON(r.Context(), w, http.StatusUnauthorized, apperror.AppError{Code: apperror.ErrCodeUnauthorized, Message: "Invalid token"})
 		return
 	}
@@ -38,7 +38,7 @@ func (h *Handler) AddModifier(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	currentUser := shared.CurrentUser{ID: claims.UserID, Role: claims.Role}
+	currentUser := shared.CurrentUser{ID: cu.ID, Role: cu.Role}
 
 	err := h.addModifier.Execute(r.Context(), appProblem.AddModifierInput{
 		Slug:        slug,

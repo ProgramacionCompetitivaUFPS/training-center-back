@@ -181,6 +181,7 @@ func NewRouter(h *Handlers, s *Services, allowedOrigins []string) *chi.Mux {
 		})
 
 		r.Get("/users/me", h.User.GetMyProfile)
+		r.Get("/users/me/dashboard", h.User.GetDashboard)
 		r.Get("/users/me/groups", h.Group.ListMyGroups)
 		r.Get("/users/me/teams", h.Team.ListMyTeams)
 		r.Get("/users/me/team-invitations", h.Team.ListMyInvitations)

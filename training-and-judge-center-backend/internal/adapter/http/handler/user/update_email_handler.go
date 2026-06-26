@@ -26,15 +26,15 @@ type requestEmailChangeBody struct {
 // @Failure      401 {object} apperror.AppError
 // @Router       /users/email-change/request [post]
 func (h *Handler) RequestEmailChange(w http.ResponseWriter, r *http.Request) {
-	claims := middleware.GetClaims(r.Context())
-	if claims == nil {
+	cu, ok := middleware.GetCurrentUser(r.Context())
+	if !ok {
 		handler.WriteJSON(r.Context(), w, http.StatusUnauthorized, map[string]string{
 			"error":   "UNAUTHORIZED",
 			"message": "Invalid or missing authentication token",
 		})
 		return
 	}
-	userID := claims.UserID
+	userID := cu.ID
 	ctx := r.Context()
 
 	var body requestEmailChangeBody
@@ -90,15 +90,15 @@ type confirmEmailChangeBody struct {
 // @Failure      401 {object} apperror.AppError
 // @Router       /users/email-change/confirm [post]
 func (h *Handler) ConfirmEmailChange(w http.ResponseWriter, r *http.Request) {
-	claims := middleware.GetClaims(r.Context())
-	if claims == nil {
+	cu, ok := middleware.GetCurrentUser(r.Context())
+	if !ok {
 		handler.WriteJSON(r.Context(), w, http.StatusUnauthorized, map[string]string{
 			"error":   "UNAUTHORIZED",
 			"message": "Invalid or missing authentication token",
 		})
 		return
 	}
-	userID := claims.UserID
+	userID := cu.ID
 	ctx := r.Context()
 
 	var body confirmEmailChangeBody

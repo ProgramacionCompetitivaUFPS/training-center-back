@@ -48,8 +48,7 @@ type noSubmissionsResponse struct {
 // @Failure      404 {object} apperror.AppError
 // @Router       /problems/p/{slug}/statistics [get]
 func (h *Handler) GetStatistics(w http.ResponseWriter, r *http.Request) {
-	claims := middleware.GetClaims(r.Context())
-	if claims == nil {
+	if _, ok := middleware.GetCurrentUser(r.Context()); !ok {
 		handler.WriteJSON(r.Context(), w, http.StatusUnauthorized, apperror.AppError{Code: apperror.ErrCodeUnauthorized, Message: "Invalid or missing authentication token"})
 		return
 	}
