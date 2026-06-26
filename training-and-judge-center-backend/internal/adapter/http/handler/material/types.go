@@ -65,8 +65,8 @@ func buildResponse(m appMaterial.MaterialData) materialResponse {
 		Pinned:      m.Pinned,
 		PinnedAt:    formatTimePtr(m.PinnedAt),
 		Author:      author,
-		CreatedAt:   m.CreatedAt.Format(time.RFC3339Nano),
-		UpdatedAt:   m.UpdatedAt.Format(time.RFC3339Nano),
+		CreatedAt:   m.CreatedAt.UTC().Format(time.RFC3339),
+		UpdatedAt:   m.UpdatedAt.UTC().Format(time.RFC3339),
 		PublishedAt: formatTimePtr(m.PublishedAt),
 	}
 }
@@ -75,6 +75,6 @@ func formatTimePtr(t *time.Time) *string {
 	if t == nil {
 		return nil
 	}
-	s := t.Format(time.RFC3339Nano)
+	s := t.UTC().Format(time.RFC3339)
 	return &s
 }

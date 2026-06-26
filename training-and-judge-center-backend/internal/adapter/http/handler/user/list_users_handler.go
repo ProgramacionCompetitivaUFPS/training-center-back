@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/training-judge-center/backend/internal/adapter/http/handler"
 	appuser "github.com/training-judge-center/backend/internal/application/user"
@@ -113,17 +114,17 @@ func (h *Handler) ListUsers(w http.ResponseWriter, r *http.Request) {
 			Institution: u.Institution,
 			Role:        u.Role,
 			Status:      u.Status,
-			CreatedAt:   u.CreatedAt.Format("2006-01-02T15:04:05Z"),
+			CreatedAt:   u.CreatedAt.UTC().Format(time.RFC3339),
 		}
 		if u.Email != nil {
 			item.Email = u.Email
 		}
 		if u.UpdatedAt != nil {
-			s := u.UpdatedAt.Format("2006-01-02T15:04:05Z")
+			s := u.UpdatedAt.UTC().Format(time.RFC3339)
 			item.UpdatedAt = &s
 		}
 		if u.DeactivatedAt != nil {
-			s := u.DeactivatedAt.Format("2006-01-02T15:04:05Z")
+			s := u.DeactivatedAt.UTC().Format(time.RFC3339)
 			item.DeactivatedAt = &s
 		}
 		items = append(items, item)

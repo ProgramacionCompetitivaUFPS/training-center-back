@@ -3,11 +3,11 @@ package group
 import (
 	"encoding/json"
 	"net/http"
+	"time"
 
 	"github.com/training-judge-center/backend/internal/adapter/http/handler"
 	appGroup "github.com/training-judge-center/backend/internal/application/group"
 	"github.com/training-judge-center/backend/pkg/apperror"
-	"github.com/training-judge-center/backend/pkg/timeutil"
 )
 
 // @Summary      Change member role
@@ -54,7 +54,7 @@ func (h *Handler) ChangeRole(w http.ResponseWriter, r *http.Request) {
 		UserID:        out.UserID,
 		Nickname:      out.Nickname,
 		Role:          out.Role,
-		JoinedAt:      out.JoinedAt.Format(timeutil.RFC3339UTC),
-		RoleChangedAt: out.RoleChangedAt.Format(timeutil.RFC3339UTC),
+		JoinedAt:      out.JoinedAt.UTC().Format(time.RFC3339),
+		RoleChangedAt: out.RoleChangedAt.UTC().Format(time.RFC3339),
 	})
 }

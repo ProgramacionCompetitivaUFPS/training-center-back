@@ -2,6 +2,7 @@ package user
 
 import (
 	"net/http"
+	"time"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/training-judge-center/backend/internal/adapter/http/handler"
@@ -94,7 +95,7 @@ func (h *Handler) GetByNickname(w http.ResponseWriter, r *http.Request) {
 			Nickname:    out.User.Nickname,
 			Institution: out.User.Institution,
 			Role:        out.User.Role,
-			CreatedAt:   out.User.CreatedAt.Format("2006-01-02T15:04:05Z"),
+			CreatedAt:   out.User.CreatedAt.UTC().Format(time.RFC3339),
 		})
 	}
 }
@@ -107,13 +108,13 @@ func buildFullResponse(u appuser.UserDTO) fullUserResponse {
 		City:        u.City,
 		Institution: u.Institution,
 		Role:        u.Role,
-		CreatedAt:   u.CreatedAt.Format("2006-01-02T15:04:05Z"),
+		CreatedAt:   u.CreatedAt.UTC().Format(time.RFC3339),
 	}
 	if u.Email != nil {
 		resp.Email = *u.Email
 	}
 	if u.UpdatedAt != nil {
-		resp.UpdatedAt = u.UpdatedAt.Format("2006-01-02T15:04:05Z")
+		resp.UpdatedAt = u.UpdatedAt.UTC().Format(time.RFC3339)
 	}
 	return resp
 }

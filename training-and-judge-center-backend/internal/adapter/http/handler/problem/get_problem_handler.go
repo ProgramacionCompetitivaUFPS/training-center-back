@@ -2,6 +2,7 @@
 
 import (
 	"net/http"
+	"time"
 
 	"github.com/training-judge-center/backend/internal/adapter/http/handler"
 	"github.com/training-judge-center/backend/internal/adapter/http/middleware"
@@ -50,7 +51,7 @@ func (h *Handler) GetProblem(w http.ResponseWriter, r *http.Request) {
 
 	var judgingUpdatedAt *string
 	if p.JudgingUpdatedAt != nil {
-		s := p.JudgingUpdatedAt.Format("2006-01-02T15:04:05Z")
+		s := p.JudgingUpdatedAt.UTC().Format(time.RFC3339)
 		judgingUpdatedAt = &s
 	}
 
@@ -65,8 +66,8 @@ func (h *Handler) GetProblem(w http.ResponseWriter, r *http.Request) {
 		Status:                  p.Status,
 		Accessibility:           p.Accessibility,
 		Author:                  authorResp{Nickname: out.Author.Nickname, Name: out.Author.Name},
-		CreatedAt:               p.CreatedAt.Format("2006-01-02T15:04:05Z"),
-		UpdatedAt:               p.UpdatedAt.Format("2006-01-02T15:04:05Z"),
+		CreatedAt:               p.CreatedAt.UTC().Format(time.RFC3339),
+		UpdatedAt:               p.UpdatedAt.UTC().Format(time.RFC3339),
 		ProblemJudgingUpdatedAt: judgingUpdatedAt,
 	}
 

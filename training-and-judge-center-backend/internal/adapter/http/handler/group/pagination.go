@@ -47,4 +47,3 @@ func writeBadPagination(ctx context.Context, w http.ResponseWriter, field, msg s
 		Details: []apperror.FieldError{{Field: field, Message: msg}},
 	})
 }
-
