@@ -4,15 +4,17 @@ import (
 	"context"
 	"time"
 
+	"golang.org/x/sync/errgroup"
+
 	appshared "github.com/training-judge-center/backend/internal/application/shared"
 )
 
 const (
-	dashboardRecentSubmissionsLimit  = 10
-	dashboardUpcomingContestsLimit   = 3
-	dashboardActiveContestsLimit     = 3
-	dashboardFinishedContestsLimit   = 10
-	dashboardRecentMaterialsLimit    = 10
+	dashboardRecentSubmissionsLimit    = 10
+	dashboardUpcomingContestsLimit     = 3
+	dashboardActiveContestsLimit       = 3
+	dashboardFinishedContestsLimit     = 10
+	dashboardRecentMaterialsLimit      = 10
 	dashboardRecentMaterialsWindowDays = 30
 )
 
@@ -57,38 +59,49 @@ func NewGetDashboardUseCase(
 func (uc *GetDashboardUseCase) Execute(ctx context.Context, in GetDashboardInput) (*GetDashboardOutput, error) {
 	userID := in.CurrentUser.ID
 
-	submissions, err := uc.submissionProvider.GetRecentSubmissions(ctx, userID, dashboardRecentSubmissionsLimit)
-	if err != nil {
-		return nil, err
-	}
+	var (
+		submissions []DashboardSubmission
+		dates       []time.Time
+		upcoming    []DashboardContest
+		active      []DashboardContest
+		finished    []DashboardContestResult
+		materials   []DashboardMaterial
+		problemsSolved, totalUsers int
+		position                   *int
+	)
 
-	dates, err := uc.submissionProvider.GetSubmissionDates(ctx, userID)
-	if err != nil {
-		return nil, err
-	}
+	g, ctx := errgroup.WithContext(ctx)
 
-	upcoming, err := uc.contestProvider.GetUpcomingContests(ctx, userID, dashboardUpcomingContestsLimit)
-	if err != nil {
-		return nil, err
-	}
+	g.Go(func() (err error) {
+		submissions, err = uc.submissionProvider.GetRecentSubmissions(ctx, userID, dashboardRecentSubmissionsLimit)
+		return
+	})
+	g.Go(func() (err error) {
+		dates, err = uc.submissionProvider.GetSubmissionDates(ctx, userID)
+		return
+	})
+	g.Go(func() (err error) {
+		upcoming, err = uc.contestProvider.GetUpcomingContests(ctx, userID, dashboardUpcomingContestsLimit)
+		return
+	})
+	g.Go(func() (err error) {
+		active, err = uc.contestProvider.GetActiveContests(ctx, userID, dashboardActiveContestsLimit)
+		return
+	})
+	g.Go(func() (err error) {
+		finished, err = uc.contestProvider.GetFinishedContestResults(ctx, userID, dashboardFinishedContestsLimit)
+		return
+	})
+	g.Go(func() (err error) {
+		materials, err = uc.materialProvider.GetRecentMaterials(ctx, userID, dashboardRecentMaterialsLimit, dashboardRecentMaterialsWindowDays)
+		return
+	})
+	g.Go(func() (err error) {
+		problemsSolved, position, totalUsers, err = uc.rankingProvider.GetUserStats(ctx, userID)
+		return
+	})
 
-	active, err := uc.contestProvider.GetActiveContests(ctx, userID, dashboardActiveContestsLimit)
-	if err != nil {
-		return nil, err
-	}
-
-	finished, err := uc.contestProvider.GetFinishedContestResults(ctx, userID, dashboardFinishedContestsLimit)
-	if err != nil {
-		return nil, err
-	}
-
-	materials, err := uc.materialProvider.GetRecentMaterials(ctx, userID, dashboardRecentMaterialsLimit, dashboardRecentMaterialsWindowDays)
-	if err != nil {
-		return nil, err
-	}
-
-	problemsSolved, position, totalUsers, err := uc.rankingProvider.GetUserStats(ctx, userID)
-	if err != nil {
+	if err := g.Wait(); err != nil {
 		return nil, err
 	}
 
