@@ -8,6 +8,8 @@ import (
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
+	"golang.org/x/sync/errgroup"
+
 	infraPostgres "github.com/training-judge-center/backend/internal/adapter/postgres"
 	domainContest "github.com/training-judge-center/backend/internal/domain/contest"
 	"github.com/training-judge-center/backend/pkg/apperror"
@@ -77,44 +79,59 @@ func (r *RegistrationRepository) Delete(ctx context.Context, contestID, userID s
 }
 
 func (r *RegistrationRepository) ListByContest(ctx context.Context, contestID string, page, limit int) ([]*domainContest.ContestRegistration, int, error) {
-	q := infraPostgres.GetQuerier(ctx, r.db)
-	var total int
-	err := q.QueryRow(ctx,
-		`SELECT COUNT(*) FROM contest_registrations WHERE contest_id=$1`,
-		contestID,
-	).Scan(&total)
-	if err != nil {
-		slog.ErrorContext(ctx, "failed to count contest registrations for list", "contest_id", contestID, "error", err)
-		return nil, 0, apperror.NewInternal()
-	}
-	if total == 0 {
-		return []*domainContest.ContestRegistration{}, 0, nil
-	}
-
 	offset := (page - 1) * limit
-	rows, err := q.Query(ctx,
-		`SELECT id, contest_id, user_id, registered_at FROM contest_registrations WHERE contest_id=$1 ORDER BY registered_at ASC LIMIT $2 OFFSET $3`,
-		contestID, limit, offset,
-	)
-	if err != nil {
-		slog.ErrorContext(ctx, "failed to list contest registrations", "contest_id", contestID, "error", err)
-		return nil, 0, apperror.NewInternal()
-	}
-	defer rows.Close()
 
+	// Obtain the querier before spawning goroutines so both share the same tx if active.
+	q := infraPostgres.GetQuerier(ctx, r.db)
+	g, gCtx := errgroup.WithContext(ctx)
+
+	var total int
 	var regs []*domainContest.ContestRegistration
-	for rows.Next() {
-		var id, cID, uID string
-		var registeredAt time.Time
-		if err := rows.Scan(&id, &cID, &uID, &registeredAt); err != nil {
-			slog.ErrorContext(ctx, "failed to scan registration row", "contest_id", contestID, "error", err)
-			return nil, 0, apperror.NewInternal()
+
+	g.Go(func() error {
+		err := q.QueryRow(gCtx,
+			`SELECT COUNT(*) FROM contest_registrations WHERE contest_id=$1`,
+			contestID,
+		).Scan(&total)
+		if err != nil {
+			slog.ErrorContext(gCtx, "failed to count contest registrations for list", "contest_id", contestID, "error", err)
+			return apperror.NewInternal()
 		}
-		regs = append(regs, domainContest.RestoreContestRegistration(id, cID, uID, registeredAt))
+		return nil
+	})
+
+	g.Go(func() error {
+		rows, err := q.Query(gCtx,
+			`SELECT id, contest_id, user_id, registered_at FROM contest_registrations WHERE contest_id=$1 ORDER BY registered_at ASC LIMIT $2 OFFSET $3`,
+			contestID, limit, offset,
+		)
+		if err != nil {
+			slog.ErrorContext(gCtx, "failed to list contest registrations", "contest_id", contestID, "error", err)
+			return apperror.NewInternal()
+		}
+		defer rows.Close()
+
+		for rows.Next() {
+			var id, cID, uID string
+			var registeredAt time.Time
+			if err := rows.Scan(&id, &cID, &uID, &registeredAt); err != nil {
+				slog.ErrorContext(gCtx, "failed to scan registration row", "contest_id", contestID, "error", err)
+				return apperror.NewInternal()
+			}
+			regs = append(regs, domainContest.RestoreContestRegistration(id, cID, uID, registeredAt))
+		}
+		if err := rows.Err(); err != nil {
+			slog.ErrorContext(gCtx, "list registrations rows error", "contest_id", contestID, "error", err)
+			return apperror.NewInternal()
+		}
+		return nil
+	})
+
+	if err := g.Wait(); err != nil {
+		return nil, 0, err
 	}
-	if err := rows.Err(); err != nil {
-		slog.ErrorContext(ctx, "list registrations rows error", "contest_id", contestID, "error", err)
-		return nil, 0, apperror.NewInternal()
+	if regs == nil {
+		regs = []*domainContest.ContestRegistration{}
 	}
 	return regs, total, nil
 }
