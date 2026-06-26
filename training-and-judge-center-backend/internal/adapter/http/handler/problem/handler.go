@@ -19,10 +19,12 @@ type Handler struct {
 	unpublishProblem     *appProblem.UnpublishProblemUseCase
 	changeAccessibility  *appProblem.ChangeAccessibilityUseCase
 	deleteProblem        *appProblem.DeleteProblemUseCase
-	getProblemStatistics *appProblem.GetProblemStatisticsUseCase
-	rejudgeSubmissions   *appProblem.RejudgeSubmissionsUseCase
-	userProvider         appProblem.UserProvider
-	settings             domainProblem.PlatformSettings
+	getProblemStatistics         *appProblem.GetProblemStatisticsUseCase
+	rejudgeSubmissions           *appProblem.RejudgeSubmissionsUseCase
+	rejudgeContestSubmissions    *appProblem.RejudgeContestSubmissionsUseCase
+	adminRejudgeSubmissions      *appProblem.AdminRejudgeSubmissionsUseCase
+	userProvider                 appProblem.UserProvider
+	settings                     domainProblem.PlatformSettings
 }
 
 func NewHandler(
@@ -41,26 +43,30 @@ func NewHandler(
 	deleteProblem *appProblem.DeleteProblemUseCase,
 	getProblemStatistics *appProblem.GetProblemStatisticsUseCase,
 	rejudgeSubmissions *appProblem.RejudgeSubmissionsUseCase,
+	rejudgeContestSubmissions *appProblem.RejudgeContestSubmissionsUseCase,
+	adminRejudgeSubmissions *appProblem.AdminRejudgeSubmissionsUseCase,
 	userProvider appProblem.UserProvider,
 	settings domainProblem.PlatformSettings,
 ) *Handler {
 	return &Handler{
-		createProblem:        createProblem,
-		importProblem:        importProblem,
-		updateProblem:        updateProblem,
-		uploadProblemFiles:   uploadProblemFiles,
-		deleteProblemFile:    deleteProblemFile,
-		addModifier:          addModifier,
-		removeModifier:       removeModifier,
-		listModifiers:        listModifiers,
-		getProblem:           getProblem,
-		listProblems:         listProblems,
-		unpublishProblem:     unpublishProblem,
-		changeAccessibility:  changeAccessibility,
-		deleteProblem:        deleteProblem,
-		getProblemStatistics: getProblemStatistics,
-		rejudgeSubmissions:   rejudgeSubmissions,
-		userProvider:         userProvider,
-		settings:             settings,
+		createProblem:             createProblem,
+		importProblem:             importProblem,
+		updateProblem:             updateProblem,
+		uploadProblemFiles:        uploadProblemFiles,
+		deleteProblemFile:         deleteProblemFile,
+		addModifier:               addModifier,
+		removeModifier:            removeModifier,
+		listModifiers:             listModifiers,
+		getProblem:                getProblem,
+		listProblems:              listProblems,
+		unpublishProblem:          unpublishProblem,
+		changeAccessibility:       changeAccessibility,
+		deleteProblem:             deleteProblem,
+		getProblemStatistics:      getProblemStatistics,
+		rejudgeSubmissions:        rejudgeSubmissions,
+		rejudgeContestSubmissions: rejudgeContestSubmissions,
+		adminRejudgeSubmissions:   adminRejudgeSubmissions,
+		userProvider:              userProvider,
+		settings:                  settings,
 	}
 }

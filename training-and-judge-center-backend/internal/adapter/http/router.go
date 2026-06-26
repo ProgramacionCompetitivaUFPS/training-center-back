@@ -133,6 +133,11 @@ func NewRouter(h *Handlers, s *Services, allowedOrigins []string) *chi.Mux {
 		r.Route("/submissions", func(r chi.Router) {
 			r.Get("/{submissionId}", h.Submission.GetSubmission)
 			r.Patch("/{submissionId}/visibility", h.Submission.UpdateVisibility)
+			r.Post("/{submissionId}/rejudge", h.Submission.RejudgeSubmission)
+		})
+
+		r.Route("/contests/{contestId}/problems/{slug}", func(r chi.Router) {
+			r.Post("/rejudge", h.Problem.RejudgeContest)
 		})
 
 		r.Route("/problems", func(r chi.Router) {
@@ -203,6 +208,9 @@ func NewRouter(h *Handlers, s *Services, allowedOrigins []string) *chi.Mux {
 		r.Get("/users", h.User.ListUsers)
 		r.Put("/users/{id}", h.User.AdminUpdateUser)
 		r.Post("/users/{id}/deactivate", h.User.AdminDeactivateUser)
+
+		r.Post("/problems/{slug}/rejudge", h.Problem.AdminRejudge)
+		r.Post("/submissions/{submissionId}/rejudge", h.Submission.AdminRejudgeSubmission)
 	})
 
 	return r

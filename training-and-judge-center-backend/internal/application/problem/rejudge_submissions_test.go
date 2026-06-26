@@ -27,6 +27,10 @@ func (m *mockSubmissionRejudger) ListByProblemBefore(ctx context.Context, proble
 	return nil, nil
 }
 
+func (m *mockSubmissionRejudger) ListByProblemAndContestBefore(_ context.Context, _, _ string, _ time.Time) ([]SubmissionRejudgeInfo, error) {
+	return nil, nil
+}
+
 func (m *mockSubmissionRejudger) RejudgeOne(ctx context.Context, info SubmissionRejudgeInfo, problemID string, now time.Time) error {
 	m.rejudged = append(m.rejudged, info.ID)
 	if m.rejudgeOneFn != nil {

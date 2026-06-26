@@ -434,7 +434,10 @@ func main() {
 	}
 
 	submissionRejudger := adaptersubmission.NewRejudger(dbPool, submissionQueue)
+	contestRejudgeProvider := adaptercontest.NewRejudgeProvider(dbPool)
 	rejudgeSubmissionsUseCase := appProblem.NewRejudgeSubmissionsUseCase(problemRepo, submissionRejudger)
+	rejudgeContestSubmissionsUseCase := appProblem.NewRejudgeContestSubmissionsUseCase(problemRepo, submissionRejudger, contestRejudgeProvider)
+	adminRejudgeSubmissionsUseCase := appProblem.NewAdminRejudgeSubmissionsUseCase(problemRepo, submissionRejudger, contestRejudgeProvider)
 
 	problemHandler := handlerProblem.NewHandler(
 		createProblemUseCase,
@@ -452,6 +455,8 @@ func main() {
 		deleteProblemUseCase,
 		getProblemStatisticsUseCase,
 		rejudgeSubmissionsUseCase,
+		rejudgeContestSubmissionsUseCase,
+		adminRejudgeSubmissionsUseCase,
 		userProvider,
 		settingsProvider,
 	)
@@ -498,6 +503,15 @@ func main() {
 		submissionUserDisplay,
 	)
 
+	submissionProblemJudgingProvider := adaptersubmission.NewProblemJudgingProvider(dbPool)
+	submissionContestTimesProvider := adaptersubmission.NewContestTimesProvider(dbPool)
+	rejudgeSubmissionUseCase := appsubmission.NewRejudgeSubmissionUseCase(
+		submissionRepo,
+		submissionProblemJudgingProvider,
+		submissionContestTimesProvider,
+		submissionRejudger,
+	)
+
 	submissionHandler := handlersubmission.NewHandler(
 		submitSolutionUseCase,
 		submitContestSolutionUseCase,
@@ -505,6 +519,7 @@ func main() {
 		updateSubmissionVisibilityUseCase,
 		listMySubmissionsUseCase,
 		listProblemSubmissionsUseCase,
+		rejudgeSubmissionUseCase,
 	)
 
 	router := adapterhttp.NewRouter(&adapterhttp.Handlers{

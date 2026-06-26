@@ -25,6 +25,10 @@ func (m *mockSubmissionRejudgerH) ListByProblemBefore(_ context.Context, _ strin
 	return m.subs, m.listErr
 }
 
+func (m *mockSubmissionRejudgerH) ListByProblemAndContestBefore(_ context.Context, _, _ string, _ time.Time) ([]appProblem.SubmissionRejudgeInfo, error) {
+	return nil, nil
+}
+
 func (m *mockSubmissionRejudgerH) RejudgeOne(_ context.Context, _ appProblem.SubmissionRejudgeInfo, _ string, _ time.Time) error {
 	return m.rejudgeErr
 }

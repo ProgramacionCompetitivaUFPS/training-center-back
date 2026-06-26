@@ -1,0 +1,115 @@
+package problem
+
+import (
+	"context"
+	"log/slog"
+	"time"
+
+	appshared "github.com/training-judge-center/backend/internal/application/shared"
+	"github.com/training-judge-center/backend/internal/domain/problem"
+	"github.com/training-judge-center/backend/pkg/apperror"
+)
+
+type RejudgeContestSubmissionsInput struct {
+	ContestID   string
+	Slug        string
+	CurrentUser appshared.CurrentUser
+	Now         time.Time
+}
+
+type RejudgeContestSubmissionsOutput struct {
+	ContestID         string
+	ProblemSlug       string
+	SubmissionsQueued int
+}
+
+type RejudgeContestSubmissionsUseCase struct {
+	repo            problem.Repository
+	rejudger        SubmissionRejudger
+	contestProvider ContestRejudgeProvider
+}
+
+func NewRejudgeContestSubmissionsUseCase(
+	repo problem.Repository,
+	rejudger SubmissionRejudger,
+	contestProvider ContestRejudgeProvider,
+) *RejudgeContestSubmissionsUseCase {
+	return &RejudgeContestSubmissionsUseCase{
+		repo:            repo,
+		rejudger:        rejudger,
+		contestProvider: contestProvider,
+	}
+}
+
+func (uc *RejudgeContestSubmissionsUseCase) Execute(ctx context.Context, in RejudgeContestSubmissionsInput) (*RejudgeContestSubmissionsOutput, error) {
+	contest, err := uc.contestProvider.GetContestForRejudge(ctx, in.ContestID)
+	if err != nil {
+		return nil, err
+	}
+
+	if !in.Now.After(contest.StartTime) || !in.Now.Before(contest.EndTime) {
+		return nil, apperror.NewBadRequest(ErrCodeContestNotActive, "rejudge is only allowed during active contests")
+	}
+
+	userID := in.CurrentUser.ID
+	if contest.OwnerID != userID {
+		if contest.GroupID == nil {
+			return nil, apperror.NewForbidden(ErrCodeInsufficientPermissions,
+				"only the contest owner or Leads of the group can rejudge submissions")
+		}
+		isLead, err := uc.contestProvider.IsLeadOfGroup(ctx, userID, *contest.GroupID)
+		if err != nil {
+			return nil, err
+		}
+		if !isLead {
+			return nil, apperror.NewForbidden(ErrCodeInsufficientPermissions,
+				"only the contest owner or Leads of the group can rejudge submissions")
+		}
+	}
+
+	slug, err := problem.NewSlug(in.Slug)
+	if err != nil {
+		return nil, err
+	}
+
+	p, err := uc.repo.FindBySlug(ctx, slug)
+	if err != nil {
+		return nil, err
+	}
+
+	inContest, err := uc.contestProvider.IsProblemInContest(ctx, in.ContestID, p.ID())
+	if err != nil {
+		return nil, err
+	}
+	if !inContest {
+		return nil, apperror.NewBadRequest(ErrCodeProblemNotInContest, "the specified problem is not part of this contest")
+	}
+
+	if p.JudgingUpdatedAt() == nil {
+		return &RejudgeContestSubmissionsOutput{
+			ContestID:         in.ContestID,
+			ProblemSlug:       p.Slug().String(),
+			SubmissionsQueued: 0,
+		}, nil
+	}
+
+	submissions, err := uc.rejudger.ListByProblemAndContestBefore(ctx, p.ID(), in.ContestID, *p.JudgingUpdatedAt())
+	if err != nil {
+		return nil, err
+	}
+
+	queued := 0
+	for _, sub := range submissions {
+		if err := uc.rejudger.RejudgeOne(ctx, sub, p.ID(), in.Now); err != nil {
+			slog.ErrorContext(ctx, "rejudge contest: failed to rejudge submission", "submission_id", sub.ID, "error", err)
+			continue
+		}
+		queued++
+	}
+
+	return &RejudgeContestSubmissionsOutput{
+		ContestID:         in.ContestID,
+		ProblemSlug:       p.Slug().String(),
+		SubmissionsQueued: queued,
+	}, nil
+}

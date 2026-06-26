@@ -15,5 +15,6 @@ type SubmissionRejudgeInfo struct {
 // SubmissionRejudger lists submissions eligible for rejudging and re-enqueues each one.
 type SubmissionRejudger interface {
 	ListByProblemBefore(ctx context.Context, problemID string, before time.Time) ([]SubmissionRejudgeInfo, error)
+	ListByProblemAndContestBefore(ctx context.Context, problemID, contestID string, before time.Time) ([]SubmissionRejudgeInfo, error)
 	RejudgeOne(ctx context.Context, info SubmissionRejudgeInfo, problemID string, now time.Time) error
 }

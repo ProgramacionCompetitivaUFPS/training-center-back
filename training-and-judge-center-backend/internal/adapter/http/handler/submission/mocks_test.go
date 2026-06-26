@@ -99,7 +99,7 @@ func (m *mockQueue) Publish(_ context.Context, _ appsubmission.SubmissionQueueMe
 
 func newHandlerWithSubmit(pp appsubmission.ProblemProvider, repo domainsubmission.Repository) *Handler {
 	uc := appsubmission.NewSubmitSolutionUseCase(pp, repo, &mockStorage{}, &mockQueue{}, 1<<20, 1)
-	return NewHandler(uc, nil, nil, nil, nil, nil)
+	return NewHandler(uc, nil, nil, nil, nil, nil, nil)
 }
 
 // ── auth helpers ──────────────────────────────────────────────────────────────
@@ -238,7 +238,7 @@ func newHandlerWithSubmitContest(
 		contestProvider, standingResolver, problemProvider, repo,
 		&mockStorage{}, &mockQueue{}, 1<<20, 1,
 	)
-	return NewHandler(nil, uc, nil, nil, nil, nil)
+	return NewHandler(nil, uc, nil, nil, nil, nil, nil)
 }
 
 // ── fixtures ──────────────────────────────────────────────────────────────────
@@ -274,12 +274,12 @@ func newHandlerWithGetSubmission(repo *mockSubmissionRepo) *Handler {
 		&mockTeamChecker{},
 		&mockLeadChecker{},
 	)
-	return NewHandler(nil, nil, uc, nil, nil, nil)
+	return NewHandler(nil, nil, uc, nil, nil, nil, nil)
 }
 
 func newHandlerWithUpdateVisibility(repo *mockSubmissionRepo) *Handler {
 	uc := appsubmission.NewUpdateSubmissionVisibilityUseCase(repo)
-	return NewHandler(nil, nil, nil, uc, nil, nil)
+	return NewHandler(nil, nil, nil, uc, nil, nil, nil)
 }
 
 func newHandlerWithListMy(repo *mockSubmissionRepo) *Handler {
@@ -290,7 +290,7 @@ func newHandlerWithListMy(repo *mockSubmissionRepo) *Handler {
 		&mockContestDisplayProvider{},
 		&mockProblemProvider{},
 	)
-	return NewHandler(nil, nil, nil, nil, uc, nil)
+	return NewHandler(nil, nil, nil, nil, uc, nil, nil)
 }
 
 func newHandlerWithListProblem(repo *mockSubmissionRepo) *Handler {
@@ -299,7 +299,7 @@ func newHandlerWithListProblem(repo *mockSubmissionRepo) *Handler {
 		&mockProblemProvider{},
 		&mockUserDisplayProvider{},
 	)
-	return NewHandler(nil, nil, nil, nil, nil, uc)
+	return NewHandler(nil, nil, nil, nil, nil, uc, nil)
 }
 
 // ── multipart builders ────────────────────────────────────────────────────────
