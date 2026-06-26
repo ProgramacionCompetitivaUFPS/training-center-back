@@ -131,7 +131,7 @@ func (h *Handler) ListUsers(w http.ResponseWriter, r *http.Request) {
 		items = append(items, item)
 	}
 
-	totalPages := 1
+	totalPages := 0
 	if out.Limit > 0 && out.TotalCount > 0 {
 		totalPages = (out.TotalCount + out.Limit - 1) / out.Limit
 	}
@@ -144,7 +144,7 @@ func (h *Handler) ListUsers(w http.ResponseWriter, r *http.Request) {
 			Total:       out.TotalCount,
 			TotalPages:  totalPages,
 			HasNextPage: out.Page < totalPages,
-			HasPrevPage: out.Page > 1,
+			HasPrevPage: out.Page > 1 && totalPages > 0,
 		},
 	})
 }

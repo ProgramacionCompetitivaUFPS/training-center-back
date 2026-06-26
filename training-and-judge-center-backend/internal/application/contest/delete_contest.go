@@ -54,10 +54,6 @@ func (uc *DeleteContestUseCase) Execute(ctx context.Context, in DeleteContestInp
 		return apperror.NewNotFound(ErrCodeGroupNotFound, "group not found")
 	}
 
-	if contest.Status(in.Now) == domainContest.StatusActive {
-		return apperror.NewConflict(domainContest.ErrCodeContestIsActive, "cannot delete an active contest")
-	}
-
 	isAdmin := in.CurrentUser.IsAdmin()
 	if !isAdmin {
 		isLead, err := uc.memberProvider.IsLeadOfGroup(ctx, in.CurrentUser.ID, in.GroupID)
@@ -67,6 +63,10 @@ func (uc *DeleteContestUseCase) Execute(ctx context.Context, in DeleteContestInp
 		if !isLead {
 			return apperror.NewForbidden(ErrCodeInsufficientPermissions, "only leads and admins can delete contests")
 		}
+	}
+
+	if contest.Status(in.Now) == domainContest.StatusActive {
+		return apperror.NewConflict(domainContest.ErrCodeContestIsActive, "cannot delete an active contest")
 	}
 
 	if err := uc.contestRepo.Delete(ctx, in.ContestID); err != nil {

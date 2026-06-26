@@ -196,17 +196,11 @@ func (uc *GetStandingsUseCase) rebuild(ctx context.Context, contestID string) (*
 	// userToContestant maps submitter userID → contestantID.
 	// For individual participants: userID → userID.
 	// For team members: userID → teamID (all members submit under the team).
+	// Teams are processed first so that in MIXED contests, team membership takes
+	// precedence: a user who is both individually registered and a selected team
+	// member has their submissions attributed to the team only.
 	userToContestant := make(map[string]string, len(regs)+len(teamMembers)*3)
 	standings := make(map[string]*domainContest.ParticipantStanding, len(regs)+len(teamMembers))
-
-	for _, reg := range regs {
-		standings[reg.UserID()] = &domainContest.ParticipantStanding{
-			ContestantID:    reg.UserID(),
-			ParticipantType: "INDIVIDUAL",
-			Problems:        make(map[string]domainContest.ProblemAttempt),
-		}
-		userToContestant[reg.UserID()] = reg.UserID()
-	}
 
 	for teamID, members := range teamMembers {
 		standings[teamID] = &domainContest.ParticipantStanding{
@@ -217,6 +211,18 @@ func (uc *GetStandingsUseCase) rebuild(ctx context.Context, contestID string) (*
 		for _, memberID := range members {
 			userToContestant[memberID] = teamID
 		}
+	}
+
+	for _, reg := range regs {
+		if _, onTeam := userToContestant[reg.UserID()]; onTeam {
+			continue // MIXED: user is a selected team member; submissions count for the team
+		}
+		standings[reg.UserID()] = &domainContest.ParticipantStanding{
+			ContestantID:    reg.UserID(),
+			ParticipantType: "INDIVIDUAL",
+			Problems:        make(map[string]domainContest.ProblemAttempt),
+		}
+		userToContestant[reg.UserID()] = reg.UserID()
 	}
 
 	for _, sub := range subs {
