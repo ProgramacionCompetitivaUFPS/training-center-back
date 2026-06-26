@@ -434,7 +434,7 @@ func main() {
 	}
 
 	submissionRejudger := adaptersubmission.NewRejudger(dbPool, submissionQueue)
-	contestRejudgeProvider := adaptercontest.NewRejudgeProvider(dbPool)
+	contestRejudgeProvider := adaptercontest.NewContestRejudgeProvider(dbPool)
 	rejudgeSubmissionsUseCase := appProblem.NewRejudgeSubmissionsUseCase(problemRepo, submissionRejudger)
 	rejudgeContestSubmissionsUseCase := appProblem.NewRejudgeContestSubmissionsUseCase(problemRepo, submissionRejudger, contestRejudgeProvider)
 	adminRejudgeSubmissionsUseCase := appProblem.NewAdminRejudgeSubmissionsUseCase(problemRepo, submissionRejudger, contestRejudgeProvider)

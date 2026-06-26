@@ -13,18 +13,18 @@ import (
 	"github.com/training-judge-center/backend/pkg/apperror"
 )
 
-// RejudgeProvider implements appProblem.ContestRejudgeProvider.
-type RejudgeProvider struct {
+// ContestRejudgeProvider implements appProblem.ContestRejudgeProvider.
+type ContestRejudgeProvider struct {
 	db infraPostgres.Querier
 }
 
-func NewRejudgeProvider(db infraPostgres.Querier) *RejudgeProvider {
-	return &RejudgeProvider{db: db}
+func NewContestRejudgeProvider(db infraPostgres.Querier) *ContestRejudgeProvider {
+	return &ContestRejudgeProvider{db: db}
 }
 
-var _ appProblem.ContestRejudgeProvider = (*RejudgeProvider)(nil)
+var _ appProblem.ContestRejudgeProvider = (*ContestRejudgeProvider)(nil)
 
-func (p *RejudgeProvider) GetContestForRejudge(ctx context.Context, contestID string) (*appProblem.ContestRejudgeInfo, error) {
+func (p *ContestRejudgeProvider) GetContestForRejudge(ctx context.Context, contestID string) (*appProblem.ContestRejudgeInfo, error) {
 	q := infraPostgres.GetQuerier(ctx, p.db)
 
 	var info appProblem.ContestRejudgeInfo
@@ -46,7 +46,7 @@ func (p *RejudgeProvider) GetContestForRejudge(ctx context.Context, contestID st
 	return &info, nil
 }
 
-func (p *RejudgeProvider) IsProblemInContest(ctx context.Context, contestID, problemID string) (bool, error) {
+func (p *ContestRejudgeProvider) IsProblemInContest(ctx context.Context, contestID, problemID string) (bool, error) {
 	q := infraPostgres.GetQuerier(ctx, p.db)
 	var exists bool
 	err := q.QueryRow(ctx, `
@@ -62,7 +62,7 @@ func (p *RejudgeProvider) IsProblemInContest(ctx context.Context, contestID, pro
 	return exists, nil
 }
 
-func (p *RejudgeProvider) IsLeadOfGroup(ctx context.Context, userID, groupID string) (bool, error) {
+func (p *ContestRejudgeProvider) IsLeadOfGroup(ctx context.Context, userID, groupID string) (bool, error) {
 	q := infraPostgres.GetQuerier(ctx, p.db)
 	var exists bool
 	err := q.QueryRow(ctx, `

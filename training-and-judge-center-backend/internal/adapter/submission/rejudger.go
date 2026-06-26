@@ -81,10 +81,10 @@ func (r *Rejudger) ListByProblemAndContestBefore(ctx context.Context, problemID,
 	return result, nil
 }
 
-func (r *Rejudger) RejudgeByID(ctx context.Context, submissionID, problemID string, contestID *string, language string, now time.Time) error {
+func (r *Rejudger) RejudgeByID(ctx context.Context, submissionID, problemID, userID string, contestID *string, language string, now time.Time) error {
 	info := appProblem.SubmissionRejudgeInfo{
 		ID:        submissionID,
-		UserID:    "",
+		UserID:    userID,
 		ContestID: contestID,
 		Language:  language,
 	}

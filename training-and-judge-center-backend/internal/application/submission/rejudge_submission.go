@@ -60,7 +60,7 @@ func (uc *RejudgeSubmissionUseCase) Execute(ctx context.Context, in RejudgeSubmi
 			return nil, err
 		}
 		contestActive := in.Now.After(startTime) && in.Now.Before(endTime)
-		submittedDuringContest := !sub.SubmittedAt().After(endTime)
+		submittedDuringContest := sub.SubmittedAt().After(startTime) && !sub.SubmittedAt().After(endTime)
 		if contestActive && submittedDuringContest {
 			return nil, apperror.NewForbidden(domainsubmission.ErrCodeCannotRejudgeInActiveContest,
 				"cannot rejudge own submissions in active contests")
@@ -80,7 +80,7 @@ func (uc *RejudgeSubmissionUseCase) Execute(ctx context.Context, in RejudgeSubmi
 
 	previousVerdict := sub.Status().String()
 
-	if err := uc.rejudger.RejudgeByID(ctx, sub.ID(), sub.ProblemID(), sub.ContestID(), sub.Language().String(), in.Now); err != nil {
+	if err := uc.rejudger.RejudgeByID(ctx, sub.ID(), sub.ProblemID(), sub.UserID().String(), sub.ContestID(), sub.Language().String(), in.Now); err != nil {
 		return nil, err
 	}
 

@@ -14,5 +14,5 @@ type ContestTimesProvider interface {
 }
 
 type SingleSubmissionRejudger interface {
-	RejudgeByID(ctx context.Context, submissionID, problemID string, contestID *string, language string, now time.Time) error
+	RejudgeByID(ctx context.Context, submissionID, problemID, userID string, contestID *string, language string, now time.Time) error
 }
