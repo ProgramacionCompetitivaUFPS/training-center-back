@@ -16,9 +16,8 @@ import (
 // ── mock SubmissionRejudger ──────────────────────────────────────────────────
 
 type mockSubmissionRejudgerH struct {
-	subs       []appProblem.SubmissionRejudgeInfo
-	listErr    error
-	rejudgeErr error
+	subs    []appProblem.SubmissionRejudgeInfo
+	listErr error
 }
 
 func (m *mockSubmissionRejudgerH) ListByProblemBefore(_ context.Context, _ string, _ time.Time) ([]appProblem.SubmissionRejudgeInfo, error) {
@@ -29,8 +28,8 @@ func (m *mockSubmissionRejudgerH) ListByProblemAndContestBefore(_ context.Contex
 	return nil, nil
 }
 
-func (m *mockSubmissionRejudgerH) RejudgeOne(_ context.Context, _ appProblem.SubmissionRejudgeInfo, _ string, _ time.Time) error {
-	return m.rejudgeErr
+func (m *mockSubmissionRejudgerH) RejudgeBatch(_ context.Context, subs []appProblem.SubmissionRejudgeInfo, _ string, _ time.Time) (int, error) {
+	return len(subs), nil
 }
 
 // ── fixtures ─────────────────────────────────────────────────────────────────

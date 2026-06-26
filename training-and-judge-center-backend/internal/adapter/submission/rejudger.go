@@ -88,10 +88,48 @@ func (r *Rejudger) RejudgeByID(ctx context.Context, submissionID, problemID, use
 		ContestID: contestID,
 		Language:  language,
 	}
-	return r.RejudgeOne(ctx, info, problemID, now)
+	return r.rejudgeOne(ctx, info, problemID, now)
 }
 
-func (r *Rejudger) RejudgeOne(ctx context.Context, info appProblem.SubmissionRejudgeInfo, problemID string, now time.Time) error {
+// RejudgeBatch publishes all submissions to the queue and resets their DB status in one batch UPDATE.
+func (r *Rejudger) RejudgeBatch(ctx context.Context, subs []appProblem.SubmissionRejudgeInfo, problemID string, now time.Time) (int, error) {
+	published := make([]string, 0, len(subs))
+	for _, sub := range subs {
+		if err := r.queue.Publish(ctx, appSubmission.SubmissionQueueMessage{
+			SubmissionID: sub.ID,
+			Priority:     appSubmission.QueuePriorityRejudge,
+			EnqueuedAt:   now,
+			Metadata: appSubmission.SubmissionQueueMetadata{
+				ContestID: sub.ContestID,
+				ProblemID: problemID,
+				UserID:    sub.UserID,
+				Language:  sub.Language,
+			},
+		}); err != nil {
+			slog.ErrorContext(ctx, "rejudger: failed to enqueue submission", "submission_id", sub.ID, "error", err)
+			continue
+		}
+		published = append(published, sub.ID)
+	}
+
+	if len(published) == 0 {
+		return 0, nil
+	}
+
+	q := infraPostgres.GetQuerier(ctx, r.db)
+	_, err := q.Exec(ctx, `
+		UPDATE submissions
+		SET status = 'PENDING', judged_at = NULL, time_ms = NULL, memory_kb = NULL, compile_log = NULL
+		WHERE id = ANY($1::uuid[]) AND status NOT IN ('PENDING', 'RUNNING')
+	`, published)
+	if err != nil {
+		// Messages already in queue; judge handles them — log but don't fail.
+		slog.ErrorContext(ctx, "rejudger: failed to batch reset submissions", "count", len(published), "error", err)
+	}
+	return len(published), nil
+}
+
+func (r *Rejudger) rejudgeOne(ctx context.Context, info appProblem.SubmissionRejudgeInfo, problemID string, now time.Time) error {
 	if err := r.queue.Publish(ctx, appSubmission.SubmissionQueueMessage{
 		SubmissionID: info.ID,
 		Priority:     appSubmission.QueuePriorityRejudge,

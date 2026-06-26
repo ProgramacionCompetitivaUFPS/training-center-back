@@ -15,9 +15,9 @@ import (
 // ── mock SubmissionRejudger ──────────────────────────────────────────────────
 
 type mockSubmissionRejudger struct {
-	listFn      func(ctx context.Context, problemID string, before time.Time) ([]SubmissionRejudgeInfo, error)
-	rejudgeOneFn func(ctx context.Context, info SubmissionRejudgeInfo, problemID string, now time.Time) error
-	rejudged    []string // records IDs passed to RejudgeOne
+	listFn   func(ctx context.Context, problemID string, before time.Time) ([]SubmissionRejudgeInfo, error)
+	batchFn  func(subs []SubmissionRejudgeInfo) (int, error)
+	rejudged []string
 }
 
 func (m *mockSubmissionRejudger) ListByProblemBefore(ctx context.Context, problemID string, before time.Time) ([]SubmissionRejudgeInfo, error) {
@@ -31,12 +31,14 @@ func (m *mockSubmissionRejudger) ListByProblemAndContestBefore(_ context.Context
 	return nil, nil
 }
 
-func (m *mockSubmissionRejudger) RejudgeOne(ctx context.Context, info SubmissionRejudgeInfo, problemID string, now time.Time) error {
-	m.rejudged = append(m.rejudged, info.ID)
-	if m.rejudgeOneFn != nil {
-		return m.rejudgeOneFn(ctx, info, problemID, now)
+func (m *mockSubmissionRejudger) RejudgeBatch(_ context.Context, subs []SubmissionRejudgeInfo, _ string, _ time.Time) (int, error) {
+	for _, s := range subs {
+		m.rejudged = append(m.rejudged, s.ID)
 	}
-	return nil
+	if m.batchFn != nil {
+		return m.batchFn(subs)
+	}
+	return len(subs), nil
 }
 
 // ── fixtures ─────────────────────────────────────────────────────────────────
@@ -83,7 +85,7 @@ func TestRejudgeSubmissions_Execute(t *testing.T) {
 		user        func(id string) appshared.CurrentUser
 		userID      string
 		submissions []SubmissionRejudgeInfo
-		rejudgeErr  error
+		batchFn     func([]SubmissionRejudgeInfo) (int, error)
 		wantQueued  int
 		wantErrCode string
 	}{
@@ -108,7 +110,6 @@ func TestRejudgeSubmissions_Execute(t *testing.T) {
 			problem:     newProblemNoJudgingUpdated(),
 			user:        asContestant,
 			userID:      authorID,
-			submissions: nil,
 			wantErrCode: ErrCodeNoSubmissionsToRejudge,
 		},
 		{
@@ -119,12 +120,12 @@ func TestRejudgeSubmissions_Execute(t *testing.T) {
 			wantErrCode: ErrCodeInsufficientPermissions,
 		},
 		{
-			name:        "all submissions fail to enqueue — none queued",
+			name:        "batch returns 0 queued — use case passes through count",
 			problem:     newProblemWithJudgingUpdated(),
 			user:        asContestant,
 			userID:      authorID,
 			submissions: []SubmissionRejudgeInfo{sub1, sub2},
-			rejudgeErr:  errors.New("queue down"),
+			batchFn:     func(_ []SubmissionRejudgeInfo) (int, error) { return 0, nil },
 			wantQueued:  0,
 		},
 	}
@@ -135,9 +136,7 @@ func TestRejudgeSubmissions_Execute(t *testing.T) {
 				listFn: func(_ context.Context, _ string, _ time.Time) ([]SubmissionRejudgeInfo, error) {
 					return tc.submissions, nil
 				},
-				rejudgeOneFn: func(_ context.Context, _ SubmissionRejudgeInfo, _ string, _ time.Time) error {
-					return tc.rejudgeErr
-				},
+				batchFn: tc.batchFn,
 			}
 
 			uc := NewRejudgeSubmissionsUseCase(repoWith(tc.problem), rejudger)
@@ -169,41 +168,5 @@ func TestRejudgeSubmissions_Execute(t *testing.T) {
 				t.Errorf("ProblemSlug = %q, want %q", out.ProblemSlug, testSlug)
 			}
 		})
-	}
-}
-
-func TestRejudgeSubmissions_PartialFailure_ContinuesAndCountsSuccesses(t *testing.T) {
-	sub1 := SubmissionRejudgeInfo{ID: "sub-001", UserID: authorID, Language: "cpp20"}
-	sub2 := SubmissionRejudgeInfo{ID: "sub-002", UserID: authorID, Language: "java17"}
-
-	callCount := 0
-	rejudger := &mockSubmissionRejudger{
-		listFn: func(_ context.Context, _ string, _ time.Time) ([]SubmissionRejudgeInfo, error) {
-			return []SubmissionRejudgeInfo{sub1, sub2}, nil
-		},
-		rejudgeOneFn: func(_ context.Context, _ SubmissionRejudgeInfo, _ string, _ time.Time) error {
-			callCount++
-			if callCount == 1 {
-				return errors.New("queue down")
-			}
-			return nil
-		},
-	}
-
-	uc := NewRejudgeSubmissionsUseCase(repoWith(newProblemWithJudgingUpdated()), rejudger)
-	out, err := uc.Execute(context.Background(), RejudgeSubmissionsInput{
-		Slug:        testSlug,
-		CurrentUser: asContestant(authorID),
-		Now:         testNow,
-	})
-
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if out.SubmissionsQueued != 1 {
-		t.Errorf("SubmissionsQueued = %d, want 1 (first fails, second succeeds)", out.SubmissionsQueued)
-	}
-	if callCount != 2 {
-		t.Errorf("RejudgeOne called %d times, want 2 (loop must continue on error)", callCount)
 	}
 }

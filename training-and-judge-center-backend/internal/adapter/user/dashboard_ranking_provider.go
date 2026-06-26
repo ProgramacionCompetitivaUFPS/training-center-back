@@ -25,27 +25,28 @@ func (p *DashboardRankingProvider) GetUserStats(ctx context.Context, userID stri
 
 	q := infraPostgres.GetQuerier(ctx, p.db)
 
+	// accepted_pairs uses idx_submissions_accepted_user_problem (index-only scan).
+	// user_solved derives per-user counts without COUNT(DISTINCT) on the raw table.
 	row := q.QueryRow(ctx, `
-		WITH my_solved AS (
-			SELECT COUNT(DISTINCT problem_id)::INTEGER AS cnt
+		WITH accepted_pairs AS (
+			SELECT DISTINCT user_id, problem_id
 			FROM submissions
-			WHERE user_id = $1 AND status = 'ACCEPTED'
+			WHERE status = 'ACCEPTED'
 		),
-		better AS (
-			SELECT COUNT(*)::INTEGER AS cnt
-			FROM (
-				SELECT user_id
-				FROM submissions
-				WHERE status = 'ACCEPTED'
-				GROUP BY user_id
-				HAVING COUNT(DISTINCT problem_id) > (SELECT cnt FROM my_solved)
-			) sub
+		user_solved AS (
+			SELECT user_id, COUNT(*)::INTEGER AS solved
+			FROM accepted_pairs
+			GROUP BY user_id
 		)
 		SELECT
-			(SELECT cnt FROM my_solved) AS problems_solved,
+			COALESCE((SELECT solved FROM user_solved WHERE user_id = $1), 0) AS problems_solved,
 			CASE
-				WHEN (SELECT cnt FROM my_solved) = 0 THEN NULL
-				ELSE (SELECT cnt FROM better) + 1
+				WHEN COALESCE((SELECT solved FROM user_solved WHERE user_id = $1), 0) = 0 THEN NULL
+				ELSE (
+					SELECT COUNT(*)::INTEGER + 1
+					FROM user_solved
+					WHERE solved > COALESCE((SELECT solved FROM user_solved WHERE user_id = $1), 0)
+				)
 			END AS position,
 			(SELECT COUNT(*)::INTEGER FROM users WHERE status = 'ACTIVE') AS total_users`,
 		userID,
