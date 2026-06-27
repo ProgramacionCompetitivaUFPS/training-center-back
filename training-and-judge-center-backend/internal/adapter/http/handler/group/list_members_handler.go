@@ -22,7 +22,7 @@ import (
 // @Failure      404 {object} apperror.AppError
 // @Router       /groups/{groupId}/members [get]
 func (h *Handler) ListMembers(w http.ResponseWriter, r *http.Request) {
-	currentUser, ok := h.requireCurrentUser(w, r)
+	currentUser, ok := handler.RequireCurrentUser(w, r)
 	if !ok {
 		return
 	}

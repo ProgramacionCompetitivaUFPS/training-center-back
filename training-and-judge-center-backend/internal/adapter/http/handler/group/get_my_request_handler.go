@@ -18,7 +18,7 @@ import (
 // @Failure      404 {object} apperror.AppError
 // @Router       /groups/{groupId}/requests/me [get]
 func (h *Handler) GetMyRequest(w http.ResponseWriter, r *http.Request) {
-	caller, ok := h.requireCurrentUser(w, r)
+	caller, ok := handler.RequireCurrentUser(w, r)
 	if !ok {
 		return
 	}

@@ -40,7 +40,7 @@ type createTeamResponse struct {
 // @Failure      409 {object} apperror.AppError
 // @Router       /teams [post]
 func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
-	currentUser, ok := h.requireCurrentUser(w, r)
+	currentUser, ok := handler.RequireCurrentUser(w, r)
 	if !ok {
 		return
 	}

@@ -19,7 +19,7 @@ import (
 // @Failure      404 {object} apperror.AppError
 // @Router       /groups/{groupId}/materials/{materialId}/publish [post]
 func (h *Handler) Publish(w http.ResponseWriter, r *http.Request) {
-	currentUser, ok := h.requireCurrentUser(w, r)
+	currentUser, ok := handler.RequireCurrentUser(w, r)
 	if !ok {
 		return
 	}

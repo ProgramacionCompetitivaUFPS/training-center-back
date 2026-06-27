@@ -22,7 +22,7 @@ import (
 // @Failure      401 {object} apperror.AppError
 // @Router       /groups/{groupId}/materials/{materialId} [patch]
 func (h *Handler) Update(w http.ResponseWriter, r *http.Request) {
-	currentUser, ok := h.requireCurrentUser(w, r)
+	currentUser, ok := handler.RequireCurrentUser(w, r)
 	if !ok {
 		return
 	}

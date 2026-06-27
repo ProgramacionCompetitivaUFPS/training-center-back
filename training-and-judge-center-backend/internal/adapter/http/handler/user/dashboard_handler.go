@@ -72,7 +72,7 @@ type dashboardResponse struct {
 // @Failure      401 {object} apperror.AppError
 // @Router       /users/me/dashboard [get]
 func (h *Handler) GetDashboard(w http.ResponseWriter, r *http.Request) {
-	currentUser, ok := h.requireCurrentUser(w, r)
+	currentUser, ok := handler.RequireCurrentUser(w, r)
 	if !ok {
 		return
 	}

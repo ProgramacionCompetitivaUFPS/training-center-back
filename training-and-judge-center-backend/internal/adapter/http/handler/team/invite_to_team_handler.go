@@ -43,7 +43,7 @@ type inviteToTeamResponse struct {
 // @Failure      409 {object} apperror.AppError
 // @Router       /teams/{teamId}/invitations [post]
 func (h *Handler) InviteToTeam(w http.ResponseWriter, r *http.Request) {
-	currentUser, ok := h.requireCurrentUser(w, r)
+	currentUser, ok := handler.RequireCurrentUser(w, r)
 	if !ok {
 		return
 	}

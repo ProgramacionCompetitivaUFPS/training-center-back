@@ -21,7 +21,7 @@ import (
 // @Failure      401 {object} apperror.AppError
 // @Router       /groups [get]
 func (h *Handler) ListGroups(w http.ResponseWriter, r *http.Request) {
-	currentUser, ok := h.requireCurrentUser(w, r)
+	currentUser, ok := handler.RequireCurrentUser(w, r)
 	if !ok {
 		return
 	}

@@ -30,7 +30,7 @@ type updateRequestBody struct {
 // @Failure      404 {object} apperror.AppError
 // @Router       /groups/{groupId}/requests/{requestId} [patch]
 func (h *Handler) UpdateJoinRequest(w http.ResponseWriter, r *http.Request) {
-	caller, ok := h.requireCurrentUser(w, r)
+	caller, ok := handler.RequireCurrentUser(w, r)
 	if !ok {
 		return
 	}

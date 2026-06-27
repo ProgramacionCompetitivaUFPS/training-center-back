@@ -30,7 +30,7 @@ func (h *Handler) SubmitContest(w http.ResponseWriter, r *http.Request) {
 	// Capture submittedAt IMMEDIATELY — before any validation or processing
 	submittedAt := time.Now().UTC()
 
-	cu, ok := h.requireCurrentUser(w, r)
+	cu, ok := handler.RequireCurrentUser(w, r)
 	if !ok {
 		return
 	}

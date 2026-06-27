@@ -22,7 +22,7 @@ type generateInviteResponse struct {
 // @Failure      404 {object} apperror.AppError
 // @Router       /groups/{groupId}/invitations [post]
 func (h *Handler) GenerateInvite(w http.ResponseWriter, r *http.Request) {
-	currentUser, ok := h.requireCurrentUser(w, r)
+	currentUser, ok := handler.RequireCurrentUser(w, r)
 	if !ok {
 		return
 	}

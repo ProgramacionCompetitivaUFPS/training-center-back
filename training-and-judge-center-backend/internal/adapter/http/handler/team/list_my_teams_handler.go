@@ -41,7 +41,7 @@ type paginationMeta struct {
 // @Failure      401 {object} apperror.AppError
 // @Router       /users/me/teams [get]
 func (h *Handler) ListMyTeams(w http.ResponseWriter, r *http.Request) {
-	currentUser, ok := h.requireCurrentUser(w, r)
+	currentUser, ok := handler.RequireCurrentUser(w, r)
 	if !ok {
 		return
 	}
