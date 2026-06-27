@@ -7,6 +7,7 @@ import (
 	"github.com/training-judge-center/backend/internal/adapter/http/handler"
 	"github.com/training-judge-center/backend/internal/adapter/http/middleware"
 	appuser "github.com/training-judge-center/backend/internal/application/user"
+	"github.com/training-judge-center/backend/pkg/apperror"
 )
 
 // @Summary      Request account deactivation
@@ -19,10 +20,7 @@ import (
 func (h *Handler) RequestDeactivation(w http.ResponseWriter, r *http.Request) {
 	cu, ok := middleware.GetCurrentUser(r.Context())
 	if !ok {
-		handler.WriteJSON(r.Context(), w, http.StatusUnauthorized, map[string]string{
-			"error":   "UNAUTHORIZED",
-			"message": "Invalid or missing authentication token",
-		})
+		handler.WriteJSON(r.Context(), w, http.StatusUnauthorized, apperror.AppError{Code: apperror.ErrCodeUnauthorized, Message: "invalid or missing authentication token"})
 		return
 	}
 	userID := cu.ID
@@ -55,10 +53,7 @@ type confirmDeactivationBody struct {
 func (h *Handler) ConfirmDeactivation(w http.ResponseWriter, r *http.Request) {
 	cu, ok := middleware.GetCurrentUser(r.Context())
 	if !ok {
-		handler.WriteJSON(r.Context(), w, http.StatusUnauthorized, map[string]string{
-			"error":   "UNAUTHORIZED",
-			"message": "Invalid or missing authentication token",
-		})
+		handler.WriteJSON(r.Context(), w, http.StatusUnauthorized, apperror.AppError{Code: apperror.ErrCodeUnauthorized, Message: "invalid or missing authentication token"})
 		return
 	}
 	userID := cu.ID
@@ -66,20 +61,15 @@ func (h *Handler) ConfirmDeactivation(w http.ResponseWriter, r *http.Request) {
 
 	var body confirmDeactivationBody
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-		handler.WriteJSON(r.Context(), w, http.StatusBadRequest, map[string]string{
-			"error":   "INVALID_JSON",
-			"message": "Request body must be valid JSON",
-		})
+		handler.WriteJSON(r.Context(), w, http.StatusBadRequest, apperror.AppError{Code: "INVALID_JSON", Message: "request body must be valid JSON"})
 		return
 	}
 
 	if !digitCodeRegex.MatchString(body.Code) {
-		handler.WriteJSON(r.Context(), w, http.StatusBadRequest, map[string]interface{}{
-			"error":   "VALIDATION_ERROR",
-			"message": "Invalid request data",
-			"details": []map[string]string{
-				{"field": "code", "message": "Code must be exactly 6 digits"},
-			},
+		handler.WriteJSON(r.Context(), w, http.StatusBadRequest, apperror.AppError{
+			Code:    apperror.ErrCodeValidationError,
+			Message: "invalid request data",
+			Details: []apperror.FieldError{{Field: "code", Message: "code must be exactly 6 digits"}},
 		})
 		return
 	}

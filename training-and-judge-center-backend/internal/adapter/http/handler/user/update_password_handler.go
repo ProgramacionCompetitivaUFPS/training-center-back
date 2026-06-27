@@ -7,6 +7,7 @@ import (
 	"github.com/training-judge-center/backend/internal/adapter/http/handler"
 	"github.com/training-judge-center/backend/internal/adapter/http/middleware"
 	appuser "github.com/training-judge-center/backend/internal/application/user"
+	"github.com/training-judge-center/backend/pkg/apperror"
 )
 
 type updatePasswordRequest struct {
@@ -27,19 +28,13 @@ type updatePasswordRequest struct {
 func (h *Handler) UpdatePassword(w http.ResponseWriter, r *http.Request) {
 	cu, ok := middleware.GetCurrentUser(r.Context())
 	if !ok {
-		handler.WriteJSON(r.Context(), w, http.StatusUnauthorized, map[string]string{
-			"error":   "UNAUTHORIZED",
-			"message": "Invalid or missing authentication token",
-		})
+		handler.WriteJSON(r.Context(), w, http.StatusUnauthorized, apperror.AppError{Code: apperror.ErrCodeUnauthorized, Message: "invalid or missing authentication token"})
 		return
 	}
 
 	var req updatePasswordRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		handler.WriteJSON(r.Context(), w, http.StatusBadRequest, map[string]string{
-			"error":   "INVALID_JSON",
-			"message": "Request body must be valid JSON",
-		})
+		handler.WriteJSON(r.Context(), w, http.StatusBadRequest, apperror.AppError{Code: "INVALID_JSON", Message: "request body must be valid JSON"})
 		return
 	}
 

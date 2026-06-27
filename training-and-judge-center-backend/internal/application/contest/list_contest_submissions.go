@@ -130,7 +130,7 @@ func (uc *ListContestSubmissionsUseCase) Execute(ctx context.Context, in ListCon
 			return nil, err
 		}
 		if !registered {
-			return nil, apperror.NewForbidden(ErrCodeNotRegistered, "you must be registered to view contest submissions")
+			return nil, apperror.NewForbidden(domainContest.ErrCodeNotRegistered, "you must be registered to view contest submissions")
 		}
 	}
 

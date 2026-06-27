@@ -6,6 +6,7 @@ import (
 
 	"github.com/training-judge-center/backend/internal/adapter/http/handler"
 	appuser "github.com/training-judge-center/backend/internal/application/user"
+	"github.com/training-judge-center/backend/pkg/apperror"
 )
 
 type requestPasswordRecoveryBody struct {
@@ -25,20 +26,15 @@ func (h *Handler) RequestPasswordRecovery(w http.ResponseWriter, r *http.Request
 	ctx := r.Context()
 	var body requestPasswordRecoveryBody
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-		handler.WriteJSON(r.Context(), w, http.StatusBadRequest, map[string]string{
-			"error":   "INVALID_JSON",
-			"message": "Request body must be valid JSON",
-		})
+		handler.WriteJSON(r.Context(), w, http.StatusBadRequest, apperror.AppError{Code: "INVALID_JSON", Message: "request body must be valid JSON"})
 		return
 	}
 
 	if body.Email == "" {
-		handler.WriteJSON(r.Context(), w, http.StatusBadRequest, map[string]interface{}{
-			"error":   "VALIDATION_ERROR",
-			"message": "Invalid request data",
-			"details": []map[string]string{
-				{"field": "email", "message": "Email is required"},
-			},
+		handler.WriteJSON(r.Context(), w, http.StatusBadRequest, apperror.AppError{
+			Code:    apperror.ErrCodeValidationError,
+			Message: "invalid request data",
+			Details: []apperror.FieldError{{Field: "email", Message: "email is required"}},
 		})
 		return
 	}

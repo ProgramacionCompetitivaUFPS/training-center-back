@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/training-judge-center/backend/pkg/apperror"
+	"golang.org/x/text/unicode/norm"
 )
 
 const MaxGroupNameLength = 300
@@ -14,7 +15,7 @@ type GroupName struct {
 }
 
 func NewGroupName(s string) (GroupName, error) {
-	trimmed := strings.TrimSpace(s)
+	trimmed := strings.TrimSpace(norm.NFKC.String(s))
 	if trimmed == "" {
 		return GroupName{}, apperror.NewValidation([]apperror.FieldError{
 			{Field: "name", Message: "group name cannot be empty"},

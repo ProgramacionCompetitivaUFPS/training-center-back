@@ -7,6 +7,7 @@ import (
 
 	"github.com/training-judge-center/backend/internal/adapter/http/handler"
 	appuser "github.com/training-judge-center/backend/internal/application/user"
+	"github.com/training-judge-center/backend/pkg/apperror"
 )
 
 type createUserRequest struct {
@@ -42,10 +43,7 @@ type createUserResponse struct {
 func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
 	var req createUserRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		handler.WriteJSON(r.Context(), w, http.StatusBadRequest, map[string]string{
-			"error":   "INVALID_JSON",
-			"message": "Request body must be valid JSON",
-		})
+		handler.WriteJSON(r.Context(), w, http.StatusBadRequest, apperror.AppError{Code: "INVALID_JSON", Message: "request body must be valid JSON"})
 		return
 	}
 
