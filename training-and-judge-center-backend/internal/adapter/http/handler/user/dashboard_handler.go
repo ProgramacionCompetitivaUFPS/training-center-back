@@ -79,6 +79,7 @@ func (h *Handler) GetDashboard(w http.ResponseWriter, r *http.Request) {
 
 	out, err := h.getDashboard.Execute(r.Context(), appuser.GetDashboardInput{
 		CurrentUser: *currentUser,
+		Now:         time.Now(),
 	})
 	if err != nil {
 		handler.WriteError(r.Context(), w, err)

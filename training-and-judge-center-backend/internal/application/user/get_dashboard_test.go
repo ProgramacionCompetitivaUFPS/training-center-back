@@ -205,7 +205,7 @@ func TestGetDashboard_PopulatedData_MapsToOutput(t *testing.T) {
 	}
 
 	uc := NewGetDashboardUseCase(sub, con, mat, rank)
-	out, err := uc.Execute(context.Background(), GetDashboardInput{CurrentUser: currentUser("u-99")})
+	out, err := uc.Execute(context.Background(), GetDashboardInput{CurrentUser: currentUser("u-99"), Now: fixedTime})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -249,7 +249,7 @@ func TestGetDashboard_StreakComputedFromDates(t *testing.T) {
 	_, con, mat, rank := defaultProviders()
 	uc := NewGetDashboardUseCase(sub, con, mat, rank)
 
-	out, err := uc.Execute(context.Background(), GetDashboardInput{CurrentUser: currentUser("u-streak")})
+	out, err := uc.Execute(context.Background(), GetDashboardInput{CurrentUser: currentUser("u-streak"), Now: fixedTime})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
