@@ -6,8 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
-	"path/filepath"
-	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -83,30 +81,10 @@ func (uc *SubmitContestSolutionUseCase) Execute(ctx context.Context, in SubmitCo
 			fmt.Sprintf("file size exceeds maximum allowed size of %d bytes", uc.maxFileSizeBytes))
 	}
 
-	// 2. Validate language
-	langVO, err := domainSubmission.NewLanguage(in.Language)
+	// 2-3. Validate language, compiler, and file extension
+	langVO, err := validateLanguage(in.Language, in.Compiler, in.FileName)
 	if err != nil {
 		return nil, err
-	}
-
-	// 3. Validate compiler and file extension match language
-	cfg, ok := languageConfig[in.Language]
-	if !ok {
-		return nil, apperror.NewBadRequest(domainSubmission.ErrCodeCompilerMismatch, "unsupported language")
-	}
-	if in.Compiler != cfg.compiler {
-		return nil, apperror.NewBadRequest(domainSubmission.ErrCodeCompilerMismatch, "compiler does not match the selected language")
-	}
-	fileExt := strings.ToLower(filepath.Ext(in.FileName))
-	validExt := false
-	for _, ext := range cfg.extensions {
-		if fileExt == ext {
-			validExt = true
-			break
-		}
-	}
-	if !validExt {
-		return nil, apperror.NewBadRequest(domainSubmission.ErrCodeCompilerMismatch, "file extension does not match the selected language")
 	}
 
 	// 4. Get contest info (validates contest exists and belongs to the group)
@@ -201,7 +179,7 @@ func (uc *SubmitContestSolutionUseCase) Execute(ctx context.Context, in SubmitCo
 
 	// 13. Upload to contest-specific storage path
 	submissionID := uuid.New().String()
-	storagePath := fmt.Sprintf("%s/%s/%s/%s%s", problem.ID, userID, in.ContestID, submissionID, cfg.ext)
+	storagePath := fmt.Sprintf("%s/%s/%s/%s%s", problem.ID, userID, in.ContestID, submissionID, languageConfig[in.Language].ext)
 
 	if err := uc.sourceStorage.Upload(ctx, storagePath, in.FileData); err != nil {
 		return nil, err

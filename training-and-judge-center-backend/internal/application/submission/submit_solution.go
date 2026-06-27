@@ -6,8 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
-	"path/filepath"
-	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -16,17 +14,6 @@ import (
 	"github.com/training-judge-center/backend/internal/domain/shared"
 	"github.com/training-judge-center/backend/pkg/apperror"
 )
-
-// languageConfig defines the valid compiler and file extensions for each language.
-var languageConfig = map[string]struct {
-	compiler   string
-	extensions []string
-	ext        string // canonical extension for storage path
-}{
-	"cpp20":     {compiler: "g++", extensions: []string{".cpp", ".cc", ".cxx"}, ext: ".cpp"},
-	"java17":    {compiler: "javac", extensions: []string{".java"}, ext: ".java"},
-	"python310": {compiler: "py", extensions: []string{".py"}, ext: ".py"},
-}
 
 type SubmitSolutionInput struct {
 	CurrentUser appshared.CurrentUser
@@ -84,33 +71,10 @@ func (uc *SubmitSolutionUseCase) Execute(ctx context.Context, in SubmitSolutionI
 			fmt.Sprintf("file size exceeds maximum allowed size of %d bytes", uc.maxFileSizeBytes))
 	}
 
-	// 2. Validate language
-	langVO, err := domainSubmission.NewLanguage(in.Language)
+	// 2-3. Validate language, compiler, and file extension
+	langVO, err := validateLanguage(in.Language, in.Compiler, in.FileName)
 	if err != nil {
 		return nil, err
-	}
-
-	// 3. Validate compiler and file extension match language
-	cfg, ok := languageConfig[in.Language]
-	if !ok {
-		return nil, apperror.NewBadRequest(domainSubmission.ErrCodeCompilerMismatch,
-			"unsupported language")
-	}
-	if in.Compiler != cfg.compiler {
-		return nil, apperror.NewBadRequest(domainSubmission.ErrCodeCompilerMismatch,
-			"compiler does not match the selected language")
-	}
-	fileExt := strings.ToLower(filepath.Ext(in.FileName))
-	validExt := false
-	for _, ext := range cfg.extensions {
-		if fileExt == ext {
-			validExt = true
-			break
-		}
-	}
-	if !validExt {
-		return nil, apperror.NewBadRequest(domainSubmission.ErrCodeCompilerMismatch,
-			"file extension does not match the selected language")
 	}
 
 	// 4. Get problem
@@ -175,7 +139,7 @@ func (uc *SubmitSolutionUseCase) Execute(ctx context.Context, in SubmitSolutionI
 
 	// 10. Build storage path and upload file
 	submissionID := uuid.New().String()
-	storagePath := fmt.Sprintf("%s/%s/general/%s%s", problem.ID, userID, submissionID, cfg.ext)
+	storagePath := fmt.Sprintf("%s/%s/general/%s%s", problem.ID, userID, submissionID, languageConfig[in.Language].ext)
 
 	if err := uc.sourceStorage.Upload(ctx, storagePath, in.FileData); err != nil {
 		return nil, err
