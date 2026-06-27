@@ -96,7 +96,7 @@ func (uc *ListContestSubmissionsUseCase) Execute(ctx context.Context, in ListCon
 	if err != nil {
 		return nil, err
 	}
-	if contest == nil || contest.GroupID().Value() != in.GroupID {
+	if contest.GroupID().Value() != in.GroupID {
 		return nil, apperror.NewNotFound(domainContest.ErrCodeContestNotFound, "contest not found")
 	}
 
@@ -104,21 +104,16 @@ func (uc *ListContestSubmissionsUseCase) Execute(ctx context.Context, in ListCon
 	if err != nil {
 		return nil, err
 	}
-	if group == nil {
-		return nil, apperror.NewNotFound(domainContest.ErrCodeContestNotFound, "contest not found")
-	}
 
 	isAdmin := in.CurrentUser.IsAdmin()
 	isLead, isMember := false, false
 	if !isAdmin {
-		isMember, err = uc.memberProvider.IsMemberOfGroup(ctx, in.CurrentUser.ID, in.GroupID)
+		role, err := uc.memberProvider.GetMemberRole(ctx, in.CurrentUser.ID, in.GroupID)
 		if err != nil {
 			return nil, err
 		}
-		isLead, err = uc.memberProvider.IsLeadOfGroup(ctx, in.CurrentUser.ID, in.GroupID)
-		if err != nil {
-			return nil, err
-		}
+		isMember = role != nil
+		isLead = role != nil && *role == "LEAD"
 	}
 
 	if !group.IsVisible && !isMember && !isLead && !isAdmin {
@@ -132,7 +127,7 @@ func (uc *ListContestSubmissionsUseCase) Execute(ctx context.Context, in ListCon
 			return nil, err
 		}
 		if !registered {
-			return nil, apperror.NewForbidden(ErrCodeNotRegistered, "you must be registered to view contest submissions")
+			return nil, apperror.NewForbidden(domainContest.ErrCodeNotRegistered, "you must be registered to view contest submissions")
 		}
 	}
 

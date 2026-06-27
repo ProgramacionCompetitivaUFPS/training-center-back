@@ -35,7 +35,6 @@ func newHandlerWithDelete(uc *appcontest.DeleteContestUseCase) *Handler {
 func defaultDeleteUC() *appcontest.DeleteContestUseCase {
 	return appcontest.NewDeleteContestUseCase(
 		&mockRepoReturning{contest: contestToDelete()},
-		&mockGroupProvider{},
 		&mockMemberProvider{isLead: true, isMember: true},
 		&mockStandingsCache{},
 	)
@@ -86,7 +85,6 @@ func TestDeleteContest_ActiveContest_Returns409(t *testing.T) {
 	)
 	uc := appcontest.NewDeleteContestUseCase(
 		&mockRepoReturning{contest: activeContest},
-		&mockGroupProvider{},
 		&mockMemberProvider{isLead: true, isMember: true},
 		&mockStandingsCache{},
 	)
@@ -106,7 +104,6 @@ func TestDeleteContest_ActiveContest_Returns409(t *testing.T) {
 func TestDeleteContest_ContestNotFound_Returns404(t *testing.T) {
 	uc := appcontest.NewDeleteContestUseCase(
 		&mockRepoReturning{contest: nil},
-		&mockGroupProvider{},
 		&mockMemberProvider{isLead: true, isMember: true},
 		&mockStandingsCache{},
 	)

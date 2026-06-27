@@ -18,20 +18,17 @@ type DeleteContestInput struct {
 
 type DeleteContestUseCase struct {
 	contestRepo    domainContest.Repository
-	groupProvider  GroupProvider
 	memberProvider GroupMemberProvider
 	standingsCache StandingsCache
 }
 
 func NewDeleteContestUseCase(
 	contestRepo domainContest.Repository,
-	groupProvider GroupProvider,
 	memberProvider GroupMemberProvider,
 	standingsCache StandingsCache,
 ) *DeleteContestUseCase {
 	return &DeleteContestUseCase{
 		contestRepo:    contestRepo,
-		groupProvider:  groupProvider,
 		memberProvider: memberProvider,
 		standingsCache: standingsCache,
 	}
@@ -42,25 +39,17 @@ func (uc *DeleteContestUseCase) Execute(ctx context.Context, in DeleteContestInp
 	if err != nil {
 		return err
 	}
-	if contest == nil || contest.GroupID().Value() != in.GroupID {
+	if contest.GroupID().Value() != in.GroupID {
 		return apperror.NewNotFound(domainContest.ErrCodeContestNotFound, "contest not found")
-	}
-
-	group, err := uc.groupProvider.FindByID(ctx, in.GroupID)
-	if err != nil {
-		return err
-	}
-	if group == nil {
-		return apperror.NewNotFound(ErrCodeGroupNotFound, "group not found")
 	}
 
 	isAdmin := in.CurrentUser.IsAdmin()
 	if !isAdmin {
-		isLead, err := uc.memberProvider.IsLeadOfGroup(ctx, in.CurrentUser.ID, in.GroupID)
+		role, err := uc.memberProvider.GetMemberRole(ctx, in.CurrentUser.ID, in.GroupID)
 		if err != nil {
 			return err
 		}
-		if !isLead {
+		if role == nil || *role != "LEAD" {
 			return apperror.NewForbidden(ErrCodeInsufficientPermissions, "only leads and admins can delete contests")
 		}
 	}

@@ -266,17 +266,26 @@ func (r *Repository) List(ctx context.Context, filters domainContest.ListFilters
 }
 
 func (r *Repository) upsertProblems(ctx context.Context, q infraPostgres.Querier, contestID string, problems []domainContest.ContestProblem) error {
-	for _, cp := range problems {
-		_, err := q.Exec(ctx, `
-			INSERT INTO contest_problems (id, contest_id, problem_id, "order")
-			VALUES ($1, $2, $3, $4)
-			ON CONFLICT (contest_id, problem_id) DO UPDATE SET "order"=EXCLUDED."order"`,
-			cp.ID(), contestID, cp.ProblemID(), cp.Order(),
-		)
-		if err != nil {
-			slog.ErrorContext(ctx, "failed to upsert contest problem", "error", err, "contest_id", contestID, "problem_id", cp.ProblemID())
-			return apperror.NewInternal()
-		}
+	if len(problems) == 0 {
+		return nil
+	}
+	ids := make([]string, len(problems))
+	problemIDs := make([]string, len(problems))
+	orders := make([]int32, len(problems))
+	for i, cp := range problems {
+		ids[i] = cp.ID()
+		problemIDs[i] = cp.ProblemID()
+		orders[i] = int32(cp.Order())
+	}
+	_, err := q.Exec(ctx, `
+		INSERT INTO contest_problems (id, contest_id, problem_id, "order")
+		SELECT unnest($1::uuid[]), $2, unnest($3::uuid[]), unnest($4::int[])
+		ON CONFLICT (contest_id, problem_id) DO UPDATE SET "order"=EXCLUDED."order"`,
+		ids, contestID, problemIDs, orders,
+	)
+	if err != nil {
+		slog.ErrorContext(ctx, "failed to upsert contest problems", "error", err, "contest_id", contestID, "count", len(problems))
+		return apperror.NewInternal()
 	}
 	return nil
 }

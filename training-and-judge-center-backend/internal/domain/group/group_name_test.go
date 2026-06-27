@@ -86,6 +86,17 @@ func TestNewGroupName_MultibyteValid(t *testing.T) {
 	}
 }
 
+func TestNewGroupName_NFKCNormalization(t *testing.T) {
+	// ﬁ (U+FB01 LATIN SMALL LIGATURE FI) normalizes to "fi" under NFKC
+	n, err := group.NewGroupName("ﬁnals 2025")
+	if err != nil {
+		t.Fatalf("NewGroupName with ligature unexpected error: %v", err)
+	}
+	if n.Value() != "finals 2025" {
+		t.Errorf("expected NFKC normalized value %q, got %q", "finals 2025", n.Value())
+	}
+}
+
 func TestRestoreGroupName(t *testing.T) {
 	n := group.RestoreGroupName("My Group")
 	if n.Value() != "My Group" {

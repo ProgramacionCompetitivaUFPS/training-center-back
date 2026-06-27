@@ -191,6 +191,27 @@ func TestNewContest_NegativeFreezeMinutes(t *testing.T) {
 	assertValidationField(t, "NewContest(negativeFreezeMinutes)", err, "freezeMinutes")
 }
 
+func TestNewContest_FreezeMinutesExceedsDuration(t *testing.T) {
+	_, err := contest.NewContest(
+		"contest-id",
+		mustName(t, "Weekly Contest"),
+		nil,
+		fixedNow.Add(time.Hour),
+		fixedNow.Add(2*time.Hour), // duration = 60 min
+		mustPenalty(t, 20),
+		60, // freeze == duration → invalid
+		false,
+		shared.RestoreGroupID("group-id"),
+		shared.RestoreUserID("owner-id"),
+		contest.RestoreParticipationMode("INDIVIDUAL"), contest.RestoreTeamSize(2, 5),
+		fixedNow,
+	)
+	ae, ok := err.(*apperror.AppError)
+	if !ok || ae.Code != contest.ErrCodeFreezeTooLong {
+		t.Fatalf("NewContest(freezeMinutesExceedsDuration): expected FREEZE_TOO_LONG, got %v", err)
+	}
+}
+
 func TestContest_Status(t *testing.T) {
 	start := time.Date(2026, 5, 4, 14, 0, 0, 0, time.UTC)
 	end := time.Date(2026, 5, 4, 19, 0, 0, 0, time.UTC)
@@ -222,7 +243,7 @@ func TestContest_Status(t *testing.T) {
 		{"before start", start.Add(-time.Minute), contest.StatusScheduled},
 		{"at start", start, contest.StatusActive},
 		{"during contest", start.Add(time.Hour), contest.StatusActive},
-		{"at end", end, contest.StatusActive},
+		{"at end", end, contest.StatusFinished},
 		{"after end", end.Add(time.Second), contest.StatusFinished},
 	}
 

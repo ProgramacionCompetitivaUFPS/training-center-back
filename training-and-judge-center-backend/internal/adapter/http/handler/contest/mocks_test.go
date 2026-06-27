@@ -72,12 +72,16 @@ type mockMemberProvider struct {
 	isMember bool
 }
 
-func (s *mockMemberProvider) IsLeadOfGroup(_ context.Context, _, _ string) (bool, error) {
-	return s.isLead, nil
-}
-
-func (s *mockMemberProvider) IsMemberOfGroup(_ context.Context, _, _ string) (bool, error) {
-	return s.isMember, nil
+func (s *mockMemberProvider) GetMemberRole(_ context.Context, _, _ string) (*string, error) {
+	if s.isLead {
+		role := "LEAD"
+		return &role, nil
+	}
+	if s.isMember {
+		role := "MEMBER"
+		return &role, nil
+	}
+	return nil, nil
 }
 
 type mockProblemProvider struct{}

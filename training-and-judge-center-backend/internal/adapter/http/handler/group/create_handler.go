@@ -25,7 +25,7 @@ type groupResponse struct {
 	Description *string `json:"description,omitempty"`
 	JoinPolicy  string  `json:"joinPolicy"`
 	Visibility  string  `json:"visibility"`
-	IsDefault   bool    `json:"isDefault"`
+	IsGlobal    bool    `json:"isGlobal"`
 	CreatedBy   string  `json:"createdBy"`
 	CreatedAt   string  `json:"createdAt"`
 	UpdatedAt   string  `json:"updatedAt"`
@@ -80,7 +80,7 @@ func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
 		Description: out.Description,
 		JoinPolicy:  out.JoinPolicy,
 		Visibility:  out.Visibility,
-		IsDefault:   out.IsDefault,
+		IsGlobal:    out.IsDefault,
 		CreatedBy:   out.CreatedBy,
 		CreatedAt:   out.CreatedAt.UTC().Format(time.RFC3339),
 		UpdatedAt:   out.UpdatedAt.UTC().Format(time.RFC3339),

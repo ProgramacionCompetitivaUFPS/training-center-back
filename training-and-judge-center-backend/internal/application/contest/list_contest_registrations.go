@@ -55,19 +55,15 @@ func (uc *ListContestRegistrationsUseCase) Execute(ctx context.Context, in ListC
 	if err != nil {
 		return nil, err
 	}
-	if c == nil {
-		return nil, apperror.NewNotFound(domainContest.ErrCodeContestNotFound, "contest not found")
-	}
-
 	if c.GroupID().Value() != in.GroupID {
 		return nil, apperror.NewNotFound(domainContest.ErrCodeContestNotFound, "contest not found")
 	}
 
-	isMember, err := uc.memberProvider.IsMemberOfGroup(ctx, in.CurrentUser.ID, in.GroupID)
+	role, err := uc.memberProvider.GetMemberRole(ctx, in.CurrentUser.ID, in.GroupID)
 	if err != nil {
 		return nil, err
 	}
-	if !isMember && !in.CurrentUser.IsAdmin() {
+	if role == nil && !in.CurrentUser.IsAdmin() {
 		return nil, apperror.NewForbidden(ErrCodeNotGroupMember, "only group members can view contest registrations")
 	}
 

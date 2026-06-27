@@ -8,6 +8,7 @@ import (
 	"github.com/training-judge-center/backend/internal/adapter/http/handler"
 	"github.com/training-judge-center/backend/internal/adapter/http/middleware"
 	appuser "github.com/training-judge-center/backend/internal/application/user"
+	"github.com/training-judge-center/backend/pkg/apperror"
 )
 
 type fullUserResponse struct {
@@ -40,10 +41,7 @@ type publicUserResponse struct {
 func (h *Handler) GetMyProfile(w http.ResponseWriter, r *http.Request) {
 	cu, ok := middleware.GetCurrentUser(r.Context())
 	if !ok {
-		handler.WriteJSON(r.Context(), w, http.StatusUnauthorized, map[string]string{
-			"error":   "UNAUTHORIZED",
-			"message": "Invalid or missing authentication token",
-		})
+		handler.WriteJSON(r.Context(), w, http.StatusUnauthorized, apperror.AppError{Code: apperror.ErrCodeUnauthorized, Message: "invalid or missing authentication token"})
 		return
 	}
 
@@ -68,10 +66,7 @@ func (h *Handler) GetMyProfile(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) GetByNickname(w http.ResponseWriter, r *http.Request) {
 	cu, ok := middleware.GetCurrentUser(r.Context())
 	if !ok {
-		handler.WriteJSON(r.Context(), w, http.StatusUnauthorized, map[string]string{
-			"error":   "UNAUTHORIZED",
-			"message": "Invalid or missing authentication token",
-		})
+		handler.WriteJSON(r.Context(), w, http.StatusUnauthorized, apperror.AppError{Code: apperror.ErrCodeUnauthorized, Message: "invalid or missing authentication token"})
 		return
 	}
 

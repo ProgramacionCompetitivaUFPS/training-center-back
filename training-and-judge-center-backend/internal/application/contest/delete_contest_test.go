@@ -11,10 +11,9 @@ import (
 	"github.com/training-judge-center/backend/pkg/apperror"
 )
 
-func newDeleteContestUseCase(contest *domainContest.Contest, group *GroupInfo, memberProvider *mockGroupMemberProvider) *DeleteContestUseCase {
+func newDeleteContestUseCase(contest *domainContest.Contest, memberProvider *mockGroupMemberProvider) *DeleteContestUseCase {
 	return NewDeleteContestUseCase(
 		repoWith(contest),
-		&mockGroupProvider{findByIDFn: func(_ context.Context, _ string) (*GroupInfo, error) { return group, nil }},
 		memberProvider,
 		&mockStandingsCache{},
 	)
@@ -38,7 +37,7 @@ func scheduledContestFixture() *domainContest.Contest {
 }
 
 func TestDeleteContest_NotLead_Returns403(t *testing.T) {
-	uc := newDeleteContestUseCase(activeContest(), visibleGroup(), isMemberNotLead())
+	uc := newDeleteContestUseCase(activeContest(), isMemberNotLead())
 
 	err := uc.Execute(context.Background(), DeleteContestInput{
 		CurrentUser: asContestant(callerID),
@@ -53,8 +52,9 @@ func TestDeleteContest_NotLead_Returns403(t *testing.T) {
 
 func TestDeleteContest_ContestNotFound_Returns404(t *testing.T) {
 	uc := NewDeleteContestUseCase(
-		repoWith(nil),
-		&mockGroupProvider{findByIDFn: func(_ context.Context, _ string) (*GroupInfo, error) { return visibleGroup(), nil }},
+		&mockContestRepository{findByIDFn: func(_ context.Context, _ string) (*domainContest.Contest, error) {
+			return nil, apperror.NewNotFound(domainContest.ErrCodeContestNotFound, "contest not found")
+		}},
 		isLead(),
 		&mockStandingsCache{},
 	)
@@ -70,7 +70,7 @@ func TestDeleteContest_ContestNotFound_Returns404(t *testing.T) {
 }
 
 func TestDeleteContest_Lead_Succeeds(t *testing.T) {
-	uc := newDeleteContestUseCase(scheduledContestFixture(), visibleGroup(), isLead())
+	uc := newDeleteContestUseCase(scheduledContestFixture(), isLead())
 
 	err := uc.Execute(context.Background(), DeleteContestInput{
 		CurrentUser: asCoach(callerID),
@@ -83,7 +83,7 @@ func TestDeleteContest_Lead_Succeeds(t *testing.T) {
 }
 
 func TestDeleteContest_Admin_Succeeds(t *testing.T) {
-	uc := newDeleteContestUseCase(activeContest(), visibleGroup(), notLead())
+	uc := newDeleteContestUseCase(activeContest(), notLead())
 
 	err := uc.Execute(context.Background(), DeleteContestInput{
 		CurrentUser: asAdmin(callerID),
@@ -97,7 +97,7 @@ func TestDeleteContest_Admin_Succeeds(t *testing.T) {
 
 func TestDeleteContest_AnyStatus_Succeeds(t *testing.T) {
 	for _, c := range []*domainContest.Contest{scheduledContestFixture(), activeContest(), finishedContest()} {
-		uc := newDeleteContestUseCase(c, visibleGroup(), isLead())
+		uc := newDeleteContestUseCase(c, isLead())
 		err := uc.Execute(context.Background(), DeleteContestInput{
 			CurrentUser: asCoach(callerID),
 			GroupID:     testGroupID,
@@ -119,7 +119,6 @@ func TestDeleteContest_InvalidatesStandingsCache(t *testing.T) {
 	}
 	uc := NewDeleteContestUseCase(
 		repoWith(activeContest()),
-		&mockGroupProvider{findByIDFn: func(_ context.Context, _ string) (*GroupInfo, error) { return visibleGroup(), nil }},
 		isLead(),
 		cache,
 	)

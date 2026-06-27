@@ -105,18 +105,11 @@ func (uc *ListContestsUseCase) Execute(ctx context.Context, in ListContestsInput
 
 	isMember := false
 	if !isAdmin {
-		var err error
-		isMember, err = uc.memberProvider.IsMemberOfGroup(ctx, in.CurrentUser.ID, in.GroupID)
+		role, err := uc.memberProvider.GetMemberRole(ctx, in.CurrentUser.ID, in.GroupID)
 		if err != nil {
 			return nil, err
 		}
-		if !isMember {
-			isLead, err := uc.memberProvider.IsLeadOfGroup(ctx, in.CurrentUser.ID, in.GroupID)
-			if err != nil {
-				return nil, err
-			}
-			isMember = isLead
-		}
+		isMember = role != nil
 	}
 
 	if !group.IsVisible && !isMember && !isAdmin {

@@ -7,6 +7,7 @@ import (
 	domainContest "github.com/training-judge-center/backend/internal/domain/contest"
 	"github.com/training-judge-center/backend/internal/domain/shared"
 	"github.com/training-judge-center/backend/internal/testutil"
+	"github.com/training-judge-center/backend/pkg/apperror"
 )
 
 // ── Time fixture ─────────────────────────────────────────────────────────────
@@ -47,7 +48,7 @@ func (m *mockContestRepository) FindByID(ctx context.Context, id string) (*domai
 	if m.findByIDFn != nil {
 		return m.findByIDFn(ctx, id)
 	}
-	return nil, nil
+	return nil, apperror.NewNotFound(domainContest.ErrCodeContestNotFound, "contest not found")
 }
 func (m *mockContestRepository) Delete(ctx context.Context, id string) error {
 	if m.deleteFn != nil {
@@ -90,40 +91,31 @@ func groupNotFound() *mockGroupProvider {
 // ── GroupMemberProvider mock ─────────────────────────────────────────────────
 
 type mockGroupMemberProvider struct {
-	isLeadFn   func(ctx context.Context, userID, groupID string) (bool, error)
-	isMemberFn func(ctx context.Context, userID, groupID string) (bool, error)
+	getRoleFn func(ctx context.Context, userID, groupID string) (*string, error)
 }
 
-func (m *mockGroupMemberProvider) IsLeadOfGroup(ctx context.Context, userID, groupID string) (bool, error) {
-	if m.isLeadFn != nil {
-		return m.isLeadFn(ctx, userID, groupID)
+func (m *mockGroupMemberProvider) GetMemberRole(ctx context.Context, userID, groupID string) (*string, error) {
+	if m.getRoleFn != nil {
+		return m.getRoleFn(ctx, userID, groupID)
 	}
-	return false, nil
-}
-
-func (m *mockGroupMemberProvider) IsMemberOfGroup(ctx context.Context, userID, groupID string) (bool, error) {
-	if m.isMemberFn != nil {
-		return m.isMemberFn(ctx, userID, groupID)
-	}
-	return false, nil
+	return nil, nil
 }
 
 func isLead() *mockGroupMemberProvider {
+	role := "LEAD"
 	return &mockGroupMemberProvider{
-		isLeadFn:   func(_ context.Context, _, _ string) (bool, error) { return true, nil },
-		isMemberFn: func(_ context.Context, _, _ string) (bool, error) { return true, nil },
+		getRoleFn: func(_ context.Context, _, _ string) (*string, error) { return &role, nil },
 	}
 }
 func notLead() *mockGroupMemberProvider {
 	return &mockGroupMemberProvider{
-		isLeadFn:   func(_ context.Context, _, _ string) (bool, error) { return false, nil },
-		isMemberFn: func(_ context.Context, _, _ string) (bool, error) { return false, nil },
+		getRoleFn: func(_ context.Context, _, _ string) (*string, error) { return nil, nil },
 	}
 }
 func isMemberNotLead() *mockGroupMemberProvider {
+	role := "MEMBER"
 	return &mockGroupMemberProvider{
-		isLeadFn:   func(_ context.Context, _, _ string) (bool, error) { return false, nil },
-		isMemberFn: func(_ context.Context, _, _ string) (bool, error) { return true, nil },
+		getRoleFn: func(_ context.Context, _, _ string) (*string, error) { return &role, nil },
 	}
 }
 

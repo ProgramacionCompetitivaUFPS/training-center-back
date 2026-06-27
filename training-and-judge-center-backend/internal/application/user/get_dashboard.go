@@ -20,6 +20,7 @@ const (
 
 type GetDashboardInput struct {
 	CurrentUser appshared.CurrentUser
+	Now         time.Time
 }
 
 type GetDashboardOutput struct {
@@ -105,7 +106,7 @@ func (uc *GetDashboardUseCase) Execute(ctx context.Context, in GetDashboardInput
 		return nil, err
 	}
 
-	currentStreak, maximumStreak := computeStreak(dates, time.Now())
+	currentStreak, maximumStreak := computeStreak(dates, in.Now)
 
 	return &GetDashboardOutput{
 		RecentSubmissions:    submissions,
