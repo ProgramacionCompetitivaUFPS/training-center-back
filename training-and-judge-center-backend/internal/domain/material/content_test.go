@@ -13,7 +13,7 @@ func TestNewContent(t *testing.T) {
 		input   string
 		wantErr bool
 	}{
-		{"empty string", "", false},
+		{"empty string", "", true},
 		{"valid content", "Hello, world!", false},
 		{"exactly 50000 chars", strings.Repeat("a", 50000), false},
 		{"50001 chars", strings.Repeat("a", 50001), true},

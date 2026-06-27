@@ -206,23 +206,21 @@ func TestUpdateMaterial_ClearTags(t *testing.T) {
 	}
 }
 
-func TestUpdateMaterial_ClearContent(t *testing.T) {
+func TestUpdateMaterial_EmptyContentReturnsValidation(t *testing.T) {
 	m := newTestMaterial()
 	uc := newUpdateMaterialUseCase(repoWith(m), groupExists())
 
 	emptyContent := ""
-	out, err := uc.Execute(context.Background(), UpdateMaterialInput{
+	_, err := uc.Execute(context.Background(), UpdateMaterialInput{
 		CurrentUser: asCoach(testAuthorID),
 		GroupID:     testGroupID,
 		MaterialID:  testMaterialID,
 		Content:     &emptyContent,
 	})
 
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if out.Material.Content != "" {
-		t.Errorf("expected empty content, got %q", out.Material.Content)
+	ae, ok := err.(*apperror.AppError)
+	if !ok || ae.Code != apperror.ErrCodeValidationError {
+		t.Fatalf("expected VALIDATION_ERROR, got %v", err)
 	}
 }
 
