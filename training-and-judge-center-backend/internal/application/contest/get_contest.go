@@ -77,9 +77,6 @@ func (uc *GetContestUseCase) Execute(ctx context.Context, in GetContestInput) (*
 	if err != nil {
 		return nil, err
 	}
-	if c == nil {
-		return nil, apperror.NewNotFound(domainContest.ErrCodeContestNotFound, "contest not found")
-	}
 	if c.GroupID().Value() != in.GroupID {
 		return nil, apperror.NewNotFound(domainContest.ErrCodeContestNotFound, "contest not found")
 	}
@@ -87,9 +84,6 @@ func (uc *GetContestUseCase) Execute(ctx context.Context, in GetContestInput) (*
 	group, err := uc.groupProvider.FindByID(ctx, in.GroupID)
 	if err != nil {
 		return nil, err
-	}
-	if group == nil {
-		return nil, apperror.NewNotFound(ErrCodeGroupNotFound, "group not found")
 	}
 
 	isAdmin := in.CurrentUser.IsAdmin()

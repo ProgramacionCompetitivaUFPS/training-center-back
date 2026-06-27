@@ -96,16 +96,13 @@ func (uc *ListContestSubmissionsUseCase) Execute(ctx context.Context, in ListCon
 	if err != nil {
 		return nil, err
 	}
-	if contest == nil || contest.GroupID().Value() != in.GroupID {
+	if contest.GroupID().Value() != in.GroupID {
 		return nil, apperror.NewNotFound(domainContest.ErrCodeContestNotFound, "contest not found")
 	}
 
 	group, err := uc.groupProvider.FindByID(ctx, in.GroupID)
 	if err != nil {
 		return nil, err
-	}
-	if group == nil {
-		return nil, apperror.NewNotFound(domainContest.ErrCodeContestNotFound, "contest not found")
 	}
 
 	isAdmin := in.CurrentUser.IsAdmin()

@@ -38,7 +38,7 @@ func TestUnregisterFromContest_HappyPath(t *testing.T) {
 func TestUnregisterFromContest_ContestNotFound(t *testing.T) {
 	repo := &mockContestRepository{
 		findByIDFn: func(_ context.Context, _ string) (*domainContest.Contest, error) {
-			return nil, nil
+			return nil, apperror.NewNotFound(domainContest.ErrCodeContestNotFound, "contest not found")
 		},
 	}
 	uc := newUnregisterUseCase(repo, mockRegistrations(), isMemberNotLead())

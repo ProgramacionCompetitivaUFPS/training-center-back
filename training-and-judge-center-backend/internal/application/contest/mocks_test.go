@@ -7,6 +7,7 @@ import (
 	domainContest "github.com/training-judge-center/backend/internal/domain/contest"
 	"github.com/training-judge-center/backend/internal/domain/shared"
 	"github.com/training-judge-center/backend/internal/testutil"
+	"github.com/training-judge-center/backend/pkg/apperror"
 )
 
 // ── Time fixture ─────────────────────────────────────────────────────────────
@@ -47,7 +48,7 @@ func (m *mockContestRepository) FindByID(ctx context.Context, id string) (*domai
 	if m.findByIDFn != nil {
 		return m.findByIDFn(ctx, id)
 	}
-	return nil, nil
+	return nil, apperror.NewNotFound(domainContest.ErrCodeContestNotFound, "contest not found")
 }
 func (m *mockContestRepository) Delete(ctx context.Context, id string) error {
 	if m.deleteFn != nil {

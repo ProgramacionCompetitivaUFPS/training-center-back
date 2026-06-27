@@ -73,10 +73,6 @@ func (uc *UpdateContestUseCase) Execute(ctx context.Context, in UpdateContestInp
 	if err != nil {
 		return nil, err
 	}
-	if c == nil {
-		return nil, apperror.NewNotFound(domainContest.ErrCodeContestNotFound, "contest not found")
-	}
-
 	if c.GroupID().Value() != in.GroupID {
 		return nil, apperror.NewNotFound(domainContest.ErrCodeContestNotFound, "contest not found in this group")
 	}

@@ -55,10 +55,6 @@ func (uc *ListContestRegistrationsUseCase) Execute(ctx context.Context, in ListC
 	if err != nil {
 		return nil, err
 	}
-	if c == nil {
-		return nil, apperror.NewNotFound(domainContest.ErrCodeContestNotFound, "contest not found")
-	}
-
 	if c.GroupID().Value() != in.GroupID {
 		return nil, apperror.NewNotFound(domainContest.ErrCodeContestNotFound, "contest not found")
 	}

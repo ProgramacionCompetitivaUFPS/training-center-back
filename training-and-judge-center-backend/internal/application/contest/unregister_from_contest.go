@@ -38,10 +38,6 @@ func (uc *UnregisterFromContestUseCase) Execute(ctx context.Context, in Unregist
 	if err != nil {
 		return err
 	}
-	if c == nil {
-		return apperror.NewNotFound(domainContest.ErrCodeContestNotFound, "contest not found")
-	}
-
 	if c.GroupID().Value() != in.GroupID {
 		return apperror.NewNotFound(domainContest.ErrCodeContestNotFound, "contest not found")
 	}

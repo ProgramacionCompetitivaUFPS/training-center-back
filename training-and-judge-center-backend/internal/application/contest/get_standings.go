@@ -96,9 +96,6 @@ func (uc *GetStandingsUseCase) Execute(ctx context.Context, in GetStandingsInput
 	if err != nil {
 		return nil, err
 	}
-	if contest == nil {
-		return nil, apperror.NewNotFound(domainContest.ErrCodeContestNotFound, "contest not found")
-	}
 	if contest.GroupID().Value() != in.GroupID {
 		return nil, apperror.NewNotFound(domainContest.ErrCodeContestNotFound, "contest not found")
 	}
@@ -106,9 +103,6 @@ func (uc *GetStandingsUseCase) Execute(ctx context.Context, in GetStandingsInput
 	group, err := uc.groupProvider.FindByID(ctx, in.GroupID)
 	if err != nil {
 		return nil, err
-	}
-	if group == nil {
-		return nil, apperror.NewNotFound(ErrCodeGroupNotFound, "group not found")
 	}
 
 	isAdmin := in.CurrentUser.IsAdmin()

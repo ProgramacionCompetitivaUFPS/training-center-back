@@ -348,7 +348,7 @@ func main() {
 		contestCallerStandingProvider,
 	)
 	deleteContestUseCase := appcontest.NewDeleteContestUseCase(
-		contestRepo, contestGroupProvider, contestMemberProvider, contestStandingsCache,
+		contestRepo, contestMemberProvider, contestStandingsCache,
 	)
 	contestHandler := handlercontest.NewHandler(
 		createContestUseCase, updateContestUseCase, deleteContestUseCase,

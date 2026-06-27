@@ -9,6 +9,7 @@ import (
 
 	appcontest "github.com/training-judge-center/backend/internal/application/contest"
 	domainContest "github.com/training-judge-center/backend/internal/domain/contest"
+	"github.com/training-judge-center/backend/pkg/apperror"
 )
 
 func newHandlerWithRegister(uc *appcontest.RegisterToContestUseCase) *Handler {
@@ -33,6 +34,9 @@ type mockRepoReturning struct {
 func (s *mockRepoReturning) Create(_ context.Context, _ *domainContest.Contest) error { return nil }
 func (s *mockRepoReturning) Update(_ context.Context, _ *domainContest.Contest) error { return nil }
 func (s *mockRepoReturning) FindByID(_ context.Context, _ string) (*domainContest.Contest, error) {
+	if s.contest == nil {
+		return nil, apperror.NewNotFound(domainContest.ErrCodeContestNotFound, "contest not found")
+	}
 	return s.contest, nil
 }
 func (s *mockRepoReturning) Delete(_ context.Context, _ string) error { return nil }
