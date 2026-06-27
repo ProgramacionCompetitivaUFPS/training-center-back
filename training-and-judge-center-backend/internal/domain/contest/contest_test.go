@@ -206,7 +206,10 @@ func TestNewContest_FreezeMinutesExceedsDuration(t *testing.T) {
 		contest.RestoreParticipationMode("INDIVIDUAL"), contest.RestoreTeamSize(2, 5),
 		fixedNow,
 	)
-	assertValidationField(t, "NewContest(freezeMinutesExceedsDuration)", err, "freezeMinutes")
+	ae, ok := err.(*apperror.AppError)
+	if !ok || ae.Code != contest.ErrCodeFreezeTooLong {
+		t.Fatalf("NewContest(freezeMinutesExceedsDuration): expected FREEZE_TOO_LONG, got %v", err)
+	}
 }
 
 func TestContest_Status(t *testing.T) {

@@ -98,12 +98,10 @@ func (h *Handler) ConfirmEmailChange(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if !digitCodeRegex.MatchString(body.Code) {
-		handler.WriteJSON(r.Context(), w, http.StatusBadRequest, map[string]any{
-			"error":   "VALIDATION_ERROR",
-			"message": "Invalid request data",
-			"details": []map[string]string{
-				{"field": "code", "message": "Code must be exactly 6 digits"},
-			},
+		handler.WriteJSON(r.Context(), w, http.StatusBadRequest, apperror.AppError{
+			Code:    apperror.ErrCodeValidationError,
+			Message: "invalid request data",
+			Details: []apperror.FieldError{{Field: "code", Message: "code must be exactly 6 digits"}},
 		})
 		return
 	}

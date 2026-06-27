@@ -21,23 +21,23 @@ var languageConfig = map[string]struct {
 
 // validateLanguage checks that language, compiler, and filename extension are
 // mutually compatible. Returns the typed Language value object on success.
-func validateLanguage(language, compiler, fileName string) (domainSubmission.Language, error) {
+func validateLanguage(language, compiler, fileName string) (domainSubmission.Language, string, error) {
 	langVO, err := domainSubmission.NewLanguage(language)
 	if err != nil {
-		return domainSubmission.Language{}, err
+		return domainSubmission.Language{}, "", err
 	}
 	cfg, ok := languageConfig[language]
 	if !ok {
-		return domainSubmission.Language{}, apperror.NewBadRequest(domainSubmission.ErrCodeCompilerMismatch, "unsupported language")
+		return domainSubmission.Language{}, "", apperror.NewBadRequest(domainSubmission.ErrCodeCompilerMismatch, "unsupported language")
 	}
 	if compiler != cfg.compiler {
-		return domainSubmission.Language{}, apperror.NewBadRequest(domainSubmission.ErrCodeCompilerMismatch, "compiler does not match the selected language")
+		return domainSubmission.Language{}, "", apperror.NewBadRequest(domainSubmission.ErrCodeCompilerMismatch, "compiler does not match the selected language")
 	}
 	fileExt := strings.ToLower(filepath.Ext(fileName))
 	for _, ext := range cfg.extensions {
 		if fileExt == ext {
-			return langVO, nil
+			return langVO, cfg.ext, nil
 		}
 	}
-	return domainSubmission.Language{}, apperror.NewBadRequest(domainSubmission.ErrCodeCompilerMismatch, "file extension does not match the selected language")
+	return domainSubmission.Language{}, "", apperror.NewBadRequest(domainSubmission.ErrCodeCompilerMismatch, "file extension does not match the selected language")
 }

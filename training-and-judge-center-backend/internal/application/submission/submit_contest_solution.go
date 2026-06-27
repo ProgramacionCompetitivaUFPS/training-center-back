@@ -82,7 +82,7 @@ func (uc *SubmitContestSolutionUseCase) Execute(ctx context.Context, in SubmitCo
 	}
 
 	// 2-3. Validate language, compiler, and file extension
-	langVO, err := validateLanguage(in.Language, in.Compiler, in.FileName)
+	langVO, ext, err := validateLanguage(in.Language, in.Compiler, in.FileName)
 	if err != nil {
 		return nil, err
 	}
@@ -179,7 +179,7 @@ func (uc *SubmitContestSolutionUseCase) Execute(ctx context.Context, in SubmitCo
 
 	// 13. Upload to contest-specific storage path
 	submissionID := uuid.New().String()
-	storagePath := fmt.Sprintf("%s/%s/%s/%s%s", problem.ID, userID, in.ContestID, submissionID, languageConfig[in.Language].ext)
+	storagePath := fmt.Sprintf("%s/%s/%s/%s%s", problem.ID, userID, in.ContestID, submissionID, ext)
 
 	if err := uc.sourceStorage.Upload(ctx, storagePath, in.FileData); err != nil {
 		return nil, err
