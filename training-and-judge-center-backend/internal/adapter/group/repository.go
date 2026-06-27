@@ -206,12 +206,17 @@ func (r *Repository) List(ctx context.Context, filters domainGroup.ListFilters) 
 		where = "WHERE " + strings.Join(conds, " AND ")
 	}
 
-	orderBy := mapSortClause(filters, viewerArg)
-
+	joinClause := ""
 	memberCountSelect := ""
-	if filters.SortBy == domainGroup.SortByMemberCount {
-		memberCountSelect = ", (SELECT COUNT(*) FROM group_members gm2 WHERE gm2.group_id = g.id) AS mc"
+	switch filters.SortBy {
+	case domainGroup.SortByMemberCount:
+		joinClause = "LEFT JOIN (SELECT group_id, COUNT(*) AS mc FROM group_members GROUP BY group_id) gm_count ON gm_count.group_id = g.id"
+		memberCountSelect = ", COALESCE(gm_count.mc, 0) AS mc"
+	case domainGroup.SortByJoinedAt:
+		joinClause = fmt.Sprintf("LEFT JOIN group_members gm_joined ON gm_joined.group_id = g.id AND gm_joined.user_id = %s", viewerArg())
 	}
+
+	orderBy := mapSortClause(filters)
 
 	countArgs := make([]any, len(args))
 	copy(countArgs, args)
@@ -225,9 +230,10 @@ func (r *Repository) List(ctx context.Context, filters domainGroup.ListFilters) 
 		       g.created_by, g.created_at, g.updated_at%s
 		FROM groups g
 		%s
+		%s
 		ORDER BY %s
 		LIMIT %s OFFSET %s
-	`, memberCountSelect, where, orderBy, limitArg, offsetArg)
+	`, memberCountSelect, joinClause, where, orderBy, limitArg, offsetArg)
 
 	countQuery := fmt.Sprintf("SELECT COUNT(*) FROM groups g %s", where)
 
@@ -312,7 +318,7 @@ func scanGroupRow(row rowScanner, hasMemberCount bool) (*domainGroup.Group, erro
 	), nil
 }
 
-func mapSortClause(f domainGroup.ListFilters, viewerArg func() string) string {
+func mapSortClause(f domainGroup.ListFilters) string {
 	dir := "ASC"
 	if f.Order == domainGroup.OrderDesc {
 		dir = "DESC"
@@ -323,10 +329,7 @@ func mapSortClause(f domainGroup.ListFilters, viewerArg func() string) string {
 	case domainGroup.SortByMemberCount:
 		return fmt.Sprintf("mc %s, g.name ASC", dir)
 	case domainGroup.SortByJoinedAt:
-		return fmt.Sprintf(
-			"(SELECT joined_at FROM group_members gm WHERE gm.group_id = g.id AND gm.user_id = %s) %s, g.name ASC",
-			viewerArg(), dir,
-		)
+		return fmt.Sprintf("gm_joined.joined_at %s, g.name ASC", dir)
 	default:
 		return fmt.Sprintf("g.name %s", dir)
 	}
