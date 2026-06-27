@@ -105,11 +105,6 @@ func (uc *CreateContestUseCase) Execute(ctx context.Context, in CreateContestInp
 	}
 
 	// Resolve and validate problems.
-	type problemEntry struct {
-		id    string
-		slug  string
-		title string
-	}
 	var problemEntries []problemEntry
 
 	if len(in.Problems) > 0 {

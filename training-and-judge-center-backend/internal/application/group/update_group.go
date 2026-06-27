@@ -135,82 +135,13 @@ func (uc *UpdateGroupUseCase) Execute(ctx context.Context, in UpdateGroupInput) 
 	autoApproved := 0
 	autoRejected := 0
 
-	// policyActuallyChanges is true only when the new join policy differs from the current one.
-	// This prevents loading and processing pending requests on a no-op (e.g. REQUEST→REQUEST).
-	policyActuallyChanges := newJoinPolicy != nil && *newJoinPolicy != oldPolicy
-
-	needPending := (newVisibility != nil && *newVisibility == domainGroup.VisibilityNotVisible) ||
-		(policyActuallyChanges && oldPolicy == domainGroup.JoinPolicyRequest)
-
 	if err := uc.txManager.WithTx(ctx, func(txCtx context.Context) error {
-		var pendingRequests []*domainGroup.JoinRequest
-		if needPending {
-			pending := domainGroup.JoinRequestStatusPending
-			reqs, _, err := uc.reqRepo.FindByGroup(txCtx, in.GroupID, domainGroup.JoinRequestFilters{
-				Status: &pending,
-				Page:   1,
-				Limit:  10000,
-			})
-			if err != nil {
-				return err
-			}
-			pendingRequests = reqs
+		approved, rejected, err := uc.processPendingRequests(txCtx, in.GroupID, oldPolicy, newJoinPolicy, newVisibility, now)
+		if err != nil {
+			return err
 		}
-
-		if newVisibility != nil && *newVisibility == domainGroup.VisibilityNotVisible {
-			for _, req := range pendingRequests {
-				if err := req.Reject(); err != nil {
-					return err
-				}
-				if err := uc.reqRepo.Save(txCtx, req); err != nil {
-					return err
-				}
-				autoRejected++
-			}
-		} else if policyActuallyChanges && oldPolicy == domainGroup.JoinPolicyRequest {
-			if *newJoinPolicy == domainGroup.JoinPolicyOpen {
-				for _, req := range pendingRequests {
-					existing, err := uc.memberRepo.FindByGroupAndUser(txCtx, in.GroupID, req.RequesterUserID())
-					if err != nil {
-						return err
-					}
-					if existing != nil {
-						_ = req.Reject()
-						if err := uc.reqRepo.Save(txCtx, req); err != nil {
-							return err
-						}
-						continue
-					}
-					if err := req.Approve(); err != nil {
-						return err
-					}
-					if err := uc.reqRepo.Save(txCtx, req); err != nil {
-						return err
-					}
-					newMember, err := domainGroup.NewGroupMember(
-						uuid.New().String(), in.GroupID, req.RequesterUserID(),
-						domainGroup.MemberRoleMember, domainGroup.JoinMethodRequestApproved, nil, now,
-					)
-					if err != nil {
-						return err
-					}
-					if err := uc.memberRepo.Save(txCtx, newMember); err != nil {
-						return err
-					}
-					autoApproved++
-				}
-			} else {
-				for _, req := range pendingRequests {
-					if err := req.Reject(); err != nil {
-						return err
-					}
-					if err := uc.reqRepo.Save(txCtx, req); err != nil {
-						return err
-					}
-					autoRejected++
-				}
-			}
-		}
+		autoApproved = approved
+		autoRejected = rejected
 
 		var descUpdate **string
 		if in.Description != nil {
@@ -248,4 +179,94 @@ func (uc *UpdateGroupUseCase) Execute(ctx context.Context, in UpdateGroupInput) 
 		RequestsAutoApproved: autoApproved,
 		RequestsAutoRejected: autoRejected,
 	}, nil
+}
+
+// processPendingRequests handles the three-way logic for outstanding join
+// requests when the group's visibility or join policy changes inside a
+// transaction: NOT_VISIBLE → reject all; REQUEST→OPEN → approve (or reject if
+// already a member); REQUEST→INVITE → reject all.
+func (uc *UpdateGroupUseCase) processPendingRequests(
+	ctx context.Context,
+	groupID string,
+	oldPolicy domainGroup.JoinPolicy,
+	newJoinPolicy *domainGroup.JoinPolicy,
+	newVisibility *domainGroup.Visibility,
+	now time.Time,
+) (autoApproved, autoRejected int, err error) {
+	policyActuallyChanges := newJoinPolicy != nil && *newJoinPolicy != oldPolicy
+	needPending := (newVisibility != nil && *newVisibility == domainGroup.VisibilityNotVisible) ||
+		(policyActuallyChanges && oldPolicy == domainGroup.JoinPolicyRequest)
+
+	if !needPending {
+		return 0, 0, nil
+	}
+
+	pending := domainGroup.JoinRequestStatusPending
+	pendingRequests, _, err := uc.reqRepo.FindByGroup(ctx, groupID, domainGroup.JoinRequestFilters{
+		Status: &pending,
+		Page:   1,
+		Limit:  10000,
+	})
+	if err != nil {
+		return 0, 0, err
+	}
+
+	if newVisibility != nil && *newVisibility == domainGroup.VisibilityNotVisible {
+		for _, req := range pendingRequests {
+			if err := req.Reject(); err != nil {
+				return 0, 0, err
+			}
+			if err := uc.reqRepo.Save(ctx, req); err != nil {
+				return 0, 0, err
+			}
+			autoRejected++
+		}
+		return autoApproved, autoRejected, nil
+	}
+
+	// oldPolicy == REQUEST and policy is actually changing
+	if *newJoinPolicy == domainGroup.JoinPolicyOpen {
+		for _, req := range pendingRequests {
+			existing, err := uc.memberRepo.FindByGroupAndUser(ctx, groupID, req.RequesterUserID())
+			if err != nil {
+				return 0, 0, err
+			}
+			if existing != nil {
+				_ = req.Reject()
+				if err := uc.reqRepo.Save(ctx, req); err != nil {
+					return 0, 0, err
+				}
+				continue
+			}
+			if err := req.Approve(); err != nil {
+				return 0, 0, err
+			}
+			if err := uc.reqRepo.Save(ctx, req); err != nil {
+				return 0, 0, err
+			}
+			newMember, err := domainGroup.NewGroupMember(
+				uuid.New().String(), groupID, req.RequesterUserID(),
+				domainGroup.MemberRoleMember, domainGroup.JoinMethodRequestApproved, nil, now,
+			)
+			if err != nil {
+				return 0, 0, err
+			}
+			if err := uc.memberRepo.Save(ctx, newMember); err != nil {
+				return 0, 0, err
+			}
+			autoApproved++
+		}
+	} else {
+		for _, req := range pendingRequests {
+			if err := req.Reject(); err != nil {
+				return 0, 0, err
+			}
+			if err := uc.reqRepo.Save(ctx, req); err != nil {
+				return 0, 0, err
+			}
+			autoRejected++
+		}
+	}
+
+	return autoApproved, autoRejected, nil
 }
