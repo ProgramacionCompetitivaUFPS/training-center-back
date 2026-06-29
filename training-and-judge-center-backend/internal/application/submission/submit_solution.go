@@ -131,7 +131,7 @@ func (uc *SubmitSolutionUseCase) Execute(ctx context.Context, in SubmitSolutionI
 	if last != nil {
 		elapsed := in.SubmittedAt.Sub(last.SubmittedAt())
 		if elapsed.Seconds() < float64(uc.rateLimitSeconds) {
-			return nil, apperror.NewTooManyRequests(domainSubmission.ErrCodeRateLimitExceeded,
+			return nil, apperror.NewTooManyRequests(ErrCodeRateLimitExceeded,
 				fmt.Sprintf("please wait before submitting again (rate limit: %d second)", uc.rateLimitSeconds),
 				uc.rateLimitSeconds)
 		}
