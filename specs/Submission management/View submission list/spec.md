@@ -64,48 +64,6 @@ As a user, I want to see public submissions for a problem so that I can learn fr
 
 ---
 
-### User Story 3 - View submissions in a contest (Priority: P1)
-
-> ⚠️ **SUPERSEDED (2026-06-21)** — El modelo de parámetro `scope` (`mine`/`team`/`public`/`all`) y el error `SCOPE_NOT_ALLOWED` descritos en esta historia y en su contrato (`GET /api/groups/{groupId}/contests/{contestId}/submissions`, ver más abajo) **NO** se implementaron. El endpoint sigue la spec **`Contest management/View contest submissions`**, que usa lógica de *freeze* + filtros `problemSlug`/`nickname`/`phase` en lugar de `scope`. Esta sección queda reemplazada por esa spec. Ver `.agent/audit/01-submission-management.md` §3.
-
-As a contest participant, I want to see submissions in a contest so that I can review my and my team's progress.
-
-**Why this priority**: Contest submission visibility is essential for team coordination and post-contest analysis.
-
-**Acceptance Scenarios**:
-
-1. **Scenario**: User views their own submissions in a contest
-   * **Given** user is registered to a contest
-   * **And** has submitted solutions
-   * **When** they request their contest submissions
-   * **Then** system returns all their submissions in that contest
-
-2. **Scenario**: User views their team's submissions in a contest
-   * **Given** user is in a team registered to a contest
-   * **And** teammates have submitted solutions
-   * **When** they request team submissions
-   * **Then** system returns all submissions from team members
-
-3. **Scenario**: User views public submissions in finished contest
-   * **Given** a contest is FINISHED
-   * **And** has PUBLIC submissions from participants
-   * **When** user requests public submissions
-   * **Then** system returns PUBLIC submissions from all participants
-
-4. **Scenario**: Lead views all submissions in their group's contest
-   * **Given** user is Lead of a group
-   * **And** a contest exists in that group
-   * **When** Lead requests contest submissions
-   * **Then** system returns ALL submissions (Lead sees all as public)
-
-5. **Scenario**: Non-participant cannot view submissions in active contest
-   * **Given** a contest is ACTIVE
-   * **And** user is NOT registered
-   * **When** they request contest submissions
-   * **Then** system rejects with 403 Forbidden
-
----
-
 ## Requirements *(mandatory)*
 
 ### Functional Requirements
@@ -124,16 +82,6 @@ As a contest participant, I want to see submissions in a contest so that I can r
 * **FR-VSL-007**: System MUST only return PUBLIC submissions for non-admin users.
 * **FR-VSL-008**: System MUST exclude contest submissions from this view.
 * **FR-VSL-009**: Admin users MUST see all submissions regardless of visibility.
-
-**Contest Submissions**
-
-* **FR-VSL-010**: System MUST provide endpoint to list submissions in a contest.
-* **FR-VSL-011**: Participants MUST see their own submissions.
-* **FR-VSL-012**: Team members MUST see all submissions from their team.
-* **FR-VSL-013**: In FINISHED contests, participants MUST see PUBLIC submissions from all participants.
-* **FR-VSL-014**: Lead MUST see all submissions in contests within their group.
-* **FR-VSL-015**: Admin MUST see all submissions.
-* **FR-VSL-016**: Non-registered users MUST NOT see submissions in ACTIVE contests.
 
 **Filters**
 
@@ -259,65 +207,6 @@ List public submissions for a problem (outside contests).
 * Returns only PUBLIC submissions by default
 * Admin sees ALL submissions
 * Use `?mine=true` to see only your submissions (regardless of visibility)
-
----
-
-### GET /api/groups/{groupId}/contests/{contestId}/submissions
-
-> ⚠️ **SUPERSEDED** — El parámetro `scope` y el error `SCOPE_NOT_ALLOWED` de abajo no se implementaron. Ver la spec vigente `Contest management/View contest submissions` (freeze + `problemSlug`/`nickname`/`phase`).
-
-List submissions in a contest.
-
-**Headers**:
-
-| Header | Type | Required | Description |
-|--------|------|----------|-------------|
-| Authorization | string | Yes | Bearer token for authentication |
-
-**Path Parameters**:
-
-| Parameter | Type | Required | Description |
-|-----------|------|----------|-------------|
-| groupId | UUID | Yes | The group ID |
-| contestId | UUID | Yes | The contest ID |
-
-**Query Parameters**:
-
-| Parameter | Type | Required | Default | Description |
-|-----------|------|----------|---------|-------------|
-| page | integer | No | 1 | Page number |
-| limit | integer | No | 20 | Items per page |
-| scope | enum | No | mine | `mine`, `team`, `public`, `all` |
-| problemSlug | string | No | - | Filter by problem |
-| verdict | string | No | - | Filter by verdict |
-| language | string | No | - | Filter by language |
-
-**Scope Values**:
-
-| Scope | Who Can Use | Description |
-|-------|-------------|-------------|
-| `mine` | Registered user | Only my submissions |
-| `team` | Team member | All team submissions |
-| `public` | Any registered user (FINISHED) | PUBLIC submissions in finished contest |
-| `all` | Lead, Admin | All submissions |
-
-**Error Responses**:
-
-#### 403 Forbidden
-
-```json
-{
-  "error": "ACCESS_DENIED",
-  "message": "You must be registered to the contest to view submissions"
-}
-```
-
-```json
-{
-  "error": "SCOPE_NOT_ALLOWED",
-  "message": "The 'all' scope is only available for Leads and Admins"
-}
-```
 
 ---
 

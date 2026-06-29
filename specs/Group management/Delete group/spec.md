@@ -80,24 +80,6 @@ As an Admin, I want to delete any group in the system so that I can perform admi
 
 ---
 
-### User Story 3 – Contestant attempts to delete group (Priority: P3)
-
-As a Contestant, I should not be able to delete any group regardless of my membership status.
-
-**Why this priority**: Security validation to ensure only authorized roles can perform destructive operations.
-
-**Independent Test**: This user story can be tested independently by attempting deletion with Contestant role, validating rejection.
-
-**Acceptance Scenarios**:
-
-1. **Scenario**: Contestant attempts to delete group
-   * **Given** a group exists
-   * **And** the authenticated user has Contestant role (even if they are a member)
-   * **When** they attempt to delete the group
-   * **Then** the system rejects with 403 Forbidden (INSUFFICIENT_PERMISSIONS)
-
----
-
 ### Edge Cases
 
 * Group with no contests or materials (simple deletion)

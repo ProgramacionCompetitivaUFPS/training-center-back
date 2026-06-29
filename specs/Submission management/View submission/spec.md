@@ -205,59 +205,6 @@ Retrieve details of a specific submission.
 
 ---
 
-### PATCH /api/submissions/{submissionId}/visibility
-
-Update the visibility of a submission.
-
-**Headers**:
-
-| Header | Type | Required | Description |
-|--------|------|----------|-------------|
-| Authorization | string | Yes | Bearer token for authentication |
-
-**Path Parameters**:
-
-| Parameter | Type | Required | Description |
-|-----------|------|----------|-------------|
-| submissionId | UUID | Yes | The unique identifier of the submission |
-
-**Request Body**:
-
-```json
-{
-  "visibility": "PUBLIC"
-}
-```
-
-| Field | Type | Required | Description |
-|-------|------|----------|-------------|
-| visibility | enum | Yes | PUBLIC or PRIVATE |
-
-**Success Response (200 OK)**:
-
-```json
-{
-  "id": "submission-uuid",
-  "visibility": "PUBLIC",
-  "message": "Visibility updated successfully"
-}
-```
-
-**Error Responses**:
-
-#### 403 Forbidden
-
-Only the author can change visibility.
-
-```json
-{
-  "error": "ACCESS_DENIED",
-  "message": "Only the submission author can change visibility"
-}
-```
-
----
-
 ## Notes / Implementation hints
 
 * Source code is stored in cloud storage, not in the database

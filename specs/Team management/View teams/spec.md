@@ -32,33 +32,7 @@ As a user, I want to see a list of teams I belong to so that I can manage my tea
 
 ---
 
-### User Story 2 - View pending team invitations (Priority: P1)
-
-As a user, I want to see team invitations I've received so that I can accept or reject them.
-
-**Why this priority**: Users need to see and respond to invitations to join teams.
-
-**Acceptance Scenarios**:
-
-1. **Scenario**: User views pending invitations
-   * **Given** user has pending team invitations
-   * **When** they request their invitations
-   * **Then** system returns all pending invitations
-   * **And** includes team info and inviter info
-
-2. **Scenario**: User has no pending invitations
-   * **Given** user has no pending invitations
-   * **When** they request their invitations
-   * **Then** system returns an empty list
-
-3. **Scenario**: Invitation was already accepted
-   * **Given** user accepted an invitation
-   * **When** they request pending invitations
-   * **Then** that invitation is NOT in the list
-
----
-
-### User Story 3 - View team details (Priority: P2)
+### User Story 2 - View team details (Priority: P2)
 
 As an authenticated user, I want to view the details of any team so that I can see its members before accepting an invitation or checking contest standings.
 
@@ -93,14 +67,6 @@ As an authenticated user, I want to view the details of any team so that I can s
 * **FR-VT-002**: System MUST return team name and member count for each team.
 * **FR-VT-003**: System MUST return the user's join date for each team.
 * **FR-VT-004**: System MUST sort teams by join date descending by default.
-
-**Pending Invitations**
-
-* **FR-VT-005**: System MUST provide endpoint for users to list pending team invitations.
-* **FR-VT-006**: System MUST include team info (id, name) for each invitation.
-* **FR-VT-007**: System MUST include inviter info (id, nickname) for each invitation.
-* **FR-VT-008**: System MUST include invitation date and expiration (if applicable).
-* **FR-VT-009**: System MUST NOT return accepted or rejected invitations.
 
 **Team Details**
 
@@ -160,46 +126,6 @@ List teams where the authenticated user is a member.
     "page": 1,
     "limit": 20,
     "total": 2,
-    "totalPages": 1
-  }
-}
-```
-
----
-
-### GET /api/users/me/team-invitations
-
-List pending team invitations for the authenticated user.
-
-**Headers**:
-
-| Header | Type | Required | Description |
-|--------|------|----------|-------------|
-| Authorization | string | Yes | Bearer token for authentication |
-
-**Success Response (200 OK)**:
-
-```json
-{
-  "invitations": [
-    {
-      "id": "invitation-uuid",
-      "team": {
-        "id": "team-uuid",
-        "name": "Team Beta"
-      },
-      "invitedBy": {
-        "id": "user-uuid",
-        "nickname": "alice_coder"
-      },
-      "invitedAt": "2026-02-05T10:00:00Z",
-      "expiresAt": null
-    }
-  ],
-  "pagination": {
-    "page": 1,
-    "limit": 20,
-    "total": 1,
     "totalPages": 1
   }
 }
