@@ -121,7 +121,7 @@ func TestSubmitSolution_RateLimitExceeded(t *testing.T) {
 	require.Error(t, err)
 	ae := err.(*apperror.AppError)
 	assert.Equal(t, apperror.KindTooManyRequests, ae.Kind)
-	assert.Equal(t, domainSubmission.ErrCodeRateLimitExceeded, ae.Code)
+	assert.Equal(t, ErrCodeRateLimitExceeded, ae.Code)
 }
 
 func TestSubmitSolution_RateLimit_OldEnough_Succeeds(t *testing.T) {

@@ -62,7 +62,7 @@ func (uc *RejudgeSubmissionUseCase) Execute(ctx context.Context, in RejudgeSubmi
 		contestActive := in.Now.After(startTime) && in.Now.Before(endTime)
 		submittedDuringContest := sub.SubmittedAt().After(startTime) && sub.SubmittedAt().Before(endTime)
 		if contestActive && submittedDuringContest {
-			return nil, apperror.NewForbidden(domainsubmission.ErrCodeCannotRejudgeInActiveContest,
+			return nil, apperror.NewForbidden(ErrCodeCannotRejudgeInActiveContest,
 				"cannot rejudge own submissions in active contests")
 		}
 	}
@@ -73,7 +73,7 @@ func (uc *RejudgeSubmissionUseCase) Execute(ctx context.Context, in RejudgeSubmi
 			return nil, err
 		}
 		if judgingUpdatedAt == nil || !sub.SubmittedAt().Before(*judgingUpdatedAt) {
-			return nil, apperror.NewBadRequest(domainsubmission.ErrCodeNoRejudgeNeeded,
+			return nil, apperror.NewBadRequest(ErrCodeNoRejudgeNeeded,
 				"this submission does not need rejudging; judging components have not been updated since submission")
 		}
 	}

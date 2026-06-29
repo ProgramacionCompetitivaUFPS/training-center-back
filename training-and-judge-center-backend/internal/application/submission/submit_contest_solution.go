@@ -99,19 +99,19 @@ func (uc *SubmitContestSolutionUseCase) Execute(ctx context.Context, in SubmitCo
 		return nil, err
 	}
 	if !registered {
-		return nil, apperror.NewForbidden(domainSubmission.ErrCodeNotRegistered,
+		return nil, apperror.NewForbidden(ErrCodeNotRegistered,
 			"you must be registered to the contest to submit solutions")
 	}
 
 	// 6. Validate contest status using the captured submittedAt timestamp
 	var queuePriority int
 	if in.SubmittedAt.Before(contest.StartTime) {
-		return nil, apperror.NewBadRequest(domainSubmission.ErrCodeContestNotStarted,
+		return nil, apperror.NewBadRequest(ErrCodeContestNotStarted,
 			"submissions are only allowed during ACTIVE contests or postcompetition")
 	}
 	if in.SubmittedAt.After(contest.EndTime) {
 		if !contest.EnablePostContest {
-			return nil, apperror.NewBadRequest(domainSubmission.ErrCodeContestFinished,
+			return nil, apperror.NewBadRequest(ErrCodeContestFinished,
 				"the contest has ended and postcompetition is not enabled")
 		}
 		queuePriority = QueuePriorityPostContest
@@ -140,7 +140,7 @@ func (uc *SubmitContestSolutionUseCase) Execute(ctx context.Context, in SubmitCo
 		}
 	}
 	if !inContest {
-		return nil, apperror.NewBadRequest(domainSubmission.ErrCodeProblemNotInContest,
+		return nil, apperror.NewBadRequest(ErrCodeProblemNotInContest,
 			"this problem is not part of this contest")
 	}
 
@@ -171,7 +171,7 @@ func (uc *SubmitContestSolutionUseCase) Execute(ctx context.Context, in SubmitCo
 	if last != nil {
 		elapsed := in.SubmittedAt.Sub(last.SubmittedAt())
 		if elapsed.Seconds() < float64(uc.rateLimitSeconds) {
-			return nil, apperror.NewTooManyRequests(domainSubmission.ErrCodeRateLimitExceeded,
+			return nil, apperror.NewTooManyRequests(ErrCodeRateLimitExceeded,
 				fmt.Sprintf("please wait before submitting again (rate limit: %d second)", uc.rateLimitSeconds),
 				uc.rateLimitSeconds)
 		}

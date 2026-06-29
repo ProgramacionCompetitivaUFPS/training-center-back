@@ -9,7 +9,6 @@ import (
 
 	appsubmission "github.com/training-judge-center/backend/internal/application/submission"
 	domainshared "github.com/training-judge-center/backend/internal/domain/shared"
-	domainsubmission "github.com/training-judge-center/backend/internal/domain/submission"
 	domainuser "github.com/training-judge-center/backend/internal/domain/user"
 	"github.com/training-judge-center/backend/pkg/apperror"
 )
@@ -111,8 +110,8 @@ func TestSubmitContest_NotRegisteredReturns403(t *testing.T) {
 	if err := json.NewDecoder(w.Body).Decode(&body); err != nil {
 		t.Fatalf("decode: %v", err)
 	}
-	if body.Code != domainsubmission.ErrCodeNotRegistered {
-		t.Errorf("expected %s, got %s", domainsubmission.ErrCodeNotRegistered, body.Code)
+	if body.Code != appsubmission.ErrCodeNotRegistered {
+		t.Errorf("expected %s, got %s", appsubmission.ErrCodeNotRegistered, body.Code)
 	}
 }
 
@@ -142,8 +141,8 @@ func TestSubmitContest_ContestNotStartedReturns400(t *testing.T) {
 	if err := json.NewDecoder(w.Body).Decode(&body); err != nil {
 		t.Fatalf("decode: %v", err)
 	}
-	if body.Code != domainsubmission.ErrCodeContestNotStarted {
-		t.Errorf("expected %s, got %s", domainsubmission.ErrCodeContestNotStarted, body.Code)
+	if body.Code != appsubmission.ErrCodeContestNotStarted {
+		t.Errorf("expected %s, got %s", appsubmission.ErrCodeContestNotStarted, body.Code)
 	}
 }
 
@@ -173,8 +172,8 @@ func TestSubmitContest_ContestFinishedNoPostContestReturns400(t *testing.T) {
 	if err := json.NewDecoder(w.Body).Decode(&body); err != nil {
 		t.Fatalf("decode: %v", err)
 	}
-	if body.Code != domainsubmission.ErrCodeContestFinished {
-		t.Errorf("expected %s, got %s", domainsubmission.ErrCodeContestFinished, body.Code)
+	if body.Code != appsubmission.ErrCodeContestFinished {
+		t.Errorf("expected %s, got %s", appsubmission.ErrCodeContestFinished, body.Code)
 	}
 }
 
@@ -204,8 +203,8 @@ func TestSubmitContest_ProblemNotInContestReturns400(t *testing.T) {
 	if err := json.NewDecoder(w.Body).Decode(&body); err != nil {
 		t.Fatalf("decode: %v", err)
 	}
-	if body.Code != domainsubmission.ErrCodeProblemNotInContest {
-		t.Errorf("expected %s, got %s", domainsubmission.ErrCodeProblemNotInContest, body.Code)
+	if body.Code != appsubmission.ErrCodeProblemNotInContest {
+		t.Errorf("expected %s, got %s", appsubmission.ErrCodeProblemNotInContest, body.Code)
 	}
 }
 

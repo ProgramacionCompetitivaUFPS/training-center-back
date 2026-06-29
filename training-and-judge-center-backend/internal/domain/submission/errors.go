@@ -9,16 +9,7 @@ const (
 	ErrCodeProblemNotPublished  = "PROBLEM_NOT_PUBLISHED"
 	ErrCodeProblemNotAccessible = "PROBLEM_NOT_ACCESSIBLE"
 	ErrCodeDuplicateSubmission  = "DUPLICATE_SUBMISSION"
-	ErrCodeRateLimitExceeded    = "RATE_LIMIT_EXCEEDED"
 	ErrCodeFileTooLarge         = "FILE_TOO_LARGE"
 	ErrCodeCompilerMismatch     = "COMPILER_MISMATCH"
 	ErrCodeNoTestCases          = "NO_TEST_CASES"
-
-	ErrCodeNotRegistered      = "NOT_REGISTERED"
-	ErrCodeProblemNotInContest = "PROBLEM_NOT_IN_CONTEST"
-	ErrCodeContestNotStarted  = "CONTEST_NOT_STARTED"
-	ErrCodeContestFinished    = "CONTEST_FINISHED"
-
-	ErrCodeNoRejudgeNeeded             = "NO_REJUDGE_NEEDED"
-	ErrCodeCannotRejudgeInActiveContest = "CANNOT_REJUDGE_IN_ACTIVE_CONTEST"
 )
