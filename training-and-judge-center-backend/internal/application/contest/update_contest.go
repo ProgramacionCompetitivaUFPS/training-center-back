@@ -277,6 +277,13 @@ func validateScalarFields(in UpdateContestInput, existing *domainContest.Contest
 }
 
 func (uc *UpdateContestUseCase) resolveProblems(ctx context.Context, inputs []ProblemOrderInput, userID string, isAdmin bool) ([]problemEntry, error) {
+	return resolveContestProblems(ctx, uc.problemProvider, inputs, userID, isAdmin)
+}
+
+// resolveContestProblems deduplicates slugs, fetches problem metadata, and
+// validates that each problem is published and accessible to the caller.
+// Shared by CreateContestUseCase and UpdateContestUseCase.
+func resolveContestProblems(ctx context.Context, provider ProblemProvider, inputs []ProblemOrderInput, userID string, isAdmin bool) ([]problemEntry, error) {
 	deduped := deduplicateBySlug(inputs)
 	if len(deduped) == 0 {
 		return nil, nil
@@ -287,7 +294,7 @@ func (uc *UpdateContestUseCase) resolveProblems(ctx context.Context, inputs []Pr
 		slugs[i] = p.Slug
 	}
 
-	infos, err := uc.problemProvider.FindBySlugs(ctx, slugs, userID, isAdmin)
+	infos, err := provider.FindBySlugs(ctx, slugs, userID, isAdmin)
 	if err != nil {
 		return nil, err
 	}

@@ -10,7 +10,7 @@ import (
 )
 
 func TestListGroups_NonIntegerPageReturns400(t *testing.T) {
-	h := stubHandler()
+	h := mockHandler()
 	w := httptest.NewRecorder()
 
 	wrapAuth(http.HandlerFunc(h.ListGroups)).ServeHTTP(w, authedRequest("GET", "/groups?page=abc"))
@@ -28,7 +28,7 @@ func TestListGroups_NonIntegerPageReturns400(t *testing.T) {
 }
 
 func TestListGroups_NonIntegerLimitReturns400(t *testing.T) {
-	h := stubHandler()
+	h := mockHandler()
 	w := httptest.NewRecorder()
 
 	wrapAuth(http.HandlerFunc(h.ListGroups)).ServeHTTP(w, authedRequest("GET", "/groups?limit=xyz"))
@@ -45,7 +45,7 @@ func TestListGroups_NonIntegerLimitReturns400(t *testing.T) {
 	}
 }
 
-// ── buildPagination tests ─────────────────────────────────────────────────────
+// â”€â”€ buildPagination tests â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 func TestBuildPagination_FirstPageOfMany_HasNextNoPrev(t *testing.T) {
 	p := buildPagination(30, 1, 3, 10)

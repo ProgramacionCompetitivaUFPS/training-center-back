@@ -18,12 +18,12 @@ func newHandlerWithJoin(uc *appGroup.JoinGroupUseCase) *Handler {
 }
 
 func TestJoin_GroupNotFoundReturns404(t *testing.T) {
-	repo := &stubGroupRepo{
+	repo := &mockGroupRepo{
 		findByIDFn: func(_ string) (*domainGroup.Group, error) {
 			return nil, apperror.NewNotFound(domainGroup.ErrCodeGroupNotFound, "group not found")
 		},
 	}
-	h := newHandlerWithJoin(appGroup.NewJoinGroupUseCase(repo, &stubMemberRepo{}))
+	h := newHandlerWithJoin(appGroup.NewJoinGroupUseCase(repo, &mockMemberRepo{}))
 
 	r := authedRequest("POST", "/groups/nonexistent/join")
 	r.SetPathValue("groupId", "nonexistent")
@@ -42,10 +42,10 @@ func TestJoin_NonOpenPolicyReturns403(t *testing.T) {
 		domainGroup.VisibilityVisible, domainGroup.JoinPolicyInvite,
 		false, shared.RestoreUserID("author-1"), testTime(), testTime(),
 	)
-	repo := &stubGroupRepo{
+	repo := &mockGroupRepo{
 		findByIDFn: func(_ string) (*domainGroup.Group, error) { return g, nil },
 	}
-	h := newHandlerWithJoin(appGroup.NewJoinGroupUseCase(repo, &stubMemberRepo{}))
+	h := newHandlerWithJoin(appGroup.NewJoinGroupUseCase(repo, &mockMemberRepo{}))
 
 	r := authedRequest("POST", "/groups/g-invite/join")
 	r.SetPathValue("groupId", "g-invite")
@@ -66,10 +66,10 @@ func TestJoin_AlreadyMemberReturns409(t *testing.T) {
 	)
 	userID := shared.RestoreUserID("u1")
 	existingMember := domainGroup.RestoreGroupMember("m1", "g-open", userID, domainGroup.MemberRoleMember, testTime(), nil, domainGroup.JoinMethodOpenJoin)
-	repo := &stubGroupRepo{
+	repo := &mockGroupRepo{
 		findByIDFn: func(_ string) (*domainGroup.Group, error) { return g, nil },
 	}
-	memberRepo := &stubMemberRepo{
+	memberRepo := &mockMemberRepo{
 		findByGroupAndUserFn: func(_ string, _ shared.UserID) (*domainGroup.GroupMember, error) {
 			return existingMember, nil
 		},
@@ -93,10 +93,10 @@ func TestJoin_SuccessReturns201WithRoleAndJoinedAt(t *testing.T) {
 		domainGroup.VisibilityVisible, domainGroup.JoinPolicyOpen,
 		false, shared.RestoreUserID("author-1"), testTime(), testTime(),
 	)
-	repo := &stubGroupRepo{
+	repo := &mockGroupRepo{
 		findByIDFn: func(_ string) (*domainGroup.Group, error) { return g, nil },
 	}
-	h := newHandlerWithJoin(appGroup.NewJoinGroupUseCase(repo, &stubMemberRepo{}))
+	h := newHandlerWithJoin(appGroup.NewJoinGroupUseCase(repo, &mockMemberRepo{}))
 
 	r := authedRequest("POST", "/groups/g-open/join")
 	r.SetPathValue("groupId", "g-open")
@@ -123,7 +123,7 @@ func TestJoin_SuccessReturns201WithRoleAndJoinedAt(t *testing.T) {
 }
 
 func TestJoin_UnauthenticatedReturns401(t *testing.T) {
-	h := stubHandler()
+	h := mockHandler()
 	w := httptest.NewRecorder()
 	r := httptest.NewRequest("POST", "/groups/g-open/join", nil)
 	r.SetPathValue("groupId", "g-open")

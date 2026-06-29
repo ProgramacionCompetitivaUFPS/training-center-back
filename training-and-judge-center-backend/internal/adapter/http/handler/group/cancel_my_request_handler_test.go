@@ -7,7 +7,7 @@ import (
 )
 
 func TestCancelMyRequest_UnauthenticatedReturns401(t *testing.T) {
-	h := stubHandler()
+	h := mockHandler()
 	w := httptest.NewRecorder()
 	r := httptest.NewRequest("DELETE", "/groups/g1/requests/me", nil)
 	r.SetPathValue("groupId", "g1")
@@ -18,7 +18,7 @@ func TestCancelMyRequest_UnauthenticatedReturns401(t *testing.T) {
 }
 
 func TestCancelMyRequest_NoRequestReturns404(t *testing.T) {
-	h := stubHandler()
+	h := mockHandler()
 	w := httptest.NewRecorder()
 	r := authedRequest("DELETE", "/groups/g1/requests/me")
 	r.SetPathValue("groupId", "g1")

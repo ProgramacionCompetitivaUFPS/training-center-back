@@ -14,134 +14,134 @@ import (
 	domainUser "github.com/training-judge-center/backend/internal/domain/user"
 )
 
-// ── stubGroupRepo ─────────────────────────────────────────────────────────────
+// â”€â”€ mockGroupRepo â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
-type stubGroupRepo struct {
+type mockGroupRepo struct {
 	findByIDFn     func(id string) (*domainGroup.Group, error)
 	existsByNameFn func(name domainGroup.GroupName) (bool, error)
 }
 
-func (s *stubGroupRepo) Save(_ context.Context, _ *domainGroup.Group) error   { return nil }
-func (s *stubGroupRepo) Update(_ context.Context, _ *domainGroup.Group) error { return nil }
-func (s *stubGroupRepo) FindByID(_ context.Context, id string) (*domainGroup.Group, error) {
+func (s *mockGroupRepo) Save(_ context.Context, _ *domainGroup.Group) error   { return nil }
+func (s *mockGroupRepo) Update(_ context.Context, _ *domainGroup.Group) error { return nil }
+func (s *mockGroupRepo) FindByID(_ context.Context, id string) (*domainGroup.Group, error) {
 	if s.findByIDFn != nil {
 		return s.findByIDFn(id)
 	}
 	return nil, nil
 }
-func (s *stubGroupRepo) ExistsByName(_ context.Context, n domainGroup.GroupName) (bool, error) {
+func (s *mockGroupRepo) ExistsByName(_ context.Context, n domainGroup.GroupName) (bool, error) {
 	if s.existsByNameFn != nil {
 		return s.existsByNameFn(n)
 	}
 	return false, nil
 }
-func (s *stubGroupRepo) FindDefault(_ context.Context) (*domainGroup.Group, error) { return nil, nil }
-func (s *stubGroupRepo) Delete(_ context.Context, _ string) error                  { return nil }
-func (s *stubGroupRepo) List(_ context.Context, _ domainGroup.ListFilters) ([]*domainGroup.Group, int, error) {
+func (s *mockGroupRepo) FindDefault(_ context.Context) (*domainGroup.Group, error) { return nil, nil }
+func (s *mockGroupRepo) Delete(_ context.Context, _ string) error                  { return nil }
+func (s *mockGroupRepo) List(_ context.Context, _ domainGroup.ListFilters) ([]*domainGroup.Group, int, error) {
 	return nil, 0, nil
 }
 
-// ── stubMemberRepo ────────────────────────────────────────────────────────────
+// â”€â”€ mockMemberRepo â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
-type stubMemberRepo struct {
+type mockMemberRepo struct {
 	findByGroupAndUserFn func(groupID string, userID shared.UserID) (*domainGroup.GroupMember, error)
 	countMembersFn       func(groupID string) (int, error)
 	countLeadsFn         func(groupID string) (int, error)
 	listLeadsFn          func(groupID string) ([]*domainGroup.GroupMember, error)
 }
 
-func (s *stubMemberRepo) Save(_ context.Context, _ *domainGroup.GroupMember) error   { return nil }
-func (s *stubMemberRepo) Update(_ context.Context, _ *domainGroup.GroupMember) error { return nil }
-func (s *stubMemberRepo) SaveAll(_ context.Context, _ []*domainGroup.GroupMember) error {
+func (s *mockMemberRepo) Save(_ context.Context, _ *domainGroup.GroupMember) error   { return nil }
+func (s *mockMemberRepo) Update(_ context.Context, _ *domainGroup.GroupMember) error { return nil }
+func (s *mockMemberRepo) SaveAll(_ context.Context, _ []*domainGroup.GroupMember) error {
 	return nil
 }
-func (s *stubMemberRepo) FindByGroupAndUser(_ context.Context, groupID string, userID shared.UserID) (*domainGroup.GroupMember, error) {
+func (s *mockMemberRepo) FindByGroupAndUser(_ context.Context, groupID string, userID shared.UserID) (*domainGroup.GroupMember, error) {
 	if s.findByGroupAndUserFn != nil {
 		return s.findByGroupAndUserFn(groupID, userID)
 	}
 	return nil, nil
 }
-func (s *stubMemberRepo) FindByGroup(_ context.Context, _ string, _ domainGroup.MemberFilters) ([]*domainGroup.GroupMember, int, error) {
+func (s *mockMemberRepo) FindByGroup(_ context.Context, _ string, _ domainGroup.MemberFilters) ([]*domainGroup.GroupMember, int, error) {
 	return nil, 0, nil
 }
-func (s *stubMemberRepo) Delete(_ context.Context, _ string, _ shared.UserID) error { return nil }
-func (s *stubMemberRepo) CountLeads(_ context.Context, groupID string) (int, error) {
+func (s *mockMemberRepo) Delete(_ context.Context, _ string, _ shared.UserID) error { return nil }
+func (s *mockMemberRepo) CountLeads(_ context.Context, groupID string) (int, error) {
 	if s.countLeadsFn != nil {
 		return s.countLeadsFn(groupID)
 	}
 	return 0, nil
 }
-func (s *stubMemberRepo) CountMembers(_ context.Context, groupID string) (int, error) {
+func (s *mockMemberRepo) CountMembers(_ context.Context, groupID string) (int, error) {
 	if s.countMembersFn != nil {
 		return s.countMembersFn(groupID)
 	}
 	return 0, nil
 }
-func (s *stubMemberRepo) ListLeads(_ context.Context, groupID string) ([]*domainGroup.GroupMember, error) {
+func (s *mockMemberRepo) ListLeads(_ context.Context, groupID string) ([]*domainGroup.GroupMember, error) {
 	if s.listLeadsFn != nil {
 		return s.listLeadsFn(groupID)
 	}
 	return nil, nil
 }
-func (s *stubMemberRepo) BulkStats(_ context.Context, _ []string, _ shared.UserID) (map[string]domainGroup.MemberStats, error) {
+func (s *mockMemberRepo) BulkStats(_ context.Context, _ []string, _ shared.UserID) (map[string]domainGroup.MemberStats, error) {
 	return nil, nil
 }
 
-// ── stubJoinRequestRepo ───────────────────────────────────────────────────────
+// â”€â”€ mockJoinRequestRepo â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
-type stubJoinRequestRepo struct {
+type mockJoinRequestRepo struct {
 	findByIDFn           func(id string) (*domainGroup.JoinRequest, error)
 	findByGroupAndUserFn func(groupID string, userID shared.UserID) (*domainGroup.JoinRequest, error)
 }
 
-func (s *stubJoinRequestRepo) Save(_ context.Context, _ *domainGroup.JoinRequest) error { return nil }
-func (s *stubJoinRequestRepo) FindByID(_ context.Context, id string) (*domainGroup.JoinRequest, error) {
+func (s *mockJoinRequestRepo) Save(_ context.Context, _ *domainGroup.JoinRequest) error { return nil }
+func (s *mockJoinRequestRepo) FindByID(_ context.Context, id string) (*domainGroup.JoinRequest, error) {
 	if s.findByIDFn != nil {
 		return s.findByIDFn(id)
 	}
 	return nil, nil
 }
-func (s *stubJoinRequestRepo) FindByGroupAndUser(_ context.Context, groupID string, userID shared.UserID) (*domainGroup.JoinRequest, error) {
+func (s *mockJoinRequestRepo) FindByGroupAndUser(_ context.Context, groupID string, userID shared.UserID) (*domainGroup.JoinRequest, error) {
 	if s.findByGroupAndUserFn != nil {
 		return s.findByGroupAndUserFn(groupID, userID)
 	}
 	return nil, nil
 }
-func (s *stubJoinRequestRepo) FindByGroup(_ context.Context, _ string, _ domainGroup.JoinRequestFilters) ([]*domainGroup.JoinRequest, int, error) {
+func (s *mockJoinRequestRepo) FindByGroup(_ context.Context, _ string, _ domainGroup.JoinRequestFilters) ([]*domainGroup.JoinRequest, int, error) {
 	return nil, 0, nil
 }
-func (s *stubJoinRequestRepo) Delete(_ context.Context, _ string) error { return nil }
+func (s *mockJoinRequestRepo) Delete(_ context.Context, _ string) error { return nil }
 
-// ── other stubs ───────────────────────────────────────────────────────────────
+// â”€â”€ other stubs â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
-type stubUserProvider struct{}
+type mockUserProvider struct{}
 
-func (s *stubUserProvider) GetDisplays(_ context.Context, _ []string) (map[string]*appGroup.UserDisplay, error) {
+func (s *mockUserProvider) GetDisplays(_ context.Context, _ []string) (map[string]*appGroup.UserDisplay, error) {
 	return nil, nil
 }
 
-type stubPrefsReader struct{}
+type mockPrefsReader struct{}
 
-func (s *stubPrefsReader) HideGlobalGroup(_ context.Context, _ string) (bool, error) {
+func (s *mockPrefsReader) HideGlobalGroup(_ context.Context, _ string) (bool, error) {
 	return false, nil
 }
 
-type stubTxManager struct{}
+type mockTxManager struct{}
 
-func (s *stubTxManager) WithTx(ctx context.Context, fn func(context.Context) error) error {
+func (s *mockTxManager) WithTx(ctx context.Context, fn func(context.Context) error) error {
 	return fn(ctx)
 }
 
-type stubInvitationSvc struct{}
+type mockInvitationSvc struct{}
 
-func (s *stubInvitationSvc) GenerateInviteToken(_, _ string) (string, error) {
+func (s *mockInvitationSvc) GenerateInviteToken(_, _ string) (string, error) {
 	return "stub.invite.token", nil
 }
-func (s *stubInvitationSvc) ValidateInviteToken(_ string) (*appGroup.InvitationClaims, error) {
+func (s *mockInvitationSvc) ValidateInviteToken(_ string) (*appGroup.InvitationClaims, error) {
 	return &appGroup.InvitationClaims{GroupID: "g1"}, nil
 }
 
-// ── auth mocks ────────────────────────────────────────────────────────────────
+// â”€â”€ auth mocks â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 type mockTokenSvc struct{}
 
@@ -161,7 +161,7 @@ func (m *mockAdminTokenSvc) ValidateToken(_ string) (*domainUser.TokenClaims, er
 	return &domainUser.TokenClaims{UserID: "admin-1", Role: shared.RoleAdmin}, nil
 }
 
-// ── request helpers ───────────────────────────────────────────────────────────
+// â”€â”€ request helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 func authedRequest(method, target string) *http.Request {
 	r := httptest.NewRequest(method, target, nil)
@@ -184,29 +184,29 @@ func wrapAuthAsAdmin(h http.Handler) http.Handler {
 	return middleware.Auth(&mockAdminTokenSvc{}, nil)(h)
 }
 
-// ── shared fixtures ───────────────────────────────────────────────────────────
+// â”€â”€ shared fixtures â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 func testTime() time.Time {
 	return time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)
 }
 
-// stubHandler wires a Handler with all default (no-op) dependencies.
-func stubHandler() *Handler {
-	repo := &stubGroupRepo{}
-	memberRepo := &stubMemberRepo{}
-	joinRequestRepo := &stubJoinRequestRepo{}
-	txMgr := &stubTxManager{}
-	inviteSvc := &stubInvitationSvc{}
+// mockHandler wires a Handler with all default (no-op) dependencies.
+func mockHandler() *Handler {
+	repo := &mockGroupRepo{}
+	memberRepo := &mockMemberRepo{}
+	joinRequestRepo := &mockJoinRequestRepo{}
+	txMgr := &mockTxManager{}
+	inviteSvc := &mockInvitationSvc{}
 	return NewHandler(
 		appGroup.NewCreateGroupUseCase(repo, memberRepo, txMgr),
 		appGroup.NewListGroupsUseCase(repo, memberRepo),
-		appGroup.NewGetGroupUseCase(repo, memberRepo, &stubUserProvider{}),
-		appGroup.NewListMyGroupsUseCase(repo, memberRepo, &stubPrefsReader{}),
+		appGroup.NewGetGroupUseCase(repo, memberRepo, &mockUserProvider{}),
+		appGroup.NewListMyGroupsUseCase(repo, memberRepo, &mockPrefsReader{}),
 		appGroup.NewJoinGroupUseCase(repo, memberRepo),
 		appGroup.NewRequestJoinUseCase(repo, memberRepo, joinRequestRepo),
 		appGroup.NewApproveRequestUseCase(memberRepo, joinRequestRepo, txMgr),
 		appGroup.NewRejectRequestUseCase(memberRepo, joinRequestRepo),
-		appGroup.NewListJoinRequestsUseCase(memberRepo, joinRequestRepo, &stubUserProvider{}),
+		appGroup.NewListJoinRequestsUseCase(memberRepo, joinRequestRepo, &mockUserProvider{}),
 		appGroup.NewGetMyRequestUseCase(joinRequestRepo),
 		appGroup.NewCancelMyRequestUseCase(joinRequestRepo),
 		appGroup.NewGenerateInviteUseCase(repo, memberRepo, inviteSvc),

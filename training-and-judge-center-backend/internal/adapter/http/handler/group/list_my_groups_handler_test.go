@@ -7,7 +7,7 @@ import (
 )
 
 func TestListMyGroups_NonIntegerPageReturns400(t *testing.T) {
-	h := stubHandler()
+	h := mockHandler()
 	w := httptest.NewRecorder()
 
 	wrapAuth(http.HandlerFunc(h.ListMyGroups)).ServeHTTP(w, authedRequest("GET", "/users/me/groups?page=abc"))

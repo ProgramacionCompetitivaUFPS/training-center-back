@@ -7,7 +7,7 @@ import (
 )
 
 func TestGenerateInvite_UnauthenticatedReturns401(t *testing.T) {
-	h := stubHandler()
+	h := mockHandler()
 	w := httptest.NewRecorder()
 	r := httptest.NewRequest("POST", "/groups/g1/invitations", nil)
 	r.SetPathValue("groupId", "g1")

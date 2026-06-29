@@ -17,12 +17,12 @@ func newHandlerWithGetGroup(uc *appGroup.GetGroupUseCase) *Handler {
 }
 
 func TestGetGroup_NotFoundReturns404(t *testing.T) {
-	repo := &stubGroupRepo{
+	repo := &mockGroupRepo{
 		findByIDFn: func(_ string) (*domainGroup.Group, error) {
 			return nil, apperror.NewNotFound(domainGroup.ErrCodeGroupNotFound, "group not found")
 		},
 	}
-	h := newHandlerWithGetGroup(appGroup.NewGetGroupUseCase(repo, &stubMemberRepo{}, &stubUserProvider{}))
+	h := newHandlerWithGetGroup(appGroup.NewGetGroupUseCase(repo, &mockMemberRepo{}, &mockUserProvider{}))
 
 	r := authedRequest("GET", "/groups/nonexistent")
 	r.SetPathValue("groupId", "nonexistent")
@@ -41,10 +41,10 @@ func TestGetGroup_NonMemberHasNilRoleAndJoinedAt(t *testing.T) {
 		domainGroup.VisibilityVisible, domainGroup.JoinPolicyOpen,
 		false, shared.RestoreUserID("author-1"), testTime(), testTime(),
 	)
-	repo := &stubGroupRepo{
+	repo := &mockGroupRepo{
 		findByIDFn: func(_ string) (*domainGroup.Group, error) { return group, nil },
 	}
-	h := newHandlerWithGetGroup(appGroup.NewGetGroupUseCase(repo, &stubMemberRepo{}, &stubUserProvider{}))
+	h := newHandlerWithGetGroup(appGroup.NewGetGroupUseCase(repo, &mockMemberRepo{}, &mockUserProvider{}))
 
 	r := authedRequest("GET", "/groups/g-1")
 	r.SetPathValue("groupId", "g-1")
@@ -76,10 +76,10 @@ func TestGetGroup_ResponseShape(t *testing.T) {
 		domainGroup.VisibilityVisible, domainGroup.JoinPolicyOpen,
 		false, shared.RestoreUserID("author-1"), testTime(), testTime(),
 	)
-	repo := &stubGroupRepo{
+	repo := &mockGroupRepo{
 		findByIDFn: func(_ string) (*domainGroup.Group, error) { return g, nil },
 	}
-	h := newHandlerWithGetGroup(appGroup.NewGetGroupUseCase(repo, &stubMemberRepo{}, &stubUserProvider{}))
+	h := newHandlerWithGetGroup(appGroup.NewGetGroupUseCase(repo, &mockMemberRepo{}, &mockUserProvider{}))
 
 	r := authedRequest("GET", "/groups/g-2")
 	r.SetPathValue("groupId", "g-2")

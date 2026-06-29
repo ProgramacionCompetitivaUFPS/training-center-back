@@ -156,10 +156,11 @@ func (r *Repository) List(ctx context.Context, filters domainGroup.ListFilters) 
 		return s
 	}
 
-	// Register viewerID upfront when it may appear in WHERE or ORDER BY,
-	// so its placeholder index is stable regardless of condition order.
+	// Register viewerID for WHERE conditions only. The JOIN clause for
+	// SortByJoinedAt registers its own arg after countArgs is snapshotted so
+	// it never bleeds into the count query.
 	viewerArg := func() string { return "" }
-	if filters.OnlyMyGroups != nil || !filters.ViewerIsAdmin || filters.SortBy == domainGroup.SortByJoinedAt {
+	if filters.OnlyMyGroups != nil || !filters.ViewerIsAdmin {
 		placeholder := nextArg(filters.ViewerID.Value())
 		viewerArg = func() string { return placeholder }
 	}
@@ -206,6 +207,10 @@ func (r *Repository) List(ctx context.Context, filters domainGroup.ListFilters) 
 		where = "WHERE " + strings.Join(conds, " AND ")
 	}
 
+	// Snapshot countArgs here — only WHERE args are in args at this point.
+	countArgs := make([]any, len(args))
+	copy(countArgs, args)
+
 	joinClause := ""
 	memberCountSelect := ""
 	switch filters.SortBy {
@@ -213,13 +218,16 @@ func (r *Repository) List(ctx context.Context, filters domainGroup.ListFilters) 
 		joinClause = "LEFT JOIN (SELECT group_id, COUNT(*) AS mc FROM group_members GROUP BY group_id) gm_count ON gm_count.group_id = g.id"
 		memberCountSelect = ", COALESCE(gm_count.mc, 0) AS mc"
 	case domainGroup.SortByJoinedAt:
-		joinClause = fmt.Sprintf("LEFT JOIN group_members gm_joined ON gm_joined.group_id = g.id AND gm_joined.user_id = %s", viewerArg())
+		// Reuse the WHERE viewer placeholder when already registered; otherwise
+		// register a fresh one that lives only in the SELECT query.
+		joinViewer := viewerArg()
+		if joinViewer == "" {
+			joinViewer = nextArg(filters.ViewerID.Value())
+		}
+		joinClause = fmt.Sprintf("LEFT JOIN group_members gm_joined ON gm_joined.group_id = g.id AND gm_joined.user_id = %s", joinViewer)
 	}
 
 	orderBy := mapSortClause(filters)
-
-	countArgs := make([]any, len(args))
-	copy(countArgs, args)
 
 	offset := (filters.Page - 1) * filters.Limit
 	limitArg := nextArg(filters.Limit)

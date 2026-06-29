@@ -10,7 +10,7 @@ import (
 )
 
 func TestUpdateJoinRequest_UnauthenticatedReturns401(t *testing.T) {
-	h := stubHandler()
+	h := mockHandler()
 	w := httptest.NewRecorder()
 	r := httptest.NewRequest("PATCH", "/groups/g1/requests/r1", nil)
 	r.SetPathValue("groupId", "g1")
@@ -22,7 +22,7 @@ func TestUpdateJoinRequest_UnauthenticatedReturns401(t *testing.T) {
 }
 
 func TestUpdateJoinRequest_InvalidJSONReturns400(t *testing.T) {
-	h := stubHandler()
+	h := mockHandler()
 	w := httptest.NewRecorder()
 	r := authedPostRequest("/groups/g1/requests/r1", `{bad json}`)
 	r.Method = "PATCH"
@@ -35,7 +35,7 @@ func TestUpdateJoinRequest_InvalidJSONReturns400(t *testing.T) {
 }
 
 func TestUpdateJoinRequest_InvalidStatusReturns400(t *testing.T) {
-	h := stubHandler()
+	h := mockHandler()
 	w := httptest.NewRecorder()
 	r := authedPostRequest("/groups/g1/requests/r1", `{"status":"PENDING"}`)
 	r.Method = "PATCH"

@@ -7,7 +7,7 @@ import (
 )
 
 func TestListJoinRequests_UnauthenticatedReturns401(t *testing.T) {
-	h := stubHandler()
+	h := mockHandler()
 	w := httptest.NewRecorder()
 	r := httptest.NewRequest("GET", "/groups/g1/requests", nil)
 	r.SetPathValue("groupId", "g1")
@@ -18,7 +18,7 @@ func TestListJoinRequests_UnauthenticatedReturns401(t *testing.T) {
 }
 
 func TestListJoinRequests_InvalidPageReturns400(t *testing.T) {
-	h := stubHandler()
+	h := mockHandler()
 	w := httptest.NewRecorder()
 	r := authedRequest("GET", "/groups/g1/requests?page=abc")
 	r.SetPathValue("groupId", "g1")

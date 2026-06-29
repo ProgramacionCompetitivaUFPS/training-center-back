@@ -1,4 +1,4 @@
-﻿package group
+package group
 
 import (
 	"encoding/json"
@@ -6,9 +6,7 @@ import (
 	"time"
 
 	"github.com/training-judge-center/backend/internal/adapter/http/handler"
-	"github.com/training-judge-center/backend/internal/adapter/http/middleware"
 	appGroup "github.com/training-judge-center/backend/internal/application/group"
-	"github.com/training-judge-center/backend/internal/application/shared"
 	"github.com/training-judge-center/backend/pkg/apperror"
 )
 
@@ -42,12 +40,8 @@ type groupResponse struct {
 // @Failure      401 {object} apperror.AppError
 // @Router       /groups [post]
 func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
-	cu, ok := middleware.GetCurrentUser(r.Context())
+	currentUser, ok := handler.RequireCurrentUser(w, r)
 	if !ok {
-		handler.WriteJSON(r.Context(), w, http.StatusUnauthorized, apperror.AppError{
-			Code:    apperror.ErrCodeUnauthorized,
-			Message: "Invalid or missing authentication token",
-		})
 		return
 	}
 
@@ -60,14 +54,12 @@ func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	currentUser := shared.CurrentUser{ID: cu.ID, Role: cu.Role}
-
 	out, ucErr := h.createGroup.Execute(r.Context(), appGroup.CreateGroupInput{
 		Name:        body.Name,
 		Description: body.Description,
 		JoinMode:    body.JoinMode,
 		Visibility:  body.Visibility,
-		CurrentUser: currentUser,
+		CurrentUser: *currentUser,
 	})
 	if ucErr != nil {
 		handler.WriteError(r.Context(), w, ucErr)

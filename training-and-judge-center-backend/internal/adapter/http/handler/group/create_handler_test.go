@@ -15,7 +15,7 @@ func newHandlerWithCreate(uc *appGroup.CreateGroupUseCase) *Handler {
 }
 
 func TestCreate_InvalidJSONReturns400(t *testing.T) {
-	h := stubHandler()
+	h := mockHandler()
 	w := httptest.NewRecorder()
 
 	r := authedPostRequest("/groups", `{invalid json}`)
@@ -27,7 +27,7 @@ func TestCreate_InvalidJSONReturns400(t *testing.T) {
 }
 
 func TestCreate_ContestantReturns403(t *testing.T) {
-	h := stubHandler()
+	h := mockHandler()
 	w := httptest.NewRecorder()
 
 	r := authedPostRequest("/groups", `{"name":"Test","joinMode":"OPEN","visibility":"VISIBLE"}`)
@@ -39,7 +39,7 @@ func TestCreate_ContestantReturns403(t *testing.T) {
 }
 
 func TestCreate_ValidAdminRequestReturns201(t *testing.T) {
-	h := stubHandler()
+	h := mockHandler()
 	w := httptest.NewRecorder()
 
 	r := authedPostRequest("/groups", `{"name":"Algorithms Club","joinMode":"OPEN","visibility":"VISIBLE"}`)
@@ -61,10 +61,10 @@ func TestCreate_ValidAdminRequestReturns201(t *testing.T) {
 }
 
 func TestCreate_DuplicateNameReturns409(t *testing.T) {
-	repo := &stubGroupRepo{
+	repo := &mockGroupRepo{
 		existsByNameFn: func(_ domainGroup.GroupName) (bool, error) { return true, nil },
 	}
-	h := newHandlerWithCreate(appGroup.NewCreateGroupUseCase(repo, &stubMemberRepo{}, &stubTxManager{}))
+	h := newHandlerWithCreate(appGroup.NewCreateGroupUseCase(repo, &mockMemberRepo{}, &mockTxManager{}))
 	w := httptest.NewRecorder()
 
 	r := authedPostRequest("/groups", `{"name":"Existing Group","joinMode":"OPEN","visibility":"VISIBLE"}`)

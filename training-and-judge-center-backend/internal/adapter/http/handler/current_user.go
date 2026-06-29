@@ -11,7 +11,7 @@ import (
 func RequireCurrentUser(w http.ResponseWriter, r *http.Request) (*appshared.CurrentUser, bool) {
 	cu, ok := middleware.GetCurrentUser(r.Context())
 	if !ok {
-		WriteError(r.Context(), w, apperror.NewUnauthorized(apperror.ErrCodeUnauthorized, "invalid or missing authentication token"))
+		WriteError(r.Context(), w, apperror.NewUnauthorized(apperror.ErrCodeUnauthorized, "Invalid or missing authentication token"))
 		return nil, false
 	}
 	return &cu, true

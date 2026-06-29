@@ -15,7 +15,7 @@ func newHandlerWithRequestJoin(uc *appGroup.RequestJoinUseCase) *Handler {
 }
 
 func TestRequestJoin_UnauthenticatedReturns401(t *testing.T) {
-	h := stubHandler()
+	h := mockHandler()
 	w := httptest.NewRecorder()
 	r := httptest.NewRequest("POST", "/groups/g1/requests", nil)
 	r.SetPathValue("groupId", "g1")
@@ -26,7 +26,7 @@ func TestRequestJoin_UnauthenticatedReturns401(t *testing.T) {
 }
 
 func TestRequestJoin_InvalidJSONReturns400(t *testing.T) {
-	h := stubHandler()
+	h := mockHandler()
 	w := httptest.NewRecorder()
 	r := authedPostRequest("/groups/g1/requests", `{invalid}`)
 	r.SetPathValue("groupId", "g1")
@@ -42,10 +42,10 @@ func TestRequestJoin_EmptyBodyIsValid(t *testing.T) {
 		domainGroup.VisibilityVisible, domainGroup.JoinPolicyRequest,
 		false, shared.RestoreUserID("author-1"), testTime(), testTime(),
 	)
-	repo := &stubGroupRepo{
+	repo := &mockGroupRepo{
 		findByIDFn: func(_ string) (*domainGroup.Group, error) { return g, nil },
 	}
-	h := newHandlerWithRequestJoin(appGroup.NewRequestJoinUseCase(repo, &stubMemberRepo{}, &stubJoinRequestRepo{}))
+	h := newHandlerWithRequestJoin(appGroup.NewRequestJoinUseCase(repo, &mockMemberRepo{}, &mockJoinRequestRepo{}))
 
 	r := httptest.NewRequest("POST", "/groups/g-req/requests", nil)
 	r.Header.Set("Authorization", "Bearer tok")

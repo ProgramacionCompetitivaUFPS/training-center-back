@@ -7,7 +7,7 @@ import (
 )
 
 func TestAcceptInvite_UnauthenticatedReturns401(t *testing.T) {
-	h := stubHandler()
+	h := mockHandler()
 	w := httptest.NewRecorder()
 	r := httptest.NewRequest("POST", "/groups/g1/invitations/accept", nil)
 	r.SetPathValue("groupId", "g1")
@@ -18,7 +18,7 @@ func TestAcceptInvite_UnauthenticatedReturns401(t *testing.T) {
 }
 
 func TestAcceptInvite_InvalidJSONReturns400(t *testing.T) {
-	h := stubHandler()
+	h := mockHandler()
 	w := httptest.NewRecorder()
 	r := authedPostRequest("/groups/g1/invitations/accept", `{invalid json}`)
 	r.SetPathValue("groupId", "g1")
