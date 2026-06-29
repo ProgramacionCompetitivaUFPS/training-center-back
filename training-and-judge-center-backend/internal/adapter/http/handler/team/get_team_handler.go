@@ -51,7 +51,7 @@ type getTeamResponse struct {
 // @Failure      404 {object} apperror.AppError
 // @Router       /teams/{teamId} [get]
 func (h *Handler) GetTeam(w http.ResponseWriter, r *http.Request) {
-	cu, ok := h.requireCurrentUser(w, r)
+	cu, ok := handler.RequireCurrentUser(w, r)
 	if !ok {
 		return
 	}

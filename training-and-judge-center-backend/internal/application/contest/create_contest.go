@@ -105,32 +105,17 @@ func (uc *CreateContestUseCase) Execute(ctx context.Context, in CreateContestInp
 	}
 
 	// Resolve and validate problems.
-	type problemEntry struct {
-		id    string
-		slug  string
-		title string
-	}
 	var problemEntries []problemEntry
 
 	if len(in.Problems) > 0 {
-		deduped := deduplicateSlugs(in.Problems)
-		infos, err := uc.problemProvider.FindBySlugs(ctx, deduped, in.CurrentUser.ID, in.CurrentUser.IsAdmin())
+		inputs := make([]ProblemOrderInput, len(in.Problems))
+		for i, s := range in.Problems {
+			inputs[i] = ProblemOrderInput{Slug: s}
+		}
+		var err error
+		problemEntries, err = resolveContestProblems(ctx, uc.problemProvider, inputs, in.CurrentUser.ID, in.CurrentUser.IsAdmin())
 		if err != nil {
 			return nil, err
-		}
-		for _, slug := range deduped {
-			info, ok := infos[slug]
-			if !ok {
-				return nil, apperror.NewNotFound(ErrCodeProblemNotFound, "problem '"+slug+"' not found")
-			}
-			if !info.IsPublished {
-				return nil, apperror.NewBadRequest(ErrCodeProblemNotPublished, "problem '"+slug+"' is not published")
-			}
-			if !info.CanAdd {
-				return nil, apperror.NewForbidden(ErrCodeProblemAccessDenied,
-					"cannot add private problem '"+slug+"' — you are not a modifier")
-			}
-			problemEntries = append(problemEntries, problemEntry{id: info.ID, slug: slug, title: info.Title})
 		}
 	}
 
@@ -214,14 +199,3 @@ func (uc *CreateContestUseCase) Execute(ctx context.Context, in CreateContestInp
 	return buildOutput(c, group, owner, problemDisplays, now), nil
 }
 
-func deduplicateSlugs(slugs []string) []string {
-	seen := make(map[string]struct{}, len(slugs))
-	out := make([]string, 0, len(slugs))
-	for _, s := range slugs {
-		if _, ok := seen[s]; !ok {
-			seen[s] = struct{}{}
-			out = append(out, s)
-		}
-	}
-	return out
-}

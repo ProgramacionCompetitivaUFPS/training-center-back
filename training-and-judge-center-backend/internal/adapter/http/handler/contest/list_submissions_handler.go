@@ -28,7 +28,7 @@ import (
 // @Failure      404 {object} apperror.AppError
 // @Router       /groups/{groupId}/contests/{contestId}/submissions [get]
 func (h *Handler) ListContestSubmissions(w http.ResponseWriter, r *http.Request) {
-	caller, ok := h.requireCurrentUser(w, r)
+	caller, ok := handler.RequireCurrentUser(w, r)
 	if !ok {
 		return
 	}

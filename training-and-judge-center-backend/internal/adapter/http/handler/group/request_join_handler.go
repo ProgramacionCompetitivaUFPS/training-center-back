@@ -30,7 +30,7 @@ type requestJoinBody struct {
 // @Failure      409 {object} apperror.AppError
 // @Router       /groups/{groupId}/requests [post]
 func (h *Handler) RequestJoin(w http.ResponseWriter, r *http.Request) {
-	caller, ok := h.requireCurrentUser(w, r)
+	caller, ok := handler.RequireCurrentUser(w, r)
 	if !ok {
 		return
 	}

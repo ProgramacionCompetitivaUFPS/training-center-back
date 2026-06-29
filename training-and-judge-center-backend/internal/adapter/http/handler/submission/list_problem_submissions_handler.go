@@ -27,7 +27,7 @@ import (
 // @Failure      500 {object} apperror.AppError
 // @Router       /problems/p/{slug}/submissions [get]
 func (h *Handler) ListProblemSubmissions(w http.ResponseWriter, r *http.Request) {
-	cu, ok := h.requireCurrentUser(w, r)
+	cu, ok := handler.RequireCurrentUser(w, r)
 	if !ok {
 		return
 	}

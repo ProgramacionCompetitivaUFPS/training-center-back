@@ -38,7 +38,7 @@ type getSubmissionResponse struct {
 // @Failure      404 {object} apperror.AppError
 // @Router       /submissions/{submissionId} [get]
 func (h *Handler) GetSubmission(w http.ResponseWriter, r *http.Request) {
-	cu, ok := h.requireCurrentUser(w, r)
+	cu, ok := handler.RequireCurrentUser(w, r)
 	if !ok {
 		return
 	}

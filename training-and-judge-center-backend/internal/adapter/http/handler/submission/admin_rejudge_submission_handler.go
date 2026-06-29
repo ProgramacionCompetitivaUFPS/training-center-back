@@ -19,7 +19,7 @@ import (
 // @Failure      404 {object} apperror.AppError
 // @Router       /admin/submissions/{submissionId}/rejudge [post]
 func (h *Handler) AdminRejudgeSubmission(w http.ResponseWriter, r *http.Request) {
-	cu, ok := h.requireCurrentUser(w, r)
+	cu, ok := handler.RequireCurrentUser(w, r)
 	if !ok {
 		return
 	}

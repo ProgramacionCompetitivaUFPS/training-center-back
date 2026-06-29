@@ -18,7 +18,7 @@ import (
 // @Failure      409 {object} apperror.AppError
 // @Router       /teams/{teamId}/members/me [delete]
 func (h *Handler) LeaveTeam(w http.ResponseWriter, r *http.Request) {
-	currentUser, ok := h.requireCurrentUser(w, r)
+	currentUser, ok := handler.RequireCurrentUser(w, r)
 	if !ok {
 		return
 	}

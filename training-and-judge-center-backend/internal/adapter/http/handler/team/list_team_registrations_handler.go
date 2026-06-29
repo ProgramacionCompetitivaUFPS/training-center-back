@@ -38,7 +38,7 @@ type listTeamRegistrationsResponse struct {
 // @Failure      401,403,404 {object} apperror.AppError
 // @Router       /groups/{groupId}/contests/{contestId}/team-registrations [get]
 func (h *Handler) ListTeamRegistrations(w http.ResponseWriter, r *http.Request) {
-	caller, ok := h.requireCurrentUser(w, r)
+	caller, ok := handler.RequireCurrentUser(w, r)
 	if !ok {
 		return
 	}

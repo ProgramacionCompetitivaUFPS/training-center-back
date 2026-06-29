@@ -25,7 +25,7 @@ import (
 // @Failure      404 {object} apperror.AppError
 // @Router       /groups/{groupId}/contests/{contestId} [put]
 func (h *Handler) Update(w http.ResponseWriter, r *http.Request) {
-	caller, ok := h.requireCurrentUser(w, r)
+	caller, ok := handler.RequireCurrentUser(w, r)
 	if !ok {
 		return
 	}

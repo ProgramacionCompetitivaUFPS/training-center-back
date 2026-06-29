@@ -36,7 +36,7 @@ type updateTeamRegistrationResponse struct {
 // @Failure      400,401,403,404,409 {object} apperror.AppError
 // @Router       /groups/{groupId}/contests/{contestId}/team-registrations/{teamId} [put]
 func (h *Handler) UpdateTeamRegistration(w http.ResponseWriter, r *http.Request) {
-	caller, ok := h.requireCurrentUser(w, r)
+	caller, ok := handler.RequireCurrentUser(w, r)
 	if !ok {
 		return
 	}
