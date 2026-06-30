@@ -10,6 +10,7 @@ import (
 	appshared "github.com/training-judge-center/backend/internal/application/shared"
 	"github.com/training-judge-center/backend/internal/domain/user"
 	"github.com/training-judge-center/backend/pkg/apperror"
+	"github.com/training-judge-center/backend/pkg/emailtemplate"
 )
 
 type ConfirmDeactivationInput struct {
@@ -154,6 +155,9 @@ func (uc *ConfirmDeactivationUseCase) Execute(ctx context.Context, input Confirm
 			To:      originalEmailStr,
 			Subject: "Account Deactivated",
 			Body:    "Your account has been successfully deactivated based on your request. Your identity and email have been anonymized.",
+			HTMLBody: emailtemplate.Wrap("Account Deactivated",
+				"<p style=\"margin:0 0 12px;\">Your Training Center account has been successfully deactivated as requested.</p>"+
+					"<p style=\"margin:0;color:#64748b;font-size:14px;\">Your identity and email address have been anonymized. If you believe this was done in error, please contact support.</p>"),
 		})
 	}
 

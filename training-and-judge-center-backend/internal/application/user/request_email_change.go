@@ -10,6 +10,7 @@ import (
 	appshared "github.com/training-judge-center/backend/internal/application/shared"
 	"github.com/training-judge-center/backend/internal/domain/user"
 	"github.com/training-judge-center/backend/pkg/apperror"
+	"github.com/training-judge-center/backend/pkg/emailtemplate"
 )
 
 type RequestEmailChangeInput struct {
@@ -94,10 +95,15 @@ func (uc *RequestEmailChangeUseCase) Execute(ctx context.Context, input RequestE
 		return nil, err
 	}
 
+	htmlContent := "<p style=\"margin:0 0 8px;\">We received a request to update the email address on your Training Center account.</p>" +
+		"<p style=\"margin:0 0 4px;\">Enter the code below to verify your new email:</p>" +
+		emailtemplate.CodeBlock(code) +
+		"<p style=\"margin:0;color:#64748b;font-size:14px;\">This code expires in <strong>15 minutes</strong>. If you didn't request this change, please contact support immediately.</p>"
 	if err := uc.emailSender.Send(ctx, appshared.EmailMessage{
-		To:      input.NewEmail,
-		Subject: "Verify your new email address",
-		Body:    fmt.Sprintf("Your email verification code is: %s. It will expire in 15 minutes.", code),
+		To:       input.NewEmail,
+		Subject:  "Verify your new email address",
+		Body:     fmt.Sprintf("Your email verification code is: %s. It will expire in 15 minutes.", code),
+		HTMLBody: emailtemplate.Wrap("Verify your new email address", htmlContent),
 	}); err != nil {
 		return nil, apperror.NewServiceUnavailable(ErrCodeEmailDeliveryFailed, "We couldn't deliver the verification code to your email. Please try again later.")
 	}

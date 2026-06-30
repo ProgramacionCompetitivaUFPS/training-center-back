@@ -11,6 +11,7 @@ import (
 	domainShared "github.com/training-judge-center/backend/internal/domain/shared"
 	"github.com/training-judge-center/backend/internal/domain/user"
 	"github.com/training-judge-center/backend/pkg/apperror"
+	"github.com/training-judge-center/backend/pkg/emailtemplate"
 )
 
 type RequestDeactivationInput struct {
@@ -72,10 +73,16 @@ func (uc *RequestDeactivationUseCase) Execute(ctx context.Context, input Request
 		return err
 	}
 
+	htmlContent := "<p style=\"margin:0 0 8px;\">We received a request to deactivate your Training Center account.</p>" +
+		"<p style=\"margin:0 0 4px;\">Enter the confirmation code below to proceed:</p>" +
+		emailtemplate.CodeBlock(code) +
+		"<p style=\"margin:0 0 12px;color:#64748b;font-size:14px;\">This code expires in <strong>15 minutes</strong>.</p>" +
+		"<p style=\"margin:0;color:#b91c1c;font-size:14px;\"><strong>Warning:</strong> Confirming this code will permanently anonymize your account and log you out of all sessions.</p>"
 	if err := uc.emailSender.Send(ctx, appshared.EmailMessage{
-		To:      foundUser.Email().String(),
-		Subject: "Account Deactivation Code",
-		Body:    fmt.Sprintf("You requested to deactivate your account.\n\nYour confirmation code is: %s\n\nThis code will expire in 15 minutes. Note: Confirming this code will completely anonymize your account and log you out immediately.", code),
+		To:       foundUser.Email().String(),
+		Subject:  "Account Deactivation Code",
+		Body:     fmt.Sprintf("You requested to deactivate your account.\n\nYour confirmation code is: %s\n\nThis code will expire in 15 minutes. Note: Confirming this code will completely anonymize your account and log you out immediately.", code),
+		HTMLBody: emailtemplate.Wrap("Account Deactivation Code", htmlContent),
 	}); err != nil {
 		return apperror.NewServiceUnavailable(ErrCodeEmailDeliveryFailed, "Failed to send verification email")
 	}

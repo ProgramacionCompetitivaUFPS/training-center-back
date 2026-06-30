@@ -9,6 +9,7 @@ import (
 	appshared "github.com/training-judge-center/backend/internal/application/shared"
 	"github.com/training-judge-center/backend/internal/domain/user"
 	"github.com/training-judge-center/backend/pkg/apperror"
+	"github.com/training-judge-center/backend/pkg/emailtemplate"
 )
 
 type ConfirmEmailChangeInput struct {
@@ -90,12 +91,18 @@ func (uc *ConfirmEmailChangeUseCase) Execute(ctx context.Context, input ConfirmE
 		To:      oldEmail,
 		Subject: "Security Alert: Your Email Was Changed",
 		Body:    "Your account email has been successfully changed to a new one. If you did not make this change, please contact support immediately.",
+		HTMLBody: emailtemplate.Wrap("Security Alert: Your Email Was Changed",
+			"<p style=\"margin:0 0 12px;\">Your Training Center account email address has been successfully changed.</p>"+
+				"<p style=\"margin:0;color:#b91c1c;font-size:14px;\"><strong>If you did not make this change</strong>, please contact support immediately as your account may be compromised.</p>"),
 	})
 
 	_ = uc.emailSender.Send(ctx, appshared.EmailMessage{
 		To:      req.NewEmail().String(),
 		Subject: "Email successfully updated",
 		Body:    fmt.Sprintf("Hello %s, your email address has been successfully verified and updated on our platform.", u.Name()),
+		HTMLBody: emailtemplate.Wrap("Email successfully updated",
+			fmt.Sprintf("<p style=\"margin:0 0 12px;\">Hi <strong>%s</strong>,</p>"+
+				"<p style=\"margin:0;\">Your email address has been successfully verified and updated on your Training Center account.</p>", u.Name())),
 	})
 
 	return &ConfirmEmailChangeOutput{Email: newEmailVal.String()}, nil
