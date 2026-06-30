@@ -38,6 +38,12 @@ func (s *SMTPSender) Send(ctx context.Context, msg shared.EmailMessage) error {
 		return apperror.NewInternal()
 	}
 
+	fromAddr, err := mail.ParseAddress(s.from)
+	if err != nil {
+		slog.ErrorContext(ctx, "invalid sender address in smtp config", "from", s.from, "error", err)
+		return apperror.NewInternal()
+	}
+
 	safeSubject := mime.QEncoding.Encode("utf-8", strings.ReplaceAll(msg.Subject, "\r\n", " "))
 
 	var auth smtp.Auth
@@ -53,7 +59,7 @@ func (s *SMTPSender) Send(ctx context.Context, msg shared.EmailMessage) error {
 		"\r\n" + msg.Body)
 
 	addr := fmt.Sprintf("%s:%s", s.host, s.port)
-	if err := smtp.SendMail(addr, auth, s.from, []string{toAddr.Address}, raw); err != nil {
+	if err := smtp.SendMail(addr, auth, fromAddr.Address, []string{toAddr.Address}, raw); err != nil {
 		slog.ErrorContext(ctx, "failed to send email via SMTP", "to", msg.To, "error", err)
 		return apperror.NewInternal()
 	}
