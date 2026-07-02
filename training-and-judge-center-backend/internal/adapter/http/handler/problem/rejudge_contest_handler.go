@@ -24,6 +24,7 @@ type rejudgeContestResponse struct {
 // @Tags         contests
 // @Produce      json
 // @Security     BearerAuth
+// @Param        groupId   path string true "Group ID"
 // @Param        contestId path string true "Contest ID"
 // @Param        slug      path string true "Problem slug"
 // @Success      200 {object} rejudgeContestResponse
@@ -31,7 +32,7 @@ type rejudgeContestResponse struct {
 // @Failure      401 {object} apperror.AppError
 // @Failure      403 {object} apperror.AppError
 // @Failure      404 {object} apperror.AppError
-// @Router       /contests/{contestId}/problems/{slug}/rejudge [post]
+// @Router       /groups/{groupId}/contests/{contestId}/problems/{slug}/rejudge [post]
 func (h *Handler) RejudgeContest(w http.ResponseWriter, r *http.Request) {
 	cu, ok := middleware.GetCurrentUser(r.Context())
 	if !ok {
@@ -39,12 +40,14 @@ func (h *Handler) RejudgeContest(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	groupID := r.PathValue("groupId")
 	contestID := r.PathValue("contestId")
-	slug := r.PathValue("slug")
+	slug := r.PathValue("problemSlug")
 
 	out, err := h.rejudgeContestSubmissions.Execute(r.Context(), appProblem.RejudgeContestSubmissionsInput{
 		ContestID:   contestID,
 		Slug:        slug,
+		GroupID:     groupID,
 		CurrentUser: shared.CurrentUser{ID: cu.ID, Role: cu.Role},
 		Now:         time.Now(),
 	})

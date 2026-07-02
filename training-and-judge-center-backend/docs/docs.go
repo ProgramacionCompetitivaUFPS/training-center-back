@@ -15,6 +15,120 @@ const docTemplate = `{
     "host": "{{.Host}}",
     "basePath": "{{.BasePath}}",
     "paths": {
+        "/admin/problems/{slug}/rejudge": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "admin"
+                ],
+                "summary": "Admin rejudge problem submissions",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Problem slug",
+                        "name": "slug",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Filter by contest ID",
+                        "name": "contestId",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/problem.adminRejudgeResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/apperror.AppError"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/apperror.AppError"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/apperror.AppError"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/apperror.AppError"
+                        }
+                    }
+                }
+            }
+        },
+        "/admin/submissions/{submissionId}/rejudge": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "admin"
+                ],
+                "summary": "Admin rejudge specific submission",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Submission ID",
+                        "name": "submissionId",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/submission.rejudgeSubmissionResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/apperror.AppError"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/apperror.AppError"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/apperror.AppError"
+                        }
+                    }
+                }
+            }
+        },
         "/admin/users": {
             "get": {
                 "security": [
@@ -447,6 +561,79 @@ const docTemplate = `{
                         }
                     }
                 }
+            },
+            "patch": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "groups"
+                ],
+                "summary": "Update group",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Group ID",
+                        "name": "groupId",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Fields to update (all optional)",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/group.updateGroupReq"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/group.updateGroupResp"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/apperror.AppError"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/apperror.AppError"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/apperror.AppError"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/apperror.AppError"
+                        }
+                    },
+                    "409": {
+                        "description": "Conflict",
+                        "schema": {
+                            "$ref": "#/definitions/apperror.AppError"
+                        }
+                    }
+                }
             }
         },
         "/groups/{groupId}/contests": {
@@ -745,6 +932,77 @@ const docTemplate = `{
                 "responses": {
                     "204": {
                         "description": "No Content"
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/apperror.AppError"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/apperror.AppError"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/apperror.AppError"
+                        }
+                    }
+                }
+            }
+        },
+        "/groups/{groupId}/contests/{contestId}/problems/{slug}/rejudge": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "contests"
+                ],
+                "summary": "Rejudge contest submissions",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Group ID",
+                        "name": "groupId",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Contest ID",
+                        "name": "contestId",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Problem slug",
+                        "name": "slug",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/problem.rejudgeContestResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/apperror.AppError"
+                        }
                     },
                     "401": {
                         "description": "Unauthorized",
@@ -1160,6 +1418,320 @@ const docTemplate = `{
                     },
                     "404": {
                         "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/apperror.AppError"
+                        }
+                    }
+                }
+            }
+        },
+        "/groups/{groupId}/contests/{contestId}/team-registrations": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "teams"
+                ],
+                "summary": "List team registrations for a contest",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Group ID",
+                        "name": "groupId",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Contest ID",
+                        "name": "contestId",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "default": 1,
+                        "description": "Page",
+                        "name": "page",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "default": 20,
+                        "description": "Limit",
+                        "name": "limit",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/team.listTeamRegistrationsResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/apperror.AppError"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/apperror.AppError"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/apperror.AppError"
+                        }
+                    }
+                }
+            }
+        },
+        "/groups/{groupId}/contests/{contestId}/team-registrations/{teamId}": {
+            "put": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "teams"
+                ],
+                "summary": "Update team registration selected members",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Group ID",
+                        "name": "groupId",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Contest ID",
+                        "name": "contestId",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Team ID",
+                        "name": "teamId",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "New selected members",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/team.updateTeamRegistrationRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/team.updateTeamRegistrationResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/apperror.AppError"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/apperror.AppError"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/apperror.AppError"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/apperror.AppError"
+                        }
+                    },
+                    "409": {
+                        "description": "Conflict",
+                        "schema": {
+                            "$ref": "#/definitions/apperror.AppError"
+                        }
+                    }
+                }
+            },
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "teams"
+                ],
+                "summary": "Register team to contest",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Group ID",
+                        "name": "groupId",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Contest ID",
+                        "name": "contestId",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Team ID",
+                        "name": "teamId",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Selected members",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/team.registerTeamToContestRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "schema": {
+                            "$ref": "#/definitions/team.teamRegistrationResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/apperror.AppError"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/apperror.AppError"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/apperror.AppError"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/apperror.AppError"
+                        }
+                    },
+                    "409": {
+                        "description": "Conflict",
+                        "schema": {
+                            "$ref": "#/definitions/apperror.AppError"
+                        }
+                    }
+                }
+            },
+            "delete": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "teams"
+                ],
+                "summary": "Unregister team from contest",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Group ID",
+                        "name": "groupId",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Contest ID",
+                        "name": "contestId",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Team ID",
+                        "name": "teamId",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "No Content"
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/apperror.AppError"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/apperror.AppError"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/apperror.AppError"
+                        }
+                    },
+                    "409": {
+                        "description": "Conflict",
                         "schema": {
                             "$ref": "#/definitions/apperror.AppError"
                         }
@@ -3169,7 +3741,7 @@ const docTemplate = `{
                         "required": true
                     },
                     {
-                        "description": "User ID",
+                        "description": "User nickname",
                         "name": "body",
                         "in": "body",
                         "required": true,
@@ -3197,7 +3769,7 @@ const docTemplate = `{
                 }
             }
         },
-        "/problems/p/{slug}/modifiers/{userId}": {
+        "/problems/p/{slug}/modifiers/{nickname}": {
             "delete": {
                 "security": [
                     {
@@ -3221,8 +3793,8 @@ const docTemplate = `{
                     },
                     {
                         "type": "string",
-                        "description": "User ID",
-                        "name": "userId",
+                        "description": "Nickname of the modifier",
+                        "name": "nickname",
                         "in": "path",
                         "required": true
                     }
@@ -3239,6 +3811,195 @@ const docTemplate = `{
                     },
                     "404": {
                         "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/apperror.AppError"
+                        }
+                    }
+                }
+            }
+        },
+        "/problems/p/{slug}/rejudge": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "problems"
+                ],
+                "summary": "Rejudge submissions",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Problem slug",
+                        "name": "slug",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/problem.rejudgeResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/apperror.AppError"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/apperror.AppError"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/apperror.AppError"
+                        }
+                    }
+                }
+            }
+        },
+        "/problems/p/{slug}/statistics": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "problems"
+                ],
+                "summary": "Get problem statistics",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Problem slug",
+                        "name": "slug",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/problem.statisticsResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/apperror.AppError"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/apperror.AppError"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/apperror.AppError"
+                        }
+                    }
+                }
+            }
+        },
+        "/problems/p/{slug}/submissions": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "submissions"
+                ],
+                "summary": "List submissions for a problem",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Problem slug",
+                        "name": "slug",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Page number (default 1)",
+                        "name": "page",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Items per page (default 20, max 100)",
+                        "name": "limit",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Filter by verdict",
+                        "name": "verdict",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Filter by language",
+                        "name": "language",
+                        "in": "query"
+                    },
+                    {
+                        "type": "boolean",
+                        "description": "Only my submissions (regardless of visibility)",
+                        "name": "mine",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/submission.listSubmissionsResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/apperror.AppError"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/apperror.AppError"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/apperror.AppError"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
                         "schema": {
                             "$ref": "#/definitions/apperror.AppError"
                         }
@@ -3278,6 +4039,180 @@ const docTemplate = `{
                     },
                     "401": {
                         "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/apperror.AppError"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/apperror.AppError"
+                        }
+                    }
+                }
+            }
+        },
+        "/submissions/{submissionId}": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "submissions"
+                ],
+                "summary": "Get submission",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Submission ID",
+                        "name": "submissionId",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/submission.getSubmissionResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/apperror.AppError"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/apperror.AppError"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/apperror.AppError"
+                        }
+                    }
+                }
+            }
+        },
+        "/submissions/{submissionId}/rejudge": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "submissions"
+                ],
+                "summary": "Rejudge own submission",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Submission ID",
+                        "name": "submissionId",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/submission.rejudgeSubmissionResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/apperror.AppError"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/apperror.AppError"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/apperror.AppError"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/apperror.AppError"
+                        }
+                    }
+                }
+            }
+        },
+        "/submissions/{submissionId}/visibility": {
+            "patch": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "submissions"
+                ],
+                "summary": "Update submission visibility",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Submission ID",
+                        "name": "submissionId",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "New visibility",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/submission.updateVisibilityRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK"
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/apperror.AppError"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/apperror.AppError"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
                         "schema": {
                             "$ref": "#/definitions/apperror.AppError"
                         }
@@ -3923,6 +4858,36 @@ const docTemplate = `{
                 }
             }
         },
+        "/users/me/dashboard": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "users"
+                ],
+                "summary": "Get my dashboard",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/user.dashboardResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/apperror.AppError"
+                        }
+                    }
+                }
+            }
+        },
         "/users/me/groups": {
             "get": {
                 "security": [
@@ -3966,6 +4931,80 @@ const docTemplate = `{
                     },
                     "401": {
                         "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/apperror.AppError"
+                        }
+                    }
+                }
+            }
+        },
+        "/users/me/submissions": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "submissions"
+                ],
+                "summary": "List my submissions",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Page number (default 1)",
+                        "name": "page",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Items per page (default 20, max 100)",
+                        "name": "limit",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Filter by status",
+                        "name": "verdict",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Filter by language",
+                        "name": "language",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Filter by problem slug",
+                        "name": "problemSlug",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/submission.listSubmissionsResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/apperror.AppError"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/apperror.AppError"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
                         "schema": {
                             "$ref": "#/definitions/apperror.AppError"
                         }
@@ -4254,6 +5293,9 @@ const docTemplate = `{
                 "owner": {
                     "$ref": "#/definitions/contest.ownerDisplay"
                 },
+                "participationMode": {
+                    "type": "string"
+                },
                 "penalty": {
                     "type": "integer"
                 },
@@ -4271,6 +5313,12 @@ const docTemplate = `{
                 },
                 "status": {
                     "type": "string"
+                },
+                "teamSizeMax": {
+                    "type": "integer"
+                },
+                "teamSizeMin": {
+                    "type": "integer"
                 },
                 "updatedAt": {
                     "type": "string"
@@ -4295,6 +5343,9 @@ const docTemplate = `{
                 "name": {
                     "type": "string"
                 },
+                "participationMode": {
+                    "type": "string"
+                },
                 "penalty": {
                     "type": "integer"
                 },
@@ -4306,6 +5357,12 @@ const docTemplate = `{
                 },
                 "startTime": {
                     "type": "string"
+                },
+                "teamSizeMax": {
+                    "type": "integer"
+                },
+                "teamSizeMin": {
+                    "type": "integer"
                 }
             }
         },
@@ -4472,6 +5529,12 @@ const docTemplate = `{
         "contest.pagination": {
             "type": "object",
             "properties": {
+                "hasNextPage": {
+                    "type": "boolean"
+                },
+                "hasPrevPage": {
+                    "type": "boolean"
+                },
                 "limit": {
                     "type": "integer"
                 },
@@ -4540,6 +5603,9 @@ const docTemplate = `{
                 "lastAcceptedAt": {
                     "type": "string"
                 },
+                "participantType": {
+                    "type": "string"
+                },
                 "problems": {
                     "type": "object",
                     "additionalProperties": {
@@ -4599,7 +5665,10 @@ const docTemplate = `{
         "contest.registrationsPagination": {
             "type": "object",
             "properties": {
-                "hasMore": {
+                "hasNextPage": {
+                    "type": "boolean"
+                },
+                "hasPrevPage": {
                     "type": "boolean"
                 },
                 "limit": {
@@ -4636,6 +5705,12 @@ const docTemplate = `{
         "contest.standingsPagination": {
             "type": "object",
             "properties": {
+                "hasNextPage": {
+                    "type": "boolean"
+                },
+                "hasPrevPage": {
+                    "type": "boolean"
+                },
                 "limit": {
                     "type": "integer"
                 },
@@ -4702,7 +5777,25 @@ const docTemplate = `{
         "contest.submissionSubmitter": {
             "type": "object",
             "properties": {
+                "members": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "name": {
+                    "type": "string"
+                },
                 "nickname": {
+                    "type": "string"
+                },
+                "teamId": {
+                    "type": "string"
+                },
+                "teamName": {
+                    "type": "string"
+                },
+                "type": {
                     "type": "string"
                 }
             }
@@ -4748,6 +5841,9 @@ const docTemplate = `{
                 "name": {
                     "type": "string"
                 },
+                "participationMode": {
+                    "type": "string"
+                },
                 "penalty": {
                     "type": "integer"
                 },
@@ -4759,6 +5855,12 @@ const docTemplate = `{
                 },
                 "startTime": {
                     "type": "string"
+                },
+                "teamSizeMax": {
+                    "type": "integer"
+                },
+                "teamSizeMin": {
+                    "type": "integer"
                 }
             }
         },
@@ -5004,7 +6106,7 @@ const docTemplate = `{
                 "id": {
                     "type": "string"
                 },
-                "isDefault": {
+                "isGlobal": {
                     "type": "boolean"
                 },
                 "joinPolicy": {
@@ -5183,22 +6285,33 @@ const docTemplate = `{
         "group.paginationResp": {
             "type": "object",
             "properties": {
-                "currentPage": {
-                    "type": "integer"
-                },
                 "hasNextPage": {
                     "type": "boolean"
                 },
                 "hasPrevPage": {
                     "type": "boolean"
                 },
-                "itemsPerPage": {
+                "limit": {
                     "type": "integer"
                 },
-                "totalCount": {
+                "page": {
+                    "type": "integer"
+                },
+                "total": {
                     "type": "integer"
                 },
                 "totalPages": {
+                    "type": "integer"
+                }
+            }
+        },
+        "group.policyChangeEffectsResp": {
+            "type": "object",
+            "properties": {
+                "requestsAutoApproved": {
+                    "type": "integer"
+                },
+                "requestsAutoRejected": {
                     "type": "integer"
                 }
             }
@@ -5236,6 +6349,58 @@ const docTemplate = `{
                 },
                 "memberCount": {
                     "type": "integer"
+                }
+            }
+        },
+        "group.updateGroupReq": {
+            "type": "object",
+            "properties": {
+                "description": {
+                    "type": "string"
+                },
+                "joinPolicy": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "visibility": {
+                    "type": "string"
+                }
+            }
+        },
+        "group.updateGroupResp": {
+            "type": "object",
+            "properties": {
+                "createdAt": {
+                    "type": "string"
+                },
+                "createdBy": {
+                    "type": "string"
+                },
+                "description": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "joinPolicy": {
+                    "type": "string"
+                },
+                "membersCount": {
+                    "type": "integer"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "policyChangeEffects": {
+                    "$ref": "#/definitions/group.policyChangeEffectsResp"
+                },
+                "updatedAt": {
+                    "type": "string"
+                },
+                "visibility": {
+                    "type": "string"
                 }
             }
         },
@@ -5401,13 +6566,19 @@ const docTemplate = `{
         "material.paginationResp": {
             "type": "object",
             "properties": {
-                "currentPage": {
+                "hasNextPage": {
+                    "type": "boolean"
+                },
+                "hasPrevPage": {
+                    "type": "boolean"
+                },
+                "limit": {
                     "type": "integer"
                 },
-                "itemsPerPage": {
+                "page": {
                     "type": "integer"
                 },
-                "totalCount": {
+                "total": {
                     "type": "integer"
                 },
                 "totalPages": {
@@ -5435,8 +6606,28 @@ const docTemplate = `{
         "problem.addModifierRequest": {
             "type": "object",
             "properties": {
-                "userId": {
+                "userNickname": {
                     "type": "string"
+                }
+            }
+        },
+        "problem.adminRejudgeResponse": {
+            "type": "object",
+            "properties": {
+                "contestStatus": {
+                    "type": "string"
+                },
+                "message": {
+                    "type": "string"
+                },
+                "problemSlug": {
+                    "type": "string"
+                },
+                "standingWillUpdate": {
+                    "type": "boolean"
+                },
+                "submissionsQueued": {
+                    "type": "integer"
                 }
             }
         },
@@ -5623,6 +6814,20 @@ const docTemplate = `{
                 }
             }
         },
+        "problem.languageStatResp": {
+            "type": "object",
+            "properties": {
+                "language": {
+                    "type": "string"
+                },
+                "usersAccepted": {
+                    "type": "integer"
+                },
+                "usersAttempted": {
+                    "type": "integer"
+                }
+            }
+        },
         "problem.listModifiersResponse": {
             "type": "object",
             "properties": {
@@ -5662,13 +6867,19 @@ const docTemplate = `{
         "problem.paginationResp": {
             "type": "object",
             "properties": {
-                "currentPage": {
+                "hasNextPage": {
+                    "type": "boolean"
+                },
+                "hasPrevPage": {
+                    "type": "boolean"
+                },
+                "limit": {
                     "type": "integer"
                 },
-                "itemsPerPage": {
+                "page": {
                     "type": "integer"
                 },
-                "totalCount": {
+                "total": {
                     "type": "integer"
                 },
                 "totalPages": {
@@ -5708,6 +6919,43 @@ const docTemplate = `{
                 }
             }
         },
+        "problem.rejudgeContestResponse": {
+            "type": "object",
+            "properties": {
+                "contestId": {
+                    "type": "string"
+                },
+                "contestStatus": {
+                    "type": "string"
+                },
+                "message": {
+                    "type": "string"
+                },
+                "problemSlug": {
+                    "type": "string"
+                },
+                "standingWillUpdate": {
+                    "type": "boolean"
+                },
+                "submissionsQueued": {
+                    "type": "integer"
+                }
+            }
+        },
+        "problem.rejudgeResponse": {
+            "type": "object",
+            "properties": {
+                "message": {
+                    "type": "string"
+                },
+                "problemSlug": {
+                    "type": "string"
+                },
+                "submissionsQueued": {
+                    "type": "integer"
+                }
+            }
+        },
         "problem.solutionResp": {
             "type": "object",
             "properties": {
@@ -5716,6 +6964,40 @@ const docTemplate = `{
                 },
                 "language": {
                     "type": "string"
+                }
+            }
+        },
+        "problem.statisticsResponse": {
+            "type": "object",
+            "properties": {
+                "acceptanceRateByLanguage": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/problem.languageStatResp"
+                    }
+                },
+                "totalSubmissions": {
+                    "type": "integer"
+                },
+                "uniqueUsers": {
+                    "$ref": "#/definitions/problem.uniqueUsersResp"
+                },
+                "verdictDistribution": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/problem.verdictStatResp"
+                    }
+                }
+            }
+        },
+        "problem.uniqueUsersResp": {
+            "type": "object",
+            "properties": {
+                "attempted": {
+                    "type": "integer"
+                },
+                "solved": {
+                    "type": "integer"
                 }
             }
         },
@@ -5761,6 +7043,197 @@ const docTemplate = `{
                     "type": "integer"
                 },
                 "title": {
+                    "type": "string"
+                }
+            }
+        },
+        "problem.verdictStatResp": {
+            "type": "object",
+            "properties": {
+                "count": {
+                    "type": "integer"
+                },
+                "verdict": {
+                    "type": "string"
+                }
+            }
+        },
+        "submission.contestSummary": {
+            "type": "object",
+            "properties": {
+                "id": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                }
+            }
+        },
+        "submission.getSubmissionResponse": {
+            "type": "object",
+            "properties": {
+                "compiler": {
+                    "type": "string"
+                },
+                "contest": {
+                    "$ref": "#/definitions/submission.contestSummary"
+                },
+                "executionTime": {
+                    "type": "integer"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "judgedAt": {
+                    "type": "string"
+                },
+                "language": {
+                    "type": "string"
+                },
+                "memoryKb": {
+                    "type": "integer"
+                },
+                "problem": {
+                    "$ref": "#/definitions/submission.problemSummary"
+                },
+                "sourceCode": {
+                    "type": "string"
+                },
+                "status": {
+                    "type": "string"
+                },
+                "submittedAt": {
+                    "type": "string"
+                },
+                "submittedBy": {
+                    "$ref": "#/definitions/submission.userSummary"
+                },
+                "visibility": {
+                    "type": "string"
+                }
+            }
+        },
+        "submission.listSubmissionsResponse": {
+            "type": "object",
+            "properties": {
+                "pagination": {
+                    "$ref": "#/definitions/submission.pagination"
+                },
+                "submissions": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/submission.submissionSummaryResponse"
+                    }
+                }
+            }
+        },
+        "submission.pagination": {
+            "type": "object",
+            "properties": {
+                "hasNextPage": {
+                    "type": "boolean"
+                },
+                "hasPrevPage": {
+                    "type": "boolean"
+                },
+                "limit": {
+                    "type": "integer"
+                },
+                "page": {
+                    "type": "integer"
+                },
+                "total": {
+                    "type": "integer"
+                },
+                "totalPages": {
+                    "type": "integer"
+                }
+            }
+        },
+        "submission.problemSummary": {
+            "type": "object",
+            "properties": {
+                "slug": {
+                    "type": "string"
+                },
+                "title": {
+                    "type": "string"
+                }
+            }
+        },
+        "submission.rejudgeSubmissionResponse": {
+            "type": "object",
+            "properties": {
+                "currentStatus": {
+                    "type": "string"
+                },
+                "message": {
+                    "type": "string"
+                },
+                "previousVerdict": {
+                    "type": "string"
+                },
+                "problemSlug": {
+                    "type": "string"
+                },
+                "submissionId": {
+                    "type": "string"
+                }
+            }
+        },
+        "submission.submissionSummaryResponse": {
+            "type": "object",
+            "properties": {
+                "contest": {
+                    "$ref": "#/definitions/submission.contestSummary"
+                },
+                "executionTime": {
+                    "type": "integer"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "judgedAt": {
+                    "type": "string"
+                },
+                "language": {
+                    "type": "string"
+                },
+                "memoryKb": {
+                    "type": "integer"
+                },
+                "problem": {
+                    "$ref": "#/definitions/submission.problemSummary"
+                },
+                "status": {
+                    "type": "string"
+                },
+                "submittedAt": {
+                    "type": "string"
+                },
+                "submittedBy": {
+                    "$ref": "#/definitions/submission.userSummary"
+                },
+                "visibility": {
+                    "type": "string"
+                }
+            }
+        },
+        "submission.updateVisibilityRequest": {
+            "type": "object",
+            "properties": {
+                "visibility": {
+                    "type": "string"
+                }
+            }
+        },
+        "submission.userSummary": {
+            "type": "object",
+            "properties": {
+                "id": {
+                    "type": "string"
+                },
+                "nickname": {
                     "type": "string"
                 }
             }
@@ -5824,6 +7297,12 @@ const docTemplate = `{
                 },
                 "name": {
                     "type": "string"
+                },
+                "pendingInvitations": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/team.pendingInvitationItem"
+                    }
                 }
             }
         },
@@ -5897,6 +7376,29 @@ const docTemplate = `{
                 }
             }
         },
+        "team.listTeamRegistrationsResponse": {
+            "type": "object",
+            "properties": {
+                "items": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/team.teamRegistrationItem"
+                    }
+                },
+                "limit": {
+                    "type": "integer"
+                },
+                "page": {
+                    "type": "integer"
+                },
+                "total": {
+                    "type": "integer"
+                },
+                "totalPages": {
+                    "type": "integer"
+                }
+            }
+        },
         "team.member": {
             "type": "object",
             "properties": {
@@ -5934,6 +7436,12 @@ const docTemplate = `{
         "team.paginationMeta": {
             "type": "object",
             "properties": {
+                "hasNextPage": {
+                    "type": "boolean"
+                },
+                "hasPrevPage": {
+                    "type": "boolean"
+                },
                 "limit": {
                     "type": "integer"
                 },
@@ -5945,6 +7453,45 @@ const docTemplate = `{
                 },
                 "totalPages": {
                     "type": "integer"
+                }
+            }
+        },
+        "team.pendingInvitationItem": {
+            "type": "object",
+            "properties": {
+                "id": {
+                    "type": "string"
+                },
+                "invitedAt": {
+                    "type": "string"
+                },
+                "invitedBy": {
+                    "$ref": "#/definitions/team.teamUserRef"
+                },
+                "invitee": {
+                    "$ref": "#/definitions/team.teamUserRef"
+                }
+            }
+        },
+        "team.registerTeamToContestRequest": {
+            "type": "object",
+            "properties": {
+                "selectedMembers": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                }
+            }
+        },
+        "team.selectedMemberResponse": {
+            "type": "object",
+            "properties": {
+                "id": {
+                    "type": "string"
+                },
+                "nickname": {
+                    "type": "string"
                 }
             }
         },
@@ -5980,6 +7527,103 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "name": {
+                    "type": "string"
+                }
+            }
+        },
+        "team.teamRegistrationItem": {
+            "type": "object",
+            "properties": {
+                "id": {
+                    "type": "string"
+                },
+                "registeredAt": {
+                    "type": "string"
+                },
+                "selectedMembers": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/team.selectedMemberResponse"
+                    }
+                },
+                "teamId": {
+                    "type": "string"
+                },
+                "teamName": {
+                    "type": "string"
+                }
+            }
+        },
+        "team.teamRegistrationResponse": {
+            "type": "object",
+            "properties": {
+                "contestId": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "registeredAt": {
+                    "type": "string"
+                },
+                "selectedMembers": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/team.selectedMemberResponse"
+                    }
+                },
+                "teamId": {
+                    "type": "string"
+                },
+                "teamName": {
+                    "type": "string"
+                }
+            }
+        },
+        "team.teamUserRef": {
+            "type": "object",
+            "properties": {
+                "id": {
+                    "type": "string"
+                },
+                "nickname": {
+                    "type": "string"
+                }
+            }
+        },
+        "team.updateTeamRegistrationRequest": {
+            "type": "object",
+            "properties": {
+                "selectedMembers": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                }
+            }
+        },
+        "team.updateTeamRegistrationResponse": {
+            "type": "object",
+            "properties": {
+                "contestId": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "registeredAt": {
+                    "type": "string"
+                },
+                "selectedMembers": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/team.selectedMemberResponse"
+                    }
+                },
+                "teamId": {
+                    "type": "string"
+                },
+                "teamName": {
                     "type": "string"
                 }
             }
@@ -6037,6 +7681,43 @@ const docTemplate = `{
                 }
             }
         },
+        "user.contestResultResp": {
+            "type": "object",
+            "properties": {
+                "contestId": {
+                    "type": "string"
+                },
+                "contestName": {
+                    "type": "string"
+                },
+                "penalty": {
+                    "type": "integer"
+                },
+                "position": {
+                    "type": "integer"
+                },
+                "problemsSolved": {
+                    "type": "integer"
+                }
+            }
+        },
+        "user.contestSummaryResp": {
+            "type": "object",
+            "properties": {
+                "durationMinutes": {
+                    "type": "integer"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "startTime": {
+                    "type": "string"
+                }
+            }
+        },
         "user.createUserRequest": {
             "type": "object",
             "properties": {
@@ -6089,6 +7770,50 @@ const docTemplate = `{
                 },
                 "role": {
                     "type": "string"
+                }
+            }
+        },
+        "user.dashboardResponse": {
+            "type": "object",
+            "properties": {
+                "activeContests": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/user.contestSummaryResp"
+                    }
+                },
+                "problemsSolved": {
+                    "type": "integer"
+                },
+                "ranking": {
+                    "$ref": "#/definitions/user.rankingResp"
+                },
+                "recentContestResults": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/user.contestResultResp"
+                    }
+                },
+                "recentMaterials": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/user.materialResp"
+                    }
+                },
+                "recentSubmissions": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/user.submissionResp"
+                    }
+                },
+                "streak": {
+                    "$ref": "#/definitions/user.streakResp"
+                },
+                "upcomingContests": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/user.contestSummaryResp"
+                    }
                 }
             }
         },
@@ -6179,19 +7904,59 @@ const docTemplate = `{
                 }
             }
         },
+        "user.materialResp": {
+            "type": "object",
+            "properties": {
+                "authorNickname": {
+                    "type": "string"
+                },
+                "groupId": {
+                    "type": "string"
+                },
+                "groupName": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "publishedAt": {
+                    "type": "string"
+                },
+                "title": {
+                    "type": "string"
+                }
+            }
+        },
         "user.paginationMeta": {
             "type": "object",
             "properties": {
-                "currentPage": {
+                "hasNextPage": {
+                    "type": "boolean"
+                },
+                "hasPrevPage": {
+                    "type": "boolean"
+                },
+                "limit": {
                     "type": "integer"
                 },
-                "itemsPerPage": {
+                "page": {
                     "type": "integer"
                 },
-                "totalCount": {
+                "total": {
                     "type": "integer"
                 },
                 "totalPages": {
+                    "type": "integer"
+                }
+            }
+        },
+        "user.rankingResp": {
+            "type": "object",
+            "properties": {
+                "position": {
+                    "type": "integer"
+                },
+                "totalUsers": {
                     "type": "integer"
                 }
             }
@@ -6225,6 +7990,46 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "newPassword": {
+                    "type": "string"
+                }
+            }
+        },
+        "user.streakResp": {
+            "type": "object",
+            "properties": {
+                "current": {
+                    "type": "integer"
+                },
+                "maximum": {
+                    "type": "integer"
+                }
+            }
+        },
+        "user.submissionResp": {
+            "type": "object",
+            "properties": {
+                "executionTime": {
+                    "type": "integer"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "language": {
+                    "type": "string"
+                },
+                "memoryKb": {
+                    "type": "integer"
+                },
+                "problemSlug": {
+                    "type": "string"
+                },
+                "problemTitle": {
+                    "type": "string"
+                },
+                "submittedAt": {
+                    "type": "string"
+                },
+                "verdict": {
                     "type": "string"
                 }
             }

@@ -167,7 +167,7 @@ func main() {
 	uploadProblemFilesUseCase := appProblem.NewUploadProblemFilesUseCase(problemRepo, fileStorage, zipParser, settingsProvider)
 	deleteProblemFileUseCase := appProblem.NewDeleteProblemFileUseCase(problemRepo, fileStorage)
 	addModifierUseCase := appProblem.NewAddModifierUseCase(problemRepo, userProvider)
-	removeModifierUseCase := appProblem.NewRemoveModifierUseCase(problemRepo)
+	removeModifierUseCase := appProblem.NewRemoveModifierUseCase(problemRepo, userProvider)
 	listModifiersUseCase := appProblem.NewListModifiersUseCase(problemRepo)
 	getProblemUseCase := appProblem.NewGetProblemUseCase(problemRepo, userProvider)
 	listProblemsUseCase := appProblem.NewListProblemsUseCase(problemRepo, userProvider)
