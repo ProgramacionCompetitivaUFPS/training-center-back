@@ -11,14 +11,6 @@ import (
 const newModifierID = "cccccccc-0000-0000-0000-000000000001"
 const newModifierNickname = "new_modifier_nick"
 
-func providerResolving(userID string) *mockUserProvider {
-	return &mockUserProvider{
-		getIDByNicknameFn: func(_ context.Context, _ string) (string, bool, error) {
-			return userID, true, nil
-		},
-	}
-}
-
 func TestAddModifier_Success_Author(t *testing.T) {
 	repo := repoWith(newDraftProblem())
 	uc := NewAddModifierUseCase(repo, providerResolving(newModifierID))

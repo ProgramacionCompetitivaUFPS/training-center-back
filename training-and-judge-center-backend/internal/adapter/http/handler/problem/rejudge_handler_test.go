@@ -1,7 +1,6 @@
 package problem
 
 import (
-	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -12,25 +11,6 @@ import (
 	domainProblem "github.com/training-judge-center/backend/internal/domain/problem"
 	"github.com/training-judge-center/backend/internal/domain/shared"
 )
-
-// ── mock SubmissionRejudger ──────────────────────────────────────────────────
-
-type mockSubmissionRejudgerH struct {
-	subs    []appProblem.SubmissionRejudgeInfo
-	listErr error
-}
-
-func (m *mockSubmissionRejudgerH) ListByProblemBefore(_ context.Context, _ string, _ time.Time) ([]appProblem.SubmissionRejudgeInfo, error) {
-	return m.subs, m.listErr
-}
-
-func (m *mockSubmissionRejudgerH) ListByProblemAndContestBefore(_ context.Context, _, _ string, _ time.Time) ([]appProblem.SubmissionRejudgeInfo, error) {
-	return nil, nil
-}
-
-func (m *mockSubmissionRejudgerH) RejudgeBatch(_ context.Context, subs []appProblem.SubmissionRejudgeInfo, _ string, _ time.Time) (int, error) {
-	return len(subs), nil
-}
 
 // ── fixtures ─────────────────────────────────────────────────────────────────
 

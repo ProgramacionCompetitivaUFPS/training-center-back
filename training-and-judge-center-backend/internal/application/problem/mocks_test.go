@@ -90,6 +90,14 @@ func (m *mockUserProvider) GetIDByNickname(ctx context.Context, nickname string)
 	return "", false, nil
 }
 
+func providerResolving(userID string) *mockUserProvider {
+	return &mockUserProvider{
+		getIDByNicknameFn: func(_ context.Context, _ string) (string, bool, error) {
+			return userID, true, nil
+		},
+	}
+}
+
 // ── ProblemFileRepository mock ───────────────────────────────────────────────
 
 type mockFileStorage struct {

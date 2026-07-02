@@ -44,15 +44,7 @@ func (uc *RemoveModifierUseCase) Execute(ctx context.Context, input RemoveModifi
 		return apperror.NewForbidden(ErrCodeInsufficientPermissions, "Only the author or Admin can remove modifiers")
 	}
 
-	userID, found, err := uc.userProvider.GetIDByNickname(ctx, input.UserNickname)
-	if err != nil {
-		return err
-	}
-	if !found {
-		return apperror.NewNotFound(ErrCodeUserNotFound, "User not found")
-	}
-
-	modifierID, err := shared.NewUserID(userID)
+	modifierID, err := resolveModifierID(ctx, uc.userProvider, input.UserNickname)
 	if err != nil {
 		return err
 	}

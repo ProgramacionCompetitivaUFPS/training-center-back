@@ -24,15 +24,15 @@ type rejudgeContestResponse struct {
 // @Tags         contests
 // @Produce      json
 // @Security     BearerAuth
-// @Param        groupId   path string true "Group ID"
-// @Param        contestId path string true "Contest ID"
-// @Param        slug      path string true "Problem slug"
+// @Param        groupId     path string true "Group ID"
+// @Param        contestId   path string true "Contest ID"
+// @Param        problemSlug path string true "Problem slug"
 // @Success      200 {object} rejudgeContestResponse
 // @Failure      400 {object} apperror.AppError
 // @Failure      401 {object} apperror.AppError
 // @Failure      403 {object} apperror.AppError
 // @Failure      404 {object} apperror.AppError
-// @Router       /groups/{groupId}/contests/{contestId}/problems/{slug}/rejudge [post]
+// @Router       /groups/{groupId}/contests/{contestId}/problems/{problemSlug}/rejudge [post]
 func (h *Handler) RejudgeContest(w http.ResponseWriter, r *http.Request) {
 	cu, ok := middleware.GetCurrentUser(r.Context())
 	if !ok {

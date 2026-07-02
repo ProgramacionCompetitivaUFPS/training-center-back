@@ -954,7 +954,7 @@ const docTemplate = `{
                 }
             }
         },
-        "/groups/{groupId}/contests/{contestId}/problems/{slug}/rejudge": {
+        "/groups/{groupId}/contests/{contestId}/problems/{problemSlug}/rejudge": {
             "post": {
                 "security": [
                     {
@@ -986,7 +986,7 @@ const docTemplate = `{
                     {
                         "type": "string",
                         "description": "Problem slug",
-                        "name": "slug",
+                        "name": "problemSlug",
                         "in": "path",
                         "required": true
                     }

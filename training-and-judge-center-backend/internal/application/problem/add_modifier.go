@@ -47,15 +47,7 @@ func (uc *AddModifierUseCase) Execute(ctx context.Context, input AddModifierInpu
 		return apperror.NewForbidden(ErrCodeInsufficientPermissions, "Only the author or Admin can add modifiers")
 	}
 
-	userID, found, err := uc.userProvider.GetIDByNickname(ctx, input.UserNickname)
-	if err != nil {
-		return err
-	}
-	if !found {
-		return apperror.NewNotFound(ErrCodeUserNotFound, "User not found")
-	}
-
-	modifierID, err := shared.NewUserID(userID)
+	modifierID, err := resolveModifierID(ctx, uc.userProvider, input.UserNickname)
 	if err != nil {
 		return err
 	}
