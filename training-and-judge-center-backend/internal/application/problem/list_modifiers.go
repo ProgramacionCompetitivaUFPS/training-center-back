@@ -15,15 +15,16 @@ type ListModifiersInput struct {
 }
 
 type ListModifiersOutput struct {
-	Nicknames []string
+	Modifiers []ModifierDisplay
 }
 
 type ListModifiersUseCase struct {
-	repo problem.Repository
+	repo         problem.Repository
+	userProvider UserProvider
 }
 
-func NewListModifiersUseCase(repo problem.Repository) *ListModifiersUseCase {
-	return &ListModifiersUseCase{repo: repo}
+func NewListModifiersUseCase(repo problem.Repository, userProvider UserProvider) *ListModifiersUseCase {
+	return &ListModifiersUseCase{repo: repo, userProvider: userProvider}
 }
 
 func (uc *ListModifiersUseCase) Execute(ctx context.Context, input ListModifiersInput) (*ListModifiersOutput, error) {
@@ -41,9 +42,19 @@ func (uc *ListModifiersUseCase) Execute(ctx context.Context, input ListModifiers
 		return nil, apperror.NewForbidden(ErrCodeInsufficientPermissions, "Only the problem author, Admin, or assigned modifiers can view modifiers")
 	}
 
-	nicknames := make([]string, len(p.ModifierIDs()))
+	modifierIDs := make([]string, len(p.ModifierIDs()))
 	for i, id := range p.ModifierIDs() {
-		nicknames[i] = id.Value()
+		modifierIDs[i] = id.Value()
 	}
-	return &ListModifiersOutput{Nicknames: nicknames}, nil
+	displays, err := uc.userProvider.GetDisplays(ctx, modifierIDs)
+	if err != nil {
+		return nil, err
+	}
+	modifiers := make([]ModifierDisplay, 0, len(modifierIDs))
+	for _, id := range modifierIDs {
+		if d, ok := displays[id]; ok {
+			modifiers = append(modifiers, ModifierDisplay{Nickname: d.Nickname, Name: d.Name})
+		}
+	}
+	return &ListModifiersOutput{Modifiers: modifiers}, nil
 }

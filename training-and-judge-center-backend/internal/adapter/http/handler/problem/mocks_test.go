@@ -196,6 +196,10 @@ func newHandlerWithRemoveModifier(repo domainProblem.Repository, userProvider ap
 	return &Handler{removeModifier: appProblem.NewRemoveModifierUseCase(repo, userProvider)}
 }
 
+func newHandlerWithListModifiers(repo domainProblem.Repository, userProvider appProblem.UserProvider) *Handler {
+	return &Handler{listModifiers: appProblem.NewListModifiersUseCase(repo, userProvider)}
+}
+
 func newHandlerWithRejudgeContest(repo domainProblem.Repository, rejudger appProblem.SubmissionRejudger, contestProvider appProblem.ContestRejudgeProvider) *Handler {
 	return &Handler{rejudgeContestSubmissions: appProblem.NewRejudgeContestSubmissionsUseCase(repo, rejudger, contestProvider)}
 }

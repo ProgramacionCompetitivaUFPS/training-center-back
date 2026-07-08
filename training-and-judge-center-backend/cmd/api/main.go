@@ -168,7 +168,7 @@ func main() {
 	deleteProblemFileUseCase := appProblem.NewDeleteProblemFileUseCase(problemRepo, fileStorage)
 	addModifierUseCase := appProblem.NewAddModifierUseCase(problemRepo, userProvider)
 	removeModifierUseCase := appProblem.NewRemoveModifierUseCase(problemRepo, userProvider)
-	listModifiersUseCase := appProblem.NewListModifiersUseCase(problemRepo)
+	listModifiersUseCase := appProblem.NewListModifiersUseCase(problemRepo, userProvider)
 	getProblemUseCase := appProblem.NewGetProblemUseCase(problemRepo, userProvider)
 	listProblemsUseCase := appProblem.NewListProblemsUseCase(problemRepo, userProvider)
 	unpublishProblemUseCase := appProblem.NewUnpublishProblemUseCase(problemRepo, problemActiveContestChecker)
