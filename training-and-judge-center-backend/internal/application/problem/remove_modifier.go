@@ -12,17 +12,18 @@ import (
 )
 
 type RemoveModifierInput struct {
-	Slug        string
-	UserID      string
-	CurrentUser appshared.CurrentUser
+	Slug         string
+	UserNickname string
+	CurrentUser  appshared.CurrentUser
 }
 
 type RemoveModifierUseCase struct {
-	repo problem.Repository
+	repo         problem.Repository
+	userProvider UserProvider
 }
 
-func NewRemoveModifierUseCase(repo problem.Repository) *RemoveModifierUseCase {
-	return &RemoveModifierUseCase{repo: repo}
+func NewRemoveModifierUseCase(repo problem.Repository, userProvider UserProvider) *RemoveModifierUseCase {
+	return &RemoveModifierUseCase{repo: repo, userProvider: userProvider}
 }
 
 func (uc *RemoveModifierUseCase) Execute(ctx context.Context, input RemoveModifierInput) error {
@@ -43,7 +44,7 @@ func (uc *RemoveModifierUseCase) Execute(ctx context.Context, input RemoveModifi
 		return apperror.NewForbidden(ErrCodeInsufficientPermissions, "Only the author or Admin can remove modifiers")
 	}
 
-	modifierID, err := shared.NewUserID(input.UserID)
+	modifierID, err := resolveModifierID(ctx, uc.userProvider, input.UserNickname)
 	if err != nil {
 		return err
 	}

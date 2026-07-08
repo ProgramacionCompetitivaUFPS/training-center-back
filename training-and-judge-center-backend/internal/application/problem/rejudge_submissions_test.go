@@ -15,9 +15,10 @@ import (
 // ── mock SubmissionRejudger ──────────────────────────────────────────────────
 
 type mockSubmissionRejudger struct {
-	listFn   func(ctx context.Context, problemID string, before time.Time) ([]SubmissionRejudgeInfo, error)
-	batchFn  func(subs []SubmissionRejudgeInfo) (int, error)
-	rejudged []string
+	listFn        func(ctx context.Context, problemID string, before time.Time) ([]SubmissionRejudgeInfo, error)
+	listContestFn func(ctx context.Context, problemID, contestID string, before time.Time) ([]SubmissionRejudgeInfo, error)
+	batchFn       func(subs []SubmissionRejudgeInfo) (int, error)
+	rejudged      []string
 }
 
 func (m *mockSubmissionRejudger) ListByProblemBefore(ctx context.Context, problemID string, before time.Time) ([]SubmissionRejudgeInfo, error) {
@@ -27,7 +28,10 @@ func (m *mockSubmissionRejudger) ListByProblemBefore(ctx context.Context, proble
 	return nil, nil
 }
 
-func (m *mockSubmissionRejudger) ListByProblemAndContestBefore(_ context.Context, _, _ string, _ time.Time) ([]SubmissionRejudgeInfo, error) {
+func (m *mockSubmissionRejudger) ListByProblemAndContestBefore(ctx context.Context, problemID, contestID string, before time.Time) ([]SubmissionRejudgeInfo, error) {
+	if m.listContestFn != nil {
+		return m.listContestFn(ctx, problemID, contestID, before)
+	}
 	return nil, nil
 }
 

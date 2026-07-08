@@ -1,4 +1,4 @@
-﻿package problem
+package problem
 
 import (
 	"context"
@@ -9,15 +9,16 @@ import (
 )
 
 const newModifierID = "cccccccc-0000-0000-0000-000000000001"
+const newModifierNickname = "new_modifier_nick"
 
 func TestAddModifier_Success_Author(t *testing.T) {
 	repo := repoWith(newDraftProblem())
-	uc := NewAddModifierUseCase(repo, &mockUserProvider{})
+	uc := NewAddModifierUseCase(repo, providerResolving(newModifierID))
 
 	err := uc.Execute(context.Background(), AddModifierInput{
-		Slug:        testSlug,
-		UserID:      newModifierID,
-		CurrentUser: asCoach(authorID),
+		Slug:         testSlug,
+		UserNickname: newModifierNickname,
+		CurrentUser:  asCoach(authorID),
 	})
 	if err != nil {
 		t.Fatalf("author should be able to add a modifier, got: %v", err)
@@ -26,12 +27,12 @@ func TestAddModifier_Success_Author(t *testing.T) {
 
 func TestAddModifier_Success_Admin(t *testing.T) {
 	repo := repoWith(newDraftProblem())
-	uc := NewAddModifierUseCase(repo, &mockUserProvider{})
+	uc := NewAddModifierUseCase(repo, providerResolving(newModifierID))
 
 	err := uc.Execute(context.Background(), AddModifierInput{
-		Slug:        testSlug,
-		UserID:      newModifierID,
-		CurrentUser: asAdmin(strangerID),
+		Slug:         testSlug,
+		UserNickname: newModifierNickname,
+		CurrentUser:  asAdmin(strangerID),
 	})
 	if err != nil {
 		t.Fatalf("admin should be able to add a modifier, got: %v", err)
@@ -40,12 +41,12 @@ func TestAddModifier_Success_Admin(t *testing.T) {
 
 func TestAddModifier_Forbidden_Stranger(t *testing.T) {
 	repo := repoWith(newDraftProblem())
-	uc := NewAddModifierUseCase(repo, &mockUserProvider{})
+	uc := NewAddModifierUseCase(repo, providerResolving(newModifierID))
 
 	err := uc.Execute(context.Background(), AddModifierInput{
-		Slug:        testSlug,
-		UserID:      newModifierID,
-		CurrentUser: asContestant(strangerID),
+		Slug:         testSlug,
+		UserNickname: newModifierNickname,
+		CurrentUser:  asContestant(strangerID),
 	})
 	if err == nil {
 		t.Fatal("stranger should not add modifiers, got nil error")
@@ -63,16 +64,16 @@ func TestAddModifier_Forbidden_Stranger(t *testing.T) {
 func TestAddModifier_UserNotFound(t *testing.T) {
 	repo := repoWith(newDraftProblem())
 	provider := &mockUserProvider{
-		existsByIDFn: func(_ context.Context, _ string) (bool, error) {
-			return false, nil
+		getIDByNicknameFn: func(_ context.Context, _ string) (string, bool, error) {
+			return "", false, nil
 		},
 	}
 	uc := NewAddModifierUseCase(repo, provider)
 
 	err := uc.Execute(context.Background(), AddModifierInput{
-		Slug:        testSlug,
-		UserID:      "nonexistent-user-id-x",
-		CurrentUser: asCoach(authorID),
+		Slug:         testSlug,
+		UserNickname: "nonexistent_nick",
+		CurrentUser:  asCoach(authorID),
 	})
 	if err == nil {
 		t.Fatal("expected not-found error for unknown user, got nil")
@@ -89,12 +90,12 @@ func TestAddModifier_UserNotFound(t *testing.T) {
 
 func TestAddModifier_UserAlreadyModifier(t *testing.T) {
 	repo := repoWith(newDraftProblemWithModifier()) // modifierID already in list
-	uc := NewAddModifierUseCase(repo, &mockUserProvider{})
+	uc := NewAddModifierUseCase(repo, providerResolving(modifierID))
 
 	err := uc.Execute(context.Background(), AddModifierInput{
-		Slug:        testSlug,
-		UserID:      modifierID, // already a modifier
-		CurrentUser: asCoach(authorID),
+		Slug:         testSlug,
+		UserNickname: "existing_modifier_nick", // already a modifier
+		CurrentUser:  asCoach(authorID),
 	})
 	if err == nil {
 		t.Fatal("expected conflict error, got nil")
@@ -112,16 +113,16 @@ func TestAddModifier_UserAlreadyModifier(t *testing.T) {
 func TestAddModifier_UserProviderError(t *testing.T) {
 	repo := repoWith(newDraftProblem())
 	provider := &mockUserProvider{
-		existsByIDFn: func(_ context.Context, _ string) (bool, error) {
-			return false, apperror.NewInternal()
+		getIDByNicknameFn: func(_ context.Context, _ string) (string, bool, error) {
+			return "", false, apperror.NewInternal()
 		},
 	}
 	uc := NewAddModifierUseCase(repo, provider)
 
 	err := uc.Execute(context.Background(), AddModifierInput{
-		Slug:        testSlug,
-		UserID:      newModifierID,
-		CurrentUser: asCoach(authorID),
+		Slug:         testSlug,
+		UserNickname: newModifierNickname,
+		CurrentUser:  asCoach(authorID),
 	})
 	if err == nil {
 		t.Fatal("expected internal error when provider fails, got nil")
@@ -133,19 +134,5 @@ func TestAddModifier_UserProviderError(t *testing.T) {
 	}
 	if appErr.Code != apperror.ErrCodeInternalError {
 		t.Errorf("expected INTERNAL_ERROR, got %q", appErr.Code)
-	}
-}
-
-func TestAddModifier_InvalidUserID(t *testing.T) {
-	repo := repoWith(newDraftProblem())
-	uc := NewAddModifierUseCase(repo, &mockUserProvider{})
-
-	err := uc.Execute(context.Background(), AddModifierInput{
-		Slug:        testSlug,
-		UserID:      "", // empty ID should fail NewUserID validation
-		CurrentUser: asCoach(authorID),
-	})
-	if err == nil {
-		t.Fatal("expected error for empty user ID, got nil")
 	}
 }

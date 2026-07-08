@@ -95,6 +95,77 @@ func (m *mockActiveContestCheckerH) IsProblemInActiveContest(_ context.Context, 
 	return m.inActive, m.err
 }
 
+// ── SubmissionRejudger mock ──────────────────────────────────────────────────
+
+type mockSubmissionRejudgerH struct {
+	subs        []appProblem.SubmissionRejudgeInfo
+	listErr     error
+	contestSubs []appProblem.SubmissionRejudgeInfo
+	contestErr  error
+}
+
+func (m *mockSubmissionRejudgerH) ListByProblemBefore(_ context.Context, _ string, _ time.Time) ([]appProblem.SubmissionRejudgeInfo, error) {
+	return m.subs, m.listErr
+}
+
+func (m *mockSubmissionRejudgerH) ListByProblemAndContestBefore(_ context.Context, _, _ string, _ time.Time) ([]appProblem.SubmissionRejudgeInfo, error) {
+	return m.contestSubs, m.contestErr
+}
+
+func (m *mockSubmissionRejudgerH) RejudgeBatch(_ context.Context, subs []appProblem.SubmissionRejudgeInfo, _ string, _ time.Time) (int, error) {
+	return len(subs), nil
+}
+
+// ── UserProvider mock ────────────────────────────────────────────────────────
+
+type mockUserProviderH struct {
+	getIDByNicknameFn func(ctx context.Context, nickname string) (string, bool, error)
+}
+
+func (m *mockUserProviderH) ExistsByID(_ context.Context, _ string) (bool, error) { return true, nil }
+func (m *mockUserProviderH) GetDisplay(_ context.Context, userID string) (*appProblem.UserDisplay, error) {
+	return &appProblem.UserDisplay{Nickname: "user_" + userID, Name: "Test User"}, nil
+}
+func (m *mockUserProviderH) GetDisplays(_ context.Context, userIDs []string) (map[string]*appProblem.UserDisplay, error) {
+	out := make(map[string]*appProblem.UserDisplay, len(userIDs))
+	for _, id := range userIDs {
+		out[id] = &appProblem.UserDisplay{Nickname: "user_" + id, Name: "Test User"}
+	}
+	return out, nil
+}
+func (m *mockUserProviderH) GetIDByNickname(ctx context.Context, nickname string) (string, bool, error) {
+	if m.getIDByNicknameFn != nil {
+		return m.getIDByNicknameFn(ctx, nickname)
+	}
+	return "", false, nil
+}
+
+func userProviderResolvingH(userID string) *mockUserProviderH {
+	return &mockUserProviderH{
+		getIDByNicknameFn: func(_ context.Context, _ string) (string, bool, error) {
+			return userID, true, nil
+		},
+	}
+}
+
+// ── ContestRejudgeProvider mock ──────────────────────────────────────────────
+
+type mockContestRejudgeProviderH struct {
+	contest            *appProblem.ContestRejudgeInfo
+	isLeadOfGroup      bool
+	isProblemInContest bool
+}
+
+func (m *mockContestRejudgeProviderH) GetContestForRejudge(_ context.Context, _ string) (*appProblem.ContestRejudgeInfo, error) {
+	return m.contest, nil
+}
+func (m *mockContestRejudgeProviderH) IsProblemInContest(_ context.Context, _, _ string) (bool, error) {
+	return m.isProblemInContest, nil
+}
+func (m *mockContestRejudgeProviderH) IsLeadOfGroup(_ context.Context, _, _ string) (bool, error) {
+	return m.isLeadOfGroup, nil
+}
+
 // ── Handler constructor helpers ──────────────────────────────────────────────
 
 func newHandlerWithStatistics(uc *appProblem.GetProblemStatisticsUseCase) *Handler {
@@ -115,6 +186,22 @@ func newHandlerWithChangeAccessibility(repo domainProblem.Repository) *Handler {
 
 func newHandlerWithRejudge(repo domainProblem.Repository, rejudger appProblem.SubmissionRejudger) *Handler {
 	return &Handler{rejudgeSubmissions: appProblem.NewRejudgeSubmissionsUseCase(repo, rejudger)}
+}
+
+func newHandlerWithAddModifier(repo domainProblem.Repository, userProvider appProblem.UserProvider) *Handler {
+	return &Handler{addModifier: appProblem.NewAddModifierUseCase(repo, userProvider)}
+}
+
+func newHandlerWithRemoveModifier(repo domainProblem.Repository, userProvider appProblem.UserProvider) *Handler {
+	return &Handler{removeModifier: appProblem.NewRemoveModifierUseCase(repo, userProvider)}
+}
+
+func newHandlerWithListModifiers(repo domainProblem.Repository, userProvider appProblem.UserProvider) *Handler {
+	return &Handler{listModifiers: appProblem.NewListModifiersUseCase(repo, userProvider)}
+}
+
+func newHandlerWithRejudgeContest(repo domainProblem.Repository, rejudger appProblem.SubmissionRejudger, contestProvider appProblem.ContestRejudgeProvider) *Handler {
+	return &Handler{rejudgeContestSubmissions: appProblem.NewRejudgeContestSubmissionsUseCase(repo, rejudger, contestProvider)}
 }
 
 // ── Problem fixtures ─────────────────────────────────────────────────────────
@@ -142,6 +229,34 @@ func draftProblem() *domainProblem.Problem {
 		"DRAFT", "PRIVATE",
 		shared.RestoreUserID("u1"),
 		[]shared.UserID{},
+		[]domainProblem.LanguageOverride{},
+		nil, []domainProblem.JudgingFile{},
+		nil, nil, nil,
+		testNow, testNow,
+	)
+}
+
+func draftProblemWithAuthor(authorID string) *domainProblem.Problem {
+	return domainProblem.RestoreProblem(
+		"p1", "test-problem", "Test Problem",
+		nil, nil, nil, []string{},
+		"DRAFT", "PRIVATE",
+		shared.RestoreUserID(authorID),
+		[]shared.UserID{},
+		[]domainProblem.LanguageOverride{},
+		nil, []domainProblem.JudgingFile{},
+		nil, nil, nil,
+		testNow, testNow,
+	)
+}
+
+func draftProblemWithModifier(modifierID string) *domainProblem.Problem {
+	return domainProblem.RestoreProblem(
+		"p1", "test-problem", "Test Problem",
+		nil, nil, nil, []string{},
+		"DRAFT", "PRIVATE",
+		shared.RestoreUserID("u1"),
+		[]shared.UserID{shared.RestoreUserID(modifierID)},
 		[]domainProblem.LanguageOverride{},
 		nil, []domainProblem.JudgingFile{},
 		nil, nil, nil,

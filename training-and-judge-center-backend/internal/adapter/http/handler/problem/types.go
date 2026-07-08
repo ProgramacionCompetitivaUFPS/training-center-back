@@ -70,7 +70,7 @@ type problemListItemResp struct {
 }
 
 type addModifierRequest struct {
-	UserID string `json:"userId"`
+	UserNickname string `json:"userNickname"`
 }
 
 type listModifiersResponse struct {

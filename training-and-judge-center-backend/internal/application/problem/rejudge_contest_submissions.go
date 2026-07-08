@@ -12,6 +12,7 @@ import (
 type RejudgeContestSubmissionsInput struct {
 	ContestID   string
 	Slug        string
+	GroupID     string
 	CurrentUser appshared.CurrentUser
 	Now         time.Time
 }
@@ -46,6 +47,10 @@ func (uc *RejudgeContestSubmissionsUseCase) Execute(ctx context.Context, in Reju
 	contest, err := uc.contestProvider.GetContestForRejudge(ctx, in.ContestID)
 	if err != nil {
 		return nil, err
+	}
+
+	if contest.GroupID == nil || *contest.GroupID != in.GroupID {
+		return nil, apperror.NewNotFound(ErrCodeContestNotFound, "contest not found")
 	}
 
 	if !in.Now.After(contest.StartTime) || !in.Now.Before(contest.EndTime) {

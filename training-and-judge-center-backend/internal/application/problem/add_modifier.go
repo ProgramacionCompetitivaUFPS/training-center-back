@@ -12,9 +12,9 @@ import (
 )
 
 type AddModifierInput struct {
-	Slug        string
-	UserID      string
-	CurrentUser appshared.CurrentUser
+	Slug         string
+	UserNickname string
+	CurrentUser  appshared.CurrentUser
 }
 
 type AddModifierUseCase struct {
@@ -47,15 +47,7 @@ func (uc *AddModifierUseCase) Execute(ctx context.Context, input AddModifierInpu
 		return apperror.NewForbidden(ErrCodeInsufficientPermissions, "Only the author or Admin can add modifiers")
 	}
 
-	exists, err := uc.userProvider.ExistsByID(ctx, input.UserID)
-	if err != nil {
-		return err
-	}
-	if !exists {
-		return apperror.NewNotFound(ErrCodeUserNotFound, "User not found")
-	}
-
-	modifierID, err := shared.NewUserID(input.UserID)
+	modifierID, err := resolveModifierID(ctx, uc.userProvider, input.UserNickname)
 	if err != nil {
 		return err
 	}
