@@ -22,7 +22,7 @@ func NewNicknameResolver(db *pgxpool.Pool) *NicknameResolver {
 
 // ResolveByNickname returns (nil, nil) when no user has that nickname.
 func (r *NicknameResolver) ResolveByNickname(ctx context.Context, nickname string) (*appGroup.UserDisplay, error) {
-	const q = `SELECT id, nickname, name, email, role FROM users WHERE LOWER(nickname) = LOWER($1) LIMIT 1`
+	const q = `SELECT id, nickname, name, email, role FROM users WHERE nickname = LOWER($1) LIMIT 1`
 	var id, nick, name, email, role string
 	err := r.db.QueryRow(ctx, q, nickname).Scan(&id, &nick, &name, &email, &role)
 	if err != nil {

@@ -72,7 +72,7 @@ func (p *UserProvider) GetDisplays(ctx context.Context, userIDs []string) (map[s
 
 func (p *UserProvider) GetIDByNickname(ctx context.Context, nickname string) (string, bool, error) {
 	var id string
-	err := p.db.QueryRow(ctx, `SELECT id FROM users WHERE LOWER(nickname) = LOWER($1)`, nickname).Scan(&id)
+	err := p.db.QueryRow(ctx, `SELECT id FROM users WHERE nickname = LOWER($1)`, nickname).Scan(&id)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return "", false, nil

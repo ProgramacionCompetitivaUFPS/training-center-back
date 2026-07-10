@@ -175,7 +175,7 @@ func (r *Repository) FindByID(ctx context.Context, id string) (*domainUser.User,
 }
 
 func (r *Repository) FindByNickname(ctx context.Context, nickname domainUser.Nickname) (*domainUser.User, error) {
-	query := `SELECT ` + userColumns + ` FROM users WHERE LOWER(nickname) = LOWER($1)`
+	query := `SELECT ` + userColumns + ` FROM users WHERE nickname = LOWER($1)`
 
 	u, err := scanUser(r.querier.QueryRow(ctx, query, nickname.String()))
 	if err != nil {
