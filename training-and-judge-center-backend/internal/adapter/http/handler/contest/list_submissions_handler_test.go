@@ -28,6 +28,9 @@ func (m *mockSubmissionsContestRepo) Delete(_ context.Context, _ string) error {
 func (m *mockSubmissionsContestRepo) List(_ context.Context, _ domainContest.ListFilters) ([]*domainContest.Contest, int, error) {
 	return nil, 0, nil
 }
+func (m *mockSubmissionsContestRepo) ListByGroupIDs(_ context.Context, _ []string, _ domainContest.ListFilters) ([]*domainContest.Contest, int, error) {
+	return nil, 0, nil
+}
 
 // ── participant provider always registered ────────────────────────────────────
 

@@ -44,6 +44,9 @@ func (s *stubUpdateRepo) Delete(_ context.Context, _ string) error { return nil 
 func (s *stubUpdateRepo) List(_ context.Context, _ domainContest.ListFilters) ([]*domainContest.Contest, int, error) {
 	return nil, 0, nil
 }
+func (s *stubUpdateRepo) ListByGroupIDs(_ context.Context, _ []string, _ domainContest.ListFilters) ([]*domainContest.Contest, int, error) {
+	return nil, 0, nil
+}
 
 func defaultUpdateUC() *appcontest.UpdateContestUseCase {
 	return appcontest.NewUpdateContestUseCase(

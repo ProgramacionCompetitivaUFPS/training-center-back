@@ -43,6 +43,9 @@ func (s *mockRepoReturning) Delete(_ context.Context, _ string) error { return n
 func (s *mockRepoReturning) List(_ context.Context, _ domainContest.ListFilters) ([]*domainContest.Contest, int, error) {
 	return nil, 0, nil
 }
+func (s *mockRepoReturning) ListByGroupIDs(_ context.Context, _ []string, _ domainContest.ListFilters) ([]*domainContest.Contest, int, error) {
+	return nil, 0, nil
+}
 
 func TestRegister_Unauthenticated_Returns401(t *testing.T) {
 	h := newHandlerWithRegister(defaultRegisterUC())

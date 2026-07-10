@@ -322,6 +322,9 @@ func main() {
 	listContestsUseCase := appcontest.NewListContestsUseCase(
 		contestRepo, contestGroupProvider, contestMemberProvider, contestParticipantProvider,
 	)
+	listMyContestsUseCase := appcontest.NewListMyContestsUseCase(
+		contestRepo, contestGroupProvider, contestParticipantProvider,
+	)
 	contestTeamSelectionChecker := adaptercontest.NewTeamSelectionChecker(dbPool)
 	registerToContestUseCase := appcontest.NewRegisterToContestUseCase(
 		contestRepo, contestRegistrationRepo, contestMemberProvider, contestTeamSelectionChecker,
@@ -352,7 +355,7 @@ func main() {
 	)
 	contestHandler := handlercontest.NewHandler(
 		createContestUseCase, updateContestUseCase, deleteContestUseCase,
-		getContestUseCase, listContestsUseCase,
+		getContestUseCase, listContestsUseCase, listMyContestsUseCase,
 		registerToContestUseCase, unregisterFromContestUseCase,
 		getRegistrationStatusUseCase, listContestRegistrationsUseCase,
 		getStandingsUseCase, listContestSubmissionsUseCase,
