@@ -146,6 +146,30 @@ type listContestsResponse struct {
 	Pagination pagination        `json:"pagination"`
 }
 
+// ── GET /contests (global) response ──────────────────────────────────────────
+
+type myContestListItem struct {
+	ID                string       `json:"id"`
+	Name              string       `json:"name"`
+	Description       *string      `json:"description,omitempty"`
+	StartTime         string       `json:"startTime"`
+	EndTime           string       `json:"endTime"`
+	Duration          int          `json:"duration"`
+	Status            string       `json:"status"`
+	Penalty           int          `json:"penalty"`
+	FreezeMinutes     int          `json:"freezeMinutes"`
+	EnablePostContest bool         `json:"enablePostContest"`
+	ParticipantCount  int          `json:"participantCount"`
+	IsRegistered      bool         `json:"isRegistered"`
+	ProblemCount      int          `json:"problemCount"`
+	Group             groupDisplay `json:"group"`
+}
+
+type listMyContestsResponse struct {
+	Items      []myContestListItem `json:"items"`
+	Pagination pagination          `json:"pagination"`
+}
+
 // ── Registration status response ─────────────────────────────────────────────
 
 type registrationStatusResponse struct {

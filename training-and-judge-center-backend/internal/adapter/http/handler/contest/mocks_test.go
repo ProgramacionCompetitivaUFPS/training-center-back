@@ -7,8 +7,8 @@ import (
 	"net/http/httptest"
 	"time"
 
-	appcontest "github.com/training-judge-center/backend/internal/application/contest"
 	"github.com/training-judge-center/backend/internal/adapter/http/middleware"
+	appcontest "github.com/training-judge-center/backend/internal/application/contest"
 	domainContest "github.com/training-judge-center/backend/internal/domain/contest"
 	"github.com/training-judge-center/backend/internal/domain/shared"
 	domainUser "github.com/training-judge-center/backend/internal/domain/user"
@@ -19,7 +19,9 @@ import (
 
 type mockTokenSvc struct{}
 
-func (m *mockTokenSvc) GenerateToken(_ context.Context, _ *domainUser.User) (string, error) { return "tok", nil }
+func (m *mockTokenSvc) GenerateToken(_ context.Context, _ *domainUser.User) (string, error) {
+	return "tok", nil
+}
 func (m *mockTokenSvc) ValidateToken(_ string) (*domainUser.TokenClaims, error) {
 	return &domainUser.TokenClaims{UserID: shared.RestoreUserID("u1").Value(), Role: shared.RoleCoach}, nil
 }
@@ -60,11 +62,27 @@ func (s *mockContestRepo) Delete(_ context.Context, _ string) error { return nil
 func (s *mockContestRepo) List(_ context.Context, _ domainContest.ListFilters) ([]*domainContest.Contest, int, error) {
 	return nil, 0, nil
 }
+func (s *mockContestRepo) ListByGroupIDs(_ context.Context, _ []string, _ domainContest.ListFilters) ([]*domainContest.Contest, int, error) {
+	return nil, 0, nil
+}
 
 type mockGroupProvider struct{}
 
 func (s *mockGroupProvider) FindByID(_ context.Context, groupID string) (*appcontest.GroupInfo, error) {
 	return &appcontest.GroupInfo{ID: groupID, Name: "Test Group", IsVisible: true}, nil
+}
+func (s *mockGroupProvider) FindByIDs(_ context.Context, groupIDs []string) (map[string]*appcontest.GroupInfo, error) {
+	out := make(map[string]*appcontest.GroupInfo, len(groupIDs))
+	for _, id := range groupIDs {
+		out[id] = &appcontest.GroupInfo{ID: id, Name: "Test Group", IsVisible: true}
+	}
+	return out, nil
+}
+func (s *mockGroupProvider) ListAccessibleGroupIDs(_ context.Context, _ string, isAdmin bool) ([]string, error) {
+	if isAdmin {
+		return nil, nil
+	}
+	return []string{}, nil
 }
 
 type mockMemberProvider struct {

@@ -116,40 +116,8 @@ func (uc *ListContestsUseCase) Execute(ctx context.Context, in ListContestsInput
 		return nil, apperror.NewNotFound(ErrCodeGroupNotFound, "group not found")
 	}
 
-	filters := domainContest.ListFilters{
-		GroupID: shared.RestoreGroupID(in.GroupID),
-		Page:    page,
-		Limit:   limit,
-	}
-
-	if in.Status != nil {
-		switch *in.Status {
-		case "SCHEDULED":
-			s := domainContest.StatusScheduled
-			filters.Status = &s
-		case "ACTIVE":
-			s := domainContest.StatusActive
-			filters.Status = &s
-		case "FINISHED":
-			s := domainContest.StatusFinished
-			filters.Status = &s
-		}
-	}
-
-	switch in.SortBy {
-	case "name":
-		filters.SortBy = domainContest.SortByName
-	case "createdAt":
-		filters.SortBy = domainContest.SortByCreatedAt
-	default:
-		filters.SortBy = domainContest.SortByStartTime
-	}
-
-	if in.Order == "asc" {
-		filters.Order = domainContest.OrderAsc
-	} else {
-		filters.Order = domainContest.OrderDesc
-	}
+	filters := buildContestFilters(in.Status, in.SortBy, in.Order, page, limit)
+	filters.GroupID = shared.RestoreGroupID(in.GroupID)
 
 	contests, total, err := uc.repo.List(ctx, filters)
 	if err != nil {
@@ -172,21 +140,7 @@ func (uc *ListContestsUseCase) Execute(ctx context.Context, in ListContestsInput
 	now := time.Now()
 	items := make([]ContestListItem, 0, len(contests))
 	for _, c := range contests {
-		items = append(items, ContestListItem{
-			ID:                c.ID(),
-			Name:              c.Name().Value(),
-			Description:       truncateDescription(c.Description()),
-			StartTime:         c.StartTime(),
-			EndTime:           c.EndTime(),
-			Duration:          c.Duration() * 60,
-			Status:            c.Status(now).String(),
-			Penalty:           c.Penalty().Value(),
-			FreezeMinutes:     c.FreezeMinutes(),
-			EnablePostContest: c.EnablePostContest(),
-			ParticipantCount:  participantCounts[c.ID()],
-			IsRegistered:      registeredMap[c.ID()],
-			ProblemCount:      len(c.Problems()),
-		})
+		items = append(items, toContestListItem(c, now, participantCounts[c.ID()], registeredMap[c.ID()]))
 	}
 
 	totalPages := appshared.CalcTotalPages(total, limit)

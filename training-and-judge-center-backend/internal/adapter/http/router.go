@@ -131,6 +131,8 @@ func NewRouter(h *Handlers, s *Services, allowedOrigins []string) *chi.Mux {
 			})
 		})
 
+		r.Get("/contests", h.Contest.ListMyContests)
+
 		r.Route("/submissions", func(r chi.Router) {
 			r.Get("/{submissionId}", h.Submission.GetSubmission)
 			r.Patch("/{submissionId}/visibility", h.Submission.UpdateVisibility)

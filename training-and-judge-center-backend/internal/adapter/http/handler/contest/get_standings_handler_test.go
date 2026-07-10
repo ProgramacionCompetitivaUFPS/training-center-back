@@ -28,6 +28,9 @@ func (m *mockStandingsContestRepo) Delete(_ context.Context, _ string) error { r
 func (m *mockStandingsContestRepo) List(_ context.Context, _ domainContest.ListFilters) ([]*domainContest.Contest, int, error) {
 	return nil, 0, nil
 }
+func (m *mockStandingsContestRepo) ListByGroupIDs(_ context.Context, _ []string, _ domainContest.ListFilters) ([]*domainContest.Contest, int, error) {
+	return nil, 0, nil
+}
 
 type mockStandingsCache struct {
 	data *appcontest.CachedStandings

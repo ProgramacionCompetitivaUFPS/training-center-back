@@ -55,6 +55,9 @@ func (s *mockGetRepo) Delete(_ context.Context, _ string) error { return nil }
 func (s *mockGetRepo) List(_ context.Context, _ domainContest.ListFilters) ([]*domainContest.Contest, int, error) {
 	return nil, 0, nil
 }
+func (s *mockGetRepo) ListByGroupIDs(_ context.Context, _ []string, _ domainContest.ListFilters) ([]*domainContest.Contest, int, error) {
+	return nil, 0, nil
+}
 
 func TestGetContest_Unauthenticated_Returns401(t *testing.T) {
 	h := newHandlerWithGet(defaultGetUC())

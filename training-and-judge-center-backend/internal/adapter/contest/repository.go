@@ -5,6 +5,7 @@ import (
 	"errors"
 	"log/slog"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -88,14 +89,14 @@ func (r *Repository) FindByID(ctx context.Context, id string) (*domainContest.Co
 	q := infraPostgres.GetQuerier(ctx, r.db)
 
 	var (
-		cID, name, groupID, ownerID                  string
-		participationMode                             string
-		description                                   *string
-		startTime, endTime, createdAt                 time.Time
-		updatedAt                                     *time.Time
-		penalty, freezeMinutes                        int
-		teamSizeMin, teamSizeMax                      int
-		enablePostContest, locked, showTeamMembers    bool
+		cID, name, groupID, ownerID                string
+		participationMode                          string
+		description                                *string
+		startTime, endTime, createdAt              time.Time
+		updatedAt                                  *time.Time
+		penalty, freezeMinutes                     int
+		teamSizeMin, teamSizeMax                   int
+		enablePostContest, locked, showTeamMembers bool
 	)
 	err := q.QueryRow(ctx, `
 		SELECT id, name, description, start_time, end_time,
@@ -162,21 +163,45 @@ var sortColumn = map[domainContest.SortField]string{
 }
 
 func (r *Repository) List(ctx context.Context, filters domainContest.ListFilters) ([]*domainContest.Contest, int, error) {
+	return r.listContests(ctx, "group_id=$1", []interface{}{filters.GroupID.Value()}, filters)
+}
+
+// ListByGroupIDs lists contests scoped to groupIDs. groupIDs == nil omits the
+// group filter entirely (Admins, "all contests"); groupIDs == []string{}
+// matches nothing (no accessible groups).
+func (r *Repository) ListByGroupIDs(ctx context.Context, groupIDs []string, filters domainContest.ListFilters) ([]*domainContest.Contest, int, error) {
+	if groupIDs == nil {
+		return r.listContests(ctx, "", nil, filters)
+	}
+	return r.listContests(ctx, "group_id = ANY($1)", []interface{}{groupIDs}, filters)
+}
+
+// listContests runs the shared list+count query. baseCond is an optional
+// group-scoping condition (e.g. "group_id=$1" or "group_id = ANY($1)") whose
+// placeholders are bound by baseArgs; pass "" / nil to omit group scoping.
+func (r *Repository) listContests(ctx context.Context, baseCond string, baseArgs []interface{}, filters domainContest.ListFilters) ([]*domainContest.Contest, int, error) {
 	q := infraPostgres.GetQuerier(ctx, r.db)
 
-	// Build WHERE clause.
-	where := "WHERE group_id=$1"
-	args := []interface{}{filters.GroupID.Value()}
+	var conds []string
+	args := append([]interface{}{}, baseArgs...)
+	if baseCond != "" {
+		conds = append(conds, baseCond)
+	}
 
 	if filters.Status != nil {
 		switch *filters.Status {
 		case domainContest.StatusScheduled:
-			where += " AND start_time > NOW()"
+			conds = append(conds, "start_time > NOW()")
 		case domainContest.StatusActive:
-			where += " AND start_time <= NOW() AND end_time >= NOW()"
+			conds = append(conds, "start_time <= NOW() AND end_time >= NOW()")
 		case domainContest.StatusFinished:
-			where += " AND end_time < NOW()"
+			conds = append(conds, "end_time < NOW()")
 		}
+	}
+
+	where := ""
+	if len(conds) > 0 {
+		where = "WHERE " + strings.Join(conds, " AND ")
 	}
 
 	// ORDER BY — whitelist prevents injection.
@@ -211,14 +236,14 @@ func (r *Repository) List(ctx context.Context, filters domainContest.ListFilters
 	var result []*domainContest.Contest
 	for rows.Next() {
 		var (
-			cID, name, groupID, ownerID                  string
-			participationMode                             string
-			description                                   *string
-			startTime, endTime, createdAt                 time.Time
-			updatedAt                                     *time.Time
-			penalty, freezeMinutes                        int
-			teamSizeMin, teamSizeMax                      int
-			enablePostContest, locked, showTeamMembers    bool
+			cID, name, groupID, ownerID                string
+			participationMode                          string
+			description                                *string
+			startTime, endTime, createdAt              time.Time
+			updatedAt                                  *time.Time
+			penalty, freezeMinutes                     int
+			teamSizeMin, teamSizeMax                   int
+			enablePostContest, locked, showTeamMembers bool
 		)
 		if err := rows.Scan(
 			&cID, &name, &description, &startTime, &endTime,
@@ -254,7 +279,8 @@ func (r *Repository) List(ctx context.Context, filters domainContest.ListFilters
 	}
 
 	var total int
-	if err := q.QueryRow(ctx, `SELECT COUNT(*) FROM contests `+where, args[:len(args)-2]...).Scan(&total); err != nil {
+	countQuery := "SELECT COUNT(*) FROM contests " + where
+	if err := q.QueryRow(ctx, countQuery, args[:len(args)-2]...).Scan(&total); err != nil {
 		slog.ErrorContext(ctx, "failed to count contests", "error", err)
 		return nil, 0, apperror.NewInternal()
 	}
