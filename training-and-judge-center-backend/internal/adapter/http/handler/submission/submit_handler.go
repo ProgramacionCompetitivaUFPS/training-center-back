@@ -28,7 +28,22 @@ type submitResponse struct {
 	FileHash     string `json:"fileHash"`
 }
 
-// Submit handles POST /problems/p/{slug}/submissions
+// @Summary      Submit a solution
+// @Tags         submissions
+// @Accept       multipart/form-data
+// @Produce      json
+// @Security     BearerAuth
+// @Param        slug     path     string true "Problem slug"
+// @Param        language formData string true "Programming language"
+// @Param        compiler formData string true "Compiler identifier"
+// @Param        file     formData file   true "Solution source file"
+// @Success      201 {object} submitResponse
+// @Failure      400 {object} apperror.AppError
+// @Failure      401 {object} apperror.AppError
+// @Failure      403 {object} apperror.AppError
+// @Failure      409 {object} apperror.AppError
+// @Failure      429 {object} apperror.AppError
+// @Router       /problems/p/{slug}/submissions [post]
 func (h *Handler) Submit(w http.ResponseWriter, r *http.Request) {
 	// Capture submittedAt IMMEDIATELY — before any validation or processing
 	submittedAt := time.Now().UTC()
