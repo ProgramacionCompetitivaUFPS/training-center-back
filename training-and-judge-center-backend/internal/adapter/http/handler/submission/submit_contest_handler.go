@@ -25,7 +25,24 @@ type submitContestResponse struct {
 	FileHash     string `json:"fileHash"`
 }
 
-// SubmitContest handles POST /groups/{groupId}/contests/{contestId}/problems/{problemSlug}/submissions
+// @Summary      Submit a solution to a contest problem
+// @Tags         submissions
+// @Accept       multipart/form-data
+// @Produce      json
+// @Security     BearerAuth
+// @Param        groupId     path     string true "Group ID"
+// @Param        contestId   path     string true "Contest ID"
+// @Param        problemSlug path     string true "Problem slug"
+// @Param        language    formData string true "Programming language"
+// @Param        compiler    formData string true "Compiler identifier"
+// @Param        file        formData file   true "Solution source file"
+// @Success      201 {object} submitContestResponse
+// @Failure      400 {object} apperror.AppError
+// @Failure      401 {object} apperror.AppError
+// @Failure      403 {object} apperror.AppError
+// @Failure      409 {object} apperror.AppError
+// @Failure      429 {object} apperror.AppError
+// @Router       /groups/{groupId}/contests/{contestId}/problems/{problemSlug}/submissions [post]
 func (h *Handler) SubmitContest(w http.ResponseWriter, r *http.Request) {
 	// Capture submittedAt IMMEDIATELY — before any validation or processing
 	submittedAt := time.Now().UTC()
