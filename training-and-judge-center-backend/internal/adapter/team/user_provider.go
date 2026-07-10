@@ -63,7 +63,7 @@ func (p *UserProvider) GetDisplays(ctx context.Context, userIDs []string) (map[s
 }
 
 func (p *UserProvider) FindByNickname(ctx context.Context, nickname string) (*appTeam.UserDisplay, error) {
-	const q = `SELECT id, nickname FROM users WHERE LOWER(nickname) = LOWER($1)`
+	const q = `SELECT id, nickname FROM users WHERE nickname = LOWER($1)`
 	var id, nick string
 	err := infraPostgres.GetQuerier(ctx, p.db).QueryRow(ctx, q, nickname).Scan(&id, &nick)
 	if err != nil {

@@ -22,7 +22,7 @@ func NewAuthorIDProvider(db infraPostgres.Querier) *AuthorIDProvider {
 func (p *AuthorIDProvider) FindIDByNickname(ctx context.Context, nickname string) (string, bool, error) {
 	q := infraPostgres.GetQuerier(ctx, p.db)
 	var id string
-	err := q.QueryRow(ctx, `SELECT id FROM users WHERE LOWER(nickname) = LOWER($1)`, nickname).Scan(&id)
+	err := q.QueryRow(ctx, `SELECT id FROM users WHERE nickname = LOWER($1)`, nickname).Scan(&id)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return "", false, nil
