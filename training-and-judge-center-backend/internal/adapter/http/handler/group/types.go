@@ -177,6 +177,43 @@ type updateGroupResp struct {
 	PolicyChangeEffects *policyChangeEffectsResp `json:"policyChangeEffects,omitempty"`
 }
 
+// ── Invitation endpoints ──────────────────────────────────────────────────────
+
+type generateInviteReq struct {
+	UserNickname string `json:"userNickname"`
+	UserEmail    string `json:"userEmail"`
+	UserID       string `json:"userId"`
+}
+
+type generateInviteResponse struct {
+	ID        string         `json:"id"`
+	GroupID   string         `json:"groupId"`
+	Invitee   *requesterResp `json:"invitee,omitempty"`
+	Status    string         `json:"status"`
+	ExpiresAt string         `json:"expiresAt"`
+	CreatedAt string         `json:"createdAt"`
+}
+
+type acceptInviteRequest struct {
+	InvitationID string `json:"invitationId"`
+}
+
+type invitationListItemResp struct {
+	ID              string         `json:"id"`
+	GroupID         string         `json:"groupId"`
+	Invitee         *requesterResp `json:"invitee,omitempty"`
+	InvitedBy       string         `json:"invitedBy"`
+	Status          string         `json:"status"`
+	EffectiveStatus string         `json:"effectiveStatus"`
+	ExpiresAt       string         `json:"expiresAt"`
+	CreatedAt       string         `json:"createdAt"`
+}
+
+type listGroupInvitationsResponse struct {
+	Invitations []invitationListItemResp `json:"invitations"`
+	Pagination  paginationResp           `json:"pagination"`
+}
+
 // ── Delete group endpoint ─────────────────────────────────────────────────────
 
 type deleteGroupReq struct {
@@ -197,7 +234,7 @@ type deletionSummary struct {
 }
 
 type deleteGroupResp struct {
-	Message        string          `json:"message"`
-	DeletedGroup   deletedGroupInfo `json:"deletedGroup"`
-	DeletionSummary deletionSummary `json:"deletionSummary"`
+	Message         string           `json:"message"`
+	DeletedGroup    deletedGroupInfo `json:"deletedGroup"`
+	DeletionSummary deletionSummary  `json:"deletionSummary"`
 }

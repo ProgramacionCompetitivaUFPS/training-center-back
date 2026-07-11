@@ -26,8 +26,10 @@ type mockGroupRepository struct {
 	saveErr        error
 }
 
-func (m *mockGroupRepository) Save(ctx context.Context, g *domainGroup.Group) error   { return m.saveErr }
-func (m *mockGroupRepository) Update(ctx context.Context, g *domainGroup.Group) error { return m.saveErr }
+func (m *mockGroupRepository) Save(ctx context.Context, g *domainGroup.Group) error { return m.saveErr }
+func (m *mockGroupRepository) Update(ctx context.Context, g *domainGroup.Group) error {
+	return m.saveErr
+}
 func (m *mockGroupRepository) FindByID(ctx context.Context, id string) (*domainGroup.Group, error) {
 	for _, g := range m.groups {
 		if g.ID() == id {
@@ -204,11 +206,13 @@ func (m *mockTransactionManager) WithTx(ctx context.Context, fn func(txCtx conte
 // ── mockUserProvider ──────────────────────────────────────────────────────────
 
 type mockUserProvider struct {
-	displays map[string]*UserDisplay
-	err      error
+	displays    map[string]*UserDisplay
+	err         error
+	lastCallIDs []string
 }
 
 func (m *mockUserProvider) GetDisplays(ctx context.Context, ids []string) (map[string]*UserDisplay, error) {
+	m.lastCallIDs = ids
 	if m.err != nil {
 		return nil, m.err
 	}
@@ -221,21 +225,91 @@ func (m *mockUserProvider) GetDisplays(ctx context.Context, ids []string) (map[s
 	return out, nil
 }
 
-// ── mockInvitationTokenService ────────────────────────────────────────────────
+// ── mockInvitationRepository ──────────────────────────────────────────────────
 
-type mockInvitationTokenService struct {
-	token       string
-	genErr      error
-	claims      *InvitationClaims
-	validateErr error
+type findPendingCall struct {
+	groupID   string
+	inviteeID *shared.UserID
 }
 
-func (m *mockInvitationTokenService) GenerateInviteToken(groupID, inviterID string) (string, error) {
-	return m.token, m.genErr
+type transitionCall struct {
+	id   string
+	from domainGroup.InvitationStatus
+	to   domainGroup.InvitationStatus
 }
 
-func (m *mockInvitationTokenService) ValidateInviteToken(token string) (*InvitationClaims, error) {
-	return m.claims, m.validateErr
+type mockInvitationRepository struct {
+	byID              map[string]*domainGroup.GroupInvitation
+	findByIDErr       error
+	savedInvitations  []*domainGroup.GroupInvitation
+	saveErr           error
+	pendingResult     *domainGroup.GroupInvitation
+	findPendingErr    error
+	findPendingCalls  []findPendingCall
+	transitions       []transitionCall
+	transitionErr     error
+	findByGroupResult []*domainGroup.GroupInvitation
+	findByGroupTotal  int
+	findByGroupErr    error
+	lastFilters       domainGroup.InvitationFilters
+}
+
+func (m *mockInvitationRepository) Save(_ context.Context, inv *domainGroup.GroupInvitation) error {
+	if m.saveErr != nil {
+		return m.saveErr
+	}
+	m.savedInvitations = append(m.savedInvitations, inv)
+	if m.byID == nil {
+		m.byID = map[string]*domainGroup.GroupInvitation{}
+	}
+	m.byID[inv.ID()] = inv
+	return nil
+}
+
+func (m *mockInvitationRepository) FindByID(_ context.Context, id string) (*domainGroup.GroupInvitation, error) {
+	if m.findByIDErr != nil {
+		return nil, m.findByIDErr
+	}
+	if inv, ok := m.byID[id]; ok {
+		// Return a fresh copy, not the stored pointer: a real repository read
+		// is an independent DB round-trip and must not reflect in-memory-only
+		// mutations (e.g. inv.Accept()) the caller made to a previous read
+		// before persisting them.
+		return domainGroup.RestoreGroupInvitation(inv.ID(), inv.GroupID(), inv.InviteeID(), inv.InvitedBy(), inv.Status(), inv.ExpiresAt(), inv.CreatedAt()), nil
+	}
+	return nil, apperror.NewNotFound(domainGroup.ErrCodeInvitationNotFound, "invitation not found")
+}
+
+func (m *mockInvitationRepository) FindPendingByGroupAndInvitee(_ context.Context, groupID string, inviteeID *shared.UserID) (*domainGroup.GroupInvitation, error) {
+	m.findPendingCalls = append(m.findPendingCalls, findPendingCall{groupID: groupID, inviteeID: inviteeID})
+	if m.findPendingErr != nil {
+		return nil, m.findPendingErr
+	}
+	return m.pendingResult, nil
+}
+
+func (m *mockInvitationRepository) FindByGroup(_ context.Context, _ string, filters domainGroup.InvitationFilters) ([]*domainGroup.GroupInvitation, int, error) {
+	m.lastFilters = filters
+	if m.findByGroupErr != nil {
+		return nil, 0, m.findByGroupErr
+	}
+	return m.findByGroupResult, m.findByGroupTotal, nil
+}
+
+func (m *mockInvitationRepository) TransitionStatus(_ context.Context, id string, from, to domainGroup.InvitationStatus) error {
+	m.transitions = append(m.transitions, transitionCall{id: id, from: from, to: to})
+	return m.transitionErr
+}
+
+// ── mockEmailResolver ─────────────────────────────────────────────────────────
+
+type mockEmailResolver struct {
+	user *UserDisplay
+	err  error
+}
+
+func (m *mockEmailResolver) ResolveByEmail(_ context.Context, _ string) (*UserDisplay, error) {
+	return m.user, m.err
 }
 
 // ── mockPreferencesReader ─────────────────────────────────────────────────────
@@ -304,6 +378,19 @@ func inviteGroup(t *testing.T) *domainGroup.Group {
 }
 
 func mustUID(id string) shared.UserID { return shared.RestoreUserID(id) }
+
+// mustInvitation builds a fresh, non-expired invitation anchored to the real
+// wall clock — AcceptInviteUseCase computes expiry against time.Now() (D10:
+// the use case owns the time source, not an injected fixture), so a fixture
+// built from the fixed testNow (2026-01-01) would already read as expired.
+func mustInvitation(t *testing.T, id, groupID string, inviteeID *shared.UserID, invitedBy string) *domainGroup.GroupInvitation {
+	t.Helper()
+	inv, err := domainGroup.NewGroupInvitation(id, groupID, inviteeID, shared.RestoreUserID(invitedBy), time.Now())
+	if err != nil {
+		t.Fatalf("NewGroupInvitation: %v", err)
+	}
+	return inv
+}
 
 // ── mockGroupDeletionProvider ─────────────────────────────────────────────────
 

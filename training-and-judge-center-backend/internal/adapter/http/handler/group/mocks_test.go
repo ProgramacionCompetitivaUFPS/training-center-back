@@ -12,6 +12,7 @@ import (
 	domainGroup "github.com/training-judge-center/backend/internal/domain/group"
 	"github.com/training-judge-center/backend/internal/domain/shared"
 	domainUser "github.com/training-judge-center/backend/internal/domain/user"
+	"github.com/training-judge-center/backend/pkg/apperror"
 )
 
 // â”€â”€ mockGroupRepo â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
@@ -112,6 +113,67 @@ func (s *mockJoinRequestRepo) FindByGroup(_ context.Context, _ string, _ domainG
 }
 func (s *mockJoinRequestRepo) Delete(_ context.Context, _ string) error { return nil }
 
+// ── mockInvitationRepo ───────────────────────────────────────────────────────
+
+type mockInvitationRepo struct {
+	findByIDFn                     func(id string) (*domainGroup.GroupInvitation, error)
+	findPendingByGroupAndInviteeFn func(groupID string, inviteeID *shared.UserID) (*domainGroup.GroupInvitation, error)
+	saveFn                         func(inv *domainGroup.GroupInvitation) error
+	transitionStatusFn             func(id string, from, to domainGroup.InvitationStatus) error
+	findByGroupFn                  func(groupID string, filters domainGroup.InvitationFilters) ([]*domainGroup.GroupInvitation, int, error)
+}
+
+func (s *mockInvitationRepo) Save(_ context.Context, inv *domainGroup.GroupInvitation) error {
+	if s.saveFn != nil {
+		return s.saveFn(inv)
+	}
+	return nil
+}
+func (s *mockInvitationRepo) FindByID(_ context.Context, id string) (*domainGroup.GroupInvitation, error) {
+	if s.findByIDFn != nil {
+		return s.findByIDFn(id)
+	}
+	return nil, apperror.NewNotFound(domainGroup.ErrCodeInvitationNotFound, "invitation not found")
+}
+func (s *mockInvitationRepo) FindPendingByGroupAndInvitee(_ context.Context, groupID string, inviteeID *shared.UserID) (*domainGroup.GroupInvitation, error) {
+	if s.findPendingByGroupAndInviteeFn != nil {
+		return s.findPendingByGroupAndInviteeFn(groupID, inviteeID)
+	}
+	return nil, nil
+}
+func (s *mockInvitationRepo) FindByGroup(_ context.Context, groupID string, filters domainGroup.InvitationFilters) ([]*domainGroup.GroupInvitation, int, error) {
+	if s.findByGroupFn != nil {
+		return s.findByGroupFn(groupID, filters)
+	}
+	return nil, 0, nil
+}
+func (s *mockInvitationRepo) TransitionStatus(_ context.Context, id string, from, to domainGroup.InvitationStatus) error {
+	if s.transitionStatusFn != nil {
+		return s.transitionStatusFn(id, from, to)
+	}
+	return nil
+}
+
+// ── mockNicknameResolver / mockEmailResolver ────────────────────────────────
+
+type mockNicknameResolver struct {
+	user *appGroup.UserDisplay
+	err  error
+}
+
+func (s *mockNicknameResolver) ResolveByNickname(_ context.Context, _ string) (*appGroup.UserDisplay, error) {
+	return s.user, s.err
+}
+
+type mockEmailResolver struct {
+	user *appGroup.UserDisplay
+	err  error
+}
+
+func (s *mockEmailResolver) ResolveByEmail(_ context.Context, _ string) (*appGroup.UserDisplay, error) {
+	return s.user, s.err
+}
+
 // â”€â”€ other stubs â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 type mockUserProvider struct{}
@@ -130,15 +192,6 @@ type mockTxManager struct{}
 
 func (s *mockTxManager) WithTx(ctx context.Context, fn func(context.Context) error) error {
 	return fn(ctx)
-}
-
-type mockInvitationSvc struct{}
-
-func (s *mockInvitationSvc) GenerateInviteToken(_, _ string) (string, error) {
-	return "stub.invite.token", nil
-}
-func (s *mockInvitationSvc) ValidateInviteToken(_ string) (*appGroup.InvitationClaims, error) {
-	return &appGroup.InvitationClaims{GroupID: "g1"}, nil
 }
 
 // â”€â”€ auth mocks â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
@@ -195,8 +248,8 @@ func mockHandler() *Handler {
 	repo := &mockGroupRepo{}
 	memberRepo := &mockMemberRepo{}
 	joinRequestRepo := &mockJoinRequestRepo{}
+	invitationRepo := &mockInvitationRepo{}
 	txMgr := &mockTxManager{}
-	inviteSvc := &mockInvitationSvc{}
 	return NewHandler(
 		appGroup.NewCreateGroupUseCase(repo, memberRepo, txMgr),
 		appGroup.NewListGroupsUseCase(repo, memberRepo),
@@ -209,8 +262,10 @@ func mockHandler() *Handler {
 		appGroup.NewListJoinRequestsUseCase(memberRepo, joinRequestRepo, &mockUserProvider{}),
 		appGroup.NewGetMyRequestUseCase(joinRequestRepo),
 		appGroup.NewCancelMyRequestUseCase(joinRequestRepo),
-		appGroup.NewGenerateInviteUseCase(repo, memberRepo, inviteSvc),
-		appGroup.NewAcceptInviteUseCase(repo, memberRepo, inviteSvc),
+		appGroup.NewGenerateInviteUseCase(repo, memberRepo, invitationRepo, &mockNicknameResolver{}, &mockEmailResolver{}, &mockUserProvider{}, txMgr),
+		appGroup.NewAcceptInviteUseCase(repo, memberRepo, invitationRepo, txMgr),
+		appGroup.NewListGroupInvitationsUseCase(memberRepo, invitationRepo, &mockUserProvider{}),
+		appGroup.NewRevokeInvitationUseCase(memberRepo, invitationRepo),
 		nil, /* addMember */
 		nil, /* removeMember */
 		nil, /* changeRole */

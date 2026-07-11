@@ -36,8 +36,8 @@ import (
 	"github.com/training-judge-center/backend/internal/adapter/material"
 	"github.com/training-judge-center/backend/internal/adapter/postgres"
 	"github.com/training-judge-center/backend/internal/adapter/problem"
-	"github.com/training-judge-center/backend/internal/adapter/ratelimit"
 	adapterqueue "github.com/training-judge-center/backend/internal/adapter/queue"
+	"github.com/training-judge-center/backend/internal/adapter/ratelimit"
 	adaptersubmission "github.com/training-judge-center/backend/internal/adapter/submission"
 	adapterteam "github.com/training-judge-center/backend/internal/adapter/team"
 	"github.com/training-judge-center/backend/internal/adapter/user"
@@ -209,9 +209,9 @@ func main() {
 
 	// user dashboard adapters
 	dashboardSubmissionProvider := adaptersubmission.NewDashboardProvider(dbPool)
-	dashboardContestProvider    := adaptercontest.NewDashboardProvider(dbPool)
-	dashboardMaterialProvider   := material.NewDashboardProvider(dbPool)
-	dashboardRankingProvider    := user.NewDashboardRankingProvider(dbPool)
+	dashboardContestProvider := adaptercontest.NewDashboardProvider(dbPool)
+	dashboardMaterialProvider := material.NewDashboardProvider(dbPool)
+	dashboardRankingProvider := user.NewDashboardRankingProvider(dbPool)
 
 	// user dashboard use case
 	getDashboardUseCase := appuser.NewGetDashboardUseCase(dashboardSubmissionProvider, dashboardContestProvider, dashboardMaterialProvider, dashboardRankingProvider)
@@ -226,7 +226,9 @@ func main() {
 	groupUserProvider := group.NewUserProvider(dbPool)
 	groupPrefsReader := group.NewPreferencesReader(dbPool)
 	groupNicknameResolver := group.NewNicknameResolver(dbPool)
+	groupEmailResolver := group.NewEmailResolver(dbPool)
 	joinRequestRepo := group.NewJoinRequestRepository(dbPool)
+	groupInvitationRepo := group.NewInvitationRepository(dbPool)
 	groupDeletionProvider := group.NewDeletionProvider(dbPool)
 	// Group use cases
 	createGroupUseCase := appGroup.NewCreateGroupUseCase(groupRepo, groupMemberRepo, txManager)
@@ -241,9 +243,10 @@ func main() {
 	getMyRequestUseCase := appGroup.NewGetMyRequestUseCase(joinRequestRepo)
 	cancelMyRequestUseCase := appGroup.NewCancelMyRequestUseCase(joinRequestRepo)
 
-	groupInvitationJWTSvc := auth.NewInvitationJWTService(cfg.JWTSecret)
-	generateInviteUseCase := appGroup.NewGenerateInviteUseCase(groupRepo, groupMemberRepo, groupInvitationJWTSvc)
-	acceptInviteUseCase := appGroup.NewAcceptInviteUseCase(groupRepo, groupMemberRepo, groupInvitationJWTSvc)
+	generateInviteUseCase := appGroup.NewGenerateInviteUseCase(groupRepo, groupMemberRepo, groupInvitationRepo, groupNicknameResolver, groupEmailResolver, groupUserProvider, txManager)
+	acceptInviteUseCase := appGroup.NewAcceptInviteUseCase(groupRepo, groupMemberRepo, groupInvitationRepo, txManager)
+	listGroupInvitationsUseCase := appGroup.NewListGroupInvitationsUseCase(groupMemberRepo, groupInvitationRepo, groupUserProvider)
+	revokeInvitationUseCase := appGroup.NewRevokeInvitationUseCase(groupMemberRepo, groupInvitationRepo)
 
 	addMemberUseCase := appGroup.NewAddMemberUseCase(groupRepo, groupMemberRepo, groupNicknameResolver)
 	groupContestCleaner := group.NewContestRegistrationCleaner(dbPool)
@@ -261,7 +264,7 @@ func main() {
 		joinGroupUseCase,
 		requestJoinUseCase, approveRequestUseCase, rejectRequestUseCase,
 		listJoinRequestsUseCase, getMyRequestUseCase, cancelMyRequestUseCase,
-		generateInviteUseCase, acceptInviteUseCase,
+		generateInviteUseCase, acceptInviteUseCase, listGroupInvitationsUseCase, revokeInvitationUseCase,
 		addMemberUseCase, removeMemberUseCase, changeRoleUseCase, leaveGroupUseCase, listMembersUseCase,
 		deleteGroupUseCase,
 		updateGroupUseCase,
@@ -292,19 +295,19 @@ func main() {
 	)
 
 	// contest adapters
-	contestRepo                    := adaptercontest.NewRepository(dbPool)
-	contestGroupProvider           := adaptercontest.NewGroupProvider(dbPool)
-	contestMemberProvider          := adaptercontest.NewGroupMemberProvider(dbPool)
-	contestProblemProvider         := adaptercontest.NewProblemProvider(dbPool)
-	contestOwnerProvider           := adaptercontest.NewOwnerProvider(dbPool)
-	contestRegistrationRepo        := adaptercontest.NewRegistrationRepository(dbPool)
-	contestParticipantProvider     := adaptercontest.NewContestParticipantProvider(contestRegistrationRepo)
-	contestNicknameProvider        := adaptercontest.NewParticipantNicknameProvider(dbPool)
-	contestStandingsCache          := adaptercontest.NewStandingsCache(redisClient)
-	contestSubmissionProvider      := adaptercontest.NewStandingsSubmissionProvider(dbPool)
-	contestSubmissionsProvider     := adaptercontest.NewContestSubmissionProvider(dbPool)
-	contestTeamParticipationRepo   := adaptercontest.NewTeamParticipationRepository(dbPool)
-	contestCallerStandingProvider  := adaptercontest.NewCallerStandingProvider(dbPool)
+	contestRepo := adaptercontest.NewRepository(dbPool)
+	contestGroupProvider := adaptercontest.NewGroupProvider(dbPool)
+	contestMemberProvider := adaptercontest.NewGroupMemberProvider(dbPool)
+	contestProblemProvider := adaptercontest.NewProblemProvider(dbPool)
+	contestOwnerProvider := adaptercontest.NewOwnerProvider(dbPool)
+	contestRegistrationRepo := adaptercontest.NewRegistrationRepository(dbPool)
+	contestParticipantProvider := adaptercontest.NewContestParticipantProvider(contestRegistrationRepo)
+	contestNicknameProvider := adaptercontest.NewParticipantNicknameProvider(dbPool)
+	contestStandingsCache := adaptercontest.NewStandingsCache(redisClient)
+	contestSubmissionProvider := adaptercontest.NewStandingsSubmissionProvider(dbPool)
+	contestSubmissionsProvider := adaptercontest.NewContestSubmissionProvider(dbPool)
+	contestTeamParticipationRepo := adaptercontest.NewTeamParticipationRepository(dbPool)
+	contestCallerStandingProvider := adaptercontest.NewCallerStandingProvider(dbPool)
 
 	// contest use cases
 	createContestUseCase := appcontest.NewCreateContestUseCase(
