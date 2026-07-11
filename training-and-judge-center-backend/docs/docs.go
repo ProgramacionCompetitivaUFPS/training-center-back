@@ -479,10 +479,10 @@ const docTemplate = `{
                 "tags": [
                     "groups"
                 ],
-                "summary": "Create group",
+                "summary": "Create group with optional initial members and leads",
                 "parameters": [
                     {
-                        "description": "Group data",
+                        "description": "Group data, optionally including initial member/lead nicknames",
                         "name": "body",
                         "in": "body",
                         "required": true,
@@ -506,6 +506,12 @@ const docTemplate = `{
                     },
                     "401": {
                         "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/apperror.AppError"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
                         "schema": {
                             "$ref": "#/definitions/apperror.AppError"
                         }
@@ -6400,6 +6406,18 @@ const docTemplate = `{
                 "joinMode": {
                     "type": "string"
                 },
+                "leadNicknames": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "memberNicknames": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
                 "name": {
                     "type": "string"
                 },
@@ -6591,6 +6609,12 @@ const docTemplate = `{
                 },
                 "joinPolicy": {
                     "type": "string"
+                },
+                "members": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/group.memberListItemResp"
+                    }
                 },
                 "name": {
                     "type": "string"

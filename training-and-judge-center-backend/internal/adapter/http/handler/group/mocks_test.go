@@ -20,9 +20,14 @@ import (
 type mockGroupRepo struct {
 	findByIDFn     func(id string) (*domainGroup.Group, error)
 	existsByNameFn func(name domainGroup.GroupName) (bool, error)
+	saveErr        error
+	savedGroup     *domainGroup.Group
 }
 
-func (s *mockGroupRepo) Save(_ context.Context, _ *domainGroup.Group) error   { return nil }
+func (s *mockGroupRepo) Save(_ context.Context, g *domainGroup.Group) error {
+	s.savedGroup = g
+	return s.saveErr
+}
 func (s *mockGroupRepo) Update(_ context.Context, _ *domainGroup.Group) error { return nil }
 func (s *mockGroupRepo) FindByID(_ context.Context, id string) (*domainGroup.Group, error) {
 	if s.findByIDFn != nil {
@@ -49,11 +54,17 @@ type mockMemberRepo struct {
 	countMembersFn       func(groupID string) (int, error)
 	countLeadsFn         func(groupID string) (int, error)
 	listLeadsFn          func(groupID string) ([]*domainGroup.GroupMember, error)
+	saveAllErr           error
+	savedMembers         []*domainGroup.GroupMember
 }
 
 func (s *mockMemberRepo) Save(_ context.Context, _ *domainGroup.GroupMember) error   { return nil }
 func (s *mockMemberRepo) Update(_ context.Context, _ *domainGroup.GroupMember) error { return nil }
-func (s *mockMemberRepo) SaveAll(_ context.Context, _ []*domainGroup.GroupMember) error {
+func (s *mockMemberRepo) SaveAll(_ context.Context, members []*domainGroup.GroupMember) error {
+	if s.saveAllErr != nil {
+		return s.saveAllErr
+	}
+	s.savedMembers = append(s.savedMembers, members...)
 	return nil
 }
 func (s *mockMemberRepo) FindByGroupAndUser(_ context.Context, groupID string, userID shared.UserID) (*domainGroup.GroupMember, error) {
@@ -157,12 +168,19 @@ func (s *mockInvitationRepo) TransitionStatus(_ context.Context, id string, from
 // ── mockNicknameResolver / mockEmailResolver ────────────────────────────────
 
 type mockNicknameResolver struct {
-	user *appGroup.UserDisplay
-	err  error
+	user  *appGroup.UserDisplay
+	err   error
+	users map[string]*appGroup.UserDisplay
 }
 
-func (s *mockNicknameResolver) ResolveByNickname(_ context.Context, _ string) (*appGroup.UserDisplay, error) {
-	return s.user, s.err
+func (s *mockNicknameResolver) ResolveByNickname(_ context.Context, nickname string) (*appGroup.UserDisplay, error) {
+	if s.users != nil {
+		return s.users[nickname], nil
+	}
+	if s.err != nil {
+		return nil, s.err
+	}
+	return s.user, nil
 }
 
 type mockEmailResolver struct {
@@ -251,7 +269,7 @@ func mockHandler() *Handler {
 	invitationRepo := &mockInvitationRepo{}
 	txMgr := &mockTxManager{}
 	return NewHandler(
-		appGroup.NewCreateGroupUseCase(repo, memberRepo, txMgr),
+		appGroup.NewCreateGroupUseCase(repo, memberRepo, &mockNicknameResolver{}, txMgr),
 		appGroup.NewListGroupsUseCase(repo, memberRepo),
 		appGroup.NewGetGroupUseCase(repo, memberRepo, &mockUserProvider{}),
 		appGroup.NewListMyGroupsUseCase(repo, memberRepo, &mockPrefsReader{}),

@@ -231,7 +231,7 @@ func main() {
 	groupInvitationRepo := group.NewInvitationRepository(dbPool)
 	groupDeletionProvider := group.NewDeletionProvider(dbPool)
 	// Group use cases
-	createGroupUseCase := appGroup.NewCreateGroupUseCase(groupRepo, groupMemberRepo, txManager)
+	createGroupUseCase := appGroup.NewCreateGroupUseCase(groupRepo, groupMemberRepo, groupNicknameResolver, txManager)
 	listGroupsUseCase := appGroup.NewListGroupsUseCase(groupRepo, groupMemberRepo)
 	getGroupUseCase := appGroup.NewGetGroupUseCase(groupRepo, groupMemberRepo, groupUserProvider)
 	listMyGroupsUseCase := appGroup.NewListMyGroupsUseCase(groupRepo, groupMemberRepo, groupPrefsReader)

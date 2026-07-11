@@ -24,9 +24,13 @@ type mockGroupRepository struct {
 	returnErr      error
 	existsByNameFn func(name domainGroup.GroupName) (bool, error)
 	saveErr        error
+	savedGroup     *domainGroup.Group
 }
 
-func (m *mockGroupRepository) Save(ctx context.Context, g *domainGroup.Group) error { return m.saveErr }
+func (m *mockGroupRepository) Save(ctx context.Context, g *domainGroup.Group) error {
+	m.savedGroup = g
+	return m.saveErr
+}
 func (m *mockGroupRepository) Update(ctx context.Context, g *domainGroup.Group) error {
 	return m.saveErr
 }
@@ -66,6 +70,8 @@ type mockMemberRepository struct {
 	saveErr               error
 	savedMember           *domainGroup.GroupMember
 	findByGroupAndUserErr error
+	savedMembers          []*domainGroup.GroupMember
+	saveAllErr            error
 }
 
 func (m *mockMemberRepository) Save(_ context.Context, mem *domainGroup.GroupMember) error {
@@ -77,6 +83,10 @@ func (m *mockMemberRepository) Update(_ context.Context, mem *domainGroup.GroupM
 	return m.saveErr
 }
 func (m *mockMemberRepository) SaveAll(ctx context.Context, members []*domainGroup.GroupMember) error {
+	if m.saveAllErr != nil {
+		return m.saveAllErr
+	}
+	m.savedMembers = append(m.savedMembers, members...)
 	return nil
 }
 func (m *mockMemberRepository) FindByGroupAndUser(ctx context.Context, groupID string, userID shared.UserID) (*domainGroup.GroupMember, error) {
@@ -419,12 +429,19 @@ func (m *mockGroupStandingsInvalidator) Invalidate(_ context.Context, _ string) 
 // ── mockNicknameResolver ──────────────────────────────────────────────────────
 
 type mockNicknameResolver struct {
-	user *UserDisplay
-	err  error
+	user  *UserDisplay
+	err   error
+	users map[string]*UserDisplay
 }
 
-func (m *mockNicknameResolver) ResolveByNickname(_ context.Context, _ string) (*UserDisplay, error) {
-	return m.user, m.err
+func (m *mockNicknameResolver) ResolveByNickname(_ context.Context, nickname string) (*UserDisplay, error) {
+	if m.users != nil {
+		return m.users[nickname], nil
+	}
+	if m.err != nil {
+		return nil, m.err
+	}
+	return m.user, nil
 }
 
 // ── mockContestRegistrationCleaner ────────────────────────────────────────────
