@@ -1903,7 +1903,7 @@ const docTemplate = `{
             }
         },
         "/groups/{groupId}/invitations": {
-            "post": {
+            "get": {
                 "security": [
                     {
                         "BearerAuth": []
@@ -1915,7 +1915,7 @@ const docTemplate = `{
                 "tags": [
                     "groups"
                 ],
-                "summary": "Generate invite token",
+                "summary": "List invitations for a group",
                 "parameters": [
                     {
                         "type": "string",
@@ -1923,6 +1923,84 @@ const docTemplate = `{
                         "name": "groupId",
                         "in": "path",
                         "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Filter by status (PENDING, ACCEPTED, REVOKED, EXPIRED); defaults to PENDING",
+                        "name": "status",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Page number",
+                        "name": "page",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Items per page",
+                        "name": "limit",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/group.listGroupInvitationsResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/apperror.AppError"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/apperror.AppError"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/apperror.AppError"
+                        }
+                    }
+                }
+            },
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "groups"
+                ],
+                "summary": "Generate a group invitation",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Group ID",
+                        "name": "groupId",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Optional invitee identifier (at most one of userNickname, userEmail, userId); omit for a general link-style invitation",
+                        "name": "body",
+                        "in": "body",
+                        "schema": {
+                            "$ref": "#/definitions/group.generateInviteReq"
+                        }
                     }
                 ],
                 "responses": {
@@ -1930,6 +2008,12 @@ const docTemplate = `{
                         "description": "Created",
                         "schema": {
                             "$ref": "#/definitions/group.generateInviteResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/apperror.AppError"
                         }
                     },
                     "401": {
@@ -1969,7 +2053,7 @@ const docTemplate = `{
                 "tags": [
                     "groups"
                 ],
-                "summary": "Accept invite",
+                "summary": "Accept a group invitation",
                 "parameters": [
                     {
                         "type": "string",
@@ -1979,7 +2063,7 @@ const docTemplate = `{
                         "required": true
                     },
                     {
-                        "description": "Invite token",
+                        "description": "Invitation ID",
                         "name": "body",
                         "in": "body",
                         "required": true,
@@ -2021,6 +2105,64 @@ const docTemplate = `{
                     },
                     "409": {
                         "description": "Conflict",
+                        "schema": {
+                            "$ref": "#/definitions/apperror.AppError"
+                        }
+                    }
+                }
+            }
+        },
+        "/groups/{groupId}/invitations/{invitationId}": {
+            "delete": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "tags": [
+                    "groups"
+                ],
+                "summary": "Revoke a group invitation",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Group ID",
+                        "name": "groupId",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Invitation ID",
+                        "name": "invitationId",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "No Content"
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/apperror.AppError"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/apperror.AppError"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/apperror.AppError"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
                         "schema": {
                             "$ref": "#/definitions/apperror.AppError"
                         }
@@ -6176,7 +6318,7 @@ const docTemplate = `{
         "group.acceptInviteRequest": {
             "type": "object",
             "properties": {
-                "token": {
+                "invitationId": {
                     "type": "string"
                 }
             }
@@ -6319,10 +6461,39 @@ const docTemplate = `{
                 }
             }
         },
+        "group.generateInviteReq": {
+            "type": "object",
+            "properties": {
+                "userEmail": {
+                    "type": "string"
+                },
+                "userId": {
+                    "type": "string"
+                },
+                "userNickname": {
+                    "type": "string"
+                }
+            }
+        },
         "group.generateInviteResponse": {
             "type": "object",
             "properties": {
-                "token": {
+                "createdAt": {
+                    "type": "string"
+                },
+                "expiresAt": {
+                    "type": "string"
+                },
+                "groupId": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "invitee": {
+                    "$ref": "#/definitions/group.requesterResp"
+                },
+                "status": {
                     "type": "string"
                 }
             }
@@ -6432,6 +6603,35 @@ const docTemplate = `{
                 }
             }
         },
+        "group.invitationListItemResp": {
+            "type": "object",
+            "properties": {
+                "createdAt": {
+                    "type": "string"
+                },
+                "effectiveStatus": {
+                    "type": "string"
+                },
+                "expiresAt": {
+                    "type": "string"
+                },
+                "groupId": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "invitedBy": {
+                    "type": "string"
+                },
+                "invitee": {
+                    "$ref": "#/definitions/group.requesterResp"
+                },
+                "status": {
+                    "type": "string"
+                }
+            }
+        },
         "group.joinGroupResponse": {
             "type": "object",
             "properties": {
@@ -6477,6 +6677,20 @@ const docTemplate = `{
                 },
                 "userId": {
                     "type": "string"
+                }
+            }
+        },
+        "group.listGroupInvitationsResponse": {
+            "type": "object",
+            "properties": {
+                "invitations": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/group.invitationListItemResp"
+                    }
+                },
+                "pagination": {
+                    "$ref": "#/definitions/group.paginationResp"
                 }
             }
         },

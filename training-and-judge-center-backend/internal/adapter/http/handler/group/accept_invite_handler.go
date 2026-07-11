@@ -10,17 +10,13 @@ import (
 	"github.com/training-judge-center/backend/pkg/apperror"
 )
 
-type acceptInviteRequest struct {
-	Token string `json:"token"`
-}
-
-// @Summary      Accept invite
+// @Summary      Accept a group invitation
 // @Tags         groups
 // @Accept       json
 // @Produce      json
 // @Security     BearerAuth
 // @Param        groupId path string true "Group ID"
-// @Param        body body acceptInviteRequest true "Invite token"
+// @Param        body body acceptInviteRequest true "Invitation ID"
 // @Success      201 {object} joinGroupResponse
 // @Failure      400 {object} apperror.AppError
 // @Failure      401 {object} apperror.AppError
@@ -41,8 +37,9 @@ func (h *Handler) AcceptInvite(w http.ResponseWriter, r *http.Request) {
 	}
 
 	out, err := h.acceptInvite.Execute(r.Context(), appGroup.AcceptInviteInput{
-		Token:       body.Token,
-		CurrentUser: *currentUser,
+		GroupID:      r.PathValue("groupId"),
+		InvitationID: body.InvitationID,
+		CurrentUser:  *currentUser,
 	})
 	if err != nil {
 		handler.WriteError(r.Context(), w, err)
