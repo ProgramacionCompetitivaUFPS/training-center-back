@@ -70,8 +70,13 @@ func (r *MemberRepository) Update(ctx context.Context, m *domainGroup.GroupMembe
 	return nil
 }
 
-func (r *MemberRepository) SaveAll(_ context.Context, _ []*domainGroup.GroupMember) error {
-	panic("not implemented")
+func (r *MemberRepository) SaveAll(ctx context.Context, members []*domainGroup.GroupMember) error {
+	for _, m := range members {
+		if err := r.Save(ctx, m); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func (r *MemberRepository) FindByGroup(ctx context.Context, groupID string, filters domainGroup.MemberFilters) ([]*domainGroup.GroupMember, int, error) {
