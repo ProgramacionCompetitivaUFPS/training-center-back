@@ -19,8 +19,12 @@ type mockStandingsContestRepo struct {
 	contest *domainContest.Contest
 }
 
-func (m *mockStandingsContestRepo) Create(_ context.Context, _ *domainContest.Contest) error { return nil }
-func (m *mockStandingsContestRepo) Update(_ context.Context, _ *domainContest.Contest) error { return nil }
+func (m *mockStandingsContestRepo) Create(_ context.Context, _ *domainContest.Contest) error {
+	return nil
+}
+func (m *mockStandingsContestRepo) Update(_ context.Context, _ *domainContest.Contest) error {
+	return nil
+}
 func (m *mockStandingsContestRepo) FindByID(_ context.Context, _ string) (*domainContest.Contest, error) {
 	return m.contest, nil
 }
@@ -46,7 +50,7 @@ func (m *mockStandingsCache) AcquireRefreshLock(_ context.Context, _ string, _ t
 	return true, nil
 }
 func (m *mockStandingsCache) ReleaseRefreshLock(_ context.Context, _ string) error { return nil }
-func (m *mockStandingsCache) Invalidate(_ context.Context, _ string) error          { return nil }
+func (m *mockStandingsCache) Invalidate(_ context.Context, _ string) error         { return nil }
 
 type mockSubmissionProvider struct{}
 
@@ -93,6 +97,7 @@ func defaultGetStandingsUC() *appcontest.GetStandingsUseCase {
 		&mockRegistrationRepository{},
 		&mockSubmissionProvider{},
 		&mockTeamParticipantProvider{},
+		&mockParticipantProfileProvider{},
 		&mockGroupProvider{},
 		&mockMemberProvider{isLead: true, isMember: true},
 		&mockStandingsCache{data: cached},
@@ -160,6 +165,7 @@ func TestGetStandings_Pagination_Returns200(t *testing.T) {
 		&mockRegistrationRepository{},
 		&mockSubmissionProvider{},
 		&mockTeamParticipantProvider{},
+		&mockParticipantProfileProvider{},
 		&mockGroupProvider{},
 		&mockMemberProvider{isLead: true, isMember: true},
 		&mockStandingsCache{data: cached},
@@ -189,5 +195,52 @@ func TestGetStandings_Pagination_Returns200(t *testing.T) {
 	}
 	if len(resp.Entries) != 1 {
 		t.Errorf("page entries=%d, want 1", len(resp.Entries))
+	}
+}
+
+func TestGetStandings_CountryQueryParamFiltersEntries(t *testing.T) {
+	cached := &appcontest.CachedStandings{
+		Participants: []domainContest.ParticipantStanding{
+			{ContestantID: "u1", ParticipantType: "INDIVIDUAL", Problems: map[string]domainContest.ProblemAttempt{}},
+			{ContestantID: "u2", ParticipantType: "INDIVIDUAL", Problems: map[string]domainContest.ProblemAttempt{}},
+		},
+		Profiles: map[string]*appcontest.ParticipantProfile{
+			"u1": {ID: "u1", Country: "colombia"},
+			"u2": {ID: "u2", Country: "mexico"},
+		},
+		LastUpdated: time.Now(),
+	}
+	uc := appcontest.NewGetStandingsUseCase(
+		&mockStandingsContestRepo{contest: activeContestForStandings()},
+		&mockRegistrationRepository{},
+		&mockSubmissionProvider{},
+		&mockTeamParticipantProvider{},
+		&mockParticipantProfileProvider{},
+		&mockGroupProvider{},
+		&mockMemberProvider{isLead: true, isMember: true},
+		&mockStandingsCache{data: cached},
+		30*time.Second,
+	)
+	h := newHandlerWithGetStandings(uc)
+
+	r := authedRequest(http.MethodGet, "/groups/g1/contests/c1/standings?country=colombia", nil)
+	r.SetPathValue("groupId", "g1")
+	r.SetPathValue("contestId", "c1")
+	w := httptest.NewRecorder()
+
+	wrapAuth(http.HandlerFunc(h.GetStandings)).ServeHTTP(w, r)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+	var resp getStandingsResponse
+	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if len(resp.Entries) != 1 || resp.Entries[0].ContestantID != "u1" {
+		t.Fatalf("expected only u1 to survive ?country=colombia, got %+v", resp.Entries)
+	}
+	if resp.Pagination.Total != 1 {
+		t.Errorf("total=%d, want 1", resp.Pagination.Total)
 	}
 }

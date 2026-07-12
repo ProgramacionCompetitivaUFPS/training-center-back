@@ -458,6 +458,19 @@ func (m *mockTeamParticipantProvider) ListSelectedMembersByContest(ctx context.C
 	return map[string][]string{}, nil
 }
 
+// ── ParticipantProfileProvider mock ──────────────────────────────────────────
+
+type mockParticipantProfileProvider struct {
+	getProfilesFn func(ctx context.Context, userIDs []string) (map[string]*ParticipantProfile, error)
+}
+
+func (m *mockParticipantProfileProvider) GetProfiles(ctx context.Context, userIDs []string) (map[string]*ParticipantProfile, error) {
+	if m.getProfilesFn != nil {
+		return m.getProfilesFn(ctx, userIDs)
+	}
+	return map[string]*ParticipantProfile{}, nil
+}
+
 // ── TransactionManager mock ──────────────────────────────────────────────────
 
 type mockTransactionManager struct {
