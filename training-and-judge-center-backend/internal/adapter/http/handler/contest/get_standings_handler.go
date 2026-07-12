@@ -10,15 +10,18 @@ import (
 	"github.com/training-judge-center/backend/pkg/apperror"
 )
 
-// @Summary      Get contest standings (ICPC)
+// @Summary      Get contest standings (ICPC), optionally filtered by participant country, city, or institution
 // @Tags         contests
 // @Produce      json
 // @Security     BearerAuth
-// @Param        groupId    path   string true  "Group ID"
-// @Param        contestId  path   string true  "Contest ID"
-// @Param        realtime   query  bool   false "Bypass freeze (lead/admin only)"
-// @Param        page       query  int    false "Page number (default 1)"
-// @Param        limit      query  int    false "Items per page (default 50)"
+// @Param        groupId     path   string true  "Group ID"
+// @Param        contestId   path   string true  "Contest ID"
+// @Param        realtime    query  bool   false "Bypass freeze (lead/admin only)"
+// @Param        country     query  string false "Filter by participant country (case-insensitive exact match)"
+// @Param        city        query  string false "Filter by participant city (case-insensitive exact match)"
+// @Param        institution query  string false "Filter by participant institution (case-insensitive exact match)"
+// @Param        page        query  int    false "Page number (default 1)"
+// @Param        limit       query  int    false "Items per page (default 50)"
 // @Success      200 {object} getStandingsResponse
 // @Failure      401 {object} apperror.AppError
 // @Failure      403 {object} apperror.AppError
@@ -60,6 +63,9 @@ func (h *Handler) GetStandings(w http.ResponseWriter, r *http.Request) {
 		GroupID:     groupID,
 		ContestID:   contestID,
 		Realtime:    realtime,
+		Country:     q.Get("country"),
+		City:        q.Get("city"),
+		Institution: q.Get("institution"),
 		Page:        page,
 		Limit:       limit,
 	})

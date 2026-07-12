@@ -168,6 +168,12 @@ func (m *mockTeamParticipantProvider) ListSelectedMembersByContest(_ context.Con
 	return map[string][]string{}, nil
 }
 
+type mockParticipantProfileProvider struct{}
+
+func (m *mockParticipantProfileProvider) GetProfiles(_ context.Context, _ []string) (map[string]*appcontest.ParticipantProfile, error) {
+	return map[string]*appcontest.ParticipantProfile{}, nil
+}
+
 type mockTeamParticipRepo struct{}
 
 func (s *mockTeamParticipRepo) Save(_ context.Context, _ *domainContest.ContestTeamParticipation) error {

@@ -37,6 +37,9 @@ type GetStandingsInput struct {
 	GroupID     string
 	ContestID   string
 	Realtime    bool
+	Country     string
+	City        string
+	Institution string
 	Page        int
 	Limit       int
 }
@@ -61,6 +64,7 @@ type GetStandingsUseCase struct {
 	registrationRepo     domainContest.RegistrationRepository
 	submissionProvider   StandingsSubmissionProvider
 	teamParticipProvider TeamParticipantProvider
+	profileProvider      ParticipantProfileProvider
 	groupProvider        GroupProvider
 	memberProvider       GroupMemberProvider
 	standingsCache       StandingsCache
@@ -73,6 +77,7 @@ func NewGetStandingsUseCase(
 	registrationRepo domainContest.RegistrationRepository,
 	submissionProvider StandingsSubmissionProvider,
 	teamParticipProvider TeamParticipantProvider,
+	profileProvider ParticipantProfileProvider,
 	groupProvider GroupProvider,
 	memberProvider GroupMemberProvider,
 	standingsCache StandingsCache,
@@ -83,6 +88,7 @@ func NewGetStandingsUseCase(
 		registrationRepo:     registrationRepo,
 		submissionProvider:   submissionProvider,
 		teamParticipProvider: teamParticipProvider,
+		profileProvider:      profileProvider,
 		groupProvider:        groupProvider,
 		memberProvider:       memberProvider,
 		standingsCache:       standingsCache,
@@ -148,14 +154,14 @@ func (uc *GetStandingsUseCase) Execute(ctx context.Context, in GetStandingsInput
 		if time.Since(cached.LastUpdated) > uc.staleness {
 			go uc.backgroundRefresh(in.ContestID)
 		}
-		return uc.buildOutput(cached, contest, applyFreeze, status, freezeTime, in.Page, in.Limit), nil
+		return uc.buildOutput(cached, contest, applyFreeze, status, freezeTime, in), nil
 	}
 
 	rebuilt, err := uc.rebuild(ctx, in.ContestID)
 	if err != nil {
 		return nil, err
 	}
-	return uc.buildOutput(rebuilt, contest, applyFreeze, status, freezeTime, in.Page, in.Limit), nil
+	return uc.buildOutput(rebuilt, contest, applyFreeze, status, freezeTime, in), nil
 }
 
 func (uc *GetStandingsUseCase) rebuild(ctx context.Context, contestID string) (*CachedStandings, error) {
@@ -244,7 +250,22 @@ func (uc *GetStandingsUseCase) rebuild(ctx context.Context, contestID string) (*
 		participants = append(participants, *p)
 	}
 
-	cached := &CachedStandings{Participants: participants, LastUpdated: time.Now()}
+	profileIDs := make([]string, 0, len(userToContestant))
+	for userID := range userToContestant {
+		profileIDs = append(profileIDs, userID)
+	}
+	profiles, err := uc.profileProvider.GetProfiles(ctx, profileIDs)
+	if err != nil {
+		slog.WarnContext(ctx, "rebuild: profile enrichment degraded", "error", err)
+		profiles = map[string]*ParticipantProfile{}
+	}
+
+	cached := &CachedStandings{
+		Participants: participants,
+		TeamMembers:  teamMembers,
+		Profiles:     profiles,
+		LastUpdated:  time.Now(),
+	}
 	if err := uc.standingsCache.Set(ctx, contestID, cached); err != nil {
 		slog.ErrorContext(ctx, "standings cache set failed after rebuild", "contest_id", contestID, "error", err)
 	}
@@ -270,21 +291,22 @@ func (uc *GetStandingsUseCase) buildOutput(
 	applyFreeze bool,
 	status domainContest.Status,
 	freezeTime *time.Time,
-	page, limit int,
+	in GetStandingsInput,
 ) *GetStandingsOutput {
 	var effectiveFreezeTime *time.Time
 	if applyFreeze {
 		effectiveFreezeTime = freezeTime
 	}
 
-	entries := RankStandings(cached.Participants, contest.StartTime(), contest.Penalty().Value(), effectiveFreezeTime)
+	participants := FilterStandingsByProfile(cached, in.Country, in.City, in.Institution)
+	entries := RankStandings(participants, contest.StartTime(), contest.Penalty().Value(), effectiveFreezeTime)
 
 	total := len(entries)
-	start := (page - 1) * limit
+	start := (in.Page - 1) * in.Limit
 	if start > total {
 		start = total
 	}
-	end := start + limit
+	end := start + in.Limit
 	if end > total {
 		end = total
 	}
@@ -301,8 +323,8 @@ func (uc *GetStandingsUseCase) buildOutput(
 	return &GetStandingsOutput{
 		Entries: entries[start:end],
 		Total:   total,
-		Page:    page,
-		Limit:   limit,
+		Page:    in.Page,
+		Limit:   in.Limit,
 		Meta:    meta,
 	}
 }

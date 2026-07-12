@@ -1443,7 +1443,7 @@ const docTemplate = `{
                 "tags": [
                     "contests"
                 ],
-                "summary": "Get contest standings (ICPC)",
+                "summary": "Get contest standings (ICPC), optionally filtered by participant country, city, or institution",
                 "parameters": [
                     {
                         "type": "string",
@@ -1463,6 +1463,24 @@ const docTemplate = `{
                         "type": "boolean",
                         "description": "Bypass freeze (lead/admin only)",
                         "name": "realtime",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Filter by participant country (case-insensitive exact match)",
+                        "name": "country",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Filter by participant city (case-insensitive exact match)",
+                        "name": "city",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Filter by participant institution (case-insensitive exact match)",
+                        "name": "institution",
                         "in": "query"
                     },
                     {

@@ -49,6 +49,7 @@ func newGetStandingsUseCase(
 	return NewGetStandingsUseCase(
 		contestRepo, regRepo, subProvider,
 		&mockTeamParticipantProvider{},
+		&mockParticipantProfileProvider{},
 		groupProvider, memberProvider,
 		cache,
 		testStaleness,
@@ -220,6 +221,108 @@ func TestGetStandingsUseCase_CacheMissRebuild(t *testing.T) {
 	}
 }
 
+func TestGetStandingsUseCase_FiltersByCountryEndToEnd(t *testing.T) {
+	regs := []*domainContest.ContestRegistration{reg(callerID), reg(otherID)}
+	subs := []ContestSubmissionData{
+		sub(callerID, "A", "ACCEPTED", 90),
+		sub(otherID, "A", "ACCEPTED", 60),
+	}
+	var stored *CachedStandings
+	cache := &mockStandingsCache{
+		getFn: func(_ context.Context, _ string) (*CachedStandings, error) { return stored, nil },
+		setFn: func(_ context.Context, _ string, data *CachedStandings) error { stored = data; return nil },
+	}
+	profileProvider := &mockParticipantProfileProvider{
+		getProfilesFn: func(_ context.Context, _ []string) (map[string]*ParticipantProfile, error) {
+			return map[string]*ParticipantProfile{
+				callerID: {ID: callerID, Country: "colombia"},
+				otherID:  {ID: otherID, Country: "mexico"},
+			}, nil
+		},
+	}
+	uc := NewGetStandingsUseCase(
+		&mockContestRepository{findByIDFn: func(_ context.Context, _ string) (*domainContest.Contest, error) { return activeContest(), nil }},
+		&mockRegistrationRepository{listByContestFn: func(_ context.Context, _ string, _, _ int) ([]*domainContest.ContestRegistration, int, error) {
+			return regs, len(regs), nil
+		}},
+		&mockStandingsSubmissionProvider{listByContestFn: func(_ context.Context, _ string) ([]ContestSubmissionData, error) { return subs, nil }},
+		&mockTeamParticipantProvider{},
+		profileProvider,
+		&mockGroupProvider{findByIDFn: func(_ context.Context, _ string) (*GroupInfo, error) { return visibleGroup(), nil }},
+		isMemberNotLead(),
+		cache,
+		testStaleness,
+	)
+
+	out, err := uc.Execute(context.Background(), GetStandingsInput{
+		CurrentUser: asContestant(callerID),
+		GroupID:     testGroupID,
+		ContestID:   testContestID,
+		Country:     "colombia",
+		Page:        1,
+		Limit:       50,
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if out.Total != 1 || out.Entries[0].ContestantID != callerID {
+		t.Fatalf("expected only %q to survive the country filter, got %+v", callerID, out.Entries)
+	}
+}
+
+func TestGetStandingsUseCase_ProfileProviderCalledOnceAcrossDifferentFilters(t *testing.T) {
+	regs := []*domainContest.ContestRegistration{reg(callerID), reg(otherID)}
+	subs := []ContestSubmissionData{sub(callerID, "A", "ACCEPTED", 90)}
+	var stored *CachedStandings
+	cache := &mockStandingsCache{
+		getFn: func(_ context.Context, _ string) (*CachedStandings, error) { return stored, nil },
+		setFn: func(_ context.Context, _ string, data *CachedStandings) error { stored = data; return nil },
+	}
+	getProfilesCalls := 0
+	profileProvider := &mockParticipantProfileProvider{
+		getProfilesFn: func(_ context.Context, _ []string) (map[string]*ParticipantProfile, error) {
+			getProfilesCalls++
+			return map[string]*ParticipantProfile{
+				callerID: {ID: callerID, Country: "colombia"},
+				otherID:  {ID: otherID, Country: "mexico"},
+			}, nil
+		},
+	}
+	uc := NewGetStandingsUseCase(
+		&mockContestRepository{findByIDFn: func(_ context.Context, _ string) (*domainContest.Contest, error) { return activeContest(), nil }},
+		&mockRegistrationRepository{listByContestFn: func(_ context.Context, _ string, _, _ int) ([]*domainContest.ContestRegistration, int, error) {
+			return regs, len(regs), nil
+		}},
+		&mockStandingsSubmissionProvider{listByContestFn: func(_ context.Context, _ string) ([]ContestSubmissionData, error) { return subs, nil }},
+		&mockTeamParticipantProvider{},
+		profileProvider,
+		&mockGroupProvider{findByIDFn: func(_ context.Context, _ string) (*GroupInfo, error) { return visibleGroup(), nil }},
+		isMemberNotLead(),
+		cache,
+		testStaleness,
+	)
+
+	// First call: cache miss, triggers rebuild() → GetProfiles called once.
+	if _, err := uc.Execute(context.Background(), GetStandingsInput{
+		CurrentUser: asContestant(callerID), GroupID: testGroupID, ContestID: testContestID,
+		Country: "colombia", Page: 1, Limit: 50,
+	}); err != nil {
+		t.Fatalf("unexpected error on first call: %v", err)
+	}
+	// Second call: cache hit, DIFFERENT filter value → must not call GetProfiles again,
+	// since profiles for every participant are already in the cached blob.
+	if _, err := uc.Execute(context.Background(), GetStandingsInput{
+		CurrentUser: asContestant(callerID), GroupID: testGroupID, ContestID: testContestID,
+		Country: "mexico", Page: 1, Limit: 50,
+	}); err != nil {
+		t.Fatalf("unexpected error on second call: %v", err)
+	}
+
+	if getProfilesCalls != 1 {
+		t.Errorf("expected GetProfiles to be called exactly once across both requests, got %d calls", getProfilesCalls)
+	}
+}
+
 func TestGetStandingsUseCase_FreezeAppliedForRegularUser(t *testing.T) {
 	// frozenContest: freeze started 30 min ago, so submission 20 min ago is after freeze
 	acceptedAfterFreeze := time.Now().Add(-20 * time.Minute)
@@ -234,7 +337,7 @@ func TestGetStandingsUseCase_FreezeAppliedForRegularUser(t *testing.T) {
 		CurrentUser: asContestant(callerID),
 		GroupID:     testGroupID,
 		ContestID:   testContestID,
-		Page: 1, Limit: 50,
+		Page:        1, Limit: 50,
 	})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -262,7 +365,7 @@ func TestGetStandingsUseCase_RealtimeBypassesFreezeForLead(t *testing.T) {
 		GroupID:     testGroupID,
 		ContestID:   testContestID,
 		Realtime:    true,
-		Page: 1, Limit: 50,
+		Page:        1, Limit: 50,
 	})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -284,7 +387,7 @@ func TestGetStandingsUseCase_RealtimeForbiddenForContestant(t *testing.T) {
 		GroupID:     testGroupID,
 		ContestID:   testContestID,
 		Realtime:    true,
-		Page: 1, Limit: 50,
+		Page:        1, Limit: 50,
 	})
 	if err == nil {
 		t.Fatal("expected forbidden error, got nil")
@@ -298,7 +401,7 @@ func TestGetStandingsUseCase_NotFoundForNonMemberOfHiddenGroup(t *testing.T) {
 		CurrentUser: asContestant(callerID),
 		GroupID:     testGroupID,
 		ContestID:   testContestID,
-		Page: 1, Limit: 50,
+		Page:        1, Limit: 50,
 	})
 	if err == nil {
 		t.Fatal("expected not found error, got nil")
@@ -345,7 +448,7 @@ func TestGetStandingsUseCase_CompilationErrorNotCountedAsWrongAttempt(t *testing
 		CurrentUser: asContestant(callerID),
 		GroupID:     testGroupID,
 		ContestID:   testContestID,
-		Page: 1, Limit: 50,
+		Page:        1, Limit: 50,
 	})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
