@@ -126,19 +126,6 @@ func (m *mockOutputChecker) Check(ctx context.Context, req CheckRequest) (CheckR
 	return CheckResult{Accepted: true}, nil
 }
 
-// ── StandingUpdater mock ─────────────────────────────────────────────────────
-
-type mockStandingUpdater struct {
-	recordVerdictFn func(ctx context.Context, req RecordVerdictRequest) error
-}
-
-func (m *mockStandingUpdater) RecordVerdict(ctx context.Context, req RecordVerdictRequest) error {
-	if m.recordVerdictFn != nil {
-		return m.recordVerdictFn(ctx, req)
-	}
-	return nil
-}
-
 // ── TransactionManager mock ──────────────────────────────────────────────────
 
 type mockTransactionManager struct {
@@ -158,7 +145,6 @@ const (
 	submissionID = "aaaaaaaa-0000-0000-0000-000000000001"
 	problemID    = "bbbbbbbb-0000-0000-0000-000000000001"
 	userID       = "cccccccc-0000-0000-0000-000000000001"
-	contestID    = "dddddddd-0000-0000-0000-000000000001"
 )
 
 // ── Domain fixtures ──────────────────────────────────────────────────────────
@@ -169,21 +155,6 @@ func pendingSubmission() *submission.Submission {
 		submissionID, problemID,
 		shared.RestoreUserID(userID),
 		nil, nil,
-		lang, "g++",
-		submission.RestoreStatus("PENDING"),
-		submission.RestoreVisibility("PRIVATE"),
-		"gs://bucket/code.cpp",
-		"", 0,
-		testNow, nil, nil, nil, nil, "", "",
-	)
-}
-
-func pendingSubmissionInContest(cID string) *submission.Submission {
-	lang := submission.RestoreLanguage("cpp20")
-	return submission.RestoreSubmission(
-		submissionID, problemID,
-		shared.RestoreUserID(userID),
-		&cID, nil,
 		lang, "g++",
 		submission.RestoreStatus("PENDING"),
 		submission.RestoreVisibility("PRIVATE"),
