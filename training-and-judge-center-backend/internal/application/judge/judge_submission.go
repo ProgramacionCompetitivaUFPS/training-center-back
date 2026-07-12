@@ -27,7 +27,6 @@ type JudgeSubmissionUseCase struct {
 	testCaseProvider     TestCaseProvider
 	executor             Executor
 	outputChecker        OutputChecker
-	standingUpdater      StandingUpdater
 	txManager            appshared.TransactionManager
 }
 
@@ -38,7 +37,6 @@ func NewJudgeSubmissionUseCase(
 	testCaseProvider TestCaseProvider,
 	executor Executor,
 	outputChecker OutputChecker,
-	standingUpdater StandingUpdater,
 	txManager appshared.TransactionManager,
 ) *JudgeSubmissionUseCase {
 	return &JudgeSubmissionUseCase{
@@ -48,7 +46,6 @@ func NewJudgeSubmissionUseCase(
 		testCaseProvider:     testCaseProvider,
 		executor:             executor,
 		outputChecker:        outputChecker,
-		standingUpdater:      standingUpdater,
 		txManager:            txManager,
 	}
 }
@@ -164,19 +161,6 @@ func (uc *JudgeSubmissionUseCase) persistVerdict(ctx context.Context, sub *submi
 		if err := uc.submissionUpdater.Update(txCtx, sub); err != nil {
 			slog.ErrorContext(txCtx, "failed to update submission verdict", "error", err)
 			return apperror.NewInternal()
-		}
-		if sub.ContestID() != nil {
-			req := RecordVerdictRequest{
-				UserID:      sub.UserID(),
-				ContestID:   *sub.ContestID(),
-				ProblemID:   sub.ProblemID(),
-				Verdict:     sub.Status(),
-				SubmittedAt: sub.SubmittedAt(),
-			}
-			if err := uc.standingUpdater.RecordVerdict(txCtx, req); err != nil {
-				slog.ErrorContext(txCtx, "failed to record verdict in standing", "error", err)
-				return apperror.NewInternal()
-			}
 		}
 		return nil
 	})
