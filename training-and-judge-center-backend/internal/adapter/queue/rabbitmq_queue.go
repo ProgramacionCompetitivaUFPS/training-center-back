@@ -134,6 +134,55 @@ func (q *RabbitMQQueue) publishLocked(body []byte, priority uint8) error {
 	)
 }
 
+func (q *RabbitMQQueue) Consume(ctx context.Context, handler func(ctx context.Context, msg appsubmission.SubmissionQueueMessage) error) error {
+	q.mu.Lock()
+	deliveries, err := q.ch.Consume(submissionQueueName, "", false, false, false, false, nil)
+	q.mu.Unlock()
+	if err != nil {
+		return fmt.Errorf("rabbitmq: consume: %w", err)
+	}
+
+	for {
+		select {
+		case <-ctx.Done():
+			return nil
+		case d, ok := <-deliveries:
+			if !ok {
+				return fmt.Errorf("rabbitmq: deliveries channel closed")
+			}
+			var raw queueMessage
+			if err := json.Unmarshal(d.Body, &raw); err != nil {
+				slog.ErrorContext(ctx, "rabbitmq: failed to unmarshal message", "error", err)
+				_ = d.Nack(false, false)
+				continue
+			}
+			enqueuedAt, err := time.Parse(time.RFC3339, raw.EnqueuedAt)
+			if err != nil {
+				slog.ErrorContext(ctx, "rabbitmq: failed to parse enqueuedAt", "raw", raw.EnqueuedAt, "error", err)
+				_ = d.Nack(false, false)
+				continue
+			}
+			msg := appsubmission.SubmissionQueueMessage{
+				SubmissionID: raw.SubmissionID,
+				Priority:     raw.Priority,
+				EnqueuedAt:   enqueuedAt,
+				Metadata: appsubmission.SubmissionQueueMetadata{
+					ContestID: raw.Metadata.ContestID,
+					ProblemID: raw.Metadata.ProblemID,
+					UserID:    raw.Metadata.UserID,
+					Language:  raw.Metadata.Language,
+				},
+			}
+			if err := handler(ctx, msg); err != nil {
+				slog.ErrorContext(ctx, "rabbitmq: handler returned error", "error", err)
+				_ = d.Nack(false, false)
+				continue
+			}
+			_ = d.Ack(false)
+		}
+	}
+}
+
 func (q *RabbitMQQueue) Close() {
 	q.mu.Lock()
 	defer q.mu.Unlock()

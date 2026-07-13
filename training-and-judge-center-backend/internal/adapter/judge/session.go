@@ -34,10 +34,6 @@ type Session struct {
 }
 
 func (s *Session) Compile(ctx context.Context, req appjudge.CompileRequest) (appjudge.CompileResult, error) {
-	if s.langCfg.CompileCmd == "" {
-		return appjudge.CompileResult{Success: true}, nil
-	}
-
 	ctx30, cancel := context.WithTimeout(ctx, compileTimeout)
 	defer cancel()
 
@@ -47,6 +43,10 @@ func (s *Session) Compile(ctx context.Context, req appjudge.CompileRequest) (app
 	}); err != nil {
 		slog.ErrorContext(ctx, "executor: copy source failed", "container_id", s.container.ID(), "error", err)
 		return appjudge.CompileResult{}, apperror.NewInternal()
+	}
+
+	if s.langCfg.CompileCmd == "" {
+		return appjudge.CompileResult{Success: true}, nil
 	}
 
 	execRes, err := s.docker.ExecCreate(ctx30, s.container.ID(), client.ExecCreateOptions{

@@ -113,6 +113,33 @@ services:
       mailhog:
         condition: service_started
 
+  judge-worker:
+    build: .
+    container_name: training-center-worker
+    entrypoint: ["/bin/worker"]
+    environment:
+      DB_HOST: postgres
+      DB_PORT: "5432"
+      DB_USER: ${POSTGRES_USER}
+      DB_PASSWORD: ${POSTGRES_PASSWORD}
+      DB_NAME: ${POSTGRES_DB}
+      RABBITMQ_URL: ${RABBITMQ_URL:-amqp://judge:judge@rabbitmq:5672/}
+      STORAGE_BACKEND: ${STORAGE_BACKEND:-local}
+      STORAGE_LOCAL_DIR: /data/uploads
+      GCS_BUCKET: ${GCS_BUCKET:-}
+      POD_MEMORY_LIMIT: ${POD_MEMORY_LIMIT:-8589934592}
+      JUDGE_CONFIG: /config/judge_config.yaml
+    volumes:
+      - problem_uploads:/data/uploads
+      - //./pipe/docker_engine://./pipe/docker_engine
+      # Linux / macOS: uncomment the line below, comment out the line above
+      # - /var/run/docker.sock:/var/run/docker.sock
+    depends_on:
+      seed:
+        condition: service_completed_successfully
+      rabbitmq:
+        condition: service_healthy
+
   mailhog:
     image: mailhog/mailhog
     container_name: training-center-mailhog
