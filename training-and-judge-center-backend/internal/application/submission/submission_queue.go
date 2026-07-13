@@ -5,8 +5,7 @@ import (
 	"time"
 )
 
-// RabbitMQ delivers higher numeric priorities first (x-max-priority: 4).
-// Contest submissions must be processed before practice and bulk rejudges.
+// Single "submissions" queue with x-max-priority: 4 instead of separate per-type queues — avoids per-queue workers and manual routing.
 const (
 	QueuePriorityContest     = 4
 	QueuePriorityPostContest = 3
