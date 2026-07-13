@@ -2,6 +2,7 @@ package submission
 
 import (
 	"context"
+	"errors"
 	"testing"
 	"time"
 
@@ -169,4 +170,21 @@ func TestSubmitSolution_AllLanguages(t *testing.T) {
 			assert.Equal(t, tt.compiler, out.Compiler)
 		})
 	}
+}
+
+func TestSubmitSolution_PublishesWithPracticePriority(t *testing.T) {
+	q := &mockQueue{}
+	uc := NewSubmitSolutionUseCase(publicProblem(), cleanRepo(), &mockSourceStorage{}, q, maxFileSize, rateLimitSeconds)
+	_, err := uc.Execute(ctx(), validInput())
+	require.NoError(t, err)
+	require.NotNil(t, q.lastPublished())
+	assert.Equal(t, QueuePriorityPractice, q.lastPublished().Priority)
+}
+
+func TestSubmitSolution_QueueError_DoesNotFailSubmit(t *testing.T) {
+	q := &mockQueue{err: errors.New("rabbitmq down")}
+	uc := NewSubmitSolutionUseCase(publicProblem(), cleanRepo(), &mockSourceStorage{}, q, maxFileSize, rateLimitSeconds)
+	out, err := uc.Execute(ctx(), validInput())
+	require.NoError(t, err)
+	assert.Equal(t, "PENDING", out.Status)
 }

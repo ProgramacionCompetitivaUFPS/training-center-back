@@ -140,9 +140,25 @@ func (m *mockSourceStorage) Delete(_ context.Context, _ string) error {
 
 // ── mockSubmissionQueue ───────────────────────────────────────────────────────
 
-type mockQueue struct{}
+type mockQueue struct {
+	published []SubmissionQueueMessage
+	err       error
+}
 
-func (m *mockQueue) Publish(_ context.Context, _ SubmissionQueueMessage) error { return nil }
+func (m *mockQueue) Publish(_ context.Context, msg SubmissionQueueMessage) error {
+	if m.err != nil {
+		return m.err
+	}
+	m.published = append(m.published, msg)
+	return nil
+}
+
+func (m *mockQueue) lastPublished() *SubmissionQueueMessage {
+	if len(m.published) == 0 {
+		return nil
+	}
+	return &m.published[len(m.published)-1]
+}
 
 // ── builder helper ────────────────────────────────────────────────────────────
 
@@ -187,6 +203,7 @@ const (
 	testAuthorID     = testUserID
 	testOtherUserID  = "ffffffff-0000-0000-0000-000000000001"
 	testContestID    = "cccccccc-0000-0000-0000-000000000001"
+	testGroupID      = "eeeeeeee-0000-0000-0000-000000000001"
 	testSourcePath   = "gs://bucket/code.cpp"
 )
 
@@ -351,4 +368,30 @@ func newListProblemSubmissionsUseCase(
 		usr = &mockUserProvider{}
 	}
 	return NewListProblemSubmissionsUseCase(repo, bySlug, usr)
+}
+
+// ── mockContestSubmissionProvider ─────────────────────────────────────────────
+
+type mockContestSubmissionProvider struct {
+	fn func(groupID, contestID string) (*ContestSubmissionInfo, error)
+}
+
+func (m *mockContestSubmissionProvider) GetContestForSubmission(_ context.Context, groupID, contestID string) (*ContestSubmissionInfo, error) {
+	if m.fn != nil {
+		return m.fn(groupID, contestID)
+	}
+	return nil, apperror.NewNotFound("CONTEST_NOT_FOUND", "contest not found")
+}
+
+// ── mockStandingIDResolver ────────────────────────────────────────────────────
+
+type mockStandingIDResolver struct {
+	fn func(contestID, userID string) (string, bool, error)
+}
+
+func (m *mockStandingIDResolver) ResolveStandingID(_ context.Context, contestID, userID string) (string, bool, error) {
+	if m.fn != nil {
+		return m.fn(contestID, userID)
+	}
+	return "standing-001", true, nil
 }

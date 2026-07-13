@@ -63,6 +63,43 @@ func consume(t *testing.T, url string) []byte {
 	}
 }
 
+func consumeN(t *testing.T, url string, n int) []struct{ ID string; Priority int } {
+	t.Helper()
+	conn, err := amqp.Dial(url)
+	if err != nil {
+		t.Fatalf("consumeN dial: %v", err)
+	}
+	defer conn.Close()
+	ch, err := conn.Channel()
+	if err != nil {
+		t.Fatalf("consumeN channel: %v", err)
+	}
+	defer ch.Close()
+
+	msgs, err := ch.Consume("submissions", "", true, false, false, false, nil)
+	if err != nil {
+		t.Fatalf("consumeN: %v", err)
+	}
+
+	result := make([]struct{ ID string; Priority int }, 0, n)
+	for len(result) < n {
+		select {
+		case raw := <-msgs:
+			var m struct {
+				ID       string `json:"submissionId"`
+				Priority int    `json:"priority"`
+			}
+			if err := json.Unmarshal(raw.Body, &m); err != nil {
+				t.Fatalf("consumeN unmarshal: %v", err)
+			}
+			result = append(result, struct{ ID string; Priority int }{m.ID, m.Priority})
+		case <-time.After(5 * time.Second):
+			t.Fatalf("consumeN: timeout after receiving %d of %d messages", len(result), n)
+		}
+	}
+	return result
+}
+
 func TestPublish_DeliversPriorityMessage(t *testing.T) {
 	url := startRabbitMQ(t)
 
@@ -161,5 +198,54 @@ func TestPublish_NilContestID_OmitsField(t *testing.T) {
 	}
 	if got["submissionId"] != "sub-002" {
 		t.Errorf("submissionId = %v, want sub-002", got["submissionId"])
+	}
+}
+
+func TestPublish_PriorityOrdering_HighestFirst(t *testing.T) {
+	url := startRabbitMQ(t)
+
+	q, err := adapterqueue.NewRabbitMQQueue(url)
+	if err != nil {
+		t.Fatalf("NewRabbitMQQueue: %v", err)
+	}
+	defer q.Close()
+
+	ctx := context.Background()
+	now := time.Now()
+	meta := appsubmission.SubmissionQueueMetadata{ProblemID: "p1", UserID: "u1", Language: "cpp20"}
+
+	// Publish in REVERSE priority order: lowest first, highest last.
+	// If priority is working, the consumer must receive them highest-first regardless.
+	messages := []appsubmission.SubmissionQueueMessage{
+		{SubmissionID: "sub-rejudge", Priority: appsubmission.QueuePriorityRejudge, EnqueuedAt: now, Metadata: meta},
+		{SubmissionID: "sub-practice", Priority: appsubmission.QueuePriorityPractice, EnqueuedAt: now, Metadata: meta},
+		{SubmissionID: "sub-contest", Priority: appsubmission.QueuePriorityContest, EnqueuedAt: now, Metadata: meta},
+	}
+	for _, msg := range messages {
+		if err := q.Publish(ctx, msg); err != nil {
+			t.Fatalf("Publish %s: %v", msg.SubmissionID, err)
+		}
+	}
+
+	received := consumeN(t, url, 3)
+
+	t.Logf("Insertion order: rejudge(1) → practice(2) → contest(4)")
+	t.Logf("Delivery order:  %s(%d) → %s(%d) → %s(%d)",
+		received[0].ID, received[0].Priority,
+		received[1].ID, received[1].Priority,
+		received[2].ID, received[2].Priority,
+	)
+
+	if received[0].Priority != appsubmission.QueuePriorityContest {
+		t.Errorf("1st delivered: want priority %d (contest), got %d (%s)",
+			appsubmission.QueuePriorityContest, received[0].Priority, received[0].ID)
+	}
+	if received[1].Priority != appsubmission.QueuePriorityPractice {
+		t.Errorf("2nd delivered: want priority %d (practice), got %d (%s)",
+			appsubmission.QueuePriorityPractice, received[1].Priority, received[1].ID)
+	}
+	if received[2].Priority != appsubmission.QueuePriorityRejudge {
+		t.Errorf("3rd delivered: want priority %d (rejudge), got %d (%s)",
+			appsubmission.QueuePriorityRejudge, received[2].Priority, received[2].ID)
 	}
 }
