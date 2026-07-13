@@ -1,0 +1,28 @@
+judge:
+  idleTimeoutMinutes: 10
+  memoryOverheadBytes: 536870912  # 512 MiB reservado para el proceso worker
+
+  languages:
+    cpp20:
+      image: "judge-runner:cpp20"
+      cpu: "1"
+      memoryBytes: 2147483648  # 2 GiB
+      compileCmd: "g++ -std=c++20 -O2 -o /sandbox/solution /sandbox/solution.cpp"
+      runCmd: "/sandbox/solution"
+      extension: "cpp"
+
+    java17:
+      image: "judge-runner:java17"
+      cpu: "1"
+      memoryBytes: 2147483648  # 2 GiB — más alto por la JVM
+      compileCmd: "javac -encoding UTF-8 /sandbox/solution.java"
+      runCmd: "java -cp /sandbox solution"
+      extension: "java"
+
+    python310:
+      image: "judge-runner:python310"
+      cpu: "1"
+      memoryBytes: 1073741824  # 1 GiB
+      compileCmd: ""           # vacío = lenguaje interpretado, se omite la compilación
+      runCmd: "python3 /sandbox/solution.py"
+      extension: "py"
