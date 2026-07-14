@@ -192,7 +192,7 @@ func main() {
 
 	// User use cases
 	createUserUseCase := appuser.NewCreateUserUseCase(userRepo)
-	loginUseCase := appuser.NewLoginUseCase(userRepo, jwtService)
+	loginUseCase := appuser.NewLoginUseCase(userRepo, jwtService, redisRateLimiter)
 	getMyProfileUseCase := appuser.NewGetMyProfileUseCase(userRepo)
 	getUserByNicknameUseCase := appuser.NewGetUserByNicknameUseCase(userRepo)
 	updateUserUseCase := appuser.NewUpdateUserUseCase(userRepo)
