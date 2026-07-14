@@ -74,10 +74,12 @@ func (m *mockTestCaseProvider) GetTestCases(ctx context.Context, problemID strin
 // ── Executor mock ────────────────────────────────────────────────────────────
 
 type mockExecutor struct {
+	calls          int
 	beginSessionFn func(ctx context.Context, language submission.Language) (ExecutionSession, error)
 }
 
 func (m *mockExecutor) BeginSession(ctx context.Context, language submission.Language) (ExecutionSession, error) {
+	m.calls++
 	if m.beginSessionFn != nil {
 		return m.beginSessionFn(ctx, language)
 	}

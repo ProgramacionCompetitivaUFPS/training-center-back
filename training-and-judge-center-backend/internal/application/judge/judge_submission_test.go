@@ -2,7 +2,9 @@ package judge
 
 import (
 	"context"
+	"errors"
 	"testing"
+	"time"
 
 	"github.com/training-judge-center/backend/internal/domain/submission"
 )
@@ -15,10 +17,13 @@ func newJudgeSubmissionUseCase(
 	executor *mockExecutor,
 	checker *mockOutputChecker,
 ) *JudgeSubmissionUseCase {
-	return NewJudgeSubmissionUseCase(
+	uc := NewJudgeSubmissionUseCase(
 		updater, downloader, problems, testCases,
 		executor, checker, &mockTransactionManager{},
+		RetryConfig{MaxAttempts: 1, BackoffBase: 0},
 	)
+	uc.sleep = func(time.Duration) {}
+	return uc
 }
 
 func TestJudgeSubmission_NotPending_IsIgnored(t *testing.T) {
@@ -52,9 +57,15 @@ func TestJudgeSubmission_NotPending_IsIgnored(t *testing.T) {
 	}
 }
 
-func TestJudgeSubmission_SourceCodeDownloadError_ReturnsError(t *testing.T) {
+func TestJudgeSubmission_SourceCodeDownloadError_MarksSystemError(t *testing.T) {
+	var updatedStatus string
 	uc := newJudgeSubmissionUseCase(
-		&mockSubmissionUpdater{},
+		&mockSubmissionUpdater{
+			updateFn: func(_ context.Context, s *submission.Submission) error {
+				updatedStatus = s.Status().String()
+				return nil
+			},
+		},
 		&mockSourceCodeDownloader{
 			downloadFn: func(_ context.Context, _ string) ([]byte, error) {
 				return nil, errTransient
@@ -66,8 +77,11 @@ func TestJudgeSubmission_SourceCodeDownloadError_ReturnsError(t *testing.T) {
 		&mockOutputChecker{},
 	)
 
-	if err := uc.Execute(context.Background(), JudgeSubmissionInput{SubmissionID: submissionID}); err == nil {
-		t.Error("expected error for download failure, got nil")
+	if err := uc.Execute(context.Background(), JudgeSubmissionInput{SubmissionID: submissionID}); err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	if updatedStatus != "SYSTEM_ERROR" {
+		t.Errorf("expected SYSTEM_ERROR, got %s", updatedStatus)
 	}
 }
 
@@ -293,6 +307,8 @@ func TestJudgeSubmission_TxError_ReturnsError(t *testing.T) {
 		executor:             &mockExecutor{},
 		outputChecker:        &mockOutputChecker{},
 		txManager:            &mockFailingTxManager{fn: func() { txCalled = true }},
+		retry:                RetryConfig{MaxAttempts: 1},
+		sleep:                func(time.Duration) {},
 	}
 
 	if err := uc.Execute(context.Background(), JudgeSubmissionInput{SubmissionID: submissionID}); err == nil {
@@ -313,4 +329,196 @@ func (m *mockFailingTxManager) WithTx(_ context.Context, _ func(txCtx context.Co
 		m.fn()
 	}
 	return errTransient
+}
+
+// ── Retry tests ──────────────────────────────────────────────────────────────
+
+func TestJudgeSubmission_TransientError_Retries_ThenSucceeds(t *testing.T) {
+	var updatedStatus string
+	executor := &mockExecutor{}
+	attempt := 0
+	executor.beginSessionFn = func(_ context.Context, _ submission.Language) (ExecutionSession, error) {
+		attempt++
+		if attempt < 3 {
+			return nil, errors.New("docker unavailable")
+		}
+		return &mockExecutionSession{}, nil
+	}
+
+	uc := newJudgeSubmissionUseCase(
+		&mockSubmissionUpdater{
+			updateFn: func(_ context.Context, s *submission.Submission) error {
+				updatedStatus = s.Status().String()
+				return nil
+			},
+		},
+		&mockSourceCodeDownloader{},
+		&mockProblemProvider{},
+		&mockTestCaseProvider{},
+		executor,
+		&mockOutputChecker{},
+	)
+	uc.retry = RetryConfig{MaxAttempts: 3, BackoffBase: 0}
+
+	if err := uc.Execute(context.Background(), JudgeSubmissionInput{SubmissionID: submissionID}); err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	if updatedStatus != "ACCEPTED" {
+		t.Errorf("expected ACCEPTED, got %s", updatedStatus)
+	}
+	if executor.calls != 3 {
+		t.Errorf("expected BeginSession called 3 times, got %d", executor.calls)
+	}
+}
+
+func TestJudgeSubmission_TransientError_ExhaustsRetries_MarksSystemError(t *testing.T) {
+	var updatedStatus string
+	executor := &mockExecutor{
+		beginSessionFn: func(_ context.Context, _ submission.Language) (ExecutionSession, error) {
+			return nil, errors.New("docker unavailable")
+		},
+	}
+
+	uc := newJudgeSubmissionUseCase(
+		&mockSubmissionUpdater{
+			updateFn: func(_ context.Context, s *submission.Submission) error {
+				updatedStatus = s.Status().String()
+				return nil
+			},
+		},
+		&mockSourceCodeDownloader{},
+		&mockProblemProvider{},
+		&mockTestCaseProvider{},
+		executor,
+		&mockOutputChecker{},
+	)
+	uc.retry = RetryConfig{MaxAttempts: 3, BackoffBase: 0}
+
+	if err := uc.Execute(context.Background(), JudgeSubmissionInput{SubmissionID: submissionID}); err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	if updatedStatus != "SYSTEM_ERROR" {
+		t.Errorf("expected SYSTEM_ERROR, got %s", updatedStatus)
+	}
+	if executor.calls != 3 {
+		t.Errorf("expected BeginSession called 3 times, got %d", executor.calls)
+	}
+}
+
+func TestJudgeSubmission_RunTestCaseInfraError_Retries(t *testing.T) {
+	var updatedStatus string
+	executor := &mockExecutor{}
+	sessionCall := 0
+	executor.beginSessionFn = func(_ context.Context, _ submission.Language) (ExecutionSession, error) {
+		sessionCall++
+		runCall := 0
+		return &mockExecutionSession{
+			runTestCaseFn: func(_ context.Context, _ RunRequest) (RunResult, error) {
+				runCall++
+				if sessionCall == 1 && runCall == 1 {
+					return RunResult{}, errors.New("container died")
+				}
+				return RunResult{ExitCode: 0, TimeMs: 50, MemoryKb: 1024, Output: []byte("3")}, nil
+			},
+		}, nil
+	}
+
+	uc := newJudgeSubmissionUseCase(
+		&mockSubmissionUpdater{
+			updateFn: func(_ context.Context, s *submission.Submission) error {
+				updatedStatus = s.Status().String()
+				return nil
+			},
+		},
+		&mockSourceCodeDownloader{},
+		&mockProblemProvider{},
+		&mockTestCaseProvider{},
+		executor,
+		&mockOutputChecker{},
+	)
+	uc.retry = RetryConfig{MaxAttempts: 3, BackoffBase: 0}
+
+	if err := uc.Execute(context.Background(), JudgeSubmissionInput{SubmissionID: submissionID}); err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	if updatedStatus != "ACCEPTED" {
+		t.Errorf("expected ACCEPTED, got %s", updatedStatus)
+	}
+	if executor.calls != 2 {
+		t.Errorf("expected BeginSession called 2 times, got %d", executor.calls)
+	}
+}
+
+func TestJudgeSubmission_CompilationError_DoesNotRetry(t *testing.T) {
+	var updatedStatus string
+	executor := &mockExecutor{
+		beginSessionFn: func(_ context.Context, _ submission.Language) (ExecutionSession, error) {
+			return &mockExecutionSession{
+				compileFn: func(_ context.Context, _ CompileRequest) (CompileResult, error) {
+					return CompileResult{Success: false, Log: "error: undeclared"}, nil
+				},
+			}, nil
+		},
+	}
+
+	uc := newJudgeSubmissionUseCase(
+		&mockSubmissionUpdater{
+			updateFn: func(_ context.Context, s *submission.Submission) error {
+				updatedStatus = s.Status().String()
+				return nil
+			},
+		},
+		&mockSourceCodeDownloader{},
+		&mockProblemProvider{},
+		&mockTestCaseProvider{},
+		executor,
+		&mockOutputChecker{},
+	)
+	uc.retry = RetryConfig{MaxAttempts: 3, BackoffBase: 0}
+
+	if err := uc.Execute(context.Background(), JudgeSubmissionInput{SubmissionID: submissionID}); err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	if updatedStatus != "COMPILATION_ERROR" {
+		t.Errorf("expected COMPILATION_ERROR, got %s", updatedStatus)
+	}
+	if executor.calls != 1 {
+		t.Errorf("expected BeginSession called 1 time, got %d", executor.calls)
+	}
+}
+
+func TestJudgeSubmission_WrongAnswer_DoesNotRetry(t *testing.T) {
+	var updatedStatus string
+	checkerCalls := 0
+	executor := &mockExecutor{}
+
+	uc := newJudgeSubmissionUseCase(
+		&mockSubmissionUpdater{
+			updateFn: func(_ context.Context, s *submission.Submission) error {
+				updatedStatus = s.Status().String()
+				return nil
+			},
+		},
+		&mockSourceCodeDownloader{},
+		&mockProblemProvider{},
+		&mockTestCaseProvider{},
+		executor,
+		&mockOutputChecker{
+			checkFn: func(_ context.Context, _ CheckRequest) (CheckResult, error) {
+				checkerCalls++
+				return CheckResult{Accepted: false}, nil
+			},
+		},
+	)
+	uc.retry = RetryConfig{MaxAttempts: 3, BackoffBase: 0}
+
+	if err := uc.Execute(context.Background(), JudgeSubmissionInput{SubmissionID: submissionID}); err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	if updatedStatus != "WRONG_ANSWER" {
+		t.Errorf("expected WRONG_ANSWER, got %s", updatedStatus)
+	}
+	if checkerCalls != 1 {
+		t.Errorf("expected checker called 1 time, got %d", checkerCalls)
+	}
 }

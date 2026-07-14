@@ -149,6 +149,7 @@ func main() {
 		executor,
 		outputChecker,
 		txManager,
+		appjudge.DefaultRetryConfig(),
 	)
 
 	// consume loop
