@@ -59,7 +59,7 @@ func TestLogin_Success(t *testing.T) {
 	repo.findByEmailFn = func(_ context.Context, _ domain.Email) (*domain.User, error) {
 		return activeUser, nil
 	}
-	uc := NewLoginUseCase(repo, tokenSvc)
+	uc := NewLoginUseCase(repo, tokenSvc, &mockRateLimiter{})
 
 	result, err := uc.Execute(context.Background(), LoginInput{
 		Email:    "test@example.com",
@@ -78,7 +78,7 @@ func TestLogin_Success(t *testing.T) {
 
 func TestLogin_MissingFields(t *testing.T) {
 	repo, tokenSvc := newLoginDeps()
-	uc := NewLoginUseCase(repo, tokenSvc)
+	uc := NewLoginUseCase(repo, tokenSvc, &mockRateLimiter{})
 
 	_, err := uc.Execute(context.Background(), LoginInput{
 		Email:    "",
@@ -102,7 +102,7 @@ func TestLogin_MissingFields(t *testing.T) {
 
 func TestLogin_InvalidEmailFormat(t *testing.T) {
 	repo, tokenSvc := newLoginDeps()
-	uc := NewLoginUseCase(repo, tokenSvc)
+	uc := NewLoginUseCase(repo, tokenSvc, &mockRateLimiter{})
 
 	_, err := uc.Execute(context.Background(), LoginInput{
 		Email:    "not-an-email",
@@ -129,7 +129,7 @@ func TestLogin_UserNotFound(t *testing.T) {
 	repo.findByEmailFn = func(_ context.Context, _ domain.Email) (*domain.User, error) {
 		return nil, nil
 	}
-	uc := NewLoginUseCase(repo, tokenSvc)
+	uc := NewLoginUseCase(repo, tokenSvc, &mockRateLimiter{})
 
 	_, err := uc.Execute(context.Background(), LoginInput{
 		Email:    "nobody@example.com",
@@ -155,7 +155,7 @@ func TestLogin_DeactivatedAccount(t *testing.T) {
 	repo.findByEmailFn = func(_ context.Context, _ domain.Email) (*domain.User, error) {
 		return deactivatedUser, nil
 	}
-	uc := NewLoginUseCase(repo, tokenSvc)
+	uc := NewLoginUseCase(repo, tokenSvc, &mockRateLimiter{})
 
 	_, err := uc.Execute(context.Background(), LoginInput{
 		Email:    "test@example.com",
@@ -183,7 +183,7 @@ func TestLogin_WrongPassword(t *testing.T) {
 	repo.findByEmailFn = func(_ context.Context, _ domain.Email) (*domain.User, error) {
 		return activeUser, nil
 	}
-	uc := NewLoginUseCase(repo, tokenSvc)
+	uc := NewLoginUseCase(repo, tokenSvc, &mockRateLimiter{})
 
 	_, err := uc.Execute(context.Background(), LoginInput{
 		Email:    "test@example.com",
@@ -209,7 +209,7 @@ func TestLogin_SameErrorForNotFoundAndWrongPassword(t *testing.T) {
 	repo.findByEmailFn = func(_ context.Context, _ domain.Email) (*domain.User, error) {
 		return nil, nil
 	}
-	uc := NewLoginUseCase(repo, tokenSvc)
+	uc := NewLoginUseCase(repo, tokenSvc, &mockRateLimiter{})
 	_, errNotFound := uc.Execute(context.Background(), LoginInput{
 		Email: "nobody@example.com", Password: "Secret1!",
 	})
@@ -243,7 +243,7 @@ func TestLogin_TokenGenerationError(t *testing.T) {
 	tokenSvc.generateTokenFn = func(_ context.Context, _ *domain.User) (string, error) {
 		return "", apperror.NewInternal()
 	}
-	uc := NewLoginUseCase(repo, tokenSvc)
+	uc := NewLoginUseCase(repo, tokenSvc, &mockRateLimiter{})
 
 	_, err := uc.Execute(context.Background(), LoginInput{
 		Email:    "test@example.com",
@@ -267,7 +267,7 @@ func TestLogin_RepositoryFindByEmailError(t *testing.T) {
 	repo.findByEmailFn = func(_ context.Context, _ domain.Email) (*domain.User, error) {
 		return nil, apperror.NewInternal()
 	}
-	uc := NewLoginUseCase(repo, tokenSvc)
+	uc := NewLoginUseCase(repo, tokenSvc, &mockRateLimiter{})
 
 	_, err := uc.Execute(context.Background(), LoginInput{
 		Email:    "test@example.com",
@@ -313,7 +313,7 @@ func TestLogin_PasswordAtBcryptBoundary(t *testing.T) {
 	repo.findByEmailFn = func(_ context.Context, _ domain.Email) (*domain.User, error) {
 		return u, nil
 	}
-	uc := NewLoginUseCase(repo, tokenSvc)
+	uc := NewLoginUseCase(repo, tokenSvc, &mockRateLimiter{})
 
 	_, err = uc.Execute(context.Background(), LoginInput{
 		Email:    "boundary@example.com",
@@ -321,5 +321,121 @@ func TestLogin_PasswordAtBcryptBoundary(t *testing.T) {
 	})
 	if err != nil {
 		t.Fatalf("login with 72-byte password must succeed, got: %v", err)
+	}
+}
+
+func TestLogin_RateLimitExceeded(t *testing.T) {
+	repo, tokenSvc := newLoginDeps()
+	rl := &mockRateLimiter{
+		allowFn: func(_ context.Context, _ string, _ int, _ time.Duration) (bool, error) {
+			return false, nil
+		},
+	}
+	uc := NewLoginUseCase(repo, tokenSvc, rl)
+
+	_, err := uc.Execute(context.Background(), LoginInput{
+		Email:    "test@example.com",
+		Password: "Secret1!",
+	})
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+
+	appErr, ok := err.(*apperror.AppError)
+	if !ok {
+		t.Fatalf("expected *apperror.AppError, got %T", err)
+	}
+	if appErr.Code != ErrCodeTooManyRequests {
+		t.Errorf("expected code TOO_MANY_REQUESTS, got %q", appErr.Code)
+	}
+	if appErr.Kind != apperror.KindTooManyRequests {
+		t.Errorf("expected kind TOO_MANY_REQUESTS, got %s", appErr.Kind)
+	}
+}
+
+func TestLogin_RateLimitError(t *testing.T) {
+	repo, tokenSvc := newLoginDeps()
+	rl := &mockRateLimiter{
+		allowFn: func(_ context.Context, _ string, _ int, _ time.Duration) (bool, error) {
+			return false, apperror.NewInternal()
+		},
+	}
+	uc := NewLoginUseCase(repo, tokenSvc, rl)
+
+	_, err := uc.Execute(context.Background(), LoginInput{
+		Email:    "test@example.com",
+		Password: "Secret1!",
+	})
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+
+	appErr, ok := err.(*apperror.AppError)
+	if !ok {
+		t.Fatalf("expected *apperror.AppError, got %T", err)
+	}
+	if appErr.Kind != apperror.KindInternal {
+		t.Errorf("expected kind INTERNAL, got %s", appErr.Kind)
+	}
+}
+
+func TestLogin_Success_ResetsRateLimit(t *testing.T) {
+	repo, tokenSvc := newLoginDeps()
+	activeUser := newActiveUser()
+	repo.findByEmailFn = func(_ context.Context, _ domain.Email) (*domain.User, error) {
+		return activeUser, nil
+	}
+
+	resetCalls := 0
+	var resetKey string
+	rl := &mockRateLimiter{
+		resetFn: func(_ context.Context, key string) error {
+			resetCalls++
+			resetKey = key
+			return nil
+		},
+	}
+	uc := NewLoginUseCase(repo, tokenSvc, rl)
+
+	_, err := uc.Execute(context.Background(), LoginInput{
+		Email:    "test@example.com",
+		Password: "Secret1!",
+	})
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+	if resetCalls != 1 {
+		t.Errorf("expected Reset to be called exactly once, got %d calls", resetCalls)
+	}
+	if resetKey != "rate_limit:login:test@example.com" {
+		t.Errorf("expected reset key %q, got %q", "rate_limit:login:test@example.com", resetKey)
+	}
+}
+
+func TestLogin_WrongPassword_DoesNotResetRateLimit(t *testing.T) {
+	repo, tokenSvc := newLoginDeps()
+	activeUser := newActiveUser()
+	repo.findByEmailFn = func(_ context.Context, _ domain.Email) (*domain.User, error) {
+		return activeUser, nil
+	}
+
+	resetCalled := false
+	rl := &mockRateLimiter{
+		resetFn: func(_ context.Context, _ string) error {
+			resetCalled = true
+			return nil
+		},
+	}
+	uc := NewLoginUseCase(repo, tokenSvc, rl)
+
+	_, err := uc.Execute(context.Background(), LoginInput{
+		Email:    "test@example.com",
+		Password: "WrongPass1!",
+	})
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+	if resetCalled {
+		t.Error("expected Reset not to be called on failed login")
 	}
 }
