@@ -211,13 +211,22 @@ func main() {
 	dashboardSubmissionProvider := adaptersubmission.NewDashboardProvider(dbPool)
 	dashboardContestProvider := adaptercontest.NewDashboardProvider(dbPool)
 	dashboardMaterialProvider := material.NewDashboardProvider(dbPool)
-	dashboardRankingProvider := user.NewDashboardRankingProvider(dbPool)
+	problemsSolvedProvider := user.NewProblemsSolvedProvider(dbPool)
 
 	// user dashboard use case
-	getDashboardUseCase := appuser.NewGetDashboardUseCase(dashboardSubmissionProvider, dashboardContestProvider, dashboardMaterialProvider, dashboardRankingProvider)
+	getDashboardUseCase := appuser.NewGetDashboardUseCase(dashboardSubmissionProvider, dashboardContestProvider, dashboardMaterialProvider, problemsSolvedProvider)
+
+	// user profile stats adapters
+	rankingProvider := user.NewRankingProvider(dbPool)
+	submissionStatsProvider := adaptersubmission.NewStatsProvider(dbPool)
+	contestParticipationProvider := adaptercontest.NewStatsProvider(dbPool)
+	topicStatsProvider := problem.NewStatsProvider(dbPool)
+
+	// user profile stats use case
+	getProfileStatsUseCase := appuser.NewGetProfileStatsUseCase(rankingProvider, submissionStatsProvider, contestParticipationProvider, topicStatsProvider)
 
 	// Handlers
-	userHandler := handlerUser.NewHandler(createUserUseCase, getMyProfileUseCase, getUserByNicknameUseCase, updateUserUseCase, updatePasswordUseCase, adminUpdateUserUseCase, adminDeactivateUserUseCase, listUsersUseCase, requestEmailChangeUseCase, confirmEmailChangeUseCase, requestPasswordRecoveryUseCase, resetPasswordUseCase, requestDeactivationUseCase, confirmDeactivationUseCase, getDashboardUseCase)
+	userHandler := handlerUser.NewHandler(createUserUseCase, getMyProfileUseCase, getUserByNicknameUseCase, updateUserUseCase, updatePasswordUseCase, adminUpdateUserUseCase, adminDeactivateUserUseCase, listUsersUseCase, requestEmailChangeUseCase, confirmEmailChangeUseCase, requestPasswordRecoveryUseCase, resetPasswordUseCase, requestDeactivationUseCase, confirmDeactivationUseCase, getDashboardUseCase, getProfileStatsUseCase)
 	authHandler := handler.NewAuthHandler(loginUseCase)
 
 	// Group repositories & platform adapters

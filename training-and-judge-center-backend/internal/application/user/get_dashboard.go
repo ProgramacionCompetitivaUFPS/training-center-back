@@ -14,7 +14,6 @@ const (
 	dashboardUpcomingContestsLimit     = 3
 	dashboardActiveContestsLimit       = 3
 	dashboardFinishedContestsLimit     = 10
-	dashboardRecentMaterialsLimit      = 10
 	dashboardRecentMaterialsWindowDays = 30
 )
 
@@ -28,32 +27,30 @@ type GetDashboardOutput struct {
 	UpcomingContests     []DashboardContest
 	ActiveContests       []DashboardContest
 	ProblemsSolved       int
-	RecentMaterials      []DashboardMaterial
+	MaterialsCount       int
 	CurrentStreak        int
 	MaximumStreak        int
-	RankingPosition      *int
-	RankingTotalUsers    int
 	RecentContestResults []DashboardContestResult
 }
 
 type GetDashboardUseCase struct {
-	submissionProvider DashboardSubmissionProvider
-	contestProvider    DashboardContestProvider
-	materialProvider   DashboardMaterialProvider
-	rankingProvider    DashboardRankingProvider
+	submissionProvider     DashboardSubmissionProvider
+	contestProvider        DashboardContestProvider
+	materialProvider       DashboardMaterialProvider
+	problemsSolvedProvider ProblemsSolvedProvider
 }
 
 func NewGetDashboardUseCase(
 	submissionProvider DashboardSubmissionProvider,
 	contestProvider DashboardContestProvider,
 	materialProvider DashboardMaterialProvider,
-	rankingProvider DashboardRankingProvider,
+	problemsSolvedProvider ProblemsSolvedProvider,
 ) *GetDashboardUseCase {
 	return &GetDashboardUseCase{
-		submissionProvider: submissionProvider,
-		contestProvider:    contestProvider,
-		materialProvider:   materialProvider,
-		rankingProvider:    rankingProvider,
+		submissionProvider:     submissionProvider,
+		contestProvider:        contestProvider,
+		materialProvider:       materialProvider,
+		problemsSolvedProvider: problemsSolvedProvider,
 	}
 }
 
@@ -61,14 +58,13 @@ func (uc *GetDashboardUseCase) Execute(ctx context.Context, in GetDashboardInput
 	userID := in.CurrentUser.ID
 
 	var (
-		submissions []DashboardSubmission
-		dates       []time.Time
-		upcoming    []DashboardContest
-		active      []DashboardContest
-		finished    []DashboardContestResult
-		materials   []DashboardMaterial
-		problemsSolved, totalUsers int
-		position                   *int
+		submissions    []DashboardSubmission
+		dates          []time.Time
+		upcoming       []DashboardContest
+		active         []DashboardContest
+		finished       []DashboardContestResult
+		problemsSolved int
+		materialsCount int
 	)
 
 	g, ctx := errgroup.WithContext(ctx)
@@ -94,11 +90,11 @@ func (uc *GetDashboardUseCase) Execute(ctx context.Context, in GetDashboardInput
 		return
 	})
 	g.Go(func() (err error) {
-		materials, err = uc.materialProvider.GetRecentMaterials(ctx, userID, dashboardRecentMaterialsLimit, dashboardRecentMaterialsWindowDays)
+		materialsCount, err = uc.materialProvider.GetRecentMaterialsCount(ctx, userID, dashboardRecentMaterialsWindowDays)
 		return
 	})
 	g.Go(func() (err error) {
-		problemsSolved, position, totalUsers, err = uc.rankingProvider.GetUserStats(ctx, userID)
+		problemsSolved, err = uc.problemsSolvedProvider.GetProblemsSolved(ctx, userID)
 		return
 	})
 
@@ -113,11 +109,9 @@ func (uc *GetDashboardUseCase) Execute(ctx context.Context, in GetDashboardInput
 		UpcomingContests:     upcoming,
 		ActiveContests:       active,
 		ProblemsSolved:       problemsSolved,
-		RecentMaterials:      materials,
+		MaterialsCount:       materialsCount,
 		CurrentStreak:        currentStreak,
 		MaximumStreak:        maximumStreak,
-		RankingPosition:      position,
-		RankingTotalUsers:    totalUsers,
 		RecentContestResults: finished,
 	}, nil
 }

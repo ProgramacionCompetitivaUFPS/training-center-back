@@ -341,8 +341,8 @@ const docTemplate = `{
                 }
             }
         },
-        "/contests/{contestId}/problems/{slug}/rejudge": {
-            "post": {
+        "/contests": {
+            "get": {
                 "security": [
                     {
                         "BearerAuth": []
@@ -354,50 +354,48 @@ const docTemplate = `{
                 "tags": [
                     "contests"
                 ],
-                "summary": "Rejudge contest submissions",
+                "summary": "List my contests",
                 "parameters": [
                     {
                         "type": "string",
-                        "description": "Contest ID",
-                        "name": "contestId",
-                        "in": "path",
-                        "required": true
+                        "description": "Filter by status (SCHEDULED, ACTIVE, FINISHED)",
+                        "name": "status",
+                        "in": "query"
                     },
                     {
                         "type": "string",
-                        "description": "Problem slug",
-                        "name": "slug",
-                        "in": "path",
-                        "required": true
+                        "description": "Sort field (name, startTime, createdAt)",
+                        "name": "sortBy",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Sort order (asc, desc)",
+                        "name": "order",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Page number (default 1)",
+                        "name": "page",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Items per page (default 20, max 100)",
+                        "name": "limit",
+                        "in": "query"
                     }
                 ],
                 "responses": {
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/problem.rejudgeContestResponse"
-                        }
-                    },
-                    "400": {
-                        "description": "Bad Request",
-                        "schema": {
-                            "$ref": "#/definitions/apperror.AppError"
+                            "$ref": "#/definitions/contest.listMyContestsResponse"
                         }
                     },
                     "401": {
                         "description": "Unauthorized",
-                        "schema": {
-                            "$ref": "#/definitions/apperror.AppError"
-                        }
-                    },
-                    "403": {
-                        "description": "Forbidden",
-                        "schema": {
-                            "$ref": "#/definitions/apperror.AppError"
-                        }
-                    },
-                    "404": {
-                        "description": "Not Found",
                         "schema": {
                             "$ref": "#/definitions/apperror.AppError"
                         }
@@ -481,10 +479,10 @@ const docTemplate = `{
                 "tags": [
                     "groups"
                 ],
-                "summary": "Create group",
+                "summary": "Create group with optional initial members and leads",
                 "parameters": [
                     {
-                        "description": "Group data",
+                        "description": "Group data, optionally including initial member/lead nicknames",
                         "name": "body",
                         "in": "body",
                         "required": true,
@@ -508,6 +506,12 @@ const docTemplate = `{
                     },
                     "401": {
                         "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/apperror.AppError"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
                         "schema": {
                             "$ref": "#/definitions/apperror.AppError"
                         }
@@ -1018,6 +1022,178 @@ const docTemplate = `{
                 }
             }
         },
+        "/groups/{groupId}/contests/{contestId}/problems/{problemSlug}/rejudge": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "contests"
+                ],
+                "summary": "Rejudge contest submissions",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Group ID",
+                        "name": "groupId",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Contest ID",
+                        "name": "contestId",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Problem slug",
+                        "name": "problemSlug",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/problem.rejudgeContestResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/apperror.AppError"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/apperror.AppError"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/apperror.AppError"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/apperror.AppError"
+                        }
+                    }
+                }
+            }
+        },
+        "/groups/{groupId}/contests/{contestId}/problems/{problemSlug}/submissions": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "consumes": [
+                    "multipart/form-data"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "submissions"
+                ],
+                "summary": "Submit a solution to a contest problem",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Group ID",
+                        "name": "groupId",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Contest ID",
+                        "name": "contestId",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Problem slug",
+                        "name": "problemSlug",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Programming language",
+                        "name": "language",
+                        "in": "formData",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Compiler identifier",
+                        "name": "compiler",
+                        "in": "formData",
+                        "required": true
+                    },
+                    {
+                        "type": "file",
+                        "description": "Solution source file",
+                        "name": "file",
+                        "in": "formData",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "schema": {
+                            "$ref": "#/definitions/submission.submitContestResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/apperror.AppError"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/apperror.AppError"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/apperror.AppError"
+                        }
+                    },
+                    "409": {
+                        "description": "Conflict",
+                        "schema": {
+                            "$ref": "#/definitions/apperror.AppError"
+                        }
+                    },
+                    "429": {
+                        "description": "Too Many Requests",
+                        "schema": {
+                            "$ref": "#/definitions/apperror.AppError"
+                        }
+                    }
+                }
+            }
+        },
         "/groups/{groupId}/contests/{contestId}/register": {
             "post": {
                 "security": [
@@ -1267,7 +1443,7 @@ const docTemplate = `{
                 "tags": [
                     "contests"
                 ],
-                "summary": "Get contest standings (ICPC)",
+                "summary": "Get contest standings (ICPC), optionally filtered by participant country, city, or institution",
                 "parameters": [
                     {
                         "type": "string",
@@ -1287,6 +1463,24 @@ const docTemplate = `{
                         "type": "boolean",
                         "description": "Bypass freeze (lead/admin only)",
                         "name": "realtime",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Filter by participant country (case-insensitive exact match)",
+                        "name": "country",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Filter by participant city (case-insensitive exact match)",
+                        "name": "city",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Filter by participant institution (case-insensitive exact match)",
+                        "name": "institution",
                         "in": "query"
                     },
                     {
@@ -1733,7 +1927,7 @@ const docTemplate = `{
             }
         },
         "/groups/{groupId}/invitations": {
-            "post": {
+            "get": {
                 "security": [
                     {
                         "BearerAuth": []
@@ -1745,7 +1939,7 @@ const docTemplate = `{
                 "tags": [
                     "groups"
                 ],
-                "summary": "Generate invite token",
+                "summary": "List invitations for a group",
                 "parameters": [
                     {
                         "type": "string",
@@ -1753,6 +1947,84 @@ const docTemplate = `{
                         "name": "groupId",
                         "in": "path",
                         "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Filter by status (PENDING, ACCEPTED, REVOKED, EXPIRED); defaults to PENDING",
+                        "name": "status",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Page number",
+                        "name": "page",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Items per page",
+                        "name": "limit",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/group.listGroupInvitationsResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/apperror.AppError"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/apperror.AppError"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/apperror.AppError"
+                        }
+                    }
+                }
+            },
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "groups"
+                ],
+                "summary": "Generate a group invitation",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Group ID",
+                        "name": "groupId",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Optional invitee identifier (at most one of userNickname, userEmail, userId); omit for a general link-style invitation",
+                        "name": "body",
+                        "in": "body",
+                        "schema": {
+                            "$ref": "#/definitions/group.generateInviteReq"
+                        }
                     }
                 ],
                 "responses": {
@@ -1760,6 +2032,12 @@ const docTemplate = `{
                         "description": "Created",
                         "schema": {
                             "$ref": "#/definitions/group.generateInviteResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/apperror.AppError"
                         }
                     },
                     "401": {
@@ -1799,7 +2077,7 @@ const docTemplate = `{
                 "tags": [
                     "groups"
                 ],
-                "summary": "Accept invite",
+                "summary": "Accept a group invitation",
                 "parameters": [
                     {
                         "type": "string",
@@ -1809,7 +2087,7 @@ const docTemplate = `{
                         "required": true
                     },
                     {
-                        "description": "Invite token",
+                        "description": "Invitation ID",
                         "name": "body",
                         "in": "body",
                         "required": true,
@@ -1851,6 +2129,64 @@ const docTemplate = `{
                     },
                     "409": {
                         "description": "Conflict",
+                        "schema": {
+                            "$ref": "#/definitions/apperror.AppError"
+                        }
+                    }
+                }
+            }
+        },
+        "/groups/{groupId}/invitations/{invitationId}": {
+            "delete": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "tags": [
+                    "groups"
+                ],
+                "summary": "Revoke a group invitation",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Group ID",
+                        "name": "groupId",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Invitation ID",
+                        "name": "invitationId",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "No Content"
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/apperror.AppError"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/apperror.AppError"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/apperror.AppError"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
                         "schema": {
                             "$ref": "#/definitions/apperror.AppError"
                         }
@@ -3734,7 +4070,7 @@ const docTemplate = `{
                         "required": true
                     },
                     {
-                        "description": "User ID",
+                        "description": "User nickname",
                         "name": "body",
                         "in": "body",
                         "required": true,
@@ -3762,7 +4098,7 @@ const docTemplate = `{
                 }
             }
         },
-        "/problems/p/{slug}/modifiers/{userId}": {
+        "/problems/p/{slug}/modifiers/{nickname}": {
             "delete": {
                 "security": [
                     {
@@ -3786,8 +4122,8 @@ const docTemplate = `{
                     },
                     {
                         "type": "string",
-                        "description": "User ID",
-                        "name": "userId",
+                        "description": "Nickname of the modifier",
+                        "name": "nickname",
                         "in": "path",
                         "required": true
                     }
@@ -3993,6 +4329,91 @@ const docTemplate = `{
                     },
                     "500": {
                         "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/apperror.AppError"
+                        }
+                    }
+                }
+            },
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "consumes": [
+                    "multipart/form-data"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "submissions"
+                ],
+                "summary": "Submit a solution",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Problem slug",
+                        "name": "slug",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Programming language",
+                        "name": "language",
+                        "in": "formData",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Compiler identifier",
+                        "name": "compiler",
+                        "in": "formData",
+                        "required": true
+                    },
+                    {
+                        "type": "file",
+                        "description": "Solution source file",
+                        "name": "file",
+                        "in": "formData",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "schema": {
+                            "$ref": "#/definitions/submission.submitResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/apperror.AppError"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/apperror.AppError"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/apperror.AppError"
+                        }
+                    },
+                    "409": {
+                        "description": "Conflict",
+                        "schema": {
+                            "$ref": "#/definitions/apperror.AppError"
+                        }
+                    },
+                    "429": {
+                        "description": "Too Many Requests",
                         "schema": {
                             "$ref": "#/definitions/apperror.AppError"
                         }
@@ -4931,6 +5352,42 @@ const docTemplate = `{
                 }
             }
         },
+        "/users/me/stats": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "users"
+                ],
+                "summary": "Get my profile statistics",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/user.statsResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/apperror.AppError"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/apperror.AppError"
+                        }
+                    }
+                }
+            }
+        },
         "/users/me/submissions": {
             "get": {
                 "security": [
@@ -5463,6 +5920,20 @@ const docTemplate = `{
                 }
             }
         },
+        "contest.listMyContestsResponse": {
+            "type": "object",
+            "properties": {
+                "items": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/contest.myContestListItem"
+                    }
+                },
+                "pagination": {
+                    "$ref": "#/definitions/contest.pagination"
+                }
+            }
+        },
         "contest.listRegistrationsResponse": {
             "type": "object",
             "properties": {
@@ -5491,6 +5962,53 @@ const docTemplate = `{
                     "items": {
                         "$ref": "#/definitions/contest.submissionItem"
                     }
+                }
+            }
+        },
+        "contest.myContestListItem": {
+            "type": "object",
+            "properties": {
+                "description": {
+                    "type": "string"
+                },
+                "duration": {
+                    "type": "integer"
+                },
+                "enablePostContest": {
+                    "type": "boolean"
+                },
+                "endTime": {
+                    "type": "string"
+                },
+                "freezeMinutes": {
+                    "type": "integer"
+                },
+                "group": {
+                    "$ref": "#/definitions/contest.groupDisplay"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "isRegistered": {
+                    "type": "boolean"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "participantCount": {
+                    "type": "integer"
+                },
+                "penalty": {
+                    "type": "integer"
+                },
+                "problemCount": {
+                    "type": "integer"
+                },
+                "startTime": {
+                    "type": "string"
+                },
+                "status": {
+                    "type": "string"
                 }
             }
         },
@@ -5860,7 +6378,7 @@ const docTemplate = `{
         "group.acceptInviteRequest": {
             "type": "object",
             "properties": {
-                "token": {
+                "invitationId": {
                     "type": "string"
                 }
             }
@@ -5942,6 +6460,18 @@ const docTemplate = `{
                 "joinMode": {
                     "type": "string"
                 },
+                "leadNicknames": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "memberNicknames": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
                 "name": {
                     "type": "string"
                 },
@@ -6003,10 +6533,39 @@ const docTemplate = `{
                 }
             }
         },
+        "group.generateInviteReq": {
+            "type": "object",
+            "properties": {
+                "userEmail": {
+                    "type": "string"
+                },
+                "userId": {
+                    "type": "string"
+                },
+                "userNickname": {
+                    "type": "string"
+                }
+            }
+        },
         "group.generateInviteResponse": {
             "type": "object",
             "properties": {
-                "token": {
+                "createdAt": {
+                    "type": "string"
+                },
+                "expiresAt": {
+                    "type": "string"
+                },
+                "groupId": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "invitee": {
+                    "$ref": "#/definitions/group.requesterResp"
+                },
+                "status": {
                     "type": "string"
                 }
             }
@@ -6105,6 +6664,12 @@ const docTemplate = `{
                 "joinPolicy": {
                     "type": "string"
                 },
+                "members": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/group.memberListItemResp"
+                    }
+                },
                 "name": {
                     "type": "string"
                 },
@@ -6112,6 +6677,35 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "visibility": {
+                    "type": "string"
+                }
+            }
+        },
+        "group.invitationListItemResp": {
+            "type": "object",
+            "properties": {
+                "createdAt": {
+                    "type": "string"
+                },
+                "effectiveStatus": {
+                    "type": "string"
+                },
+                "expiresAt": {
+                    "type": "string"
+                },
+                "groupId": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "invitedBy": {
+                    "type": "string"
+                },
+                "invitee": {
+                    "$ref": "#/definitions/group.requesterResp"
+                },
+                "status": {
                     "type": "string"
                 }
             }
@@ -6161,6 +6755,20 @@ const docTemplate = `{
                 },
                 "userId": {
                     "type": "string"
+                }
+            }
+        },
+        "group.listGroupInvitationsResponse": {
+            "type": "object",
+            "properties": {
+                "invitations": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/group.invitationListItemResp"
+                    }
+                },
+                "pagination": {
+                    "$ref": "#/definitions/group.paginationResp"
                 }
             }
         },
@@ -6599,7 +7207,7 @@ const docTemplate = `{
         "problem.addModifierRequest": {
             "type": "object",
             "properties": {
-                "userId": {
+                "userNickname": {
                     "type": "string"
                 }
             }
@@ -7212,6 +7820,76 @@ const docTemplate = `{
                 }
             }
         },
+        "submission.submitContestResponse": {
+            "type": "object",
+            "properties": {
+                "compiler": {
+                    "type": "string"
+                },
+                "contestId": {
+                    "type": "string"
+                },
+                "contestName": {
+                    "type": "string"
+                },
+                "fileHash": {
+                    "type": "string"
+                },
+                "fileSize": {
+                    "type": "integer"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "language": {
+                    "type": "string"
+                },
+                "problemSlug": {
+                    "type": "string"
+                },
+                "problemTitle": {
+                    "type": "string"
+                },
+                "status": {
+                    "type": "string"
+                },
+                "submittedAt": {
+                    "type": "string"
+                }
+            }
+        },
+        "submission.submitResponse": {
+            "type": "object",
+            "properties": {
+                "compiler": {
+                    "type": "string"
+                },
+                "fileHash": {
+                    "type": "string"
+                },
+                "fileSize": {
+                    "type": "integer"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "language": {
+                    "type": "string"
+                },
+                "problemSlug": {
+                    "type": "string"
+                },
+                "problemTitle": {
+                    "type": "string"
+                },
+                "status": {
+                    "type": "string"
+                },
+                "submittedAt": {
+                    "type": "string"
+                }
+            }
+        },
         "submission.updateVisibilityRequest": {
             "type": "object",
             "properties": {
@@ -7694,11 +8372,17 @@ const docTemplate = `{
                 }
             }
         },
-        "user.contestSummaryResp": {
+        "user.contestSummary": {
             "type": "object",
             "properties": {
                 "durationMinutes": {
                     "type": "integer"
+                },
+                "groupId": {
+                    "type": "string"
+                },
+                "groupName": {
+                    "type": "string"
                 },
                 "id": {
                     "type": "string"
@@ -7772,25 +8456,19 @@ const docTemplate = `{
                 "activeContests": {
                     "type": "array",
                     "items": {
-                        "$ref": "#/definitions/user.contestSummaryResp"
+                        "$ref": "#/definitions/user.contestSummary"
                     }
+                },
+                "materialsCount": {
+                    "type": "integer"
                 },
                 "problemsSolved": {
                     "type": "integer"
-                },
-                "ranking": {
-                    "$ref": "#/definitions/user.rankingResp"
                 },
                 "recentContestResults": {
                     "type": "array",
                     "items": {
                         "$ref": "#/definitions/user.contestResultResp"
-                    }
-                },
-                "recentMaterials": {
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/user.materialResp"
                     }
                 },
                 "recentSubmissions": {
@@ -7805,7 +8483,7 @@ const docTemplate = `{
                 "upcomingContests": {
                     "type": "array",
                     "items": {
-                        "$ref": "#/definitions/user.contestSummaryResp"
+                        "$ref": "#/definitions/user.contestSummary"
                     }
                 }
             }
@@ -7897,29 +8575,6 @@ const docTemplate = `{
                 }
             }
         },
-        "user.materialResp": {
-            "type": "object",
-            "properties": {
-                "authorNickname": {
-                    "type": "string"
-                },
-                "groupId": {
-                    "type": "string"
-                },
-                "groupName": {
-                    "type": "string"
-                },
-                "id": {
-                    "type": "string"
-                },
-                "publishedAt": {
-                    "type": "string"
-                },
-                "title": {
-                    "type": "string"
-                }
-            }
-        },
         "user.paginationMeta": {
             "type": "object",
             "properties": {
@@ -7943,7 +8598,7 @@ const docTemplate = `{
                 }
             }
         },
-        "user.rankingResp": {
+        "user.ranking": {
             "type": "object",
             "properties": {
                 "position": {
@@ -7987,6 +8642,32 @@ const docTemplate = `{
                 }
             }
         },
+        "user.statsResponse": {
+            "type": "object",
+            "properties": {
+                "acceptedSubmissions": {
+                    "type": "integer"
+                },
+                "contestsParticipated": {
+                    "type": "integer"
+                },
+                "problemsSolved": {
+                    "type": "integer"
+                },
+                "ranking": {
+                    "$ref": "#/definitions/user.ranking"
+                },
+                "topicStats": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/user.topicStat"
+                    }
+                },
+                "totalSubmissions": {
+                    "type": "integer"
+                }
+            }
+        },
         "user.streakResp": {
             "type": "object",
             "properties": {
@@ -8023,6 +8704,17 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "verdict": {
+                    "type": "string"
+                }
+            }
+        },
+        "user.topicStat": {
+            "type": "object",
+            "properties": {
+                "solved": {
+                    "type": "integer"
+                },
+                "tag": {
                     "type": "string"
                 }
             }

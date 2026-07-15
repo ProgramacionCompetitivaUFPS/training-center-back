@@ -19,30 +19,18 @@ type submissionResp struct {
 	MemoryKb      *int   `json:"memoryKb"`
 }
 
-type contestSummaryResp struct {
+type contestSummary struct {
 	ID              string `json:"id"`
 	Name            string `json:"name"`
 	StartTime       string `json:"startTime"`
 	DurationMinutes int    `json:"durationMinutes"`
-}
-
-type materialResp struct {
-	ID             string `json:"id"`
-	Title          string `json:"title"`
-	GroupID        string `json:"groupId"`
-	GroupName      string `json:"groupName"`
-	PublishedAt    string `json:"publishedAt"`
-	AuthorNickname string `json:"authorNickname"`
+	GroupID         string `json:"groupId"`
+	GroupName       string `json:"groupName"`
 }
 
 type streakResp struct {
 	Current int `json:"current"`
 	Maximum int `json:"maximum"`
-}
-
-type rankingResp struct {
-	Position   *int `json:"position"`
-	TotalUsers int  `json:"totalUsers"`
 }
 
 type contestResultResp struct {
@@ -55,13 +43,12 @@ type contestResultResp struct {
 
 type dashboardResponse struct {
 	RecentSubmissions    []submissionResp    `json:"recentSubmissions"`
-	UpcomingContests     []contestSummaryResp `json:"upcomingContests"`
-	ActiveContests       []contestSummaryResp `json:"activeContests"`
-	ProblemsSolved       int                  `json:"problemsSolved"`
-	RecentMaterials      []materialResp       `json:"recentMaterials"`
-	Streak               streakResp           `json:"streak"`
-	Ranking              rankingResp          `json:"ranking"`
-	RecentContestResults []contestResultResp  `json:"recentContestResults"`
+	UpcomingContests     []contestSummary    `json:"upcomingContests"`
+	ActiveContests       []contestSummary    `json:"activeContests"`
+	ProblemsSolved       int                 `json:"problemsSolved"`
+	MaterialsCount       int                 `json:"materialsCount"`
+	Streak               streakResp          `json:"streak"`
+	RecentContestResults []contestResultResp `json:"recentContestResults"`
 }
 
 // @Summary      Get my dashboard
@@ -104,35 +91,27 @@ func buildDashboardResponse(out *appuser.GetDashboardOutput) dashboardResponse {
 		})
 	}
 
-	upcoming := make([]contestSummaryResp, 0, len(out.UpcomingContests))
+	upcoming := make([]contestSummary, 0, len(out.UpcomingContests))
 	for _, c := range out.UpcomingContests {
-		upcoming = append(upcoming, contestSummaryResp{
+		upcoming = append(upcoming, contestSummary{
 			ID:              c.ID,
 			Name:            c.Name,
 			StartTime:       c.StartTime.UTC().Format(time.RFC3339),
 			DurationMinutes: c.DurationMinutes,
+			GroupID:         c.GroupID,
+			GroupName:       c.GroupName,
 		})
 	}
 
-	active := make([]contestSummaryResp, 0, len(out.ActiveContests))
+	active := make([]contestSummary, 0, len(out.ActiveContests))
 	for _, c := range out.ActiveContests {
-		active = append(active, contestSummaryResp{
+		active = append(active, contestSummary{
 			ID:              c.ID,
 			Name:            c.Name,
 			StartTime:       c.StartTime.UTC().Format(time.RFC3339),
 			DurationMinutes: c.DurationMinutes,
-		})
-	}
-
-	materials := make([]materialResp, 0, len(out.RecentMaterials))
-	for _, m := range out.RecentMaterials {
-		materials = append(materials, materialResp{
-			ID:             m.ID,
-			Title:          m.Title,
-			GroupID:        m.GroupID,
-			GroupName:      m.GroupName,
-			PublishedAt:    m.PublishedAt.UTC().Format(time.RFC3339),
-			AuthorNickname: m.AuthorNickname,
+			GroupID:         c.GroupID,
+			GroupName:       c.GroupName,
 		})
 	}
 
@@ -152,9 +131,8 @@ func buildDashboardResponse(out *appuser.GetDashboardOutput) dashboardResponse {
 		UpcomingContests:     upcoming,
 		ActiveContests:       active,
 		ProblemsSolved:       out.ProblemsSolved,
-		RecentMaterials:      materials,
+		MaterialsCount:       out.MaterialsCount,
 		Streak:               streakResp{Current: out.CurrentStreak, Maximum: out.MaximumStreak},
-		Ranking:              rankingResp{Position: out.RankingPosition, TotalUsers: out.RankingTotalUsers},
 		RecentContestResults: results,
 	}
 }
