@@ -16,7 +16,6 @@ type Config struct {
 	DBUser             string
 	DBPassword         string
 	DBName             string
-	MockAuth           bool
 	StorageBackend     string
 	StorageLocalDir    string
 	GCSBucket          string
@@ -43,7 +42,6 @@ func Load() *Config {
 		DBUser:             getEnv("DB_USER", "postgres"),
 		DBPassword:         getEnv("DB_PASSWORD", "postgres"),
 		DBName:             getEnv("DB_NAME", "training_center"),
-		MockAuth:           getEnv("MOCK_AUTH", "") == "1",
 		StorageBackend:     getEnv("STORAGE_BACKEND", "local"),
 		StorageLocalDir:    getEnv("STORAGE_LOCAL_DIR", ".local_storage"),
 		GCSBucket:          getEnv("GCS_BUCKET", ""),

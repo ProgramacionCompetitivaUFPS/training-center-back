@@ -47,32 +47,57 @@ docker-compose --env-file .env.example up postgres -d
 go run cmd/migrate/main.go up
 ```
 
-3. Iniciar el servidor con mock auth:
+3. Iniciar el servidor:
 
 ```bash
-MOCK_AUTH=1 go run cmd/api/main.go
+go run cmd/api/main.go
 ```
 
-En PowerShell:
+## Autenticación
 
-```powershell
-$env:MOCK_AUTH="1"; go run cmd/api/main.go
+No hay modo mock: todos los endpoints protegidos requieren un JWT real obtenido por login.
+
+1. Registrar un usuario (rol `CONTESTANT` por defecto):
+
+```bash
+curl -X POST http://localhost:8080/users \
+  -H "Content-Type: application/json" \
+  -d '{
+    "email": "coach@example.com",
+    "password": "Coach1234!",
+    "name": "Coach Example",
+    "nickname": "coach_example",
+    "country": "co",
+    "city": "city",
+    "institution": "institution"
+  }'
 ```
 
-## Mock Auth
+2. Iniciar sesión para obtener el token:
 
-Con `MOCK_AUTH=1`, el middleware inyecta un usuario simulado vía el header `X-Mock-User`.
+```bash
+curl -X POST http://localhost:8080/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"email": "coach@example.com", "password": "Coach1234!"}'
+```
 
-Usuarios disponibles:
+La respuesta incluye `{"token": "...", "user": {...}}`. Usa ese token en cada request protegida:
 
-| Header Value   | Rol         |
-|----------------|-------------|
-| `admin`        | ADMIN       |
-| `coach_john`   | COACH       |
-| `coach_mary`   | COACH       |
-| `contestant`   | CONTESTANT  |
+```bash
+curl http://localhost:8080/users/me \
+  -H "Authorization: Bearer <token>"
+```
 
-Si no envías el header, se usa `coach_john` por defecto.
+Para promover un usuario a `COACH` o `ADMIN` (solo un Admin puede hacerlo):
+
+```bash
+curl -X PUT http://localhost:8080/admin/users/{id} \
+  -H "Authorization: Bearer <admin-token>" \
+  -H "Content-Type: application/json" \
+  -d '{"role": "COACH"}'
+```
+
+El primer Admin se crea con `go run cmd/seed/main.go` (lee `ADMIN_EMAIL`/`ADMIN_PASSWORD` del `.env`, es idempotente por email).
 
 ## Tags válidos
 
@@ -105,7 +130,7 @@ POST /problems
 ```bash
 curl -X POST http://localhost:8080/problems \
   -H "Content-Type: application/json" \
-  -H "X-Mock-User: coach_john" \
+  -H "Authorization: Bearer $COACH_TOKEN" \
   -d '{
     "slug": "two-sum",
     "title": "Two Sum",
@@ -118,7 +143,7 @@ curl -X POST http://localhost:8080/problems \
 ```bash
 curl -X POST http://localhost:8080/problems \
   -H "Content-Type: application/json" \
-  -H "X-Mock-User: coach_john" \
+  -H "Authorization: Bearer $COACH_TOKEN" \
   -d '{
     "slug": "fibonacci-sequence",
     "title": "Fibonacci Sequence",
@@ -145,7 +170,7 @@ curl -X POST http://localhost:8080/problems \
 ```bash
 curl -X POST http://localhost:8080/problems \
   -H "Content-Type: application/json" \
-  -H "X-Mock-User: admin" \
+  -H "Authorization: Bearer $ADMIN_TOKEN" \
   -d '{
     "slug": "graph-bfs",
     "title": "BFS on Graph",
@@ -204,7 +229,7 @@ curl -X POST http://localhost:8080/problems \
 ```bash
 curl -X POST http://localhost:8080/problems \
   -H "Content-Type: application/json" \
-  -H "X-Mock-User: contestant" \
+  -H "Authorization: Bearer $CONTESTANT_TOKEN" \
   -d '{
     "slug": "test",
     "title": "Test",
@@ -241,7 +266,7 @@ Todos los campos son opcionales (solo se actualiza lo que se envía). El problem
 ```bash
 curl -X PUT http://localhost:8080/problems/p/two-sum \
   -H "Content-Type: application/json" \
-  -H "X-Mock-User: coach_john" \
+  -H "Authorization: Bearer $COACH_TOKEN" \
   -d '{
     "title": "Two Sum (Updated)",
     "statement": "Given an array of integers, return indices of the two numbers that add up to target.",
@@ -277,7 +302,7 @@ Acepta `multipart/form-data` con un `.zip` en formato ICPC (con `problem.xml` y 
 
 ```bash
 curl -X POST http://localhost:8080/problems/import \
-  -H "X-Mock-User: coach_john" \
+  -H "Authorization: Bearer $COACH_TOKEN" \
   -F "slug=icpc-problem-a" \
   -F "file=@/path/to/package.zip"
 ```
@@ -308,13 +333,13 @@ Acepta `multipart/form-data`. El campo `fileType` determina qué tipo de archivo
 ```bash
 # Subir casos de prueba
 curl -X POST http://localhost:8080/problems/p/two-sum/files \
-  -H "X-Mock-User: coach_john" \
+  -H "Authorization: Bearer $COACH_TOKEN" \
   -F "fileType=testcases" \
   -F "file=@/path/to/tests.zip"
 
 # Subir solución
 curl -X POST http://localhost:8080/problems/p/two-sum/files \
-  -H "X-Mock-User: coach_john" \
+  -H "Authorization: Bearer $COACH_TOKEN" \
   -F "fileType=solution" \
   -F "file=@/path/to/solution.cpp"
 ```
@@ -341,15 +366,15 @@ Para `solution`, el filename es requerido via query param `?fileName=`.
 ```bash
 # Eliminar casos de prueba
 curl -X DELETE http://localhost:8080/problems/p/two-sum/files/testcases \
-  -H "X-Mock-User: coach_john"
+  -H "Authorization: Bearer $COACH_TOKEN"
 
 # Eliminar una solución específica
 curl -X DELETE "http://localhost:8080/problems/p/two-sum/files/solution?fileName=solution.cpp" \
-  -H "X-Mock-User: coach_john"
+  -H "Authorization: Bearer $COACH_TOKEN"
 
 # Eliminar checker
 curl -X DELETE http://localhost:8080/problems/p/two-sum/files/checker \
-  -H "X-Mock-User: coach_john"
+  -H "Authorization: Bearer $COACH_TOKEN"
 ```
 
 **Respuestas esperadas:**
@@ -371,9 +396,9 @@ Solo el autor o un admin puede agregar modifiers.
 ```bash
 curl -X POST http://localhost:8080/problems/p/two-sum/modifiers \
   -H "Content-Type: application/json" \
-  -H "X-Mock-User: coach_john" \
+  -H "Authorization: Bearer $COACH_TOKEN" \
   -d '{
-    "userId": "coach_mary"
+    "userNickname": "coach_mary"
   }'
 ```
 
@@ -394,7 +419,7 @@ GET /problems/p/{slug}/modifiers
 
 ```bash
 curl http://localhost:8080/problems/p/two-sum/modifiers \
-  -H "X-Mock-User: coach_john"
+  -H "Authorization: Bearer $COACH_TOKEN"
 ```
 
 **Respuesta `200 OK`:**
@@ -410,12 +435,12 @@ curl http://localhost:8080/problems/p/two-sum/modifiers \
 ### Eliminar Modifier
 
 ```
-DELETE /problems/p/{slug}/modifiers/{userId}
+DELETE /problems/p/{slug}/modifiers/{nickname}
 ```
 
 ```bash
 curl -X DELETE http://localhost:8080/problems/p/two-sum/modifiers/coach_mary \
-  -H "X-Mock-User: coach_john"
+  -H "Authorization: Bearer $COACH_TOKEN"
 ```
 
 **Respuestas esperadas:**
