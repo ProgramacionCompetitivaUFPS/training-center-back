@@ -48,7 +48,7 @@ func TestGenerateInvite_UnauthenticatedReturns401(t *testing.T) {
 
 func TestGenerateInvite_NonLeadReturns403(t *testing.T) {
 	repo := &mockGroupRepo{findByIDFn: func(_ string) (*domainGroup.Group, error) { return inviteGroupFixture(), nil }}
-	uc := appGroup.NewGenerateInviteUseCase(repo, &mockMemberRepo{}, &mockInvitationRepo{}, &mockNicknameResolver{}, &mockEmailResolver{}, &mockUserProvider{}, &mockTxManager{})
+	uc := appGroup.NewGenerateInviteUseCase(repo, &mockMemberRepo{}, &mockInvitationRepo{}, &mockNicknameResolver{}, &mockEmailResolver{}, &mockUserProvider{}, &mockTxManager{}, &mockEmailSender{}, "http://localhost:5173")
 	h := newHandlerWithGenerateInvite(uc)
 
 	r := authedPostRequest("/groups/g1/invitations", `{}`)
@@ -77,7 +77,7 @@ func TestGenerateInvite_InvalidJSONReturns400(t *testing.T) {
 
 func TestGenerateInvite_GeneralInvitationSuccess(t *testing.T) {
 	repo := &mockGroupRepo{findByIDFn: func(_ string) (*domainGroup.Group, error) { return inviteGroupFixture(), nil }}
-	uc := appGroup.NewGenerateInviteUseCase(repo, leadMemberRepoHandler("g1", "u1"), &mockInvitationRepo{}, &mockNicknameResolver{}, &mockEmailResolver{}, &mockUserProvider{}, &mockTxManager{})
+	uc := appGroup.NewGenerateInviteUseCase(repo, leadMemberRepoHandler("g1", "u1"), &mockInvitationRepo{}, &mockNicknameResolver{}, &mockEmailResolver{}, &mockUserProvider{}, &mockTxManager{}, &mockEmailSender{}, "http://localhost:5173")
 	h := newHandlerWithGenerateInvite(uc)
 
 	r := authedPostRequest("/groups/g1/invitations", `{}`)
@@ -107,7 +107,7 @@ func TestGenerateInvite_GeneralInvitationSuccess(t *testing.T) {
 func TestGenerateInvite_PersonalInvitationByNicknameSuccess(t *testing.T) {
 	repo := &mockGroupRepo{findByIDFn: func(_ string) (*domainGroup.Group, error) { return inviteGroupFixture(), nil }}
 	display := &appGroup.UserDisplay{ID: "invitee-1", Nickname: "bob", Name: "Bob", Email: "bob@example.com"}
-	uc := appGroup.NewGenerateInviteUseCase(repo, leadMemberRepoHandler("g1", "u1"), &mockInvitationRepo{}, &mockNicknameResolver{user: display}, &mockEmailResolver{}, &mockUserProvider{}, &mockTxManager{})
+	uc := appGroup.NewGenerateInviteUseCase(repo, leadMemberRepoHandler("g1", "u1"), &mockInvitationRepo{}, &mockNicknameResolver{user: display}, &mockEmailResolver{}, &mockUserProvider{}, &mockTxManager{}, &mockEmailSender{}, "http://localhost:5173")
 	h := newHandlerWithGenerateInvite(uc)
 
 	r := authedPostRequest("/groups/g1/invitations", `{"userNickname":"bob"}`)
@@ -130,7 +130,7 @@ func TestGenerateInvite_PersonalInvitationByNicknameSuccess(t *testing.T) {
 
 func TestGenerateInvite_NicknameNotFoundReturns404(t *testing.T) {
 	repo := &mockGroupRepo{findByIDFn: func(_ string) (*domainGroup.Group, error) { return inviteGroupFixture(), nil }}
-	uc := appGroup.NewGenerateInviteUseCase(repo, leadMemberRepoHandler("g1", "u1"), &mockInvitationRepo{}, &mockNicknameResolver{}, &mockEmailResolver{}, &mockUserProvider{}, &mockTxManager{})
+	uc := appGroup.NewGenerateInviteUseCase(repo, leadMemberRepoHandler("g1", "u1"), &mockInvitationRepo{}, &mockNicknameResolver{}, &mockEmailResolver{}, &mockUserProvider{}, &mockTxManager{}, &mockEmailSender{}, "http://localhost:5173")
 	h := newHandlerWithGenerateInvite(uc)
 
 	r := authedPostRequest("/groups/g1/invitations", `{"userNickname":"ghost"}`)
@@ -146,7 +146,7 @@ func TestGenerateInvite_NicknameNotFoundReturns404(t *testing.T) {
 
 func TestGenerateInvite_EmptyBodyIsValidGeneralInvitation(t *testing.T) {
 	repo := &mockGroupRepo{findByIDFn: func(_ string) (*domainGroup.Group, error) { return inviteGroupFixture(), nil }}
-	uc := appGroup.NewGenerateInviteUseCase(repo, leadMemberRepoHandler("g1", "u1"), &mockInvitationRepo{}, &mockNicknameResolver{}, &mockEmailResolver{}, &mockUserProvider{}, &mockTxManager{})
+	uc := appGroup.NewGenerateInviteUseCase(repo, leadMemberRepoHandler("g1", "u1"), &mockInvitationRepo{}, &mockNicknameResolver{}, &mockEmailResolver{}, &mockUserProvider{}, &mockTxManager{}, &mockEmailSender{}, "http://localhost:5173")
 	h := newHandlerWithGenerateInvite(uc)
 
 	r := authedRequest("POST", "/groups/g1/invitations")

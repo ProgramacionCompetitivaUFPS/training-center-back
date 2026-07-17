@@ -12,6 +12,7 @@ const (
 	ErrCodeInvitationNotFound         = "INVITATION_NOT_FOUND"
 	ErrCodeInvitationAlreadyProcessed = "INVITATION_ALREADY_PROCESSED"
 	ErrCodeInvitationExpired          = "INVITATION_EXPIRED"
+	ErrCodeInvitationRevoked          = "INVITATION_REVOKED"
 
 	ErrCodeNotAMember                       = "NOT_A_MEMBER"
 	ErrCodeInvalidLeadAssignment            = "INVALID_LEAD_ASSIGNMENT"

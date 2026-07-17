@@ -4,7 +4,6 @@ import (
 	"context"
 	"time"
 
-	"github.com/google/uuid"
 	appshared "github.com/training-judge-center/backend/internal/application/shared"
 	domainGroup "github.com/training-judge-center/backend/internal/domain/group"
 	"github.com/training-judge-center/backend/internal/domain/shared"
@@ -32,6 +31,8 @@ type GenerateInviteUseCase struct {
 	emailResolver    EmailResolver
 	userProvider     UserProvider
 	txManager        appshared.TransactionManager
+	emailSender      appshared.EmailSender
+	frontendBaseURL  string
 }
 
 func NewGenerateInviteUseCase(
@@ -42,6 +43,8 @@ func NewGenerateInviteUseCase(
 	emailResolver EmailResolver,
 	userProvider UserProvider,
 	txManager appshared.TransactionManager,
+	emailSender appshared.EmailSender,
+	frontendBaseURL string,
 ) *GenerateInviteUseCase {
 	return &GenerateInviteUseCase{
 		groupRepo:        groupRepo,
@@ -51,6 +54,8 @@ func NewGenerateInviteUseCase(
 		emailResolver:    emailResolver,
 		userProvider:     userProvider,
 		txManager:        txManager,
+		emailSender:      emailSender,
+		frontendBaseURL:  frontendBaseURL,
 	}
 }
 
@@ -134,36 +139,8 @@ func (uc *GenerateInviteUseCase) Execute(ctx context.Context, input GenerateInvi
 	now := time.Now()
 
 	err = uc.txManager.WithTx(ctx, func(txCtx context.Context) error {
-		// Re-check the join policy inside the transaction: the check above
-		// used a group snapshot read before the transaction started, so a
-		// concurrent UpdateGroup switching the policy away from INVITE in the
-		// meantime would otherwise go unnoticed and leave a dangling invitation.
-		currentGroup, err := uc.groupRepo.FindByID(txCtx, input.GroupID)
+		inv, err := issueInvitation(txCtx, uc.groupRepo, uc.invitationRepo, input.GroupID, inviteeID, shared.RestoreUserID(input.CurrentUser.ID), now)
 		if err != nil {
-			return err
-		}
-		if currentGroup.JoinPolicy() != domainGroup.JoinPolicyInvite {
-			return apperror.NewBadRequest(ErrCodeInvalidJoinPolicy, "this group does not use invite mode")
-		}
-
-		existing, err := uc.invitationRepo.FindPendingByGroupAndInvitee(txCtx, input.GroupID, inviteeID)
-		if err != nil {
-			return err
-		}
-		if existing != nil {
-			if err := existing.Revoke(); err != nil {
-				return err
-			}
-			if err := uc.invitationRepo.TransitionStatus(txCtx, existing.ID(), domainGroup.InvitationStatusPending, domainGroup.InvitationStatusRevoked); err != nil {
-				return err
-			}
-		}
-
-		inv, err := domainGroup.NewGroupInvitation(uuid.New().String(), input.GroupID, inviteeID, shared.RestoreUserID(input.CurrentUser.ID), now)
-		if err != nil {
-			return err
-		}
-		if err := uc.invitationRepo.Save(txCtx, inv); err != nil {
 			return err
 		}
 		newInv = inv
@@ -171,6 +148,17 @@ func (uc *GenerateInviteUseCase) Execute(ctx context.Context, input GenerateInvi
 	})
 	if err != nil {
 		return nil, err
+	}
+
+	// Sent after the commit, not before, to avoid notifying the invitee about
+	// an invitation that never made it to the DB. Trade-off accepted for the
+	// MVP: if the email fails post-commit, the invitation stays persisted but
+	// Execute still errors — safe to retry, since a new call revokes and
+	// replaces the pending invitation.
+	if inviteeDisplay != nil {
+		if err := sendInvitationEmail(ctx, uc.emailSender, uc.frontendBaseURL, g.Name().String(), newInv, inviteeDisplay); err != nil {
+			return nil, err
+		}
 	}
 
 	return &GenerateInviteOutput{

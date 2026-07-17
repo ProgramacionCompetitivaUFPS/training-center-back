@@ -11,7 +11,7 @@ import (
 	"github.com/training-judge-center/backend/pkg/apperror"
 )
 
-// @Summary      Generate a group invitation
+// @Summary      Generate a group invitation (sends an email to the invitee, if any)
 // @Tags         groups
 // @Accept       json
 // @Produce      json
@@ -23,6 +23,7 @@ import (
 // @Failure      401 {object} apperror.AppError
 // @Failure      403 {object} apperror.AppError
 // @Failure      404 {object} apperror.AppError
+// @Failure      503 {object} apperror.AppError
 // @Router       /groups/{groupId}/invitations [post]
 func (h *Handler) GenerateInvite(w http.ResponseWriter, r *http.Request) {
 	currentUser, ok := handler.RequireCurrentUser(w, r)

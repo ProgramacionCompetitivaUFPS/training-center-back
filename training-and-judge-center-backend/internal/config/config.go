@@ -31,6 +31,7 @@ type Config struct {
 	RedisURL           string
 	RabbitMQURL        string
 	AllowedOrigins     []string
+	FrontendBaseURL    string
 }
 
 func Load() *Config {
@@ -57,6 +58,7 @@ func Load() *Config {
 		RedisURL:           getEnv("REDIS_URL", "localhost:6379"),
 		RabbitMQURL:        getEnv("RABBITMQ_URL", ""),
 		AllowedOrigins:     getEnvAsSlice("ALLOWED_ORIGINS", "http://localhost:5173"),
+		FrontendBaseURL:    getEnv("FRONTEND_BASE_URL", "http://localhost:5173"),
 	}
 }
 

@@ -20,6 +20,7 @@ type Handler struct {
 	acceptInvite         *appGroup.AcceptInviteUseCase
 	listGroupInvitations *appGroup.ListGroupInvitationsUseCase
 	revokeInvitation     *appGroup.RevokeInvitationUseCase
+	inviteByNicknames    *appGroup.InviteByNicknamesUseCase
 	addMember            *appGroup.AddMemberUseCase
 	removeMember         *appGroup.RemoveMemberUseCase
 	changeRole           *appGroup.ChangeRoleUseCase
@@ -45,6 +46,7 @@ func NewHandler(
 	acceptInvite *appGroup.AcceptInviteUseCase,
 	listGroupInvitations *appGroup.ListGroupInvitationsUseCase,
 	revokeInvitation *appGroup.RevokeInvitationUseCase,
+	inviteByNicknames *appGroup.InviteByNicknamesUseCase,
 	addMember *appGroup.AddMemberUseCase,
 	removeMember *appGroup.RemoveMemberUseCase,
 	changeRole *appGroup.ChangeRoleUseCase,
@@ -69,6 +71,7 @@ func NewHandler(
 		acceptInvite:         acceptInvite,
 		listGroupInvitations: listGroupInvitations,
 		revokeInvitation:     revokeInvitation,
+		inviteByNicknames:    inviteByNicknames,
 		addMember:            addMember,
 		removeMember:         removeMember,
 		changeRole:           changeRole,
