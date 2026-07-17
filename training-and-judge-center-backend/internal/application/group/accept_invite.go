@@ -64,7 +64,8 @@ func (uc *AcceptInviteUseCase) Execute(ctx context.Context, input AcceptInviteIn
 	}
 
 	if !inv.IsPending() {
-		return nil, apperror.NewBadRequest(domainGroup.ErrCodeInvitationAlreadyProcessed, "this invitation has already been processed")
+		code, message := invitationNotPendingError(inv)
+		return nil, apperror.NewBadRequest(code, message)
 	}
 
 	now := time.Now()
@@ -101,7 +102,8 @@ func (uc *AcceptInviteUseCase) Execute(ctx context.Context, input AcceptInviteIn
 			return err
 		}
 		if !currentInv.IsPending() {
-			return apperror.NewConflict(domainGroup.ErrCodeInvitationAlreadyProcessed, "this invitation has already been processed")
+			code, message := invitationNotPendingError(currentInv)
+			return apperror.NewConflict(code, message)
 		}
 
 		g, err := uc.groupRepo.FindByID(txCtx, inv.GroupID())
@@ -144,4 +146,20 @@ func (uc *AcceptInviteUseCase) Execute(ctx context.Context, input AcceptInviteIn
 	}
 
 	return &AcceptInviteOutput{Member: memberToDTO(member)}, nil
+}
+
+// invitationNotPendingError picks the most specific code/message for a
+// non-pending invitation. REVOKED and EXPIRED get their own codes so a stale
+// link tells the invitee exactly what happened (revoked: superseded by a
+// re-invite; expired: past its 72h window) instead of the generic
+// "already processed", which remains the fallback for ACCEPTED.
+func invitationNotPendingError(inv *domainGroup.GroupInvitation) (code, message string) {
+	switch inv.Status() {
+	case domainGroup.InvitationStatusRevoked:
+		return domainGroup.ErrCodeInvitationRevoked, "this invitation has been revoked"
+	case domainGroup.InvitationStatusExpired:
+		return domainGroup.ErrCodeInvitationExpired, "this invitation has expired"
+	default:
+		return domainGroup.ErrCodeInvitationAlreadyProcessed, "this invitation has already been processed"
+	}
 }

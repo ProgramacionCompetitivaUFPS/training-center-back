@@ -94,7 +94,7 @@ func TestAcceptInvite_WrongInviteeReturns403(t *testing.T) {
 	}
 }
 
-func TestAcceptInvite_AlreadyProcessedReturns400(t *testing.T) {
+func TestAcceptInvite_RevokedInvitationReturns400(t *testing.T) {
 	g := inviteGroup(t)
 	inv := mustInvitation(t, "inv1", "g1", nil, "lead1")
 	if err := inv.Revoke(); err != nil {
@@ -109,6 +109,36 @@ func TestAcceptInvite_AlreadyProcessedReturns400(t *testing.T) {
 		CurrentUser:  asContestant("u1"),
 	})
 
+	// A revoked invitation gets its own code/message — distinct from the
+	// generic "already processed" — so a stale link tells the invitee it was
+	// intentionally invalidated (e.g. superseded by a re-invite).
+	ae, ok := err.(*apperror.AppError)
+	if !ok || ae.Code != domainGroup.ErrCodeInvitationRevoked {
+		t.Fatalf("expected INVITATION_REVOKED, got %v", err)
+	}
+	if ae.Kind != apperror.KindBadRequest {
+		t.Errorf("expected kind BAD_REQUEST, got %s", ae.Kind)
+	}
+}
+
+func TestAcceptInvite_AlreadyAcceptedReturns400(t *testing.T) {
+	g := inviteGroup(t)
+	inviteeID := mustUID("u1")
+	inv := mustInvitation(t, "inv1", "g1", &inviteeID, "lead1")
+	if err := inv.Accept(); err != nil {
+		t.Fatalf("Accept: %v", err)
+	}
+	invRepo := &mockInvitationRepository{byID: map[string]*domainGroup.GroupInvitation{"inv1": inv}}
+	uc := newAcceptInviteUseCase(&mockGroupRepository{groups: []*domainGroup.Group{g}}, &mockMemberRepository{}, invRepo, nil)
+
+	_, err := uc.Execute(context.Background(), AcceptInviteInput{
+		GroupID:      "g1",
+		InvitationID: "inv1",
+		CurrentUser:  asContestant("u1"),
+	})
+
+	// An already-accepted invitation keeps the generic code — REVOKED and
+	// EXPIRED are the only statuses that get their own, more specific one.
 	ae, ok := err.(*apperror.AppError)
 	if !ok || ae.Code != domainGroup.ErrCodeInvitationAlreadyProcessed {
 		t.Fatalf("expected INVITATION_ALREADY_PROCESSED, got %v", err)
@@ -145,6 +175,36 @@ func TestAcceptInvite_ExpiredInvitationReturns400AndFlipsStatus(t *testing.T) {
 	tr := invRepo.transitions[0]
 	if tr.id != "inv1" || tr.from != domainGroup.InvitationStatusPending || tr.to != domainGroup.InvitationStatusExpired {
 		t.Errorf("expected transition inv1 PENDING->EXPIRED, got %+v", tr)
+	}
+}
+
+func TestAcceptInvite_AlreadyExpiredInvitationReturns400(t *testing.T) {
+	// Unlike TestAcceptInvite_ExpiredInvitationReturns400AndFlipsStatus (which
+	// covers the lazy-expiry path: still PENDING in the DB, past its
+	// expiresAt), this covers an invitation whose status is ALREADY
+	// EXPIRED — e.g. a second accept attempt on the same stale link after
+	// the first attempt already flipped it. It must hit
+	// invitationNotPendingError's EXPIRED branch, not the generic one.
+	g := inviteGroup(t)
+	inv := domainGroup.RestoreGroupInvitation(
+		"inv1", "g1", nil, shared.RestoreUserID("lead1"),
+		domainGroup.InvitationStatusExpired, testNow, testNow,
+	)
+	invRepo := &mockInvitationRepository{byID: map[string]*domainGroup.GroupInvitation{"inv1": inv}}
+	uc := newAcceptInviteUseCase(&mockGroupRepository{groups: []*domainGroup.Group{g}}, &mockMemberRepository{}, invRepo, nil)
+
+	_, err := uc.Execute(context.Background(), AcceptInviteInput{
+		GroupID:      "g1",
+		InvitationID: "inv1",
+		CurrentUser:  asContestant("u1"),
+	})
+
+	ae, ok := err.(*apperror.AppError)
+	if !ok || ae.Code != domainGroup.ErrCodeInvitationExpired {
+		t.Fatalf("expected INVITATION_EXPIRED, got %v", err)
+	}
+	if ae.Kind != apperror.KindBadRequest {
+		t.Errorf("expected kind BAD_REQUEST, got %s", ae.Kind)
 	}
 }
 
@@ -356,8 +416,8 @@ func TestAcceptInvite_RaceCondition_GeneralInvitationRevokedBeforeTxCommits(t *t
 		t.Fatal("expected WithTx to be called")
 	}
 	ae, ok := err.(*apperror.AppError)
-	if !ok || ae.Code != domainGroup.ErrCodeInvitationAlreadyProcessed {
-		t.Fatalf("expected INVITATION_ALREADY_PROCESSED, got %v", err)
+	if !ok || ae.Code != domainGroup.ErrCodeInvitationRevoked {
+		t.Fatalf("expected INVITATION_REVOKED, got %v", err)
 	}
 	if ae.Kind != apperror.KindConflict {
 		t.Errorf("expected kind CONFLICT, got %s", ae.Kind)

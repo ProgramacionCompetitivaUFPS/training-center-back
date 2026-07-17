@@ -5,9 +5,12 @@ import (
 	"errors"
 	"testing"
 
+	appshared "github.com/training-judge-center/backend/internal/application/shared"
 	domainGroup "github.com/training-judge-center/backend/internal/domain/group"
 	"github.com/training-judge-center/backend/pkg/apperror"
 )
+
+const testFrontendBaseURL = "http://localhost:5173"
 
 func newGenerateInviteUseCase(
 	groupRepo domainGroup.Repository,
@@ -16,12 +19,13 @@ func newGenerateInviteUseCase(
 	nicknameResolver NicknameResolver,
 	emailResolver EmailResolver,
 	userProvider UserProvider,
+	emailSender appshared.EmailSender,
 ) *GenerateInviteUseCase {
-	return NewGenerateInviteUseCase(groupRepo, memberRepo, invitationRepo, nicknameResolver, emailResolver, userProvider, &mockTransactionManager{})
+	return NewGenerateInviteUseCase(groupRepo, memberRepo, invitationRepo, nicknameResolver, emailResolver, userProvider, &mockTransactionManager{}, emailSender, testFrontendBaseURL)
 }
 
 func TestGenerateInvite_EmptyGroupIDReturnsValidationError(t *testing.T) {
-	uc := newGenerateInviteUseCase(&mockGroupRepository{}, &mockMemberRepository{}, &mockInvitationRepository{}, &mockNicknameResolver{}, &mockEmailResolver{}, &mockUserProvider{})
+	uc := newGenerateInviteUseCase(&mockGroupRepository{}, &mockMemberRepository{}, &mockInvitationRepository{}, &mockNicknameResolver{}, &mockEmailResolver{}, &mockUserProvider{}, &mockEmailSender{})
 
 	_, err := uc.Execute(context.Background(), GenerateInviteInput{
 		GroupID:     "",
@@ -38,7 +42,7 @@ func TestGenerateInvite_EmptyGroupIDReturnsValidationError(t *testing.T) {
 }
 
 func TestGenerateInvite_GroupNotFoundReturns404(t *testing.T) {
-	uc := newGenerateInviteUseCase(&mockGroupRepository{}, &mockMemberRepository{}, &mockInvitationRepository{}, &mockNicknameResolver{}, &mockEmailResolver{}, &mockUserProvider{})
+	uc := newGenerateInviteUseCase(&mockGroupRepository{}, &mockMemberRepository{}, &mockInvitationRepository{}, &mockNicknameResolver{}, &mockEmailResolver{}, &mockUserProvider{}, &mockEmailSender{})
 
 	_, err := uc.Execute(context.Background(), GenerateInviteInput{
 		GroupID:     "nonexistent",
@@ -60,6 +64,7 @@ func TestGenerateInvite_CallerNotLeadReturns403(t *testing.T) {
 		&mockNicknameResolver{},
 		&mockEmailResolver{},
 		&mockUserProvider{},
+		&mockEmailSender{},
 	)
 
 	_, err := uc.Execute(context.Background(), GenerateInviteInput{
@@ -85,6 +90,7 @@ func TestGenerateInvite_OpenPolicyReturns400(t *testing.T) {
 		&mockNicknameResolver{},
 		&mockEmailResolver{},
 		&mockUserProvider{},
+		&mockEmailSender{},
 	)
 
 	_, err := uc.Execute(context.Background(), GenerateInviteInput{
@@ -119,7 +125,7 @@ func TestGenerateInvite_PolicyChangedInsideTx_ReturnsBadRequest(t *testing.T) {
 			return fn(ctx)
 		},
 	}
-	uc := NewGenerateInviteUseCase(repo, leadMemberRepo("g1", "u1"), invRepo, &mockNicknameResolver{}, &mockEmailResolver{}, &mockUserProvider{}, txManager)
+	uc := NewGenerateInviteUseCase(repo, leadMemberRepo("g1", "u1"), invRepo, &mockNicknameResolver{}, &mockEmailResolver{}, &mockUserProvider{}, txManager, &mockEmailSender{}, testFrontendBaseURL)
 
 	_, err := uc.Execute(context.Background(), GenerateInviteInput{
 		GroupID:     "g1",
@@ -147,6 +153,7 @@ func TestGenerateInvite_MultipleIdentifiersReturnsValidationError(t *testing.T) 
 		&mockNicknameResolver{},
 		&mockEmailResolver{},
 		&mockUserProvider{},
+		&mockEmailSender{},
 	)
 
 	_, err := uc.Execute(context.Background(), GenerateInviteInput{
@@ -171,6 +178,7 @@ func TestGenerateInvite_NicknameNotFoundReturns404(t *testing.T) {
 		&mockNicknameResolver{}, // no user
 		&mockEmailResolver{},
 		&mockUserProvider{},
+		&mockEmailSender{},
 	)
 
 	_, err := uc.Execute(context.Background(), GenerateInviteInput{
@@ -194,6 +202,7 @@ func TestGenerateInvite_EmailNotFoundReturns404(t *testing.T) {
 		&mockNicknameResolver{},
 		&mockEmailResolver{}, // no user
 		&mockUserProvider{},
+		&mockEmailSender{},
 	)
 
 	_, err := uc.Execute(context.Background(), GenerateInviteInput{
@@ -217,6 +226,7 @@ func TestGenerateInvite_UserIDNotFoundReturns404(t *testing.T) {
 		&mockNicknameResolver{},
 		&mockEmailResolver{},
 		&mockUserProvider{}, // empty displays map
+		&mockEmailSender{},
 	)
 
 	_, err := uc.Execute(context.Background(), GenerateInviteInput{
@@ -241,6 +251,7 @@ func TestGenerateInvite_GeneralInvitationSuccess(t *testing.T) {
 		&mockNicknameResolver{},
 		&mockEmailResolver{},
 		&mockUserProvider{},
+		&mockEmailSender{},
 	)
 
 	out, err := uc.Execute(context.Background(), GenerateInviteInput{
@@ -273,6 +284,7 @@ func TestGenerateInvite_PersonalInvitationByNicknameSuccess(t *testing.T) {
 		&mockNicknameResolver{user: display},
 		&mockEmailResolver{},
 		&mockUserProvider{},
+		&mockEmailSender{},
 	)
 
 	out, err := uc.Execute(context.Background(), GenerateInviteInput{
@@ -303,6 +315,7 @@ func TestGenerateInvite_PersonalInvitationByEmailSuccess(t *testing.T) {
 		&mockNicknameResolver{},
 		&mockEmailResolver{user: display},
 		&mockUserProvider{},
+		&mockEmailSender{},
 	)
 
 	out, err := uc.Execute(context.Background(), GenerateInviteInput{
@@ -330,6 +343,7 @@ func TestGenerateInvite_PersonalInvitationByUserIDSuccess(t *testing.T) {
 		&mockNicknameResolver{},
 		&mockEmailResolver{},
 		&mockUserProvider{displays: map[string]*UserDisplay{"invitee-3": display}},
+		&mockEmailSender{},
 	)
 
 	out, err := uc.Execute(context.Background(), GenerateInviteInput{
@@ -362,6 +376,7 @@ func TestGenerateInvite_ExistingPendingInvitationIsRevokedThenNewCreated(t *test
 		&mockNicknameResolver{user: display},
 		&mockEmailResolver{},
 		&mockUserProvider{},
+		&mockEmailSender{},
 	)
 
 	out, err := uc.Execute(context.Background(), GenerateInviteInput{
@@ -398,6 +413,7 @@ func TestGenerateInvite_SaveFailurePropagatesError(t *testing.T) {
 		&mockNicknameResolver{},
 		&mockEmailResolver{},
 		&mockUserProvider{},
+		&mockEmailSender{},
 	)
 
 	_, err := uc.Execute(context.Background(), GenerateInviteInput{
@@ -420,6 +436,7 @@ func TestGenerateInvite_AdminBypassesMemberCheck(t *testing.T) {
 		&mockNicknameResolver{},
 		&mockEmailResolver{},
 		&mockUserProvider{},
+		&mockEmailSender{},
 	)
 
 	_, err := uc.Execute(context.Background(), GenerateInviteInput{
@@ -449,6 +466,7 @@ func TestGenerateInvite_ShapeInviteeIDByUserIDMatchesInput(t *testing.T) {
 		&mockNicknameResolver{},
 		&mockEmailResolver{},
 		&mockUserProvider{displays: map[string]*UserDisplay{"invitee-4": display}},
+		&mockEmailSender{},
 	)
 
 	out, err := uc.Execute(context.Background(), GenerateInviteInput{
@@ -462,5 +480,103 @@ func TestGenerateInvite_ShapeInviteeIDByUserIDMatchesInput(t *testing.T) {
 	}
 	if out.Invitation.InviteeID == nil || *out.Invitation.InviteeID != "invitee-4" {
 		t.Errorf("expected InviteeID = invitee-4, got %v", out.Invitation.InviteeID)
+	}
+}
+
+func TestGenerateInvite_TargetedInvite_SendsEmail(t *testing.T) {
+	g := inviteGroup(t)
+	invRepo := &mockInvitationRepository{}
+	display := &UserDisplay{ID: "invitee-1", Nickname: "bob", Name: "Bob", Email: "bob@example.com"}
+	emailSender := &mockEmailSender{}
+	uc := newGenerateInviteUseCase(
+		&mockGroupRepository{groups: []*domainGroup.Group{g}},
+		leadMemberRepo("g1", "u1"),
+		invRepo,
+		&mockNicknameResolver{user: display},
+		&mockEmailResolver{},
+		&mockUserProvider{},
+		emailSender,
+	)
+
+	_, err := uc.Execute(context.Background(), GenerateInviteInput{
+		GroupID:      "g1",
+		UserNickname: "bob",
+		CurrentUser:  asContestant("u1"),
+	})
+
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(emailSender.sentMsgs) != 1 {
+		t.Fatalf("expected 1 email sent, got %d", len(emailSender.sentMsgs))
+	}
+	if emailSender.sentMsgs[0].To != display.Email {
+		t.Errorf("expected email To = %s, got %s", display.Email, emailSender.sentMsgs[0].To)
+	}
+}
+
+func TestGenerateInvite_GeneralInvite_DoesNotSendEmail(t *testing.T) {
+	g := inviteGroup(t)
+	invRepo := &mockInvitationRepository{}
+	emailSender := &mockEmailSender{}
+	uc := newGenerateInviteUseCase(
+		&mockGroupRepository{groups: []*domainGroup.Group{g}},
+		leadMemberRepo("g1", "u1"),
+		invRepo,
+		&mockNicknameResolver{},
+		&mockEmailResolver{},
+		&mockUserProvider{},
+		emailSender,
+	)
+
+	_, err := uc.Execute(context.Background(), GenerateInviteInput{
+		GroupID:     "g1",
+		CurrentUser: asContestant("u1"),
+	})
+
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(emailSender.sentMsgs) != 0 {
+		t.Errorf("expected no email sent for a general invitation, got %d", len(emailSender.sentMsgs))
+	}
+}
+
+func TestGenerateInvite_EmailSendFails_ReturnsServiceUnavailable(t *testing.T) {
+	g := inviteGroup(t)
+	invRepo := &mockInvitationRepository{}
+	display := &UserDisplay{ID: "invitee-1", Nickname: "bob", Name: "Bob", Email: "bob@example.com"}
+	emailSender := &mockEmailSender{
+		sendFn: func(_ context.Context, _ appshared.EmailMessage) error {
+			return errors.New("smtp down")
+		},
+	}
+	uc := newGenerateInviteUseCase(
+		&mockGroupRepository{groups: []*domainGroup.Group{g}},
+		leadMemberRepo("g1", "u1"),
+		invRepo,
+		&mockNicknameResolver{user: display},
+		&mockEmailResolver{},
+		&mockUserProvider{},
+		emailSender,
+	)
+
+	_, err := uc.Execute(context.Background(), GenerateInviteInput{
+		GroupID:      "g1",
+		UserNickname: "bob",
+		CurrentUser:  asContestant("u1"),
+	})
+
+	ae, ok := err.(*apperror.AppError)
+	if !ok || ae.Code != ErrCodeEmailDeliveryFailed {
+		t.Fatalf("expected EMAIL_DELIVERY_FAILED, got %v", err)
+	}
+	if ae.Kind != apperror.KindServiceUnavailable {
+		t.Errorf("expected kind SERVICE_UNAVAILABLE, got %s", ae.Kind)
+	}
+	// Commit happens before the email attempt (see generate_invite.go) — the
+	// invitation should remain persisted despite the send failure.
+	if len(invRepo.savedInvitations) != 1 {
+		t.Errorf("expected the invitation to remain persisted despite the email failure, got %d saved", len(invRepo.savedInvitations))
 	}
 }

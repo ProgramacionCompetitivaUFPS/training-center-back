@@ -9,6 +9,7 @@ import (
 
 	"github.com/training-judge-center/backend/internal/adapter/http/middleware"
 	appGroup "github.com/training-judge-center/backend/internal/application/group"
+	appshared "github.com/training-judge-center/backend/internal/application/shared"
 	domainGroup "github.com/training-judge-center/backend/internal/domain/group"
 	"github.com/training-judge-center/backend/internal/domain/shared"
 	domainUser "github.com/training-judge-center/backend/internal/domain/user"
@@ -194,6 +195,12 @@ func (s *mockEmailResolver) ResolveByEmail(_ context.Context, _ string) (*appGro
 
 // â”€â”€ other stubs â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
+type mockEmailSender struct{}
+
+func (s *mockEmailSender) Send(_ context.Context, _ appshared.EmailMessage) error {
+	return nil
+}
+
 type mockUserProvider struct{}
 
 func (s *mockUserProvider) GetDisplays(_ context.Context, _ []string) (map[string]*appGroup.UserDisplay, error) {
@@ -280,10 +287,11 @@ func mockHandler() *Handler {
 		appGroup.NewListJoinRequestsUseCase(memberRepo, joinRequestRepo, &mockUserProvider{}),
 		appGroup.NewGetMyRequestUseCase(joinRequestRepo),
 		appGroup.NewCancelMyRequestUseCase(joinRequestRepo),
-		appGroup.NewGenerateInviteUseCase(repo, memberRepo, invitationRepo, &mockNicknameResolver{}, &mockEmailResolver{}, &mockUserProvider{}, txMgr),
+		appGroup.NewGenerateInviteUseCase(repo, memberRepo, invitationRepo, &mockNicknameResolver{}, &mockEmailResolver{}, &mockUserProvider{}, txMgr, &mockEmailSender{}, "http://localhost:5173"),
 		appGroup.NewAcceptInviteUseCase(repo, memberRepo, invitationRepo, txMgr),
 		appGroup.NewListGroupInvitationsUseCase(memberRepo, invitationRepo, &mockUserProvider{}),
 		appGroup.NewRevokeInvitationUseCase(memberRepo, invitationRepo),
+		appGroup.NewInviteByNicknamesUseCase(repo, memberRepo, invitationRepo, &mockNicknameResolver{}, txMgr, &mockEmailSender{}, "http://localhost:5173"),
 		nil, /* addMember */
 		nil, /* removeMember */
 		nil, /* changeRole */

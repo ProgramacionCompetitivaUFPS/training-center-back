@@ -5,6 +5,7 @@ import (
 	"testing"
 	"time"
 
+	appshared "github.com/training-judge-center/backend/internal/application/shared"
 	domainGroup "github.com/training-judge-center/backend/internal/domain/group"
 	"github.com/training-judge-center/backend/internal/domain/shared"
 	"github.com/training-judge-center/backend/internal/testutil"
@@ -320,6 +321,21 @@ type mockEmailResolver struct {
 
 func (m *mockEmailResolver) ResolveByEmail(_ context.Context, _ string) (*UserDisplay, error) {
 	return m.user, m.err
+}
+
+// ── mockEmailSender ────────────────────────────────────────────────────────────
+
+type mockEmailSender struct {
+	sendFn   func(ctx context.Context, msg appshared.EmailMessage) error
+	sentMsgs []appshared.EmailMessage
+}
+
+func (m *mockEmailSender) Send(ctx context.Context, msg appshared.EmailMessage) error {
+	m.sentMsgs = append(m.sentMsgs, msg)
+	if m.sendFn != nil {
+		return m.sendFn(ctx, msg)
+	}
+	return nil
 }
 
 // ── mockPreferencesReader ─────────────────────────────────────────────────────

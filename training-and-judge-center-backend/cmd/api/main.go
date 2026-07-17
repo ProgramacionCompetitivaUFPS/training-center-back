@@ -243,10 +243,11 @@ func main() {
 	getMyRequestUseCase := appGroup.NewGetMyRequestUseCase(joinRequestRepo)
 	cancelMyRequestUseCase := appGroup.NewCancelMyRequestUseCase(joinRequestRepo)
 
-	generateInviteUseCase := appGroup.NewGenerateInviteUseCase(groupRepo, groupMemberRepo, groupInvitationRepo, groupNicknameResolver, groupEmailResolver, groupUserProvider, txManager)
+	generateInviteUseCase := appGroup.NewGenerateInviteUseCase(groupRepo, groupMemberRepo, groupInvitationRepo, groupNicknameResolver, groupEmailResolver, groupUserProvider, txManager, emailSender, cfg.FrontendBaseURL)
 	acceptInviteUseCase := appGroup.NewAcceptInviteUseCase(groupRepo, groupMemberRepo, groupInvitationRepo, txManager)
 	listGroupInvitationsUseCase := appGroup.NewListGroupInvitationsUseCase(groupMemberRepo, groupInvitationRepo, groupUserProvider)
 	revokeInvitationUseCase := appGroup.NewRevokeInvitationUseCase(groupMemberRepo, groupInvitationRepo)
+	inviteByNicknamesUseCase := appGroup.NewInviteByNicknamesUseCase(groupRepo, groupMemberRepo, groupInvitationRepo, groupNicknameResolver, txManager, emailSender, cfg.FrontendBaseURL)
 
 	addMemberUseCase := appGroup.NewAddMemberUseCase(groupRepo, groupMemberRepo, groupNicknameResolver)
 	groupContestCleaner := group.NewContestRegistrationCleaner(dbPool)
@@ -264,7 +265,7 @@ func main() {
 		joinGroupUseCase,
 		requestJoinUseCase, approveRequestUseCase, rejectRequestUseCase,
 		listJoinRequestsUseCase, getMyRequestUseCase, cancelMyRequestUseCase,
-		generateInviteUseCase, acceptInviteUseCase, listGroupInvitationsUseCase, revokeInvitationUseCase,
+		generateInviteUseCase, acceptInviteUseCase, listGroupInvitationsUseCase, revokeInvitationUseCase, inviteByNicknamesUseCase,
 		addMemberUseCase, removeMemberUseCase, changeRoleUseCase, leaveGroupUseCase, listMembersUseCase,
 		deleteGroupUseCase,
 		updateGroupUseCase,

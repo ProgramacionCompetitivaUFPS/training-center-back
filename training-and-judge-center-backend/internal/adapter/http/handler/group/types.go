@@ -214,6 +214,29 @@ type listGroupInvitationsResponse struct {
 	Pagination  paginationResp           `json:"pagination"`
 }
 
+type inviteByNicknamesReq struct {
+	Nicknames []string `json:"nicknames"`
+}
+
+type invitationSummaryResp struct {
+	ID        string `json:"id"`
+	Status    string `json:"status"`
+	ExpiresAt string `json:"expiresAt"`
+	CreatedAt string `json:"createdAt"`
+}
+
+type inviteByNicknamesResultResp struct {
+	Nickname   string                 `json:"nickname"`
+	Status     string                 `json:"status"`
+	Invitation *invitationSummaryResp `json:"invitation,omitempty"`
+	Invitee    *requesterResp         `json:"invitee,omitempty"`
+	Reason     string                 `json:"reason,omitempty"`
+}
+
+type inviteByNicknamesResponse struct {
+	Results []inviteByNicknamesResultResp `json:"results"`
+}
+
 // ── Delete group endpoint ─────────────────────────────────────────────────────
 
 type deleteGroupReq struct {
