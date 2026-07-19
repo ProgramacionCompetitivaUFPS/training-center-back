@@ -9,10 +9,11 @@ import (
 	"github.com/training-judge-center/backend/pkg/apperror"
 )
 
-// ProblemsSolvedProvider implements application/user.ProblemsSolvedProvider.
 type ProblemsSolvedProvider struct {
 	db infraPostgres.Querier
 }
+
+var _ appuser.ProblemsSolvedProvider = (*ProblemsSolvedProvider)(nil)
 
 func NewProblemsSolvedProvider(db infraPostgres.Querier) *ProblemsSolvedProvider {
 	return &ProblemsSolvedProvider{db: db}
@@ -20,9 +21,12 @@ func NewProblemsSolvedProvider(db infraPostgres.Querier) *ProblemsSolvedProvider
 
 // GetProblemsSolved computes the user's count of unique problems with at
 // least one ACCEPTED submission.
+//
+// This duplicates the "unique problems solved" computation embedded in
+// adapter/user/ranking_provider.go (GetRanking) — kept separate on purpose so
+// this cheap query doesn't pay the cost of the ranking CTE. If the definition
+// of "solved" ever changes, update both.
 func (p *ProblemsSolvedProvider) GetProblemsSolved(ctx context.Context, userID string) (int, error) {
-	_ = appuser.ProblemsSolvedProvider(p) // compile-time interface check
-
 	q := infraPostgres.GetQuerier(ctx, p.db)
 
 	row := q.QueryRow(ctx, `

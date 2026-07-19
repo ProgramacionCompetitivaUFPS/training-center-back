@@ -8,16 +8,15 @@ import (
 	"github.com/training-judge-center/backend/pkg/apperror"
 )
 
-// StatsProvider implements application/user.SubmissionStatsProvider.
-type StatsProvider struct {
+type SubmissionStatsProvider struct {
 	db infraPostgres.Querier
 }
 
-func NewStatsProvider(db infraPostgres.Querier) *StatsProvider {
-	return &StatsProvider{db: db}
+func NewSubmissionStatsProvider(db infraPostgres.Querier) *SubmissionStatsProvider {
+	return &SubmissionStatsProvider{db: db}
 }
 
-func (p *StatsProvider) GetSubmissionCounts(ctx context.Context, userID string) (total int, accepted int, err error) {
+func (p *SubmissionStatsProvider) GetSubmissionCounts(ctx context.Context, userID string) (total int, accepted int, err error) {
 	q := infraPostgres.GetQuerier(ctx, p.db)
 
 	row := q.QueryRow(ctx, `

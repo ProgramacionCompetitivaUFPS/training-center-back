@@ -4,24 +4,25 @@ import (
 	"context"
 	"log/slog"
 
-	"github.com/jackc/pgx/v5/pgxpool"
+	infraPostgres "github.com/training-judge-center/backend/internal/adapter/postgres"
 	appuser "github.com/training-judge-center/backend/internal/application/user"
 	"github.com/training-judge-center/backend/pkg/apperror"
 )
 
-// StatsProvider implements application/user.TopicStatsProvider.
-type StatsProvider struct {
-	db *pgxpool.Pool
+type TopicStatsProvider struct {
+	db infraPostgres.Querier
 }
 
-func NewStatsProvider(db *pgxpool.Pool) *StatsProvider {
-	return &StatsProvider{db: db}
+func NewTopicStatsProvider(db infraPostgres.Querier) *TopicStatsProvider {
+	return &TopicStatsProvider{db: db}
 }
 
 // GetTopicBreakdown returns, for each tag on a problem the user solved, the
 // count of unique problems solved carrying that tag, ordered by count descending.
-func (p *StatsProvider) GetTopicBreakdown(ctx context.Context, userID string) ([]appuser.TopicStat, error) {
-	rows, err := p.db.Query(ctx, `
+func (p *TopicStatsProvider) GetTopicBreakdown(ctx context.Context, userID string) ([]appuser.TopicStat, error) {
+	q := infraPostgres.GetQuerier(ctx, p.db)
+
+	rows, err := q.Query(ctx, `
 		SELECT tag, COUNT(DISTINCT p.id)::INTEGER AS solved
 		FROM problems p, unnest(p.tags) AS tag
 		WHERE p.id IN (

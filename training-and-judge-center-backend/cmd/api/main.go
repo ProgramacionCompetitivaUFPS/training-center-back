@@ -218,9 +218,9 @@ func main() {
 
 	// user profile stats adapters
 	rankingProvider := user.NewRankingProvider(dbPool)
-	submissionStatsProvider := adaptersubmission.NewStatsProvider(dbPool)
-	contestParticipationProvider := adaptercontest.NewStatsProvider(dbPool)
-	topicStatsProvider := problem.NewStatsProvider(dbPool)
+	submissionStatsProvider := adaptersubmission.NewSubmissionStatsProvider(dbPool)
+	contestParticipationProvider := adaptercontest.NewContestParticipationProvider(dbPool)
+	topicStatsProvider := problem.NewTopicStatsProvider(dbPool)
 
 	// user profile stats use case
 	getProfileStatsUseCase := appuser.NewGetProfileStatsUseCase(rankingProvider, submissionStatsProvider, contestParticipationProvider, topicStatsProvider)

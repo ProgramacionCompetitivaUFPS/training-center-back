@@ -8,18 +8,17 @@ import (
 	"github.com/training-judge-center/backend/pkg/apperror"
 )
 
-// StatsProvider implements application/user.ContestParticipationProvider.
-type StatsProvider struct {
+type ContestParticipationProvider struct {
 	db infraPostgres.Querier
 }
 
-func NewStatsProvider(db infraPostgres.Querier) *StatsProvider {
-	return &StatsProvider{db: db}
+func NewContestParticipationProvider(db infraPostgres.Querier) *ContestParticipationProvider {
+	return &ContestParticipationProvider{db: db}
 }
 
 // GetContestsParticipatedCount counts distinct contests the user is or was
 // registered to, individually or as part of a team, regardless of status.
-func (p *StatsProvider) GetContestsParticipatedCount(ctx context.Context, userID string) (int, error) {
+func (p *ContestParticipationProvider) GetContestsParticipatedCount(ctx context.Context, userID string) (int, error) {
 	q := infraPostgres.GetQuerier(ctx, p.db)
 
 	row := q.QueryRow(ctx, `
