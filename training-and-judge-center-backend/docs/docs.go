@@ -2009,7 +2009,7 @@ const docTemplate = `{
                 "tags": [
                     "groups"
                 ],
-                "summary": "Generate a group invitation",
+                "summary": "Generate a group invitation (sends an email to the invitee, if any)",
                 "parameters": [
                     {
                         "type": "string",
@@ -2054,6 +2054,12 @@ const docTemplate = `{
                     },
                     "404": {
                         "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/apperror.AppError"
+                        }
+                    },
+                    "503": {
+                        "description": "Service Unavailable",
                         "schema": {
                             "$ref": "#/definitions/apperror.AppError"
                         }
@@ -2129,6 +2135,69 @@ const docTemplate = `{
                     },
                     "409": {
                         "description": "Conflict",
+                        "schema": {
+                            "$ref": "#/definitions/apperror.AppError"
+                        }
+                    }
+                }
+            }
+        },
+        "/groups/{groupId}/invitations/targeted": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "groups"
+                ],
+                "summary": "Send targeted invitations by nickname (batch, best-effort)",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Group ID",
+                        "name": "groupId",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "List of nicknames to invite",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/group.inviteByNicknamesReq"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/group.inviteByNicknamesResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/apperror.AppError"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/apperror.AppError"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
                         "schema": {
                             "$ref": "#/definitions/apperror.AppError"
                         }
@@ -6710,6 +6779,65 @@ const docTemplate = `{
                 }
             }
         },
+        "group.invitationSummaryResp": {
+            "type": "object",
+            "properties": {
+                "createdAt": {
+                    "type": "string"
+                },
+                "expiresAt": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "status": {
+                    "type": "string"
+                }
+            }
+        },
+        "group.inviteByNicknamesReq": {
+            "type": "object",
+            "properties": {
+                "nicknames": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                }
+            }
+        },
+        "group.inviteByNicknamesResponse": {
+            "type": "object",
+            "properties": {
+                "results": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/group.inviteByNicknamesResultResp"
+                    }
+                }
+            }
+        },
+        "group.inviteByNicknamesResultResp": {
+            "type": "object",
+            "properties": {
+                "invitation": {
+                    "$ref": "#/definitions/group.invitationSummaryResp"
+                },
+                "invitee": {
+                    "$ref": "#/definitions/group.requesterResp"
+                },
+                "nickname": {
+                    "type": "string"
+                },
+                "reason": {
+                    "type": "string"
+                },
+                "status": {
+                    "type": "string"
+                }
+            }
+        },
         "group.joinGroupResponse": {
             "type": "object",
             "properties": {
@@ -8390,7 +8518,7 @@ const docTemplate = `{
                 "name": {
                     "type": "string"
                 },
-                "startTime": {
+                "startDate": {
                     "type": "string"
                 }
             }

@@ -22,7 +22,7 @@ type submissionResp struct {
 type contestSummary struct {
 	ID              string `json:"id"`
 	Name            string `json:"name"`
-	StartTime       string `json:"startTime"`
+	StartTime       string `json:"startDate"`
 	DurationMinutes int    `json:"durationMinutes"`
 	GroupID         string `json:"groupId"`
 	GroupName       string `json:"groupName"`
