@@ -21,11 +21,7 @@ func NewRankingProvider(db infraPostgres.Querier) *RankingProvider {
 
 // GetRanking computes the user's unique problems solved, their global rank
 // (1-based position by problems solved), and the total number of active users.
-//
-// The "unique problems solved" computation here duplicates the one in
-// adapter/user/problems_solved_provider.go (GetProblemsSolved) — kept separate
-// on purpose so /dashboard doesn't pay the cost of this ranking query. If the
-// definition of "solved" ever changes, update both.
+// Same "solved" logic as ProblemsSolvedProvider.GetProblemsSolved — keep in sync.
 func (p *RankingProvider) GetRanking(ctx context.Context, userID string) (problemsSolved int, position *int, totalUsers int, err error) {
 	q := infraPostgres.GetQuerier(ctx, p.db)
 

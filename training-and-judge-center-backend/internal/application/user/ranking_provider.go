@@ -2,10 +2,8 @@ package user
 
 import "context"
 
-// RankingProvider computes the user's global ranking stats. Intentionally
-// separate from ProblemsSolvedProvider — this data is used only by the
-// profile stats endpoint, which is expected to compute more expensive,
-// slow-changing statistics that the dashboard never needs.
+// RankingProvider is kept separate from ProblemsSolvedProvider so /dashboard
+// doesn't pay the cost of this ranking query on every load.
 type RankingProvider interface {
 	// GetRanking returns:
 	//   - problemsSolved: count of unique problems with at least one ACCEPTED submission

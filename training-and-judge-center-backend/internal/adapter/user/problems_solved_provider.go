@@ -21,11 +21,7 @@ func NewProblemsSolvedProvider(db infraPostgres.Querier) *ProblemsSolvedProvider
 
 // GetProblemsSolved computes the user's count of unique problems with at
 // least one ACCEPTED submission.
-//
-// This duplicates the "unique problems solved" computation embedded in
-// adapter/user/ranking_provider.go (GetRanking) — kept separate on purpose so
-// this cheap query doesn't pay the cost of the ranking CTE. If the definition
-// of "solved" ever changes, update both.
+// Same "solved" logic as RankingProvider.GetRanking — keep in sync.
 func (p *ProblemsSolvedProvider) GetProblemsSolved(ctx context.Context, userID string) (int, error) {
 	q := infraPostgres.GetQuerier(ctx, p.db)
 

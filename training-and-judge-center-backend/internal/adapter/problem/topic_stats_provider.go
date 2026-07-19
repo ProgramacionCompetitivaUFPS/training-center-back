@@ -17,8 +17,7 @@ func NewTopicStatsProvider(db infraPostgres.Querier) *TopicStatsProvider {
 	return &TopicStatsProvider{db: db}
 }
 
-// GetTopicBreakdown returns, for each tag on a problem the user solved, the
-// count of unique problems solved carrying that tag, ordered by count descending.
+// GetTopicBreakdown counts solved problems (ACCEPTED) per tag, ordered by count descending.
 func (p *TopicStatsProvider) GetTopicBreakdown(ctx context.Context, userID string) ([]appuser.TopicStat, error) {
 	q := infraPostgres.GetQuerier(ctx, p.db)
 
