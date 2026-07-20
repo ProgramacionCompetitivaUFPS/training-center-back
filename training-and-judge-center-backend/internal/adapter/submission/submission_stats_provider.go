@@ -5,12 +5,15 @@ import (
 	"log/slog"
 
 	infraPostgres "github.com/training-judge-center/backend/internal/adapter/postgres"
+	appuser "github.com/training-judge-center/backend/internal/application/user"
 	"github.com/training-judge-center/backend/pkg/apperror"
 )
 
 type SubmissionStatsProvider struct {
 	db infraPostgres.Querier
 }
+
+var _ appuser.SubmissionStatsProvider = (*SubmissionStatsProvider)(nil)
 
 func NewSubmissionStatsProvider(db infraPostgres.Querier) *SubmissionStatsProvider {
 	return &SubmissionStatsProvider{db: db}

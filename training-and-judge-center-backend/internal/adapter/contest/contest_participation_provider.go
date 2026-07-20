@@ -5,12 +5,15 @@ import (
 	"log/slog"
 
 	infraPostgres "github.com/training-judge-center/backend/internal/adapter/postgres"
+	appuser "github.com/training-judge-center/backend/internal/application/user"
 	"github.com/training-judge-center/backend/pkg/apperror"
 )
 
 type ContestParticipationProvider struct {
 	db infraPostgres.Querier
 }
+
+var _ appuser.ContestParticipationProvider = (*ContestParticipationProvider)(nil)
 
 func NewContestParticipationProvider(db infraPostgres.Querier) *ContestParticipationProvider {
 	return &ContestParticipationProvider{db: db}

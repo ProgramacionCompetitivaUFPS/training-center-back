@@ -13,6 +13,8 @@ type TopicStatsProvider struct {
 	db infraPostgres.Querier
 }
 
+var _ appuser.TopicStatsProvider = (*TopicStatsProvider)(nil)
+
 func NewTopicStatsProvider(db infraPostgres.Querier) *TopicStatsProvider {
 	return &TopicStatsProvider{db: db}
 }
