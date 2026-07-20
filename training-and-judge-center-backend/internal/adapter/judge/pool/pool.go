@@ -63,6 +63,13 @@ func (p *Pool) Stop() {
 	<-p.done
 }
 
+// IsHealthy reports whether the Docker daemon backing the pool is reachable.
+// A false result means the pool cannot create or run containers anymore.
+func (p *Pool) IsHealthy(ctx context.Context) bool {
+	_, err := p.docker.Ping(ctx, client.PingOptions{})
+	return err == nil
+}
+
 // The caller must Release the returned container when done.
 //
 // Algorithm:

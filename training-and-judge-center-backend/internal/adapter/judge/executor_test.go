@@ -169,6 +169,10 @@ func (m *mockPoolDockerClient) ContainerRemove(_ context.Context, _ string, _ cl
 	return client.ContainerRemoveResult{}, nil
 }
 
+func (m *mockPoolDockerClient) Ping(_ context.Context, _ client.PingOptions) (client.PingResult, error) {
+	return client.PingResult{}, nil
+}
+
 // --- test setup ---
 
 const (
