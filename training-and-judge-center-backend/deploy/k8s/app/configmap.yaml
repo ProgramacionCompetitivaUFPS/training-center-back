@@ -17,5 +17,5 @@ data:
   SMTP_PORT: "587"
   SMTP_USER: trainingcenter.ufps@gmail.com
   SMTP_FROM: Training Center <trainingcenter.ufps@gmail.com>
-  ALLOWED_ORIGINS: http://localhost:5173,https://training-and-judge-center-frontend.vercel.app
+  ALLOWED_ORIGINS: http://localhost:5173,https://training-and-judge-center-frontend.vercel.app,https://trainingjudgecenter.com,https://www.trainingjudgecenter.com
   FRONTEND_BASE_URL: https://training-and-judge-center-frontend.vercel.app
