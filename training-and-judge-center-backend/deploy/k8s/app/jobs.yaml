@@ -1,4 +1,4 @@
-apiVersion: batch/v1
+﻿apiVersion: batch/v1
 kind: Job
 metadata:
   name: migrate
@@ -10,7 +10,7 @@ spec:
       restartPolicy: Never
       containers:
         - name: migrate
-          image: us-east1-docker.pkg.dev/training-center-502916/training-center/backend:v0.1.1
+          image: us-east1-docker.pkg.dev/training-center-502916/training-center/backend:v0.2.0
           command: ["/bin/migrate", "up"]
           envFrom:
             - configMapRef:
@@ -39,7 +39,7 @@ spec:
       restartPolicy: Never
       containers:
         - name: seed
-          image: us-east1-docker.pkg.dev/training-center-502916/training-center/backend:v0.1.1
+          image: us-east1-docker.pkg.dev/training-center-502916/training-center/backend:v0.2.0
           command: ["/bin/seed"]
           envFrom:
             - configMapRef:
