@@ -119,8 +119,8 @@ Pod con 4 CPUs → semáforo de 3. Pod con 8 CPUs → semáforo de 7. Si se camb
 
 Sin la reserva, 4 judgings a CPU llena + worker comparando salidas + daemon creando execs
 compiten por 4 cores: el scheduler roba ciclos a procesos de estudiantes mientras su reloj corre.
-La reserva hace la contención *rara*; la medición por tiempo de CPU (ver EXECUTOR_ADAPTER_PLAN,
-RunTestCase) hace que la contención residual sea *inofensiva para el veredicto*. Defensa en profundidad.
+La reserva hace la contención *rara*; la medición por tiempo de CPU (§7) hace que la
+contención residual sea *inofensiva para el veredicto*. Defensa en profundidad.
 
 La concurrencia real queda acotada por el mínimo de ambos recursos:
 
@@ -504,32 +504,40 @@ for _, tc := range testCases {
 ```
 1. CopyToContainer: input → container:/sandbox/input.txt
 
-2. exec: sh -c 'timeout --kill-after=1s {limitSeconds}s
+2. ContainerStats (pre): cpuBeforeNs ← acumulado de CPU del cgroup del container
+
+3. exec: sh -c 'timeout --kill-after=1s {wallBackstopSeconds}s        ← 2× el límite, mín 2s
                 /sandbox/solution < /sandbox/input.txt > /sandbox/output.txt 2>/dev/null'
-         Go context: context.WithTimeout(timeLimit × 2)   ← safety net
+         Go context: context.WithTimeout(wallBackstop + 2s)   ← safety net
          captura: exit code
 
-3. CopyFromContainer: container:/sandbox/output.txt → worker (truncado a 64MB)
+4. ContainerStats (post): cpuAfterNs + memoria pico
+   TimeMs = (cpuAfterNs − cpuBeforeNs) / 1e6                  ← el reloj del veredicto
 
-4. exec: rm /sandbox/input.txt /sandbox/output.txt
+5. CopyFromContainer: container:/sandbox/output.txt → worker (truncado a 64MB)
+
+6. exec: rm /sandbox/input.txt /sandbox/output.txt
          limpia entre test cases, el binario se conserva para el siguiente
 ```
 
-#### Timeout: dos capas con responsabilidades distintas
+#### Medición y límites: tres capas con responsabilidades distintas
 
 | Capa | Mecanismo | Se activa | Propósito |
 |---|---|---|---|
-| Primaria | `timeout` command dentro del container | A los `timeLimit` segundos | Da el veredicto TLE al usuario |
-| Safety net | `context.WithTimeout(timeLimit × 2)` de Go | Si el exec no retorna | Protege la infraestructura del worker |
+| **Veredicto (juez)** | Delta de CPU del cgroup vía `ContainerStats` | `TimeMs > timeLimit`, aunque exit sea 0 | TLE justo: este reloj no avanza cuando el scheduler aparca al proceso — inmune a contención de vecinos |
+| Backstop de pared | `timeout` a 2× el límite, dentro del container | Procesos colgados o dormidos que nunca acumulan CPU | Libera el slot; exit 124 → TLE |
+| Safety net | `context.WithTimeout` de Go | Si el exec no retorna | Protege la infraestructura del worker |
 
+El delta de CPU es limpio porque cada container está reclamado en exclusiva por un judging (§4).
 El safety net nunca debería activarse en operación normal. Si se activa, es señal de fallo de infraestructura — el container se marca como dañado, se destruye, y la submission recibe `SYSTEM_ERROR`.
 
-Exit codes del `timeout` command:
+Veredicto por exit code + reloj de CPU (la comparación `TimeMs > timeLimit` la hace la capa de aplicación):
 ```
-124 → TLE (tiempo agotado)
-137 → MLE (proceso matado por cgroup, OOM)
-0   → éxito
-otro → RUNTIME_EXCEPTION
+124                       → TLE (backstop de pared: proceso colgado/dormido)
+137                       → MLE (proceso matado por cgroup, OOM)
+0 y TimeMs > timeLimit    → TLE (por CPU)
+0 y TimeMs ≤ timeLimit    → éxito (el output checker decide AC/WA)
+otro                      → RUNTIME_EXCEPTION
 ```
 
 #### Memoria: dos concerns distintos
