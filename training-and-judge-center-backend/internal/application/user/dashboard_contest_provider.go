@@ -23,6 +23,8 @@ type DashboardContest struct {
 	Name            string
 	StartTime       time.Time
 	DurationMinutes int
+	GroupID         string
+	GroupName       string
 }
 
 type DashboardContestResult struct {

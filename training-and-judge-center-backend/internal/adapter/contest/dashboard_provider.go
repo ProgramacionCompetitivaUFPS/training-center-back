@@ -33,8 +33,11 @@ func (p *DashboardProvider) GetUpcomingContests(ctx context.Context, userID stri
 		SELECT c.id,
 		       c.name,
 		       c.start_time,
-		       EXTRACT(EPOCH FROM (c.end_time - c.start_time))::INTEGER / 60 AS duration_minutes
+		       EXTRACT(EPOCH FROM (c.end_time - c.start_time))::INTEGER / 60 AS duration_minutes,
+		       g.id,
+		       g.name
 		FROM contests c
+		JOIN groups g ON g.id = c.group_id
 		WHERE c.start_time > NOW()
 		  AND `+participationFilter+`
 		ORDER BY c.start_time ASC
@@ -56,8 +59,11 @@ func (p *DashboardProvider) GetActiveContests(ctx context.Context, userID string
 		SELECT c.id,
 		       c.name,
 		       c.start_time,
-		       EXTRACT(EPOCH FROM (c.end_time - c.start_time))::INTEGER / 60 AS duration_minutes
+		       EXTRACT(EPOCH FROM (c.end_time - c.start_time))::INTEGER / 60 AS duration_minutes,
+		       g.id,
+		       g.name
 		FROM contests c
+		JOIN groups g ON g.id = c.group_id
 		WHERE c.start_time <= NOW()
 		  AND c.end_time   >= NOW()
 		  AND `+participationFilter+`
@@ -187,7 +193,7 @@ func scanContests(ctx context.Context, rows contestRows) ([]appuser.DashboardCon
 	var result []appuser.DashboardContest
 	for rows.Next() {
 		var c appuser.DashboardContest
-		if err := rows.Scan(&c.ID, &c.Name, &c.StartTime, &c.DurationMinutes); err != nil {
+		if err := rows.Scan(&c.ID, &c.Name, &c.StartTime, &c.DurationMinutes, &c.GroupID, &c.GroupName); err != nil {
 			slog.ErrorContext(ctx, "dashboard: failed to scan contest row", "error", err)
 			return nil, apperror.NewInternal()
 		}

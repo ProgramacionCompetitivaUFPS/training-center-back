@@ -9,20 +9,20 @@ import (
 	"github.com/training-judge-center/backend/pkg/apperror"
 )
 
-// DashboardRankingProvider implements application/user.DashboardRankingProvider.
-type DashboardRankingProvider struct {
+type RankingProvider struct {
 	db infraPostgres.Querier
 }
 
-func NewDashboardRankingProvider(db infraPostgres.Querier) *DashboardRankingProvider {
-	return &DashboardRankingProvider{db: db}
+var _ appuser.RankingProvider = (*RankingProvider)(nil)
+
+func NewRankingProvider(db infraPostgres.Querier) *RankingProvider {
+	return &RankingProvider{db: db}
 }
 
-// GetUserStats computes the user's unique problems solved, their global rank
+// GetRanking computes the user's unique problems solved, their global rank
 // (1-based position by problems solved), and the total number of active users.
-func (p *DashboardRankingProvider) GetUserStats(ctx context.Context, userID string) (problemsSolved int, position *int, totalUsers int, err error) {
-	_ = appuser.DashboardRankingProvider(p) // compile-time interface check
-
+// Same "solved" logic as ProblemsSolvedProvider.GetProblemsSolved — keep in sync.
+func (p *RankingProvider) GetRanking(ctx context.Context, userID string) (problemsSolved int, position *int, totalUsers int, err error) {
 	q := infraPostgres.GetQuerier(ctx, p.db)
 
 	// accepted_pairs uses idx_submissions_accepted_user_problem (index-only scan).
@@ -54,7 +54,7 @@ func (p *DashboardRankingProvider) GetUserStats(ctx context.Context, userID stri
 
 	var pos *int
 	if scanErr := row.Scan(&problemsSolved, &pos, &totalUsers); scanErr != nil {
-		slog.ErrorContext(ctx, "dashboard: failed to query user stats", "user_id", userID, "error", scanErr)
+		slog.ErrorContext(ctx, "profile stats: failed to query ranking", "user_id", userID, "error", scanErr)
 		return 0, nil, 0, apperror.NewInternal()
 	}
 	return problemsSolved, pos, totalUsers, nil

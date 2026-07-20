@@ -36,7 +36,7 @@ func TestGetDashboard_Authenticated_EmptyData_Returns200(t *testing.T) {
 		&mockDashboardSubmissionProvider{},
 		&mockDashboardContestProvider{},
 		&mockDashboardMaterialProvider{},
-		&mockDashboardRankingProvider{},
+		&mockProblemsSolvedProvider{},
 	)
 	h := newHandlerWithGetDashboard(uc)
 	wrapped := wrapWithAuth(
@@ -67,17 +67,14 @@ func TestGetDashboard_Authenticated_EmptyData_Returns200(t *testing.T) {
 	if resp.ActiveContests == nil {
 		t.Error("activeContests should be an empty array, not null")
 	}
-	if resp.RecentMaterials == nil {
-		t.Error("recentMaterials should be an empty array, not null")
-	}
 	if resp.RecentContestResults == nil {
 		t.Error("recentContestResults should be an empty array, not null")
 	}
 	if resp.ProblemsSolved != 0 {
 		t.Errorf("problemsSolved: want 0, got %d", resp.ProblemsSolved)
 	}
-	if resp.Ranking.Position != nil {
-		t.Errorf("ranking.position: want null, got %v", resp.Ranking.Position)
+	if resp.MaterialsCount != 0 {
+		t.Errorf("materialsCount: want 0, got %d", resp.MaterialsCount)
 	}
 }
 
@@ -85,7 +82,6 @@ func TestGetDashboard_Authenticated_PopulatedData_Returns200(t *testing.T) {
 	const userID = "user-42"
 	execTime := 120
 	memKb := 4096
-	pos := 3
 
 	fixedTime := time.Date(2026, 6, 25, 12, 0, 0, 0, time.UTC)
 
@@ -111,7 +107,7 @@ func TestGetDashboard_Authenticated_PopulatedData_Returns200(t *testing.T) {
 	contestProvider := &mockDashboardContestProvider{
 		getUpcomingContestsFn: func(_ context.Context, _ string, _ int) ([]appuser.DashboardContest, error) {
 			return []appuser.DashboardContest{
-				{ID: "c-1", Name: "Contest A", StartTime: fixedTime.Add(24 * time.Hour), DurationMinutes: 180},
+				{ID: "c-1", Name: "Contest A", StartTime: fixedTime.Add(24 * time.Hour), DurationMinutes: 180, GroupID: "g-1", GroupName: "Team A"},
 			}, nil
 		},
 		getActiveContestsFn: func(_ context.Context, _ string, _ int) ([]appuser.DashboardContest, error) {
@@ -124,19 +120,17 @@ func TestGetDashboard_Authenticated_PopulatedData_Returns200(t *testing.T) {
 		},
 	}
 	materialProvider := &mockDashboardMaterialProvider{
-		getRecentMaterialsFn: func(_ context.Context, _ string, _ int, _ int) ([]appuser.DashboardMaterial, error) {
-			return []appuser.DashboardMaterial{
-				{ID: "m-1", Title: "Algo Notes", GroupID: "g-1", GroupName: "Team A", PublishedAt: fixedTime, AuthorNickname: "coach1"},
-			}, nil
+		getRecentMaterialsCountFn: func(_ context.Context, _ string, _ int) (int, error) {
+			return 4, nil
 		},
 	}
-	rankingProvider := &mockDashboardRankingProvider{
-		getUserStatsFn: func(_ context.Context, _ string) (int, *int, int, error) {
-			return 7, &pos, 100, nil
+	problemsSolvedProvider := &mockProblemsSolvedProvider{
+		getProblemsSolvedFn: func(_ context.Context, _ string) (int, error) {
+			return 7, nil
 		},
 	}
 
-	uc := appuser.NewGetDashboardUseCase(subProvider, contestProvider, materialProvider, rankingProvider)
+	uc := appuser.NewGetDashboardUseCase(subProvider, contestProvider, materialProvider, problemsSolvedProvider)
 	h := newHandlerWithGetDashboard(uc)
 	wrapped := wrapWithAuth(
 		http.HandlerFunc(h.GetDashboard),
@@ -178,15 +172,15 @@ func TestGetDashboard_Authenticated_PopulatedData_Returns200(t *testing.T) {
 	if resp.UpcomingContests[0].Name != "Contest A" {
 		t.Errorf("upcomingContests[0].name: want Contest A, got %s", resp.UpcomingContests[0].Name)
 	}
+	if resp.UpcomingContests[0].GroupID != "g-1" || resp.UpcomingContests[0].GroupName != "Team A" {
+		t.Errorf("upcomingContests[0] group fields unexpected: %+v", resp.UpcomingContests[0])
+	}
 
 	if resp.ProblemsSolved != 7 {
 		t.Errorf("problemsSolved: want 7, got %d", resp.ProblemsSolved)
 	}
-	if resp.Ranking.Position == nil || *resp.Ranking.Position != 3 {
-		t.Errorf("ranking.position: want 3, got %v", resp.Ranking.Position)
-	}
-	if resp.Ranking.TotalUsers != 100 {
-		t.Errorf("ranking.totalUsers: want 100, got %d", resp.Ranking.TotalUsers)
+	if resp.MaterialsCount != 4 {
+		t.Errorf("materialsCount: want 4, got %d", resp.MaterialsCount)
 	}
 
 	if len(resp.RecentContestResults) != 1 {
@@ -195,9 +189,5 @@ func TestGetDashboard_Authenticated_PopulatedData_Returns200(t *testing.T) {
 	cr := resp.RecentContestResults[0]
 	if cr.Position != 3 || cr.ProblemsSolved != 4 || cr.Penalty != 120 {
 		t.Errorf("contestResult: want pos=3 solved=4 penalty=120, got pos=%d solved=%d penalty=%d", cr.Position, cr.ProblemsSolved, cr.Penalty)
-	}
-
-	if len(resp.RecentMaterials) != 1 || resp.RecentMaterials[0].Title != "Algo Notes" {
-		t.Errorf("recentMaterials: unexpected content %+v", resp.RecentMaterials)
 	}
 }

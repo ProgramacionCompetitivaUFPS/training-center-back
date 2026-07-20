@@ -107,7 +107,8 @@ Several features use 6-digit numeric verification codes sent via email:
 | [Self deactivate user](Self%20deactivated%20user/spec.md) | `POST /users/deactivation/*` | Self-deactivation with confirmation |
 | [Admin deactivate user](Admin%20deactivate%20user/spec.md) | `POST /admin/users/{id}/deactivate` | Admin deactivates any user |
 | [List users](List%20users/spec.md) | `GET /admin/users` | Admin lists all users with filters and search |
-| [User activity dashboard](User%20activity%20dashboard/spec.md) | `GET /users/me/dashboard` | View personal activity dashboard with statistics |
+| [User activity dashboard](User%20activity%20dashboard/spec.md) | `GET /users/me/dashboard` | View personal recent/upcoming activity (submissions, live/upcoming contests, materials, streak) |
+| [View profile statistics](View%20profile%20statistics/spec.md) | `GET /users/me/stats` | View personal achievement statistics (ranking, acceptance rate, contests participated, topic breakdown) |
 
 ## Future Specs (Planned)
 
@@ -122,6 +123,7 @@ Several features use 6-digit numeric verification codes sent via email:
 | Register (create account) | ✅ | ✅ | ✅ |
 | View own profile | ✅ | ✅ | ✅ |
 | View own dashboard | ✅ | ✅ | ✅ |
+| View own statistics | ✅ | ✅ | ✅ |
 | View other active profiles | ✅ (public fields) | ✅ (public fields) | ✅ (all fields) |
 | View Admin profiles | ❌ | ❌ | ✅ |
 | Update own profile | ✅ | ✅ | ✅ |
