@@ -1,0 +1,25 @@
+# control de versiones — no aporta al build y pesa
+.git
+.gitignore
+
+# secretos — jamás deben viajar al daemon de build
+.env
+
+# binarios compilados localmente — la imagen compila los suyos
+*.exe
+worker
+
+# datos locales de desarrollo
+.local_storage
+
+# generado dentro del build por swag init
+docs
+
+# orquestación local — no forma parte de la imagen
+docker-compose.yml
+docker-compose.override.yml
+docker-compose.deploy.yml
+nginx
+
+# documentación — innecesaria dentro de la imagen
+*.md
