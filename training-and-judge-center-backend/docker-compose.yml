@@ -127,6 +127,7 @@ services:
       STORAGE_LOCAL_DIR: /data/uploads
       GCS_BUCKET: ${GCS_BUCKET:-}
       POD_MEMORY_LIMIT: ${POD_MEMORY_LIMIT:-8589934592}
+      POD_CPU_LIMIT: ${POD_CPU_LIMIT:-4000}
       JUDGE_CONFIG: /config/judge_config.yaml
     volumes:
       - problem_uploads:/data/uploads
