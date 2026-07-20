@@ -148,6 +148,7 @@ func main() {
 	problemProvider := adapterjudge.NewProblemProvider(dbPool)
 	submissionRepo := adaptersubmission.NewRepository(dbPool)
 	submissionUpdater := adapterjudge.NewSubmissionUpdater(submissionRepo)
+	staleSubmissionRecoverer := adapterjudge.NewStaleSubmissionRecoverer(dbPool)
 
 	// judge use case
 
@@ -162,10 +163,52 @@ func main() {
 		appjudge.DefaultRetryConfig(),
 	)
 
-	// consume loop
+	recoverStaleSubmissionsUseCase := appjudge.NewRecoverStaleSubmissionsUseCase(
+		staleSubmissionRecoverer,
+		time.Duration(judgeCfg.Judge.StaleRunningAfterMinutes)*time.Minute,
+	)
+
+	// background guardians
 
 	ctx, stop := signal.NotifyContext(ctx, os.Interrupt, syscall.SIGTERM)
 	defer stop()
+
+	go func() {
+		ticker := time.NewTicker(30 * time.Second)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-ticker.C:
+				pingCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
+				healthy := pool.IsHealthy(pingCtx)
+				cancel()
+				if !healthy {
+					slog.Error("worker: container pool is unhealthy, exiting so the pod restarts")
+					os.Exit(1)
+				}
+			}
+		}
+	}()
+
+	go func() {
+		ticker := time.NewTicker(5 * time.Minute)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-ticker.C:
+				count, err := recoverStaleSubmissionsUseCase.Execute(ctx)
+				if err == nil && count > 0 {
+					slog.Info("worker: stale submissions recovered", "count", count)
+				}
+			}
+		}
+	}()
+
+	// consume loop
 
 	slog.Info("worker: listening for submissions")
 
@@ -194,10 +237,11 @@ type judgeLanguageConfig struct {
 }
 
 type judgeSection struct {
-	IdleTimeoutMinutes  int                            `yaml:"idleTimeoutMinutes"`
-	MemoryOverheadBytes int64                          `yaml:"memoryOverheadBytes"`
-	CPUOverheadCores    int                            `yaml:"cpuOverheadCores"`
-	Languages           map[string]judgeLanguageConfig `yaml:"languages"`
+	IdleTimeoutMinutes       int                            `yaml:"idleTimeoutMinutes"`
+	MemoryOverheadBytes      int64                          `yaml:"memoryOverheadBytes"`
+	CPUOverheadCores         int                            `yaml:"cpuOverheadCores"`
+	StaleRunningAfterMinutes int                            `yaml:"staleRunningAfterMinutes"`
+	Languages                map[string]judgeLanguageConfig `yaml:"languages"`
 }
 
 type judgeConfigFile struct {
@@ -222,6 +266,9 @@ func loadJudgeConfig() judgeConfigFile {
 	}
 	if cfg.Judge.CPUOverheadCores <= 0 {
 		cfg.Judge.CPUOverheadCores = 1
+	}
+	if cfg.Judge.StaleRunningAfterMinutes <= 0 {
+		cfg.Judge.StaleRunningAfterMinutes = 10
 	}
 	return cfg
 }

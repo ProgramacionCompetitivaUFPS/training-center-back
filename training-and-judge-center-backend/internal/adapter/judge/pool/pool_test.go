@@ -36,6 +36,7 @@ type mockDockerClient struct {
 	createFn  func(context.Context, client.ContainerCreateOptions) (client.ContainerCreateResult, error)
 	startFn   func(context.Context, string, client.ContainerStartOptions) (client.ContainerStartResult, error)
 	removeFn  func(context.Context, string, client.ContainerRemoveOptions) (client.ContainerRemoveResult, error)
+	pingFn    func(context.Context, client.PingOptions) (client.PingResult, error)
 	createCnt atomic.Int64
 	removeCnt atomic.Int64
 	idCounter atomic.Int64
@@ -62,6 +63,32 @@ func (m *mockDockerClient) ContainerRemove(ctx context.Context, id string, opts 
 		return m.removeFn(ctx, id, opts)
 	}
 	return client.ContainerRemoveResult{}, nil
+}
+
+func (m *mockDockerClient) Ping(ctx context.Context, opts client.PingOptions) (client.PingResult, error) {
+	if m.pingFn != nil {
+		return m.pingFn(ctx, opts)
+	}
+	return client.PingResult{}, nil
+}
+
+func TestIsHealthy_ReturnsTrueWhenDaemonResponds(t *testing.T) {
+	p := newTestPool(t, testCfg(1), &mockDockerClient{})
+	if !p.IsHealthy(context.Background()) {
+		t.Error("expected healthy pool when daemon responds")
+	}
+}
+
+func TestIsHealthy_ReturnsFalseWhenDaemonUnreachable(t *testing.T) {
+	docker := &mockDockerClient{
+		pingFn: func(context.Context, client.PingOptions) (client.PingResult, error) {
+			return client.PingResult{}, errors.New("daemon unreachable")
+		},
+	}
+	p := newTestPool(t, testCfg(1), docker)
+	if p.IsHealthy(context.Background()) {
+		t.Error("expected unhealthy pool when daemon is unreachable")
+	}
 }
 
 // newTestPool creates a started Pool and registers p.Stop as a test cleanup,

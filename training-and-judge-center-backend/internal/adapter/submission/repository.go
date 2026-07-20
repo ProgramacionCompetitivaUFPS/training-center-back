@@ -40,7 +40,8 @@ func (r *Repository) Save(ctx context.Context, s *domainSubmission.Submission) e
 			file_hash     = EXCLUDED.file_hash,
 			file_size     = EXCLUDED.file_size,
 			problem_title = EXCLUDED.problem_title,
-			problem_slug  = EXCLUDED.problem_slug
+			problem_slug  = EXCLUDED.problem_slug,
+			updated_at    = now()
 	`,
 		s.ID(),
 		nilIfEmpty(s.ProblemID()),
@@ -142,7 +143,8 @@ func (r *Repository) Update(ctx context.Context, s *domainSubmission.Submission)
 			judged_at   = $3,
 			time_ms     = $4,
 			memory_kb   = $5,
-			compile_log = $6
+			compile_log = $6,
+			updated_at  = now()
 		WHERE id = $1
 	`,
 		s.ID(),

@@ -141,6 +141,19 @@ func (m *mockTransactionManager) WithTx(ctx context.Context, fn func(txCtx conte
 	return fn(ctx)
 }
 
+// ── StaleSubmissionRecoverer mock ────────────────────────────────────────────
+
+type mockStaleSubmissionRecoverer struct {
+	recoverFn func(ctx context.Context, cutoff time.Time) (int, error)
+}
+
+func (m *mockStaleSubmissionRecoverer) RecoverStaleBefore(ctx context.Context, cutoff time.Time) (int, error) {
+	if m.recoverFn != nil {
+		return m.recoverFn(ctx, cutoff)
+	}
+	return 0, nil
+}
+
 // ── Test constants ───────────────────────────────────────────────────────────
 
 const (
