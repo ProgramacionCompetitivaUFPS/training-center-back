@@ -107,7 +107,7 @@ adapter/ratelimit/ ← driven adapter: rate limiting (transversal)
 
 **Adapter double-logging:** the adapter logs the raw error before returning `apperror.NewInternal()`. The application layer must NOT log errors that come from adapters — they were already logged at the boundary.
 
-**Estado de los dominios:** todos los dominios del backend (`user`, `problem`, `group`, `material`, `contest`, `team`, `submission`) tienen capa de dominio, `application/` y handlers HTTP implementados. El **Judge System** está pendiente.
+**Estado de los dominios:** todos los dominios del backend (`user`, `problem`, `group`, `material`, `contest`, `team`, `submission`) tienen capa de dominio, `application/` y handlers HTTP implementados. El **Judge System** está mayormente implementado: pool de containers (`adapter/judge/pool/`), executor/session (`adapter/judge/`), use case con retries (`application/judge/`) y el binario `cmd/worker/` (RUNNER_ARCHITECTURE.md lo llama `cmd/judge` — es el mismo componente). Pendientes: consumidor concurrente con semáforo (hoy es serial), `Pool.IsHealthy()` + `os.Exit` si el pool se degrada, goroutine de recuperación (§874), y despliegue DinD en GKE.
 
 **Endpoints pendientes principales:**
 - `POST /problems/p/{slug}/publish` — requiere Judge System; bloquea DRAFT→PUBLISHED por API.
