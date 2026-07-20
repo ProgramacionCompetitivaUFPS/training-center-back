@@ -39,7 +39,7 @@ adapter/ratelimit/ ← driven adapter: rate limiting (transversal)
 
 `adapter/http/` must NOT import `adapter/postgres/`, `adapter/user/`, etc. — only `application/` and `domain/shared/`.
 
-**Codebase in transition.** `internal/server/` → `adapter/http/`, `internal/platform/` → `adapter/<domain>/`, `internal/infrastructure/` → `adapter/postgres/`. New code goes in the target structure. `PENDIENTE_REFACTOR.md` has the full change list.
+**Migración de estructura completada** (verificado 2026-07-19): `internal/server/`, `internal/platform/` e `internal/infrastructure/` ya no existen; todo el código vive en la estructura destino (`adapter/`). El backlog de refactors de convenciones (`PENDIENTE_REFACTOR.md`) se completó y fue eliminado.
 
 ## Conventions summary
 
