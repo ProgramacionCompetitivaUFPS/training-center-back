@@ -90,16 +90,16 @@ func (s *Session) RunTestCase(ctx context.Context, req appjudge.RunRequest) (app
 		return appjudge.RunResult{}, apperror.NewInternal()
 	}
 
-	timeLimitSecs := max(1, (req.TimeLimitMs+999)/1000)
+	wallBackstopSecs := max(2, (req.TimeLimitMs*2+999)/1000)
 	cmd := fmt.Sprintf(
 		"timeout --kill-after=1s %ds %s < /sandbox/input.txt > /sandbox/output.txt 2>/dev/null",
-		timeLimitSecs, s.langCfg.RunCmd,
+		wallBackstopSecs, s.langCfg.RunCmd,
 	)
 
-	safetyCtx, cancel := context.WithTimeout(ctx, time.Duration(timeLimitSecs+2)*time.Second)
+	safetyCtx, cancel := context.WithTimeout(ctx, time.Duration(wallBackstopSecs+2)*time.Second)
 	defer cancel()
 
-	start := time.Now()
+	cpuBeforeNs, _ := s.readStats(ctx)
 	execRes, err := s.docker.ExecCreate(safetyCtx, s.container.ID(), client.ExecCreateOptions{
 		Cmd: []string{"sh", "-c", cmd},
 	})
@@ -118,7 +118,6 @@ func (s *Session) RunTestCase(ctx context.Context, req appjudge.RunRequest) (app
 	defer stop()
 
 	_, _ = io.Copy(io.Discard, att.Reader)
-	elapsed := time.Since(start)
 
 	if safetyCtx.Err() != nil {
 		slog.ErrorContext(ctx, "executor: safety net activated", "container_id", s.container.ID())
@@ -134,10 +133,16 @@ func (s *Session) RunTestCase(ctx context.Context, req appjudge.RunRequest) (app
 		return appjudge.RunResult{}, apperror.NewInternal()
 	}
 
+	cpuAfterNs, memoryKb := s.readStats(ctx)
+	cpuTimeMs := 0
+	if cpuAfterNs > cpuBeforeNs {
+		cpuTimeMs = int((cpuAfterNs - cpuBeforeNs) / 1_000_000)
+	}
+
 	result := appjudge.RunResult{
 		ExitCode: inspectRes.ExitCode,
-		TimeMs:   int(elapsed.Milliseconds()),
-		MemoryKb: s.readMemoryKb(ctx),
+		TimeMs:   cpuTimeMs,
+		MemoryKb: memoryKb,
 		Output:   s.copyOutput(ctx),
 	}
 	s.cleanup(ctx)
@@ -153,17 +158,17 @@ func (s *Session) Close(ctx context.Context) error {
 	return nil
 }
 
-func (s *Session) readMemoryKb(ctx context.Context) int {
+func (s *Session) readStats(ctx context.Context) (uint64, int) {
 	statsRes, err := s.docker.ContainerStats(ctx, s.container.ID(), client.ContainerStatsOptions{Stream: false})
 	if err != nil {
-		return 0
+		return 0, 0
 	}
 	defer statsRes.Body.Close()
 	var stats container.StatsResponse
 	if err := json.NewDecoder(statsRes.Body).Decode(&stats); err != nil {
-		return 0
+		return 0, 0
 	}
-	return int(stats.MemoryStats.MaxUsage / 1024)
+	return stats.CPUStats.CPUUsage.TotalUsage, int(stats.MemoryStats.MaxUsage / 1024)
 }
 
 func (s *Session) copyOutput(ctx context.Context) []byte {

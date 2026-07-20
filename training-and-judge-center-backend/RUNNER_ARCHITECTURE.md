@@ -106,10 +106,21 @@ El semáforo previene este caso acotando los judgings activos al número de CPU 
 ### Derivación del semáforo desde el pod
 
 ```
-maxConcurrent = floor(POD_CPU_LIMIT / 1.0)   # cada judging ocupa 1 core
+maxConcurrent = max(1, floor(POD_CPU_LIMIT) - cpuOverheadCores)   # cada judging ocupa 1 core
 ```
 
-Pod con 4 CPUs → semáforo de 4. Pod con 8 CPUs → semáforo de 8. Si se cambia el CPU limit del pod en K8s, el semáforo se ajusta en el siguiente arranque sin tocar configuración.
+`cpuOverheadCores` (default 1) reserva capacidad para los otros dos consumidores de CPU del pod:
+el proceso worker (descarga de test cases, comparación de salidas, escritura de veredictos) y el
+daemon Docker (creación de execs, streaming). Es el análogo en CPU del `memoryOverheadBytes` que
+la contabilidad de memoria ya reserva para el worker: ningún recurso del pod se reparte al 100%
+entre los judgings — la casa siempre come primero.
+
+Pod con 4 CPUs → semáforo de 3. Pod con 8 CPUs → semáforo de 7. Si se cambia el CPU limit del pod en K8s, el semáforo se ajusta en el siguiente arranque sin tocar configuración.
+
+Sin la reserva, 4 judgings a CPU llena + worker comparando salidas + daemon creando execs
+compiten por 4 cores: el scheduler roba ciclos a procesos de estudiantes mientras su reloj corre.
+La reserva hace la contención *rara*; la medición por tiempo de CPU (ver EXECUTOR_ADAPTER_PLAN,
+RunTestCase) hace que la contención residual sea *inofensiva para el veredicto*. Defensa en profundidad.
 
 La concurrencia real queda acotada por el mínimo de ambos recursos:
 
@@ -333,6 +344,7 @@ judge:
   # maxConcurrent se deriva de POD_CPU_LIMIT al arrancar — no se configura aquí
   idleTimeoutMinutes: 10         # timeout de container idle (por container individual)
   memoryOverheadBytes: 536870912 # 512Mi reservado para el proceso worker
+  cpuOverheadCores: 1            # cores reservados para worker + daemon Docker (se restan del semáforo)
 
   languages:
     cpp20:
