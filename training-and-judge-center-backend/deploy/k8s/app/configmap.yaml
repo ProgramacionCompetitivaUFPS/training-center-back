@@ -1,0 +1,21 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: app-config
+  namespace: training-center
+data:
+  PORT: "8080"
+  DB_HOST: postgres
+  DB_PORT: "5432"
+  DB_USER: postgres
+  DB_NAME: training_center
+  STORAGE_BACKEND: gcs
+  GCS_BUCKET: training-center-502916-uploads
+  VIRTUAL_OBJECT_CONFIG: /config/virtual_object.json
+  REDIS_URL: redis://redis:6379
+  SMTP_HOST: smtp.gmail.com
+  SMTP_PORT: "587"
+  SMTP_USER: trainingcenter.ufps@gmail.com
+  SMTP_FROM: Training Center <trainingcenter.ufps@gmail.com>
+  ALLOWED_ORIGINS: http://localhost:5173,https://training-and-judge-center-frontend.vercel.app
+  FRONTEND_BASE_URL: https://training-and-judge-center-frontend.vercel.app
