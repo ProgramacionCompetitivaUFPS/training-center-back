@@ -106,8 +106,12 @@ El semáforo previene este caso acotando los judgings activos al número de CPU 
 ### Derivación del semáforo desde el pod
 
 ```
-maxConcurrent = max(1, floor(POD_CPU_LIMIT) - cpuOverheadCores)   # cada judging ocupa 1 core
+maxConcurrent = max(1, POD_CPU_LIMIT/1000 - cpuOverheadCores)   # cada judging ocupa 1 core
 ```
+
+`POD_CPU_LIMIT` viene en **millicores** (entero, ej: 3500). En el pod spec, el Downward API debe
+usar `divisor: 1m` — con divisor `1`, Kubernetes redondea los cores **hacia arriba** (3.5 → "4")
+y el semáforo quedaría sobrevendido. La división entera hace el floor.
 
 `cpuOverheadCores` (default 1) reserva capacidad para los otros dos consumidores de CPU del pod:
 el proceso worker (descarga de test cases, comparación de salidas, escritura de veredictos) y el

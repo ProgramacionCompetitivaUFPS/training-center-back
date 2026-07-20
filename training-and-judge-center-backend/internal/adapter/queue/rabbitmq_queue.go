@@ -134,9 +134,12 @@ func (q *RabbitMQQueue) publishLocked(body []byte, priority uint8) error {
 	)
 }
 
-func (q *RabbitMQQueue) Consume(ctx context.Context, handler func(ctx context.Context, msg appsubmission.SubmissionQueueMessage) error) error {
+func (q *RabbitMQQueue) Consume(ctx context.Context, maxConcurrent int, handler func(ctx context.Context, msg appsubmission.SubmissionQueueMessage) error) error {
+	if maxConcurrent < 1 {
+		return fmt.Errorf("rabbitmq: maxConcurrent must be at least 1, got %d", maxConcurrent)
+	}
 	q.mu.Lock()
-	if err := q.ch.Qos(1, 0, false); err != nil {
+	if err := q.ch.Qos(maxConcurrent, 0, false); err != nil {
 		q.mu.Unlock()
 		return fmt.Errorf("rabbitmq: qos: %w", err)
 	}
@@ -146,45 +149,65 @@ func (q *RabbitMQQueue) Consume(ctx context.Context, handler func(ctx context.Co
 		return fmt.Errorf("rabbitmq: consume: %w", err)
 	}
 
+	sem := make(chan struct{}, maxConcurrent)
+	var wg sync.WaitGroup
+
 	for {
 		select {
 		case <-ctx.Done():
+			wg.Wait()
 			return nil
 		case d, ok := <-deliveries:
 			if !ok {
+				wg.Wait()
 				return fmt.Errorf("rabbitmq: deliveries channel closed")
 			}
-			var raw queueMessage
-			if err := json.Unmarshal(d.Body, &raw); err != nil {
-				slog.ErrorContext(ctx, "rabbitmq: failed to unmarshal message", "error", err)
-				_ = d.Nack(false, false)
-				continue
+			select {
+			case sem <- struct{}{}:
+			case <-ctx.Done():
+				_ = d.Nack(false, true)
+				wg.Wait()
+				return nil
 			}
-			enqueuedAt, err := time.Parse(time.RFC3339, raw.EnqueuedAt)
-			if err != nil {
-				slog.ErrorContext(ctx, "rabbitmq: failed to parse enqueuedAt", "raw", raw.EnqueuedAt, "error", err)
-				_ = d.Nack(false, false)
-				continue
-			}
-			msg := appsubmission.SubmissionQueueMessage{
-				SubmissionID: raw.SubmissionID,
-				Priority:     raw.Priority,
-				EnqueuedAt:   enqueuedAt,
-				Metadata: appsubmission.SubmissionQueueMetadata{
-					ContestID: raw.Metadata.ContestID,
-					ProblemID: raw.Metadata.ProblemID,
-					UserID:    raw.Metadata.UserID,
-					Language:  raw.Metadata.Language,
-				},
-			}
-			if err := handler(ctx, msg); err != nil {
-				slog.ErrorContext(ctx, "rabbitmq: handler returned error", "error", err)
-				_ = d.Nack(false, false)
-				continue
-			}
-			_ = d.Ack(false)
+			wg.Add(1)
+			go func(d amqp.Delivery) {
+				defer func() { <-sem; wg.Done() }()
+				q.handleDelivery(ctx, d, handler)
+			}(d)
 		}
 	}
+}
+
+func (q *RabbitMQQueue) handleDelivery(ctx context.Context, d amqp.Delivery, handler func(ctx context.Context, msg appsubmission.SubmissionQueueMessage) error) {
+	var raw queueMessage
+	if err := json.Unmarshal(d.Body, &raw); err != nil {
+		slog.ErrorContext(ctx, "rabbitmq: failed to unmarshal message", "error", err)
+		_ = d.Nack(false, false)
+		return
+	}
+	enqueuedAt, err := time.Parse(time.RFC3339, raw.EnqueuedAt)
+	if err != nil {
+		slog.ErrorContext(ctx, "rabbitmq: failed to parse enqueuedAt", "raw", raw.EnqueuedAt, "error", err)
+		_ = d.Nack(false, false)
+		return
+	}
+	msg := appsubmission.SubmissionQueueMessage{
+		SubmissionID: raw.SubmissionID,
+		Priority:     raw.Priority,
+		EnqueuedAt:   enqueuedAt,
+		Metadata: appsubmission.SubmissionQueueMetadata{
+			ContestID: raw.Metadata.ContestID,
+			ProblemID: raw.Metadata.ProblemID,
+			UserID:    raw.Metadata.UserID,
+			Language:  raw.Metadata.Language,
+		},
+	}
+	if err := handler(ctx, msg); err != nil {
+		slog.ErrorContext(ctx, "rabbitmq: handler returned error", "error", err)
+		_ = d.Nack(false, false)
+		return
+	}
+	_ = d.Ack(false)
 }
 
 func (q *RabbitMQQueue) Close() {

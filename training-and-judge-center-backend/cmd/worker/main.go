@@ -77,6 +77,16 @@ func main() {
 
 	poolMemLimit := getRequiredEnvInt64("POD_MEMORY_LIMIT")
 
+	podCPUMillis := getRequiredEnvInt64("POD_CPU_LIMIT")
+	maxConcurrent := int(podCPUMillis/1000) - judgeCfg.Judge.CPUOverheadCores
+	if maxConcurrent < 1 {
+		maxConcurrent = 1
+	}
+	slog.Info("worker: concurrency derived",
+		"pod_cpu_millicores", podCPUMillis,
+		"cpu_overhead_cores", judgeCfg.Judge.CPUOverheadCores,
+		"max_concurrent", maxConcurrent)
+
 	poolLanguages := make(map[string]judgepool.LanguageConfig, len(judgeCfg.Judge.Languages))
 	execLanguages := make(map[string]adapterjudge.LanguageExecConfig, len(judgeCfg.Judge.Languages))
 	for lang, lc := range judgeCfg.Judge.Languages {
@@ -159,7 +169,7 @@ func main() {
 
 	slog.Info("worker: listening for submissions")
 
-	if err := queue.Consume(ctx, func(ctx context.Context, msg appsubmission.SubmissionQueueMessage) error {
+	if err := queue.Consume(ctx, maxConcurrent, func(ctx context.Context, msg appsubmission.SubmissionQueueMessage) error {
 		if err := judgeSubmissionUseCase.Execute(ctx, appjudge.JudgeSubmissionInput{
 			SubmissionID: msg.SubmissionID,
 		}); err != nil {
@@ -186,6 +196,7 @@ type judgeLanguageConfig struct {
 type judgeSection struct {
 	IdleTimeoutMinutes  int                            `yaml:"idleTimeoutMinutes"`
 	MemoryOverheadBytes int64                          `yaml:"memoryOverheadBytes"`
+	CPUOverheadCores    int                            `yaml:"cpuOverheadCores"`
 	Languages           map[string]judgeLanguageConfig `yaml:"languages"`
 }
 
@@ -208,6 +219,9 @@ func loadJudgeConfig() judgeConfigFile {
 	if len(cfg.Judge.Languages) == 0 {
 		slog.Error("worker: judge config has no languages defined", "path", path)
 		os.Exit(1)
+	}
+	if cfg.Judge.CPUOverheadCores <= 0 {
+		cfg.Judge.CPUOverheadCores = 1
 	}
 	return cfg
 }

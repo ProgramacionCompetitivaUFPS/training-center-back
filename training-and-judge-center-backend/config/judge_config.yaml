@@ -1,6 +1,7 @@
 judge:
   idleTimeoutMinutes: 10
   memoryOverheadBytes: 536870912  # 512 MiB reservado para el proceso worker
+  cpuOverheadCores: 1             # cores reservados para worker + daemon Docker (se restan del semáforo)
 
   languages:
     cpp20:
