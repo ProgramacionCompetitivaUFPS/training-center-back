@@ -201,6 +201,38 @@ func TestJudgeSubmission_TimeLimitExceeded(t *testing.T) {
 	}
 }
 
+func TestJudgeSubmission_TimeLimitExceededByCPUTime(t *testing.T) {
+	var updatedStatus string
+	uc := newJudgeSubmissionUseCase(
+		&mockSubmissionUpdater{
+			updateFn: func(_ context.Context, s *submission.Submission) error {
+				updatedStatus = s.Status().String()
+				return nil
+			},
+		},
+		&mockSourceCodeDownloader{},
+		&mockProblemProvider{},
+		&mockTestCaseProvider{},
+		&mockExecutor{
+			beginSessionFn: func(_ context.Context, _ submission.Language) (ExecutionSession, error) {
+				return &mockExecutionSession{
+					runTestCaseFn: func(_ context.Context, _ RunRequest) (RunResult, error) {
+						return RunResult{ExitCode: 0, TimeMs: 1500, MemoryKb: 1024, Output: []byte("3")}, nil
+					},
+				}, nil
+			},
+		},
+		&mockOutputChecker{},
+	)
+
+	if err := uc.Execute(context.Background(), JudgeSubmissionInput{SubmissionID: submissionID}); err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	if updatedStatus != "TIME_LIMIT_EXCEEDED" {
+		t.Errorf("expected TIME_LIMIT_EXCEEDED, got %s", updatedStatus)
+	}
+}
+
 func TestJudgeSubmission_MemoryLimitExceeded(t *testing.T) {
 	var updatedStatus string
 	uc := newJudgeSubmissionUseCase(

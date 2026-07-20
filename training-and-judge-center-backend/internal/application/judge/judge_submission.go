@@ -166,6 +166,10 @@ func (uc *JudgeSubmissionUseCase) judgeAttempt(
 			_ = sub.MarkMemoryLimitExceeded(runResult.MemoryKb, now)
 			return false, nil
 		case 0:
+			if runResult.TimeMs > limits.TimeLimitMs {
+				_ = sub.MarkTimeLimitExceeded(runResult.TimeMs, now)
+				return false, nil
+			}
 			checkResult, err := uc.outputChecker.Check(ctx, CheckRequest{
 				Input:            tc.Input,
 				ExpectedOutput:   tc.ExpectedOutput,
