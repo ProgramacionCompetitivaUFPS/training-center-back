@@ -136,6 +136,10 @@ func (q *RabbitMQQueue) publishLocked(body []byte, priority uint8) error {
 
 func (q *RabbitMQQueue) Consume(ctx context.Context, handler func(ctx context.Context, msg appsubmission.SubmissionQueueMessage) error) error {
 	q.mu.Lock()
+	if err := q.ch.Qos(1, 0, false); err != nil {
+		q.mu.Unlock()
+		return fmt.Errorf("rabbitmq: qos: %w", err)
+	}
 	deliveries, err := q.ch.Consume(submissionQueueName, "", false, false, false, false, nil)
 	q.mu.Unlock()
 	if err != nil {
