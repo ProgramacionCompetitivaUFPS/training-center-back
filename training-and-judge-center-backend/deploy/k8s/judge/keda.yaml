@@ -1,0 +1,33 @@
+apiVersion: keda.sh/v1alpha1
+kind: TriggerAuthentication
+metadata:
+  name: rabbitmq-auth
+  namespace: training-center
+spec:
+  secretTargetRef:
+    - parameter: host
+      name: keda-rabbitmq
+      key: host
+---
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata:
+  name: judge-worker
+  namespace: training-center
+spec:
+  scaleTargetRef:
+    name: judge-worker
+  minReplicaCount: 0
+  maxReplicaCount: 2
+  pollingInterval: 15
+  cooldownPeriod: 300
+  triggers:
+    - type: rabbitmq
+      metadata:
+        protocol: amqp
+        queueName: submissions
+        mode: QueueLength
+        value: "10"           # 2do pod solo con backlog sostenido (~11 msgs); escalar nodos para picos chicos es inútil (~2min de arranque)
+        activationValue: "0"  # despertar de 0→1 con CUALQUIER mensaje (>0); una submission solitaria no puede quedar sin juzgar
+      authenticationRef:
+        name: rabbitmq-auth
