@@ -48,8 +48,7 @@ func NewCreateMaterialUseCase(
 func (uc *CreateMaterialUseCase) Execute(ctx context.Context, in CreateMaterialInput) (*CreateMaterialOutput, error) {
 	exists, err := uc.groupProvider.Exists(ctx, in.GroupID)
 	if err != nil {
-		slog.ErrorContext(ctx, "failed to check group existence", "error", err, "group_id", in.GroupID)
-		return nil, apperror.NewInternal()
+		return nil, err
 	}
 	if !exists {
 		return nil, apperror.NewNotFound(ErrCodeGroupNotFound, "group not found")
@@ -58,8 +57,7 @@ func (uc *CreateMaterialUseCase) Execute(ctx context.Context, in CreateMaterialI
 	if !in.CurrentUser.IsAdmin() {
 		isLead, err := uc.memberProvider.IsLeadOfGroup(ctx, in.CurrentUser.ID, in.GroupID)
 		if err != nil {
-			slog.ErrorContext(ctx, "failed to check group membership", "error", err, "user_id", in.CurrentUser.ID, "group_id", in.GroupID)
-			return nil, apperror.NewInternal()
+			return nil, err
 		}
 		if !isLead {
 			return nil, apperror.NewForbidden(ErrCodeInsufficientPermissions, "only group leads can create materials")
@@ -110,15 +108,13 @@ func (uc *CreateMaterialUseCase) Execute(ctx context.Context, in CreateMaterialI
 	}
 
 	if err := uc.repo.Save(ctx, m); err != nil {
-		slog.ErrorContext(ctx, "failed to save material", "error", err, "material_id", m.ID())
-		return nil, apperror.NewInternal()
+		return nil, err
 	}
 
 	data := toMaterialData(m)
 	displays, err := uc.authorProvider.GetDisplays(ctx, []string{m.AuthorID().Value()})
 	if err != nil {
-		slog.ErrorContext(ctx, "failed to resolve author display", "error", err, "author_id", m.AuthorID().Value())
-		return nil, apperror.NewInternal()
+		return nil, err
 	}
 	if disp := displays[m.AuthorID().Value()]; disp != nil {
 		data.Author = &AuthorDTO{Nickname: disp.Nickname, Name: disp.Name}

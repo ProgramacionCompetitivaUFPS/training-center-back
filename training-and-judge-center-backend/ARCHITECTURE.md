@@ -50,18 +50,24 @@ training-and-judge-center-backend/
 │   │   └── virtual_object.go
 │   │
 │   ├── domain/              ← the hexagon core (pure business logic)
-│   │   ├── shared/          ← cross-domain primitives (UserID, CurrentUser, Role)
+│   │   ├── shared/          ← cross-domain primitives (UserID, GroupID, Role)
 │   │   ├── user/
 │   │   ├── problem/
 │   │   ├── group/
-│   │   └── material/
+│   │   ├── material/
+│   │   ├── contest/
+│   │   ├── team/
+│   │   └── submission/
 │   │
 │   ├── application/         ← use cases (orchestration layer)
-│   │   ├── shared/          ← cross-cutting ports (EmailSender, RateLimiter, TransactionManager)
+│   │   ├── shared/          ← cross-cutting concerns (CurrentUser, EmailSender, RateLimiter, TransactionManager)
 │   │   ├── user/
 │   │   ├── problem/
 │   │   ├── group/
-│   │   └── material/
+│   │   ├── material/
+│   │   ├── contest/
+│   │   ├── team/
+│   │   └── submission/
 │   │
 │   └── adapter/             ← everything outside the hexagon
 │       │
@@ -74,9 +80,13 @@ training-and-judge-center-backend/
 │       │   │   ├── problem/
 │       │   │   ├── user/
 │       │   │   ├── group/
-│       │   │   └── material/
+│       │   │   ├── material/
+│       │   │   ├── contest/
+│       │   │   ├── team/
+│       │   │   └── submission/
 │       │   └── middleware/
-│       │       └── auth_middleware.go
+│       │       ├── auth.go
+│       │       └── require_role.go
 │       │
 │       ├── postgres/        ← shared DB infrastructure (used by domain adapters)
 │       │   ├── connection.go
@@ -171,7 +181,7 @@ It is shared infrastructure used by multiple domain adapters (`adapter/user/`, `
 | `cmd/` | everything | — |
 | `pkg/` | standard library only | `internal/` |
 
-The `adapter/http/` handler layer specifically must not import driven adapters — it only knows about use cases from `application/`.
+The `adapter/http/` handler layer specifically must not import driven adapters — it only knows about use cases from `application/` and primitives from `domain/shared/`.
 
 ---
 
@@ -472,9 +482,6 @@ domain/group/member_repository.go        ← MemberRepository, MemberFilters, Me
 domain/group/join_request_repository.go  ← JoinRequestRepository, JoinRequestFilters
 ```
 
-Esto resuelve también el caso de `domain/group/repository.go` que hoy agrupa tres repositorios con siete tipos de soporte en un solo archivo — no porque haya que "limpiar", sino porque cada repositorio es un contrato independiente que merece su propio archivo.
-
-El único caso especial es `domain/user/filter.go`: los tipos ahí (`UserFilter`, `SortField`, `SortOrder`, `SearchField`) deben moverse a `repository.go` porque son el contrato del repositorio de `User`, no conceptos de dominio independientes.
 
 ---
 
@@ -653,7 +660,7 @@ Every use case is a struct named `<Operation>UseCase`. Its constructor is `New<O
 
 ```
 CreateGroupUseCase      ✅
-CreateMaterialUseCase   ✅  (currently CreateMaterial — needs fix)
+CreateMaterialUseCase   ✅
 LoginUseCase            ✅
 ```
 
@@ -771,7 +778,7 @@ application/shared/
   transaction_manager.go  ← TransactionManager
 ```
 
-**`application/shared/` es el lugar de los puertos transversales** — los que usan múltiples dominios de aplicación. `TransactionManager` actualmente está duplicado en `application/user/ports.go` y `application/group/ports.go`; su lugar correcto es `application/shared/transaction_manager.go`.
+**`application/shared/` es el lugar de los puertos transversales** — los que usan múltiples dominios de aplicación, más `CurrentUser` que captura el contexto de la request.
 
 **Por qué no `ports.go`?**
 
@@ -1023,7 +1030,7 @@ func NewCreateMaterialUseCase(repo, group, member, author) *CreateMaterialUseCas
 
 // test — privado, baked-in defaults para lo que no importa configurar
 func newCreateMaterialUseCase(repo *mockMaterialRepository, group *mockGroupProvider, member *mockGroupMemberProvider) *CreateMaterialUseCase {
-    return NewCreateMaterialUseCase(repo, group, member, stubAuthorProvider())
+    return NewCreateMaterialUseCase(repo, group, member, mockAuthorProvider())
 }
 
 // ❌
@@ -1267,90 +1274,49 @@ El repositorio nunca sabe con cuál está hablando. La transacción es un detall
 
 **Interfaces locales privadas que reimplementan `GetQuerier` están prohibidas.** `memberDBQuerier`, `joinRequestDBQuerier` y patrones similares reinventan exactamente lo que ya hace `postgres.GetQuerier` — deben eliminarse.
 
-### Ad9 — `response.go` es el único lugar con lógica de respuesta HTTP
+### Ad4 — HTTP handler structs se llaman `Handler` dentro de su paquete de dominio
 
-`adapter/http/handler/response.go` expone exactamente dos funciones públicas: `WriteJSON` y `WriteError`. No existen wrappers privados que las envuelvan — los handlers las llaman directamente.
-
-```go
-// ✅ el handler llama directo
-handler.WriteJSON(w, http.StatusOK, resp)
-handler.WriteError(w, err)
-
-// ❌ wrapper privado que no agrega nada
-func respondJSON(w http.ResponseWriter, status int, data any) {
-    WriteJSON(w, status, data)
-}
-```
-
-`response.go` también contiene `kindToStatus` — el único lugar del proyecto donde `apperror.Kind` se mapea a un código HTTP. Ningún otro archivo importa `net/http` para hacer este mapeo.
-
-```go
-func kindToStatus(k apperror.Kind) int {
-    switch k {
-    case apperror.KindValidation:      return http.StatusBadRequest
-    case apperror.KindNotFound:        return http.StatusNotFound
-    case apperror.KindConflict:        return http.StatusConflict
-    case apperror.KindForbidden:       return http.StatusForbidden
-    case apperror.KindUnauthorized:    return http.StatusUnauthorized
-    case apperror.KindTooManyRequests: return http.StatusTooManyRequests
-    default:                           return http.StatusInternalServerError
-    }
-}
-```
-
-### Ad8 — Lógica compartida entre handler packages vive en `adapter/http/handler/`
-
-El paquete raíz `adapter/http/handler/` ya es importado por todos los sub-paquetes de dominio. Las funciones utilitarias que usan dos o más paquetes de handler van ahí, en archivos con nombre descriptivo del concepto.
-
-```
-adapter/http/handler/
-  response.go    ← WriteJSON, WriteError (ya existe)
-  pagination.go  ← ParsePagination, ParseIntParam, WriteBadPagination
-```
-
-**Regla:** si una función de utilidad HTTP es necesaria en 2+ paquetes de handler → sube al paquete raíz. Si es específica de un dominio → se queda en el paquete de ese dominio.
-
-Las funciones compartidas se parametrizan para no importar conceptos de dominio:
-
-```go
-// adapter/http/handler/pagination.go — sin imports de dominio
-func ParsePagination(q url.Values, w http.ResponseWriter, defaultLimit int) (page, limit int, ok bool)
-func ParseIntParam(raw string, defaultVal int) (int, error)
-
-// cada handler aporta su propio default — el dominio no contamina el paquete compartido
-page, limit, ok := handler.ParsePagination(r.URL.Query(), w, appGroup.DefaultPageLimit)
-```
-
-Las utilidades genéricas sin conocimiento HTTP (e.g., conversiones de string/pointer) van en `pkg/`.
-
-No existe `helpers.go` — el nombre no comunica nada sobre el contenido. Los archivos de lógica compartida dentro de un paquete se nombran por el concepto que agrupan (`pagination.go`, no `helpers.go`).
-
-### Ad7 — Naming de tipos de request y response en handlers
-
-Los tipos HTTP del handler layer usan sufijos según su rol:
-
-| Rol | Sufijo | Ejemplo |
-|---|---|---|
-| Top-level request (body o params que el handler deserializa) | `*Request` | `createGroupRequest`, `updateProblemRequest` |
-| Top-level response (struct que el handler serializa a JSON) | `*Response` | `getGroupResponse`, `listProblemsResponse` |
-| Sub-componente (tipo anidado dentro de un request o response) | sin sufijo | `pagination`, `author`, `langOverride` |
+El struct principal del handler de un dominio se llama `Handler`. El paquete ya identifica el dominio — repetirlo en el nombre del tipo es redundante, igual que en Ad1.
 
 ```go
 // ✅
-type createGroupRequest struct { ... }         // top-level: recibe el handler
-type listGroupsResponse struct {               // top-level: escribe el handler
-    Groups     []groupListItem `json:"groups"` // sub-componente: sin sufijo
-    Pagination pagination      `json:"pagination"`
-}
+package user
+type Handler struct { ... }
+func NewHandler(...) *Handler
 
-// ❌
-type paginationResp struct { ... }   // sufijo inconsistente
-type requestJoinBody struct { ... }  // sufijo incorrecto
+// desde main.go — el alias del import da el contexto
+handlerUser.NewHandler(...)
+
+// ❌ — "user" aparece dos veces
+type UserHandler struct { ... }
+// handlerUser.UserHandler
 ```
 
-Si al quitar el sufijo de un sub-componente el nombre queda ambiguo o poco descriptivo, se usa un nombre más específico — no es una excepción a la regla, sino una decisión de naming. `langOverrideRequest` y `langOverrideResp` son casi idénticos: se fusionan en `langOverride` (un solo tipo).
+Esta convención aplica a los paquetes de dominio bajo `adapter/http/handler/`: `user/`, `problem/`, `group/`, `material/`, `contest/`, `team/`, `submission/`. Los handlers que viven en `adapter/http/handler/` directamente (sin sub-paquete) pueden llevar nombre descriptivo si hay más de uno en el mismo paquete.
 
-El sufijo `*Body` no existe en este proyecto.
+### Ad5 — Un archivo `<operación>_handler.go` por método de handler
+
+Cada método de handler vive en su propio archivo. El nombre del archivo es el snake_case del nombre del método, con sufijo `_handler.go`. No se incluye el nombre del dominio en el archivo — el paquete ya lo da.
+
+```
+adapter/http/handler/user/
+  create_handler.go                  ← Handler.Create
+  request_deactivation_handler.go    ← Handler.RequestDeactivation
+  confirm_deactivation_handler.go    ← Handler.ConfirmDeactivation
+  request_email_change_handler.go    ← Handler.RequestEmailChange
+  confirm_email_change_handler.go    ← Handler.ConfirmEmailChange
+```
+
+Un archivo con dos métodos de handler agrupa dos operaciones sin justificación — cada use case tiene su propio `Execute`, cada handler tiene su propio archivo. La misma razón por la que A5 prohíbe múltiples métodos de negocio en un use case aplica acá.
+
+```
+// ❌ dos operaciones en un archivo
+user/deactivation_handler.go → RequestDeactivation + ConfirmDeactivation
+
+// ✅ una operación por archivo
+user/request_deactivation_handler.go  → RequestDeactivation
+user/confirm_deactivation_handler.go  → ConfirmDeactivation
+```
 
 ### Ad6 — `handler.go`: struct, campos y constructor
 
@@ -1389,49 +1355,103 @@ func NewHandler(
 }
 ```
 
-### Ad5 — Un archivo `<operación>_handler.go` por método de handler
+### Ad7 — Naming de tipos de request y response en handlers
 
-Cada método de handler vive en su propio archivo. El nombre del archivo es el snake_case del nombre del método, con sufijo `_handler.go`. No se incluye el nombre del dominio en el archivo — el paquete ya lo da.
+Los tipos HTTP del handler layer usan sufijos según su rol:
 
-```
-adapter/http/handler/user/
-  create_handler.go                  ← Handler.Create
-  request_deactivation_handler.go    ← Handler.RequestDeactivation
-  confirm_deactivation_handler.go    ← Handler.ConfirmDeactivation
-  request_email_change_handler.go    ← Handler.RequestEmailChange
-  confirm_email_change_handler.go    ← Handler.ConfirmEmailChange
-```
-
-Un archivo con dos métodos de handler agrupa dos operaciones sin justificación — cada use case tiene su propio `Execute`, cada handler tiene su propio archivo. La misma razón por la que A5 prohíbe múltiples métodos de negocio en un use case aplica acá.
-
-```
-// ❌ dos operaciones en un archivo
-user/deactivation_handler.go → RequestDeactivation + ConfirmDeactivation
-
-// ✅ una operación por archivo
-user/request_deactivation_handler.go  → RequestDeactivation
-user/confirm_deactivation_handler.go  → ConfirmDeactivation
-```
-
-### Ad4 — HTTP handler structs se llaman `Handler` dentro de su paquete de dominio
-
-El struct principal del handler de un dominio se llama `Handler`. El paquete ya identifica el dominio — repetirlo en el nombre del tipo es redundante, igual que en Ad1.
+| Rol | Sufijo | Ejemplo |
+|---|---|---|
+| Top-level request (body o params que el handler deserializa) | `*Request` | `createGroupRequest`, `updateProblemRequest` |
+| Top-level response (struct que el handler serializa a JSON) | `*Response` | `getGroupResponse`, `listProblemsResponse` |
+| Sub-componente (tipo anidado dentro de un request o response) | sin sufijo | `pagination`, `author`, `langOverride` |
 
 ```go
 // ✅
-package user
-type Handler struct { ... }
-func NewHandler(...) *Handler
+type createGroupRequest struct { ... }         // top-level: recibe el handler
+type listGroupsResponse struct {               // top-level: escribe el handler
+    Groups     []groupListItem `json:"groups"` // sub-componente: sin sufijo
+    Pagination pagination      `json:"pagination"`
+}
 
-// desde main.go — el alias del import da el contexto
-handlerUser.NewHandler(...)
-
-// ❌ — "user" aparece dos veces
-type UserHandler struct { ... }
-// handlerUser.UserHandler
+// ❌
+type paginationResp struct { ... }   // sufijo inconsistente
+type requestJoinBody struct { ... }  // sufijo incorrecto
 ```
 
-Esta convención aplica a los paquetes de dominio bajo `adapter/http/handler/`: `user/`, `problem/`, `group/`, `material/`. Los handlers que viven en `adapter/http/handler/` directamente (sin sub-paquete) pueden llevar nombre descriptivo si hay más de uno en el mismo paquete.
+Si al quitar el sufijo de un sub-componente el nombre queda ambiguo o poco descriptivo, se usa un nombre más específico — no es una excepción a la regla, sino una decisión de naming. `langOverrideRequest` y `langOverrideResp` son casi idénticos: se fusionan en `langOverride` (un solo tipo).
+
+**Sub-componente de paginación canónico.** Todas las respuestas de lista usan la misma forma. El nombre del tipo es `pagination` (sin sufijo) y el campo en la respuesta se llama `"pagination"`:
+
+```go
+type pagination struct {
+    Page        int  `json:"page"`
+    Limit       int  `json:"limit"`
+    Total       int  `json:"total"`
+    TotalPages  int  `json:"totalPages"`
+    HasNextPage bool `json:"hasNextPage"`
+    HasPrevPage bool `json:"hasPrevPage"`
+}
+```
+
+El sufijo `*Body` no existe en este proyecto.
+
+### Ad8 — Lógica compartida entre handler packages vive en `adapter/http/handler/`
+
+El paquete raíz `adapter/http/handler/` ya es importado por todos los sub-paquetes de dominio. Las funciones utilitarias que usan dos o más paquetes de handler van ahí, en archivos con nombre descriptivo del concepto.
+
+```
+adapter/http/handler/
+  response.go    ← WriteJSON, WriteError (ya existe)
+  pagination.go  ← ParsePagination, ParseIntParam, WriteBadPagination
+```
+
+**Regla:** si una función de utilidad HTTP es necesaria en 2+ paquetes de handler → sube al paquete raíz. Si es específica de un dominio → se queda en el paquete de ese dominio.
+
+Las funciones compartidas se parametrizan para no importar conceptos de dominio:
+
+```go
+// adapter/http/handler/pagination.go — sin imports de dominio
+func ParsePagination(q url.Values, w http.ResponseWriter, defaultLimit int) (page, limit int, ok bool)
+func ParseIntParam(raw string, defaultVal int) (int, error)
+
+// cada handler aporta su propio default — el dominio no contamina el paquete compartido
+page, limit, ok := handler.ParsePagination(r.URL.Query(), w, appGroup.DefaultPageLimit)
+```
+
+Las utilidades genéricas sin conocimiento HTTP (e.g., conversiones de string/pointer) van en `pkg/`.
+
+No existe `helpers.go` — el nombre no comunica nada sobre el contenido. Los archivos de lógica compartida dentro de un paquete se nombran por el concepto que agrupan (`pagination.go`, no `helpers.go`).
+
+### Ad9 — `response.go` es el único lugar con lógica de respuesta HTTP
+
+`adapter/http/handler/response.go` expone exactamente dos funciones públicas: `WriteJSON` y `WriteError`. No existen wrappers privados que las envuelvan — los handlers las llaman directamente.
+
+```go
+// ✅ el handler llama directo
+handler.WriteJSON(r.Context(), w, http.StatusOK, resp)
+handler.WriteError(r.Context(), w, err)
+
+// ❌ wrapper privado que no agrega nada
+func respondJSON(w http.ResponseWriter, status int, data any) {
+    WriteJSON(r.Context(), w, status, data)
+}
+```
+
+`response.go` también contiene `kindToStatus` — el único lugar del proyecto donde `apperror.Kind` se mapea a un código HTTP. Ningún otro archivo importa `net/http` para hacer este mapeo.
+
+```go
+func kindToStatus(k apperror.Kind) int {
+    switch k {
+    case apperror.KindValidation:      return http.StatusBadRequest
+    case apperror.KindNotFound:        return http.StatusNotFound
+    case apperror.KindConflict:        return http.StatusConflict
+    case apperror.KindForbidden:       return http.StatusForbidden
+    case apperror.KindUnauthorized:    return http.StatusUnauthorized
+    case apperror.KindTooManyRequests: return http.StatusTooManyRequests
+    default:                           return http.StatusInternalServerError
+    }
+}
+```
 
 ### Ad10 — Swagger: todo endpoint HTTP tiene anotaciones completas
 
@@ -1527,6 +1547,62 @@ CreatedAt: out.CreatedAt.Format("2006-01-02T15:04:05Z")
 **Por qué `.UTC()` explícito:** los timestamps vienen de la base de datos con timezone ya en UTC, pero la conversión explícita es la garantía correcta — no un supuesto implícito sobre el origen del valor.
 
 `time.RFC3339` equivale a `"2006-01-02T15:04:05Z07:00"`, que es el verbo correcto: si el valor está en UTC emite `Z`, si tiene offset lo emite como `+05:00`.
+
+### Ad13 — SDK clients: interfaz privada dentro del paquete
+
+Los adapters que dependen de un SDK externo con tipos concretos en su API (`*storage.Client` de GCS, `*client.Client` de Docker, etc.) definen una **interfaz privada mínima** dentro del paquete del adapter. El struct almacena esa interfaz — nunca el cliente concreto del SDK.
+
+**Por qué:** el cliente concreto no puede instanciarse en tests sin una conexión real al servicio externo. La interfaz privada permite inyectar un mock sin exponer la abstracción hacia afuera.
+
+**Estructura canónica** — cuando el SDK satisface la interfaz directamente (`*client.Client` para Docker):
+
+```go
+// pool/docker_client.go — tipo privado al paquete
+type dockerLifecycle interface {
+    ContainerCreate(ctx context.Context, opts client.ContainerCreateOptions) (client.ContainerCreateResult, error)
+    ContainerStart(ctx context.Context, containerID string, opts client.ContainerStartOptions) (client.ContainerStartResult, error)
+    ContainerRemove(ctx context.Context, containerID string, opts client.ContainerRemoveOptions) (client.ContainerRemoveResult, error)
+}
+// *client.Client satisface dockerLifecycle directamente.
+
+// pool/pool.go
+type Pool struct { docker dockerLifecycle }
+func NewPool(cfg PoolConfig, docker dockerLifecycle) *Pool
+// Tests pasan un mockDockerClient{}; producción pasa *client.Client.
+```
+
+**Cuando el SDK NO satisface la interfaz directamente** (e.g. GCS, cuya API es un chain de tipos concretos), se define además un thin adapter privado:
+
+```go
+// adapter/judge/gcs.go — private al paquete
+type gcsReader interface {
+    readObject(ctx context.Context, object string) (io.ReadCloser, error)
+}
+
+type gcsClientReader struct {
+    client *storage.Client
+    bucket string
+}
+
+func (r *gcsClientReader) readObject(ctx context.Context, object string) (io.ReadCloser, error) {
+    return r.client.Bucket(r.bucket).Object(object).NewReader(ctx)
+}
+
+func newGCSReader(client *storage.Client, bucket string) gcsReader {
+    return &gcsClientReader{client: client, bucket: bucket}
+}
+
+// adapter/judge/source_code_downloader.go
+type SourceCodeDownloader struct { reader gcsReader }
+
+func NewSourceCodeDownloader(client *storage.Client, bucket string) *SourceCodeDownloader {
+    return &SourceCodeDownloader{reader: newGCSReader(client, bucket)}
+}
+// El constructor público acepta el tipo concreto del SDK — el composition root
+// no ve la interfaz interna. Solo los tests la ven, inyectando un mockGCSReader.
+```
+
+**Cada paquete define su propia interfaz** con exactamente los métodos que necesita (Interface Segregation). No existe una interfaz GCS o Docker compartida entre paquetes — la duplicación de forma es intencional.
 
 ---
 

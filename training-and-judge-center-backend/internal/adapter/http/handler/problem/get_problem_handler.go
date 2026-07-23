@@ -2,6 +2,7 @@
 
 import (
 	"net/http"
+	"time"
 
 	"github.com/training-judge-center/backend/internal/adapter/http/handler"
 	"github.com/training-judge-center/backend/internal/adapter/http/middleware"
@@ -20,16 +21,16 @@ import (
 // @Failure      404 {object} apperror.AppError
 // @Router       /problems/p/{slug} [get]
 func (h *Handler) GetProblem(w http.ResponseWriter, r *http.Request) {
-	claims := middleware.GetClaims(r.Context())
-	if claims == nil {
+	cu, ok := middleware.GetCurrentUser(r.Context())
+	if !ok {
 		handler.WriteJSON(r.Context(), w, http.StatusUnauthorized, apperror.AppError{Code: apperror.ErrCodeUnauthorized, Message: "Invalid or missing authentication token"})
 		return
 	}
 
 	slug := r.PathValue("slug")
-	currentUser := shared.CurrentUser{ID: claims.UserID, Role: claims.Role}
+	currentUser := shared.CurrentUser{ID: cu.ID, Role: cu.Role}
 
-	out, err := h.getProblemUC.Execute(r.Context(), appProblem.GetProblemInput{
+	out, err := h.getProblem.Execute(r.Context(), appProblem.GetProblemInput{
 		Slug:        slug,
 		CurrentUser: currentUser,
 	})
@@ -50,7 +51,7 @@ func (h *Handler) GetProblem(w http.ResponseWriter, r *http.Request) {
 
 	var judgingUpdatedAt *string
 	if p.JudgingUpdatedAt != nil {
-		s := p.JudgingUpdatedAt.Format("2006-01-02T15:04:05Z")
+		s := p.JudgingUpdatedAt.UTC().Format(time.RFC3339)
 		judgingUpdatedAt = &s
 	}
 
@@ -65,8 +66,8 @@ func (h *Handler) GetProblem(w http.ResponseWriter, r *http.Request) {
 		Status:                  p.Status,
 		Accessibility:           p.Accessibility,
 		Author:                  authorResp{Nickname: out.Author.Nickname, Name: out.Author.Name},
-		CreatedAt:               p.CreatedAt.Format("2006-01-02T15:04:05Z"),
-		UpdatedAt:               p.UpdatedAt.Format("2006-01-02T15:04:05Z"),
+		CreatedAt:               p.CreatedAt.UTC().Format(time.RFC3339),
+		UpdatedAt:               p.UpdatedAt.UTC().Format(time.RFC3339),
 		ProblemJudgingUpdatedAt: judgingUpdatedAt,
 	}
 

@@ -6,7 +6,7 @@ import (
 
 	domainProblem "github.com/training-judge-center/backend/internal/domain/problem"
 	"github.com/training-judge-center/backend/internal/domain/shared"
-	appshared "github.com/training-judge-center/backend/internal/application/shared"
+	"github.com/training-judge-center/backend/internal/testutil"
 )
 
 var testNow = time.Date(2024, 1, 15, 10, 0, 0, 0, time.UTC)
@@ -90,6 +90,14 @@ func (m *mockUserProvider) GetIDByNickname(ctx context.Context, nickname string)
 	return "", false, nil
 }
 
+func providerResolving(userID string) *mockUserProvider {
+	return &mockUserProvider{
+		getIDByNicknameFn: func(_ context.Context, _ string) (string, bool, error) {
+			return userID, true, nil
+		},
+	}
+}
+
 // ── ProblemFileRepository mock ───────────────────────────────────────────────
 
 type mockFileStorage struct {
@@ -117,6 +125,17 @@ func (m *mockFileStorage) DeleteFilesWithPrefix(ctx context.Context, prefix stri
 	return nil
 }
 
+// ── ActiveContestChecker mock ────────────────────────────────────────────────
+
+type mockActiveContestChecker struct {
+	inActive bool
+	err      error
+}
+
+func (m *mockActiveContestChecker) IsProblemInActiveContest(_ context.Context, _ string) (bool, error) {
+	return m.inActive, m.err
+}
+
 // ── PlatformSettings default ─────────────────────────────────────────────────
 
 func newDefaultSettings() domainProblem.PlatformSettings {
@@ -141,9 +160,11 @@ func newDefaultSettings() domainProblem.PlatformSettings {
 
 // ── CurrentUser helpers ──────────────────────────────────────────────────────
 
-func asCoach(id string) appshared.CurrentUser      { return appshared.CurrentUser{ID: id, Role: shared.RoleCoach} }
-func asAdmin(id string) appshared.CurrentUser      { return appshared.CurrentUser{ID: id, Role: shared.RoleAdmin} }
-func asContestant(id string) appshared.CurrentUser { return appshared.CurrentUser{ID: id, Role: shared.RoleContestant} }
+var (
+	asAdmin      = testutil.AsAdmin
+	asCoach      = testutil.AsCoach
+	asContestant = testutil.AsContestant
+)
 
 // ── Problem fixtures ─────────────────────────────────────────────────────────
 

@@ -19,12 +19,12 @@ import (
 // @Failure      404 {object} apperror.AppError
 // @Router       /groups/{groupId}/materials/{materialId}/unpublish [post]
 func (h *Handler) Unpublish(w http.ResponseWriter, r *http.Request) {
-	currentUser, ok := h.requireCurrentUser(w, r)
+	currentUser, ok := handler.RequireCurrentUser(w, r)
 	if !ok {
 		return
 	}
 
-	out, err := h.unpublishUC.Execute(r.Context(), appMaterial.UnpublishMaterialInput{
+	out, err := h.unpublishMaterial.Execute(r.Context(), appMaterial.UnpublishMaterialInput{
 		CurrentUser: *currentUser,
 		GroupID:     r.PathValue("groupId"),
 		MaterialID:  r.PathValue("materialId"),

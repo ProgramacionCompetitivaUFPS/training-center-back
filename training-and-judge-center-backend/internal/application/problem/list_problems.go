@@ -2,16 +2,14 @@
 
 import (
 	"context"
-	"fmt"
-	"log/slog"
-	"math"
 
-	"github.com/training-judge-center/backend/internal/domain/problem"
+
 	appshared "github.com/training-judge-center/backend/internal/application/shared"
+	"github.com/training-judge-center/backend/internal/domain/problem"
 	"github.com/training-judge-center/backend/pkg/apperror"
 )
 
-const MaxPageLimit = 100
+const maxPageLimit = 100
 
 type ListProblemsInput struct {
 	CurrentUser    appshared.CurrentUser
@@ -46,15 +44,8 @@ func NewListProblemsUseCase(repo problem.Repository, userProvider UserProvider) 
 }
 
 func (uc *ListProblemsUseCase) Execute(ctx context.Context, in ListProblemsInput) (*ListProblemsOutput, error) {
-	if in.Page < 1 {
-		return nil, apperror.NewValidation([]apperror.FieldError{
-			{Field: "page", Message: "Page must be a positive integer"},
-		})
-	}
-	if in.Limit < 1 || in.Limit > MaxPageLimit {
-		return nil, apperror.NewValidation([]apperror.FieldError{
-			{Field: "limit", Message: fmt.Sprintf("Limit must be between 1 and %d", MaxPageLimit)},
-		})
+	if err := appshared.ValidatePagination(in.Page, in.Limit, maxPageLimit); err != nil {
+		return nil, err
 	}
 
 	filters := problem.ListFilters{
@@ -91,8 +82,7 @@ func (uc *ListProblemsUseCase) Execute(ctx context.Context, in ListProblemsInput
 	if in.AuthorNickname != nil {
 		authorID, found, err := uc.userProvider.GetIDByNickname(ctx, *in.AuthorNickname)
 		if err != nil {
-			slog.ErrorContext(ctx, "failed to get author ID by nickname", "error", err, "nickname", *in.AuthorNickname)
-			return nil, apperror.NewInternal()
+			return nil, err
 		}
 		if !found {
 			return &ListProblemsOutput{
@@ -123,8 +113,7 @@ func (uc *ListProblemsUseCase) Execute(ctx context.Context, in ListProblemsInput
 
 	displays, err := uc.userProvider.GetDisplays(ctx, authorIDs)
 	if err != nil {
-		slog.ErrorContext(ctx, "failed to fetch author displays", "error", err)
-		return nil, apperror.NewInternal()
+		return nil, err
 	}
 
 	summaries := make([]ProblemSummary, 0, len(problems))
@@ -137,7 +126,7 @@ func (uc *ListProblemsUseCase) Execute(ctx context.Context, in ListProblemsInput
 		summaries = append(summaries, ProblemSummary{Problem: problemToDTO(p), Author: author})
 	}
 
-	totalPages := int(math.Ceil(float64(total) / float64(in.Limit)))
+	totalPages := appshared.CalcTotalPages(total, in.Limit)
 
 	return &ListProblemsOutput{
 		Problems:   summaries,

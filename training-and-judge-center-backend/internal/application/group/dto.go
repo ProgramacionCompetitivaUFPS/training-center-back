@@ -31,6 +31,16 @@ type JoinRequestDTO struct {
 	CreatedAt       time.Time
 }
 
+type GroupInvitationDTO struct {
+	ID        string
+	GroupID   string
+	InviteeID *string // nil for a general (link-only) invitation
+	InvitedBy string
+	Status    string
+	ExpiresAt time.Time
+	CreatedAt time.Time
+}
+
 func groupToDTO(g *domainGroup.Group) GroupDTO {
 	return GroupDTO{
 		ID:          g.ID(),
@@ -56,5 +66,22 @@ func joinRequestToDTO(r *domainGroup.JoinRequest) JoinRequestDTO {
 		Status:          r.Status().String(),
 		Message:         r.Message(),
 		CreatedAt:       r.CreatedAt(),
+	}
+}
+
+func groupInvitationToDTO(inv *domainGroup.GroupInvitation) GroupInvitationDTO {
+	var inviteeID *string
+	if id := inv.InviteeID(); id != nil {
+		v := id.Value()
+		inviteeID = &v
+	}
+	return GroupInvitationDTO{
+		ID:        inv.ID(),
+		GroupID:   inv.GroupID(),
+		InviteeID: inviteeID,
+		InvitedBy: inv.InvitedBy().Value(),
+		Status:    inv.Status().String(),
+		ExpiresAt: inv.ExpiresAt(),
+		CreatedAt: inv.CreatedAt(),
 	}
 }

@@ -3,10 +3,12 @@ package user
 import (
 	"encoding/json"
 	"net/http"
+	"time"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/training-judge-center/backend/internal/adapter/http/handler"
 	appuser "github.com/training-judge-center/backend/internal/application/user"
+	"github.com/training-judge-center/backend/pkg/apperror"
 )
 
 type adminUpdateUserRequest struct {
@@ -31,15 +33,12 @@ type adminUpdateUserRequest struct {
 // @Failure      401 {object} apperror.AppError
 // @Failure      403 {object} apperror.AppError
 // @Router       /admin/users/{id} [put]
-func (h *UserHandler) AdminUpdateUser(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) AdminUpdateUser(w http.ResponseWriter, r *http.Request) {
 	targetID := chi.URLParam(r, "id")
 
 	var req adminUpdateUserRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		handler.WriteJSON(r.Context(), w, http.StatusBadRequest, map[string]string{
-			"error":   "INVALID_JSON",
-			"message": "Request body must be valid JSON",
-		})
+		handler.WriteJSON(r.Context(), w, http.StatusBadRequest, apperror.AppError{Code: "INVALID_JSON", Message: "request body must be valid JSON"})
 		return
 	}
 
@@ -65,13 +64,13 @@ func (h *UserHandler) AdminUpdateUser(w http.ResponseWriter, r *http.Request) {
 		City:        out.User.City,
 		Country:     out.User.Country,
 		Role:        out.User.Role,
-		CreatedAt:   out.User.CreatedAt.Format("2006-01-02T15:04:05Z"),
+		CreatedAt:   out.User.CreatedAt.UTC().Format(time.RFC3339),
 	}
 	if out.User.Email != nil {
 		resp.Email = *out.User.Email
 	}
 	if out.User.UpdatedAt != nil {
-		resp.UpdatedAt = out.User.UpdatedAt.Format("2006-01-02T15:04:05Z")
+		resp.UpdatedAt = out.User.UpdatedAt.UTC().Format(time.RFC3339)
 	}
 
 	handler.WriteJSON(r.Context(), w, http.StatusOK, resp)

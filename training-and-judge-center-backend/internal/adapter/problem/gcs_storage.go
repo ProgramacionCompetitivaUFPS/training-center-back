@@ -3,30 +3,27 @@ package problem
 import (
 	"context"
 	"errors"
-	"fmt"
 	"log/slog"
 
 	"cloud.google.com/go/storage"
-	appProblem "github.com/training-judge-center/backend/internal/application/problem"
+	"github.com/training-judge-center/backend/pkg/apperror"
 	"golang.org/x/sync/errgroup"
 	"google.golang.org/api/iterator"
 )
 
-type GCSProblemFileRepository struct {
+type GCSFileRepository struct {
 	client *storage.Client
 	bucket string
 }
 
-var _ appProblem.ProblemFileRepository = (*GCSProblemFileRepository)(nil)
-
-func NewGCSProblemFileRepository(client *storage.Client, bucketName string) *GCSProblemFileRepository {
-	return &GCSProblemFileRepository{
+func NewGCSFileRepository(client *storage.Client, bucketName string) *GCSFileRepository {
+	return &GCSFileRepository{
 		client: client,
 		bucket: bucketName,
 	}
 }
 
-func (r *GCSProblemFileRepository) UploadFile(ctx context.Context, path string, content []byte) error {
+func (r *GCSFileRepository) UploadFile(ctx context.Context, path string, content []byte) error {
 	obj := r.client.Bucket(r.bucket).Object(path)
 	writer := obj.NewWriter(ctx)
 
@@ -34,28 +31,31 @@ func (r *GCSProblemFileRepository) UploadFile(ctx context.Context, path string, 
 		if closeErr := writer.Close(); closeErr != nil {
 			slog.ErrorContext(ctx, "GCS writer close failed after write error", "close_error", closeErr, "path", path)
 		}
-		return fmt.Errorf("failed to write data to GCS object %s: %w", path, err)
+		slog.ErrorContext(ctx, "gcs: failed to write object", "path", path, "error", err)
+		return apperror.NewInternal()
 	}
 
 	if err := writer.Close(); err != nil {
-		return fmt.Errorf("failed to close GCS writer for object %s: %w", path, err)
+		slog.ErrorContext(ctx, "gcs: failed to close writer", "path", path, "error", err)
+		return apperror.NewInternal()
 	}
 
 	return nil
 }
 
-func (r *GCSProblemFileRepository) DeleteFile(ctx context.Context, path string) error {
+func (r *GCSFileRepository) DeleteFile(ctx context.Context, path string) error {
 	obj := r.client.Bucket(r.bucket).Object(path)
 	if err := obj.Delete(ctx); err != nil {
 		if errors.Is(err, storage.ErrObjectNotExist) {
 			return nil
 		}
-		return fmt.Errorf("failed to delete GCS object %s: %w", path, err)
+		slog.ErrorContext(ctx, "gcs: failed to delete object", "path", path, "error", err)
+		return apperror.NewInternal()
 	}
 	return nil
 }
 
-func (r *GCSProblemFileRepository) DeleteFilesWithPrefix(ctx context.Context, prefix string) error {
+func (r *GCSFileRepository) DeleteFilesWithPrefix(ctx context.Context, prefix string) error {
 	it := r.client.Bucket(r.bucket).Objects(ctx, &storage.Query{Prefix: prefix})
 
 	var names []string
@@ -65,7 +65,8 @@ func (r *GCSProblemFileRepository) DeleteFilesWithPrefix(ctx context.Context, pr
 			break
 		}
 		if err != nil {
-			return fmt.Errorf("failed to list GCS objects with prefix %s: %w", prefix, err)
+			slog.ErrorContext(ctx, "gcs: failed to list objects", "prefix", prefix, "error", err)
+			return apperror.NewInternal()
 		}
 		names = append(names, attrs.Name)
 	}
@@ -82,7 +83,8 @@ func (r *GCSProblemFileRepository) DeleteFilesWithPrefix(ctx context.Context, pr
 		g.Go(func() error {
 			if err := r.client.Bucket(r.bucket).Object(name).Delete(gCtx); err != nil {
 				if !errors.Is(err, storage.ErrObjectNotExist) {
-					return fmt.Errorf("failed to delete GCS object %s: %w", name, err)
+					slog.ErrorContext(gCtx, "gcs: failed to delete object", "name", name, "error", err)
+					return apperror.NewInternal()
 				}
 			}
 			return nil

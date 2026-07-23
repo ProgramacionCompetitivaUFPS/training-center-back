@@ -2,12 +2,14 @@ package user
 
 import (
 	"context"
-	"fmt"
+	"errors"
+	"log/slog"
 	"time"
 
 	"github.com/jackc/pgx/v5"
 	infraPostgres "github.com/training-judge-center/backend/internal/adapter/postgres"
 	domainUser "github.com/training-judge-center/backend/internal/domain/user"
+	"github.com/training-judge-center/backend/pkg/apperror"
 )
 
 type DeactivationRequestRepository struct {
@@ -37,7 +39,8 @@ func (r *DeactivationRequestRepository) Save(ctx context.Context, req *domainUse
 		req.UpdatedAt(),
 	)
 	if err != nil {
-		return fmt.Errorf("failed to save deactivation request: %w", err)
+		slog.ErrorContext(ctx, "database error saving deactivation request", "error", err)
+		return apperror.NewInternal()
 	}
 
 	return nil
@@ -69,10 +72,11 @@ func (r *DeactivationRequestRepository) FindPendingByUserID(ctx context.Context,
 	)
 
 	if err != nil {
-		if err == pgx.ErrNoRows {
+		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, nil
 		}
-		return nil, fmt.Errorf("failed to find pending deactivation request: %w", err)
+		slog.ErrorContext(ctx, "database error finding pending deactivation request", "user_id", userID, "error", err)
+		return nil, apperror.NewInternal()
 	}
 
 	req := domainUser.RestoreDeactivationRequest(id, returnedUserID, verificationCode, expiresAt, attempts, blockedUntil, domainUser.RestoreDeactivationStatus(status), createdAt, updatedAt)
@@ -104,10 +108,11 @@ func (r *DeactivationRequestRepository) FindByID(ctx context.Context, id string)
 	)
 
 	if err != nil {
-		if err == pgx.ErrNoRows {
+		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, nil
 		}
-		return nil, fmt.Errorf("failed to find deactivation request by id: %w", err)
+		slog.ErrorContext(ctx, "database error finding deactivation request by id", "id", id, "error", err)
+		return nil, apperror.NewInternal()
 	}
 
 	req := domainUser.RestoreDeactivationRequest(returnedID, returnedUserID, verificationCode, expiresAt, attempts, blockedUntil, domainUser.RestoreDeactivationStatus(status), createdAt, updatedAt)
@@ -131,7 +136,8 @@ func (r *DeactivationRequestRepository) Update(ctx context.Context, req *domainU
 		req.ID(),
 	)
 	if err != nil {
-		return fmt.Errorf("failed to update deactivation request: %w", err)
+		slog.ErrorContext(ctx, "database error updating deactivation request", "id", req.ID(), "error", err)
+		return apperror.NewInternal()
 	}
 
 	return nil
@@ -148,7 +154,8 @@ func (r *DeactivationRequestRepository) InvalidatePendingByUserID(ctx context.Co
 		domainUser.DeactivationStatusExpired.String(), now, userID, domainUser.DeactivationStatusPending.String(), domainUser.DeactivationStatusBlocked.String())
 
 	if err != nil {
-		return fmt.Errorf("failed to invalidate prior deactivation requests: %w", err)
+		slog.ErrorContext(ctx, "database error invalidating deactivation requests", "user_id", userID, "error", err)
+		return apperror.NewInternal()
 	}
 
 	return nil

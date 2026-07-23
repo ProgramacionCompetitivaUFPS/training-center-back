@@ -2,8 +2,6 @@
 
 import (
 	"context"
-	"errors"
-	"log/slog"
 
 	domainMaterial "github.com/training-judge-center/backend/internal/domain/material"
 	"github.com/training-judge-center/backend/internal/domain/shared"
@@ -29,8 +27,7 @@ func NewDeleteMaterialUseCase(repo domainMaterial.Repository, groupProvider Grou
 func (uc *DeleteMaterialUseCase) Execute(ctx context.Context, in DeleteMaterialInput) error {
 	exists, err := uc.groupProvider.Exists(ctx, in.GroupID)
 	if err != nil {
-		slog.ErrorContext(ctx, "failed to check group existence", "error", err, "group_id", in.GroupID)
-		return apperror.NewInternal()
+		return err
 	}
 	if !exists {
 		return apperror.NewNotFound(ErrCodeGroupNotFound, "group not found")
@@ -38,12 +35,7 @@ func (uc *DeleteMaterialUseCase) Execute(ctx context.Context, in DeleteMaterialI
 
 	m, err := uc.repo.FindByID(ctx, in.MaterialID)
 	if err != nil {
-		var appErr *apperror.AppError
-		if errors.As(err, &appErr) {
-			return err
-		}
-		slog.ErrorContext(ctx, "failed to find material", "error", err, "material_id", in.MaterialID)
-		return apperror.NewInternal()
+		return err
 	}
 	if m.GroupID() != in.GroupID {
 		return apperror.NewNotFound(domainMaterial.ErrCodeMaterialNotFound, "material not found")
@@ -54,8 +46,7 @@ func (uc *DeleteMaterialUseCase) Execute(ctx context.Context, in DeleteMaterialI
 	}
 
 	if err := uc.repo.Delete(ctx, in.MaterialID); err != nil {
-		slog.ErrorContext(ctx, "failed to delete material", "error", err, "material_id", in.MaterialID)
-		return apperror.NewInternal()
+		return err
 	}
 
 	return nil

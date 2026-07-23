@@ -1,6 +1,15 @@
 package submission
 
 const (
-	ErrCodeInvalidTransition = "INVALID_STATUS_TRANSITION"
-	ErrCodeInvalidLanguage   = "INVALID_LANGUAGE"
+	ErrCodeInvalidTransition  = "INVALID_STATUS_TRANSITION"
+	ErrCodeInvalidLanguage    = "INVALID_LANGUAGE"
+	ErrCodeSubmissionNotFound = "SUBMISSION_NOT_FOUND"
+	ErrCodeAccessDenied       = "ACCESS_DENIED"
+
+	ErrCodeProblemNotPublished  = "PROBLEM_NOT_PUBLISHED"
+	ErrCodeProblemNotAccessible = "PROBLEM_NOT_ACCESSIBLE"
+	ErrCodeDuplicateSubmission  = "DUPLICATE_SUBMISSION"
+	ErrCodeFileTooLarge         = "FILE_TOO_LARGE"
+	ErrCodeCompilerMismatch     = "COMPILER_MISMATCH"
+	ErrCodeNoTestCases          = "NO_TEST_CASES"
 )

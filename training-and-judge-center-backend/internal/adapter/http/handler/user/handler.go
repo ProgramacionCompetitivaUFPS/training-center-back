@@ -4,7 +4,7 @@ import (
 	appuser "github.com/training-judge-center/backend/internal/application/user"
 )
 
-type UserHandler struct {
+type Handler struct {
 	createUser              *appuser.CreateUserUseCase
 	getMyProfile            *appuser.GetMyProfileUseCase
 	getUserByNickname       *appuser.GetUserByNicknameUseCase
@@ -19,9 +19,11 @@ type UserHandler struct {
 	resetPassword           *appuser.ResetPasswordUseCase
 	requestDeactivation     *appuser.RequestDeactivationUseCase
 	confirmDeactivation     *appuser.ConfirmDeactivationUseCase
+	getDashboard            *appuser.GetDashboardUseCase
+	getProfileStats         *appuser.GetProfileStatsUseCase
 }
 
-func NewUserHandler(
+func NewHandler(
 	createUser *appuser.CreateUserUseCase,
 	getMyProfile *appuser.GetMyProfileUseCase,
 	getUserByNickname *appuser.GetUserByNicknameUseCase,
@@ -36,8 +38,10 @@ func NewUserHandler(
 	resetPassword *appuser.ResetPasswordUseCase,
 	requestDeactivation *appuser.RequestDeactivationUseCase,
 	confirmDeactivation *appuser.ConfirmDeactivationUseCase,
-) *UserHandler {
-	return &UserHandler{
+	getDashboard *appuser.GetDashboardUseCase,
+	getProfileStats *appuser.GetProfileStatsUseCase,
+) *Handler {
+	return &Handler{
 		createUser:              createUser,
 		getMyProfile:            getMyProfile,
 		getUserByNickname:       getUserByNickname,
@@ -52,5 +56,7 @@ func NewUserHandler(
 		resetPassword:           resetPassword,
 		requestDeactivation:     requestDeactivation,
 		confirmDeactivation:     confirmDeactivation,
+		getDashboard:            getDashboard,
+		getProfileStats:         getProfileStats,
 	}
 }

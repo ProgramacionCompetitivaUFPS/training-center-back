@@ -9,4 +9,9 @@ const (
 	ErrCodeUserNotFound               = "USER_NOT_FOUND"
 	ErrCodeInsufficientPermissions    = "INSUFFICIENT_PERMISSIONS"
 	ErrCodeFileNameNotApplicable      = "FILE_NAME_NOT_APPLICABLE"
+	ErrCodeProblemNotPublished        = "PROBLEM_NOT_PUBLISHED"
+	ErrCodeProblemNotInContest        = "PROBLEM_NOT_IN_CONTEST"
+	ErrCodeContestNotFound            = "CONTEST_NOT_FOUND"
+	ErrCodeContestNotActive           = "CONTEST_NOT_ACTIVE"
+	ErrCodeNoSubmissionsToRejudge     = "NO_SUBMISSIONS_TO_REJUDGE"
 )

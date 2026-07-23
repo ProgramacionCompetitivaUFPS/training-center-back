@@ -52,8 +52,7 @@ func (uc *ResetPasswordUseCase) Execute(ctx context.Context, input ResetPassword
 
 	foundUser, err := uc.userRepo.FindByEmail(ctx, emailVO)
 	if err != nil {
-		slog.ErrorContext(ctx, "failed to find user by email during password reset", "error", err)
-		return nil, apperror.NewInternal()
+		return nil, err
 	}
 	if foundUser == nil || foundUser.Status() == user.StatusDeactivated {
 		return nil, apperror.NewBadRequest(ErrCodeInvalidRecoveryAttempt, "Invalid email or recovery code")
@@ -61,8 +60,7 @@ func (uc *ResetPasswordUseCase) Execute(ctx context.Context, input ResetPassword
 
 	req, err := uc.recoveryRepo.FindPendingByUserID(ctx, foundUser.ID())
 	if err != nil {
-		slog.ErrorContext(ctx, "failed to find pending recovery request", "user_id", foundUser.ID(), "error", err)
-		return nil, apperror.NewInternal()
+		return nil, err
 	}
 	if req == nil {
 		return nil, apperror.NewBadRequest(ErrCodeInvalidRecoveryAttempt, "Invalid email or recovery code")
@@ -85,8 +83,7 @@ func (uc *ResetPasswordUseCase) Execute(ctx context.Context, input ResetPassword
 		return nil, apperror.NewInternal()
 	}
 	if err := req.MarkAsUsed(now); err != nil {
-		slog.ErrorContext(ctx, "failed to mark recovery request as used", "user_id", foundUser.ID(), "error", err)
-		return nil, apperror.NewInternal()
+		return nil, err
 	}
 
 	if err := uc.txManager.WithTx(ctx, func(txCtx context.Context) error {
@@ -98,13 +95,11 @@ func (uc *ResetPasswordUseCase) Execute(ctx context.Context, input ResetPassword
 		}
 		return nil
 	}); err != nil {
-		slog.ErrorContext(ctx, "failed to commit password reset transaction", "user_id", foundUser.ID(), "error", err)
-		return nil, apperror.NewInternal()
+		return nil, err
 	}
 
 	sessionsInvalidated := true
 	if err := uc.sessionInvalidator.InvalidateAllUserSessions(ctx, foundUser.ID(), now); err != nil {
-		slog.ErrorContext(ctx, "failed to invalidate sessions after password reset", "user_id", foundUser.ID(), "error", err)
 		sessionsInvalidated = false
 	}
 

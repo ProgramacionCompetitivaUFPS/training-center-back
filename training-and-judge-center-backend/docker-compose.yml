@@ -94,7 +94,7 @@ services:
       SMTP_PASSWORD: ${SMTP_PASSWORD:-}
       SMTP_FROM: ${SMTP_FROM:-noreply@trainingcenter.com}
       REDIS_URL: redis://redis:6379
-      MOCK_AUTH: ${MOCK_AUTH:-0}
+      RABBITMQ_URL: ${RABBITMQ_URL:-amqp://judge:judge@rabbitmq:5672/}
       VIRTUAL_OBJECT_CONFIG: /config/virtual_object.json
       STORAGE_BACKEND: ${STORAGE_BACKEND:-local}
       STORAGE_LOCAL_DIR: /data/uploads
@@ -107,8 +107,38 @@ services:
         condition: service_completed_successfully
       redis:
         condition: service_started
+      rabbitmq:
+        condition: service_healthy
       mailhog:
         condition: service_started
+
+  judge-worker:
+    build: .
+    container_name: training-center-worker
+    entrypoint: ["/bin/worker"]
+    environment:
+      DB_HOST: postgres
+      DB_PORT: "5432"
+      DB_USER: ${POSTGRES_USER}
+      DB_PASSWORD: ${POSTGRES_PASSWORD}
+      DB_NAME: ${POSTGRES_DB}
+      RABBITMQ_URL: ${RABBITMQ_URL:-amqp://judge:judge@rabbitmq:5672/}
+      STORAGE_BACKEND: ${STORAGE_BACKEND:-local}
+      STORAGE_LOCAL_DIR: /data/uploads
+      GCS_BUCKET: ${GCS_BUCKET:-}
+      POD_MEMORY_LIMIT: ${POD_MEMORY_LIMIT:-8589934592}
+      POD_CPU_LIMIT: ${POD_CPU_LIMIT:-4000}
+      JUDGE_CONFIG: /config/judge_config.yaml
+    volumes:
+      - problem_uploads:/data/uploads
+      - //./pipe/docker_engine://./pipe/docker_engine
+      # Linux / macOS: uncomment the line below, comment out the line above
+      # - /var/run/docker.sock:/var/run/docker.sock
+    depends_on:
+      seed:
+        condition: service_completed_successfully
+      rabbitmq:
+        condition: service_healthy
 
   mailhog:
     image: mailhog/mailhog
@@ -123,9 +153,27 @@ services:
     ports:
       - "6379:6379"
 
+  rabbitmq:
+    image: rabbitmq:3-management
+    container_name: training-center-rabbitmq
+    ports:
+      - "5672:5672"    # AMQP
+      - "15672:15672"  # Management UI
+    environment:
+      RABBITMQ_DEFAULT_USER: judge
+      RABBITMQ_DEFAULT_PASS: judge
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
 volumes:
   postgres_data:
   problem_uploads:
+  rabbitmq_data:
   certbot_etc:
   certbot_var:
   certbot_webroot:

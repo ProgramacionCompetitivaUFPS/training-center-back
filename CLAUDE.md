@@ -39,7 +39,7 @@ adapter/ratelimit/ ← driven adapter: rate limiting (transversal)
 
 `adapter/http/` must NOT import `adapter/postgres/`, `adapter/user/`, etc. — only `application/` and `domain/shared/`.
 
-**Codebase in transition.** `internal/server/` → `adapter/http/`, `internal/platform/` → `adapter/<domain>/`, `internal/infrastructure/` → `adapter/postgres/`. New code goes in the target structure. `PENDIENTE_REFACTOR.md` has the full change list.
+**Migración de estructura completada** (verificado 2026-07-19): `internal/server/`, `internal/platform/` e `internal/infrastructure/` ya no existen; todo el código vive en la estructura destino (`adapter/`). El backlog de refactors de convenciones (`PENDIENTE_REFACTOR.md`) se completó y fue eliminado.
 
 ## Conventions summary
 
@@ -107,4 +107,8 @@ adapter/ratelimit/ ← driven adapter: rate limiting (transversal)
 
 **Adapter double-logging:** the adapter logs the raw error before returning `apperror.NewInternal()`. The application layer must NOT log errors that come from adapters — they were already logged at the boundary.
 
-**Dominios en progreso:** `domain/group/` and `domain/material/` have domain implementation + tests but no application layer or handlers. `application/contest/`, `application/submission/` are intentionally empty placeholders for future work.
+**Estado de los dominios:** todos los dominios del backend (`user`, `problem`, `group`, `material`, `contest`, `team`, `submission`) tienen capa de dominio, `application/` y handlers HTTP implementados. El **Judge System** está mayormente implementado: pool de containers (`adapter/judge/pool/`), executor/session (`adapter/judge/`), use case con retries (`application/judge/`) y el binario `cmd/worker/` (RUNNER_ARCHITECTURE.md lo llama `cmd/judge` — es el mismo componente). Pendientes: consumidor concurrente con semáforo (hoy es serial), `Pool.IsHealthy()` + `os.Exit` si el pool se degrada, goroutine de recuperación (§874), y despliegue DinD en GKE.
+
+**Endpoints pendientes principales:**
+- `POST /problems/p/{slug}/publish` — requiere Judge System; bloquea DRAFT→PUBLISHED por API.
+- `GET /users/me/dashboard` — dashboard de actividad cross-domain (misc-4).

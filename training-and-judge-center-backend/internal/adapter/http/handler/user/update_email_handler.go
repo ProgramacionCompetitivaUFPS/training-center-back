@@ -8,6 +8,7 @@ import (
 	"github.com/training-judge-center/backend/internal/adapter/http/handler"
 	"github.com/training-judge-center/backend/internal/adapter/http/middleware"
 	appuser "github.com/training-judge-center/backend/internal/application/user"
+	"github.com/training-judge-center/backend/pkg/apperror"
 )
 
 type requestEmailChangeBody struct {
@@ -25,34 +26,26 @@ type requestEmailChangeBody struct {
 // @Failure      400 {object} apperror.AppError
 // @Failure      401 {object} apperror.AppError
 // @Router       /users/email-change/request [post]
-func (h *UserHandler) RequestEmailChange(w http.ResponseWriter, r *http.Request) {
-	claims := middleware.GetClaims(r.Context())
-	if claims == nil {
-		handler.WriteJSON(r.Context(), w, http.StatusUnauthorized, map[string]string{
-			"error":   "UNAUTHORIZED",
-			"message": "Invalid or missing authentication token",
-		})
+func (h *Handler) RequestEmailChange(w http.ResponseWriter, r *http.Request) {
+	cu, ok := middleware.GetCurrentUser(r.Context())
+	if !ok {
+		handler.WriteJSON(r.Context(), w, http.StatusUnauthorized, apperror.AppError{Code: apperror.ErrCodeUnauthorized, Message: "invalid or missing authentication token"})
 		return
 	}
-	userID := claims.UserID
+	userID := cu.ID
 	ctx := r.Context()
 
 	var body requestEmailChangeBody
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-		handler.WriteJSON(r.Context(), w, http.StatusBadRequest, map[string]string{
-			"error":   "INVALID_JSON",
-			"message": "Request body must be valid JSON",
-		})
+		handler.WriteJSON(r.Context(), w, http.StatusBadRequest, apperror.AppError{Code: "INVALID_JSON", Message: "request body must be valid JSON"})
 		return
 	}
 
 	if body.Password == "" || body.NewEmail == "" {
-		handler.WriteJSON(r.Context(), w, http.StatusBadRequest, map[string]interface{}{
-			"error":   "VALIDATION_ERROR",
-			"message": "Invalid request data",
-			"details": []map[string]string{
-				{"field": "password/newEmail", "message": "They are required"},
-			},
+		handler.WriteJSON(r.Context(), w, http.StatusBadRequest, apperror.AppError{
+			Code:    apperror.ErrCodeValidationError,
+			Message: "invalid request data",
+			Details: []apperror.FieldError{{Field: "password/newEmail", Message: "all fields are required"}},
 		})
 		return
 	}
@@ -69,7 +62,7 @@ func (h *UserHandler) RequestEmailChange(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	handler.WriteJSON(r.Context(), w, http.StatusOK, map[string]interface{}{
+	handler.WriteJSON(r.Context(), w, http.StatusOK, map[string]any{
 		"message":   "Verification code sent to the new email address",
 		"expiresAt": output.ExpiresAt.Format(time.RFC3339),
 	})
@@ -89,34 +82,26 @@ type confirmEmailChangeBody struct {
 // @Failure      400 {object} apperror.AppError
 // @Failure      401 {object} apperror.AppError
 // @Router       /users/email-change/confirm [post]
-func (h *UserHandler) ConfirmEmailChange(w http.ResponseWriter, r *http.Request) {
-	claims := middleware.GetClaims(r.Context())
-	if claims == nil {
-		handler.WriteJSON(r.Context(), w, http.StatusUnauthorized, map[string]string{
-			"error":   "UNAUTHORIZED",
-			"message": "Invalid or missing authentication token",
-		})
+func (h *Handler) ConfirmEmailChange(w http.ResponseWriter, r *http.Request) {
+	cu, ok := middleware.GetCurrentUser(r.Context())
+	if !ok {
+		handler.WriteJSON(r.Context(), w, http.StatusUnauthorized, apperror.AppError{Code: apperror.ErrCodeUnauthorized, Message: "invalid or missing authentication token"})
 		return
 	}
-	userID := claims.UserID
+	userID := cu.ID
 	ctx := r.Context()
 
 	var body confirmEmailChangeBody
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-		handler.WriteJSON(r.Context(), w, http.StatusBadRequest, map[string]string{
-			"error":   "INVALID_JSON",
-			"message": "Request body must be valid JSON",
-		})
+		handler.WriteJSON(r.Context(), w, http.StatusBadRequest, apperror.AppError{Code: "INVALID_JSON", Message: "request body must be valid JSON"})
 		return
 	}
 
 	if !digitCodeRegex.MatchString(body.Code) {
-		handler.WriteJSON(r.Context(), w, http.StatusBadRequest, map[string]interface{}{
-			"error":   "VALIDATION_ERROR",
-			"message": "Invalid request data",
-			"details": []map[string]string{
-				{"field": "code", "message": "Code must be exactly 6 digits"},
-			},
+		handler.WriteJSON(r.Context(), w, http.StatusBadRequest, apperror.AppError{
+			Code:    apperror.ErrCodeValidationError,
+			Message: "invalid request data",
+			Details: []apperror.FieldError{{Field: "code", Message: "code must be exactly 6 digits"}},
 		})
 		return
 	}
@@ -132,7 +117,7 @@ func (h *UserHandler) ConfirmEmailChange(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	handler.WriteJSON(r.Context(), w, http.StatusOK, map[string]interface{}{
+	handler.WriteJSON(r.Context(), w, http.StatusOK, map[string]any{
 		"message": "Email updated successfully",
 		"email":   out.Email,
 	})

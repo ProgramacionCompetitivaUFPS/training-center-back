@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/training-judge-center/backend/internal/application/shared"
+	appuser "github.com/training-judge-center/backend/internal/application/user"
 	domainuser "github.com/training-judge-center/backend/internal/domain/user"
 )
 
@@ -79,7 +80,9 @@ type mockTokenService struct {
 	validateFn func(token string) (*domainuser.TokenClaims, error)
 }
 
-func (m *mockTokenService) GenerateToken(_ *domainuser.User) (string, error) { return "", nil }
+func (m *mockTokenService) GenerateToken(_ context.Context, _ *domainuser.User) (string, error) {
+	return "", nil
+}
 func (m *mockTokenService) ValidateToken(token string) (*domainuser.TokenClaims, error) {
 	return m.validateFn(token)
 }
@@ -173,4 +176,120 @@ type mockHandlerTxManager struct{}
 
 func (m *mockHandlerTxManager) WithTx(ctx context.Context, fn func(context.Context) error) error {
 	return fn(ctx)
+}
+
+// ── dashboard provider mocks ──────────────────────────────────────────────────
+
+type mockDashboardSubmissionProvider struct {
+	getRecentSubmissionsFn func(ctx context.Context, userID string, limit int) ([]appuser.DashboardSubmission, error)
+	getSubmissionDatesFn   func(ctx context.Context, userID string) ([]time.Time, error)
+}
+
+func (m *mockDashboardSubmissionProvider) GetRecentSubmissions(ctx context.Context, userID string, limit int) ([]appuser.DashboardSubmission, error) {
+	if m.getRecentSubmissionsFn != nil {
+		return m.getRecentSubmissionsFn(ctx, userID, limit)
+	}
+	return nil, nil
+}
+
+func (m *mockDashboardSubmissionProvider) GetSubmissionDates(ctx context.Context, userID string) ([]time.Time, error) {
+	if m.getSubmissionDatesFn != nil {
+		return m.getSubmissionDatesFn(ctx, userID)
+	}
+	return nil, nil
+}
+
+type mockDashboardContestProvider struct {
+	getUpcomingContestsFn       func(ctx context.Context, userID string, limit int) ([]appuser.DashboardContest, error)
+	getActiveContestsFn         func(ctx context.Context, userID string, limit int) ([]appuser.DashboardContest, error)
+	getFinishedContestResultsFn func(ctx context.Context, userID string, limit int) ([]appuser.DashboardContestResult, error)
+}
+
+func (m *mockDashboardContestProvider) GetUpcomingContests(ctx context.Context, userID string, limit int) ([]appuser.DashboardContest, error) {
+	if m.getUpcomingContestsFn != nil {
+		return m.getUpcomingContestsFn(ctx, userID, limit)
+	}
+	return nil, nil
+}
+
+func (m *mockDashboardContestProvider) GetActiveContests(ctx context.Context, userID string, limit int) ([]appuser.DashboardContest, error) {
+	if m.getActiveContestsFn != nil {
+		return m.getActiveContestsFn(ctx, userID, limit)
+	}
+	return nil, nil
+}
+
+func (m *mockDashboardContestProvider) GetFinishedContestResults(ctx context.Context, userID string, limit int) ([]appuser.DashboardContestResult, error) {
+	if m.getFinishedContestResultsFn != nil {
+		return m.getFinishedContestResultsFn(ctx, userID, limit)
+	}
+	return nil, nil
+}
+
+type mockDashboardMaterialProvider struct {
+	getRecentMaterialsCountFn func(ctx context.Context, userID string, windowDays int) (int, error)
+}
+
+func (m *mockDashboardMaterialProvider) GetRecentMaterialsCount(ctx context.Context, userID string, windowDays int) (int, error) {
+	if m.getRecentMaterialsCountFn != nil {
+		return m.getRecentMaterialsCountFn(ctx, userID, windowDays)
+	}
+	return 0, nil
+}
+
+type mockProblemsSolvedProvider struct {
+	getProblemsSolvedFn func(ctx context.Context, userID string) (int, error)
+}
+
+func (m *mockProblemsSolvedProvider) GetProblemsSolved(ctx context.Context, userID string) (int, error) {
+	if m.getProblemsSolvedFn != nil {
+		return m.getProblemsSolvedFn(ctx, userID)
+	}
+	return 0, nil
+}
+
+// ── stats provider mocks ──────────────────────────────────────────────────────
+
+type mockRankingProvider struct {
+	getRankingFn func(ctx context.Context, userID string) (int, *int, int, error)
+}
+
+func (m *mockRankingProvider) GetRanking(ctx context.Context, userID string) (int, *int, int, error) {
+	if m.getRankingFn != nil {
+		return m.getRankingFn(ctx, userID)
+	}
+	return 0, nil, 0, nil
+}
+
+type mockSubmissionStatsProvider struct {
+	getSubmissionCountsFn func(ctx context.Context, userID string) (int, int, error)
+}
+
+func (m *mockSubmissionStatsProvider) GetSubmissionCounts(ctx context.Context, userID string) (int, int, error) {
+	if m.getSubmissionCountsFn != nil {
+		return m.getSubmissionCountsFn(ctx, userID)
+	}
+	return 0, 0, nil
+}
+
+type mockContestParticipationProvider struct {
+	getContestsParticipatedCountFn func(ctx context.Context, userID string) (int, error)
+}
+
+func (m *mockContestParticipationProvider) GetContestsParticipatedCount(ctx context.Context, userID string) (int, error) {
+	if m.getContestsParticipatedCountFn != nil {
+		return m.getContestsParticipatedCountFn(ctx, userID)
+	}
+	return 0, nil
+}
+
+type mockTopicStatsProvider struct {
+	getTopicBreakdownFn func(ctx context.Context, userID string) ([]appuser.TopicStat, error)
+}
+
+func (m *mockTopicStatsProvider) GetTopicBreakdown(ctx context.Context, userID string) ([]appuser.TopicStat, error) {
+	if m.getTopicBreakdownFn != nil {
+		return m.getTopicBreakdownFn(ctx, userID)
+	}
+	return nil, nil
 }

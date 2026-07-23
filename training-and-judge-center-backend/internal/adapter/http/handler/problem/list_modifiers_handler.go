@@ -20,8 +20,8 @@ import (
 // @Failure      404 {object} apperror.AppError
 // @Router       /problems/p/{slug}/modifiers [get]
 func (h *Handler) ListModifiers(w http.ResponseWriter, r *http.Request) {
-	claims := middleware.GetClaims(r.Context())
-	if claims == nil {
+	cu, ok := middleware.GetCurrentUser(r.Context())
+	if !ok {
 		handler.WriteJSON(r.Context(), w, http.StatusUnauthorized, apperror.AppError{Code: apperror.ErrCodeUnauthorized, Message: "Invalid token"})
 		return
 	}
@@ -32,9 +32,9 @@ func (h *Handler) ListModifiers(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	currentUser := shared.CurrentUser{ID: claims.UserID, Role: claims.Role}
+	currentUser := shared.CurrentUser{ID: cu.ID, Role: cu.Role}
 
-	out, err := h.listModifiersUC.Execute(r.Context(), appProblem.ListModifiersInput{
+	out, err := h.listModifiers.Execute(r.Context(), appProblem.ListModifiersInput{
 		Slug:        slug,
 		CurrentUser: currentUser,
 	})
@@ -43,5 +43,9 @@ func (h *Handler) ListModifiers(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	handler.WriteJSON(r.Context(), w, http.StatusOK, map[string]interface{}{"modifiers": out.Nicknames})
+	modifiers := make([]modifierResp, 0, len(out.Modifiers))
+	for _, m := range out.Modifiers {
+		modifiers = append(modifiers, modifierResp{Nickname: m.Nickname, Name: m.Name})
+	}
+	handler.WriteJSON(r.Context(), w, http.StatusOK, listModifiersResponse{Modifiers: modifiers})
 }

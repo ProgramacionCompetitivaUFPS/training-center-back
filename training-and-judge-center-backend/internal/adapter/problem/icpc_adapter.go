@@ -6,17 +6,15 @@ import (
 	appProblem "github.com/training-judge-center/backend/internal/application/problem"
 )
 
-type ICPCParserAdapter struct {
+type ZipParser struct {
 	inner *ICPCParser
 }
 
-var _ appProblem.ZipParser = (*ICPCParserAdapter)(nil)
-
-func NewICPCParserAdapter(inner *ICPCParser) *ICPCParserAdapter {
-	return &ICPCParserAdapter{inner: inner}
+func NewZipParser(inner *ICPCParser) *ZipParser {
+	return &ZipParser{inner: inner}
 }
 
-func (a *ICPCParserAdapter) ParseTestCasesZip(ctx context.Context, zipData []byte) ([]appProblem.ParsedFile, error) {
+func (a *ZipParser) ParseTestCasesZip(ctx context.Context, zipData []byte) ([]appProblem.ParsedFile, error) {
 	extracted, err := a.inner.ParseTestCasesZip(ctx, zipData)
 	if err != nil {
 		return nil, err
@@ -28,17 +26,15 @@ func (a *ICPCParserAdapter) ParseTestCasesZip(ctx context.Context, zipData []byt
 	return result, nil
 }
 
-type ICPCPackageParserAdapter struct {
+type ICPCPackageParser struct {
 	inner *ICPCParser
 }
 
-var _ appProblem.ICPCPackageParser = (*ICPCPackageParserAdapter)(nil)
-
-func NewICPCPackageParserAdapter(inner *ICPCParser) *ICPCPackageParserAdapter {
-	return &ICPCPackageParserAdapter{inner: inner}
+func NewICPCPackageParser(inner *ICPCParser) *ICPCPackageParser {
+	return &ICPCPackageParser{inner: inner}
 }
 
-func (a *ICPCPackageParserAdapter) ParsePackageZip(ctx context.Context, zipData []byte) (*appProblem.ParsedPackage, error) {
+func (a *ICPCPackageParser) ParsePackageZip(ctx context.Context, zipData []byte) (*appProblem.ParsedPackage, error) {
 	pkg, err := a.inner.ParsePackageZip(ctx, zipData)
 	if err != nil {
 		return nil, err

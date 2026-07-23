@@ -5,20 +5,19 @@ import (
 	"testing"
 
 	domainGroup "github.com/training-judge-center/backend/internal/domain/group"
-	"github.com/training-judge-center/backend/internal/domain/shared"
 	"github.com/training-judge-center/backend/pkg/apperror"
 )
 
-func newListRequestsUC(memberRepo *fakeMemberRepo, reqRepo *fakeJoinRequestRepo) *ListJoinRequestsUseCase {
-	return NewListJoinRequestsUseCase(memberRepo, reqRepo, &fakeUserProvider{})
+func newListJoinRequestsUseCase(memberRepo *mockMemberRepository, reqRepo *mockJoinRequestRepository) *ListJoinRequestsUseCase {
+	return NewListJoinRequestsUseCase(memberRepo, reqRepo, &mockUserProvider{})
 }
 
 func TestListJoinRequests_NonLeadReturns403(t *testing.T) {
-	uc := newListRequestsUC(&fakeMemberRepo{}, &fakeJoinRequestRepo{})
+	uc := newListJoinRequestsUseCase(&mockMemberRepository{}, &mockJoinRequestRepository{})
 
 	_, err := uc.Execute(context.Background(), ListJoinRequestsInput{
 		GroupID:     "g1",
-		CurrentUser: currentUser("nobody", shared.RoleContestant),
+		CurrentUser: asContestant("nobody"),
 	})
 	ae, ok := err.(*apperror.AppError)
 	if !ok || ae.Code != ErrCodeInsufficientPermissions {
@@ -28,12 +27,14 @@ func TestListJoinRequests_NonLeadReturns403(t *testing.T) {
 
 func TestListJoinRequests_AdminCanList(t *testing.T) {
 	req := pendingRequest("r1", "g1", "u1")
-	reqRepo := &fakeJoinRequestRepo{requests: []*domainGroup.JoinRequest{req}}
-	uc := newListRequestsUC(&fakeMemberRepo{}, reqRepo)
+	reqRepo := &mockJoinRequestRepository{requests: []*domainGroup.JoinRequest{req}}
+	uc := newListJoinRequestsUseCase(&mockMemberRepository{}, reqRepo)
 
 	out, err := uc.Execute(context.Background(), ListJoinRequestsInput{
 		GroupID:     "g1",
-		CurrentUser: currentUser("admin", shared.RoleAdmin),
+		Page:        1,
+		Limit:       20,
+		CurrentUser: asAdmin("admin"),
 	})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -47,12 +48,14 @@ func TestListJoinRequests_DefaultsToStatusPending(t *testing.T) {
 	pending := pendingRequest("r1", "g1", "u1")
 	rejected := pendingRequest("r2", "g1", "u2")
 	_ = rejected.Reject()
-	reqRepo := &fakeJoinRequestRepo{requests: []*domainGroup.JoinRequest{pending, rejected}}
-	uc := newListRequestsUC(leadMemberRepo("g1", "lead-id"), reqRepo)
+	reqRepo := &mockJoinRequestRepository{requests: []*domainGroup.JoinRequest{pending, rejected}}
+	uc := newListJoinRequestsUseCase(leadMemberRepo("g1", "lead-id"), reqRepo)
 
 	out, err := uc.Execute(context.Background(), ListJoinRequestsInput{
 		GroupID:     "g1",
-		CurrentUser: currentUser("lead-id", shared.RoleContestant),
+		Page:        1,
+		Limit:       20,
+		CurrentUser: asContestant("lead-id"),
 	})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -63,12 +66,12 @@ func TestListJoinRequests_DefaultsToStatusPending(t *testing.T) {
 }
 
 func TestListJoinRequests_InvalidStatusReturnsValidationError(t *testing.T) {
-	uc := newListRequestsUC(leadMemberRepo("g1", "lead-id"), &fakeJoinRequestRepo{})
+	uc := newListJoinRequestsUseCase(leadMemberRepo("g1", "lead-id"), &mockJoinRequestRepository{})
 
 	_, err := uc.Execute(context.Background(), ListJoinRequestsInput{
 		GroupID:     "g1",
 		Status:      "INVALID",
-		CurrentUser: currentUser("lead-id", shared.RoleContestant),
+		CurrentUser: asContestant("lead-id"),
 	})
 	ae, ok := err.(*apperror.AppError)
 	if !ok || ae.Code != apperror.ErrCodeValidationError {
@@ -77,12 +80,12 @@ func TestListJoinRequests_InvalidStatusReturnsValidationError(t *testing.T) {
 }
 
 func TestListJoinRequests_LimitExceeded100Returns400(t *testing.T) {
-	uc := newListRequestsUC(leadMemberRepo("g1", "lead-id"), &fakeJoinRequestRepo{})
+	uc := newListJoinRequestsUseCase(leadMemberRepo("g1", "lead-id"), &mockJoinRequestRepository{})
 
 	_, err := uc.Execute(context.Background(), ListJoinRequestsInput{
 		GroupID:     "g1",
 		Limit:       101,
-		CurrentUser: currentUser("lead-id", shared.RoleContestant),
+		CurrentUser: asContestant("lead-id"),
 	})
 	ae, ok := err.(*apperror.AppError)
 	if !ok || ae.Code != apperror.ErrCodeValidationError {

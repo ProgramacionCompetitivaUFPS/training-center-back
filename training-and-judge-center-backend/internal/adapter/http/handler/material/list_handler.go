@@ -6,10 +6,17 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/training-judge-center/backend/internal/adapter/http/handler"
 	appMaterial "github.com/training-judge-center/backend/internal/application/material"
 	"github.com/training-judge-center/backend/pkg/apperror"
+)
+
+const (
+	defaultPage  = 1
+	defaultLimit = 20
+	maxLimit     = 100
 )
 
 // @Summary      List materials
@@ -25,7 +32,7 @@ import (
 // @Failure      401 {object} apperror.AppError
 // @Router       /groups/{groupId}/materials [get]
 func (h *Handler) List(w http.ResponseWriter, r *http.Request) {
-	currentUser, ok := h.requireCurrentUser(w, r)
+	currentUser, ok := handler.RequireCurrentUser(w, r)
 	if !ok {
 		return
 	}
@@ -64,13 +71,45 @@ func (h *Handler) List(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	out, err := h.listUC.Execute(r.Context(), appMaterial.ListMaterialsInput{
-		CurrentUser: *currentUser,
-		GroupID:     groupID,
-		Pinned:      pinned,
-		Tags:        tags,
-		Page:        page,
-		Limit:       limit,
+	query := strings.TrimSpace(q.Get("q"))
+	author := strings.TrimSpace(q.Get("author"))
+	sort := strings.TrimSpace(q.Get("sort"))
+
+	parseDate := func(field, raw string) (*time.Time, bool) {
+		if raw == "" {
+			return nil, true
+		}
+		t, err := time.Parse("2006-01-02", raw)
+		if err != nil {
+			handler.WriteError(r.Context(), w, apperror.NewValidation([]apperror.FieldError{
+				{Field: field, Message: field + " must be a date in YYYY-MM-DD format"},
+			}))
+			return nil, false
+		}
+		return &t, true
+	}
+
+	publishedFrom, ok2 := parseDate("publishedFrom", q.Get("publishedFrom"))
+	if !ok2 {
+		return
+	}
+	publishedTo, ok3 := parseDate("publishedTo", q.Get("publishedTo"))
+	if !ok3 {
+		return
+	}
+
+	out, err := h.listMaterials.Execute(r.Context(), appMaterial.ListMaterialsInput{
+		CurrentUser:   *currentUser,
+		GroupID:       groupID,
+		Query:         query,
+		Author:        author,
+		PublishedFrom: publishedFrom,
+		PublishedTo:   publishedTo,
+		Pinned:        pinned,
+		Tags:          tags,
+		Sort:          sort,
+		Page:          page,
+		Limit:         limit,
 	})
 	if err != nil {
 		handler.WriteError(r.Context(), w, err)
@@ -85,17 +124,19 @@ func (h *Handler) List(w http.ResponseWriter, r *http.Request) {
 	handler.WriteJSON(r.Context(), w, http.StatusOK, listMaterialsResponse{
 		Materials: items,
 		Pagination: paginationResp{
-			TotalCount:   out.Pagination.TotalCount,
-			CurrentPage:  out.Pagination.CurrentPage,
-			TotalPages:   out.Pagination.TotalPages,
-			ItemsPerPage: out.Pagination.ItemsPerPage,
+			Page:        out.Pagination.CurrentPage,
+			Limit:       out.Pagination.ItemsPerPage,
+			Total:       out.Pagination.TotalCount,
+			TotalPages:  out.Pagination.TotalPages,
+			HasNextPage: out.Pagination.CurrentPage < out.Pagination.TotalPages,
+			HasPrevPage: out.Pagination.CurrentPage > 1,
 		},
 	})
 }
 
 func parsePagination(ctx context.Context, w http.ResponseWriter, rawPage, rawLimit string) (page, limit int, ok bool) {
-	page = appMaterial.DefaultPage
-	limit = appMaterial.DefaultLimit
+	page = defaultPage
+	limit = defaultLimit
 
 	if rawPage != "" {
 		v, err := strconv.Atoi(rawPage)
@@ -110,9 +151,9 @@ func parsePagination(ctx context.Context, w http.ResponseWriter, rawPage, rawLim
 
 	if rawLimit != "" {
 		v, err := strconv.Atoi(rawLimit)
-		if err != nil || v < 1 || v > appMaterial.MaxLimit {
+		if err != nil || v < 1 || v > maxLimit {
 			handler.WriteError(ctx, w, apperror.NewValidation([]apperror.FieldError{
-				{Field: "limit", Message: fmt.Sprintf("limit must be between 1 and %d", appMaterial.MaxLimit)},
+				{Field: "limit", Message: fmt.Sprintf("limit must be between 1 and %d", maxLimit)},
 			}))
 			return 0, 0, false
 		}

@@ -10,6 +10,7 @@ import (
 	appshared "github.com/training-judge-center/backend/internal/application/shared"
 	"github.com/training-judge-center/backend/internal/domain/user"
 	"github.com/training-judge-center/backend/pkg/apperror"
+	"github.com/training-judge-center/backend/pkg/emailtemplate"
 )
 
 type ConfirmDeactivationInput struct {
@@ -53,8 +54,7 @@ func NewConfirmDeactivationUseCase(
 func (uc *ConfirmDeactivationUseCase) Execute(ctx context.Context, input ConfirmDeactivationInput) (*ConfirmDeactivationOutput, error) {
 	foundUser, err := uc.userRepo.FindByID(ctx, input.UserID)
 	if err != nil {
-		slog.ErrorContext(ctx, "failed to find user during deactivation confirmation", "user_id", input.UserID, "error", err)
-		return nil, apperror.NewInternal()
+		return nil, err
 	}
 	if foundUser == nil || foundUser.Status() == user.StatusDeactivated {
 		return nil, apperror.NewConflict(user.ErrCodeAlreadyDeactivated, "User account is already deactivated or doesn't exist")
@@ -62,8 +62,7 @@ func (uc *ConfirmDeactivationUseCase) Execute(ctx context.Context, input Confirm
 
 	req, err := uc.deactRepo.FindPendingByUserID(ctx, input.UserID)
 	if err != nil {
-		slog.ErrorContext(ctx, "failed to find pending deactivation request", "user_id", input.UserID, "error", err)
-		return nil, apperror.NewInternal()
+		return nil, err
 	}
 	if req == nil {
 		return nil, apperror.NewNotFound(ErrCodeNoPendingRequest, "No pending deactivation request found")
@@ -83,8 +82,7 @@ func (uc *ConfirmDeactivationUseCase) Execute(ctx context.Context, input Confirm
 		// Block period has expired — invalidate the request entirely; user must start a new one
 		req.MarkAsExpired(now)
 		if err := uc.deactRepo.Update(ctx, req); err != nil {
-			slog.ErrorContext(ctx, "failed to mark expired deactivation request", "user_id", input.UserID, "error", err)
-			return nil, apperror.NewInternal()
+			return nil, err
 		}
 		return nil, apperror.NewBadRequest(ErrCodeExpiredCode, "The confirmation code has expired. Please request a new one")
 	}
@@ -93,8 +91,7 @@ func (uc *ConfirmDeactivationUseCase) Execute(ctx context.Context, input Confirm
 	if req.IsExpired(now) {
 		req.MarkAsExpired(now)
 		if err := uc.deactRepo.Update(ctx, req); err != nil {
-			slog.ErrorContext(ctx, "failed to mark expired deactivation request", "user_id", input.UserID, "error", err)
-			return nil, apperror.NewInternal()
+			return nil, err
 		}
 		return nil, apperror.NewBadRequest(ErrCodeExpiredCode, "The confirmation code has expired. Please request a new one")
 	}
@@ -105,15 +102,13 @@ func (uc *ConfirmDeactivationUseCase) Execute(ctx context.Context, input Confirm
 
 		if req.IsBlocked() {
 			if err := uc.deactRepo.Update(ctx, req); err != nil {
-				slog.ErrorContext(ctx, "failed to persist blocked deactivation request", "user_id", input.UserID, "error", err)
-				return nil, apperror.NewInternal()
+				return nil, err
 			}
 			return nil, apperror.NewTooManyRequests(ErrCodeMaxAttemptsExceeded, "Maximum confirmation attempts exceeded. Please try again later", 3600)
 		}
 
 		if err := uc.deactRepo.Update(ctx, req); err != nil {
-			slog.ErrorContext(ctx, "failed to persist failed deactivation attempt", "user_id", input.UserID, "error", err)
-			return nil, apperror.NewInternal()
+			return nil, err
 		}
 		return nil, apperror.NewBadRequest(ErrCodeInvalidCode, "The confirmation code is invalid")
 	}
@@ -138,13 +133,11 @@ func (uc *ConfirmDeactivationUseCase) Execute(ctx context.Context, input Confirm
 		}
 		return nil
 	}); err != nil {
-		slog.ErrorContext(ctx, "failed to commit deactivation transaction", "user_id", input.UserID, "error", err)
-		return nil, apperror.NewInternal()
+		return nil, err
 	}
 
 	sessionsInvalidated := true
 	if err := uc.sessionInvalidator.InvalidateAllUserSessions(ctx, foundUser.ID(), now); err != nil {
-		slog.ErrorContext(ctx, "failed to invalidate sessions after self-deactivation", "user_id", foundUser.ID(), "error", err)
 		sessionsInvalidated = false
 	}
 
@@ -154,19 +147,18 @@ func (uc *ConfirmDeactivationUseCase) Execute(ctx context.Context, input Confirm
 		slog.ErrorContext(ctx, "failed to build deactivation audit log", "user_id", foundUser.ID(), "error", err)
 		return nil, apperror.NewInternal()
 	}
-	if err := uc.auditRepo.Save(ctx, auditLog); err != nil {
-		slog.ErrorContext(ctx, "failed to save deactivation audit log", "user_id", foundUser.ID(), "error", err)
-	}
+	_ = uc.auditRepo.Save(ctx, auditLog)
 
 	// Send final email
 	if originalEmailStr != "" {
-		if err := uc.emailSender.Send(ctx, appshared.EmailMessage{
+		_ = uc.emailSender.Send(ctx, appshared.EmailMessage{
 			To:      originalEmailStr,
 			Subject: "Account Deactivated",
 			Body:    "Your account has been successfully deactivated based on your request. Your identity and email have been anonymized.",
-		}); err != nil {
-			slog.ErrorContext(ctx, "failed to send deactivation confirmation email", "error", err)
-		}
+			HTMLBody: emailtemplate.Wrap("Account Deactivated",
+				"<p style=\"margin:0 0 12px;\">Your Training Center account has been successfully deactivated as requested.</p>"+
+					"<p style=\"margin:0;color:#64748b;font-size:14px;\">Your identity and email address have been anonymized. If you believe this was done in error, please contact support.</p>"),
+		})
 	}
 
 	return &ConfirmDeactivationOutput{SessionsInvalidated: sessionsInvalidated}, nil

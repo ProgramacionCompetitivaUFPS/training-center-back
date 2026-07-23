@@ -16,7 +16,6 @@ type Config struct {
 	DBUser             string
 	DBPassword         string
 	DBName             string
-	MockAuth           bool
 	StorageBackend     string
 	StorageLocalDir    string
 	GCSBucket          string
@@ -29,7 +28,9 @@ type Config struct {
 	SMTPPassword       string
 	SMTPFrom           string
 	RedisURL           string
+	RabbitMQURL        string
 	AllowedOrigins     []string
+	FrontendBaseURL    string
 }
 
 func Load() *Config {
@@ -41,7 +42,6 @@ func Load() *Config {
 		DBUser:             getEnv("DB_USER", "postgres"),
 		DBPassword:         getEnv("DB_PASSWORD", "postgres"),
 		DBName:             getEnv("DB_NAME", "training_center"),
-		MockAuth:           getEnv("MOCK_AUTH", "") == "1",
 		StorageBackend:     getEnv("STORAGE_BACKEND", "local"),
 		StorageLocalDir:    getEnv("STORAGE_LOCAL_DIR", ".local_storage"),
 		GCSBucket:          getEnv("GCS_BUCKET", ""),
@@ -54,7 +54,9 @@ func Load() *Config {
 		SMTPPassword:       getEnv("SMTP_PASSWORD", ""),
 		SMTPFrom:           getEnv("SMTP_FROM", "noreply@trainingcenter.com"),
 		RedisURL:           getEnv("REDIS_URL", "localhost:6379"),
+		RabbitMQURL:        getEnv("RABBITMQ_URL", ""),
 		AllowedOrigins:     getEnvAsSlice("ALLOWED_ORIGINS", "http://localhost:5173"),
+		FrontendBaseURL:    getEnv("FRONTEND_BASE_URL", "http://localhost:5173"),
 	}
 }
 

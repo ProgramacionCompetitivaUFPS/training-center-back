@@ -15,15 +15,15 @@ import (
 	"github.com/training-judge-center/backend/pkg/apperror"
 )
 
-type UserRepository struct {
+type Repository struct {
 	querier infraPostgres.Querier
 }
 
-func NewUserRepository(querier infraPostgres.Querier) *UserRepository {
-	return &UserRepository{querier: querier}
+func NewRepository(querier infraPostgres.Querier) *Repository {
+	return &Repository{querier: querier}
 }
 
-func (r *UserRepository) Save(ctx context.Context, u *domainUser.User) error {
+func (r *Repository) Save(ctx context.Context, u *domainUser.User) error {
 	query := `
 		INSERT INTO users (id, email, password, name, nickname, country, city, institution, role, status, created_at)
 		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`
@@ -44,7 +44,7 @@ func (r *UserRepository) Save(ctx context.Context, u *domainUser.User) error {
 	)
 	if err != nil {
 		var pgErr *pgconn.PgError
-		if errors.As(err, &pgErr) && pgErr.Code == "23505" {
+		if errors.As(err, &pgErr) && pgErr.Code == infraPostgres.UniqueViolation {
 			switch pgErr.ConstraintName {
 			case "users_email_key":
 				return apperror.NewConflict(domainUser.ErrCodeEmailConflict, "email already in use")
@@ -59,7 +59,7 @@ func (r *UserRepository) Save(ctx context.Context, u *domainUser.User) error {
 	return nil
 }
 
-func (r *UserRepository) Update(ctx context.Context, u *domainUser.User) error {
+func (r *Repository) Update(ctx context.Context, u *domainUser.User) error {
 	query := `
 		UPDATE users
 		SET name = $1, nickname = $2, institution = $3, email = $4, password = $5,
@@ -89,7 +89,7 @@ func (r *UserRepository) Update(ctx context.Context, u *domainUser.User) error {
 	)
 	if err != nil {
 		var pgErr *pgconn.PgError
-		if errors.As(err, &pgErr) && pgErr.Code == "23505" {
+		if errors.As(err, &pgErr) && pgErr.Code == infraPostgres.UniqueViolation {
 			switch pgErr.ConstraintName {
 			case "users_nickname_key":
 				return apperror.NewConflict(domainUser.ErrCodeNicknameConflict, "nickname already in use")
@@ -152,32 +152,35 @@ func scanUser(row pgx.Row) (*domainUser.User, error) {
 	), nil
 }
 
-func (r *UserRepository) FindByEmail(ctx context.Context, email domainUser.Email) (*domainUser.User, error) {
+func (r *Repository) FindByEmail(ctx context.Context, email domainUser.Email) (*domainUser.User, error) {
 	query := `SELECT ` + userColumns + ` FROM users WHERE email = $1`
 
 	u, err := scanUser(r.querier.QueryRow(ctx, query, email.String()))
 	if err != nil {
-		return nil, fmt.Errorf("failed to find user by email: %w", err)
+		slog.ErrorContext(ctx, "database error in FindByEmail", "error", err)
+		return nil, apperror.NewInternal()
 	}
 	return u, nil
 }
 
-func (r *UserRepository) FindByID(ctx context.Context, id string) (*domainUser.User, error) {
+func (r *Repository) FindByID(ctx context.Context, id string) (*domainUser.User, error) {
 	query := `SELECT ` + userColumns + ` FROM users WHERE id = $1`
 
 	u, err := scanUser(r.querier.QueryRow(ctx, query, id))
 	if err != nil {
-		return nil, fmt.Errorf("failed to find user by id: %w", err)
+		slog.ErrorContext(ctx, "database error in FindByID", "error", err)
+		return nil, apperror.NewInternal()
 	}
 	return u, nil
 }
 
-func (r *UserRepository) FindByNickname(ctx context.Context, nickname domainUser.Nickname) (*domainUser.User, error) {
-	query := `SELECT ` + userColumns + ` FROM users WHERE LOWER(nickname) = LOWER($1)`
+func (r *Repository) FindByNickname(ctx context.Context, nickname domainUser.Nickname) (*domainUser.User, error) {
+	query := `SELECT ` + userColumns + ` FROM users WHERE nickname = LOWER($1)`
 
 	u, err := scanUser(r.querier.QueryRow(ctx, query, nickname.String()))
 	if err != nil {
-		return nil, fmt.Errorf("failed to find user by nickname: %w", err)
+		slog.ErrorContext(ctx, "database error in FindByNickname", "error", err)
+		return nil, apperror.NewInternal()
 	}
 	return u, nil
 }
@@ -197,7 +200,7 @@ var sortColumnMap = map[domainUser.SortField]string{
 	domainUser.SortByDeactivatedAt: "deactivated_at",
 }
 
-func (r *UserRepository) FindAll(ctx context.Context, filter domainUser.UserFilter) ([]*domainUser.User, int, error) {
+func (r *Repository) FindAll(ctx context.Context, filter domainUser.UserFilter) ([]*domainUser.User, int, error) {
 	args := []interface{}{}
 	conditions := []string{}
 	n := 1
@@ -291,7 +294,8 @@ func (r *UserRepository) FindAll(ctx context.Context, filter domainUser.UserFilt
 	countQuery := fmt.Sprintf(`SELECT COUNT(*) FROM users %s`, whereClause)
 	var totalCount int
 	if err := r.querier.QueryRow(ctx, countQuery, args...).Scan(&totalCount); err != nil {
-		return nil, 0, fmt.Errorf("failed to count users: %w", err)
+		slog.ErrorContext(ctx, "database error counting users", "error", err)
+		return nil, 0, apperror.NewInternal()
 	}
 
 	// Main query with pagination
@@ -304,7 +308,8 @@ func (r *UserRepository) FindAll(ctx context.Context, filter domainUser.UserFilt
 
 	rows, err := r.querier.Query(ctx, dataQuery, args...)
 	if err != nil {
-		return nil, 0, fmt.Errorf("failed to list users: %w", err)
+		slog.ErrorContext(ctx, "database error listing users", "error", err)
+		return nil, 0, apperror.NewInternal()
 	}
 	defer rows.Close()
 
@@ -312,7 +317,8 @@ func (r *UserRepository) FindAll(ctx context.Context, filter domainUser.UserFilt
 	for rows.Next() {
 		u, err := scanUser(rows)
 		if err != nil {
-			return nil, 0, fmt.Errorf("failed to scan user row: %w", err)
+			slog.ErrorContext(ctx, "database error scanning user row", "error", err)
+			return nil, 0, apperror.NewInternal()
 		}
 		if u != nil {
 			users = append(users, u)
@@ -320,7 +326,8 @@ func (r *UserRepository) FindAll(ctx context.Context, filter domainUser.UserFilt
 	}
 
 	if err := rows.Err(); err != nil {
-		return nil, 0, fmt.Errorf("error iterating user rows: %w", err)
+		slog.ErrorContext(ctx, "database error iterating user rows", "error", err)
+		return nil, 0, apperror.NewInternal()
 	}
 
 	return users, totalCount, nil

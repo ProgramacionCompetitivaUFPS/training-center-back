@@ -1,13 +1,12 @@
-﻿package problem
+package problem
 
 import (
 	"context"
-	"log/slog"
 	"time"
 
+	appshared "github.com/training-judge-center/backend/internal/application/shared"
 	"github.com/training-judge-center/backend/internal/domain/problem"
 	"github.com/training-judge-center/backend/internal/domain/shared"
-	appshared "github.com/training-judge-center/backend/internal/application/shared"
 	"github.com/training-judge-center/backend/pkg/apperror"
 )
 
@@ -17,11 +16,12 @@ type UnpublishProblemInput struct {
 }
 
 type UnpublishProblemUseCase struct {
-	repo problem.Repository
+	repo           problem.Repository
+	contestChecker ActiveContestChecker
 }
 
-func NewUnpublishProblemUseCase(repo problem.Repository) *UnpublishProblemUseCase {
-	return &UnpublishProblemUseCase{repo: repo}
+func NewUnpublishProblemUseCase(repo problem.Repository, contestChecker ActiveContestChecker) *UnpublishProblemUseCase {
+	return &UnpublishProblemUseCase{repo: repo, contestChecker: contestChecker}
 }
 
 type UnpublishProblemOutput struct {
@@ -45,14 +45,21 @@ func (uc *UnpublishProblemUseCase) Execute(ctx context.Context, in UnpublishProb
 		return nil, apperror.NewForbidden(ErrCodeInsufficientPermissions, "Only the problem author, Admin, or assigned modifiers can unpublish this problem")
 	}
 
+	inActive, err := uc.contestChecker.IsProblemInActiveContest(ctx, p.ID())
+	if err != nil {
+		return nil, err
+	}
+	if inActive {
+		return nil, apperror.NewConflict(problem.ErrCodeProblemInActiveContest, "Cannot unpublish a problem that is currently being used in an active contest")
+	}
+
 	now := time.Now()
 	if err := p.Unpublish(now); err != nil {
 		return nil, err
 	}
 
 	if err := uc.repo.Save(ctx, p); err != nil {
-		slog.ErrorContext(ctx, "failed to save problem after unpublish", "error", err, "slug", p.Slug().String())
-		return nil, apperror.NewInternal()
+		return nil, err
 	}
 
 	return &UnpublishProblemOutput{Problem: problemToDTO(p)}, nil

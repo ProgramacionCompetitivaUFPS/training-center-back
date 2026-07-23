@@ -2,10 +2,11 @@ package ratelimit
 
 import (
 	"context"
-	"fmt"
+	"log/slog"
 	"time"
 
 	"github.com/redis/go-redis/v9"
+	"github.com/training-judge-center/backend/pkg/apperror"
 )
 
 var rateLimitScript = redis.NewScript(`
@@ -27,11 +28,16 @@ func NewRedisRateLimiter(client *redis.Client) *RedisRateLimiter {
 func (r *RedisRateLimiter) Allow(ctx context.Context, key string, maxAttempts int, window time.Duration) (bool, error) {
 	count, err := rateLimitScript.Run(ctx, r.client, []string{key}, int64(window.Seconds())).Int64()
 	if err != nil {
-		return false, fmt.Errorf("rate limit script failed: %w", err)
+		slog.ErrorContext(ctx, "rate limit script failed", "key", key, "error", err)
+		return false, apperror.NewInternal()
 	}
 	return count <= int64(maxAttempts), nil
 }
 
 func (r *RedisRateLimiter) Reset(ctx context.Context, key string) error {
-	return r.client.Del(ctx, key).Err()
+	if err := r.client.Del(ctx, key).Err(); err != nil {
+		slog.ErrorContext(ctx, "failed to reset rate limit key", "key", key, "error", err)
+		return apperror.NewInternal()
+	}
+	return nil
 }

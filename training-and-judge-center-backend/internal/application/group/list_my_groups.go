@@ -48,7 +48,7 @@ func NewListMyGroupsUseCase(repo domainGroup.Repository, memberRepo domainGroup.
 }
 
 func (uc *ListMyGroupsUseCase) Execute(ctx context.Context, in ListMyGroupsInput) (*ListMyGroupsOutput, error) {
-	if err := validatePagination(in.Page, in.Limit); err != nil {
+	if err := appshared.ValidatePagination(in.Page, in.Limit, maxPageLimit); err != nil {
 		return nil, err
 	}
 
@@ -125,7 +125,7 @@ func (uc *ListMyGroupsUseCase) Execute(ctx context.Context, in ListMyGroupsInput
 	return &ListMyGroupsOutput{
 		Groups:     items,
 		TotalCount: len(items),
-		TotalPages: calcTotalPages(total, in.Limit),
+		TotalPages: appshared.CalcTotalPages(total, in.Limit),
 		Page:       in.Page,
 		Limit:      in.Limit,
 	}, nil

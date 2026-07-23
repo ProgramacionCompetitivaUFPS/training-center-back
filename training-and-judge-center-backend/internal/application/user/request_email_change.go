@@ -2,16 +2,15 @@ package user
 
 import (
 	"context"
-	"crypto/rand"
 	"fmt"
 	"log/slog"
-	"math/big"
 	"time"
 
 	"github.com/google/uuid"
 	appshared "github.com/training-judge-center/backend/internal/application/shared"
 	"github.com/training-judge-center/backend/internal/domain/user"
 	"github.com/training-judge-center/backend/pkg/apperror"
+	"github.com/training-judge-center/backend/pkg/emailtemplate"
 )
 
 type RequestEmailChangeInput struct {
@@ -48,8 +47,7 @@ func NewRequestEmailChangeUseCase(
 func (uc *RequestEmailChangeUseCase) Execute(ctx context.Context, input RequestEmailChangeInput) (*RequestEmailChangeOutput, error) {
 	allowed, err := uc.rateLimiter.Allow(ctx, "email-change-request:"+input.UserID, 5, time.Hour)
 	if err != nil {
-		slog.ErrorContext(ctx, "failed to check rate limit for email change request", "user_id", input.UserID, "error", err)
-		return nil, apperror.NewInternal()
+		return nil, err
 	}
 	if !allowed {
 		return nil, apperror.NewTooManyRequests(ErrCodeTooManyRequests, "Too many requests. Please try again later.", 3600)
@@ -57,8 +55,7 @@ func (uc *RequestEmailChangeUseCase) Execute(ctx context.Context, input RequestE
 
 	u, err := uc.userRepo.FindByID(ctx, input.UserID)
 	if err != nil {
-		slog.ErrorContext(ctx, "failed to find user during email change request", "user_id", input.UserID, "error", err)
-		return nil, apperror.NewInternal()
+		return nil, err
 	}
 	if u == nil {
 		return nil, apperror.NewUnauthorized(ErrCodeInvalidCredentials, "Invalid credentials")
@@ -78,8 +75,7 @@ func (uc *RequestEmailChangeUseCase) Execute(ctx context.Context, input RequestE
 	now := time.Now()
 
 	if err := uc.emailChangeRepo.InvalidatePendingByUserID(ctx, input.UserID, now); err != nil {
-		slog.ErrorContext(ctx, "failed to invalidate pending email change requests", "user_id", input.UserID, "error", err)
-		return nil, apperror.NewInternal()
+		return nil, err
 	}
 
 	code, err := generateSixDigitCode()
@@ -96,29 +92,21 @@ func (uc *RequestEmailChangeUseCase) Execute(ctx context.Context, input RequestE
 	}
 
 	if err := uc.emailChangeRepo.Save(ctx, req); err != nil {
-		slog.ErrorContext(ctx, "failed to save email change request", "user_id", input.UserID, "error", err)
-		return nil, apperror.NewInternal()
+		return nil, err
 	}
 
+	htmlContent := "<p style=\"margin:0 0 8px;\">We received a request to update the email address on your Training Center account.</p>" +
+		"<p style=\"margin:0 0 4px;\">Enter the code below to verify your new email:</p>" +
+		emailtemplate.CodeBlock(code) +
+		"<p style=\"margin:0;color:#64748b;font-size:14px;\">This code expires in <strong>15 minutes</strong>. If you didn't request this change, please contact support immediately.</p>"
 	if err := uc.emailSender.Send(ctx, appshared.EmailMessage{
-		To:      input.NewEmail,
-		Subject: "Verify your new email address",
-		Body:    fmt.Sprintf("Your email verification code is: %s. It will expire in 15 minutes.", code),
+		To:       input.NewEmail,
+		Subject:  "Verify your new email address",
+		Body:     fmt.Sprintf("Your email verification code is: %s. It will expire in 15 minutes.", code),
+		HTMLBody: emailtemplate.Wrap("Verify your new email address", htmlContent),
 	}); err != nil {
-		slog.ErrorContext(ctx, "failed to send verification email", "email", input.NewEmail, "error", err)
 		return nil, apperror.NewServiceUnavailable(ErrCodeEmailDeliveryFailed, "We couldn't deliver the verification code to your email. Please try again later.")
 	}
 
 	return &RequestEmailChangeOutput{ExpiresAt: req.ExpiresAt()}, nil
-}
-
-func generateSixDigitCode() (string, error) {
-	// Generate a random number between 0 and 999999
-	max := big.NewInt(1000000)
-	n, err := rand.Int(rand.Reader, max)
-	if err != nil {
-		return "", err
-	}
-	// Format as a 6-digit string with leading zeros
-	return fmt.Sprintf("%06d", n.Int64()), nil
 }

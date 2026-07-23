@@ -1,10 +1,10 @@
 package group
 
 type paginationResp struct {
-	TotalCount   int  `json:"totalCount"`
-	CurrentPage  int  `json:"currentPage"`
+	TotalCount   int  `json:"total"`
+	CurrentPage  int  `json:"page"`
 	TotalPages   int  `json:"totalPages"`
-	ItemsPerPage int  `json:"itemsPerPage"`
+	ItemsPerPage int  `json:"limit"`
 	HasNextPage  bool `json:"hasNextPage"`
 	HasPrevPage  bool `json:"hasPrevPage"`
 }
@@ -105,4 +105,159 @@ func buildPagination(total, page, totalPages, limit int) paginationResp {
 		HasNextPage:  page < totalPages,
 		HasPrevPage:  page > 1 && total > 0,
 	}
+}
+
+// ── Member endpoints ──────────────────────────────────────────────────────────
+
+type addMemberReq struct {
+	Nickname string `json:"nickname"`
+	Role     string `json:"role"`
+}
+
+type addMemberResp struct {
+	GroupID    string `json:"groupId"`
+	UserID     string `json:"userId"`
+	Nickname   string `json:"nickname"`
+	Role       string `json:"role"`
+	JoinedAt   string `json:"joinedAt"`
+	AddedBy    string `json:"addedBy"`
+	JoinMethod string `json:"joinMethod"`
+}
+
+type changeRoleReq struct {
+	Role string `json:"role"`
+}
+
+type changeRoleResp struct {
+	GroupID       string `json:"groupId"`
+	UserID        string `json:"userId"`
+	Nickname      string `json:"nickname"`
+	Role          string `json:"role"`
+	JoinedAt      string `json:"joinedAt"`
+	RoleChangedAt string `json:"roleChangedAt"`
+}
+
+type memberListItemResp struct {
+	UserID   string `json:"userId"`
+	Nickname string `json:"nickname"`
+	Name     string `json:"name"`
+	Role     string `json:"role"`
+	JoinedAt string `json:"joinedAt"`
+}
+
+type listMembersResp struct {
+	Members    []memberListItemResp `json:"members"`
+	Pagination paginationResp       `json:"pagination"`
+}
+
+// ── Update group endpoint ─────────────────────────────────────────────────────
+
+type updateGroupReq struct {
+	Name        *string `json:"name"`
+	Description *string `json:"description"`
+	Visibility  *string `json:"visibility"`
+	JoinPolicy  *string `json:"joinPolicy"`
+}
+
+type policyChangeEffectsResp struct {
+	RequestsAutoApproved int `json:"requestsAutoApproved"`
+	RequestsAutoRejected int `json:"requestsAutoRejected"`
+}
+
+type updateGroupResp struct {
+	ID                  string                   `json:"id"`
+	Name                string                   `json:"name"`
+	Description         *string                  `json:"description"`
+	Visibility          string                   `json:"visibility"`
+	JoinPolicy          string                   `json:"joinPolicy"`
+	CreatedBy           string                   `json:"createdBy"`
+	CreatedAt           string                   `json:"createdAt"`
+	UpdatedAt           string                   `json:"updatedAt"`
+	MembersCount        int                      `json:"membersCount"`
+	PolicyChangeEffects *policyChangeEffectsResp `json:"policyChangeEffects,omitempty"`
+}
+
+// ── Invitation endpoints ──────────────────────────────────────────────────────
+
+type generateInviteReq struct {
+	UserNickname string `json:"userNickname"`
+	UserEmail    string `json:"userEmail"`
+	UserID       string `json:"userId"`
+}
+
+type generateInviteResponse struct {
+	ID        string         `json:"id"`
+	GroupID   string         `json:"groupId"`
+	Invitee   *requesterResp `json:"invitee,omitempty"`
+	Status    string         `json:"status"`
+	ExpiresAt string         `json:"expiresAt"`
+	CreatedAt string         `json:"createdAt"`
+}
+
+type acceptInviteRequest struct {
+	InvitationID string `json:"invitationId"`
+}
+
+type invitationListItemResp struct {
+	ID              string         `json:"id"`
+	GroupID         string         `json:"groupId"`
+	Invitee         *requesterResp `json:"invitee,omitempty"`
+	InvitedBy       string         `json:"invitedBy"`
+	Status          string         `json:"status"`
+	EffectiveStatus string         `json:"effectiveStatus"`
+	ExpiresAt       string         `json:"expiresAt"`
+	CreatedAt       string         `json:"createdAt"`
+}
+
+type listGroupInvitationsResponse struct {
+	Invitations []invitationListItemResp `json:"invitations"`
+	Pagination  paginationResp           `json:"pagination"`
+}
+
+type inviteByNicknamesReq struct {
+	Nicknames []string `json:"nicknames"`
+}
+
+type invitationSummaryResp struct {
+	ID        string `json:"id"`
+	Status    string `json:"status"`
+	ExpiresAt string `json:"expiresAt"`
+	CreatedAt string `json:"createdAt"`
+}
+
+type inviteByNicknamesResultResp struct {
+	Nickname   string                 `json:"nickname"`
+	Status     string                 `json:"status"`
+	Invitation *invitationSummaryResp `json:"invitation,omitempty"`
+	Invitee    *requesterResp         `json:"invitee,omitempty"`
+	Reason     string                 `json:"reason,omitempty"`
+}
+
+type inviteByNicknamesResponse struct {
+	Results []inviteByNicknamesResultResp `json:"results"`
+}
+
+// ── Delete group endpoint ─────────────────────────────────────────────────────
+
+type deleteGroupReq struct {
+	ConfirmationName string `json:"confirmationName"`
+}
+
+type deletedGroupInfo struct {
+	ID   string `json:"id"`
+	Name string `json:"name"`
+}
+
+type deletionSummary struct {
+	ContestsDeleted            int `json:"contestsDeleted"`
+	MaterialsDeleted           int `json:"materialsDeleted"`
+	StandingCollectionsDeleted int `json:"standingCollectionsDeleted"`
+	SubmissionsOrphaned        int `json:"submissionsOrphaned"`
+	MembersRemoved             int `json:"membersRemoved"`
+}
+
+type deleteGroupResp struct {
+	Message         string           `json:"message"`
+	DeletedGroup    deletedGroupInfo `json:"deletedGroup"`
+	DeletionSummary deletionSummary  `json:"deletionSummary"`
 }

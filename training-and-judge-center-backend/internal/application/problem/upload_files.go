@@ -111,8 +111,7 @@ func (uc *UploadProblemFilesUseCase) Execute(ctx context.Context, input UploadPr
 
 	if err := uc.repo.Save(ctx, p); err != nil {
 		uc.cleanupFiles(ctx, action.rollbackFiles)
-		slog.ErrorContext(ctx, "failed to save problem after file upload", "error", err, "slug", p.Slug().String())
-		return nil, apperror.NewInternal()
+		return nil, err
 	}
 
 	uc.cleanupFiles(ctx, action.cleanupFiles)
@@ -128,9 +127,7 @@ func (uc *UploadProblemFilesUseCase) Execute(ctx context.Context, input UploadPr
 
 func (uc *UploadProblemFilesUseCase) cleanupFiles(ctx context.Context, keys []string) {
 	for _, key := range keys {
-		if err := uc.storage.DeleteFile(ctx, key); err != nil {
-			slog.ErrorContext(ctx, "failed to cleanup storage file", "key", key, "error", err)
-		}
+		_ = uc.storage.DeleteFile(ctx, key)
 	}
 }
 
@@ -138,9 +135,7 @@ func (uc *UploadProblemFilesUseCase) cleanupPrefix(ctx context.Context, prefix s
 	if prefix == "" {
 		return
 	}
-	if err := uc.storage.DeleteFilesWithPrefix(ctx, prefix); err != nil {
-		slog.ErrorContext(ctx, "failed to cleanup storage prefix", "prefix", prefix, "error", err)
-	}
+	_ = uc.storage.DeleteFilesWithPrefix(ctx, prefix)
 }
 
 func (uc *UploadProblemFilesUseCase) handleTestCases(ctx context.Context, p *problem.Problem, input UploadProblemFilesInput, now time.Time) (fileAction, error) {
@@ -160,8 +155,7 @@ func (uc *UploadProblemFilesUseCase) handleTestCases(ctx context.Context, p *pro
 	}
 
 	if err := uc.storage.UploadFile(ctx, zipKey, input.FileData); err != nil {
-		slog.ErrorContext(ctx, "failed to upload testcases zip", "error", err, "slug", p.Slug().String())
-		return fileAction{rollbackFiles: allNewKeys}, apperror.NewInternal()
+		return fileAction{rollbackFiles: allNewKeys}, err
 	}
 
 	g, gCtx := errgroup.WithContext(ctx)
@@ -172,15 +166,14 @@ func (uc *UploadProblemFilesUseCase) handleTestCases(ctx context.Context, p *pro
 		g.Go(func() error {
 			destinationPath := fmt.Sprintf("%s/%s", basePath, file.Path)
 			if err := uc.storage.UploadFile(gCtx, destinationPath, file.Content); err != nil {
-				slog.ErrorContext(gCtx, "failed to upload sample test case file", "error", err, "path", destinationPath)
-				return apperror.NewInternal()
+				return err
 			}
 			return nil
 		})
 	}
 
 	if err := g.Wait(); err != nil {
-		return fileAction{rollbackFiles: allNewKeys}, apperror.NewInternal()
+		return fileAction{rollbackFiles: allNewKeys}, err
 	}
 
 	action := fileAction{rollbackFiles: allNewKeys}
@@ -212,8 +205,7 @@ func (uc *UploadProblemFilesUseCase) handleSolution(ctx context.Context, p *prob
 	}
 
 	if err := uc.storage.UploadFile(ctx, fileKey, input.FileData); err != nil {
-		slog.ErrorContext(ctx, "failed to upload solution file", "error", err, "slug", p.Slug().String(), "filename", cleanName)
-		return fileAction{}, apperror.NewInternal()
+		return fileAction{}, err
 	}
 
 	action := fileAction{rollbackFiles: []string{fileKey}}
@@ -270,8 +262,7 @@ func (uc *UploadProblemFilesUseCase) handleVerifier(
 	}
 
 	if err := uc.storage.UploadFile(ctx, fileKey, input.FileData); err != nil {
-		slog.ErrorContext(ctx, "failed to upload "+fileType+" file", "error", err, "slug", p.Slug().String(), "filename", cleanName)
-		return fileAction{rollbackFiles: action.rollbackFiles}, apperror.NewInternal()
+		return fileAction{rollbackFiles: action.rollbackFiles}, err
 	}
 
 	setVerifier(verifierObj)

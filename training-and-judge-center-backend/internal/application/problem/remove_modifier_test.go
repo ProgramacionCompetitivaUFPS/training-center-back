@@ -2,21 +2,22 @@ package problem
 
 import (
 	"context"
-	"errors"
 	"testing"
 
 	domainProblem "github.com/training-judge-center/backend/internal/domain/problem"
 	"github.com/training-judge-center/backend/pkg/apperror"
 )
 
+const existingModifierNickname = "existing_modifier_nick"
+
 func TestRemoveModifier_Success_Author(t *testing.T) {
 	repo := repoWith(newDraftProblemWithModifier())
-	uc := NewRemoveModifierUseCase(repo)
+	uc := NewRemoveModifierUseCase(repo, providerResolving(modifierID))
 
 	err := uc.Execute(context.Background(), RemoveModifierInput{
-		Slug:        testSlug,
-		UserID:      modifierID,
-		CurrentUser: asCoach(authorID),
+		Slug:         testSlug,
+		UserNickname: existingModifierNickname,
+		CurrentUser:  asCoach(authorID),
 	})
 	if err != nil {
 		t.Fatalf("author should remove a modifier, got: %v", err)
@@ -25,12 +26,12 @@ func TestRemoveModifier_Success_Author(t *testing.T) {
 
 func TestRemoveModifier_Success_Admin(t *testing.T) {
 	repo := repoWith(newDraftProblemWithModifier())
-	uc := NewRemoveModifierUseCase(repo)
+	uc := NewRemoveModifierUseCase(repo, providerResolving(modifierID))
 
 	err := uc.Execute(context.Background(), RemoveModifierInput{
-		Slug:        testSlug,
-		UserID:      modifierID,
-		CurrentUser: asAdmin(strangerID),
+		Slug:         testSlug,
+		UserNickname: existingModifierNickname,
+		CurrentUser:  asAdmin(strangerID),
 	})
 	if err != nil {
 		t.Fatalf("admin should remove any modifier, got: %v", err)
@@ -39,12 +40,12 @@ func TestRemoveModifier_Success_Admin(t *testing.T) {
 
 func TestRemoveModifier_Forbidden_Stranger(t *testing.T) {
 	repo := repoWith(newDraftProblemWithModifier())
-	uc := NewRemoveModifierUseCase(repo)
+	uc := NewRemoveModifierUseCase(repo, providerResolving(modifierID))
 
 	err := uc.Execute(context.Background(), RemoveModifierInput{
-		Slug:        testSlug,
-		UserID:      modifierID,
-		CurrentUser: asContestant(strangerID),
+		Slug:         testSlug,
+		UserNickname: existingModifierNickname,
+		CurrentUser:  asContestant(strangerID),
 	})
 	if err == nil {
 		t.Fatal("stranger should not remove modifiers, got nil error")
@@ -59,14 +60,41 @@ func TestRemoveModifier_Forbidden_Stranger(t *testing.T) {
 	}
 }
 
-func TestRemoveModifier_ModifierNotFound(t *testing.T) {
-	repo := repoWith(newDraftProblem()) // no modifiers
-	uc := NewRemoveModifierUseCase(repo)
+func TestRemoveModifier_NicknameNotFound(t *testing.T) {
+	repo := repoWith(newDraftProblemWithModifier())
+	provider := &mockUserProvider{
+		getIDByNicknameFn: func(_ context.Context, _ string) (string, bool, error) {
+			return "", false, nil
+		},
+	}
+	uc := NewRemoveModifierUseCase(repo, provider)
 
 	err := uc.Execute(context.Background(), RemoveModifierInput{
-		Slug:        testSlug,
-		UserID:      modifierID,
-		CurrentUser: asCoach(authorID),
+		Slug:         testSlug,
+		UserNickname: "nonexistent_nick",
+		CurrentUser:  asCoach(authorID),
+	})
+	if err == nil {
+		t.Fatal("expected not-found error for unknown nickname, got nil")
+	}
+
+	appErr, ok := err.(*apperror.AppError)
+	if !ok {
+		t.Fatalf("expected *apperror.AppError, got %T", err)
+	}
+	if appErr.Code != ErrCodeUserNotFound {
+		t.Errorf("expected %s, got %q", ErrCodeUserNotFound, appErr.Code)
+	}
+}
+
+func TestRemoveModifier_ModifierNotFound(t *testing.T) {
+	repo := repoWith(newDraftProblem()) // no modifiers
+	uc := NewRemoveModifierUseCase(repo, providerResolving(modifierID))
+
+	err := uc.Execute(context.Background(), RemoveModifierInput{
+		Slug:         testSlug,
+		UserNickname: existingModifierNickname,
+		CurrentUser:  asCoach(authorID),
 	})
 	if err == nil {
 		t.Fatal("expected not-found error when user is not a modifier, got nil")
@@ -87,15 +115,15 @@ func TestRemoveModifier_RepositoryError(t *testing.T) {
 			return newDraftProblemWithModifier(), nil
 		},
 		saveFn: func(_ context.Context, _ *domainProblem.Problem) error {
-			return errors.New("db error")
+			return apperror.NewInternal()
 		},
 	}
-	uc := NewRemoveModifierUseCase(repo)
+	uc := NewRemoveModifierUseCase(repo, providerResolving(modifierID))
 
 	err := uc.Execute(context.Background(), RemoveModifierInput{
-		Slug:        testSlug,
-		UserID:      modifierID,
-		CurrentUser: asCoach(authorID),
+		Slug:         testSlug,
+		UserNickname: existingModifierNickname,
+		CurrentUser:  asCoach(authorID),
 	})
 	if err == nil {
 		t.Fatal("expected internal error on save failure, got nil")

@@ -1,8 +1,7 @@
-package user
+﻿package user
 
 import (
 	"context"
-	"errors"
 	"testing"
 
 	"github.com/training-judge-center/backend/internal/domain/shared"
@@ -60,7 +59,7 @@ func TestGetMyProfile_UserNotFound(t *testing.T) {
 func TestGetMyProfile_RepositoryError(t *testing.T) {
 	repo := newNoConflictRepo()
 	repo.findByIDFn = func(_ context.Context, _ string) (*domain.User, error) {
-		return nil, errors.New("db connection lost")
+		return nil, apperror.NewInternal()
 	}
 	uc := NewGetMyProfileUseCase(repo)
 

@@ -35,7 +35,7 @@ Thumbs.db
 
 # Claude
 .claude/
-docs/superpowers/
+docs/
 
 # Git worktrees
 .worktrees/

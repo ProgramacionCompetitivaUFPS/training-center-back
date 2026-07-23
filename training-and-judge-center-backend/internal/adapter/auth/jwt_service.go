@@ -1,7 +1,9 @@
 package auth
 
 import (
+	"context"
 	"fmt"
+	"log/slog"
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
@@ -28,7 +30,7 @@ func NewJWTService(secret string, expirationHours int) *JWTService {
 	}
 }
 
-func (s *JWTService) GenerateToken(u *user.User) (string, error) {
+func (s *JWTService) GenerateToken(ctx context.Context, u *user.User) (string, error) {
 	claims := jwtCustomClaims{
 		Email: u.Email().String(),
 		Role:  u.Role().String(),
@@ -40,7 +42,12 @@ func (s *JWTService) GenerateToken(u *user.User) (string, error) {
 	}
 
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
-	return token.SignedString(s.secret)
+	signed, err := token.SignedString(s.secret)
+	if err != nil {
+		slog.ErrorContext(ctx, "failed to sign JWT token", "user_id", u.ID(), "error", err)
+		return "", apperror.NewInternal()
+	}
+	return signed, nil
 }
 
 func unauthorizedToken(msg string, cause error) error {

@@ -4,16 +4,16 @@ import (
 	"context"
 	"log/slog"
 
-	"github.com/jackc/pgx/v5/pgxpool"
+	infraPostgres "github.com/training-judge-center/backend/internal/adapter/postgres"
 	appMaterial "github.com/training-judge-center/backend/internal/application/material"
 	"github.com/training-judge-center/backend/pkg/apperror"
 )
 
 type AuthorProvider struct {
-	db *pgxpool.Pool
+	db infraPostgres.Querier
 }
 
-func NewAuthorProvider(db *pgxpool.Pool) *AuthorProvider {
+func NewAuthorProvider(db infraPostgres.Querier) *AuthorProvider {
 	return &AuthorProvider{db: db}
 }
 
@@ -21,7 +21,8 @@ func (p *AuthorProvider) GetDisplays(ctx context.Context, userIDs []string) (map
 	if len(userIDs) == 0 {
 		return map[string]*appMaterial.AuthorDisplay{}, nil
 	}
-	rows, err := p.db.Query(ctx, `SELECT id, nickname, name FROM users WHERE id = ANY($1)`, userIDs)
+	q := infraPostgres.GetQuerier(ctx, p.db)
+	rows, err := q.Query(ctx, `SELECT id, nickname, name FROM users WHERE id = ANY($1)`, userIDs)
 	if err != nil {
 		slog.ErrorContext(ctx, "AuthorProvider.GetDisplays query failed", "error", err, "user_ids_count", len(userIDs))
 		return nil, apperror.NewInternal()

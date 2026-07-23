@@ -1,4 +1,4 @@
-package material
+﻿package material
 
 import (
 	"context"
@@ -9,7 +9,7 @@ import (
 	"github.com/training-judge-center/backend/pkg/apperror"
 )
 
-func newPublishUC(repo *mockMaterialRepository, group *mockGroupProvider) *PublishMaterialUseCase {
+func newPublishMaterialUseCase(repo *mockMaterialRepository, group *mockGroupProvider) *PublishMaterialUseCase {
 	return NewPublishMaterialUseCase(repo, group, stubAuthorProvider())
 }
 
@@ -20,7 +20,7 @@ func TestPublishMaterial_SuccessByAuthor(t *testing.T) {
 		findByIDFn: func(_ context.Context, _ string) (*domainMaterial.Material, error) { return m, nil },
 		saveFn:     func(_ context.Context, _ *domainMaterial.Material) error { saved = true; return nil },
 	}
-	uc := newPublishUC(repo, groupExists())
+	uc := newPublishMaterialUseCase(repo, groupExists())
 
 	out, err := uc.Execute(context.Background(), PublishMaterialInput{
 		CurrentUser: asCoach(testAuthorID),
@@ -44,7 +44,7 @@ func TestPublishMaterial_SuccessByAuthor(t *testing.T) {
 
 func TestPublishMaterial_SuccessByAdmin(t *testing.T) {
 	m := newTestMaterial()
-	uc := newPublishUC(repoWith(m), groupExists())
+	uc := newPublishMaterialUseCase(repoWith(m), groupExists())
 
 	out, err := uc.Execute(context.Background(), PublishMaterialInput{
 		CurrentUser: asAdmin(testOtherID),
@@ -68,7 +68,7 @@ func TestPublishMaterial_Idempotent_AlreadyPublished(t *testing.T) {
 		findByIDFn: func(_ context.Context, _ string) (*domainMaterial.Material, error) { return m, nil },
 		saveFn:     func(_ context.Context, _ *domainMaterial.Material) error { saveCalled = true; return nil },
 	}
-	uc := newPublishUC(repo, groupExists())
+	uc := newPublishMaterialUseCase(repo, groupExists())
 
 	out, err := uc.Execute(context.Background(), PublishMaterialInput{
 		CurrentUser: asCoach(testAuthorID),
@@ -92,7 +92,7 @@ func TestPublishMaterial_Idempotent_AlreadyPublished(t *testing.T) {
 
 func TestPublishMaterial_Forbidden_NonAuthorLead(t *testing.T) {
 	m := newTestMaterial()
-	uc := newPublishUC(repoWith(m), groupExists())
+	uc := newPublishMaterialUseCase(repoWith(m), groupExists())
 
 	_, err := uc.Execute(context.Background(), PublishMaterialInput{
 		CurrentUser: asCoach(testOtherID),
@@ -107,7 +107,7 @@ func TestPublishMaterial_Forbidden_NonAuthorLead(t *testing.T) {
 }
 
 func TestPublishMaterial_GroupNotFound(t *testing.T) {
-	uc := newPublishUC(&mockMaterialRepository{}, groupNotFound())
+	uc := newPublishMaterialUseCase(&mockMaterialRepository{}, groupNotFound())
 
 	_, err := uc.Execute(context.Background(), PublishMaterialInput{
 		CurrentUser: asCoach(testAuthorID),
@@ -122,7 +122,7 @@ func TestPublishMaterial_GroupNotFound(t *testing.T) {
 }
 
 func TestPublishMaterial_MaterialNotFound(t *testing.T) {
-	uc := newPublishUC(&mockMaterialRepository{}, groupExists())
+	uc := newPublishMaterialUseCase(&mockMaterialRepository{}, groupExists())
 
 	_, err := uc.Execute(context.Background(), PublishMaterialInput{
 		CurrentUser: asCoach(testAuthorID),
@@ -138,7 +138,7 @@ func TestPublishMaterial_MaterialNotFound(t *testing.T) {
 
 func TestPublishMaterial_MaterialInOtherGroup(t *testing.T) {
 	m := newTestMaterial()
-	uc := newPublishUC(repoWith(m), groupExists())
+	uc := newPublishMaterialUseCase(repoWith(m), groupExists())
 
 	_, err := uc.Execute(context.Background(), PublishMaterialInput{
 		CurrentUser: asCoach(testAuthorID),
@@ -153,7 +153,7 @@ func TestPublishMaterial_MaterialInOtherGroup(t *testing.T) {
 }
 
 func TestPublishMaterial_GroupProviderError_Returns500(t *testing.T) {
-	uc := newPublishUC(&mockMaterialRepository{}, groupProviderError())
+	uc := newPublishMaterialUseCase(&mockMaterialRepository{}, groupProviderError())
 
 	_, err := uc.Execute(context.Background(), PublishMaterialInput{
 		CurrentUser: asCoach(testAuthorID),
@@ -171,9 +171,9 @@ func TestPublishMaterial_SaveError(t *testing.T) {
 	m := newTestMaterial()
 	repo := &mockMaterialRepository{
 		findByIDFn: func(_ context.Context, _ string) (*domainMaterial.Material, error) { return m, nil },
-		saveFn:     func(_ context.Context, _ *domainMaterial.Material) error { return errors.New("db error") },
+		saveFn:     func(_ context.Context, _ *domainMaterial.Material) error { return apperror.NewInternal() },
 	}
-	uc := newPublishUC(repo, groupExists())
+	uc := newPublishMaterialUseCase(repo, groupExists())
 
 	_, err := uc.Execute(context.Background(), PublishMaterialInput{
 		CurrentUser: asCoach(testAuthorID),

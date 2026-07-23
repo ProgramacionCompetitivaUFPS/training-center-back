@@ -33,8 +33,8 @@ type createProblemRequest struct {
 // @Failure      401 {object} apperror.AppError
 // @Router       /problems [post]
 func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
-	claims := middleware.GetClaims(r.Context())
-	if claims == nil {
+	cu, ok := middleware.GetCurrentUser(r.Context())
+	if !ok {
 		handler.WriteJSON(r.Context(), w, http.StatusUnauthorized, apperror.AppError{
 			Code:    apperror.ErrCodeUnauthorized,
 			Message: "Invalid or missing authentication token",
@@ -52,9 +52,9 @@ func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
 	}
 
 	langOverrides := convertLangOverrides(body.LangOverrides)
-	currentUser := shared.CurrentUser{ID: claims.UserID, Role: claims.Role}
+	currentUser := shared.CurrentUser{ID: cu.ID, Role: cu.Role}
 
-	result, ucErr := h.createUC.Execute(r.Context(), appProblem.CreateProblemInput{
+	result, ucErr := h.createProblem.Execute(r.Context(), appProblem.CreateProblemInput{
 		Slug:          body.Slug,
 		Title:         body.Title,
 		Statement:     body.Statement,

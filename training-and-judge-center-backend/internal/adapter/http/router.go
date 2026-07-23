@@ -11,6 +11,8 @@ import (
 	"github.com/training-judge-center/backend/internal/adapter/http/handler/group"
 	handlerMaterial "github.com/training-judge-center/backend/internal/adapter/http/handler/material"
 	"github.com/training-judge-center/backend/internal/adapter/http/handler/problem"
+	handlerSubmission "github.com/training-judge-center/backend/internal/adapter/http/handler/submission"
+	handlerTeam "github.com/training-judge-center/backend/internal/adapter/http/handler/team"
 	handlerUser "github.com/training-judge-center/backend/internal/adapter/http/handler/user"
 	"github.com/training-judge-center/backend/internal/adapter/http/middleware"
 	"github.com/training-judge-center/backend/internal/domain/shared"
@@ -18,12 +20,14 @@ import (
 )
 
 type Handlers struct {
-	Problem  *problem.Handler
-	User     *handlerUser.UserHandler
-	Auth     *handler2.AuthHandler
-	Group    *group.Handler
-	Material *handlerMaterial.Handler
-	Contest  *handlerContest.Handler
+	Problem    *problem.Handler
+	User       *handlerUser.Handler
+	Auth       *handler2.AuthHandler
+	Group      *group.Handler
+	Material   *handlerMaterial.Handler
+	Contest    *handlerContest.Handler
+	Team       *handlerTeam.Handler
+	Submission *handlerSubmission.Handler
 }
 
 type Services struct {
@@ -41,16 +45,24 @@ func NewRouter(h *Handlers, s *Services, allowedOrigins []string) *chi.Mux {
 		AllowCredentials: true,
 		MaxAge:           300,
 	}))
+	r.Use(chimw.RequestID)
 	r.Use(chimw.Logger)
 	r.Use(chimw.Recoverer)
-	r.Use(chimw.RequestID)
 
 	r.Get("/swagger/*", httpSwagger.WrapHandler)
 
 	healthHandler := handler2.NewHealthHandler()
 	r.Get("/ping", healthHandler.Ping)
 
-	// Group and Problem routes — require authentication
+	// public
+	r.Post("/users", h.User.Create)
+	r.Post("/password/forgot", h.User.RequestPasswordRecovery)
+	r.Post("/password/reset", h.User.ResetPassword)
+	r.Route("/auth", func(r chi.Router) {
+		r.Post("/login", h.Auth.Login)
+	})
+
+	// authenticated
 	r.Group(func(r chi.Router) {
 		r.Use(middleware.Auth(s.TokenService, s.SessionInvalidator))
 
@@ -58,11 +70,24 @@ func NewRouter(h *Handlers, s *Services, allowedOrigins []string) *chi.Mux {
 			r.Post("/", h.Group.Create)
 			r.Get("/", h.Group.ListGroups)
 			r.Get("/{groupId}", h.Group.GetGroup)
+			r.Patch("/{groupId}", h.Group.UpdateGroup)
+			r.Delete("/{groupId}", h.Group.DeleteGroup)
 			r.Post("/{groupId}/join", h.Group.Join)
 
 			r.Route("/{groupId}/invitations", func(r chi.Router) {
 				r.Post("/", h.Group.GenerateInvite)
+				r.Get("/", h.Group.ListGroupInvitations)
+				r.Delete("/{invitationId}", h.Group.RevokeInvitation)
 				r.Post("/accept", h.Group.AcceptInvite)
+				r.Post("/targeted", h.Group.InviteByNicknames)
+			})
+
+			r.Route("/{groupId}/members", func(r chi.Router) {
+				r.Post("/", h.Group.AddMember)
+				r.Get("/", h.Group.ListMembers)
+				r.Delete("/me", h.Group.LeaveGroup)
+				r.Delete("/{nickname}", h.Group.RemoveMember)
+				r.Patch("/{nickname}", h.Group.ChangeRole)
 			})
 
 			r.Route("/{groupId}/requests", func(r chi.Router) {
@@ -78,6 +103,22 @@ func NewRouter(h *Handlers, s *Services, allowedOrigins []string) *chi.Mux {
 				r.Get("/", h.Contest.List)
 				r.Get("/{contestId}", h.Contest.Get)
 				r.Put("/{contestId}", h.Contest.Update)
+				r.Delete("/{contestId}", h.Contest.Delete)
+				r.Post("/{contestId}/register", h.Contest.Register)
+				r.Delete("/{contestId}/register", h.Contest.Unregister)
+				r.Get("/{contestId}/register/status", h.Contest.GetRegistrationStatus)
+				r.Get("/{contestId}/registrations", h.Contest.ListRegistrations)
+				r.Get("/{contestId}/standings", h.Contest.GetStandings)
+				r.Get("/{contestId}/submissions", h.Contest.ListContestSubmissions)
+				r.Route("/{contestId}/team-registrations", func(r chi.Router) {
+					r.Get("/", h.Team.ListTeamRegistrations)
+					r.Post("/{teamId}", h.Team.RegisterTeamToContest)
+					r.Put("/{teamId}", h.Team.UpdateTeamRegistration)
+					r.Delete("/{teamId}", h.Team.UnregisterTeamFromContest)
+				})
+
+				r.Post("/{contestId}/problems/{problemSlug}/submissions", h.Submission.SubmitContest)
+				r.Post("/{contestId}/problems/{problemSlug}/rejudge", h.Problem.RejudgeContest)
 			})
 
 			r.Route("/{groupId}/materials", func(r chi.Router) {
@@ -93,6 +134,14 @@ func NewRouter(h *Handlers, s *Services, allowedOrigins []string) *chi.Mux {
 			})
 		})
 
+		r.Get("/contests", h.Contest.ListMyContests)
+
+		r.Route("/submissions", func(r chi.Router) {
+			r.Get("/{submissionId}", h.Submission.GetSubmission)
+			r.Patch("/{submissionId}/visibility", h.Submission.UpdateVisibility)
+			r.Post("/{submissionId}/rejudge", h.Submission.RejudgeSubmission)
+		})
+
 		r.Route("/problems", func(r chi.Router) {
 			r.Get("/", h.Problem.ListProblems)
 			r.Post("/", h.Problem.Create)
@@ -103,7 +152,13 @@ func NewRouter(h *Handlers, s *Services, allowedOrigins []string) *chi.Mux {
 				r.Put("/", h.Problem.Update)
 				r.Delete("/", h.Problem.DeleteProblem)
 				r.Post("/unpublish", h.Problem.Unpublish)
+				r.Post("/rejudge", h.Problem.Rejudge)
 				r.Patch("/accessibility", h.Problem.ChangeAccessibility)
+
+				r.Get("/statistics", h.Problem.GetStatistics)
+
+				r.Get("/submissions", h.Submission.ListProblemSubmissions)
+				r.Post("/submissions", h.Submission.Submit)
 
 				r.Route("/files", func(r chi.Router) {
 					r.Post("/", h.Problem.UploadFiles)
@@ -113,27 +168,32 @@ func NewRouter(h *Handlers, s *Services, allowedOrigins []string) *chi.Mux {
 				r.Route("/modifiers", func(r chi.Router) {
 					r.Post("/", h.Problem.AddModifier)
 					r.Get("/", h.Problem.ListModifiers)
-					r.Delete("/{userId}", h.Problem.RemoveModifier)
+					r.Delete("/{nickname}", h.Problem.RemoveModifier)
 				})
 			})
 		})
-	})
 
-	// Public user routes
-	r.Post("/users", h.User.Create)
-	r.Post("/password/forgot", h.User.RequestPasswordRecovery)
-	r.Post("/password/reset", h.User.ResetPassword)
+		r.Route("/teams", func(r chi.Router) {
+			r.Post("/", h.Team.Create)
+			r.Get("/{teamId}", h.Team.GetTeam)
+			r.Route("/{teamId}/invitations", func(r chi.Router) {
+				r.Post("/", h.Team.InviteToTeam)
+			})
+			r.Delete("/{teamId}/members/me", h.Team.LeaveTeam)
+		})
 
-	r.Route("/auth", func(r chi.Router) {
-		r.Post("/login", h.Auth.Login)
-	})
-
-	// Protected routes — authenticated users
-	r.Group(func(r chi.Router) {
-		r.Use(middleware.Auth(s.TokenService, s.SessionInvalidator))
+		r.Route("/team-invitations", func(r chi.Router) {
+			r.Post("/{invitationId}/accept", h.Team.AcceptInvitation)
+			r.Delete("/{invitationId}", h.Team.RejectInvitation)
+		})
 
 		r.Get("/users/me", h.User.GetMyProfile)
+		r.Get("/users/me/dashboard", h.User.GetDashboard)
+		r.Get("/users/me/stats", h.User.GetStats)
 		r.Get("/users/me/groups", h.Group.ListMyGroups)
+		r.Get("/users/me/teams", h.Team.ListMyTeams)
+		r.Get("/users/me/team-invitations", h.Team.ListMyInvitations)
+		r.Get("/users/me/submissions", h.Submission.ListMySubmissions)
 		r.Get("/users/{nickname}", h.User.GetByNickname)
 		r.Put("/users", h.User.UpdateProfile)
 		r.Put("/users/password", h.User.UpdatePassword)
@@ -151,6 +211,9 @@ func NewRouter(h *Handlers, s *Services, allowedOrigins []string) *chi.Mux {
 		r.Get("/users", h.User.ListUsers)
 		r.Put("/users/{id}", h.User.AdminUpdateUser)
 		r.Post("/users/{id}/deactivate", h.User.AdminDeactivateUser)
+
+		r.Post("/problems/{slug}/rejudge", h.Problem.AdminRejudge)
+		r.Post("/submissions/{submissionId}/rejudge", h.Submission.AdminRejudgeSubmission)
 	})
 
 	return r

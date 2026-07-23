@@ -10,6 +10,8 @@ import (
 	"github.com/training-judge-center/backend/pkg/apperror"
 )
 
+// ── Time fixture ─────────────────────────────────────────────────────────────
+
 // testNow is a fixed anchor for createdAt/updatedAt in fixtures (not used for validation).
 var testNow = time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
 
@@ -20,30 +22,15 @@ var (
 	testEnd   = time.Now().Add(29 * time.Hour)
 )
 
-const (
-	callerID      = "aaaaaaaa-0000-0000-0000-000000000001"
-	otherID       = "aaaaaaaa-0000-0000-0000-000000000002"
-	testGroupID   = "bbbbbbbb-0000-0000-0000-000000000001"
-	testContestID = "cccccccc-0000-0000-0000-000000000001"
-	testProblemID = "dddddddd-0000-0000-0000-000000000001"
-)
-
-// ── CurrentUser helpers ──────────────────────────────────────────────────────
-
-var (
-	asAdmin      = testutil.AsAdmin
-	asCoach      = testutil.AsCoach
-	asContestant = testutil.AsContestant
-)
-
 // ── Repository mock ──────────────────────────────────────────────────────────
 
 type mockContestRepository struct {
-	createFn   func(ctx context.Context, c *domainContest.Contest) error
-	updateFn   func(ctx context.Context, c *domainContest.Contest) error
-	findByIDFn func(ctx context.Context, id string) (*domainContest.Contest, error)
-	deleteFn   func(ctx context.Context, id string) error
-	listFn     func(ctx context.Context, f domainContest.ListFilters) ([]*domainContest.Contest, int, error)
+	createFn         func(ctx context.Context, c *domainContest.Contest) error
+	updateFn         func(ctx context.Context, c *domainContest.Contest) error
+	findByIDFn       func(ctx context.Context, id string) (*domainContest.Contest, error)
+	deleteFn         func(ctx context.Context, id string) error
+	listFn           func(ctx context.Context, f domainContest.ListFilters) ([]*domainContest.Contest, int, error)
+	listByGroupIDsFn func(ctx context.Context, groupIDs []string, f domainContest.ListFilters) ([]*domainContest.Contest, int, error)
 }
 
 func (m *mockContestRepository) Create(ctx context.Context, c *domainContest.Contest) error {
@@ -76,11 +63,19 @@ func (m *mockContestRepository) List(ctx context.Context, f domainContest.ListFi
 	}
 	return []*domainContest.Contest{}, 0, nil
 }
+func (m *mockContestRepository) ListByGroupIDs(ctx context.Context, groupIDs []string, f domainContest.ListFilters) ([]*domainContest.Contest, int, error) {
+	if m.listByGroupIDsFn != nil {
+		return m.listByGroupIDsFn(ctx, groupIDs, f)
+	}
+	return []*domainContest.Contest{}, 0, nil
+}
 
 // ── GroupProvider mock ───────────────────────────────────────────────────────
 
 type mockGroupProvider struct {
-	findByIDFn func(ctx context.Context, groupID string) (*GroupInfo, error)
+	findByIDFn               func(ctx context.Context, groupID string) (*GroupInfo, error)
+	findByIDsFn              func(ctx context.Context, groupIDs []string) (map[string]*GroupInfo, error)
+	listAccessibleGroupIDsFn func(ctx context.Context, viewerID string, isAdmin bool) ([]string, error)
 }
 
 func (m *mockGroupProvider) FindByID(ctx context.Context, groupID string) (*GroupInfo, error) {
@@ -88,6 +83,25 @@ func (m *mockGroupProvider) FindByID(ctx context.Context, groupID string) (*Grou
 		return m.findByIDFn(ctx, groupID)
 	}
 	return &GroupInfo{ID: groupID, Name: "Test Group", IsVisible: true}, nil
+}
+func (m *mockGroupProvider) FindByIDs(ctx context.Context, groupIDs []string) (map[string]*GroupInfo, error) {
+	if m.findByIDsFn != nil {
+		return m.findByIDsFn(ctx, groupIDs)
+	}
+	out := make(map[string]*GroupInfo, len(groupIDs))
+	for _, id := range groupIDs {
+		out[id] = &GroupInfo{ID: id, Name: "Test Group", IsVisible: true}
+	}
+	return out, nil
+}
+func (m *mockGroupProvider) ListAccessibleGroupIDs(ctx context.Context, viewerID string, isAdmin bool) ([]string, error) {
+	if m.listAccessibleGroupIDsFn != nil {
+		return m.listAccessibleGroupIDsFn(ctx, viewerID, isAdmin)
+	}
+	if isAdmin {
+		return nil, nil
+	}
+	return []string{}, nil
 }
 
 func groupFound() *mockGroupProvider { return &mockGroupProvider{} }
@@ -105,48 +119,39 @@ func groupNotFound() *mockGroupProvider {
 // ── GroupMemberProvider mock ─────────────────────────────────────────────────
 
 type mockGroupMemberProvider struct {
-	isLeadFn   func(ctx context.Context, userID, groupID string) (bool, error)
-	isMemberFn func(ctx context.Context, userID, groupID string) (bool, error)
+	getRoleFn func(ctx context.Context, userID, groupID string) (*string, error)
 }
 
-func (m *mockGroupMemberProvider) IsLeadOfGroup(ctx context.Context, userID, groupID string) (bool, error) {
-	if m.isLeadFn != nil {
-		return m.isLeadFn(ctx, userID, groupID)
+func (m *mockGroupMemberProvider) GetMemberRole(ctx context.Context, userID, groupID string) (*string, error) {
+	if m.getRoleFn != nil {
+		return m.getRoleFn(ctx, userID, groupID)
 	}
-	return false, nil
-}
-
-func (m *mockGroupMemberProvider) IsMemberOfGroup(ctx context.Context, userID, groupID string) (bool, error) {
-	if m.isMemberFn != nil {
-		return m.isMemberFn(ctx, userID, groupID)
-	}
-	return false, nil
+	return nil, nil
 }
 
 func isLead() *mockGroupMemberProvider {
+	role := "LEAD"
 	return &mockGroupMemberProvider{
-		isLeadFn:   func(_ context.Context, _, _ string) (bool, error) { return true, nil },
-		isMemberFn: func(_ context.Context, _, _ string) (bool, error) { return true, nil },
+		getRoleFn: func(_ context.Context, _, _ string) (*string, error) { return &role, nil },
 	}
 }
 func notLead() *mockGroupMemberProvider {
 	return &mockGroupMemberProvider{
-		isLeadFn:   func(_ context.Context, _, _ string) (bool, error) { return false, nil },
-		isMemberFn: func(_ context.Context, _, _ string) (bool, error) { return false, nil },
+		getRoleFn: func(_ context.Context, _, _ string) (*string, error) { return nil, nil },
 	}
 }
 func isMemberNotLead() *mockGroupMemberProvider {
+	role := "MEMBER"
 	return &mockGroupMemberProvider{
-		isLeadFn:   func(_ context.Context, _, _ string) (bool, error) { return false, nil },
-		isMemberFn: func(_ context.Context, _, _ string) (bool, error) { return true, nil },
+		getRoleFn: func(_ context.Context, _, _ string) (*string, error) { return &role, nil },
 	}
 }
 
 // ── ProblemProvider mock ─────────────────────────────────────────────────────
 
 type mockProblemProvider struct {
-	findBySlugsFn        func(ctx context.Context, slugs []string, callerID string, isAdmin bool) (map[string]*ProblemInfo, error)
-	findByIDsFn          func(ctx context.Context, ids []string) (map[string]*ProblemBasicInfo, error)
+	findBySlugsFn         func(ctx context.Context, slugs []string, callerID string, isAdmin bool) (map[string]*ProblemInfo, error)
+	findByIDsFn           func(ctx context.Context, ids []string) (map[string]*ProblemBasicInfo, error)
 	findByIDsWithLimitsFn func(ctx context.Context, ids []string) (map[string]*ProblemWithLimits, error)
 }
 
@@ -232,6 +237,104 @@ func (m *mockContestParticipantProvider) IsRegisteredBulk(ctx context.Context, c
 
 func mockParticipants() *mockContestParticipantProvider { return &mockContestParticipantProvider{} }
 
+// ── RegistrationRepository mock ──────────────────────────────────────────────
+
+type mockRegistrationRepository struct {
+	saveFn                 func(ctx context.Context, r *domainContest.ContestRegistration) error
+	findByContestAndUserFn func(ctx context.Context, contestID, userID string) (*domainContest.ContestRegistration, error)
+	deleteFn               func(ctx context.Context, contestID, userID string) error
+	listByContestFn        func(ctx context.Context, contestID string, page, limit int) ([]*domainContest.ContestRegistration, int, error)
+	existsByContestAndUser func(ctx context.Context, contestID, userID string) (bool, error)
+	countByContestFn       func(ctx context.Context, contestID string) (int, error)
+	countByContestBulkFn   func(ctx context.Context, contestIDs []string) (map[string]int, error)
+	existsByUserBulkFn     func(ctx context.Context, contestIDs []string, userID string) (map[string]bool, error)
+}
+
+func (m *mockRegistrationRepository) Save(ctx context.Context, r *domainContest.ContestRegistration) error {
+	if m.saveFn != nil {
+		return m.saveFn(ctx, r)
+	}
+	return nil
+}
+
+func (m *mockRegistrationRepository) FindByContestAndUser(ctx context.Context, contestID, userID string) (*domainContest.ContestRegistration, error) {
+	if m.findByContestAndUserFn != nil {
+		return m.findByContestAndUserFn(ctx, contestID, userID)
+	}
+	return nil, nil
+}
+
+func (m *mockRegistrationRepository) Delete(ctx context.Context, contestID, userID string) error {
+	if m.deleteFn != nil {
+		return m.deleteFn(ctx, contestID, userID)
+	}
+	return nil
+}
+
+func (m *mockRegistrationRepository) ListByContest(ctx context.Context, contestID string, page, limit int) ([]*domainContest.ContestRegistration, int, error) {
+	if m.listByContestFn != nil {
+		return m.listByContestFn(ctx, contestID, page, limit)
+	}
+	return []*domainContest.ContestRegistration{}, 0, nil
+}
+
+func (m *mockRegistrationRepository) ExistsByContestAndUser(ctx context.Context, contestID, userID string) (bool, error) {
+	if m.existsByContestAndUser != nil {
+		return m.existsByContestAndUser(ctx, contestID, userID)
+	}
+	return false, nil
+}
+
+func (m *mockRegistrationRepository) CountByContest(ctx context.Context, contestID string) (int, error) {
+	if m.countByContestFn != nil {
+		return m.countByContestFn(ctx, contestID)
+	}
+	return 0, nil
+}
+
+func (m *mockRegistrationRepository) CountByContestBulk(ctx context.Context, contestIDs []string) (map[string]int, error) {
+	if m.countByContestBulkFn != nil {
+		return m.countByContestBulkFn(ctx, contestIDs)
+	}
+	result := make(map[string]int, len(contestIDs))
+	for _, id := range contestIDs {
+		result[id] = 0
+	}
+	return result, nil
+}
+
+func (m *mockRegistrationRepository) ExistsByUserBulk(ctx context.Context, contestIDs []string, userID string) (map[string]bool, error) {
+	if m.existsByUserBulkFn != nil {
+		return m.existsByUserBulkFn(ctx, contestIDs, userID)
+	}
+	result := make(map[string]bool, len(contestIDs))
+	for _, id := range contestIDs {
+		result[id] = false
+	}
+	return result, nil
+}
+
+func mockRegistrations() *mockRegistrationRepository { return &mockRegistrationRepository{} }
+
+// ── ParticipantNicknameProvider mock ─────────────────────────────────────────
+
+type mockNicknameProvider struct {
+	getFn func(ctx context.Context, userIDs []string) (map[string]string, error)
+}
+
+func (m *mockNicknameProvider) GetNicknamesByIDs(ctx context.Context, userIDs []string) (map[string]string, error) {
+	if m.getFn != nil {
+		return m.getFn(ctx, userIDs)
+	}
+	result := make(map[string]string, len(userIDs))
+	for _, id := range userIDs {
+		result[id] = "nick_" + id
+	}
+	return result, nil
+}
+
+func mockNicknames() *mockNicknameProvider { return &mockNicknameProvider{} }
+
 // ── OwnerProvider mock ───────────────────────────────────────────────────────
 
 type mockOwnerProvider struct {
@@ -247,33 +350,125 @@ func (m *mockOwnerProvider) GetDisplay(ctx context.Context, userID string) (*Use
 
 func mockOwner() *mockOwnerProvider { return &mockOwnerProvider{} }
 
-// ── Contest fixture ──────────────────────────────────────────────────────────
+// ── StandingsCache mock ──────────────────────────────────────────────────────
 
-func newTestContest(ownerID string) *domainContest.Contest {
-	return domainContest.RestoreContest(
-		testContestID,
-		domainContest.RestoreContestName("Test Contest"),
-		nil,
-		testStart,
-		testEnd,
-		domainContest.RestorePenalty(20),
-		0,
-		false,
-		false,
-		shared.RestoreGroupID(testGroupID),
-		shared.RestoreUserID(ownerID),
-		[]domainContest.ContestProblem{},
-		testNow.Add(-time.Hour),
-		nil,
-	)
+type mockStandingsCache struct {
+	getFn                func(ctx context.Context, contestID string) (*CachedStandings, error)
+	setFn                func(ctx context.Context, contestID string, data *CachedStandings) error
+	acquireRefreshLockFn func(ctx context.Context, contestID string, ttl time.Duration) (bool, error)
+	releaseRefreshLockFn func(ctx context.Context, contestID string) error
+	invalidateFn         func(ctx context.Context, contestID string) error
 }
 
-func repoWith(c *domainContest.Contest) *mockContestRepository {
-	return &mockContestRepository{
-		findByIDFn: func(_ context.Context, _ string) (*domainContest.Contest, error) {
-			return c, nil
-		},
+func (m *mockStandingsCache) Get(ctx context.Context, contestID string) (*CachedStandings, error) {
+	if m.getFn != nil {
+		return m.getFn(ctx, contestID)
 	}
+	return nil, nil
+}
+func (m *mockStandingsCache) Set(ctx context.Context, contestID string, data *CachedStandings) error {
+	if m.setFn != nil {
+		return m.setFn(ctx, contestID, data)
+	}
+	return nil
+}
+func (m *mockStandingsCache) AcquireRefreshLock(ctx context.Context, contestID string, ttl time.Duration) (bool, error) {
+	if m.acquireRefreshLockFn != nil {
+		return m.acquireRefreshLockFn(ctx, contestID, ttl)
+	}
+	return true, nil
+}
+func (m *mockStandingsCache) ReleaseRefreshLock(ctx context.Context, contestID string) error {
+	if m.releaseRefreshLockFn != nil {
+		return m.releaseRefreshLockFn(ctx, contestID)
+	}
+	return nil
+}
+func (m *mockStandingsCache) Invalidate(ctx context.Context, contestID string) error {
+	if m.invalidateFn != nil {
+		return m.invalidateFn(ctx, contestID)
+	}
+	return nil
+}
+
+// ── ContestSubmissionsProvider mock ──────────────────────────────────────────
+
+type mockContestSubmissionsProvider struct {
+	listByContestFn func(ctx context.Context, contestID string, filters ContestSubmissionFilters) ([]RichSubmissionData, error)
+}
+
+func (m *mockContestSubmissionsProvider) ListByContest(ctx context.Context, contestID string, filters ContestSubmissionFilters) ([]RichSubmissionData, error) {
+	if m.listByContestFn != nil {
+		return m.listByContestFn(ctx, contestID, filters)
+	}
+	return nil, nil
+}
+
+// ── CallerStandingProvider mock ───────────────────────────────────────────────
+
+type mockCallerStandingProvider struct {
+	fn func(contestID, userID string) (string, bool, error)
+}
+
+func (m *mockCallerStandingProvider) GetCallerStandingID(_ context.Context, contestID, userID string) (string, bool, error) {
+	if m.fn != nil {
+		return m.fn(contestID, userID)
+	}
+	return userID, true, nil // default: individual, standingID = userID
+}
+
+// ── StandingsSubmissionProvider mock ─────────────────────────────────────────
+
+type mockStandingsSubmissionProvider struct {
+	listByContestFn func(ctx context.Context, contestID string) ([]ContestSubmissionData, error)
+}
+
+func (m *mockStandingsSubmissionProvider) ListByContest(ctx context.Context, contestID string) ([]ContestSubmissionData, error) {
+	if m.listByContestFn != nil {
+		return m.listByContestFn(ctx, contestID)
+	}
+	return nil, nil
+}
+
+// ── TeamSelectionChecker mock ────────────────────────────────────────────────
+
+type mockTeamSelectionChecker struct {
+	fn func(contestID, userID string) (bool, error)
+}
+
+func (m *mockTeamSelectionChecker) IsUserSelectedInAnyTeam(_ context.Context, contestID, userID string) (bool, error) {
+	if m.fn != nil {
+		return m.fn(contestID, userID)
+	}
+	return false, nil
+}
+
+func mockTeamSelection() *mockTeamSelectionChecker { return &mockTeamSelectionChecker{} }
+
+// ── TeamParticipantProvider mock ─────────────────────────────────────────────
+
+type mockTeamParticipantProvider struct {
+	listSelectedMembersFn func(ctx context.Context, contestID string) (map[string][]string, error)
+}
+
+func (m *mockTeamParticipantProvider) ListSelectedMembersByContest(ctx context.Context, contestID string) (map[string][]string, error) {
+	if m.listSelectedMembersFn != nil {
+		return m.listSelectedMembersFn(ctx, contestID)
+	}
+	return map[string][]string{}, nil
+}
+
+// ── ParticipantProfileProvider mock ──────────────────────────────────────────
+
+type mockParticipantProfileProvider struct {
+	getProfilesFn func(ctx context.Context, userIDs []string) (map[string]*ParticipantProfile, error)
+}
+
+func (m *mockParticipantProfileProvider) GetProfiles(ctx context.Context, userIDs []string) (map[string]*ParticipantProfile, error) {
+	if m.getProfilesFn != nil {
+		return m.getProfilesFn(ctx, userIDs)
+	}
+	return map[string]*ParticipantProfile{}, nil
 }
 
 // ── TransactionManager mock ──────────────────────────────────────────────────
@@ -287,4 +482,108 @@ func (m *mockTransactionManager) WithTx(ctx context.Context, fn func(txCtx conte
 		return m.withTxFn(ctx, fn)
 	}
 	return fn(ctx)
+}
+
+// ── TeamParticipationRepository mock ────────────────────────────────────────
+
+type mockTeamParticipationRepository struct {
+	listFn func(ctx context.Context, contestID string, page, limit int) ([]*domainContest.ContestTeamParticipation, int, error)
+}
+
+func (m *mockTeamParticipationRepository) Save(_ context.Context, _ *domainContest.ContestTeamParticipation) error {
+	return nil
+}
+func (m *mockTeamParticipationRepository) FindByContestAndTeam(_ context.Context, _, _ string) (*domainContest.ContestTeamParticipation, error) {
+	return nil, nil
+}
+func (m *mockTeamParticipationRepository) Update(_ context.Context, _ *domainContest.ContestTeamParticipation) error {
+	return nil
+}
+func (m *mockTeamParticipationRepository) Delete(_ context.Context, _, _ string) error { return nil }
+func (m *mockTeamParticipationRepository) List(ctx context.Context, contestID string, page, limit int) ([]*domainContest.ContestTeamParticipation, int, error) {
+	if m.listFn != nil {
+		return m.listFn(ctx, contestID, page, limit)
+	}
+	return []*domainContest.ContestTeamParticipation{}, 0, nil
+}
+func (m *mockTeamParticipationRepository) AreUsersSelectedInAnyTeam(_ context.Context, _ string, userIDs []string, _ string) (map[string]bool, error) {
+	result := make(map[string]bool, len(userIDs))
+	for _, id := range userIDs {
+		result[id] = false
+	}
+	return result, nil
+}
+
+func mockTeamParticipRepo() *mockTeamParticipationRepository {
+	return &mockTeamParticipationRepository{}
+}
+
+// ── CurrentUser helpers ──────────────────────────────────────────────────────
+
+var (
+	asAdmin      = testutil.AsAdmin
+	asCoach      = testutil.AsCoach
+	asContestant = testutil.AsContestant
+)
+
+// ── Test constants ───────────────────────────────────────────────────────────
+
+const (
+	callerID      = "aaaaaaaa-0000-0000-0000-000000000001"
+	otherID       = "aaaaaaaa-0000-0000-0000-000000000002"
+	testGroupID   = "bbbbbbbb-0000-0000-0000-000000000001"
+	testContestID = "cccccccc-0000-0000-0000-000000000001"
+	testProblemID = "dddddddd-0000-0000-0000-000000000001"
+)
+
+// ── Contest fixture ──────────────────────────────────────────────────────────
+
+func newTestContest(ownerID string) *domainContest.Contest {
+	return domainContest.RestoreContest(
+		testContestID,
+		domainContest.RestoreContestName("Test Contest"),
+		nil,
+		testStart,
+		testEnd,
+		domainContest.RestorePenalty(20),
+		0,
+		false,
+		false,
+		false,
+		shared.RestoreGroupID(testGroupID),
+		shared.RestoreUserID(ownerID),
+		domainContest.RestoreParticipationMode("INDIVIDUAL"), domainContest.RestoreTeamSize(2, 5),
+		[]domainContest.ContestProblem{},
+		testNow.Add(-time.Hour),
+		nil,
+	)
+}
+
+func newFinishedContest(ownerID string) *domainContest.Contest {
+	return domainContest.RestoreContest(
+		testContestID,
+		domainContest.RestoreContestName("Finished Contest"),
+		nil,
+		time.Now().Add(-48*time.Hour),
+		time.Now().Add(-24*time.Hour),
+		domainContest.RestorePenalty(20),
+		0,
+		false,
+		false,
+		false,
+		shared.RestoreGroupID(testGroupID),
+		shared.RestoreUserID(ownerID),
+		domainContest.RestoreParticipationMode("INDIVIDUAL"), domainContest.RestoreTeamSize(2, 5),
+		[]domainContest.ContestProblem{},
+		testNow.Add(-time.Hour),
+		nil,
+	)
+}
+
+func repoWith(c *domainContest.Contest) *mockContestRepository {
+	return &mockContestRepository{
+		findByIDFn: func(_ context.Context, _ string) (*domainContest.Contest, error) {
+			return c, nil
+		},
+	}
 }

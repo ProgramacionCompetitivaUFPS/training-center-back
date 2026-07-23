@@ -1,0 +1,67 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: postgres-backup
+  namespace: training-center
+spec:
+  schedule: "0 6 * * *"          # 06:00 UTC diario (01:00 Colombia) — solo corre si el cluster está arriba
+  concurrencyPolicy: Forbid       # nunca dos backups a la vez
+  successfulJobsHistoryLimit: 3   # conserva los últimos 3 Jobs exitosos (para ver logs)
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      backoffLimit: 2
+      template:
+        spec:
+          serviceAccountName: backend   # Workload Identity → acceso a GCS
+          restartPolicy: Never
+          volumes:
+            - name: backup
+              emptyDir: {}
+          initContainers:
+            - name: dump
+              image: postgres:16-alpine
+              env:
+                - name: PGPASSWORD
+                  valueFrom:
+                    secretKeyRef:
+                      name: app-secrets
+                      key: DB_PASSWORD
+              command:
+                - /bin/sh
+                - -c
+                - |
+                  set -eo pipefail
+                  TS=$(date +%Y%m%d-%H%M%S)
+                  pg_dump -h postgres -U postgres -d training_center | gzip > /backup/training_center-$TS.sql.gz
+                  echo "dump listo: training_center-$TS.sql.gz ($(du -h /backup/*.sql.gz | cut -f1))"
+              volumeMounts:
+                - name: backup
+                  mountPath: /backup
+              resources:
+                requests:
+                  cpu: 100m
+                  memory: 128Mi
+                limits:
+                  cpu: 500m
+                  memory: 256Mi
+          containers:
+            - name: upload
+              image: google/cloud-sdk:slim
+              command:
+                - /bin/sh
+                - -c
+                - |
+                  set -e
+                  gcloud storage cp /backup/*.sql.gz gs://training-center-502916-uploads/backups/
+                  echo "subido a gs://training-center-502916-uploads/backups/"
+              volumeMounts:
+                - name: backup
+                  mountPath: /backup
+              resources:
+                requests:
+                  cpu: 100m
+                  memory: 128Mi
+                limits:
+                  cpu: 500m
+                  memory: 256Mi

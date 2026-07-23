@@ -11,11 +11,8 @@ import (
 	"github.com/training-judge-center/backend/pkg/apperror"
 )
 
-const (
-	DefaultPage  = 1
-	DefaultLimit = 20
-	MaxLimit     = 100
-)
+const maxPageLimit = 100
+
 
 type ContestListItem struct {
 	ID                string
@@ -90,16 +87,11 @@ func NewListContestsUseCase(
 }
 
 func (uc *ListContestsUseCase) Execute(ctx context.Context, in ListContestsInput) (*ListContestsOutput, error) {
+	if err := appshared.ValidatePagination(in.Page, in.Limit, maxPageLimit); err != nil {
+		return nil, err
+	}
 	page := in.Page
-	if page < 1 {
-		page = DefaultPage
-	}
 	limit := in.Limit
-	if limit < 1 {
-		limit = DefaultLimit
-	} else if limit > MaxLimit {
-		limit = MaxLimit
-	}
 
 	group, err := uc.groupProvider.FindByID(ctx, in.GroupID)
 	if err != nil {
@@ -113,58 +105,19 @@ func (uc *ListContestsUseCase) Execute(ctx context.Context, in ListContestsInput
 
 	isMember := false
 	if !isAdmin {
-		var err error
-		isMember, err = uc.memberProvider.IsMemberOfGroup(ctx, in.CurrentUser.ID, in.GroupID)
+		role, err := uc.memberProvider.GetMemberRole(ctx, in.CurrentUser.ID, in.GroupID)
 		if err != nil {
 			return nil, err
 		}
-		if !isMember {
-			isLead, err := uc.memberProvider.IsLeadOfGroup(ctx, in.CurrentUser.ID, in.GroupID)
-			if err != nil {
-				return nil, err
-			}
-			isMember = isLead
-		}
+		isMember = role != nil
 	}
 
 	if !group.IsVisible && !isMember && !isAdmin {
 		return nil, apperror.NewNotFound(ErrCodeGroupNotFound, "group not found")
 	}
 
-	filters := domainContest.ListFilters{
-		GroupID: shared.RestoreGroupID(in.GroupID),
-		Page:    page,
-		Limit:   limit,
-	}
-
-	if in.Status != nil {
-		switch *in.Status {
-		case "SCHEDULED":
-			s := domainContest.StatusScheduled
-			filters.Status = &s
-		case "ACTIVE":
-			s := domainContest.StatusActive
-			filters.Status = &s
-		case "FINISHED":
-			s := domainContest.StatusFinished
-			filters.Status = &s
-		}
-	}
-
-	switch in.SortBy {
-	case "name":
-		filters.SortBy = domainContest.SortByName
-	case "createdAt":
-		filters.SortBy = domainContest.SortByCreatedAt
-	default:
-		filters.SortBy = domainContest.SortByStartTime
-	}
-
-	if in.Order == "asc" {
-		filters.Order = domainContest.OrderAsc
-	} else {
-		filters.Order = domainContest.OrderDesc
-	}
+	filters := buildContestFilters(in.Status, in.SortBy, in.Order, page, limit)
+	filters.GroupID = shared.RestoreGroupID(in.GroupID)
 
 	contests, total, err := uc.repo.List(ctx, filters)
 	if err != nil {
@@ -187,27 +140,10 @@ func (uc *ListContestsUseCase) Execute(ctx context.Context, in ListContestsInput
 	now := time.Now()
 	items := make([]ContestListItem, 0, len(contests))
 	for _, c := range contests {
-		items = append(items, ContestListItem{
-			ID:                c.ID(),
-			Name:              c.Name().Value(),
-			Description:       truncateDescription(c.Description()),
-			StartTime:         c.StartTime(),
-			EndTime:           c.EndTime(),
-			Duration:          c.Duration() * 60,
-			Status:            c.Status(now).String(),
-			Penalty:           c.Penalty().Value(),
-			FreezeMinutes:     c.FreezeMinutes(),
-			EnablePostContest: c.EnablePostContest(),
-			ParticipantCount:  participantCounts[c.ID()],
-			IsRegistered:      registeredMap[c.ID()],
-			ProblemCount:      len(c.Problems()),
-		})
+		items = append(items, toContestListItem(c, now, participantCounts[c.ID()], registeredMap[c.ID()]))
 	}
 
-	totalPages := total / limit
-	if total%limit != 0 {
-		totalPages++
-	}
+	totalPages := appshared.CalcTotalPages(total, limit)
 
 	return &ListContestsOutput{
 		Items: items,

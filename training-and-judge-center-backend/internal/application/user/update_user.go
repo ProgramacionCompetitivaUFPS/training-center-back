@@ -39,8 +39,7 @@ func (uc *UpdateUserUseCase) Execute(ctx context.Context, input UpdateUserInput)
 
 	foundUser, err := uc.repo.FindByID(ctx, input.UserID)
 	if err != nil {
-		slog.ErrorContext(ctx, "failed to find user by id during update", "user_id", input.UserID, "error", err)
-		return nil,apperror.NewInternal()
+		return nil, err
 	}
 	if foundUser == nil {
 		return nil,apperror.NewNotFound(user.ErrCodeUserNotFound, "User not found")

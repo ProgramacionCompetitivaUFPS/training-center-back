@@ -40,8 +40,8 @@ func (p *ProblemProvider) FindBySlugs(ctx context.Context, slugs []string, calle
 		}
 		placeholder += "$" + strconv.Itoa(i+1)
 	}
-	callerPos := strconv.Itoa(len(slugs) + 1)
-	adminPos := strconv.Itoa(len(slugs) + 2)
+	callerPos := "$" + strconv.Itoa(len(slugs)+1)
+	adminPos := "$" + strconv.Itoa(len(slugs)+2)
 
 	query := `
 		SELECT p.id, p.slug, p.title, p.status,

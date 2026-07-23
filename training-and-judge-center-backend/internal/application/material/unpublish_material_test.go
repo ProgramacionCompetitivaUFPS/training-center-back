@@ -9,7 +9,7 @@ import (
 	"github.com/training-judge-center/backend/pkg/apperror"
 )
 
-func newUnpublishUC(repo *mockMaterialRepository, group *mockGroupProvider) *UnpublishMaterialUseCase {
+func newUnpublishMaterialUseCase(repo *mockMaterialRepository, group *mockGroupProvider) *UnpublishMaterialUseCase {
 	return NewUnpublishMaterialUseCase(repo, group, stubAuthorProvider())
 }
 
@@ -20,7 +20,7 @@ func TestUnpublishMaterial_SuccessByAuthor(t *testing.T) {
 		findByIDFn: func(_ context.Context, _ string) (*domainMaterial.Material, error) { return m, nil },
 		saveFn:     func(_ context.Context, _ *domainMaterial.Material) error { saved = true; return nil },
 	}
-	uc := newUnpublishUC(repo, groupExists())
+	uc := newUnpublishMaterialUseCase(repo, groupExists())
 
 	out, err := uc.Execute(context.Background(), UnpublishMaterialInput{
 		CurrentUser: asCoach(testAuthorID),
@@ -41,7 +41,7 @@ func TestUnpublishMaterial_SuccessByAuthor(t *testing.T) {
 
 func TestUnpublishMaterial_SuccessByAdmin(t *testing.T) {
 	m := newPublishedMaterial()
-	uc := newUnpublishUC(repoWith(m), groupExists())
+	uc := newUnpublishMaterialUseCase(repoWith(m), groupExists())
 
 	out, err := uc.Execute(context.Background(), UnpublishMaterialInput{
 		CurrentUser: asAdmin(testOtherID),
@@ -64,7 +64,7 @@ func TestUnpublishMaterial_Idempotent_AlreadyDraft(t *testing.T) {
 		findByIDFn: func(_ context.Context, _ string) (*domainMaterial.Material, error) { return m, nil },
 		saveFn:     func(_ context.Context, _ *domainMaterial.Material) error { saveCalled = true; return nil },
 	}
-	uc := newUnpublishUC(repo, groupExists())
+	uc := newUnpublishMaterialUseCase(repo, groupExists())
 
 	out, err := uc.Execute(context.Background(), UnpublishMaterialInput{
 		CurrentUser: asCoach(testAuthorID),
@@ -85,7 +85,7 @@ func TestUnpublishMaterial_Idempotent_AlreadyDraft(t *testing.T) {
 
 func TestUnpublishMaterial_AutoUnpin(t *testing.T) {
 	m := newPinnedMaterial()
-	uc := newUnpublishUC(repoWith(m), groupExists())
+	uc := newUnpublishMaterialUseCase(repoWith(m), groupExists())
 
 	out, err := uc.Execute(context.Background(), UnpublishMaterialInput{
 		CurrentUser: asCoach(testAuthorID),
@@ -107,7 +107,7 @@ func TestUnpublishMaterial_AutoUnpin(t *testing.T) {
 func TestUnpublishMaterial_PreservesPublishedAt(t *testing.T) {
 	m := newPublishedMaterial()
 	originalPublishedAt := m.PublishedAt()
-	uc := newUnpublishUC(repoWith(m), groupExists())
+	uc := newUnpublishMaterialUseCase(repoWith(m), groupExists())
 
 	out, err := uc.Execute(context.Background(), UnpublishMaterialInput{
 		CurrentUser: asCoach(testAuthorID),
@@ -125,7 +125,7 @@ func TestUnpublishMaterial_PreservesPublishedAt(t *testing.T) {
 
 func TestUnpublishMaterial_Forbidden_NonAuthorLead(t *testing.T) {
 	m := newPublishedMaterial()
-	uc := newUnpublishUC(repoWith(m), groupExists())
+	uc := newUnpublishMaterialUseCase(repoWith(m), groupExists())
 
 	_, err := uc.Execute(context.Background(), UnpublishMaterialInput{
 		CurrentUser: asCoach(testOtherID),
@@ -140,7 +140,7 @@ func TestUnpublishMaterial_Forbidden_NonAuthorLead(t *testing.T) {
 }
 
 func TestUnpublishMaterial_GroupProviderError_Returns500(t *testing.T) {
-	uc := newUnpublishUC(&mockMaterialRepository{}, groupProviderError())
+	uc := newUnpublishMaterialUseCase(&mockMaterialRepository{}, groupProviderError())
 
 	_, err := uc.Execute(context.Background(), UnpublishMaterialInput{
 		CurrentUser: asCoach(testAuthorID),
@@ -158,9 +158,9 @@ func TestUnpublishMaterial_SaveError(t *testing.T) {
 	m := newPublishedMaterial()
 	repo := &mockMaterialRepository{
 		findByIDFn: func(_ context.Context, _ string) (*domainMaterial.Material, error) { return m, nil },
-		saveFn:     func(_ context.Context, _ *domainMaterial.Material) error { return errors.New("db error") },
+		saveFn:     func(_ context.Context, _ *domainMaterial.Material) error { return apperror.NewInternal() },
 	}
-	uc := newUnpublishUC(repo, groupExists())
+	uc := newUnpublishMaterialUseCase(repo, groupExists())
 
 	_, err := uc.Execute(context.Background(), UnpublishMaterialInput{
 		CurrentUser: asCoach(testAuthorID),
@@ -175,7 +175,7 @@ func TestUnpublishMaterial_SaveError(t *testing.T) {
 }
 
 func TestUnpublishMaterial_GroupNotFound(t *testing.T) {
-	uc := newUnpublishUC(&mockMaterialRepository{}, groupNotFound())
+	uc := newUnpublishMaterialUseCase(&mockMaterialRepository{}, groupNotFound())
 
 	_, err := uc.Execute(context.Background(), UnpublishMaterialInput{
 		CurrentUser: asCoach(testAuthorID),
@@ -190,7 +190,7 @@ func TestUnpublishMaterial_GroupNotFound(t *testing.T) {
 }
 
 func TestUnpublishMaterial_MaterialNotFound(t *testing.T) {
-	uc := newUnpublishUC(&mockMaterialRepository{}, groupExists())
+	uc := newUnpublishMaterialUseCase(&mockMaterialRepository{}, groupExists())
 
 	_, err := uc.Execute(context.Background(), UnpublishMaterialInput{
 		CurrentUser: asCoach(testAuthorID),
@@ -206,7 +206,7 @@ func TestUnpublishMaterial_MaterialNotFound(t *testing.T) {
 
 func TestUnpublishMaterial_MaterialInOtherGroup(t *testing.T) {
 	m := newPublishedMaterial()
-	uc := newUnpublishUC(repoWith(m), groupExists())
+	uc := newUnpublishMaterialUseCase(repoWith(m), groupExists())
 
 	_, err := uc.Execute(context.Background(), UnpublishMaterialInput{
 		CurrentUser: asCoach(testAuthorID),

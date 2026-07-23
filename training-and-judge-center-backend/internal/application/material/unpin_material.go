@@ -2,7 +2,6 @@
 
 import (
 	"context"
-	"log/slog"
 	"time"
 
 	domainMaterial "github.com/training-judge-center/backend/internal/domain/material"
@@ -45,8 +44,7 @@ func NewUnpinMaterialUseCase(
 func (uc *UnpinMaterialUseCase) Execute(ctx context.Context, in UnpinMaterialInput) (*UnpinMaterialOutput, error) {
 	exists, err := uc.groupProvider.Exists(ctx, in.GroupID)
 	if err != nil {
-		slog.ErrorContext(ctx, "failed to check group existence", "error", err, "group_id", in.GroupID)
-		return nil, apperror.NewInternal()
+		return nil, err
 	}
 	if !exists {
 		return nil, apperror.NewNotFound(ErrCodeGroupNotFound, "group not found")
@@ -64,8 +62,7 @@ func (uc *UnpinMaterialUseCase) Execute(ctx context.Context, in UnpinMaterialInp
 	if !in.CurrentUser.IsAdmin() {
 		isGroupLead, err = uc.memberProvider.IsLeadOfGroup(ctx, in.CurrentUser.ID, in.GroupID)
 		if err != nil {
-			slog.ErrorContext(ctx, "failed to check lead role", "error", err, "user_id", in.CurrentUser.ID, "group_id", in.GroupID)
-			return nil, apperror.NewInternal()
+			return nil, err
 		}
 	}
 
@@ -78,16 +75,13 @@ func (uc *UnpinMaterialUseCase) Execute(ctx context.Context, in UnpinMaterialInp
 		now := time.Now()
 		m.Unpin(now)
 		if err := uc.repo.Save(ctx, m); err != nil {
-			slog.ErrorContext(ctx, "failed to save unpinned material", "error", err, "material_id", in.MaterialID)
-			return nil, apperror.NewInternal()
+			return nil, err
 		}
 	}
 
 	data := toMaterialData(m)
 	displays, err := uc.authorProvider.GetDisplays(ctx, []string{m.AuthorID().Value()})
-	if err != nil {
-		slog.WarnContext(ctx, "failed to resolve author display, returning without author info", "error", err, "author_id", m.AuthorID().Value())
-	} else {
+	if err == nil {
 		if disp := displays[m.AuthorID().Value()]; disp != nil {
 			data.Author = &AuthorDTO{Nickname: disp.Nickname, Name: disp.Name}
 		}

@@ -4,14 +4,9 @@ import (
 	"context"
 	"log/slog"
 
-	domainGroup "github.com/training-judge-center/backend/internal/domain/group"
 	appshared "github.com/training-judge-center/backend/internal/application/shared"
+	domainGroup "github.com/training-judge-center/backend/internal/domain/group"
 	"github.com/training-judge-center/backend/pkg/apperror"
-)
-
-const (
-	defaultRequestsPageLimit = 20
-	maxRequestsPageLimit     = 100
 )
 
 type ListJoinRequestsInput struct {
@@ -52,19 +47,11 @@ func (uc *ListJoinRequestsUseCase) Execute(ctx context.Context, input ListJoinRe
 		return nil, err
 	}
 
+	if err := appshared.ValidatePagination(input.Page, input.Limit, maxRequestsPageLimit); err != nil {
+		return nil, err
+	}
 	page := input.Page
-	if page < 1 {
-		page = 1
-	}
 	limit := input.Limit
-	if limit < 1 {
-		limit = defaultRequestsPageLimit
-	}
-	if limit > maxRequestsPageLimit {
-		return nil, apperror.NewValidation([]apperror.FieldError{
-			{Field: "limit", Message: "limit must not exceed 100"},
-		})
-	}
 
 	var statusFilter *domainGroup.JoinRequestStatus
 	if input.Status != "" {
@@ -95,8 +82,7 @@ func (uc *ListJoinRequestsUseCase) Execute(ctx context.Context, input ListJoinRe
 	}
 	displays, err := uc.userProvider.GetDisplays(ctx, userIDs)
 	if err != nil {
-		slog.ErrorContext(ctx, "failed to get user displays for join requests", "error", err)
-		return nil, apperror.NewInternal()
+		return nil, err
 	}
 
 	details := make([]JoinRequestDetail, 0, len(requests))
@@ -112,6 +98,6 @@ func (uc *ListJoinRequestsUseCase) Execute(ctx context.Context, input ListJoinRe
 	return &ListJoinRequestsOutput{
 		Requests:   details,
 		Total:      total,
-		TotalPages: calcTotalPages(total, limit),
+		TotalPages: appshared.CalcTotalPages(total, limit),
 	}, nil
 }

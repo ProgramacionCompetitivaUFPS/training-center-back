@@ -42,9 +42,10 @@ func (s *mockGetRepo) FindByID(_ context.Context, _ string) (*domainContest.Cont
 		nil,
 		start, end,
 		domainContest.RestorePenalty(20),
-		0, false, false,
+		0, false, false, false,
 		shared.RestoreGroupID("g1"),
 		shared.RestoreUserID("u1"),
+		domainContest.RestoreParticipationMode("INDIVIDUAL"), domainContest.RestoreTeamSize(2, 5),
 		[]domainContest.ContestProblem{},
 		time.Now(),
 		nil,
@@ -52,6 +53,9 @@ func (s *mockGetRepo) FindByID(_ context.Context, _ string) (*domainContest.Cont
 }
 func (s *mockGetRepo) Delete(_ context.Context, _ string) error { return nil }
 func (s *mockGetRepo) List(_ context.Context, _ domainContest.ListFilters) ([]*domainContest.Contest, int, error) {
+	return nil, 0, nil
+}
+func (s *mockGetRepo) ListByGroupIDs(_ context.Context, _ []string, _ domainContest.ListFilters) ([]*domainContest.Contest, int, error) {
 	return nil, 0, nil
 }
 

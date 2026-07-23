@@ -1,4 +1,4 @@
-package user
+﻿package user
 
 import (
 	"context"
@@ -11,45 +11,6 @@ import (
 	domain "github.com/training-judge-center/backend/internal/domain/user"
 	"github.com/training-judge-center/backend/pkg/apperror"
 )
-
-type mockDeactivationRepo struct {
-	saveFn                      func(ctx context.Context, req *domain.DeactivationRequest) error
-	findByIDFn                  func(ctx context.Context, id string) (*domain.DeactivationRequest, error)
-	updateFn                    func(ctx context.Context, req *domain.DeactivationRequest) error
-	findPendingByUserIDFn       func(ctx context.Context, userID string) (*domain.DeactivationRequest, error)
-	invalidatePendingByUserIDFn func(ctx context.Context, userID string, now time.Time) error
-}
-
-func (m *mockDeactivationRepo) Save(ctx context.Context, req *domain.DeactivationRequest) error {
-	if m.saveFn != nil {
-		return m.saveFn(ctx, req)
-	}
-	return nil
-}
-func (m *mockDeactivationRepo) FindByID(ctx context.Context, id string) (*domain.DeactivationRequest, error) {
-	if m.findByIDFn != nil {
-		return m.findByIDFn(ctx, id)
-	}
-	return nil, nil
-}
-func (m *mockDeactivationRepo) Update(ctx context.Context, req *domain.DeactivationRequest) error {
-	if m.updateFn != nil {
-		return m.updateFn(ctx, req)
-	}
-	return nil
-}
-func (m *mockDeactivationRepo) FindPendingByUserID(ctx context.Context, userID string) (*domain.DeactivationRequest, error) {
-	if m.findPendingByUserIDFn != nil {
-		return m.findPendingByUserIDFn(ctx, userID)
-	}
-	return nil, nil
-}
-func (m *mockDeactivationRepo) InvalidatePendingByUserID(ctx context.Context, userID string, now time.Time) error {
-	if m.invalidatePendingByUserIDFn != nil {
-		return m.invalidatePendingByUserIDFn(ctx, userID, now)
-	}
-	return nil
-}
 
 func TestRequestDeactivation_Success(t *testing.T) {
 	userRepo := newNoConflictRepo()
@@ -139,7 +100,7 @@ func TestRequestDeactivation_UserNotFound(t *testing.T) {
 func TestRequestDeactivation_UserRepoError(t *testing.T) {
 	userRepo := newNoConflictRepo()
 	userRepo.findByIDFn = func(_ context.Context, _ string) (*domain.User, error) {
-		return nil, errors.New("db down")
+		return nil, apperror.NewInternal()
 	}
 
 	uc := NewRequestDeactivationUseCase(userRepo, &mockDeactivationRepo{}, &mockEmailSender{})
@@ -161,7 +122,7 @@ func TestRequestDeactivation_InvalidatePendingError(t *testing.T) {
 
 	deactRepo := &mockDeactivationRepo{
 		invalidatePendingByUserIDFn: func(_ context.Context, _ string, _ time.Time) error {
-			return errors.New("db error")
+			return apperror.NewInternal()
 		},
 	}
 
@@ -184,7 +145,7 @@ func TestRequestDeactivation_SaveError(t *testing.T) {
 
 	deactRepo := &mockDeactivationRepo{
 		saveFn: func(_ context.Context, _ *domain.DeactivationRequest) error {
-			return errors.New("insert failed")
+			return apperror.NewInternal()
 		},
 	}
 

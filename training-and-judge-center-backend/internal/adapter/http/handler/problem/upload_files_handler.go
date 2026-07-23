@@ -33,8 +33,8 @@ const (
 // @Failure      401 {object} apperror.AppError
 // @Router       /problems/p/{slug}/files [post]
 func (h *Handler) UploadFiles(w http.ResponseWriter, r *http.Request) {
-	claims := middleware.GetClaims(r.Context())
-	if claims == nil {
+	cu, ok := middleware.GetCurrentUser(r.Context())
+	if !ok {
 		handler.WriteJSON(r.Context(), w, http.StatusUnauthorized, apperror.AppError{Code: apperror.ErrCodeUnauthorized, Message: "Invalid or missing token"})
 		return
 	}
@@ -91,9 +91,9 @@ func (h *Handler) UploadFiles(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), uploadContextTimeout)
 	defer cancel()
 
-	currentUser := shared.CurrentUser{ID: claims.UserID, Role: claims.Role}
+	currentUser := shared.CurrentUser{ID: cu.ID, Role: cu.Role}
 
-	res, ucErr := h.uploadUC.Execute(ctx, appProblem.UploadProblemFilesInput{
+	res, ucErr := h.uploadProblemFiles.Execute(ctx, appProblem.UploadProblemFilesInput{
 		Slug:        slug,
 		FileType:    fileType,
 		FileName:    fileHeader.Filename,

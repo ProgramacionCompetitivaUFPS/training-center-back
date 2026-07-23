@@ -1,0 +1,55 @@
+package submission
+
+import (
+	"net/http"
+	"time"
+
+	"github.com/training-judge-center/backend/internal/adapter/http/handler"
+	appsubmission "github.com/training-judge-center/backend/internal/application/submission"
+)
+
+type rejudgeSubmissionResponse struct {
+	SubmissionID    string `json:"submissionId"`
+	ProblemSlug     string `json:"problemSlug"`
+	PreviousVerdict string `json:"previousVerdict"`
+	CurrentStatus   string `json:"currentStatus"`
+	Message         string `json:"message"`
+}
+
+// @Summary      Rejudge own submission
+// @Tags         submissions
+// @Produce      json
+// @Security     BearerAuth
+// @Param        submissionId path string true "Submission ID"
+// @Success      200 {object} rejudgeSubmissionResponse
+// @Failure      400 {object} apperror.AppError
+// @Failure      401 {object} apperror.AppError
+// @Failure      403 {object} apperror.AppError
+// @Failure      404 {object} apperror.AppError
+// @Router       /submissions/{submissionId}/rejudge [post]
+func (h *Handler) RejudgeSubmission(w http.ResponseWriter, r *http.Request) {
+	cu, ok := handler.RequireCurrentUser(w, r)
+	if !ok {
+		return
+	}
+
+	submissionID := r.PathValue("submissionId")
+
+	out, err := h.rejudgeSubmission.Execute(r.Context(), appsubmission.RejudgeSubmissionInput{
+		SubmissionID: submissionID,
+		CurrentUser:  *cu,
+		Now:          time.Now(),
+	})
+	if err != nil {
+		handler.WriteError(r.Context(), w, err)
+		return
+	}
+
+	handler.WriteJSON(r.Context(), w, http.StatusOK, rejudgeSubmissionResponse{
+		SubmissionID:    out.SubmissionID,
+		ProblemSlug:     out.ProblemSlug,
+		PreviousVerdict: out.PreviousVerdict,
+		CurrentStatus:   "PENDING",
+		Message:         "Submission rejudge initiated successfully",
+	})
+}

@@ -1,0 +1,116 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: judge-worker
+  namespace: training-center
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: judge-worker
+  template:
+    metadata:
+      labels:
+        app: judge-worker
+    spec:
+      serviceAccountName: backend
+      terminationGracePeriodSeconds: 120
+      nodeSelector:
+        cloud.google.com/gke-nodepool: judge-pool
+      tolerations:
+        - key: judge
+          operator: Equal
+          value: "true"
+          effect: NoSchedule
+      volumes:
+        - name: dind-storage
+          emptyDir: {}
+      initContainers:
+        - name: dind
+          image: docker:27-dind
+          restartPolicy: Always
+          securityContext:
+            privileged: true
+          env:
+            - name: DOCKER_TLS_CERTDIR
+              value: ""
+          args:
+            - --host=tcp://0.0.0.0:2375
+            - --host=unix:///var/run/docker.sock
+          resources:
+            requests:
+              cpu: "2"
+              memory: 8Gi
+            limits:
+              cpu: "3"
+              memory: 10Gi
+          volumeMounts:
+            - name: dind-storage
+              mountPath: /var/lib/docker
+          startupProbe:
+            exec:
+              command: ["docker", "info"]
+            periodSeconds: 2
+            failureThreshold: 30
+        - name: prepull-language-images
+          image: docker:27-cli
+          env:
+            - name: DOCKER_HOST
+              value: tcp://localhost:2375
+          command:
+            - /bin/sh
+            - -c
+            - |
+              set -e
+              REG=us-east1-docker.pkg.dev/training-center-502916/training-center
+              TOKEN=$(wget -qO- --header 'Metadata-Flavor: Google' \
+                'http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/default/token' \
+                | sed 's/.*"access_token":"\([^"]*\)".*/\1/')
+              echo "$TOKEN" | docker login -u oauth2accesstoken --password-stdin https://us-east1-docker.pkg.dev
+              for lang in cpp20 java17 python310; do
+                docker pull "$REG/judge-runner-$lang:v0.1.0"
+                docker tag  "$REG/judge-runner-$lang:v0.1.0" "judge-runner:$lang"
+              done
+              echo "prepull: all language images ready"
+      containers:
+        - name: worker
+          image: __IMAGE__   # placeholder: se sustituye por la versión al aplicar (bootstrap) / lo actualiza el CD con set image. NO aplicar directo sin sustituir.
+          command: ["/bin/worker"]
+          envFrom:
+            - configMapRef:
+                name: app-config
+          env:
+            - name: DOCKER_HOST
+              value: tcp://localhost:2375
+            - name: JUDGE_CONFIG
+              value: /config/judge_config.yaml
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: app-secrets
+                  key: DB_PASSWORD
+            - name: RABBITMQ_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: app-secrets
+                  key: RABBITMQ_PASSWORD
+            - name: RABBITMQ_URL
+              value: amqp://judge:$(RABBITMQ_PASSWORD)@rabbitmq:5672/
+            - name: POD_MEMORY_LIMIT
+              valueFrom:
+                resourceFieldRef:
+                  containerName: dind
+                  resource: limits.memory
+            - name: POD_CPU_LIMIT
+              valueFrom:
+                resourceFieldRef:
+                  containerName: dind
+                  resource: limits.cpu
+                  divisor: 1m
+          resources:
+            requests:
+              cpu: 250m
+              memory: 256Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi

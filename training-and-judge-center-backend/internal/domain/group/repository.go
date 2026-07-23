@@ -45,6 +45,7 @@ type ListFilters struct {
 
 type Repository interface {
 	Save(ctx context.Context, g *Group) error
+	Update(ctx context.Context, g *Group) error
 	FindByID(ctx context.Context, id string) (*Group, error)
 	ExistsByName(ctx context.Context, name GroupName) (bool, error)
 	FindDefault(ctx context.Context) (*Group, error)

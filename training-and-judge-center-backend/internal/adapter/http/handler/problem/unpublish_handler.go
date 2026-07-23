@@ -26,16 +26,16 @@ type unpublishResponse struct {
 // @Failure      404 {object} apperror.AppError
 // @Router       /problems/p/{slug}/unpublish [post]
 func (h *Handler) Unpublish(w http.ResponseWriter, r *http.Request) {
-	claims := middleware.GetClaims(r.Context())
-	if claims == nil {
+	cu, ok := middleware.GetCurrentUser(r.Context())
+	if !ok {
 		handler.WriteJSON(r.Context(), w, http.StatusUnauthorized, apperror.AppError{Code: apperror.ErrCodeUnauthorized, Message: "Invalid or missing authentication token"})
 		return
 	}
 
 	slug := r.PathValue("slug")
-	currentUser := shared.CurrentUser{ID: claims.UserID, Role: claims.Role}
+	currentUser := shared.CurrentUser{ID: cu.ID, Role: cu.Role}
 
-	out, err := h.unpublishUC.Execute(r.Context(), appProblem.UnpublishProblemInput{
+	out, err := h.unpublishProblem.Execute(r.Context(), appProblem.UnpublishProblemInput{
 		Slug:        slug,
 		CurrentUser: currentUser,
 	})

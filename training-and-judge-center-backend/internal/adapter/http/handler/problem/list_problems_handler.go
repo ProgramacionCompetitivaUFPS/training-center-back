@@ -4,6 +4,7 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/training-judge-center/backend/internal/adapter/http/handler"
 	"github.com/training-judge-center/backend/internal/adapter/http/middleware"
@@ -26,8 +27,8 @@ import (
 // @Failure      401 {object} apperror.AppError
 // @Router       /problems [get]
 func (h *Handler) ListProblems(w http.ResponseWriter, r *http.Request) {
-	claims := middleware.GetClaims(r.Context())
-	if claims == nil {
+	cu, ok := middleware.GetCurrentUser(r.Context())
+	if !ok {
 		handler.WriteJSON(r.Context(), w, http.StatusUnauthorized, apperror.AppError{Code: apperror.ErrCodeUnauthorized, Message: "Invalid or missing authentication token"})
 		return
 	}
@@ -57,7 +58,7 @@ func (h *Handler) ListProblems(w http.ResponseWriter, r *http.Request) {
 		tags = strings.Split(raw, ",")
 	}
 
-	currentUser := shared.CurrentUser{ID: claims.UserID, Role: claims.Role}
+	currentUser := shared.CurrentUser{ID: cu.ID, Role: cu.Role}
 
 	in := appProblem.ListProblemsInput{
 		CurrentUser:    currentUser,
@@ -69,7 +70,7 @@ func (h *Handler) ListProblems(w http.ResponseWriter, r *http.Request) {
 		Limit:          limit,
 	}
 
-	out, ucErr := h.listProblemsUC.Execute(r.Context(), in)
+	out, ucErr := h.listProblems.Execute(r.Context(), in)
 	if ucErr != nil {
 		handler.WriteError(r.Context(), w, ucErr)
 		return
@@ -85,18 +86,20 @@ func (h *Handler) ListProblems(w http.ResponseWriter, r *http.Request) {
 			Status:        p.Status,
 			Accessibility: p.Accessibility,
 			Author:        authorResp{Nickname: s.Author.Nickname, Name: s.Author.Name},
-			CreatedAt:     p.CreatedAt.Format("2006-01-02T15:04:05Z"),
-			UpdatedAt:     p.UpdatedAt.Format("2006-01-02T15:04:05Z"),
+			CreatedAt:     p.CreatedAt.UTC().Format(time.RFC3339),
+			UpdatedAt:     p.UpdatedAt.UTC().Format(time.RFC3339),
 		})
 	}
 
 	handler.WriteJSON(r.Context(), w, http.StatusOK, listProblemsResponse{
 		Problems: items,
 		Pagination: paginationResp{
-			TotalCount:   out.TotalCount,
-			CurrentPage:  out.Page,
-			TotalPages:   out.TotalPages,
-			ItemsPerPage: out.Limit,
+			Page:        out.Page,
+			Limit:       out.Limit,
+			Total:       out.TotalCount,
+			TotalPages:  out.TotalPages,
+			HasNextPage: out.Page < out.TotalPages,
+			HasPrevPage: out.Page > 1,
 		},
 	})
 }

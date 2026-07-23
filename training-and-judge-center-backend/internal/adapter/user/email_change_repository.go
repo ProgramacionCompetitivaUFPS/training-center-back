@@ -2,12 +2,14 @@ package user
 
 import (
 	"context"
-	"fmt"
+	"errors"
+	"log/slog"
 	"time"
 
 	"github.com/jackc/pgx/v5"
 	infraPostgres "github.com/training-judge-center/backend/internal/adapter/postgres"
 	domainUser "github.com/training-judge-center/backend/internal/domain/user"
+	"github.com/training-judge-center/backend/pkg/apperror"
 )
 
 type EmailChangeRepository struct {
@@ -35,7 +37,8 @@ func (r *EmailChangeRepository) Save(ctx context.Context, req *domainUser.EmailC
 		req.UpdatedAt(),
 	)
 	if err != nil {
-		return fmt.Errorf("failed to save email change request: %w", err)
+		slog.ErrorContext(ctx, "database error saving email change request", "error", err)
+		return apperror.NewInternal()
 	}
 	return nil
 }
@@ -63,16 +66,18 @@ func (r *EmailChangeRepository) FindByID(ctx context.Context, id string) (*domai
 	)
 
 	if err != nil {
-		if err == pgx.ErrNoRows {
-			return nil, nil // Not found
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, nil
 		}
-		return nil, fmt.Errorf("failed to find email change request: %w", err)
+		slog.ErrorContext(ctx, "database error finding email change request by id", "id", id, "error", err)
+		return nil, apperror.NewInternal()
 	}
 
 	parsedEmail := domainUser.RestoreEmail(emailStr)
 	status, err := domainUser.NewRequestStatus(statusStr)
 	if err != nil {
-		return nil, fmt.Errorf("invalid status in email change request %s: %w", returnedID, err)
+		slog.ErrorContext(ctx, "corrupted status in email_change_requests table", "id", returnedID, "status", statusStr, "error", err)
+		return nil, apperror.NewInternal()
 	}
 	req := domainUser.RestoreEmailChangeRequest(returnedID, userID, parsedEmail, code, status, expiresAt, createdAt, updatedAt)
 
@@ -92,7 +97,8 @@ func (r *EmailChangeRepository) Update(ctx context.Context, req *domainUser.Emai
 		req.ID(),
 	)
 	if err != nil {
-		return fmt.Errorf("failed to update email change request: %w", err)
+		slog.ErrorContext(ctx, "database error updating email change request", "id", req.ID(), "error", err)
+		return apperror.NewInternal()
 	}
 	return nil
 }
@@ -120,16 +126,18 @@ func (r *EmailChangeRepository) FindByCodeAndUserID(ctx context.Context, code st
 	)
 
 	if err != nil {
-		if err == pgx.ErrNoRows {
-			return nil, nil // Not found
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, nil
 		}
-		return nil, fmt.Errorf("failed to find email change request by code: %w", err)
+		slog.ErrorContext(ctx, "database error finding email change request by code", "user_id", userID, "error", err)
+		return nil, apperror.NewInternal()
 	}
 
 	parsedEmail := domainUser.RestoreEmail(emailStr)
 	status, err := domainUser.NewRequestStatus(statusStr)
 	if err != nil {
-		return nil, fmt.Errorf("invalid status in email change request %s: %w", id, err)
+		slog.ErrorContext(ctx, "corrupted status in email_change_requests table", "id", id, "status", statusStr, "error", err)
+		return nil, apperror.NewInternal()
 	}
 	req := domainUser.RestoreEmailChangeRequest(id, returnedUserID, parsedEmail, codeStr, status, expiresAt, createdAt, updatedAt)
 
@@ -150,7 +158,8 @@ func (r *EmailChangeRepository) InvalidatePendingByUserID(ctx context.Context, u
 		domainUser.RequestStatusPending.String(),
 	)
 	if err != nil {
-		return fmt.Errorf("failed to invalidate pending email change requests: %w", err)
+		slog.ErrorContext(ctx, "database error invalidating pending email change requests", "user_id", userID, "error", err)
+		return apperror.NewInternal()
 	}
 	return nil
 }

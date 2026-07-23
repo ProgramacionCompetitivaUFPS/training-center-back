@@ -19,15 +19,15 @@ import (
 	"github.com/training-judge-center/backend/pkg/apperror"
 )
 
-type GroupRepository struct {
+type Repository struct {
 	db *pgxpool.Pool
 }
 
-func NewGroupRepository(db *pgxpool.Pool) *GroupRepository {
-	return &GroupRepository{db: db}
+func NewRepository(db *pgxpool.Pool) *Repository {
+	return &Repository{db: db}
 }
 
-func (r *GroupRepository) Save(ctx context.Context, g *domainGroup.Group) error {
+func (r *Repository) Save(ctx context.Context, g *domainGroup.Group) error {
 	query := `
 		INSERT INTO groups (
 			id, name, description, visibility, join_policy,
@@ -49,7 +49,7 @@ func (r *GroupRepository) Save(ctx context.Context, g *domainGroup.Group) error 
 	)
 	if err != nil {
 		var pgErr *pgconn.PgError
-		if errors.As(err, &pgErr) && pgErr.Code == "23505" {
+		if errors.As(err, &pgErr) && pgErr.Code == infraPostgres.UniqueViolation {
 			return apperror.NewConflict(domainGroup.ErrCodeNameAlreadyExists, "A group with this name already exists")
 		}
 		slog.ErrorContext(ctx, "failed to save group", "error", err, "group_id", g.ID())
@@ -58,13 +58,13 @@ func (r *GroupRepository) Save(ctx context.Context, g *domainGroup.Group) error 
 	return nil
 }
 
-func (r *GroupRepository) FindByID(ctx context.Context, id string) (*domainGroup.Group, error) {
+func (r *Repository) FindByID(ctx context.Context, id string) (*domainGroup.Group, error) {
 	const q = `
 		SELECT id, name, description, visibility, join_policy, is_default,
 		       created_by, created_at, updated_at
 		FROM groups WHERE id = $1
 	`
-	row := r.db.QueryRow(ctx, q, id)
+	row := infraPostgres.GetQuerier(ctx, r.db).QueryRow(ctx, q, id)
 	g, err := scanGroup(row)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
@@ -76,7 +76,7 @@ func (r *GroupRepository) FindByID(ctx context.Context, id string) (*domainGroup
 	return g, nil
 }
 
-func (r *GroupRepository) ExistsByName(ctx context.Context, name domainGroup.GroupName) (bool, error) {
+func (r *Repository) ExistsByName(ctx context.Context, name domainGroup.GroupName) (bool, error) {
 	var exists bool
 	err := r.db.QueryRow(ctx,
 		`SELECT EXISTS(SELECT 1 FROM groups WHERE LOWER(name) = LOWER($1))`,
@@ -89,7 +89,7 @@ func (r *GroupRepository) ExistsByName(ctx context.Context, name domainGroup.Gro
 	return exists, nil
 }
 
-func (r *GroupRepository) FindDefault(ctx context.Context) (*domainGroup.Group, error) {
+func (r *Repository) FindDefault(ctx context.Context) (*domainGroup.Group, error) {
 	row := r.db.QueryRow(ctx, `
 		SELECT id, name, description, visibility, join_policy,
 		       is_default, created_by, created_at, updated_at
@@ -108,8 +108,33 @@ func (r *GroupRepository) FindDefault(ctx context.Context) (*domainGroup.Group, 
 	return g, nil
 }
 
-func (r *GroupRepository) Delete(ctx context.Context, id string) error {
-	tag, err := r.db.Exec(ctx, `DELETE FROM groups WHERE id = $1`, id)
+func (r *Repository) Update(ctx context.Context, g *domainGroup.Group) error {
+	const q = `
+		UPDATE groups
+		SET name = $1, description = $2, visibility = $3, join_policy = $4, updated_at = $5
+		WHERE id = $6
+	`
+	_, err := infraPostgres.GetQuerier(ctx, r.db).Exec(ctx, q,
+		g.Name().Value(),
+		g.Description(),
+		g.Visibility().String(),
+		g.JoinPolicy().String(),
+		g.UpdatedAt(),
+		g.ID(),
+	)
+	if err != nil {
+		var pgErr *pgconn.PgError
+		if errors.As(err, &pgErr) && pgErr.Code == infraPostgres.UniqueViolation {
+			return apperror.NewConflict(domainGroup.ErrCodeNameAlreadyExists, "a group with this name already exists")
+		}
+		slog.ErrorContext(ctx, "failed to update group", "error", err, "group_id", g.ID())
+		return apperror.NewInternal()
+	}
+	return nil
+}
+
+func (r *Repository) Delete(ctx context.Context, id string) error {
+	tag, err := infraPostgres.GetQuerier(ctx, r.db).Exec(ctx, `DELETE FROM groups WHERE id = $1`, id)
 	if err != nil {
 		slog.ErrorContext(ctx, "failed to delete group", "error", err, "group_id", id)
 		return apperror.NewInternal()
@@ -120,7 +145,7 @@ func (r *GroupRepository) Delete(ctx context.Context, id string) error {
 	return nil
 }
 
-func (r *GroupRepository) List(ctx context.Context, filters domainGroup.ListFilters) ([]*domainGroup.Group, int, error) {
+func (r *Repository) List(ctx context.Context, filters domainGroup.ListFilters) ([]*domainGroup.Group, int, error) {
 	var conds []string
 	var args []any
 	idx := 1
@@ -131,10 +156,11 @@ func (r *GroupRepository) List(ctx context.Context, filters domainGroup.ListFilt
 		return s
 	}
 
-	// Register viewerID upfront when it may appear in WHERE or ORDER BY,
-	// so its placeholder index is stable regardless of condition order.
+	// Register viewerID for WHERE conditions only. The JOIN clause for
+	// SortByJoinedAt registers its own arg after countArgs is snapshotted so
+	// it never bleeds into the count query.
 	viewerArg := func() string { return "" }
-	if filters.OnlyMyGroups != nil || !filters.ViewerIsAdmin || filters.SortBy == domainGroup.SortByJoinedAt {
+	if filters.OnlyMyGroups != nil || !filters.ViewerIsAdmin {
 		placeholder := nextArg(filters.ViewerID.Value())
 		viewerArg = func() string { return placeholder }
 	}
@@ -181,15 +207,27 @@ func (r *GroupRepository) List(ctx context.Context, filters domainGroup.ListFilt
 		where = "WHERE " + strings.Join(conds, " AND ")
 	}
 
-	orderBy := mapSortClause(filters, viewerArg)
-
-	memberCountSelect := ""
-	if filters.SortBy == domainGroup.SortByMemberCount {
-		memberCountSelect = ", (SELECT COUNT(*) FROM group_members gm2 WHERE gm2.group_id = g.id) AS mc"
-	}
-
+	// Snapshot countArgs here — only WHERE args are in args at this point.
 	countArgs := make([]any, len(args))
 	copy(countArgs, args)
+
+	joinClause := ""
+	memberCountSelect := ""
+	switch filters.SortBy {
+	case domainGroup.SortByMemberCount:
+		joinClause = "LEFT JOIN (SELECT group_id, COUNT(*) AS mc FROM group_members GROUP BY group_id) gm_count ON gm_count.group_id = g.id"
+		memberCountSelect = ", COALESCE(gm_count.mc, 0) AS mc"
+	case domainGroup.SortByJoinedAt:
+		// Reuse the WHERE viewer placeholder when already registered; otherwise
+		// register a fresh one that lives only in the SELECT query.
+		joinViewer := viewerArg()
+		if joinViewer == "" {
+			joinViewer = nextArg(filters.ViewerID.Value())
+		}
+		joinClause = fmt.Sprintf("LEFT JOIN group_members gm_joined ON gm_joined.group_id = g.id AND gm_joined.user_id = %s", joinViewer)
+	}
+
+	orderBy := mapSortClause(filters)
 
 	offset := (filters.Page - 1) * filters.Limit
 	limitArg := nextArg(filters.Limit)
@@ -200,9 +238,10 @@ func (r *GroupRepository) List(ctx context.Context, filters domainGroup.ListFilt
 		       g.created_by, g.created_at, g.updated_at%s
 		FROM groups g
 		%s
+		%s
 		ORDER BY %s
 		LIMIT %s OFFSET %s
-	`, memberCountSelect, where, orderBy, limitArg, offsetArg)
+	`, memberCountSelect, joinClause, where, orderBy, limitArg, offsetArg)
 
 	countQuery := fmt.Sprintf("SELECT COUNT(*) FROM groups g %s", where)
 
@@ -213,31 +252,35 @@ func (r *GroupRepository) List(ctx context.Context, filters domainGroup.ListFilt
 	eg.Go(func() error {
 		rows, err := r.db.Query(gCtx, selectQuery, args...)
 		if err != nil {
-			return err
+			slog.ErrorContext(gCtx, "database error querying groups", "error", err)
+			return apperror.NewInternal()
 		}
 		defer rows.Close()
 		for rows.Next() {
 			g, err := scanGroupRow(rows, memberCountSelect != "")
 			if err != nil {
-				slog.ErrorContext(gCtx, "List groups scan failed", "error", err)
-				return err
+				slog.ErrorContext(gCtx, "database error scanning group row", "error", err)
+				return apperror.NewInternal()
 			}
 			result = append(result, g)
 		}
 		if err := rows.Err(); err != nil {
-			slog.ErrorContext(gCtx, "List groups rows error", "error", err)
-			return err
+			slog.ErrorContext(gCtx, "database error iterating group rows", "error", err)
+			return apperror.NewInternal()
 		}
 		return nil
 	})
 
 	eg.Go(func() error {
-		return r.db.QueryRow(gCtx, countQuery, countArgs...).Scan(&total)
+		if err := r.db.QueryRow(gCtx, countQuery, countArgs...).Scan(&total); err != nil {
+			slog.ErrorContext(gCtx, "database error counting groups", "error", err)
+			return apperror.NewInternal()
+		}
+		return nil
 	})
 
 	if err := eg.Wait(); err != nil {
-		slog.ErrorContext(ctx, "List groups failed", "error", err)
-		return nil, 0, apperror.NewInternal()
+		return nil, 0, err // already apperror — goroutines already logged
 	}
 	if result == nil {
 		result = []*domainGroup.Group{}
@@ -283,7 +326,7 @@ func scanGroupRow(row rowScanner, hasMemberCount bool) (*domainGroup.Group, erro
 	), nil
 }
 
-func mapSortClause(f domainGroup.ListFilters, viewerArg func() string) string {
+func mapSortClause(f domainGroup.ListFilters) string {
 	dir := "ASC"
 	if f.Order == domainGroup.OrderDesc {
 		dir = "DESC"
@@ -294,10 +337,7 @@ func mapSortClause(f domainGroup.ListFilters, viewerArg func() string) string {
 	case domainGroup.SortByMemberCount:
 		return fmt.Sprintf("mc %s, g.name ASC", dir)
 	case domainGroup.SortByJoinedAt:
-		return fmt.Sprintf(
-			"(SELECT joined_at FROM group_members gm WHERE gm.group_id = g.id AND gm.user_id = %s) %s, g.name ASC",
-			viewerArg(), dir,
-		)
+		return fmt.Sprintf("gm_joined.joined_at %s, g.name ASC", dir)
 	default:
 		return fmt.Sprintf("g.name %s", dir)
 	}

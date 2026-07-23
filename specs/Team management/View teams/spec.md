@@ -32,49 +32,23 @@ As a user, I want to see a list of teams I belong to so that I can manage my tea
 
 ---
 
-### User Story 2 - View pending team invitations (Priority: P1)
+### User Story 2 - View team details (Priority: P2)
 
-As a user, I want to see team invitations I've received so that I can accept or reject them.
+As an authenticated user, I want to view the details of any team so that I can see its members before accepting an invitation or checking contest standings.
 
-**Why this priority**: Users need to see and respond to invitations to join teams.
-
-**Acceptance Scenarios**:
-
-1. **Scenario**: User views pending invitations
-   * **Given** user has pending team invitations
-   * **When** they request their invitations
-   * **Then** system returns all pending invitations
-   * **And** includes team info and inviter info
-
-2. **Scenario**: User has no pending invitations
-   * **Given** user has no pending invitations
-   * **When** they request their invitations
-   * **Then** system returns an empty list
-
-3. **Scenario**: Invitation was already accepted
-   * **Given** user accepted an invitation
-   * **When** they request pending invitations
-   * **Then** that invitation is NOT in the list
-
----
-
-### User Story 3 - View team details (Priority: P2)
-
-As a team member, I want to view details of my team so that I can see all members.
-
-**Why this priority**: Team members need to know who else is on the team.
+**Why this priority**: Team composition is public information in a competitive programming context — any authenticated user should be able to look up who is on a team.
 
 **Acceptance Scenarios**:
 
-1. **Scenario**: Team member views team details
-   * **Given** user is a member of a team
+1. **Scenario**: Any authenticated user views team details
+   * **Given** user is authenticated (member or non-member)
    * **When** they request team details
    * **Then** system returns team name, members, and creation info
 
-2. **Scenario**: Non-member tries to view team details
-   * **Given** user is NOT a member of the team
-   * **When** they request team details
-   * **Then** system rejects with 403 Forbidden
+2. **Scenario**: Unauthenticated request
+   * **Given** request has no authentication
+   * **When** team details are requested
+   * **Then** system rejects with 401 Unauthorized
 
 3. **Scenario**: Team not found
    * **Given** no team exists with the provided ID
@@ -94,26 +68,18 @@ As a team member, I want to view details of my team so that I can see all member
 * **FR-VT-003**: System MUST return the user's join date for each team.
 * **FR-VT-004**: System MUST sort teams by join date descending by default.
 
-**Pending Invitations**
-
-* **FR-VT-005**: System MUST provide endpoint for users to list pending team invitations.
-* **FR-VT-006**: System MUST include team info (id, name) for each invitation.
-* **FR-VT-007**: System MUST include inviter info (id, nickname) for each invitation.
-* **FR-VT-008**: System MUST include invitation date and expiration (if applicable).
-* **FR-VT-009**: System MUST NOT return accepted or rejected invitations.
-
 **Team Details**
 
 * **FR-VT-010**: System MUST provide endpoint to view team details.
-* **FR-VT-011**: Only team members MUST be able to view team details.
+* **FR-VT-011**: Any authenticated user MUST be able to view team details.
 * **FR-VT-012**: Team details MUST include all members with their join dates.
 * **FR-VT-013**: Team details MUST include pending invitations (for members only).
-* **FR-VT-014**: Admin MUST be able to view any team's details.
+* **FR-VT-014**: Unauthenticated requests MUST be rejected with 401.
 
 **Privacy**
 
-* **FR-VT-015**: Teams MUST NOT be searchable publicly.
-* **FR-VT-016**: Team access MUST only be through membership or invitation.
+* **FR-VT-015**: Teams MUST NOT be searchable or discoverable publicly (no list-all endpoint).
+* **FR-VT-016**: Users can only find teams by direct ID (e.g., from an invitation or standings).
 
 ---
 
@@ -160,46 +126,6 @@ List teams where the authenticated user is a member.
     "page": 1,
     "limit": 20,
     "total": 2,
-    "totalPages": 1
-  }
-}
-```
-
----
-
-### GET /api/users/me/team-invitations
-
-List pending team invitations for the authenticated user.
-
-**Headers**:
-
-| Header | Type | Required | Description |
-|--------|------|----------|-------------|
-| Authorization | string | Yes | Bearer token for authentication |
-
-**Success Response (200 OK)**:
-
-```json
-{
-  "invitations": [
-    {
-      "id": "invitation-uuid",
-      "team": {
-        "id": "team-uuid",
-        "name": "Team Beta"
-      },
-      "invitedBy": {
-        "id": "user-uuid",
-        "nickname": "alice_coder"
-      },
-      "invitedAt": "2026-02-05T10:00:00Z",
-      "expiresAt": null
-    }
-  ],
-  "pagination": {
-    "page": 1,
-    "limit": 20,
-    "total": 1,
     "totalPages": 1
   }
 }
@@ -270,15 +196,6 @@ View details of a specific team.
 
 **Error Responses**:
 
-#### 403 Forbidden
-
-```json
-{
-  "error": "NOT_TEAM_MEMBER",
-  "message": "Only team members can view team details"
-}
-```
-
 #### 404 Not Found
 
 ```json
@@ -292,8 +209,7 @@ View details of a specific team.
 
 ## Notes / Implementation hints
 
-* Teams are private by design - no public search/discovery
-* Users can only find teams through invitations
+* Team details are visible to any authenticated user — team composition is treated as public information (similar to user profiles)
+* Teams are not publicly searchable/discoverable; a user must know the team ID (from an invitation, standings, etc.)
 * Consider caching "my teams" as this is frequently accessed
-* Pending invitations should be filtered server-side (not including expired ones)
-* Admin access to team details is for support/moderation purposes
+* Pending invitations in the detail response should be filtered server-side (not including expired ones) — implemented in T-2

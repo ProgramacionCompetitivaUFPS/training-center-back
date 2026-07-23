@@ -28,6 +28,9 @@ type ContestOutput struct {
 	FreezeMinutes     int
 	EnablePostContest bool
 	Locked            bool
+	ParticipationMode string
+	TeamSizeMin       int
+	TeamSizeMax       int
 	Group             GroupDisplay
 	Owner             UserDisplay
 	Problems          []ProblemDisplay
@@ -49,6 +52,9 @@ func buildOutput(c *domainContest.Contest, group *GroupInfo, owner *UserDisplay,
 		FreezeMinutes:     c.FreezeMinutes(),
 		EnablePostContest: c.EnablePostContest(),
 		Locked:            c.Locked(),
+		ParticipationMode: c.ParticipationMode().String(),
+		TeamSizeMin:       c.TeamSize().Min(),
+		TeamSizeMax:       c.TeamSize().Max(),
 		Group:             GroupDisplay{ID: group.ID, Name: group.Name},
 		Owner:             *owner,
 		Problems:          problems,

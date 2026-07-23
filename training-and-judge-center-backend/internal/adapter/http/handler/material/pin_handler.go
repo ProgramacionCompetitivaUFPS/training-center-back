@@ -19,12 +19,12 @@ import (
 // @Failure      404 {object} apperror.AppError
 // @Router       /groups/{groupId}/materials/{materialId}/pin [post]
 func (h *Handler) Pin(w http.ResponseWriter, r *http.Request) {
-	currentUser, ok := h.requireCurrentUser(w, r)
+	currentUser, ok := handler.RequireCurrentUser(w, r)
 	if !ok {
 		return
 	}
 
-	out, err := h.pinUC.Execute(r.Context(), appMaterial.PinMaterialInput{
+	out, err := h.pinMaterial.Execute(r.Context(), appMaterial.PinMaterialInput{
 		CurrentUser: *currentUser,
 		GroupID:     r.PathValue("groupId"),
 		MaterialID:  r.PathValue("materialId"),

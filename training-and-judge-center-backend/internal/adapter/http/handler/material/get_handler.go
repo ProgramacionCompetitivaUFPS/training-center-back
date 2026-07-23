@@ -19,7 +19,7 @@ import (
 // @Failure      404 {object} apperror.AppError
 // @Router       /groups/{groupId}/materials/{materialId} [get]
 func (h *Handler) Get(w http.ResponseWriter, r *http.Request) {
-	currentUser, ok := h.requireCurrentUser(w, r)
+	currentUser, ok := handler.RequireCurrentUser(w, r)
 	if !ok {
 		return
 	}
@@ -31,7 +31,7 @@ func (h *Handler) Get(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	out, err := h.getUC.Execute(r.Context(), appMaterial.GetMaterialInput{
+	out, err := h.getMaterial.Execute(r.Context(), appMaterial.GetMaterialInput{
 		CurrentUser: *currentUser,
 		GroupID:     groupID,
 		MaterialID:  materialID,

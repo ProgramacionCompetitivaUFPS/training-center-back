@@ -2,7 +2,7 @@
 
 import (
 	"context"
-	"log/slog"
+
 	"time"
 
 	"github.com/google/uuid"
@@ -54,7 +54,7 @@ func (uc *ApproveRequestUseCase) Execute(ctx context.Context, input ApproveReque
 
 	now := time.Now()
 	newMemberID := uuid.New().String()
-	newMember, err := domainGroup.NewGroupMember(newMemberID, input.GroupID, req.RequesterUserID(), domainGroup.MemberRoleMember, now)
+	newMember, err := domainGroup.NewGroupMember(newMemberID, input.GroupID, req.RequesterUserID(), domainGroup.MemberRoleMember, domainGroup.JoinMethodRequestApproved, nil, now)
 	if err != nil {
 		return nil, err
 	}
@@ -69,8 +69,7 @@ func (uc *ApproveRequestUseCase) Execute(ctx context.Context, input ApproveReque
 		}
 
 		if err := uc.joinRequestRepo.Save(txCtx, req); err != nil {
-			slog.ErrorContext(txCtx, "failed to save approved request", "error", err)
-			return apperror.NewInternal()
+			return err
 		}
 
 		return uc.memberRepo.Save(txCtx, newMember)

@@ -22,6 +22,7 @@ type MemberStats struct {
 
 type MemberRepository interface {
 	Save(ctx context.Context, m *GroupMember) error
+	Update(ctx context.Context, m *GroupMember) error
 	SaveAll(ctx context.Context, members []*GroupMember) error
 	FindByGroupAndUser(ctx context.Context, groupID string, userID shared.UserID) (*GroupMember, error)
 	FindByGroup(ctx context.Context, groupID string, filters MemberFilters) ([]*GroupMember, int, error)

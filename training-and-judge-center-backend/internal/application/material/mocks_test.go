@@ -2,12 +2,11 @@
 
 import (
 	"context"
-	"errors"
 	"time"
 
 	domainMaterial "github.com/training-judge-center/backend/internal/domain/material"
 	"github.com/training-judge-center/backend/internal/domain/shared"
-	appshared "github.com/training-judge-center/backend/internal/application/shared"
+	"github.com/training-judge-center/backend/internal/testutil"
 	"github.com/training-judge-center/backend/pkg/apperror"
 )
 
@@ -154,11 +153,28 @@ func (m *mockAuthorProvider) GetDisplays(ctx context.Context, userIDs []string) 
 
 func stubAuthorProvider() *mockAuthorProvider { return &mockAuthorProvider{} }
 
+// ── AuthorIDProvider mock ────────────────────────────────────────────────────
+
+type mockAuthorIDProvider struct {
+	findFn func(ctx context.Context, nickname string) (string, bool, error)
+}
+
+func (m *mockAuthorIDProvider) FindIDByNickname(ctx context.Context, nickname string) (string, bool, error) {
+	if m.findFn != nil {
+		return m.findFn(ctx, nickname)
+	}
+	return "", false, nil
+}
+
+func stubAuthorIDProvider() *mockAuthorIDProvider { return &mockAuthorIDProvider{} }
+
 // ── CurrentUser helpers ──────────────────────────────────────────────────────
 
-func asAdmin(id string) appshared.CurrentUser      { return appshared.CurrentUser{ID: id, Role: shared.RoleAdmin} }
-func asCoach(id string) appshared.CurrentUser      { return appshared.CurrentUser{ID: id, Role: shared.RoleCoach} }
-func asContestant(id string) appshared.CurrentUser { return appshared.CurrentUser{ID: id, Role: shared.RoleContestant} }
+var (
+	asAdmin      = testutil.AsAdmin
+	asCoach      = testutil.AsCoach
+	asContestant = testutil.AsContestant
+)
 
 // ── Material fixtures ────────────────────────────────────────────────────────
 
@@ -247,5 +263,5 @@ func groupNotFound() *mockGroupProvider {
 }
 
 func groupProviderError() *mockGroupProvider {
-	return &mockGroupProvider{existsFn: func(_ context.Context, _ string) (bool, error) { return false, errors.New("db timeout") }}
+	return &mockGroupProvider{existsFn: func(_ context.Context, _ string) (bool, error) { return false, apperror.NewInternal() }}
 }

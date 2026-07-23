@@ -2,7 +2,7 @@
 
 import (
 	"context"
-	"log/slog"
+
 
 	domainGroup "github.com/training-judge-center/backend/internal/domain/group"
 	appshared "github.com/training-judge-center/backend/internal/application/shared"
@@ -49,8 +49,7 @@ func (uc *RejectRequestUseCase) Execute(ctx context.Context, input RejectRequest
 	}
 
 	if err := uc.joinRequestRepo.Save(ctx, req); err != nil {
-		slog.ErrorContext(ctx, "failed to save rejected request", "error", err)
-		return nil, apperror.NewInternal()
+		return nil, err
 	}
 
 	return &RejectRequestOutput{Request: joinRequestToDTO(req)}, nil

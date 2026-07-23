@@ -2,11 +2,13 @@ package user
 
 import (
 	"net/http"
+	"time"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/training-judge-center/backend/internal/adapter/http/handler"
 	"github.com/training-judge-center/backend/internal/adapter/http/middleware"
 	appuser "github.com/training-judge-center/backend/internal/application/user"
+	"github.com/training-judge-center/backend/pkg/apperror"
 )
 
 type fullUserResponse struct {
@@ -36,17 +38,14 @@ type publicUserResponse struct {
 // @Success      200 {object} fullUserResponse
 // @Failure      401 {object} apperror.AppError
 // @Router       /users/me [get]
-func (h *UserHandler) GetMyProfile(w http.ResponseWriter, r *http.Request) {
-	claims := middleware.GetClaims(r.Context())
-	if claims == nil {
-		handler.WriteJSON(r.Context(), w, http.StatusUnauthorized, map[string]string{
-			"error":   "UNAUTHORIZED",
-			"message": "Invalid or missing authentication token",
-		})
+func (h *Handler) GetMyProfile(w http.ResponseWriter, r *http.Request) {
+	cu, ok := middleware.GetCurrentUser(r.Context())
+	if !ok {
+		handler.WriteJSON(r.Context(), w, http.StatusUnauthorized, apperror.AppError{Code: apperror.ErrCodeUnauthorized, Message: "invalid or missing authentication token"})
 		return
 	}
 
-	out, err := h.getMyProfile.Execute(r.Context(), appuser.GetMyProfileInput{UserID: claims.UserID})
+	out, err := h.getMyProfile.Execute(r.Context(), appuser.GetMyProfileInput{UserID: cu.ID})
 	if err != nil {
 		handler.WriteError(r.Context(), w, err)
 		return
@@ -64,21 +63,18 @@ func (h *UserHandler) GetMyProfile(w http.ResponseWriter, r *http.Request) {
 // @Failure      401 {object} apperror.AppError
 // @Failure      404 {object} apperror.AppError
 // @Router       /users/{nickname} [get]
-func (h *UserHandler) GetByNickname(w http.ResponseWriter, r *http.Request) {
-	claims := middleware.GetClaims(r.Context())
-	if claims == nil {
-		handler.WriteJSON(r.Context(), w, http.StatusUnauthorized, map[string]string{
-			"error":   "UNAUTHORIZED",
-			"message": "Invalid or missing authentication token",
-		})
+func (h *Handler) GetByNickname(w http.ResponseWriter, r *http.Request) {
+	cu, ok := middleware.GetCurrentUser(r.Context())
+	if !ok {
+		handler.WriteJSON(r.Context(), w, http.StatusUnauthorized, apperror.AppError{Code: apperror.ErrCodeUnauthorized, Message: "invalid or missing authentication token"})
 		return
 	}
 
 	nickname := chi.URLParam(r, "nickname")
 
 	out, err := h.getUserByNickname.Execute(r.Context(), appuser.GetUserByNicknameInput{
-		RequesterID:   claims.UserID,
-		RequesterRole: claims.Role,
+		RequesterID:   cu.ID,
+		RequesterRole: cu.Role,
 		Nickname:      nickname,
 	})
 	if err != nil {
@@ -94,7 +90,7 @@ func (h *UserHandler) GetByNickname(w http.ResponseWriter, r *http.Request) {
 			Nickname:    out.User.Nickname,
 			Institution: out.User.Institution,
 			Role:        out.User.Role,
-			CreatedAt:   out.User.CreatedAt.Format("2006-01-02T15:04:05Z"),
+			CreatedAt:   out.User.CreatedAt.UTC().Format(time.RFC3339),
 		})
 	}
 }
@@ -107,13 +103,13 @@ func buildFullResponse(u appuser.UserDTO) fullUserResponse {
 		City:        u.City,
 		Institution: u.Institution,
 		Role:        u.Role,
-		CreatedAt:   u.CreatedAt.Format("2006-01-02T15:04:05Z"),
+		CreatedAt:   u.CreatedAt.UTC().Format(time.RFC3339),
 	}
 	if u.Email != nil {
 		resp.Email = *u.Email
 	}
 	if u.UpdatedAt != nil {
-		resp.UpdatedAt = u.UpdatedAt.Format("2006-01-02T15:04:05Z")
+		resp.UpdatedAt = u.UpdatedAt.UTC().Format(time.RFC3339)
 	}
 	return resp
 }

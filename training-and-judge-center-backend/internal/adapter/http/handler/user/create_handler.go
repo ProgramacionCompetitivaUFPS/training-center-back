@@ -3,9 +3,11 @@ package user
 import (
 	"encoding/json"
 	"net/http"
+	"time"
 
 	"github.com/training-judge-center/backend/internal/adapter/http/handler"
 	appuser "github.com/training-judge-center/backend/internal/application/user"
+	"github.com/training-judge-center/backend/pkg/apperror"
 )
 
 type createUserRequest struct {
@@ -38,13 +40,10 @@ type createUserResponse struct {
 // @Failure      400 {object} apperror.AppError
 // @Failure      409 {object} apperror.AppError
 // @Router       /users [post]
-func (h *UserHandler) Create(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
 	var req createUserRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		handler.WriteJSON(r.Context(), w, http.StatusBadRequest, map[string]string{
-			"error":   "INVALID_JSON",
-			"message": "Request body must be valid JSON",
-		})
+		handler.WriteJSON(r.Context(), w, http.StatusBadRequest, apperror.AppError{Code: "INVALID_JSON", Message: "request body must be valid JSON"})
 		return
 	}
 
@@ -74,6 +73,6 @@ func (h *UserHandler) Create(w http.ResponseWriter, r *http.Request) {
 		City:        out.User.City,
 		Institution: out.User.Institution,
 		Role:        out.User.Role,
-		CreatedAt:   out.User.CreatedAt.Format("2006-01-02T15:04:05Z"),
+		CreatedAt:   out.User.CreatedAt.UTC().Format(time.RFC3339),
 	})
 }

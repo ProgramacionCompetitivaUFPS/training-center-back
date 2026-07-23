@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	appshared "github.com/training-judge-center/backend/internal/application/shared"
 	"github.com/training-judge-center/backend/internal/domain/shared"
 	"github.com/training-judge-center/backend/internal/domain/user"
 )
@@ -130,7 +131,7 @@ func TestAuth_SessionInvalidatorError(t *testing.T) {
 	}
 }
 
-func TestAuth_ValidToken_ClaimsInContext(t *testing.T) {
+func TestAuth_ValidToken_CurrentUserInContext(t *testing.T) {
 	// Arrange
 	expected := validClaims()
 	tokenSvc := &mockTokenService{
@@ -138,9 +139,10 @@ func TestAuth_ValidToken_ClaimsInContext(t *testing.T) {
 			return expected, nil
 		},
 	}
-	var capturedClaims *user.TokenClaims
+	var capturedUser appshared.CurrentUser
+	var capturedOk bool
 	capturingHandler := http.HandlerFunc(func(_ http.ResponseWriter, r *http.Request) {
-		capturedClaims = GetClaims(r.Context())
+		capturedUser, capturedOk = GetCurrentUser(r.Context())
 	})
 	handler := Auth(tokenSvc, nil)(capturingHandler)
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
@@ -151,17 +153,14 @@ func TestAuth_ValidToken_ClaimsInContext(t *testing.T) {
 	handler.ServeHTTP(rr, req)
 
 	// Assert
-	if capturedClaims == nil {
-		t.Fatal("expected claims in context, got nil")
+	if !capturedOk {
+		t.Fatal("expected current user in context, got none")
 	}
-	if capturedClaims.UserID != expected.UserID {
-		t.Errorf("expected UserID %q, got %q", expected.UserID, capturedClaims.UserID)
+	if capturedUser.ID != expected.UserID {
+		t.Errorf("expected ID %q, got %q", expected.UserID, capturedUser.ID)
 	}
-	if capturedClaims.Role != expected.Role {
-		t.Errorf("expected Role %q, got %q", expected.Role, capturedClaims.Role)
-	}
-	if capturedClaims.Email != expected.Email {
-		t.Errorf("expected Email %v, got %v", expected.Email, capturedClaims.Email)
+	if capturedUser.Role != expected.Role {
+		t.Errorf("expected Role %q, got %q", expected.Role, capturedUser.Role)
 	}
 	_ = rr
 }
@@ -170,9 +169,9 @@ func TestRequireRole_CorrectRole(t *testing.T) {
 	// Arrange
 	handler := RequireRole(shared.RoleAdmin)(okHandler())
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
-	ctx := context.WithValue(req.Context(), claimsKey, &user.TokenClaims{
-		UserID: "admin-123",
-		Role:   shared.RoleAdmin,
+	ctx := context.WithValue(req.Context(), currentUserKey, appshared.CurrentUser{
+		ID:   "admin-123",
+		Role: shared.RoleAdmin,
 	})
 	rr := httptest.NewRecorder()
 
@@ -189,9 +188,9 @@ func TestRequireRole_WrongRole(t *testing.T) {
 	// Arrange
 	handler := RequireRole(shared.RoleAdmin)(okHandler())
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
-	ctx := context.WithValue(req.Context(), claimsKey, &user.TokenClaims{
-		UserID: "coach-123",
-		Role:   shared.RoleCoach,
+	ctx := context.WithValue(req.Context(), currentUserKey, appshared.CurrentUser{
+		ID:   "coach-123",
+		Role: shared.RoleCoach,
 	})
 	rr := httptest.NewRecorder()
 
@@ -205,7 +204,7 @@ func TestRequireRole_WrongRole(t *testing.T) {
 }
 
 func TestRequireRole_NoClaims(t *testing.T) {
-	// Arrange — no claims in context (request that bypassed Auth middleware)
+	// Arrange — no current user in context (request that bypassed Auth middleware)
 	handler := RequireRole(shared.RoleAdmin)(okHandler())
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
 	rr := httptest.NewRecorder()

@@ -17,33 +17,31 @@ import (
 // @Produce      json
 // @Security     BearerAuth
 // @Param        slug path string true "Problem slug"
-// @Param        body body addModifierRequest true "User ID"
+// @Param        body body addModifierRequest true "User nickname"
 // @Success      204
 // @Failure      400 {object} apperror.AppError
 // @Failure      401 {object} apperror.AppError
 // @Router       /problems/p/{slug}/modifiers [post]
 func (h *Handler) AddModifier(w http.ResponseWriter, r *http.Request) {
-	claims := middleware.GetClaims(r.Context())
-	if claims == nil {
+	cu, ok := middleware.GetCurrentUser(r.Context())
+	if !ok {
 		handler.WriteJSON(r.Context(), w, http.StatusUnauthorized, apperror.AppError{Code: apperror.ErrCodeUnauthorized, Message: "Invalid token"})
 		return
 	}
 
 	slug := r.PathValue("slug")
-	var body struct {
-		UserID string `json:"userId"`
-	}
-	if err := json.NewDecoder(r.Body).Decode(&body); err != nil || body.UserID == "" {
-		handler.WriteJSON(r.Context(), w, http.StatusBadRequest, apperror.AppError{Code: apperror.ErrCodeBadRequest, Message: "Invalid request body or missing userId"})
+	var body addModifierRequest
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil || body.UserNickname == "" {
+		handler.WriteJSON(r.Context(), w, http.StatusBadRequest, apperror.AppError{Code: apperror.ErrCodeBadRequest, Message: "Invalid request body or missing userNickname"})
 		return
 	}
 
-	currentUser := shared.CurrentUser{ID: claims.UserID, Role: claims.Role}
+	currentUser := shared.CurrentUser{ID: cu.ID, Role: cu.Role}
 
-	err := h.addModifierUC.Execute(r.Context(), appProblem.AddModifierInput{
-		Slug:        slug,
-		UserID:      body.UserID,
-		CurrentUser: currentUser,
+	err := h.addModifier.Execute(r.Context(), appProblem.AddModifierInput{
+		Slug:         slug,
+		UserNickname: body.UserNickname,
+		CurrentUser:  currentUser,
 	})
 
 	if err != nil {

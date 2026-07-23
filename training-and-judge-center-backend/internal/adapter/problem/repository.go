@@ -14,20 +14,21 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	"golang.org/x/sync/errgroup"
 
+	infraPostgres "github.com/training-judge-center/backend/internal/adapter/postgres"
 	domainProblem "github.com/training-judge-center/backend/internal/domain/problem"
 	"github.com/training-judge-center/backend/internal/domain/shared"
 	"github.com/training-judge-center/backend/pkg/apperror"
 )
 
-type ProblemRepository struct {
+type Repository struct {
 	db *pgxpool.Pool
 }
 
-func NewProblemRepository(db *pgxpool.Pool) *ProblemRepository {
-	return &ProblemRepository{db: db}
+func NewRepository(db *pgxpool.Pool) *Repository {
+	return &Repository{db: db}
 }
 
-func (r *ProblemRepository) Save(ctx context.Context, p *domainProblem.Problem) error {
+func (r *Repository) Save(ctx context.Context, p *domainProblem.Problem) error {
 	query := `
 		INSERT INTO problems (
 			id, slug, title, statement, time_limit, memory_limit,
@@ -125,7 +126,7 @@ func (r *ProblemRepository) Save(ctx context.Context, p *domainProblem.Problem) 
 
 	if err != nil {
 		var pgErr *pgconn.PgError
-		if errors.As(err, &pgErr) && pgErr.Code == "23505" && pgErr.ConstraintName == "problems_slug_key" {
+		if errors.As(err, &pgErr) && pgErr.Code == infraPostgres.UniqueViolation && pgErr.ConstraintName == "problems_slug_key" {
 			return apperror.NewConflict(domainProblem.ErrCodeSlugAlreadyExists, "slug '"+slug+"' already in use")
 		}
 		slog.ErrorContext(ctx, "Database error in Save", "error", err, "problem_id", p.ID(), "slug", slug)
@@ -135,7 +136,7 @@ func (r *ProblemRepository) Save(ctx context.Context, p *domainProblem.Problem) 
 	return nil
 }
 
-func (r *ProblemRepository) FindBySlug(ctx context.Context, slug domainProblem.Slug) (*domainProblem.Problem, error) {
+func (r *Repository) FindBySlug(ctx context.Context, slug domainProblem.Slug) (*domainProblem.Problem, error) {
 	query := `
 		SELECT id, slug, title, statement, time_limit, memory_limit,
 			tags, status, accessibility, author_id, modifiers_ids, lang_overrides,
@@ -180,7 +181,7 @@ func scanProblem(ctx context.Context, row pgx.Row) (*domainProblem.Problem, erro
 	)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			return nil, apperror.NewNotFound(apperror.ErrCodeNotFound, "problem not found")
+			return nil, apperror.NewNotFound(domainProblem.ErrCodeProblemNotFound, "problem not found")
 		}
 		slog.ErrorContext(ctx, "Database error in scanProblem", "error", err)
 		return nil, apperror.NewInternal()
@@ -235,7 +236,7 @@ func scanProblem(ctx context.Context, row pgx.Row) (*domainProblem.Problem, erro
 	), nil
 }
 
-func (r *ProblemRepository) ExistsBySlug(ctx context.Context, slug domainProblem.Slug) (bool, error) {
+func (r *Repository) ExistsBySlug(ctx context.Context, slug domainProblem.Slug) (bool, error) {
 	query := `SELECT EXISTS(SELECT 1 FROM problems WHERE slug = $1)`
 
 	var exists bool
@@ -337,19 +338,19 @@ func judgingFileFromDB(data []byte) (*domainProblem.JudgingFile, error) {
 	return &j, nil
 }
 
-func (r *ProblemRepository) Delete(ctx context.Context, id string) error {
+func (r *Repository) Delete(ctx context.Context, id string) error {
 	tag, err := r.db.Exec(ctx, `DELETE FROM problems WHERE id = $1`, id)
 	if err != nil {
 		slog.ErrorContext(ctx, "Database error in Delete", "error", err, "problem_id", id)
 		return apperror.NewInternal()
 	}
 	if tag.RowsAffected() == 0 {
-		return apperror.NewNotFound(apperror.ErrCodeNotFound, "problem not found")
+		return apperror.NewNotFound(domainProblem.ErrCodeProblemNotFound, "problem not found")
 	}
 	return nil
 }
 
-func (r *ProblemRepository) List(ctx context.Context, filters domainProblem.ListFilters) ([]*domainProblem.Problem, int, error) {
+func (r *Repository) List(ctx context.Context, filters domainProblem.ListFilters) ([]*domainProblem.Problem, int, error) {
 	var conds []string
 	var args []any
 	idx := 1
@@ -422,28 +423,34 @@ func (r *ProblemRepository) List(ctx context.Context, filters domainProblem.List
 	g.Go(func() error {
 		rows, queryErr := r.db.Query(gCtx, selectQuery, args...)
 		if queryErr != nil {
-			return queryErr
+			slog.ErrorContext(gCtx, "database error querying problems", "error", queryErr)
+			return apperror.NewInternal()
 		}
 		defer rows.Close()
 		for rows.Next() {
 			p, err := scanProblem(gCtx, rows)
 			if err != nil {
-				return err
+				return err // scanProblem already returns apperror
 			}
 			result = append(result, p)
 		}
-		return rows.Err()
+		if err := rows.Err(); err != nil {
+			slog.ErrorContext(gCtx, "database error iterating problem rows", "error", err)
+			return apperror.NewInternal()
+		}
+		return nil
 	})
 
 	g.Go(func() error {
-		var countErr error
-		countErr = r.db.QueryRow(gCtx, countQuery, countArgs...).Scan(&total)
-		return countErr
+		if err := r.db.QueryRow(gCtx, countQuery, countArgs...).Scan(&total); err != nil {
+			slog.ErrorContext(gCtx, "database error counting problems", "error", err)
+			return apperror.NewInternal()
+		}
+		return nil
 	})
 
 	if err := g.Wait(); err != nil {
-		slog.ErrorContext(ctx, "Database error in List", "error", err)
-		return nil, 0, apperror.NewInternal()
+		return nil, 0, err // already apperror — goroutines already logged
 	}
 
 	if result == nil {

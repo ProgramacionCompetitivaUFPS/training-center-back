@@ -74,10 +74,12 @@ func (m *mockTestCaseProvider) GetTestCases(ctx context.Context, problemID strin
 // ── Executor mock ────────────────────────────────────────────────────────────
 
 type mockExecutor struct {
+	calls          int
 	beginSessionFn func(ctx context.Context, language submission.Language) (ExecutionSession, error)
 }
 
 func (m *mockExecutor) BeginSession(ctx context.Context, language submission.Language) (ExecutionSession, error) {
+	m.calls++
 	if m.beginSessionFn != nil {
 		return m.beginSessionFn(ctx, language)
 	}
@@ -126,25 +128,30 @@ func (m *mockOutputChecker) Check(ctx context.Context, req CheckRequest) (CheckR
 	return CheckResult{Accepted: true}, nil
 }
 
-// ── StandingUpdater mock ─────────────────────────────────────────────────────
-
-type mockStandingUpdater struct {
-	recordVerdictFn func(ctx context.Context, req RecordVerdictRequest) error
-}
-
-func (m *mockStandingUpdater) RecordVerdict(ctx context.Context, req RecordVerdictRequest) error {
-	if m.recordVerdictFn != nil {
-		return m.recordVerdictFn(ctx, req)
-	}
-	return nil
-}
-
 // ── TransactionManager mock ──────────────────────────────────────────────────
 
-type mockTxManager struct{}
+type mockTransactionManager struct {
+	withTxFn func(ctx context.Context, fn func(txCtx context.Context) error) error
+}
 
-func (m *mockTxManager) WithTx(ctx context.Context, fn func(txCtx context.Context) error) error {
+func (m *mockTransactionManager) WithTx(ctx context.Context, fn func(txCtx context.Context) error) error {
+	if m.withTxFn != nil {
+		return m.withTxFn(ctx, fn)
+	}
 	return fn(ctx)
+}
+
+// ── StaleSubmissionRecoverer mock ────────────────────────────────────────────
+
+type mockStaleSubmissionRecoverer struct {
+	recoverFn func(ctx context.Context, cutoff time.Time) (int, error)
+}
+
+func (m *mockStaleSubmissionRecoverer) RecoverStaleBefore(ctx context.Context, cutoff time.Time) (int, error) {
+	if m.recoverFn != nil {
+		return m.recoverFn(ctx, cutoff)
+	}
+	return 0, nil
 }
 
 // ── Test constants ───────────────────────────────────────────────────────────
@@ -153,7 +160,6 @@ const (
 	submissionID = "aaaaaaaa-0000-0000-0000-000000000001"
 	problemID    = "bbbbbbbb-0000-0000-0000-000000000001"
 	userID       = "cccccccc-0000-0000-0000-000000000001"
-	contestID    = "dddddddd-0000-0000-0000-000000000001"
 )
 
 // ── Domain fixtures ──────────────────────────────────────────────────────────
@@ -163,24 +169,13 @@ func pendingSubmission() *submission.Submission {
 	return submission.RestoreSubmission(
 		submissionID, problemID,
 		shared.RestoreUserID(userID),
-		nil,
-		lang,
+		nil, nil,
+		lang, "g++",
 		submission.RestoreStatus("PENDING"),
+		submission.RestoreVisibility("PRIVATE"),
 		"gs://bucket/code.cpp",
-		testNow, nil, nil, nil, nil,
-	)
-}
-
-func pendingSubmissionInContest(cID string) *submission.Submission {
-	lang := submission.RestoreLanguage("cpp20")
-	return submission.RestoreSubmission(
-		submissionID, problemID,
-		shared.RestoreUserID(userID),
-		&cID,
-		lang,
-		submission.RestoreStatus("PENDING"),
-		"gs://bucket/code.cpp",
-		testNow, nil, nil, nil, nil,
+		"", 0,
+		testNow, nil, nil, nil, nil, "", "",
 	)
 }
 

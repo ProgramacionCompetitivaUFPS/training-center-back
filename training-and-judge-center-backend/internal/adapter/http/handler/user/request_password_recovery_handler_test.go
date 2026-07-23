@@ -9,9 +9,9 @@ import (
 	appuser "github.com/training-judge-center/backend/internal/application/user"
 )
 
-// newHandlerWithRequestPasswordRecovery builds a UserHandler with only requestPasswordRecovery wired.
-func newHandlerWithRequestPasswordRecovery(uc *appuser.RequestPasswordRecoveryUseCase) *UserHandler {
-	return &UserHandler{requestPasswordRecovery: uc}
+// newHandlerWithRequestPasswordRecovery builds a Handler with only requestPasswordRecovery wired.
+func newHandlerWithRequestPasswordRecovery(uc *appuser.RequestPasswordRecoveryUseCase) *Handler {
+	return &Handler{requestPasswordRecovery: uc}
 }
 
 // TestRequestPasswordRecovery_EmptyEmail_Returns400 verifies that the guard rejects

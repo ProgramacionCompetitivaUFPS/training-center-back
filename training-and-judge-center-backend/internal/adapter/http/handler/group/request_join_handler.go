@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"io"
 	"net/http"
+	"time"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/training-judge-center/backend/internal/adapter/http/handler"
@@ -29,7 +30,7 @@ type requestJoinBody struct {
 // @Failure      409 {object} apperror.AppError
 // @Router       /groups/{groupId}/requests [post]
 func (h *Handler) RequestJoin(w http.ResponseWriter, r *http.Request) {
-	caller, ok := h.requireCurrentUser(w, r)
+	caller, ok := handler.RequireCurrentUser(w, r)
 	if !ok {
 		return
 	}
@@ -64,7 +65,7 @@ func buildJoinRequestResp(req appGroup.JoinRequestDTO, display *appGroup.UserDis
 		GroupID:   req.GroupID,
 		Status:    req.Status,
 		Message:   req.Message,
-		CreatedAt: req.CreatedAt.Format("2006-01-02T15:04:05Z"),
+		CreatedAt: req.CreatedAt.UTC().Format(time.RFC3339),
 	}
 	if display != nil {
 		resp.Requester = &requesterResp{

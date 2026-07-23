@@ -23,7 +23,7 @@ import (
 // @Failure      404 {object} apperror.AppError
 // @Router       /groups/{groupId}/contests [post]
 func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
-	caller, ok := h.requireCurrentUser(w, r)
+	caller, ok := handler.RequireCurrentUser(w, r)
 	if !ok {
 		return
 	}
@@ -52,6 +52,9 @@ func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
 		Penalty:           body.Penalty,
 		FreezeMinutes:     body.FreezeMinutes,
 		EnablePostContest: body.EnablePostContest,
+		ParticipationMode: body.ParticipationMode,
+		TeamSizeMin:       body.TeamSizeMin,
+		TeamSizeMax:       body.TeamSizeMax,
 		Problems:          body.Problems,
 	})
 	if err != nil {

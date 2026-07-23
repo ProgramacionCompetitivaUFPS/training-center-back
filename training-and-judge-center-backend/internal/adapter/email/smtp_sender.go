@@ -3,12 +3,14 @@ package email
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"mime"
 	"net/mail"
 	"net/smtp"
 	"strings"
 
 	"github.com/training-judge-center/backend/internal/application/shared"
+	"github.com/training-judge-center/backend/pkg/apperror"
 )
 
 type SMTPSender struct {
@@ -32,7 +34,14 @@ func NewSMTPSender(host, port, username, password, from string) *SMTPSender {
 func (s *SMTPSender) Send(ctx context.Context, msg shared.EmailMessage) error {
 	toAddr, err := mail.ParseAddress(msg.To)
 	if err != nil {
-		return fmt.Errorf("invalid recipient address: %w", err)
+		slog.ErrorContext(ctx, "invalid recipient address in email send", "to", msg.To, "error", err)
+		return apperror.NewInternal()
+	}
+
+	fromAddr, err := mail.ParseAddress(s.from)
+	if err != nil {
+		slog.ErrorContext(ctx, "invalid sender address in smtp config", "from", s.from, "error", err)
+		return apperror.NewInternal()
 	}
 
 	safeSubject := mime.QEncoding.Encode("utf-8", strings.ReplaceAll(msg.Subject, "\r\n", " "))
@@ -42,16 +51,37 @@ func (s *SMTPSender) Send(ctx context.Context, msg shared.EmailMessage) error {
 		auth = smtp.PlainAuth("", s.username, s.password, s.host)
 	}
 
-	raw := []byte("To: " + toAddr.String() + "\r\n" +
-		"From: " + s.from + "\r\n" +
-		"Subject: " + safeSubject + "\r\n" +
-		"MIME-Version: 1.0\r\n" +
-		"Content-Type: text/plain; charset=\"utf-8\"\r\n" +
-		"\r\n" + msg.Body)
+	var raw []byte
+	if msg.HTMLBody != "" {
+		const boundary = "==TrainingCenter_Boundary=="
+		raw = []byte("To: " + toAddr.String() + "\r\n" +
+			"From: " + s.from + "\r\n" +
+			"Subject: " + safeSubject + "\r\n" +
+			"MIME-Version: 1.0\r\n" +
+			"Content-Type: multipart/alternative; boundary=\"" + boundary + "\"\r\n" +
+			"\r\n" +
+			"--" + boundary + "\r\n" +
+			"Content-Type: text/plain; charset=\"utf-8\"\r\n" +
+			"\r\n" +
+			msg.Body + "\r\n" +
+			"--" + boundary + "\r\n" +
+			"Content-Type: text/html; charset=\"utf-8\"\r\n" +
+			"\r\n" +
+			msg.HTMLBody + "\r\n" +
+			"--" + boundary + "--\r\n")
+	} else {
+		raw = []byte("To: " + toAddr.String() + "\r\n" +
+			"From: " + s.from + "\r\n" +
+			"Subject: " + safeSubject + "\r\n" +
+			"MIME-Version: 1.0\r\n" +
+			"Content-Type: text/plain; charset=\"utf-8\"\r\n" +
+			"\r\n" + msg.Body)
+	}
 
 	addr := fmt.Sprintf("%s:%s", s.host, s.port)
-	if err := smtp.SendMail(addr, auth, s.from, []string{toAddr.Address}, raw); err != nil {
-		return fmt.Errorf("failed to send email: %w", err)
+	if err := smtp.SendMail(addr, auth, fromAddr.Address, []string{toAddr.Address}, raw); err != nil {
+		slog.ErrorContext(ctx, "failed to send email via SMTP", "to", msg.To, "error", err)
+		return apperror.NewInternal()
 	}
 
 	return nil

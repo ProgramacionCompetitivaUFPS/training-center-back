@@ -15,31 +15,31 @@ import (
 // @Produce      json
 // @Security     BearerAuth
 // @Param        slug path string true "Problem slug"
-// @Param        userId path string true "User ID"
+// @Param        nickname path string true "Nickname of the modifier"
 // @Success      204
 // @Failure      401 {object} apperror.AppError
 // @Failure      404 {object} apperror.AppError
-// @Router       /problems/p/{slug}/modifiers/{userId} [delete]
+// @Router       /problems/p/{slug}/modifiers/{nickname} [delete]
 func (h *Handler) RemoveModifier(w http.ResponseWriter, r *http.Request) {
-	claims := middleware.GetClaims(r.Context())
-	if claims == nil {
+	cu, ok := middleware.GetCurrentUser(r.Context())
+	if !ok {
 		handler.WriteJSON(r.Context(), w, http.StatusUnauthorized, apperror.AppError{Code: apperror.ErrCodeUnauthorized, Message: "Invalid token"})
 		return
 	}
 
 	slug := r.PathValue("slug")
-	userID := r.PathValue("userId")
-	if slug == "" || userID == "" {
-		handler.WriteJSON(r.Context(), w, http.StatusBadRequest, apperror.AppError{Code: apperror.ErrCodeBadRequest, Message: "Slug and userId are required"})
+	nickname := r.PathValue("nickname")
+	if slug == "" || nickname == "" {
+		handler.WriteJSON(r.Context(), w, http.StatusBadRequest, apperror.AppError{Code: apperror.ErrCodeBadRequest, Message: "Slug and nickname are required"})
 		return
 	}
 
-	currentUser := shared.CurrentUser{ID: claims.UserID, Role: claims.Role}
+	currentUser := shared.CurrentUser{ID: cu.ID, Role: cu.Role}
 
-	err := h.removeModifierUC.Execute(r.Context(), appProblem.RemoveModifierInput{
-		Slug:        slug,
-		UserID:      userID,
-		CurrentUser: currentUser,
+	err := h.removeModifier.Execute(r.Context(), appProblem.RemoveModifierInput{
+		Slug:         slug,
+		UserNickname: nickname,
+		CurrentUser:  currentUser,
 	})
 
 	if err != nil {

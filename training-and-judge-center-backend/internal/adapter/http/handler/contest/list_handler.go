@@ -10,6 +10,11 @@ import (
 	"github.com/training-judge-center/backend/pkg/apperror"
 )
 
+const (
+	defaultPage  = 1
+	defaultLimit = 20
+)
+
 // @Summary      List contests
 // @Tags         contests
 // @Produce      json
@@ -25,7 +30,7 @@ import (
 // @Failure      404 {object} apperror.AppError
 // @Router       /groups/{groupId}/contests [get]
 func (h *Handler) List(w http.ResponseWriter, r *http.Request) {
-	caller, ok := h.requireCurrentUser(w, r)
+	caller, ok := handler.RequireCurrentUser(w, r)
 	if !ok {
 		return
 	}
@@ -43,14 +48,14 @@ func (h *Handler) List(w http.ResponseWriter, r *http.Request) {
 		statusFilter = &s
 	}
 
-	page := appContest.DefaultPage
+	page := defaultPage
 	if v := q.Get("page"); v != "" {
 		if n, err := strconv.Atoi(v); err == nil && n >= 1 {
 			page = n
 		}
 	}
 
-	limit := appContest.DefaultLimit
+	limit := defaultLimit
 	if v := q.Get("limit"); v != "" {
 		if n, err := strconv.Atoi(v); err == nil && n >= 1 {
 			limit = n
@@ -96,10 +101,12 @@ func toListContestsResponse(out *appContest.ListContestsOutput) listContestsResp
 	return listContestsResponse{
 		Items: items,
 		Pagination: pagination{
-			Page:       out.Pagination.Page,
-			Limit:      out.Pagination.Limit,
-			Total:      out.Pagination.Total,
-			TotalPages: out.Pagination.TotalPages,
+			Page:        out.Pagination.Page,
+			Limit:       out.Pagination.Limit,
+			Total:       out.Pagination.Total,
+			TotalPages:  out.Pagination.TotalPages,
+			HasNextPage: out.Pagination.Page < out.Pagination.TotalPages,
+			HasPrevPage: out.Pagination.Page > 1 && out.Pagination.TotalPages > 0,
 		},
 	}
 }

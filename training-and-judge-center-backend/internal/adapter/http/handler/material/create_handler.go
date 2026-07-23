@@ -21,7 +21,7 @@ import (
 // @Failure      401 {object} apperror.AppError
 // @Router       /groups/{groupId}/materials [post]
 func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
-	currentUser, ok := h.requireCurrentUser(w, r)
+	currentUser, ok := handler.RequireCurrentUser(w, r)
 	if !ok {
 		return
 	}
@@ -38,7 +38,7 @@ func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	out, err := h.createUC.Execute(r.Context(), appMaterial.CreateMaterialInput{
+	out, err := h.createMaterial.Execute(r.Context(), appMaterial.CreateMaterialInput{
 		CurrentUser: *currentUser,
 		GroupID:     groupID,
 		Title:       body.Title,

@@ -2,10 +2,11 @@ package user
 
 import (
 	"context"
-	"fmt"
+	"log/slog"
 
 	infraPostgres "github.com/training-judge-center/backend/internal/adapter/postgres"
 	domainUser "github.com/training-judge-center/backend/internal/domain/user"
+	"github.com/training-judge-center/backend/pkg/apperror"
 )
 
 type DeactivationAuditLogRepository struct {
@@ -33,7 +34,8 @@ func (r *DeactivationAuditLogRepository) Save(ctx context.Context, log *domainUs
 		log.UserAgent(),
 	)
 	if err != nil {
-		return fmt.Errorf("failed to save deactivation audit log: %w", err)
+		slog.ErrorContext(ctx, "database error saving deactivation audit log", "user_id", log.UserID(), "error", err)
+		return apperror.NewInternal()
 	}
 
 	return nil

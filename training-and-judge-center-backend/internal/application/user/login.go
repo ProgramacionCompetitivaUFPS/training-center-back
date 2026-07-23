@@ -2,8 +2,9 @@ package user
 
 import (
 	"context"
-	"log/slog"
+	"time"
 
+	appshared "github.com/training-judge-center/backend/internal/application/shared"
 	"github.com/training-judge-center/backend/internal/domain/user"
 	"github.com/training-judge-center/backend/pkg/apperror"
 )
@@ -21,10 +22,11 @@ type LoginOutput struct {
 type LoginUseCase struct {
 	repo         user.Repository
 	tokenService user.TokenService
+	rateLimiter  appshared.RateLimiter
 }
 
-func NewLoginUseCase(repo user.Repository, tokenService user.TokenService) *LoginUseCase {
-	return &LoginUseCase{repo: repo, tokenService: tokenService}
+func NewLoginUseCase(repo user.Repository, tokenService user.TokenService, rateLimiter appshared.RateLimiter) *LoginUseCase {
+	return &LoginUseCase{repo: repo, tokenService: tokenService, rateLimiter: rateLimiter}
 }
 
 func (uc *LoginUseCase) Execute(ctx context.Context, input LoginInput) (*LoginOutput, error) {
@@ -40,6 +42,16 @@ func (uc *LoginUseCase) Execute(ctx context.Context, input LoginInput) (*LoginOu
 		return nil, apperror.NewValidation(fieldErrors)
 	}
 
+	rateKey := "rate_limit:login:" + input.Email
+	allowed, err := uc.rateLimiter.Allow(ctx, rateKey, 10, 15*time.Minute)
+	if err != nil {
+		return nil, err
+	}
+	if !allowed {
+		return nil, apperror.NewTooManyRequests(ErrCodeTooManyRequests,
+			"Too many login attempts. Please try again in 15 minutes.", 900)
+	}
+
 	email, err := user.NewEmail(input.Email)
 	if err != nil {
 		return nil, apperror.NewUnauthorized(ErrCodeInvalidCredentials, "Invalid email or password")
@@ -47,8 +59,7 @@ func (uc *LoginUseCase) Execute(ctx context.Context, input LoginInput) (*LoginOu
 
 	foundUser, err := uc.repo.FindByEmail(ctx, email)
 	if err != nil {
-		slog.ErrorContext(ctx, "failed to find user by email during login", "error", err)
-		return nil, apperror.NewInternal()
+		return nil, err
 	}
 	if foundUser == nil {
 		return nil, apperror.NewUnauthorized(ErrCodeInvalidCredentials, "Invalid email or password")
@@ -62,10 +73,15 @@ func (uc *LoginUseCase) Execute(ctx context.Context, input LoginInput) (*LoginOu
 		return nil, apperror.NewUnauthorized(ErrCodeInvalidCredentials, "Invalid email or password")
 	}
 
-	token, err := uc.tokenService.GenerateToken(foundUser)
+	token, err := uc.tokenService.GenerateToken(ctx, foundUser)
 	if err != nil {
-		slog.ErrorContext(ctx, "failed to generate token during login", "user_id", foundUser.ID(), "error", err)
-		return nil, apperror.NewInternal()
+		return nil, err
+	}
+
+	// Login successful: reset rate limit so the user has fresh attempts.
+	if err := uc.rateLimiter.Reset(ctx, rateKey); err != nil {
+		// Don't fail the login; the token was already generated.
+		_ = err
 	}
 
 	return &LoginOutput{Token: token, User: userToDTO(foundUser)}, nil
