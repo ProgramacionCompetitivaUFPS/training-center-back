@@ -74,7 +74,7 @@ spec:
               echo "prepull: all language images ready"
       containers:
         - name: worker
-          image: us-east1-docker.pkg.dev/training-center-502916/training-center/backend:v0.2.0
+          image: __IMAGE__   # placeholder: se sustituye por la versión al aplicar (bootstrap) / lo actualiza el CD con set image. NO aplicar directo sin sustituir.
           command: ["/bin/worker"]
           envFrom:
             - configMapRef:

@@ -1,0 +1,33 @@
+# Job de seed (siembra el admin) con imagen parametrizable (__IMAGE__).
+# Se corre UNA VEZ al bootstrapear un cluster nuevo (no re-corre en cada deploy).
+# Imagen resuelta al último tag v* del registro por el helper de bootstrap (ver GKE_DEPLOY_ROADMAP.md).
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: seed
+  namespace: training-center
+spec:
+  backoffLimit: 2
+  template:
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: seed
+          image: __IMAGE__
+          command: ["/bin/seed"]
+          envFrom:
+            - configMapRef:
+                name: app-config
+          env:
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: app-secrets
+                  key: DB_PASSWORD
+            - name: ADMIN_EMAIL
+              value: siluxib@gmail.com
+            - name: ADMIN_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: app-secrets
+                  key: ADMIN_PASSWORD
