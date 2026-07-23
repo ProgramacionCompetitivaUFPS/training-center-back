@@ -1,0 +1,67 @@
+name: Deploy to GKE
+
+on:
+  push:
+    tags: ['v*']          # releases deliberadas: imagen backend:vX.Y.Z
+  workflow_dispatch:      # disparo manual desde cualquier rama: imagen backend:{rama}-{sha}
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write       # imprescindible: permite pedir el token OIDC para Workload Identity Federation
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Calcular el tag de la imagen
+        id: tag
+        run: |
+          if [ "${{ github.ref_type }}" = "tag" ]; then
+            echo "value=${{ github.ref_name }}" >> "$GITHUB_OUTPUT"
+          else
+            SAFE_BRANCH=$(echo "${{ github.ref_name }}" | tr '/' '-')
+            echo "value=${SAFE_BRANCH}-$(git rev-parse --short HEAD)" >> "$GITHUB_OUTPUT"
+          fi
+
+      - id: auth
+        name: Autenticar a GCP (sin llaves, vía WIF)
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.WIF_PROVIDER }}
+          service_account: ${{ secrets.GCP_SERVICE_ACCOUNT }}
+
+      - uses: google-github-actions/setup-gcloud@v2
+
+      - name: Build & push a Artifact Registry
+        run: |
+          IMAGE=us-east1-docker.pkg.dev/training-center-502916/training-center/backend:${{ steps.tag.outputs.value }}
+          gcloud auth configure-docker us-east1-docker.pkg.dev --quiet
+          docker build -t "$IMAGE" ./training-and-judge-center-backend
+          docker push "$IMAGE"
+          echo "IMAGE=$IMAGE" >> "$GITHUB_ENV"
+
+      - uses: google-github-actions/get-gke-credentials@v2
+        with:
+          cluster_name: training-center
+          location: us-east1-b
+
+      - name: Correr migraciones (no-op si no hay pendientes; corta el deploy si fallan)
+        run: |
+          kubectl delete job migrate -n training-center --ignore-not-found
+          sed "s|__IMAGE__|$IMAGE|" training-and-judge-center-backend/deploy/k8s/app/migrate-job.yaml | kubectl apply -f -
+          kubectl wait --for=condition=complete job/migrate -n training-center --timeout=180s
+
+      - name: Desplegar (set image)
+        run: |
+          kubectl set image deployment/api api=$IMAGE -n training-center
+          kubectl set image deployment/judge-worker worker=$IMAGE -n training-center
+          kubectl rollout status deployment/api -n training-center --timeout=180s
+
+      - name: Logs de diagnóstico si algo falló
+        if: failure()
+        run: |
+          echo "===== logs del job de migración ====="
+          kubectl logs job/migrate -n training-center --all-containers=true --tail=100 || true
+          echo "===== estado del deployment api ====="
+          kubectl describe deployment/api -n training-center | tail -30 || true
