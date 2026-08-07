@@ -180,6 +180,51 @@ func TestRefreshToken_Rotate_AlreadyRevoked(t *testing.T) {
 	}
 }
 
+func TestRefreshToken_Rotate_AlreadyExpired(t *testing.T) {
+	token, err := user.NewRefreshToken("id", "user-id", "family-id", "hash", nil, nil, false, testNow)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	pastCeiling := testNow.Add(user.DefaultSessionCeiling + time.Second)
+	if _, err := token.Rotate("new-id", "new-hash", nil, nil, pastCeiling); err == nil {
+		t.Errorf("expected error rotating a token past its absolute ceiling")
+	}
+}
+
+func TestRefreshToken_Revoke_DoesNotAliasCallerPointer(t *testing.T) {
+	token, err := user.NewRefreshToken("id", "user-id", "family-id", "hash", nil, nil, false, testNow)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	replacedByID := "new-token-id"
+	token.Revoke(testNow, &replacedByID)
+
+	replacedByID = "mutated-after-revoke"
+	if got := token.ReplacedByID(); got == nil || *got != "new-token-id" {
+		t.Errorf("Revoke must copy replacedByID, mutating the caller's variable changed it to %v", got)
+	}
+}
+
+func TestNewRefreshToken_DoesNotAliasCallerPointers(t *testing.T) {
+	userAgent := "Mozilla/5.0"
+	ipAddress := "203.0.113.5"
+	token, err := user.NewRefreshToken("id", "user-id", "family-id", "hash", &userAgent, &ipAddress, false, testNow)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	userAgent = "mutated"
+	ipAddress = "mutated"
+	if got := token.UserAgent(); got == nil || *got != "Mozilla/5.0" {
+		t.Errorf("NewRefreshToken must copy userAgent, mutating the caller's variable changed it to %v", got)
+	}
+	if got := token.IPAddress(); got == nil || *got != "203.0.113.5" {
+		t.Errorf("NewRefreshToken must copy ipAddress, mutating the caller's variable changed it to %v", got)
+	}
+}
+
 func TestRestoreRefreshToken(t *testing.T) {
 	revokedAt := testNow
 	replacedByID := "new-token-id"

@@ -10,4 +10,5 @@ const (
 	ErrCodeCannotAssignAdminRole      = "CANNOT_ASSIGN_ADMIN_ROLE"
 	ErrCodeUserNotFound               = "USER_NOT_FOUND"
 	ErrCodeRefreshTokenAlreadyRevoked = "REFRESH_TOKEN_ALREADY_REVOKED"
+	ErrCodeRefreshTokenExpired        = "REFRESH_TOKEN_EXPIRED"
 )
