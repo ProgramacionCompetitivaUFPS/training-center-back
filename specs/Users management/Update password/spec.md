@@ -73,7 +73,7 @@ As an authenticated user, I want to update my account password so that I can kee
 
 Update the authenticated user's password.
 
-> **Important**: The user identity is resolved exclusively from the authentication token. No user identifier is accepted in the request. Upon successful update, all active sessions (including the current one) are invalidated, requiring the user to log in again.
+> **Important**: The user identity is resolved exclusively from the authentication token. No user identifier is accepted in the request. Upon successful update, all active sessions (including the current one) are invalidated, requiring the user to log in again. This includes revoking every active refresh token for the user — see [Refresh Session](../Refresh%20session/spec.md) for why both the access-token-level and refresh-token-level revocation are required.
 
 **Headers**:
 | Header | Type | Required | Description |
@@ -189,7 +189,7 @@ Rate limit exceeded (5 failed attempts, 1-hour cooldown).
   - At least 1 special character
 - **FR-006**: The system MUST reject the update if the new password is equal to the current password.
 - **FR-007**: The system MUST securely hash the new password before persisting it.
-- **FR-008**: The system MUST invalidate all active sessions (including the current one) upon successful password change.
+- **FR-008**: The system MUST invalidate all active sessions (including the current one) upon successful password change — both by bumping the access-token revocation timestamp and by revoking every active refresh token row for the user (see [Refresh Session](../Refresh%20session/spec.md)).
 - **FR-009**: The system MUST send a notification email to the user upon successful password change.
 - **FR-010**: The system MUST update the `updatedAt` timestamp after a successful password change.
 - **FR-011**: The system MUST limit failed password update attempts to 5 per hour, enforcing a 1-hour cooldown after exceeding the limit.
