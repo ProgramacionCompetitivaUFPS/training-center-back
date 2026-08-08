@@ -1,10 +1,12 @@
 package user_test
 
 import (
+	"errors"
 	"testing"
 	"time"
 
 	"github.com/training-judge-center/backend/internal/domain/user"
+	"github.com/training-judge-center/backend/pkg/apperror"
 )
 
 func TestNewRefreshToken(t *testing.T) {
@@ -104,6 +106,12 @@ func TestRefreshToken_WithinGraceWindow(t *testing.T) {
 		{name: "revoked within window", revoked: true, now: testNow.Add(5 * time.Second), expected: true},
 		{name: "revoked exactly at window boundary", revoked: true, now: testNow.Add(user.RefreshGraceWindow), expected: true},
 		{name: "revoked outside window", revoked: true, now: testNow.Add(11 * time.Second), expected: false},
+		// now before revokedAt (clock skew between the pod that revoked and the pod
+		// evaluating this): intentionally permissive. An attacker can't manufacture this —
+		// only a request concurrent with the legitimate rotation lands here, the same
+		// benign race the grace window already exists to tolerate.
+		{name: "now slightly before revokedAt", revoked: true, now: testNow.Add(-time.Second), expected: true},
+		{name: "now far before revokedAt", revoked: true, now: testNow.Add(-time.Hour), expected: true},
 	}
 
 	for _, tt := range tests {
@@ -142,14 +150,34 @@ func TestRefreshToken_Revoke(t *testing.T) {
 	}
 }
 
-func TestRefreshToken_Rotate(t *testing.T) {
+func TestRefreshToken_Revoke_NoopIfAlreadyRevoked(t *testing.T) {
+	token, err := user.NewRefreshToken("id", "user-id", "family-id", "hash", nil, nil, false, testNow)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	firstSuccessor := "first-successor"
+	token.Revoke(testNow, &firstSuccessor)
+
+	later := testNow.Add(time.Minute)
+	token.Revoke(later, nil)
+
+	if !token.RevokedAt().Equal(testNow.UTC()) {
+		t.Errorf("expected revokedAt to stay %v, got %v", testNow.UTC(), token.RevokedAt())
+	}
+	if token.ReplacedByID() == nil || *token.ReplacedByID() != firstSuccessor {
+		t.Errorf("expected replacedByID to stay %q, got %v", firstSuccessor, token.ReplacedByID())
+	}
+}
+
+func TestRefreshToken_Successor(t *testing.T) {
 	token, err := user.NewRefreshToken("id", "user-id", "family-id", "hash", nil, nil, true, testNow)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
 	rotateAt := testNow.Add(time.Minute)
-	successor, err := token.Rotate("new-id", "new-hash", nil, nil, rotateAt)
+	successor, err := token.Successor("new-id", "new-hash", nil, nil, rotateAt)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -163,32 +191,60 @@ func TestRefreshToken_Rotate(t *testing.T) {
 	if successor.UserID() != token.UserID() {
 		t.Errorf("expected successor to inherit userID %q, got %q", token.UserID(), successor.UserID())
 	}
+	if !successor.IssuedAt().Equal(rotateAt.UTC()) {
+		t.Errorf("expected successor issuedAt %v, got %v", rotateAt.UTC(), successor.IssuedAt())
+	}
 	if token.IsRevoked() {
-		t.Errorf("Rotate must not mutate the receiver — persistence decides whether it ends up revoked")
+		t.Errorf("Successor must not mutate the receiver — persistence decides whether it ends up revoked")
 	}
 }
 
-func TestRefreshToken_Rotate_AlreadyRevoked(t *testing.T) {
+func TestRefreshToken_Successor_CarriesOwnMetadata(t *testing.T) {
+	token, err := user.NewRefreshToken("id", "user-id", "family-id", "hash", nil, nil, false, testNow)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	userAgent := "Mozilla/5.0"
+	ipAddress := "203.0.113.5"
+	successor, err := token.Successor("new-id", "new-hash", &userAgent, &ipAddress, testNow)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if successor.UserAgent() == nil || *successor.UserAgent() != userAgent {
+		t.Errorf("expected successor userAgent %q, got %v", userAgent, successor.UserAgent())
+	}
+	if successor.IPAddress() == nil || *successor.IPAddress() != ipAddress {
+		t.Errorf("expected successor ipAddress %q, got %v", ipAddress, successor.IPAddress())
+	}
+}
+
+func TestRefreshToken_Successor_AlreadyRevoked(t *testing.T) {
 	token, err := user.NewRefreshToken("id", "user-id", "family-id", "hash", nil, nil, false, testNow)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	token.Revoke(testNow, nil)
 
-	if _, err := token.Rotate("new-id", "new-hash", nil, nil, testNow); err == nil {
-		t.Errorf("expected error rotating an already-revoked token")
+	_, err = token.Successor("new-id", "new-hash", nil, nil, testNow)
+	var appErr *apperror.AppError
+	if !errors.As(err, &appErr) || appErr.Code != user.ErrCodeRefreshTokenAlreadyRevoked {
+		t.Errorf("expected %q, got %v", user.ErrCodeRefreshTokenAlreadyRevoked, err)
 	}
 }
 
-func TestRefreshToken_Rotate_AlreadyExpired(t *testing.T) {
+func TestRefreshToken_Successor_AlreadyExpired(t *testing.T) {
 	token, err := user.NewRefreshToken("id", "user-id", "family-id", "hash", nil, nil, false, testNow)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
 	pastCeiling := testNow.Add(user.DefaultSessionCeiling + time.Second)
-	if _, err := token.Rotate("new-id", "new-hash", nil, nil, pastCeiling); err == nil {
-		t.Errorf("expected error rotating a token past its absolute ceiling")
+	_, err = token.Successor("new-id", "new-hash", nil, nil, pastCeiling)
+	var appErr *apperror.AppError
+	if !errors.As(err, &appErr) || appErr.Code != user.ErrCodeRefreshTokenExpired {
+		t.Errorf("expected %q, got %v", user.ErrCodeRefreshTokenExpired, err)
 	}
 }
 

@@ -25,6 +25,7 @@ type RefreshToken struct {
 	ipAddress         *string
 }
 
+// NewRefreshToken originates a brand-new family (login only) — to continue a session, use Rotate.
 func NewRefreshToken(id, userID, familyID, tokenHash string, userAgent, ipAddress *string, rememberSession bool, now time.Time) (*RefreshToken, error) {
 	ceiling := DefaultSessionCeiling
 	if rememberSession {
@@ -85,13 +86,16 @@ func (t *RefreshToken) WithinGraceWindow(now time.Time) bool {
 }
 
 func (t *RefreshToken) Revoke(now time.Time, replacedByID *string) {
+	if t.revokedAt != nil {
+		return
+	}
 	revokedAt := now.UTC()
 	t.revokedAt = &revokedAt
 	t.replacedByID = copyStringPtr(replacedByID)
 }
 
-// Rotate doesn't mutate the receiver — the checks are fail-fasts, not the real guarantee.
-func (t *RefreshToken) Rotate(newID, tokenHash string, userAgent, ipAddress *string, now time.Time) (*RefreshToken, error) {
+// Successor derives the next token in the family without mutating the receiver
+func (t *RefreshToken) Successor(newID, tokenHash string, userAgent, ipAddress *string, now time.Time) (*RefreshToken, error) {
 	if t.IsRevoked() {
 		return nil, apperror.NewConflict(ErrCodeRefreshTokenAlreadyRevoked, "refresh token is already revoked")
 	}
