@@ -13,6 +13,11 @@ import (
 
 const refreshUnauthorizedMessage = "Invalid or expired session. Please log in again"
 
+const (
+	refreshUserRateLimitMaxAttempts = 20
+	refreshUserRateLimitWindow      = 10 * time.Minute
+)
+
 type RefreshInput struct {
 	RefreshToken string
 	UserAgent    *string
@@ -58,17 +63,10 @@ func (uc *RefreshUseCase) Execute(ctx context.Context, in RefreshInput) (*Refres
 	}
 
 	if token == nil {
-		ip := "unknown"
-		if in.IPAddress != nil {
-			ip = *in.IPAddress
-		}
-		if err := uc.checkRateLimit(ctx, "rate_limit:refresh:ip:"+ip); err != nil {
-			return nil, err
-		}
 		return nil, apperror.NewUnauthorized(apperror.ErrCodeUnauthorized, refreshUnauthorizedMessage)
 	}
 
-	if err := uc.checkRateLimit(ctx, "rate_limit:refresh:user:"+token.UserID()); err != nil {
+	if err := uc.checkRateLimit(ctx, "rate_limit:refresh:user:"+token.UserID(), refreshUserRateLimitMaxAttempts, refreshUserRateLimitWindow); err != nil {
 		return nil, err
 	}
 
@@ -98,17 +96,17 @@ func (uc *RefreshUseCase) Execute(ctx context.Context, in RefreshInput) (*Refres
 		return nil, apperror.NewUnauthorized(apperror.ErrCodeUnauthorized, refreshUnauthorizedMessage)
 	}
 
+	accessToken, err := uc.tokenService.GenerateToken(ctx, foundUser)
+	if err != nil {
+		return nil, err // nothing persisted yet — the old refresh token is still valid
+	}
+
 	rotated, err := uc.refreshTokenRepo.Rotate(ctx, token.TokenHash(), successor)
 	if err != nil {
 		return nil, err
 	}
 	if !rotated {
 		return uc.handleAlreadyRevoked(ctx, token.TokenHash(), token.FamilyID(), now, foundUser)
-	}
-
-	accessToken, err := uc.tokenService.GenerateToken(ctx, foundUser)
-	if err != nil {
-		return nil, err
 	}
 
 	out := &RefreshOutput{
@@ -118,7 +116,7 @@ func (uc *RefreshUseCase) Execute(ctx context.Context, in RefreshInput) (*Refres
 	}
 
 	if err := uc.rotationCache.Save(ctx, token.TokenHash(), *out, user.RefreshGraceWindow); err != nil {
-		_ = err
+		_ = err // best-effort: cache miss just means no replay credential to hand back
 	}
 
 	return out, nil
@@ -164,14 +162,14 @@ func (uc *RefreshUseCase) handleAlreadyRevoked(ctx context.Context, tokenHash, f
 	}, nil
 }
 
-func (uc *RefreshUseCase) checkRateLimit(ctx context.Context, key string) error {
-	allowed, err := uc.rateLimiter.Allow(ctx, key, 20, 10*time.Minute)
+func (uc *RefreshUseCase) checkRateLimit(ctx context.Context, key string, maxAttempts int, window time.Duration) error {
+	allowed, err := uc.rateLimiter.Allow(ctx, key, maxAttempts, window)
 	if err != nil {
 		return err
 	}
 	if !allowed {
 		return apperror.NewTooManyRequests(ErrCodeTooManyRequests,
-			"Too many refresh attempts. Please try again later.", 600)
+			"Too many refresh attempts. Please try again later.", int(window.Seconds()))
 	}
 	return nil
 }

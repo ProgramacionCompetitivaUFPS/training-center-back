@@ -41,7 +41,7 @@ As a logged-in user, I want my access token to renew automatically in the backgr
    - **And** no new access or refresh token is issued
 
 5. **Scenario**: Rate limit exceeded
-   - **Given** the resolved identity (user, or IP if the token isn't recognized) has already made 20 refresh requests in the last 10 minutes
+   - **Given** the request's IP has already made 200 refresh requests in the last 10 minutes, or (once the token is resolved to a user) that user has already made 20 refresh requests in the last 10 minutes
    - **When** another refresh request is submitted
    - **Then** the system rejects with 429 Too Many Requests (`RATE_LIMIT_EXCEEDED`)
 
@@ -174,7 +174,7 @@ Rate limit exceeded.
 - **FR-007**: Every token in a session MUST carry the same absolute expiration, fixed at the original login (1 day by default, 30 days with `rememberSession` — see [Login](../Login/spec.md)); no rotation, including the grace-window path, may extend it.
 - **FR-008**: The system MUST reject refresh attempts once a session's absolute expiration has passed, regardless of grace window, forcing re-authentication.
 - **FR-009**: The system MUST re-verify the owning user's status is `ACTIVE` before issuing a new access token, independently of whether the token itself is otherwise valid.
-- **FR-010**: The system MUST rate-limit refresh attempts to 20 requests per 10 minutes, keyed by the resolved `userId` when the presented token matches a known session, or by IP when it does not.
+- **FR-010**: The system MUST rate-limit refresh attempts by IP, unconditionally and before looking up the presented token (200 requests per 10 minutes — sized to tolerate a training-center lab sharing a NAT, not to deter brute force, which is infeasible regardless against a 256-bit secret). Once the token resolves to a known session, the system MUST additionally rate-limit by the resolved `userId` (20 requests per 10 minutes).
 - **FR-011**: The refresh token MUST never be included in the JSON response body — only delivered via `Set-Cookie`.
 - **FR-012**: Two sessions (families) belonging to the same user, created by separate logins (e.g., different devices), MUST be fully independent — revoking or rotating one MUST NOT affect the other.
 - **FR-013**: The system MUST periodically purge refresh token records that have been revoked or past their absolute expiration for more than 15 days.

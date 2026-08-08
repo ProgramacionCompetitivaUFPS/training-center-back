@@ -83,6 +83,11 @@ func (uc *LoginUseCase) Execute(ctx context.Context, input LoginInput) (*LoginOu
 
 	now := time.Now()
 
+	token, err := uc.tokenService.GenerateToken(ctx, foundUser)
+	if err != nil {
+		return nil, err // nothing persisted yet — no orphaned refresh token
+	}
+
 	refreshSecret, err := generateRefreshTokenSecret()
 	if err != nil {
 		return nil, apperror.NewInternal()
@@ -103,11 +108,6 @@ func (uc *LoginUseCase) Execute(ctx context.Context, input LoginInput) (*LoginOu
 	}
 
 	if err := uc.refreshTokenRepo.Save(ctx, newRefreshToken); err != nil {
-		return nil, err
-	}
-
-	token, err := uc.tokenService.GenerateToken(ctx, foundUser)
-	if err != nil {
 		return nil, err
 	}
 

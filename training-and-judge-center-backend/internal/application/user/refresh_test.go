@@ -2,6 +2,7 @@ package user
 
 import (
 	"context"
+	"strings"
 	"testing"
 	"time"
 
@@ -10,7 +11,9 @@ import (
 	"github.com/training-judge-center/backend/pkg/apperror"
 )
 
-var refreshTestNow = time.Date(2026, 8, 8, 12, 0, 0, 0, time.UTC)
+// close to the real time.Now() the use case reads internally (D10) — not a fixed
+// calendar date, which would drift out of sync with Execute's own clock over time.
+var refreshTestNow = time.Now()
 
 const (
 	testRefreshTokenID = "token-id"
@@ -94,31 +97,20 @@ func TestRefresh_EmptyToken(t *testing.T) {
 	}
 }
 
-func TestRefresh_NotFound_RateLimitsByIP(t *testing.T) {
+func TestRefresh_NotFound(t *testing.T) {
 	refreshRepo, userRepo, tokenSvc, cache := newRefreshDeps()
 	refreshRepo.findByTokenHashFn = func(_ context.Context, _ string) (*domain.RefreshToken, error) {
 		return nil, nil
 	}
-	var capturedKey string
-	rl := &mockRateLimiter{
-		allowFn: func(_ context.Context, key string, _ int, _ time.Duration) (bool, error) {
-			capturedKey = key
-			return true, nil
-		},
-	}
-	uc := NewRefreshUseCase(refreshRepo, userRepo, tokenSvc, rl, cache)
+	uc := NewRefreshUseCase(refreshRepo, userRepo, tokenSvc, &mockRateLimiter{}, cache)
 
-	ip := "203.0.113.5"
-	_, err := uc.Execute(context.Background(), RefreshInput{RefreshToken: "raw-secret", IPAddress: &ip})
+	_, err := uc.Execute(context.Background(), RefreshInput{RefreshToken: "raw-secret"})
 	appErr, ok := err.(*apperror.AppError)
 	if !ok {
 		t.Fatalf("expected *apperror.AppError, got %T", err)
 	}
 	if appErr.Code != apperror.ErrCodeUnauthorized {
 		t.Errorf("expected code UNAUTHORIZED, got %q", appErr.Code)
-	}
-	if capturedKey != "rate_limit:refresh:ip:"+ip {
-		t.Errorf("expected rate limit key %q, got %q", "rate_limit:refresh:ip:"+ip, capturedKey)
 	}
 }
 
@@ -154,13 +146,15 @@ func TestRefresh_RateLimit_KeyedByUserID(t *testing.T) {
 	}
 }
 
-func TestRefresh_RateLimitExceeded(t *testing.T) {
+func TestRefresh_RateLimitExceeded_ByUser(t *testing.T) {
 	refreshRepo, userRepo, tokenSvc, cache := newRefreshDeps()
 	refreshRepo.findByTokenHashFn = func(_ context.Context, _ string) (*domain.RefreshToken, error) {
 		return activeRefreshTokenFixture(), nil
 	}
 	rl := &mockRateLimiter{
-		allowFn: func(_ context.Context, _ string, _ int, _ time.Duration) (bool, error) { return false, nil },
+		allowFn: func(_ context.Context, key string, _ int, _ time.Duration) (bool, error) {
+			return !strings.HasPrefix(key, "rate_limit:refresh:user:"), nil
+		},
 	}
 	uc := NewRefreshUseCase(refreshRepo, userRepo, tokenSvc, rl, cache)
 
@@ -380,6 +374,30 @@ func TestRefresh_TokenServiceError_Propagates(t *testing.T) {
 	}
 	if appErr.Kind != apperror.KindInternal {
 		t.Errorf("expected kind INTERNAL, got %s", appErr.Kind)
+	}
+}
+
+func TestRefresh_TokenServiceError_DoesNotRotate(t *testing.T) {
+	refreshRepo, userRepo, tokenSvc, cache := newRefreshDeps()
+	refreshRepo.findByTokenHashFn = func(_ context.Context, _ string) (*domain.RefreshToken, error) {
+		return activeRefreshTokenFixture(), nil
+	}
+	rotateCalled := false
+	refreshRepo.rotateFn = func(_ context.Context, _ string, _ *domain.RefreshToken) (bool, error) {
+		rotateCalled = true
+		return true, nil
+	}
+	tokenSvc.generateTokenFn = func(_ context.Context, _ *domain.User) (string, error) {
+		return "", apperror.NewInternal()
+	}
+	uc := NewRefreshUseCase(refreshRepo, userRepo, tokenSvc, &mockRateLimiter{}, cache)
+
+	_, err := uc.Execute(context.Background(), RefreshInput{RefreshToken: "raw-secret"})
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+	if rotateCalled {
+		t.Error("expected Rotate NOT to be called when GenerateToken fails — the old refresh token must stay valid")
 	}
 }
 
