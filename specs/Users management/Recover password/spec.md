@@ -163,7 +163,7 @@ Rate limit exceeded.
 
 Reset the password using the verification code received via email.
 
-> **Note**: This is a **public endpoint** (no authentication required). Upon successful reset, all active sessions for the user are invalidated.
+> **Note**: This is a **public endpoint** (no authentication required). Upon successful reset, all active sessions for the user are invalidated — including every active refresh token, not only outstanding access tokens (see [Refresh Session](../Refresh%20session/spec.md)).
 
 **Headers**:
 | Header | Type | Required | Description |
@@ -253,7 +253,7 @@ No pending recovery request or email not found.
 - **FR-006**: The system MUST invalidate previous recovery codes when a new one is requested.
 - **FR-007**: The system MUST validate that the new password meets complexity requirements (min 8 chars, 1 uppercase, 1 special char, 1 number).
 - **FR-008**: The system MUST securely hash the new password before storing it.
-- **FR-009**: The system MUST invalidate all active sessions for the user upon successful password reset.
+- **FR-009**: The system MUST invalidate all active sessions for the user upon successful password reset — both by bumping the access-token revocation timestamp and by revoking every active refresh token row for the user (see [Refresh Session](../Refresh%20session/spec.md)).
 - **FR-010**: The system MUST invalidate the recovery code after successful password reset.
 - **FR-011**: The system MUST return validation errors with a consistent structure and clear messages.
 
