@@ -12,6 +12,8 @@ import (
 	"github.com/training-judge-center/backend/pkg/apperror"
 )
 
+var _ domainUser.RefreshTokenRepository = (*RefreshTokenRepository)(nil)
+
 type RefreshTokenRepository struct {
 	db infraPostgres.Querier
 }
@@ -23,8 +25,8 @@ func NewRefreshTokenRepository(db infraPostgres.Querier) *RefreshTokenRepository
 func (r *RefreshTokenRepository) Save(ctx context.Context, token *domainUser.RefreshToken) error {
 	query := `
 		INSERT INTO refresh_tokens
-		(id, user_id, family_id, token_hash, issued_at, absolute_expires_at, user_agent, ip_address)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`
+		(id, user_id, family_id, token_hash, issued_at, absolute_expires_at, revoked_at, replaced_by_id, user_agent, ip_address)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`
 
 	q := infraPostgres.GetQuerier(ctx, r.db)
 	_, err := q.Exec(ctx, query,
@@ -34,6 +36,8 @@ func (r *RefreshTokenRepository) Save(ctx context.Context, token *domainUser.Ref
 		[]byte(token.TokenHash()),
 		token.IssuedAt(),
 		token.AbsoluteExpiresAt(),
+		token.RevokedAt(),
+		token.ReplacedByID(),
 		token.UserAgent(),
 		token.IPAddress(),
 	)
@@ -45,6 +49,7 @@ func (r *RefreshTokenRepository) Save(ctx context.Context, token *domainUser.Ref
 }
 
 func (r *RefreshTokenRepository) FindByTokenHash(ctx context.Context, tokenHash string) (*domainUser.RefreshToken, error) {
+	// host(ip_address), not ::text — ::text on inet returns CIDR notation ("x.x.x.x/32").
 	query := `
 		SELECT id, user_id, family_id, token_hash, issued_at, absolute_expires_at,
 		       revoked_at, replaced_by_id, user_agent, host(ip_address)
@@ -60,7 +65,8 @@ func (r *RefreshTokenRepository) FindActiveByFamilyID(ctx context.Context, famil
 		SELECT id, user_id, family_id, token_hash, issued_at, absolute_expires_at,
 		       revoked_at, replaced_by_id, user_agent, host(ip_address)
 		FROM refresh_tokens
-		WHERE family_id = $1 AND revoked_at IS NULL`
+		WHERE family_id = $1 AND revoked_at IS NULL
+		ORDER BY issued_at DESC LIMIT 1`
 
 	q := infraPostgres.GetQuerier(ctx, r.db)
 	return scanRefreshToken(ctx, q.QueryRow(ctx, query, familyID))

@@ -112,6 +112,28 @@ func refreshTokenScanFn(dest ...any) error {
 	return nil
 }
 
+// refreshTokenScanFnPopulated fills every nullable field with a distinct value, so a
+// dest-index swap in scanRefreshToken (e.g. userAgent/ipAddress) would fail this fixture
+// even though it passes with the all-nil one above.
+func refreshTokenScanFnPopulated(dest ...any) error {
+	revokedAt := testNow.Add(time.Hour)
+	replacedByID := "successor-id"
+	userAgent := "Mozilla/5.0"
+	ipAddress := "203.0.113.7"
+
+	*(dest[0].(*string)) = testTokenID
+	*(dest[1].(*string)) = testUserID
+	*(dest[2].(*string)) = testFamilyID
+	*(dest[3].(*[]byte)) = []byte(testTokenHash)
+	*(dest[4].(*time.Time)) = testNow
+	*(dest[5].(*time.Time)) = testNow.Add(domainUser.DefaultSessionCeiling)
+	*(dest[6].(**time.Time)) = &revokedAt
+	*(dest[7].(**string)) = &replacedByID
+	*(dest[8].(**string)) = &userAgent
+	*(dest[9].(**string)) = &ipAddress
+	return nil
+}
+
 // ── Save ──────────────────────────────────────────────────────────────────────
 
 func TestSave_Success(t *testing.T) {
@@ -182,6 +204,31 @@ func TestFindByTokenHash_HashRoundTrips(t *testing.T) {
 	}
 	if token.TokenHash() != testTokenHash {
 		t.Errorf("expected scanned TokenHash() %q, got %q", testTokenHash, token.TokenHash())
+	}
+}
+
+func TestFindByTokenHash_PopulatedNullableFields(t *testing.T) {
+	repo := NewRefreshTokenRepository(&mockQuerier{
+		queryRowFn: func(_ context.Context, _ string, _ ...interface{}) pgx.Row {
+			return &mockRow{scanFn: refreshTokenScanFnPopulated}
+		},
+	})
+
+	token, err := repo.FindByTokenHash(context.Background(), testTokenHash)
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+	if token.RevokedAt() == nil || !token.RevokedAt().Equal(testNow.Add(time.Hour)) {
+		t.Errorf("expected revokedAt to round-trip, got %v", token.RevokedAt())
+	}
+	if token.ReplacedByID() == nil || *token.ReplacedByID() != "successor-id" {
+		t.Errorf("expected replacedByID to round-trip, got %v", token.ReplacedByID())
+	}
+	if token.UserAgent() == nil || *token.UserAgent() != "Mozilla/5.0" {
+		t.Errorf("expected userAgent to round-trip, got %v", token.UserAgent())
+	}
+	if token.IPAddress() == nil || *token.IPAddress() != "203.0.113.7" {
+		t.Errorf("expected ipAddress to round-trip, got %v", token.IPAddress())
 	}
 }
 
@@ -269,18 +316,52 @@ func successorToken() *domainUser.RefreshToken {
 }
 
 func TestRotate_Success(t *testing.T) {
+	var capturedArgs []interface{}
 	repo := NewRefreshTokenRepository(&mockQuerier{
-		execFn: func(_ context.Context, _ string, _ ...interface{}) (pgconn.CommandTag, error) {
+		execFn: func(_ context.Context, _ string, args ...interface{}) (pgconn.CommandTag, error) {
+			capturedArgs = args
 			return pgconn.NewCommandTag("INSERT 0 1"), nil
 		},
 	})
 
-	rotated, err := repo.Rotate(context.Background(), testTokenHash, successorToken())
+	successor := successorToken()
+	rotated, err := repo.Rotate(context.Background(), testTokenHash, successor)
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
 	if !rotated {
 		t.Errorf("expected rotated=true")
+	}
+
+	// Revoke params: $1 revoked_at, $2 replaced_by_id, $3 old token_hash.
+	if got, ok := capturedArgs[0].(time.Time); !ok || !got.Equal(successor.IssuedAt()) {
+		t.Errorf("$1 revoked_at: expected %v, got %v", successor.IssuedAt(), capturedArgs[0])
+	}
+	if got, ok := capturedArgs[1].(string); !ok || got != successor.ID() {
+		t.Errorf("$2 replaced_by_id: expected %q, got %v", successor.ID(), capturedArgs[1])
+	}
+	if got, ok := capturedArgs[2].([]byte); !ok || string(got) != testTokenHash {
+		t.Errorf("$3 old token_hash: expected %q as []byte, got %v", testTokenHash, capturedArgs[2])
+	}
+
+	// Insert params: $4-$11.
+	if got, ok := capturedArgs[3].(string); !ok || got != successor.ID() {
+		t.Errorf("$4 id: expected %q, got %v", successor.ID(), capturedArgs[3])
+	}
+	if got, ok := capturedArgs[4].(string); !ok || got != successor.UserID() {
+		t.Errorf("$5 user_id: expected %q, got %v", successor.UserID(), capturedArgs[4])
+	}
+	if got, ok := capturedArgs[5].(string); !ok || got != successor.FamilyID() {
+		t.Errorf("$6 family_id: expected %q, got %v", successor.FamilyID(), capturedArgs[5])
+	}
+	if got, ok := capturedArgs[6].([]byte); !ok || string(got) != successor.TokenHash() {
+		t.Errorf("$7 token_hash: expected %q as []byte, got %v", successor.TokenHash(), capturedArgs[6])
+	}
+	if got, ok := capturedArgs[7].(time.Time); !ok || !got.Equal(successor.IssuedAt()) {
+		t.Errorf("$8 issued_at: expected %v, got %v", successor.IssuedAt(), capturedArgs[7])
+	}
+	if got, ok := capturedArgs[8].(time.Time); !ok || !got.Equal(successor.AbsoluteExpiresAt()) {
+		t.Errorf("$9 absolute_expires_at: expected %v, got %v", successor.AbsoluteExpiresAt(), capturedArgs[8])
 	}
 }
 
