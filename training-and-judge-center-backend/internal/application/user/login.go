@@ -4,29 +4,37 @@ import (
 	"context"
 	"time"
 
+	"github.com/google/uuid"
+
 	appshared "github.com/training-judge-center/backend/internal/application/shared"
 	"github.com/training-judge-center/backend/internal/domain/user"
 	"github.com/training-judge-center/backend/pkg/apperror"
 )
 
 type LoginInput struct {
-	Email    string
-	Password string
+	Email           string
+	Password        string
+	RememberSession bool
+	UserAgent       *string
+	IPAddress       *string
 }
 
 type LoginOutput struct {
-	Token string
-	User  UserDTO
+	Token            string
+	RefreshToken     string
+	SessionExpiresAt time.Time
+	User             UserDTO
 }
 
 type LoginUseCase struct {
-	repo         user.Repository
-	tokenService user.TokenService
-	rateLimiter  appshared.RateLimiter
+	repo             user.Repository
+	refreshTokenRepo user.RefreshTokenRepository
+	tokenService     user.TokenService
+	rateLimiter      appshared.RateLimiter
 }
 
-func NewLoginUseCase(repo user.Repository, tokenService user.TokenService, rateLimiter appshared.RateLimiter) *LoginUseCase {
-	return &LoginUseCase{repo: repo, tokenService: tokenService, rateLimiter: rateLimiter}
+func NewLoginUseCase(repo user.Repository, refreshTokenRepo user.RefreshTokenRepository, tokenService user.TokenService, rateLimiter appshared.RateLimiter) *LoginUseCase {
+	return &LoginUseCase{repo: repo, refreshTokenRepo: refreshTokenRepo, tokenService: tokenService, rateLimiter: rateLimiter}
 }
 
 func (uc *LoginUseCase) Execute(ctx context.Context, input LoginInput) (*LoginOutput, error) {
@@ -73,6 +81,31 @@ func (uc *LoginUseCase) Execute(ctx context.Context, input LoginInput) (*LoginOu
 		return nil, apperror.NewUnauthorized(ErrCodeInvalidCredentials, "Invalid email or password")
 	}
 
+	now := time.Now()
+
+	refreshSecret, err := generateRefreshTokenSecret()
+	if err != nil {
+		return nil, apperror.NewInternal()
+	}
+
+	newRefreshToken, err := user.NewRefreshToken(
+		uuid.New().String(),
+		foundUser.ID(),
+		uuid.New().String(),
+		hashRefreshTokenSecret(refreshSecret),
+		input.UserAgent,
+		input.IPAddress,
+		input.RememberSession,
+		now,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := uc.refreshTokenRepo.Save(ctx, newRefreshToken); err != nil {
+		return nil, err
+	}
+
 	token, err := uc.tokenService.GenerateToken(ctx, foundUser)
 	if err != nil {
 		return nil, err
@@ -84,5 +117,10 @@ func (uc *LoginUseCase) Execute(ctx context.Context, input LoginInput) (*LoginOu
 		_ = err
 	}
 
-	return &LoginOutput{Token: token, User: userToDTO(foundUser)}, nil
+	return &LoginOutput{
+		Token:            token,
+		RefreshToken:     refreshSecret,
+		SessionExpiresAt: newRefreshToken.AbsoluteExpiresAt(),
+		User:             userToDTO(foundUser),
+	}, nil
 }

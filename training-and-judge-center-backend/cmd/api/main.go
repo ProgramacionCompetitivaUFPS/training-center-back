@@ -178,6 +178,7 @@ func main() {
 
 	// User platform adapters
 	userRepo := user.NewRepository(dbPool)
+	refreshTokenRepo := user.NewRefreshTokenRepository(dbPool)
 	passwordRecoveryRepo := user.NewPasswordRecoveryRepository(dbPool)
 	emailChangeRepo := user.NewEmailChangeRepository(dbPool)
 	deactivationRequestRepo := user.NewDeactivationRequestRepository(dbPool)
@@ -192,7 +193,7 @@ func main() {
 
 	// User use cases
 	createUserUseCase := appuser.NewCreateUserUseCase(userRepo)
-	loginUseCase := appuser.NewLoginUseCase(userRepo, jwtService, redisRateLimiter)
+	loginUseCase := appuser.NewLoginUseCase(userRepo, refreshTokenRepo, jwtService, redisRateLimiter)
 	getMyProfileUseCase := appuser.NewGetMyProfileUseCase(userRepo)
 	getUserByNicknameUseCase := appuser.NewGetUserByNicknameUseCase(userRepo)
 	updateUserUseCase := appuser.NewUpdateUserUseCase(userRepo)

@@ -278,6 +278,81 @@ func (m *mockPasswordRecoveryRepo) InvalidatePendingByUserID(ctx context.Context
 	return nil
 }
 
+// ── mockRefreshTokenRepository ───────────────────────────────────────────────
+
+type mockRefreshTokenRepository struct {
+	saveFn                         func(ctx context.Context, token *domain.RefreshToken) error
+	findByTokenHashFn              func(ctx context.Context, tokenHash string) (*domain.RefreshToken, error)
+	findActiveByFamilyIDFn         func(ctx context.Context, familyID string) (*domain.RefreshToken, error)
+	rotateFn                       func(ctx context.Context, oldTokenHash string, newToken *domain.RefreshToken) (bool, error)
+	revokeByFamilyIDFn             func(ctx context.Context, familyID string, now time.Time) error
+	revokeAllByUserIDFn            func(ctx context.Context, userID string, now time.Time) error
+	deleteRevokedOrExpiredBeforeFn func(ctx context.Context, cutoff time.Time) error
+}
+
+func (m *mockRefreshTokenRepository) Save(ctx context.Context, token *domain.RefreshToken) error {
+	if m.saveFn != nil {
+		return m.saveFn(ctx, token)
+	}
+	return nil
+}
+func (m *mockRefreshTokenRepository) FindByTokenHash(ctx context.Context, tokenHash string) (*domain.RefreshToken, error) {
+	if m.findByTokenHashFn != nil {
+		return m.findByTokenHashFn(ctx, tokenHash)
+	}
+	return nil, nil
+}
+func (m *mockRefreshTokenRepository) FindActiveByFamilyID(ctx context.Context, familyID string) (*domain.RefreshToken, error) {
+	if m.findActiveByFamilyIDFn != nil {
+		return m.findActiveByFamilyIDFn(ctx, familyID)
+	}
+	return nil, nil
+}
+func (m *mockRefreshTokenRepository) Rotate(ctx context.Context, oldTokenHash string, newToken *domain.RefreshToken) (bool, error) {
+	if m.rotateFn != nil {
+		return m.rotateFn(ctx, oldTokenHash, newToken)
+	}
+	return true, nil
+}
+func (m *mockRefreshTokenRepository) RevokeByFamilyID(ctx context.Context, familyID string, now time.Time) error {
+	if m.revokeByFamilyIDFn != nil {
+		return m.revokeByFamilyIDFn(ctx, familyID, now)
+	}
+	return nil
+}
+func (m *mockRefreshTokenRepository) RevokeAllByUserID(ctx context.Context, userID string, now time.Time) error {
+	if m.revokeAllByUserIDFn != nil {
+		return m.revokeAllByUserIDFn(ctx, userID, now)
+	}
+	return nil
+}
+func (m *mockRefreshTokenRepository) DeleteRevokedOrExpiredBefore(ctx context.Context, cutoff time.Time) error {
+	if m.deleteRevokedOrExpiredBeforeFn != nil {
+		return m.deleteRevokedOrExpiredBeforeFn(ctx, cutoff)
+	}
+	return nil
+}
+
+// ── mockRotationCache ─────────────────────────────────────────────────────────
+
+type mockRotationCache struct {
+	saveFn func(ctx context.Context, oldTokenHash string, output RefreshOutput, ttl time.Duration) error
+	getFn  func(ctx context.Context, oldTokenHash string) (*RefreshOutput, error)
+}
+
+func (m *mockRotationCache) Save(ctx context.Context, oldTokenHash string, output RefreshOutput, ttl time.Duration) error {
+	if m.saveFn != nil {
+		return m.saveFn(ctx, oldTokenHash, output, ttl)
+	}
+	return nil
+}
+func (m *mockRotationCache) Get(ctx context.Context, oldTokenHash string) (*RefreshOutput, error) {
+	if m.getFn != nil {
+		return m.getFn(ctx, oldTokenHash)
+	}
+	return nil, nil
+}
+
 // ── helpers ───────────────────────────────────────────────────────────────────
 
 func strPtr(s string) *string { return &s }
