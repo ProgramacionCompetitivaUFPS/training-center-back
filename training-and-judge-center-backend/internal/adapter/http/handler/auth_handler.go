@@ -9,13 +9,15 @@ import (
 )
 
 type loginRequest struct {
-	Email    string `json:"email"`
-	Password string `json:"password"`
+	Email           string `json:"email"`
+	Password        string `json:"password"`
+	RememberSession bool   `json:"rememberSession"`
 }
 
 type loginResponse struct {
-	Token string       `json:"token"`
-	User  userResponse `json:"user"`
+	Token            string       `json:"token"`
+	SessionExpiresAt string       `json:"sessionExpiresAt"`
+	User             userResponse `json:"user"`
 }
 
 type userResponse struct {
@@ -30,11 +32,12 @@ type userResponse struct {
 }
 
 type AuthHandler struct {
-	loginUseCase *appuser.LoginUseCase
+	loginUseCase   *appuser.LoginUseCase
+	refreshUseCase *appuser.RefreshUseCase
 }
 
-func NewAuthHandler(loginUseCase *appuser.LoginUseCase) *AuthHandler {
-	return &AuthHandler{loginUseCase: loginUseCase}
+func NewAuthHandler(loginUseCase *appuser.LoginUseCase, refreshUseCase *appuser.RefreshUseCase) *AuthHandler {
+	return &AuthHandler{loginUseCase: loginUseCase, refreshUseCase: refreshUseCase}
 }
 
 // @Summary      Login
@@ -49,7 +52,7 @@ func NewAuthHandler(loginUseCase *appuser.LoginUseCase) *AuthHandler {
 func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 	var req loginRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		respondJSON(r.Context(), w, http.StatusBadRequest, map[string]string{
+		WriteJSON(r.Context(), w, http.StatusBadRequest, map[string]string{
 			"error":   "INVALID_JSON",
 			"message": "Request body must be valid JSON",
 		})
@@ -57,20 +60,26 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 	}
 
 	out, err := h.loginUseCase.Execute(r.Context(), appuser.LoginInput{
-		Email:    req.Email,
-		Password: req.Password,
+		Email:           req.Email,
+		Password:        req.Password,
+		RememberSession: req.RememberSession,
+		UserAgent:       userAgent(r),
+		IPAddress:       clientIP(r),
 	})
 	if err != nil {
-		respondError(r.Context(), w, err)
+		WriteError(r.Context(), w, err)
 		return
 	}
+
+	setRefreshCookie(w, out.RefreshToken, out.SessionExpiresAt)
 
 	var email string
 	if out.User.Email != nil {
 		email = *out.User.Email
 	}
-	respondJSON(r.Context(), w, http.StatusOK, loginResponse{
-		Token: out.Token,
+	WriteJSON(r.Context(), w, http.StatusOK, loginResponse{
+		Token:            out.Token,
+		SessionExpiresAt: out.SessionExpiresAt.UTC().Format(time.RFC3339),
 		User: userResponse{
 			Email:       email,
 			Name:        out.User.Name,
