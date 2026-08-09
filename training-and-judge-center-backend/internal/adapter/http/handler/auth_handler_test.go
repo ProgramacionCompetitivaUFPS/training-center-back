@@ -52,7 +52,7 @@ func TestLogin_Success_SetsRefreshCookieAndReturnsSessionExpiresAt(t *testing.T)
 	tokenSvc := &mockTokenService{
 		generateTokenFn: func(_ context.Context, _ *domainuser.User) (string, error) { return "new-access-token", nil },
 	}
-	loginUseCase := appuser.NewLoginUseCase(userRepo, refreshTokenRepo, tokenSvc, &mockRateLimiter{})
+	loginUseCase := appuser.NewLoginUseCase(userRepo, refreshTokenRepo, tokenSvc, &mockRefreshTokenCodec{}, &mockRateLimiter{})
 	h := newHandlerWithLogin(loginUseCase)
 
 	body := strings.NewReader(`{"email":"test@example.com","password":"` + plainPassword + `","rememberSession":true}`)
@@ -114,7 +114,7 @@ func TestLogin_UseCaseError_PropagatesWithoutSettingCookie(t *testing.T) {
 	userRepo := &mockUserRepo{
 		findByEmailFn: func(_ context.Context, _ domainuser.Email) (*domainuser.User, error) { return nil, nil },
 	}
-	loginUseCase := appuser.NewLoginUseCase(userRepo, &mockRefreshTokenRepo{}, &mockTokenService{}, &mockRateLimiter{})
+	loginUseCase := appuser.NewLoginUseCase(userRepo, &mockRefreshTokenRepo{}, &mockTokenService{}, &mockRefreshTokenCodec{}, &mockRateLimiter{})
 	h := newHandlerWithLogin(loginUseCase)
 
 	body := strings.NewReader(`{"email":"nobody@example.com","password":"Str0ng!Pass"}`)

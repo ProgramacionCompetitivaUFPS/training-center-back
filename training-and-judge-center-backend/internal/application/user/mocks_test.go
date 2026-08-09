@@ -353,6 +353,29 @@ func (m *mockRotationCache) Get(ctx context.Context, oldTokenHash string) (*Refr
 	return nil, nil
 }
 
+// ── mockRefreshTokenCodec ─────────────────────────────────────────────────────
+
+// Defaults to a pass-through Wrap and an Unwrap that reports testRefreshUserID, so existing
+// fixtures built around raw secret strings keep working without needing a real JWT envelope.
+type mockRefreshTokenCodec struct {
+	wrapFn   func(ctx context.Context, secret, userID string) (string, error)
+	unwrapFn func(wrapped string) (secret, userID string, err error)
+}
+
+func (m *mockRefreshTokenCodec) Wrap(ctx context.Context, secret, userID string) (string, error) {
+	if m.wrapFn != nil {
+		return m.wrapFn(ctx, secret, userID)
+	}
+	return secret, nil
+}
+
+func (m *mockRefreshTokenCodec) Unwrap(wrapped string) (string, string, error) {
+	if m.unwrapFn != nil {
+		return m.unwrapFn(wrapped)
+	}
+	return wrapped, testRefreshUserID, nil
+}
+
 // ── helpers ───────────────────────────────────────────────────────────────────
 
 func strPtr(s string) *string { return &s }

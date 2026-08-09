@@ -195,11 +195,12 @@ func main() {
 		slog.Error("failed to initialize rotation cache", "error", err)
 		os.Exit(1)
 	}
+	refreshTokenCodec := auth.NewJWTRefreshTokenCodec(cfg.JWTSecret)
 
 	// User use cases
 	createUserUseCase := appuser.NewCreateUserUseCase(userRepo)
-	loginUseCase := appuser.NewLoginUseCase(userRepo, refreshTokenRepo, jwtService, redisRateLimiter)
-	refreshUseCase := appuser.NewRefreshUseCase(refreshTokenRepo, userRepo, jwtService, redisRateLimiter, rotationCache)
+	loginUseCase := appuser.NewLoginUseCase(userRepo, refreshTokenRepo, jwtService, refreshTokenCodec, redisRateLimiter)
+	refreshUseCase := appuser.NewRefreshUseCase(refreshTokenRepo, userRepo, jwtService, refreshTokenCodec, redisRateLimiter, rotationCache)
 	getMyProfileUseCase := appuser.NewGetMyProfileUseCase(userRepo)
 	getUserByNicknameUseCase := appuser.NewGetUserByNicknameUseCase(userRepo)
 	updateUserUseCase := appuser.NewUpdateUserUseCase(userRepo)

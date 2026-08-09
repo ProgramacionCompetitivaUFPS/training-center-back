@@ -31,20 +31,22 @@ type RefreshOutput struct {
 }
 
 type RefreshUseCase struct {
-	refreshTokenRepo user.RefreshTokenRepository
-	userRepo         user.Repository
-	tokenService     user.TokenService
-	rateLimiter      appshared.RateLimiter
-	rotationCache    RotationCache
+	refreshTokenRepo  user.RefreshTokenRepository
+	userRepo          user.Repository
+	tokenService      user.TokenService
+	refreshTokenCodec RefreshTokenCodec
+	rateLimiter       appshared.RateLimiter
+	rotationCache     RotationCache
 }
 
-func NewRefreshUseCase(refreshTokenRepo user.RefreshTokenRepository, userRepo user.Repository, tokenService user.TokenService, rateLimiter appshared.RateLimiter, rotationCache RotationCache) *RefreshUseCase {
+func NewRefreshUseCase(refreshTokenRepo user.RefreshTokenRepository, userRepo user.Repository, tokenService user.TokenService, refreshTokenCodec RefreshTokenCodec, rateLimiter appshared.RateLimiter, rotationCache RotationCache) *RefreshUseCase {
 	return &RefreshUseCase{
-		refreshTokenRepo: refreshTokenRepo,
-		userRepo:         userRepo,
-		tokenService:     tokenService,
-		rateLimiter:      rateLimiter,
-		rotationCache:    rotationCache,
+		refreshTokenRepo:  refreshTokenRepo,
+		userRepo:          userRepo,
+		tokenService:      tokenService,
+		refreshTokenCodec: refreshTokenCodec,
+		rateLimiter:       rateLimiter,
+		rotationCache:     rotationCache,
 	}
 }
 
@@ -55,7 +57,18 @@ func (uc *RefreshUseCase) Execute(ctx context.Context, in RefreshInput) (*Refres
 		return nil, apperror.NewUnauthorized(apperror.ErrCodeUnauthorized, refreshUnauthorizedMessage)
 	}
 
-	hash := hashRefreshTokenSecret(in.RefreshToken)
+	plainSecret, userID, err := uc.refreshTokenCodec.Unwrap(in.RefreshToken)
+	if err != nil {
+		// invalid signature / malformed envelope → reject before ever touching the DB. Discard
+		// the codec's own error so every refresh 401 reads identically — the reason never leaks.
+		return nil, apperror.NewUnauthorized(apperror.ErrCodeUnauthorized, refreshUnauthorizedMessage)
+	}
+
+	if err := uc.checkRateLimit(ctx, "rate_limit:refresh:user:"+userID, refreshUserRateLimitMaxAttempts, refreshUserRateLimitWindow); err != nil {
+		return nil, err
+	}
+
+	hash := hashRefreshTokenSecret(plainSecret)
 
 	token, err := uc.refreshTokenRepo.FindByTokenHash(ctx, hash)
 	if err != nil {
@@ -64,10 +77,6 @@ func (uc *RefreshUseCase) Execute(ctx context.Context, in RefreshInput) (*Refres
 
 	if token == nil {
 		return nil, apperror.NewUnauthorized(apperror.ErrCodeUnauthorized, refreshUnauthorizedMessage)
-	}
-
-	if err := uc.checkRateLimit(ctx, "rate_limit:refresh:user:"+token.UserID(), refreshUserRateLimitMaxAttempts, refreshUserRateLimitWindow); err != nil {
-		return nil, err
 	}
 
 	foundUser, err := uc.userRepo.FindByID(ctx, token.UserID())
@@ -109,9 +118,14 @@ func (uc *RefreshUseCase) Execute(ctx context.Context, in RefreshInput) (*Refres
 		return uc.handleAlreadyRevoked(ctx, token.TokenHash(), token.FamilyID(), now, foundUser)
 	}
 
+	wrapped, err := uc.refreshTokenCodec.Wrap(ctx, newSecret, foundUser.ID())
+	if err != nil {
+		return nil, err
+	}
+
 	out := &RefreshOutput{
 		Token:            accessToken,
-		RefreshToken:     newSecret,
+		RefreshToken:     wrapped,
 		SessionExpiresAt: successor.AbsoluteExpiresAt(),
 	}
 

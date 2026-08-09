@@ -49,7 +49,7 @@ func TestRefresh_Success_RotatesCookie(t *testing.T) {
 	tokenSvc := &mockTokenService{
 		generateTokenFn: func(_ context.Context, _ *domainuser.User) (string, error) { return "new-access-token", nil },
 	}
-	refreshUseCase := appuser.NewRefreshUseCase(refreshTokenRepo, userRepo, tokenSvc, &mockRateLimiter{}, &mockRotationCache{})
+	refreshUseCase := appuser.NewRefreshUseCase(refreshTokenRepo, userRepo, tokenSvc, &mockRefreshTokenCodec{}, &mockRateLimiter{}, &mockRotationCache{})
 	h := newHandlerWithRefresh(refreshUseCase)
 
 	req := testRequestWithRefreshCookie("raw-secret")
@@ -91,7 +91,7 @@ func TestRefresh_MissingCookie_RejectsWithoutCallingUseCase(t *testing.T) {
 			return nil, nil
 		},
 	}
-	refreshUseCase := appuser.NewRefreshUseCase(refreshTokenRepo, &mockUserRepo{}, &mockTokenService{}, &mockRateLimiter{}, &mockRotationCache{})
+	refreshUseCase := appuser.NewRefreshUseCase(refreshTokenRepo, &mockUserRepo{}, &mockTokenService{}, &mockRefreshTokenCodec{}, &mockRateLimiter{}, &mockRotationCache{})
 	h := newHandlerWithRefresh(refreshUseCase)
 
 	req := testRequestWithRefreshCookie("")
@@ -111,7 +111,7 @@ func TestRefresh_UseCaseError_DoesNotSetCookie(t *testing.T) {
 	refreshTokenRepo := &mockRefreshTokenRepo{
 		findByTokenHashFn: func(_ context.Context, _ string) (*domainuser.RefreshToken, error) { return nil, nil },
 	}
-	refreshUseCase := appuser.NewRefreshUseCase(refreshTokenRepo, &mockUserRepo{}, &mockTokenService{}, &mockRateLimiter{}, &mockRotationCache{})
+	refreshUseCase := appuser.NewRefreshUseCase(refreshTokenRepo, &mockUserRepo{}, &mockTokenService{}, &mockRefreshTokenCodec{}, &mockRateLimiter{}, &mockRotationCache{})
 	h := newHandlerWithRefresh(refreshUseCase)
 
 	req := testRequestWithRefreshCookie("raw-secret")
@@ -156,7 +156,7 @@ func TestRefresh_GraceWindowRace_DoesNotOverwriteCookie(t *testing.T) {
 	cache := &mockRotationCache{
 		getFn: func(_ context.Context, _ string) (*appuser.RefreshOutput, error) { return cachedOutput, nil },
 	}
-	refreshUseCase := appuser.NewRefreshUseCase(refreshTokenRepo, userRepo, &mockTokenService{}, &mockRateLimiter{}, cache)
+	refreshUseCase := appuser.NewRefreshUseCase(refreshTokenRepo, userRepo, &mockTokenService{}, &mockRefreshTokenCodec{}, &mockRateLimiter{}, cache)
 	h := newHandlerWithRefresh(refreshUseCase)
 
 	req := testRequestWithRefreshCookie("raw-secret")

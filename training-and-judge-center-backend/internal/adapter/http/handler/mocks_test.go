@@ -112,6 +112,25 @@ func (m *mockRateLimiter) Reset(_ context.Context, _ string) error { return nil 
 
 var _ appshared.RateLimiter = (*mockRateLimiter)(nil)
 
+type mockRefreshTokenCodec struct {
+	wrapFn   func(ctx context.Context, secret, userID string) (string, error)
+	unwrapFn func(wrapped string) (secret, userID string, err error)
+}
+
+func (m *mockRefreshTokenCodec) Wrap(ctx context.Context, secret, userID string) (string, error) {
+	if m.wrapFn != nil {
+		return m.wrapFn(ctx, secret, userID)
+	}
+	return secret, nil
+}
+
+func (m *mockRefreshTokenCodec) Unwrap(wrapped string) (string, string, error) {
+	if m.unwrapFn != nil {
+		return m.unwrapFn(wrapped)
+	}
+	return wrapped, "user-id", nil
+}
+
 type mockRotationCache struct {
 	getFn  func(ctx context.Context, oldTokenHash string) (*appuser.RefreshOutput, error)
 	saveFn func(ctx context.Context, oldTokenHash string, output appuser.RefreshOutput, ttl time.Duration) error

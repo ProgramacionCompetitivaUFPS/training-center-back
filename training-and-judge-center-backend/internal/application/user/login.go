@@ -27,14 +27,15 @@ type LoginOutput struct {
 }
 
 type LoginUseCase struct {
-	repo             user.Repository
-	refreshTokenRepo user.RefreshTokenRepository
-	tokenService     user.TokenService
-	rateLimiter      appshared.RateLimiter
+	repo              user.Repository
+	refreshTokenRepo  user.RefreshTokenRepository
+	tokenService      user.TokenService
+	refreshTokenCodec RefreshTokenCodec
+	rateLimiter       appshared.RateLimiter
 }
 
-func NewLoginUseCase(repo user.Repository, refreshTokenRepo user.RefreshTokenRepository, tokenService user.TokenService, rateLimiter appshared.RateLimiter) *LoginUseCase {
-	return &LoginUseCase{repo: repo, refreshTokenRepo: refreshTokenRepo, tokenService: tokenService, rateLimiter: rateLimiter}
+func NewLoginUseCase(repo user.Repository, refreshTokenRepo user.RefreshTokenRepository, tokenService user.TokenService, refreshTokenCodec RefreshTokenCodec, rateLimiter appshared.RateLimiter) *LoginUseCase {
+	return &LoginUseCase{repo: repo, refreshTokenRepo: refreshTokenRepo, tokenService: tokenService, refreshTokenCodec: refreshTokenCodec, rateLimiter: rateLimiter}
 }
 
 func (uc *LoginUseCase) Execute(ctx context.Context, input LoginInput) (*LoginOutput, error) {
@@ -117,9 +118,14 @@ func (uc *LoginUseCase) Execute(ctx context.Context, input LoginInput) (*LoginOu
 		_ = err
 	}
 
+	wrapped, err := uc.refreshTokenCodec.Wrap(ctx, refreshSecret, foundUser.ID())
+	if err != nil {
+		return nil, err
+	}
+
 	return &LoginOutput{
 		Token:            token,
-		RefreshToken:     refreshSecret,
+		RefreshToken:     wrapped,
 		SessionExpiresAt: newRefreshToken.AbsoluteExpiresAt(),
 		User:             userToDTO(foundUser),
 	}, nil
