@@ -91,14 +91,16 @@ Keep secret plaintext out of this conversation. **Never `Read` the filled file**
    ROTATION_CACHE_ENCRYPTION_KEY=
    ```
    and a second file `keda-rabbitmq.env` for the separate secret KEDA uses to watch the queue and autoscale the judge workers. It has one key, `host`, holding a full AMQP connection URL — put the **same** value as `RABBITMQ_PASSWORD` between `judge:` and `@`:
-   ```
+   ```env
    host=amqp://judge:<RABBITMQ_PASSWORD>@rabbitmq.training-center.svc.cluster.local:5672/
    ```
 2. **By default the user types the first five values by hand.** Override a key's source only when the user explicitly asked for it: a secret they chose to **preserve** — you fill it from the value captured in step 1 (copied, not typed); a secret they chose to **generate** randomly — you fill it from a generator (PowerShell `Get-Random` / `openssl rand`). In both of those cases write the value straight into the file, never to stdout, and never `Read` the file back. Absent an explicit preserve-or-generate choice for a key, the user types it. Use the **same RabbitMQ password** in both files.
 
-   **`ROTATION_CACHE_ENCRYPTION_KEY` is the one exception to "the user types it"** — unlike the other five, it isn't a human-memorable password, it's the AES-256-GCM key that encrypts the refresh-rotation cache payload in Redis (see `internal/adapter/auth/rotation_cache.go`). There's nothing meaningful for a person to type. Unless the user chose to **preserve** it (captured in step 1), always **generate** it: 32 random bytes, base64-encoded — `openssl rand -base64 32`, or PowerShell:
+   **`ROTATION_CACHE_ENCRYPTION_KEY` is the one exception to "the user types it"** — unlike the other five, it isn't a human-memorable password, it's the AES-256-GCM key that encrypts the refresh-rotation cache payload in Redis (see `internal/adapter/auth/rotation_cache.go`). There's nothing meaningful for a person to type. Unless the user chose to **preserve** it (captured in step 1), always **generate** it: 32 random bytes from a *cryptographic* generator, base64-encoded — `openssl rand -base64 32`, or PowerShell (`Get-Random` is not cryptographically secure — don't use it for this one, it's fine for the other five, which are just passwords):
    ```powershell
-   [Convert]::ToBase64String([byte[]](1..32 | ForEach-Object { Get-Random -Maximum 256 }))
+   $bytes = [byte[]]::new(32)
+   [System.Security.Cryptography.RandomNumberGenerator]::Create().GetBytes($bytes)
+   [Convert]::ToBase64String($bytes)
    ```
    Write it straight into the file like any other generated value, never to stdout. It must be **exactly** 32 raw bytes once decoded — `NewRedisRotationCache` rejects anything else at startup — so don't substitute a plain random string here, it needs to actually be base64.
 3. Create the secrets, letting kubectl read the files (you never see the contents):

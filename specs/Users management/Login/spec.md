@@ -19,7 +19,7 @@ As a registered user, I want to authenticate using my email and password so that
 1. **Scenario**: Successful login
    - **Given** a user exists with ACTIVE status and valid credentials
    - **When** the user submits their email and password
-   - **Then** the system returns a JWT access token (1 hour expiration) and basic user information
+   - **Then** the system returns a JWT access token (1-hour expiration) and basic user information
    - **And** the token contains the user's id, email, and role as claims
    - **And** the system sets a refresh token in an `httpOnly; Secure; SameSite=Strict` cookie, host-only scoped to the API's own domain (not shared with the frontend's domain)
    - **And** without `rememberSession` in the request, the refresh token's absolute ceiling is 1 day from login

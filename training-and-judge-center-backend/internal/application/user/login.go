@@ -108,6 +108,11 @@ func (uc *LoginUseCase) Execute(ctx context.Context, input LoginInput) (*LoginOu
 		return nil, err
 	}
 
+	wrapped, err := uc.refreshTokenCodec.Wrap(ctx, refreshSecret, foundUser.ID())
+	if err != nil {
+		return nil, err
+	}
+
 	if err := uc.refreshTokenRepo.Save(ctx, newRefreshToken); err != nil {
 		return nil, err
 	}
@@ -116,11 +121,6 @@ func (uc *LoginUseCase) Execute(ctx context.Context, input LoginInput) (*LoginOu
 	if err := uc.rateLimiter.Reset(ctx, rateKey); err != nil {
 		// Don't fail the login; the token was already generated.
 		_ = err
-	}
-
-	wrapped, err := uc.refreshTokenCodec.Wrap(ctx, refreshSecret, foundUser.ID())
-	if err != nil {
-		return nil, err
 	}
 
 	return &LoginOutput{

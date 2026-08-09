@@ -292,6 +292,36 @@ func TestLogin_TokenGenerationError_DoesNotSaveRefreshToken(t *testing.T) {
 	}
 }
 
+func TestLogin_WrapFails_DoesNotSaveRefreshToken(t *testing.T) {
+	repo, tokenSvc := newLoginDeps()
+	activeUser := newActiveUser()
+	repo.findByEmailFn = func(_ context.Context, _ domain.Email) (*domain.User, error) {
+		return activeUser, nil
+	}
+	saveCalled := false
+	refreshRepo := &mockRefreshTokenRepository{
+		saveFn: func(_ context.Context, _ *domain.RefreshToken) error {
+			saveCalled = true
+			return nil
+		},
+	}
+	codec := &mockRefreshTokenCodec{
+		wrapFn: func(_ context.Context, _, _ string) (string, error) { return "", apperror.NewInternal() },
+	}
+	uc := NewLoginUseCase(repo, refreshRepo, tokenSvc, codec, &mockRateLimiter{})
+
+	_, err := uc.Execute(context.Background(), LoginInput{
+		Email:    "test@example.com",
+		Password: "Secret1!",
+	})
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+	if saveCalled {
+		t.Error("expected refreshTokenRepo.Save NOT to be called when Wrap fails — no orphaned refresh token the client never received")
+	}
+}
+
 func TestLogin_RepositoryFindByEmailError(t *testing.T) {
 	repo, tokenSvc := newLoginDeps()
 	repo.findByEmailFn = func(_ context.Context, _ domain.Email) (*domain.User, error) {

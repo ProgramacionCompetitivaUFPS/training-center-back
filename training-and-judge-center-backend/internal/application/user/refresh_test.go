@@ -467,6 +467,30 @@ func TestRefresh_TokenServiceError_DoesNotRotate(t *testing.T) {
 	}
 }
 
+func TestRefresh_WrapFails_DoesNotRotate(t *testing.T) {
+	refreshRepo, userRepo, tokenSvc, cache := newRefreshDeps()
+	refreshRepo.findByTokenHashFn = func(_ context.Context, _ string) (*domain.RefreshToken, error) {
+		return activeRefreshTokenFixture(), nil
+	}
+	rotateCalled := false
+	refreshRepo.rotateFn = func(_ context.Context, _ string, _ *domain.RefreshToken) (bool, error) {
+		rotateCalled = true
+		return true, nil
+	}
+	codec := &mockRefreshTokenCodec{
+		wrapFn: func(_ context.Context, _, _ string) (string, error) { return "", apperror.NewInternal() },
+	}
+	uc := NewRefreshUseCase(refreshRepo, userRepo, tokenSvc, codec, &mockRateLimiter{}, cache)
+
+	_, err := uc.Execute(context.Background(), RefreshInput{RefreshToken: "raw-secret"})
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+	if rotateCalled {
+		t.Error("expected Rotate NOT to be called when Wrap fails — a failed wrap must never revoke the old token and strand the client with no credential")
+	}
+}
+
 func TestRefresh_RotationCacheSaveError_DoesNotFailRefresh(t *testing.T) {
 	refreshRepo, userRepo, tokenSvc, cache := newRefreshDeps()
 	refreshRepo.findByTokenHashFn = func(_ context.Context, _ string) (*domain.RefreshToken, error) {

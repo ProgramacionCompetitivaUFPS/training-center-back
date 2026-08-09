@@ -17,7 +17,7 @@ As a logged-in user, I want my access token to renew automatically in the backgr
 1. **Scenario**: Successful refresh
    - **Given** a user has a valid, non-expired refresh token cookie from a previous login
    - **When** the client calls `POST /auth/refresh`
-   - **Then** the system returns a new access token (1 hour expiration)
+   - **Then** the system returns a new access token (1-hour expiration)
    - **And** the system rotates the refresh token: the old one is invalidated and a new one is set in the cookie
    - **And** the new refresh token belongs to the same session (family) as the one it replaced
    - **And** `sessionExpiresAt` in the response is unchanged from the original login — refreshing never extends the absolute ceiling
@@ -118,7 +118,7 @@ Refresh successful. Returns a new access token and session metadata; sets a new 
 
 | Field | Type | Description |
 |-------|------|-------------|
-| token | string | New JWT access token (1 hour expiration), same claim shape as [Login](../Login/spec.md) |
+| token | string | New JWT access token (1-hour expiration), same claim shape as [Login](../Login/spec.md) |
 | sessionExpiresAt | string (ISO 8601) | Absolute ceiling of this session, fixed at the original login — identical to the value returned by login, never extended by refreshing |
 
 **Set-Cookie**:

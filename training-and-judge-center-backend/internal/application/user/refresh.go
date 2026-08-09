@@ -107,7 +107,12 @@ func (uc *RefreshUseCase) Execute(ctx context.Context, in RefreshInput) (*Refres
 
 	accessToken, err := uc.tokenService.GenerateToken(ctx, foundUser)
 	if err != nil {
-		return nil, err // nothing persisted yet — the old refresh token is still valid
+		return nil, err
+	}
+
+	wrapped, err := uc.refreshTokenCodec.Wrap(ctx, newSecret, foundUser.ID())
+	if err != nil {
+		return nil, err
 	}
 
 	rotated, err := uc.refreshTokenRepo.Rotate(ctx, token.TokenHash(), successor)
@@ -116,11 +121,6 @@ func (uc *RefreshUseCase) Execute(ctx context.Context, in RefreshInput) (*Refres
 	}
 	if !rotated {
 		return uc.handleAlreadyRevoked(ctx, token.TokenHash(), token.FamilyID(), now, foundUser)
-	}
-
-	wrapped, err := uc.refreshTokenCodec.Wrap(ctx, newSecret, foundUser.ID())
-	if err != nil {
-		return nil, err
 	}
 
 	out := &RefreshOutput{

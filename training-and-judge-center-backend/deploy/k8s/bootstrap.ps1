@@ -26,8 +26,14 @@ $K8S = $PSScriptRoot
 
 function New-Pass { -join ((48..57) + (65..90) + (97..122) | Get-Random -Count 40 | ForEach-Object { [char]$_ }) }
 # ROTATION_CACHE_ENCRYPTION_KEY debe ser base64 de exactamente 32 bytes crudos (lo exige
-# NewRedisRotationCache) — New-Pass no sirve para esto, no es base64 estructurado.
-function New-Base64Key { [Convert]::ToBase64String([byte[]](1..32 | ForEach-Object { Get-Random -Maximum 256 })) }
+# NewRedisRotationCache) generados con un RNG criptográfico — New-Pass no sirve (no es base64
+# estructurado) y Get-Random tampoco (no es criptográficamente seguro, no apto para una llave
+# AES-256-GCM real).
+function New-Base64Key {
+  $bytes = [byte[]]::new(32)
+  [System.Security.Cryptography.RandomNumberGenerator]::Create().GetBytes($bytes)
+  [Convert]::ToBase64String($bytes)
+}
 function Apply-Tpl($file) { (Get-Content "$K8S/$file") -replace '__IMAGE__', $script:IMG | kubectl apply -f - }
 
 # 0. Resolver la última imagen v* del registro (nada quemado)
@@ -64,6 +70,16 @@ if (-not (kubectl get secret app-secrets -n $NS --ignore-not-found 2>$null)) {
   }
   foreach ($k in 'DB_PASSWORD', 'JWT_SECRET', 'RABBITMQ_PASSWORD', 'ROTATION_CACHE_ENCRYPTION_KEY', 'ADMIN_PASSWORD', 'SMTP_PASSWORD') {
     if ([string]::IsNullOrWhiteSpace($secrets[$k])) { throw "Falta $k en $envFile. Complétalo y vuelve a correr." }
+  }
+  # Falla rápido acá, no varios kubectl apply / crash-loops después: ROTATION_CACHE_ENCRYPTION_KEY
+  # tiene que decodificar a exactamente 32 bytes crudos, o el pod de la API nunca arranca.
+  try {
+    $keyBytes = [Convert]::FromBase64String($secrets['ROTATION_CACHE_ENCRYPTION_KEY'])
+  } catch {
+    throw "ROTATION_CACHE_ENCRYPTION_KEY en $envFile no es base64 válido."
+  }
+  if ($keyBytes.Length -ne 32) {
+    throw "ROTATION_CACHE_ENCRYPTION_KEY en $envFile decodifica a $($keyBytes.Length) bytes, se necesitan exactamente 32."
   }
 
   Write-Host "==> Creando secrets desde $envFile" -ForegroundColor Cyan
