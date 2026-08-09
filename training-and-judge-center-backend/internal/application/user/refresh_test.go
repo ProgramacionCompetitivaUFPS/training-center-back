@@ -65,7 +65,7 @@ func TestRefresh_Success(t *testing.T) {
 	refreshRepo.rotateFn = func(_ context.Context, _ string, _ *domain.RefreshToken) (bool, error) {
 		return true, nil
 	}
-	uc := NewRefreshUseCase(refreshRepo, userRepo, tokenSvc, &mockRateLimiter{}, cache)
+	uc := NewRefreshUseCase(refreshRepo, userRepo, tokenSvc, &mockRefreshTokenCodec{}, &mockRateLimiter{}, cache)
 
 	out, err := uc.Execute(context.Background(), RefreshInput{RefreshToken: "raw-secret"})
 	if err != nil {
@@ -85,7 +85,7 @@ func TestRefresh_Success(t *testing.T) {
 
 func TestRefresh_EmptyToken(t *testing.T) {
 	refreshRepo, userRepo, tokenSvc, cache := newRefreshDeps()
-	uc := NewRefreshUseCase(refreshRepo, userRepo, tokenSvc, &mockRateLimiter{}, cache)
+	uc := NewRefreshUseCase(refreshRepo, userRepo, tokenSvc, &mockRefreshTokenCodec{}, &mockRateLimiter{}, cache)
 
 	_, err := uc.Execute(context.Background(), RefreshInput{RefreshToken: ""})
 	appErr, ok := err.(*apperror.AppError)
@@ -102,7 +102,7 @@ func TestRefresh_NotFound(t *testing.T) {
 	refreshRepo.findByTokenHashFn = func(_ context.Context, _ string) (*domain.RefreshToken, error) {
 		return nil, nil
 	}
-	uc := NewRefreshUseCase(refreshRepo, userRepo, tokenSvc, &mockRateLimiter{}, cache)
+	uc := NewRefreshUseCase(refreshRepo, userRepo, tokenSvc, &mockRefreshTokenCodec{}, &mockRateLimiter{}, cache)
 
 	_, err := uc.Execute(context.Background(), RefreshInput{RefreshToken: "raw-secret"})
 	appErr, ok := err.(*apperror.AppError)
@@ -129,7 +129,7 @@ func TestRefresh_RateLimit_KeyedByUserID(t *testing.T) {
 		},
 	}
 	refreshRepo.rotateFn = func(_ context.Context, _ string, _ *domain.RefreshToken) (bool, error) { return true, nil }
-	uc := NewRefreshUseCase(refreshRepo, userRepo, tokenSvc, rl, cache)
+	uc := NewRefreshUseCase(refreshRepo, userRepo, tokenSvc, &mockRefreshTokenCodec{}, rl, cache)
 
 	_, err := uc.Execute(context.Background(), RefreshInput{RefreshToken: "raw-secret"})
 	if err != nil {
@@ -146,6 +146,66 @@ func TestRefresh_RateLimit_KeyedByUserID(t *testing.T) {
 	}
 }
 
+func TestRefresh_RateLimit_UsesUnwrapUserID_NotTokenUserID(t *testing.T) {
+	// activeRefreshTokenFixture's real owner is testRefreshUserID — the codec reports a
+	// DIFFERENT userID, proving the rate limit key comes from Unwrap, not token.UserID().
+	const unwrapUserID = "different-user-id"
+	refreshRepo, userRepo, tokenSvc, cache := newRefreshDeps()
+	refreshRepo.findByTokenHashFn = func(_ context.Context, _ string) (*domain.RefreshToken, error) {
+		return activeRefreshTokenFixture(), nil
+	}
+	refreshRepo.rotateFn = func(_ context.Context, _ string, _ *domain.RefreshToken) (bool, error) { return true, nil }
+	codec := &mockRefreshTokenCodec{
+		unwrapFn: func(wrapped string) (string, string, error) { return wrapped, unwrapUserID, nil },
+	}
+	var capturedKey string
+	rl := &mockRateLimiter{
+		allowFn: func(_ context.Context, key string, _ int, _ time.Duration) (bool, error) {
+			capturedKey = key
+			return true, nil
+		},
+	}
+	uc := NewRefreshUseCase(refreshRepo, userRepo, tokenSvc, codec, rl, cache)
+
+	_, err := uc.Execute(context.Background(), RefreshInput{RefreshToken: "raw-secret"})
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+	if capturedKey != "rate_limit:refresh:user:"+unwrapUserID {
+		t.Errorf("expected key %q (from Unwrap), got %q", "rate_limit:refresh:user:"+unwrapUserID, capturedKey)
+	}
+}
+
+func TestRefresh_UnwrapFails_RejectsWithoutTouchingDB(t *testing.T) {
+	refreshRepo, userRepo, tokenSvc, cache := newRefreshDeps()
+	findCalled := false
+	refreshRepo.findByTokenHashFn = func(_ context.Context, _ string) (*domain.RefreshToken, error) {
+		findCalled = true
+		return activeRefreshTokenFixture(), nil
+	}
+	codec := &mockRefreshTokenCodec{
+		unwrapFn: func(_ string) (string, string, error) {
+			return "", "", apperror.NewUnauthorized(apperror.ErrCodeUnauthorized, "invalid session")
+		},
+	}
+	uc := NewRefreshUseCase(refreshRepo, userRepo, tokenSvc, codec, &mockRateLimiter{}, cache)
+
+	_, err := uc.Execute(context.Background(), RefreshInput{RefreshToken: "garbage"})
+	appErr, ok := err.(*apperror.AppError)
+	if !ok {
+		t.Fatalf("expected *apperror.AppError, got %T", err)
+	}
+	if appErr.Code != apperror.ErrCodeUnauthorized {
+		t.Errorf("expected code UNAUTHORIZED, got %q", appErr.Code)
+	}
+	if appErr.Message != refreshUnauthorizedMessage {
+		t.Errorf("expected the standard refresh message %q (not the codec's own), got %q", refreshUnauthorizedMessage, appErr.Message)
+	}
+	if findCalled {
+		t.Error("expected FindByTokenHash NOT to be called when Unwrap fails — that's the whole point of admission control")
+	}
+}
+
 func TestRefresh_RateLimitExceeded_ByUser(t *testing.T) {
 	refreshRepo, userRepo, tokenSvc, cache := newRefreshDeps()
 	refreshRepo.findByTokenHashFn = func(_ context.Context, _ string) (*domain.RefreshToken, error) {
@@ -156,7 +216,7 @@ func TestRefresh_RateLimitExceeded_ByUser(t *testing.T) {
 			return !strings.HasPrefix(key, "rate_limit:refresh:user:"), nil
 		},
 	}
-	uc := NewRefreshUseCase(refreshRepo, userRepo, tokenSvc, rl, cache)
+	uc := NewRefreshUseCase(refreshRepo, userRepo, tokenSvc, &mockRefreshTokenCodec{}, rl, cache)
 
 	_, err := uc.Execute(context.Background(), RefreshInput{RefreshToken: "raw-secret"})
 	appErr, ok := err.(*apperror.AppError)
@@ -179,7 +239,7 @@ func TestRefresh_AccountDeactivated(t *testing.T) {
 	userRepo.findByIDFn = func(_ context.Context, _ string) (*domain.User, error) {
 		return newUserWithRole(testRefreshUserID, shared.RoleContestant, domain.StatusDeactivated), nil
 	}
-	uc := NewRefreshUseCase(refreshRepo, userRepo, tokenSvc, &mockRateLimiter{}, cache)
+	uc := NewRefreshUseCase(refreshRepo, userRepo, tokenSvc, &mockRefreshTokenCodec{}, &mockRateLimiter{}, cache)
 
 	_, err := uc.Execute(context.Background(), RefreshInput{RefreshToken: "raw-secret"})
 	appErr, ok := err.(*apperror.AppError)
@@ -199,7 +259,7 @@ func TestRefresh_Expired(t *testing.T) {
 	refreshRepo.findByTokenHashFn = func(_ context.Context, _ string) (*domain.RefreshToken, error) {
 		return expiredRefreshTokenFixture(), nil
 	}
-	uc := NewRefreshUseCase(refreshRepo, userRepo, tokenSvc, &mockRateLimiter{}, cache)
+	uc := NewRefreshUseCase(refreshRepo, userRepo, tokenSvc, &mockRefreshTokenCodec{}, &mockRateLimiter{}, cache)
 
 	_, err := uc.Execute(context.Background(), RefreshInput{RefreshToken: "raw-secret"})
 	appErr, ok := err.(*apperror.AppError)
@@ -222,7 +282,7 @@ func TestRefresh_AlreadyRevoked_OutsideGraceWindow_RevokesFamily(t *testing.T) {
 		revokedFamilyID = familyID
 		return nil
 	}
-	uc := NewRefreshUseCase(refreshRepo, userRepo, tokenSvc, &mockRateLimiter{}, cache)
+	uc := NewRefreshUseCase(refreshRepo, userRepo, tokenSvc, &mockRefreshTokenCodec{}, &mockRateLimiter{}, cache)
 
 	_, err := uc.Execute(context.Background(), RefreshInput{RefreshToken: "raw-secret"})
 	appErr, ok := err.(*apperror.AppError)
@@ -256,7 +316,7 @@ func TestRefresh_AlreadyRevoked_CacheHit_SkipsGraceWindowCheck(t *testing.T) {
 		revokeCalled = true
 		return nil
 	}
-	uc := NewRefreshUseCase(refreshRepo, userRepo, tokenSvc, &mockRateLimiter{}, cache)
+	uc := NewRefreshUseCase(refreshRepo, userRepo, tokenSvc, &mockRefreshTokenCodec{}, &mockRateLimiter{}, cache)
 
 	out, err := uc.Execute(context.Background(), RefreshInput{RefreshToken: "raw-secret"})
 	if err != nil {
@@ -294,7 +354,7 @@ func TestRefresh_AlreadyRevoked_WithinGraceWindow_WithoutCache(t *testing.T) {
 	refreshRepo.findActiveByFamilyIDFn = func(_ context.Context, _ string) (*domain.RefreshToken, error) {
 		return activeSuccessor, nil
 	}
-	uc := NewRefreshUseCase(refreshRepo, userRepo, tokenSvc, &mockRateLimiter{}, cache)
+	uc := NewRefreshUseCase(refreshRepo, userRepo, tokenSvc, &mockRefreshTokenCodec{}, &mockRateLimiter{}, cache)
 
 	out, err := uc.Execute(context.Background(), RefreshInput{RefreshToken: "raw-secret"})
 	if err != nil {
@@ -329,7 +389,7 @@ func TestRefresh_RotateReturnsFalse_TreatedAsAlreadyRevoked(t *testing.T) {
 		revokeCalled = true
 		return nil
 	}
-	uc := NewRefreshUseCase(refreshRepo, userRepo, tokenSvc, &mockRateLimiter{}, cache)
+	uc := NewRefreshUseCase(refreshRepo, userRepo, tokenSvc, &mockRefreshTokenCodec{}, &mockRateLimiter{}, cache)
 
 	_, err := uc.Execute(context.Background(), RefreshInput{RefreshToken: "raw-secret"})
 	if err == nil {
@@ -348,7 +408,7 @@ func TestRefresh_RotateDBError_Propagates(t *testing.T) {
 	refreshRepo.rotateFn = func(_ context.Context, _ string, _ *domain.RefreshToken) (bool, error) {
 		return false, apperror.NewInternal()
 	}
-	uc := NewRefreshUseCase(refreshRepo, userRepo, tokenSvc, &mockRateLimiter{}, cache)
+	uc := NewRefreshUseCase(refreshRepo, userRepo, tokenSvc, &mockRefreshTokenCodec{}, &mockRateLimiter{}, cache)
 
 	_, err := uc.Execute(context.Background(), RefreshInput{RefreshToken: "raw-secret"})
 	appErr, ok := err.(*apperror.AppError)
@@ -371,7 +431,7 @@ func TestRefresh_TokenServiceError_Propagates(t *testing.T) {
 	tokenSvc.generateTokenFn = func(_ context.Context, _ *domain.User) (string, error) {
 		return "", apperror.NewInternal()
 	}
-	uc := NewRefreshUseCase(refreshRepo, userRepo, tokenSvc, &mockRateLimiter{}, cache)
+	uc := NewRefreshUseCase(refreshRepo, userRepo, tokenSvc, &mockRefreshTokenCodec{}, &mockRateLimiter{}, cache)
 
 	_, err := uc.Execute(context.Background(), RefreshInput{RefreshToken: "raw-secret"})
 	appErr, ok := err.(*apperror.AppError)
@@ -396,7 +456,7 @@ func TestRefresh_TokenServiceError_DoesNotRotate(t *testing.T) {
 	tokenSvc.generateTokenFn = func(_ context.Context, _ *domain.User) (string, error) {
 		return "", apperror.NewInternal()
 	}
-	uc := NewRefreshUseCase(refreshRepo, userRepo, tokenSvc, &mockRateLimiter{}, cache)
+	uc := NewRefreshUseCase(refreshRepo, userRepo, tokenSvc, &mockRefreshTokenCodec{}, &mockRateLimiter{}, cache)
 
 	_, err := uc.Execute(context.Background(), RefreshInput{RefreshToken: "raw-secret"})
 	if err == nil {
@@ -404,6 +464,30 @@ func TestRefresh_TokenServiceError_DoesNotRotate(t *testing.T) {
 	}
 	if rotateCalled {
 		t.Error("expected Rotate NOT to be called when GenerateToken fails — the old refresh token must stay valid")
+	}
+}
+
+func TestRefresh_WrapFails_DoesNotRotate(t *testing.T) {
+	refreshRepo, userRepo, tokenSvc, cache := newRefreshDeps()
+	refreshRepo.findByTokenHashFn = func(_ context.Context, _ string) (*domain.RefreshToken, error) {
+		return activeRefreshTokenFixture(), nil
+	}
+	rotateCalled := false
+	refreshRepo.rotateFn = func(_ context.Context, _ string, _ *domain.RefreshToken) (bool, error) {
+		rotateCalled = true
+		return true, nil
+	}
+	codec := &mockRefreshTokenCodec{
+		wrapFn: func(_ context.Context, _, _ string) (string, error) { return "", apperror.NewInternal() },
+	}
+	uc := NewRefreshUseCase(refreshRepo, userRepo, tokenSvc, codec, &mockRateLimiter{}, cache)
+
+	_, err := uc.Execute(context.Background(), RefreshInput{RefreshToken: "raw-secret"})
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+	if rotateCalled {
+		t.Error("expected Rotate NOT to be called when Wrap fails — a failed wrap must never revoke the old token and strand the client with no credential")
 	}
 }
 
@@ -418,7 +502,7 @@ func TestRefresh_RotationCacheSaveError_DoesNotFailRefresh(t *testing.T) {
 	cache.saveFn = func(_ context.Context, _ string, _ RefreshOutput, _ time.Duration) error {
 		return apperror.NewInternal()
 	}
-	uc := NewRefreshUseCase(refreshRepo, userRepo, tokenSvc, &mockRateLimiter{}, cache)
+	uc := NewRefreshUseCase(refreshRepo, userRepo, tokenSvc, &mockRefreshTokenCodec{}, &mockRateLimiter{}, cache)
 
 	out, err := uc.Execute(context.Background(), RefreshInput{RefreshToken: "raw-secret"})
 	if err != nil {

@@ -50,11 +50,3 @@ func kindToStatus(k apperror.Kind) int {
 		return http.StatusInternalServerError
 	}
 }
-
-func respondJSON(ctx context.Context, w http.ResponseWriter, status int, data any) {
-	WriteJSON(ctx, w, status, data)
-}
-
-func respondError(ctx context.Context, w http.ResponseWriter, err error) {
-	WriteError(ctx, w, err)
-}
