@@ -237,10 +237,14 @@ func TestRefresh_AlreadyRevoked_OutsideGraceWindow_RevokesFamily(t *testing.T) {
 	}
 }
 
-func TestRefresh_AlreadyRevoked_WithinGraceWindow_WithCache(t *testing.T) {
+func TestRefresh_AlreadyRevoked_CacheHit_SkipsGraceWindowCheck(t *testing.T) {
+	// revokedAt is deliberately outside the grace window, so a cache hit only looks
+	// like a pass if it truly short-circuits before the window is ever checked.
 	refreshRepo, userRepo, tokenSvc, cache := newRefreshDeps()
-	revoked := revokedRefreshTokenFixture(refreshTestNow.Add(-2 * time.Second))
+	revoked := revokedRefreshTokenFixture(refreshTestNow.Add(-time.Hour)) // way past the 10s window
+	findCalls := 0
 	refreshRepo.findByTokenHashFn = func(_ context.Context, _ string) (*domain.RefreshToken, error) {
+		findCalls++
 		return revoked, nil
 	}
 	cachedOutput := &RefreshOutput{Token: "cached-access", RefreshToken: "cached-refresh", SessionExpiresAt: refreshTestNow}
@@ -254,7 +258,6 @@ func TestRefresh_AlreadyRevoked_WithinGraceWindow_WithCache(t *testing.T) {
 	}
 	uc := NewRefreshUseCase(refreshRepo, userRepo, tokenSvc, &mockRateLimiter{}, cache)
 
-	// use a use case-local "now" close to refreshTestNow by calling immediately
 	out, err := uc.Execute(context.Background(), RefreshInput{RefreshToken: "raw-secret"})
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
@@ -264,6 +267,9 @@ func TestRefresh_AlreadyRevoked_WithinGraceWindow_WithCache(t *testing.T) {
 	}
 	if revokeCalled {
 		t.Error("expected RevokeByFamilyID NOT to be called when the cache has a hit")
+	}
+	if findCalls != 1 {
+		t.Errorf("expected FindByTokenHash called once (only the initial lookup), got %d — the cache hit should short-circuit before the grace-window re-check", findCalls)
 	}
 }
 
