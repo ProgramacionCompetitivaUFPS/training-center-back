@@ -56,7 +56,7 @@ func TestLogin_Success_SetsRefreshCookieAndReturnsSessionExpiresAt(t *testing.T)
 	h := newHandlerWithLogin(loginUseCase)
 
 	body := strings.NewReader(`{"email":"test@example.com","password":"` + plainPassword + `","rememberSession":true}`)
-	req := httptest.NewRequest(http.MethodPost, "/auth/login", body)
+	req := httptest.NewRequestWithContext(context.Background(), http.MethodPost, "/auth/login", body)
 	rec := httptest.NewRecorder()
 
 	h.Login(rec, req)
@@ -100,7 +100,7 @@ func TestLogin_Success_SetsRefreshCookieAndReturnsSessionExpiresAt(t *testing.T)
 func TestLogin_InvalidJSON(t *testing.T) {
 	h := newHandlerWithLogin(nil)
 
-	req := httptest.NewRequest(http.MethodPost, "/auth/login", strings.NewReader("not json"))
+	req := httptest.NewRequestWithContext(context.Background(), http.MethodPost, "/auth/login", strings.NewReader("not json"))
 	rec := httptest.NewRecorder()
 
 	h.Login(rec, req)
@@ -118,7 +118,7 @@ func TestLogin_UseCaseError_PropagatesWithoutSettingCookie(t *testing.T) {
 	h := newHandlerWithLogin(loginUseCase)
 
 	body := strings.NewReader(`{"email":"nobody@example.com","password":"Str0ng!Pass"}`)
-	req := httptest.NewRequest(http.MethodPost, "/auth/login", body)
+	req := httptest.NewRequestWithContext(context.Background(), http.MethodPost, "/auth/login", body)
 	rec := httptest.NewRecorder()
 
 	h.Login(rec, req)

@@ -26,7 +26,7 @@ func activeTestRefreshToken(now time.Time) *domainuser.RefreshToken {
 }
 
 func testRequestWithRefreshCookie(secret string) *http.Request {
-	req := httptest.NewRequest(http.MethodPost, "/auth/refresh", nil)
+	req := httptest.NewRequestWithContext(context.Background(), http.MethodPost, "/auth/refresh", nil)
 	if secret != "" {
 		req.AddCookie(&http.Cookie{Name: refreshCookieName, Value: secret})
 	}
