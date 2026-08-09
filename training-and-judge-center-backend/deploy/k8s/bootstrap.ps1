@@ -9,6 +9,11 @@
 # Prerrequisitos (capa 1, aparte):
 #   1. terraform apply                                              (cluster + infra de nube)
 #   2. gcloud container clusters get-credentials training-center --zone us-east1-b
+#   3. Si el registro nació vacío (recreación/migración): backend YA empujado (imagen v*) Y
+#      las 3 imágenes de lenguaje del judge (scripts/build-judge-images.sh + tag + push como
+#      judge-runner-{cpp20,java17,python310}:v0.1.0). Si faltan, este script corre entero sin
+#      error, pero el judge-worker queda en crash-loop silencioso (prepull-language-images:
+#      "manifest unknown") hasta que las subas.
 #
 # Uso (desde cmd, para saltar la execution policy de PowerShell):
 #   powershell -ExecutionPolicy Bypass -File deploy\k8s\bootstrap.ps1
