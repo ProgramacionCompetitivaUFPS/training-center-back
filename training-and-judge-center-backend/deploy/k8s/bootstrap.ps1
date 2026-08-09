@@ -2,9 +2,10 @@
 # Aplica los manifests en orden, resuelve la última imagen v* del registro, instala KEDA
 # y crea los secrets. Idempotente: se puede re-correr sin daño.
 #
-# Secrets: la primera corrida escribe la plantilla secrets.env (DB/JWT/RabbitMQ ya
-# generados y visibles; ADMIN y SMTP en blanco) y se detiene. Complétala y vuelve a
-# correr: el script crea los secrets desde ese archivo y luego lo borra (es texto plano).
+# Secrets: la primera corrida escribe la plantilla secrets.env (DB/JWT/RabbitMQ/
+# ROTATION_CACHE_ENCRYPTION_KEY ya generados y visibles; ADMIN y SMTP en blanco) y se
+# detiene. Complétala y vuelve a correr: el script crea los secrets desde ese archivo y
+# luego lo borra (es texto plano).
 #
 # Prerrequisitos (capa 1, aparte):
 #   1. terraform apply                                              (cluster + infra de nube)
@@ -24,6 +25,9 @@ $REG = "us-east1-docker.pkg.dev/training-center-502916/training-center/backend"
 $K8S = $PSScriptRoot
 
 function New-Pass { -join ((48..57) + (65..90) + (97..122) | Get-Random -Count 40 | ForEach-Object { [char]$_ }) }
+# ROTATION_CACHE_ENCRYPTION_KEY debe ser base64 de exactamente 32 bytes crudos (lo exige
+# NewRedisRotationCache) — New-Pass no sirve para esto, no es base64 estructurado.
+function New-Base64Key { [Convert]::ToBase64String([byte[]](1..32 | ForEach-Object { Get-Random -Maximum 256 })) }
 function Apply-Tpl($file) { (Get-Content "$K8S/$file") -replace '__IMAGE__', $script:IMG | kubectl apply -f - }
 
 # 0. Resolver la última imagen v* del registro (nada quemado)
@@ -45,10 +49,11 @@ if (-not (kubectl get secret app-secrets -n $NS --ignore-not-found 2>$null)) {
       "DB_PASSWORD=$(New-Pass)"
       "JWT_SECRET=$(New-Pass)"
       "RABBITMQ_PASSWORD=$(New-Pass)"
+      "ROTATION_CACHE_ENCRYPTION_KEY=$(New-Base64Key)"
       "ADMIN_PASSWORD="
       "SMTP_PASSWORD="
     ) | Set-Content -Encoding ascii $envFile
-    throw "Escribí la plantilla $envFile con DB/JWT/RabbitMQ ya generados. Completa ADMIN_PASSWORD y SMTP_PASSWORD (y cambia los internos si quieres) y vuelve a correr."
+    throw "Escribí la plantilla $envFile con DB/JWT/RabbitMQ/ROTATION_CACHE_ENCRYPTION_KEY ya generados. Completa ADMIN_PASSWORD y SMTP_PASSWORD (y cambia los internos si quieres) y vuelve a correr."
   }
 
   # Segunda corrida: parsea, valida que no queden vacíos, y crea los secrets.
@@ -57,7 +62,7 @@ if (-not (kubectl get secret app-secrets -n $NS --ignore-not-found 2>$null)) {
     $k, $v = $_ -split '=', 2
     $secrets[$k.Trim()] = $v
   }
-  foreach ($k in 'DB_PASSWORD', 'JWT_SECRET', 'RABBITMQ_PASSWORD', 'ADMIN_PASSWORD', 'SMTP_PASSWORD') {
+  foreach ($k in 'DB_PASSWORD', 'JWT_SECRET', 'RABBITMQ_PASSWORD', 'ROTATION_CACHE_ENCRYPTION_KEY', 'ADMIN_PASSWORD', 'SMTP_PASSWORD') {
     if ([string]::IsNullOrWhiteSpace($secrets[$k])) { throw "Falta $k en $envFile. Complétalo y vuelve a correr." }
   }
 

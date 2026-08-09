@@ -24,7 +24,9 @@ Ask all of the following up front, and don't proceed until answered:
 3. **What to keep** — always ask about all three, one by one, and record each choice:
    - **Data** (Postgres + uploads bucket) — carry over (capture in step 1, restore in step 7) or start empty.
    - **Images** — same-project recreate: keep the registry (step 2 must not destroy it). Migration: carry them to the new registry (step 5 — copy the history, or rebuild from git tags).
-   - **Secrets** — the default is that the user types all five by hand (step 6); only if they explicitly ask, reuse the current values (captured in step 1) or generate random ones.
+   - **Secrets** — the default is that the user types five of the six by hand (step 6);
+     `ROTATION_CACHE_ENCRYPTION_KEY` is always generated, never typed (see step 6 for why). Only
+     if the user explicitly asks, reuse the current values (captured in step 1) instead.
 
 ## 1. Capture — before any teardown (whenever keeping data or secrets)
 Do this while the old environment is still up, and confirm you hold everything **before** step 2:
@@ -86,12 +88,19 @@ Keep secret plaintext out of this conversation. **Never `Read` the filled file**
    RABBITMQ_PASSWORD=
    ADMIN_PASSWORD=
    SMTP_PASSWORD=
+   ROTATION_CACHE_ENCRYPTION_KEY=
    ```
    and a second file `keda-rabbitmq.env` for the separate secret KEDA uses to watch the queue and autoscale the judge workers. It has one key, `host`, holding a full AMQP connection URL — put the **same** value as `RABBITMQ_PASSWORD` between `judge:` and `@`:
    ```
    host=amqp://judge:<RABBITMQ_PASSWORD>@rabbitmq.training-center.svc.cluster.local:5672/
    ```
-2. **By default the user types all five values by hand.** Override a key's source only when the user explicitly asked for it: a secret they chose to **preserve** — you fill it from the value captured in step 1 (copied, not typed); a secret they chose to **generate** randomly — you fill it from a generator (PowerShell `Get-Random` / `openssl rand`). In both of those cases write the value straight into the file, never to stdout, and never `Read` the file back. Absent an explicit preserve-or-generate choice for a key, the user types it. Use the **same RabbitMQ password** in both files.
+2. **By default the user types the first five values by hand.** Override a key's source only when the user explicitly asked for it: a secret they chose to **preserve** — you fill it from the value captured in step 1 (copied, not typed); a secret they chose to **generate** randomly — you fill it from a generator (PowerShell `Get-Random` / `openssl rand`). In both of those cases write the value straight into the file, never to stdout, and never `Read` the file back. Absent an explicit preserve-or-generate choice for a key, the user types it. Use the **same RabbitMQ password** in both files.
+
+   **`ROTATION_CACHE_ENCRYPTION_KEY` is the one exception to "the user types it"** — unlike the other five, it isn't a human-memorable password, it's the AES-256-GCM key that encrypts the refresh-rotation cache payload in Redis (see `internal/adapter/auth/rotation_cache.go`). There's nothing meaningful for a person to type. Unless the user chose to **preserve** it (captured in step 1), always **generate** it: 32 random bytes, base64-encoded — `openssl rand -base64 32`, or PowerShell:
+   ```powershell
+   [Convert]::ToBase64String([byte[]](1..32 | ForEach-Object { Get-Random -Maximum 256 }))
+   ```
+   Write it straight into the file like any other generated value, never to stdout. It must be **exactly** 32 raw bytes once decoded — `NewRedisRotationCache` rejects anything else at startup — so don't substitute a plain random string here, it needs to actually be base64.
 3. Create the secrets, letting kubectl read the files (you never see the contents):
    - `kubectl create secret generic app-secrets -n training-center --from-env-file=<path>/app-secrets.env`
    - `kubectl create secret generic keda-rabbitmq -n training-center --from-env-file=<path>/keda-rabbitmq.env`
