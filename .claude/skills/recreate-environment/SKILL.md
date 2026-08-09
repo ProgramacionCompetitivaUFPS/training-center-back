@@ -20,6 +20,7 @@ The capa-2 portion (steps 6–7) is the guided equivalent of `training-and-judge
 Ask all of the following up front, and don't proceed until answered:
 1. **Scope** — recreate **both layers** (capa 1 cloud + capa 2 app), or **only capa 2** (redeploy the app on the existing cluster). Only capa 2 → **skip steps 2 and 3**, and skip step 8 unless the Ingress IP actually changed.
 2. **Target** — recreate in the **same project**, or **migrate to a totally different GCP account/project** (new `project_id`/`project_number` in the Terraform vars — the "trial expired, moving accounts" case). Migration builds the new environment elsewhere and **leaves the old one running until the new one is verified** (step 10) — so there is no teardown in step 2; offer it only at the end.
+   **Never infer this from how the user phrased the request** (e.g. "let's test a migration," "probemos migrar") — that kind of phrasing is often exploratory, not a firm decision. Ask it as its own explicit choice, spelling out what migration concretely requires (a real, separate `project_id` with its own billing) before asking for that project's details — don't jump straight to "what's the project_id" on an assumed target.
 3. **What to keep** — always ask about all three, one by one, and record each choice:
    - **Data** (Postgres + uploads bucket) — carry over (capture in step 1, restore in step 7) or start empty.
    - **Images** — same-project recreate: keep the registry (step 2 must not destroy it). Migration: carry them to the new registry (step 5 — copy the history, or rebuild from git tags).
@@ -55,6 +56,23 @@ docker build -t us-east1-docker.pkg.dev/training-center-502916/training-center/b
 docker push us-east1-docker.pkg.dev/training-center-502916/training-center/backend:vX.Y.Z
 ```
 This is the manual equivalent of the CI's build-and-push. The CI *deploy* job additionally runs migrations and `set image`, which fail against a brand-new cluster on its first run — that's why the initial push is manual and the app instead comes up through step 7.
+
+**Judge language images — check these too, same condition (empty registry).** The judge-worker's `prepull-language-images` init container pulls `judge-runner-{cpp20,java17,python310}:v0.1.0` from this **same registry**, so they're wiped right along with the backend image. This doesn't fail loudly here — the pod schedules fine and `dind` passes, then `prepull-language-images` crash-loops on "manifest unknown" only once a judge-worker pod actually tries to start (step 10, or KEDA's first real scale-up), which makes it easy to miss until later. Check and fix it now, not then:
+```
+gcloud artifacts docker images list <registry> --include-tags --filter="tags~^judge-runner" --limit=1
+```
+If empty, rebuild and push (from `training-and-judge-center-backend/`, Docker running locally):
+```
+bash scripts/build-judge-images.sh
+```
+then tag and push the 3 language images (not `base` — that's just an intermediate layer, never pushed):
+```
+$REG = "us-east1-docker.pkg.dev/training-center-502916/training-center"
+foreach ($lang in @("cpp20","java17","python310")) {
+  docker tag "judge-runner:$lang" "$REG/judge-runner-${lang}:v0.1.0"
+  docker push "$REG/judge-runner-${lang}:v0.1.0"
+}
+```
 
 **Migrating to another project?** The new registry starts empty. To bring the app up you only need the latest `vX.Y.Z` — build it from its git tag as above (git is the source of truth, so no version is really lost). To carry the **full image history** with exact digests instead of rebuilding, authenticate to both registries and copy the whole repo — e.g. `gcrane cp -r <old-registry> <new-registry>` (or pull / re-tag / push per image).
 
