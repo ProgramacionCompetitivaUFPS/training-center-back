@@ -6,9 +6,9 @@
 
 ### User Story 1 – Renew access token silently (Priority: P1)
 
-As a logged-in user, I want my access token to renew automatically in the background when it expires, so that I don't get logged out every 30 minutes while actively using the platform.
+As a logged-in user, I want my access token to renew automatically in the background when it expires, so that I don't get logged out every hour while actively using the platform.
 
-**Why this priority**: Without this, the short access token lifetime (30 min, see [Login](../Login/spec.md)) would force re-authentication every 30 minutes — unacceptable during a multi-hour contest or training session. This is the feature that makes a short access token lifetime viable at all.
+**Why this priority**: Without this, the short access token lifetime (1 hour, see [Login](../Login/spec.md)) would force re-authentication every hour — unacceptable during a multi-hour contest or training session. This is the feature that makes a short access token lifetime viable at all.
 
 **Independent Test**: Can be tested independently by logging in to obtain a refresh token cookie, then calling `POST /auth/refresh` directly and validating a new access token is returned and the refresh token cookie is rotated.
 
@@ -17,7 +17,7 @@ As a logged-in user, I want my access token to renew automatically in the backgr
 1. **Scenario**: Successful refresh
    - **Given** a user has a valid, non-expired refresh token cookie from a previous login
    - **When** the client calls `POST /auth/refresh`
-   - **Then** the system returns a new access token (30 min expiration)
+   - **Then** the system returns a new access token (1 hour expiration)
    - **And** the system rotates the refresh token: the old one is invalidated and a new one is set in the cookie
    - **And** the new refresh token belongs to the same session (family) as the one it replaced
    - **And** `sessionExpiresAt` in the response is unchanged from the original login — refreshing never extends the absolute ceiling
@@ -41,7 +41,7 @@ As a logged-in user, I want my access token to renew automatically in the backgr
    - **And** no new access or refresh token is issued
 
 5. **Scenario**: Rate limit exceeded
-   - **Given** the request's IP has already made 200 refresh requests in the last 10 minutes, or (once the token is resolved to a user) that user has already made 20 refresh requests in the last 10 minutes
+   - **Given** the presented token resolves to a known session, and that session's user has already made 20 refresh requests in the last 10 minutes
    - **When** another refresh request is submitted
    - **Then** the system rejects with 429 Too Many Requests (`RATE_LIMIT_EXCEEDED`)
 
@@ -118,7 +118,7 @@ Refresh successful. Returns a new access token and session metadata; sets a new 
 
 | Field | Type | Description |
 |-------|------|-------------|
-| token | string | New JWT access token (30 min expiration), same claim shape as [Login](../Login/spec.md) |
+| token | string | New JWT access token (1 hour expiration), same claim shape as [Login](../Login/spec.md) |
 | sessionExpiresAt | string (ISO 8601) | Absolute ceiling of this session, fixed at the original login — identical to the value returned by login, never extended by refreshing |
 
 **Set-Cookie**:
@@ -174,7 +174,7 @@ Rate limit exceeded.
 - **FR-007**: Every token in a session MUST carry the same absolute expiration, fixed at the original login (1 day by default, 30 days with `rememberSession` — see [Login](../Login/spec.md)); no rotation, including the grace-window path, may extend it.
 - **FR-008**: The system MUST reject refresh attempts once a session's absolute expiration has passed, regardless of grace window, forcing re-authentication.
 - **FR-009**: The system MUST re-verify the owning user's status is `ACTIVE` before issuing a new access token, independently of whether the token itself is otherwise valid.
-- **FR-010**: The system MUST rate-limit refresh attempts by IP, unconditionally and before looking up the presented token (200 requests per 10 minutes — sized to tolerate a training-center lab sharing a NAT, not to deter brute force, which is infeasible regardless against a 256-bit secret). Once the token resolves to a known session, the system MUST additionally rate-limit by the resolved `userId` (20 requests per 10 minutes).
+- **FR-010**: The system MUST rate-limit refresh attempts by the resolved `userId` (20 requests per 10 minutes), once the presented token resolves to a known session — sized to tolerate normal client-side retry behavior, not to deter brute force, which is infeasible regardless against a 256-bit secret. Rate-limiting by IP was considered and deliberately dropped: it is the only place in the codebase that would have needed one (every other rate limit here keys off an identifier already known from the request — email, userId — never a proxy-dependent header), and correctly attributing a client IP behind the project's load balancers turned out to need infrastructure-specific logic disproportionate to what it defends (cheap probing against the token-lookup query, not a hard security boundary). A general, endpoint-agnostic rate limiter — protecting this and every other public endpoint uniformly — is the intended fix if abuse is ever observed, not a per-endpoint IP check.
 - **FR-011**: The refresh token MUST never be included in the JSON response body — only delivered via `Set-Cookie`.
 - **FR-012**: Two sessions (families) belonging to the same user, created by separate logins (e.g., different devices), MUST be fully independent — revoking or rotating one MUST NOT affect the other.
 - **FR-013**: The system MUST periodically purge refresh token records that have been revoked or past their absolute expiration for more than 15 days.

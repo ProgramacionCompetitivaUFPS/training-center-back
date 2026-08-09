@@ -6,7 +6,7 @@
 
 ### User Story 1 – Login with email and password (Priority: P1)
 
-As a registered user, I want to authenticate using my email and password so that I can receive an access token to interact with the platform's protected features, and optionally stay logged in across visits without re-entering my credentials every 30 minutes.
+As a registered user, I want to authenticate using my email and password so that I can receive an access token to interact with the platform's protected features, and optionally stay logged in across visits without re-entering my credentials every hour.
 
 > **Note**: This specification covers the authentication flow. The resulting JWT access token is used across the entire system to resolve user identity (`userId`), role, and email. Renewing an expired access token without re-entering credentials is covered by [Refresh Session](../Refresh%20session/spec.md) — this spec only covers issuing the initial access + refresh token pair at login.
 
@@ -19,7 +19,7 @@ As a registered user, I want to authenticate using my email and password so that
 1. **Scenario**: Successful login
    - **Given** a user exists with ACTIVE status and valid credentials
    - **When** the user submits their email and password
-   - **Then** the system returns a JWT access token (30 min expiration) and basic user information
+   - **Then** the system returns a JWT access token (1 hour expiration) and basic user information
    - **And** the token contains the user's id, email, and role as claims
    - **And** the system sets a refresh token in an `httpOnly; Secure; SameSite=Strict` cookie, host-only scoped to the API's own domain (not shared with the frontend's domain)
    - **And** without `rememberSession` in the request, the refresh token's absolute ceiling is 1 day from login
@@ -66,7 +66,7 @@ As a registered user, I want to authenticate using my email and password so that
 - Very long password (up to bcrypt's 72-byte limit).
 - Concurrent login requests from the same user.
 - Request with extra fields in the body (should be ignored).
-- Access token expiration boundary behavior (30 min).
+- Access token expiration boundary behavior (1 hour).
 - `rememberSession` sent as a non-boolean value (should be rejected as a validation error, not silently coerced).
 - User already has an active session on another device — a new login MUST NOT revoke that device's session; each login starts an independent refresh token family (see [Refresh Session](../Refresh%20session/spec.md)).
 
@@ -136,7 +136,7 @@ The generated JWT access token MUST contain the following claims:
 | `sub` | string (UUID) | User's unique identifier (`userId`) | All endpoints that need to resolve user identity (GET /users/me, PUT /users, submissions, standings, storage paths, audit logs) |
 | `email` | string | User's email address | Endpoints that compare requester identity (e.g., "is this my own profile?") |
 | `role` | string | User's role (ADMIN, COACH, CONTESTANT) | All permission checks (Admin endpoints, group management, problem access, etc.) |
-| `exp` | integer | Token expiration time (Unix timestamp, 30 min from `iat`) | Token validation |
+| `exp` | integer | Token expiration time (Unix timestamp, 1 hour from `iat`) | Token validation |
 | `iat` | integer | Token issued at (Unix timestamp) | Token metadata |
 
 > **Why these claims?** Based on system-wide usage analysis:
@@ -199,7 +199,7 @@ Account is deactivated.
 - **FR-005**: The system MUST NOT allow login for users with DEACTIVATED status, returning 403 Forbidden.
 - **FR-006**: The system MUST return identical error messages for "user not found" and "wrong password" cases to prevent account enumeration.
 - **FR-007**: The system MUST generate a JWT access token containing `sub` (userId), `email`, `role`, `exp`, and `iat` claims upon successful authentication.
-- **FR-008**: The JWT access token MUST have a configurable expiration time (default: 30 minutes).
+- **FR-008**: The JWT access token MUST have a configurable expiration time (default: 1 hour).
 - **FR-009**: The system MUST return the access token, `sessionExpiresAt`, and user profile information (excluding `id` and `password`) upon successful login.
 - **FR-010**: The system MUST return validation, authentication, and authorization errors with a consistent structure and clear messages.
 - **FR-011**: The system MUST issue a refresh token alongside the access token on every successful login, set as an `httpOnly; Secure; SameSite=Strict` cookie, never exposed in the JSON response body.
@@ -251,7 +251,7 @@ Sessions are invalidated in the following scenarios (handled by other features):
 - **SC-002**: The system rejects login attempts with invalid credentials, returning HTTP 401 with a generic error message.
 - **SC-003**: The system rejects login attempts from deactivated accounts, returning HTTP 403.
 - **SC-004**: The system rejects login attempts with missing required fields, returning HTTP 400 with field-level validation errors.
-- **SC-005**: The JWT access token contains `sub` (userId), `email`, `role`, `exp`, and `iat` claims, with `exp` 30 minutes after `iat`.
+- **SC-005**: The JWT access token contains `sub` (userId), `email`, `role`, `exp`, and `iat` claims, with `exp` 1 hour after `iat`.
 - **SC-006**: The error message for invalid credentials does not reveal whether the email exists in the system.
 - **SC-007**: Login can be successfully completed in a single call to the API with no external dependencies.
 - **SC-008**: With `rememberSession: true`, the issued refresh token's absolute ceiling is 30 days from login; without it, 1 day.
