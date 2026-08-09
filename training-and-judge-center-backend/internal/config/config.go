@@ -1,6 +1,7 @@
 package config
 
 import (
+	"encoding/base64"
 	"log/slog"
 	"os"
 	"strconv"
@@ -10,53 +11,55 @@ import (
 )
 
 type Config struct {
-	Port               string
-	DBHost             string
-	DBPort             string
-	DBUser             string
-	DBPassword         string
-	DBName             string
-	StorageBackend     string
-	StorageLocalDir    string
-	GCSBucket          string
-	VirtualObject      *VirtualObject
-	JWTSecret          string
-	JWTExpirationHours int
-	SMTPHost           string
-	SMTPPort           string
-	SMTPUser           string
-	SMTPPassword       string
-	SMTPFrom           string
-	RedisURL           string
-	RabbitMQURL        string
-	AllowedOrigins     []string
-	FrontendBaseURL    string
+	Port                       string
+	DBHost                     string
+	DBPort                     string
+	DBUser                     string
+	DBPassword                 string
+	DBName                     string
+	StorageBackend             string
+	StorageLocalDir            string
+	GCSBucket                  string
+	VirtualObject              *VirtualObject
+	JWTSecret                  string
+	JWTExpirationHours         int
+	SMTPHost                   string
+	SMTPPort                   string
+	SMTPUser                   string
+	SMTPPassword               string
+	SMTPFrom                   string
+	RedisURL                   string
+	RabbitMQURL                string
+	AllowedOrigins             []string
+	FrontendBaseURL            string
+	RotationCacheEncryptionKey []byte // 32 raw bytes, decoded from base64
 }
 
 func Load() *Config {
 	_ = godotenv.Load()
 	return &Config{
-		Port:               getEnv("PORT", "8080"),
-		DBHost:             getEnv("DB_HOST", "localhost"),
-		DBPort:             getEnv("DB_PORT", "5432"),
-		DBUser:             getEnv("DB_USER", "postgres"),
-		DBPassword:         getEnv("DB_PASSWORD", "postgres"),
-		DBName:             getEnv("DB_NAME", "training_center"),
-		StorageBackend:     getEnv("STORAGE_BACKEND", "local"),
-		StorageLocalDir:    getEnv("STORAGE_LOCAL_DIR", ".local_storage"),
-		GCSBucket:          getEnv("GCS_BUCKET", ""),
-		VirtualObject:      loadVirtualObject(),
-		JWTSecret:          getRequiredEnv("JWT_SECRET"),
-		JWTExpirationHours: getEnvAsInt("JWT_EXPIRATION_HOURS", 24),
-		SMTPHost:           getEnv("SMTP_HOST", "localhost"),
-		SMTPPort:           getEnv("SMTP_PORT", "1025"),
-		SMTPUser:           getEnv("SMTP_USER", ""),
-		SMTPPassword:       getEnv("SMTP_PASSWORD", ""),
-		SMTPFrom:           getEnv("SMTP_FROM", "noreply@trainingcenter.com"),
-		RedisURL:           getEnv("REDIS_URL", "localhost:6379"),
-		RabbitMQURL:        getEnv("RABBITMQ_URL", ""),
-		AllowedOrigins:     getEnvAsSlice("ALLOWED_ORIGINS", "http://localhost:5173"),
-		FrontendBaseURL:    getEnv("FRONTEND_BASE_URL", "http://localhost:5173"),
+		Port:                       getEnv("PORT", "8080"),
+		DBHost:                     getEnv("DB_HOST", "localhost"),
+		DBPort:                     getEnv("DB_PORT", "5432"),
+		DBUser:                     getEnv("DB_USER", "postgres"),
+		DBPassword:                 getEnv("DB_PASSWORD", "postgres"),
+		DBName:                     getEnv("DB_NAME", "training_center"),
+		StorageBackend:             getEnv("STORAGE_BACKEND", "local"),
+		StorageLocalDir:            getEnv("STORAGE_LOCAL_DIR", ".local_storage"),
+		GCSBucket:                  getEnv("GCS_BUCKET", ""),
+		VirtualObject:              loadVirtualObject(),
+		JWTSecret:                  getRequiredEnv("JWT_SECRET"),
+		JWTExpirationHours:         getEnvAsInt("JWT_EXPIRATION_HOURS", 24),
+		SMTPHost:                   getEnv("SMTP_HOST", "localhost"),
+		SMTPPort:                   getEnv("SMTP_PORT", "1025"),
+		SMTPUser:                   getEnv("SMTP_USER", ""),
+		SMTPPassword:               getEnv("SMTP_PASSWORD", ""),
+		SMTPFrom:                   getEnv("SMTP_FROM", "noreply@trainingcenter.com"),
+		RedisURL:                   getEnv("REDIS_URL", "localhost:6379"),
+		RabbitMQURL:                getEnv("RABBITMQ_URL", ""),
+		AllowedOrigins:             getEnvAsSlice("ALLOWED_ORIGINS", "http://localhost:5173"),
+		FrontendBaseURL:            getEnv("FRONTEND_BASE_URL", "http://localhost:5173"),
+		RotationCacheEncryptionKey: getRequiredBase64Env("ROTATION_CACHE_ENCRYPTION_KEY"),
 	}
 }
 
@@ -67,6 +70,15 @@ func getRequiredEnv(key string) string {
 		os.Exit(1)
 	}
 	return value
+}
+
+func getRequiredBase64Env(key string) []byte {
+	decoded, err := base64.StdEncoding.DecodeString(getRequiredEnv(key))
+	if err != nil {
+		slog.Error("environment variable is not valid base64 — application cannot start", "key", key, "error", err)
+		os.Exit(1)
+	}
+	return decoded
 }
 
 func getEnv(key, fallback string) string {
