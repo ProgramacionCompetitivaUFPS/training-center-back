@@ -114,7 +114,7 @@ Resolve the image to deploy (latest `v*` tag in the registry) and substitute `__
 2. infra — `infra/postgres.yaml`, `infra/redis.yaml`, `infra/rabbitmq.yaml`; wait `rollout status statefulset/postgres` and `statefulset/rabbitmq`.
 3. app — `app/serviceaccount.yaml`, `app/configmap.yaml`; delete + apply `app/migrate-job.yaml` and `app/seed-job.yaml`; `kubectl wait --for=condition=complete` both; then `app/api.yaml`.
 4. KEDA — install the operator manifest (`v2.20.1`), wait `deployment/keda-operator` available; then `judge/worker.yaml` and `judge/keda.yaml`.
-5. `ingress/ingress.yaml` and `infra/backup-cronjob.yaml`.
+5. `ingress/ingress.yaml`, `infra/backup-cronjob.yaml`, and `app/cleanup-sessions-cronjob.yaml` (templated — needs `__IMAGE__` resolved same as `api.yaml`/`worker.yaml`).
 
 **Keeping data (from step 0)?** Only when the user chose to preserve or migrate data. Fold these into item 3:
 - **Postgres** — the dump from step 1 already holds the full schema and all data (the admin user included). Sequence it carefully: Postgres comes up empty (item 2) → **restore the dump into it** (`psql`/`pg_restore` into the Postgres pod) → run the `migrate` job (it no-ops if the dump is already at the current schema, or applies any newer migrations on top if not) → **skip the `seed` job** (the admin already exists in the dump) → then `api`. Confirm the exact order with the user; restoring at the wrong point collides with the jobs.
