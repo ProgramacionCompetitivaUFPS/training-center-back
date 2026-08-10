@@ -35,6 +35,7 @@ func TestUpdatePassword_Success_Returns204(t *testing.T) {
 		&mockHandlerEmailSender{},
 		&mockHandlerSessionInvalidator{},
 		&mockHandlerRateLimiter{},
+		&mockHandlerRefreshTokenRepo{},
 	)
 	h := newHandlerWithUpdatePassword(uc)
 	wrapped := wrapWithAuth(
@@ -74,6 +75,7 @@ func TestUpdatePassword_SessionsNotInvalidated_Returns200WithCode(t *testing.T) 
 		&mockHandlerEmailSender{},
 		sessionInvalidator,
 		&mockHandlerRateLimiter{},
+		&mockHandlerRefreshTokenRepo{},
 	)
 	h := newHandlerWithUpdatePassword(uc)
 	wrapped := wrapWithAuth(

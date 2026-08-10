@@ -47,7 +47,7 @@ func TestResetPassword_GuardRejectsInvalidInputs_Returns400(t *testing.T) {
 		{"empty newPassword", "user@example.com", "123456", ""},
 	}
 
-	uc := appuser.NewResetPasswordUseCase(nil, nil, nil, nil)
+	uc := appuser.NewResetPasswordUseCase(nil, nil, nil, nil, nil)
 	h := newHandlerWithResetPassword(uc)
 
 	for _, tc := range cases {
@@ -96,6 +96,7 @@ func TestResetPassword_SessionsNotInvalidated_Returns200WithCode(t *testing.T) {
 		recoveryRepo,
 		sessionInvalidator,
 		&mockHandlerTxManager{},
+		&mockHandlerRefreshTokenRepo{},
 	)
 	h := newHandlerWithResetPassword(uc)
 
@@ -138,6 +139,7 @@ func TestResetPassword_Success_Returns200WithMessage(t *testing.T) {
 		recoveryRepo,
 		&mockHandlerSessionInvalidator{},
 		&mockHandlerTxManager{},
+		&mockHandlerRefreshTokenRepo{},
 	)
 	h := newHandlerWithResetPassword(uc)
 

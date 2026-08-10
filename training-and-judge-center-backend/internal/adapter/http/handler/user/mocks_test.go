@@ -178,6 +178,36 @@ func (m *mockHandlerTxManager) WithTx(ctx context.Context, fn func(context.Conte
 	return fn(ctx)
 }
 
+// mockHandlerRefreshTokenRepo implements domainuser.RefreshTokenRepository for handler tests.
+type mockHandlerRefreshTokenRepo struct {
+	revokeAllByUserIDFn func(ctx context.Context, userID string, now time.Time) error
+}
+
+func (m *mockHandlerRefreshTokenRepo) Save(_ context.Context, _ *domainuser.RefreshToken) error {
+	return nil
+}
+func (m *mockHandlerRefreshTokenRepo) FindByTokenHash(_ context.Context, _ string) (*domainuser.RefreshToken, error) {
+	return nil, nil
+}
+func (m *mockHandlerRefreshTokenRepo) FindActiveByFamilyID(_ context.Context, _ string) (*domainuser.RefreshToken, error) {
+	return nil, nil
+}
+func (m *mockHandlerRefreshTokenRepo) Rotate(_ context.Context, _ string, _ *domainuser.RefreshToken) (bool, error) {
+	return false, nil
+}
+func (m *mockHandlerRefreshTokenRepo) RevokeByFamilyID(_ context.Context, _ string, _ time.Time) error {
+	return nil
+}
+func (m *mockHandlerRefreshTokenRepo) RevokeAllByUserID(ctx context.Context, userID string, now time.Time) error {
+	if m.revokeAllByUserIDFn != nil {
+		return m.revokeAllByUserIDFn(ctx, userID, now)
+	}
+	return nil
+}
+func (m *mockHandlerRefreshTokenRepo) DeleteRevokedOrExpiredBefore(_ context.Context, _ time.Time) error {
+	return nil
+}
+
 // ── dashboard provider mocks ──────────────────────────────────────────────────
 
 type mockDashboardSubmissionProvider struct {
