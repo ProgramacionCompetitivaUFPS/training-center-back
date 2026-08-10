@@ -25,14 +25,16 @@ type UpdatePasswordUseCase struct {
 	emailSender        appshared.EmailSender
 	sessionInvalidator user.SessionInvalidator
 	rateLimiter        appshared.RateLimiter
+	refreshTokenRepo   user.RefreshTokenRepository
 }
 
-func NewUpdatePasswordUseCase(repo user.Repository, email appshared.EmailSender, sessionInvalidator user.SessionInvalidator, rateLimiter appshared.RateLimiter) *UpdatePasswordUseCase {
+func NewUpdatePasswordUseCase(repo user.Repository, email appshared.EmailSender, sessionInvalidator user.SessionInvalidator, rateLimiter appshared.RateLimiter, refreshTokenRepo user.RefreshTokenRepository) *UpdatePasswordUseCase {
 	return &UpdatePasswordUseCase{
 		repo:               repo,
 		emailSender:        email,
 		sessionInvalidator: sessionInvalidator,
 		rateLimiter:        rateLimiter,
+		refreshTokenRepo:   refreshTokenRepo,
 	}
 }
 
@@ -92,6 +94,10 @@ func (uc *UpdatePasswordUseCase) Execute(ctx context.Context, input UpdatePasswo
 	sessionsInvalidated := true
 	if err := uc.sessionInvalidator.InvalidateAllUserSessions(ctx, foundUser.ID(), now); err != nil {
 		sessionsInvalidated = false
+	}
+	if err := uc.refreshTokenRepo.RevokeAllByUserID(ctx, foundUser.ID(), now); err != nil {
+		// best-effort: password already saved, don't fail the operation.
+		slog.ErrorContext(ctx, "failed to revoke refresh tokens after password update", "user_id", foundUser.ID(), "error", err)
 	}
 
 	_ = uc.emailSender.Send(ctx, appshared.EmailMessage{

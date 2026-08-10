@@ -83,7 +83,7 @@ func TestConfirmDeactivation_InvalidCodes_Return400(t *testing.T) {
 	}
 
 	// Arrange: use case with nil repos — it must never be called for these inputs.
-	uc := appuser.NewConfirmDeactivationUseCase(nil, nil, nil, nil, nil, nil)
+	uc := appuser.NewConfirmDeactivationUseCase(nil, nil, nil, nil, nil, nil, nil)
 	h := newHandlerWithConfirmDeactivation(uc)
 	wrapped := wrapWithAuth(
 		http.HandlerFunc(h.ConfirmDeactivation),
@@ -134,6 +134,7 @@ func TestConfirmDeactivation_ValidSixDigitCode_Returns204(t *testing.T) {
 		&mockHandlerEmailSender{},
 		&mockHandlerSessionInvalidator{},
 		&mockHandlerTxManager{},
+		&mockHandlerRefreshTokenRepo{},
 	)
 	h := newHandlerWithConfirmDeactivation(uc)
 	wrapped := wrapWithAuth(

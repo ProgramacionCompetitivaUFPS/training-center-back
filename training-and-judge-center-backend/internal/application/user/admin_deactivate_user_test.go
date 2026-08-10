@@ -29,7 +29,7 @@ func TestAdminDeactivateUser_Success(t *testing.T) {
 			return nil
 		},
 	}
-	uc := NewAdminDeactivateUserUseCase(repo, invalidator)
+	uc := NewAdminDeactivateUserUseCase(repo, invalidator, &mockRefreshTokenRepository{})
 
 	err := uc.Execute(context.Background(), AdminDeactivateUserInput{RequesterID: "admin-1", TargetID: "target-1"})
 	if err != nil {
@@ -54,7 +54,7 @@ func TestAdminDeactivateUser_Success(t *testing.T) {
 
 func TestAdminDeactivateUser_SelfDeactivation(t *testing.T) {
 	repo := newNoConflictRepo()
-	uc := NewAdminDeactivateUserUseCase(repo, &mockSessionInvalidator{})
+	uc := NewAdminDeactivateUserUseCase(repo, &mockSessionInvalidator{}, &mockRefreshTokenRepository{})
 
 	err := uc.Execute(context.Background(), AdminDeactivateUserInput{RequesterID: "admin-1", TargetID: "admin-1"})
 	if err == nil {
@@ -74,7 +74,7 @@ func TestAdminDeactivateUser_SelfDeactivation(t *testing.T) {
 
 func TestAdminDeactivateUser_TargetNotFound(t *testing.T) {
 	repo := newNoConflictRepo()
-	uc := NewAdminDeactivateUserUseCase(repo, &mockSessionInvalidator{})
+	uc := NewAdminDeactivateUserUseCase(repo, &mockSessionInvalidator{}, &mockRefreshTokenRepository{})
 
 	err := uc.Execute(context.Background(), AdminDeactivateUserInput{RequesterID: "admin-1", TargetID: "nonexistent"})
 	if err == nil {
@@ -92,7 +92,7 @@ func TestAdminDeactivateUser_CannotDeactivateAdmin(t *testing.T) {
 	repo.findByIDFn = func(_ context.Context, _ string) (*domain.User, error) {
 		return adminTarget, nil
 	}
-	uc := NewAdminDeactivateUserUseCase(repo, &mockSessionInvalidator{})
+	uc := NewAdminDeactivateUserUseCase(repo, &mockSessionInvalidator{}, &mockRefreshTokenRepository{})
 
 	err := uc.Execute(context.Background(), AdminDeactivateUserInput{RequesterID: "admin-1", TargetID: "admin-2"})
 	if err == nil {
@@ -121,7 +121,7 @@ func TestAdminDeactivateUser_AlreadyDeactivated_Idempotent(t *testing.T) {
 		updateCalled = true
 		return nil
 	}
-	uc := NewAdminDeactivateUserUseCase(repo, &mockSessionInvalidator{})
+	uc := NewAdminDeactivateUserUseCase(repo, &mockSessionInvalidator{}, &mockRefreshTokenRepository{})
 
 	err := uc.Execute(context.Background(), AdminDeactivateUserInput{RequesterID: "admin-1", TargetID: "target-1"})
 	if err != nil {
@@ -137,7 +137,7 @@ func TestAdminDeactivateUser_RepositoryFindError(t *testing.T) {
 	repo.findByIDFn = func(_ context.Context, _ string) (*domain.User, error) {
 		return nil, apperror.NewInternal()
 	}
-	uc := NewAdminDeactivateUserUseCase(repo, &mockSessionInvalidator{})
+	uc := NewAdminDeactivateUserUseCase(repo, &mockSessionInvalidator{}, &mockRefreshTokenRepository{})
 
 	err := uc.Execute(context.Background(), AdminDeactivateUserInput{RequesterID: "admin-1", TargetID: "target-1"})
 	if err == nil {
@@ -165,7 +165,7 @@ func TestAdminDeactivateUser_SessionInvalidationError_DoesNotPersist(t *testing.
 			return apperror.NewInternal()
 		},
 	}
-	uc := NewAdminDeactivateUserUseCase(repo, invalidator)
+	uc := NewAdminDeactivateUserUseCase(repo, invalidator, &mockRefreshTokenRepository{})
 
 	err := uc.Execute(context.Background(), AdminDeactivateUserInput{RequesterID: "admin-1", TargetID: "target-1"})
 	if err == nil {
@@ -180,6 +180,37 @@ func TestAdminDeactivateUser_SessionInvalidationError_DoesNotPersist(t *testing.
 	}
 }
 
+func TestAdminDeactivateUser_RevokeRefreshTokensError_DoesNotPersist(t *testing.T) {
+	repo := newNoConflictRepo()
+	target := newUserWithRole("target-1", shared.RoleContestant, domain.StatusActive)
+	repo.findByIDFn = func(_ context.Context, _ string) (*domain.User, error) {
+		return target, nil
+	}
+	updateCalled := false
+	repo.updateFn = func(_ context.Context, _ *domain.User) error {
+		updateCalled = true
+		return nil
+	}
+	refreshTokenRepo := &mockRefreshTokenRepository{
+		revokeAllByUserIDFn: func(_ context.Context, _ string, _ time.Time) error {
+			return apperror.NewInternal()
+		},
+	}
+	uc := NewAdminDeactivateUserUseCase(repo, &mockSessionInvalidator{}, refreshTokenRepo)
+
+	err := uc.Execute(context.Background(), AdminDeactivateUserInput{RequesterID: "admin-1", TargetID: "target-1"})
+	if err == nil {
+		t.Fatal("expected error when refresh token revocation fails, got nil")
+	}
+	appErr := err.(*apperror.AppError)
+	if appErr.Code != apperror.ErrCodeInternalError {
+		t.Errorf("expected code INTERNAL_ERROR, got %q", appErr.Code)
+	}
+	if updateCalled {
+		t.Error("repo.Update must NOT be called when refresh token revocation fails (DB write never happens)")
+	}
+}
+
 func TestAdminDeactivateUser_RepositoryUpdateError(t *testing.T) {
 	repo := newNoConflictRepo()
 	target := newUserWithRole("target-1", shared.RoleContestant, domain.StatusActive)
@@ -189,7 +220,7 @@ func TestAdminDeactivateUser_RepositoryUpdateError(t *testing.T) {
 	repo.updateFn = func(_ context.Context, _ *domain.User) error {
 		return apperror.NewInternal()
 	}
-	uc := NewAdminDeactivateUserUseCase(repo, &mockSessionInvalidator{})
+	uc := NewAdminDeactivateUserUseCase(repo, &mockSessionInvalidator{}, &mockRefreshTokenRepository{})
 
 	err := uc.Execute(context.Background(), AdminDeactivateUserInput{RequesterID: "admin-1", TargetID: "target-1"})
 	if err == nil {

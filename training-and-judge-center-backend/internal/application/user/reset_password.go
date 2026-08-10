@@ -26,6 +26,7 @@ type ResetPasswordUseCase struct {
 	recoveryRepo       user.PasswordRecoveryRepository
 	sessionInvalidator user.SessionInvalidator
 	txManager          appshared.TransactionManager
+	refreshTokenRepo   user.RefreshTokenRepository
 }
 
 func NewResetPasswordUseCase(
@@ -33,12 +34,14 @@ func NewResetPasswordUseCase(
 	recoveryRepo user.PasswordRecoveryRepository,
 	sessionInvalidator user.SessionInvalidator,
 	txManager appshared.TransactionManager,
+	refreshTokenRepo user.RefreshTokenRepository,
 ) *ResetPasswordUseCase {
 	return &ResetPasswordUseCase{
 		userRepo:           userRepo,
 		recoveryRepo:       recoveryRepo,
 		sessionInvalidator: sessionInvalidator,
 		txManager:          txManager,
+		refreshTokenRepo:   refreshTokenRepo,
 	}
 }
 
@@ -101,6 +104,10 @@ func (uc *ResetPasswordUseCase) Execute(ctx context.Context, input ResetPassword
 	sessionsInvalidated := true
 	if err := uc.sessionInvalidator.InvalidateAllUserSessions(ctx, foundUser.ID(), now); err != nil {
 		sessionsInvalidated = false
+	}
+	if err := uc.refreshTokenRepo.RevokeAllByUserID(ctx, foundUser.ID(), now); err != nil {
+		// best-effort: password already saved, don't fail the operation.
+		slog.ErrorContext(ctx, "failed to revoke refresh tokens after password reset", "user_id", foundUser.ID(), "error", err)
 	}
 
 	return &ResetPasswordOutput{SessionsInvalidated: sessionsInvalidated}, nil
