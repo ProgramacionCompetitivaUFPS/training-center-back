@@ -113,9 +113,10 @@ kubectl wait --for=condition=available deployment/keda-operator -n keda --timeou
 Apply-Tpl "judge/worker.yaml"
 kubectl apply -f "$K8S/judge/keda.yaml"
 
-# 6. Ingress + backup programado
-Write-Host "==> Ingress + backup" -ForegroundColor Cyan
+# 6. Ingress + backup programado + limpieza de refresh tokens
+Write-Host "==> Ingress + backup + cleanup-sessions" -ForegroundColor Cyan
 kubectl apply -f "$K8S/ingress/ingress.yaml" -f "$K8S/infra/backup-cronjob.yaml"
+Apply-Tpl "app/cleanup-sessions-cronjob.yaml"
 
 # 7. NetworkPolicy (endurecimiento: default-deny ingress + allows de los flujos reales).
 #    Solo se aplican de verdad en un cluster con Dataplane V2.
