@@ -2,7 +2,9 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
+	"math"
 	"os"
 	"strconv"
 	"time"
@@ -17,7 +19,11 @@ func main() {
 	_ = godotenv.Load()
 	ctx := context.Background()
 
-	retentionDays := getEnvAsInt("CLEANUP_RETENTION_DAYS", 15)
+	retentionDays, err := getEnvAsPositiveInt("CLEANUP_RETENTION_DAYS", 15)
+	if err != nil {
+		slog.Error("cleanup-sessions: invalid CLEANUP_RETENTION_DAYS", "error", err)
+		os.Exit(1)
+	}
 
 	cfg := &config.Config{
 		DBHost:     getEnv("DB_HOST", "localhost"),
@@ -52,11 +58,20 @@ func getEnv(key, fallback string) string {
 	return fallback
 }
 
-func getEnvAsInt(key string, fallback int) int {
-	if v := os.Getenv(key); v != "" {
-		if intVal, err := strconv.Atoi(v); err == nil {
-			return intVal
-		}
+func getEnvAsPositiveInt(key string, fallback int) (int, error) {
+	v := os.Getenv(key)
+	if v == "" {
+		return fallback, nil
 	}
-	return fallback
+	intVal, err := strconv.Atoi(v)
+	if err != nil {
+		return 0, fmt.Errorf("%s: %w", key, err)
+	}
+	if intVal < 1 {
+		return 0, fmt.Errorf("%s must be >= 1, got %d", key, intVal)
+	}
+	if intVal > math.MaxInt/24 {
+		return 0, fmt.Errorf("%s is too large: %d", key, intVal)
+	}
+	return intVal, nil
 }
