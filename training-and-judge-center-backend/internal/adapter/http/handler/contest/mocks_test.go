@@ -7,7 +7,6 @@ import (
 	"net/http/httptest"
 	"time"
 
-	"github.com/training-judge-center/backend/internal/adapter/auth"
 	"github.com/training-judge-center/backend/internal/adapter/http/middleware"
 	appcontest "github.com/training-judge-center/backend/internal/application/contest"
 	domainContest "github.com/training-judge-center/backend/internal/domain/contest"
@@ -40,7 +39,7 @@ func authedRequest(method, target string, body []byte) *http.Request {
 }
 
 func wrapAuth(h http.Handler) http.Handler {
-	return middleware.Auth(&mockTokenSvc{}, &auth.NoOpSessionInvalidator{})(h)
+	return middleware.Auth(&mockTokenSvc{}, noopSessionInvalidator{})(h)
 }
 
 // ── Mock dependencies ────────────────────────────────────────────────────────
@@ -338,4 +337,21 @@ func finishedContest() *domainContest.Contest {
 		time.Now(),
 		nil,
 	)
+}
+
+// noopSessionInvalidator is a package-local no-op user.SessionInvalidator so
+// handler tests do not depend on the sibling adapter/auth package.
+type noopSessionInvalidator struct{}
+
+func (noopSessionInvalidator) InvalidateAllUserSessions(context.Context, string, time.Time) error {
+	return nil
+}
+func (noopSessionInvalidator) IsAllUserSessionRevoked(context.Context, string, time.Time) (bool, error) {
+	return false, nil
+}
+func (noopSessionInvalidator) InvalidateSession(context.Context, string, time.Time) error {
+	return nil
+}
+func (noopSessionInvalidator) IsSessionInvalidated(context.Context, string, time.Time) (bool, error) {
+	return false, nil
 }

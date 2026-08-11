@@ -8,7 +8,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/training-judge-center/backend/internal/adapter/auth"
 	appshared "github.com/training-judge-center/backend/internal/application/shared"
 	"github.com/training-judge-center/backend/internal/domain/shared"
 	"github.com/training-judge-center/backend/internal/domain/user"
@@ -40,7 +39,7 @@ func alwaysValidTokenSvc() *mockTokenService {
 
 func TestAuth_MissingAuthorizationHeader(t *testing.T) {
 	// Arrange
-	handler := Auth(alwaysValidTokenSvc(), &auth.NoOpSessionInvalidator{})(okHandler())
+	handler := Auth(alwaysValidTokenSvc(), &mockSessionInvalidator{})(okHandler())
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
 	rr := httptest.NewRecorder()
 
@@ -55,7 +54,7 @@ func TestAuth_MissingAuthorizationHeader(t *testing.T) {
 
 func TestAuth_MalformedBearerPrefix(t *testing.T) {
 	// Arrange — "BearerXYZ" without the required space after "Bearer"
-	handler := Auth(alwaysValidTokenSvc(), &auth.NoOpSessionInvalidator{})(okHandler())
+	handler := Auth(alwaysValidTokenSvc(), &mockSessionInvalidator{})(okHandler())
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
 	req.Header.Set("Authorization", "BearerXYZ some-token")
 	rr := httptest.NewRecorder()
@@ -76,7 +75,7 @@ func TestAuth_InvalidToken(t *testing.T) {
 			return nil, errors.New("invalid signature")
 		},
 	}
-	handler := Auth(tokenSvc, &auth.NoOpSessionInvalidator{})(okHandler())
+	handler := Auth(tokenSvc, &mockSessionInvalidator{})(okHandler())
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
 	req.Header.Set("Authorization", "Bearer bad.token.here")
 	rr := httptest.NewRecorder()
@@ -225,7 +224,7 @@ func TestAuth_ValidToken_CurrentUserInContext(t *testing.T) {
 	capturingHandler := http.HandlerFunc(func(_ http.ResponseWriter, r *http.Request) {
 		capturedUser, capturedOk = GetCurrentUser(r.Context())
 	})
-	handler := Auth(tokenSvc, &auth.NoOpSessionInvalidator{})(capturingHandler)
+	handler := Auth(tokenSvc, &mockSessionInvalidator{})(capturingHandler)
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
 	req.Header.Set("Authorization", "Bearer valid.token.here")
 	rr := httptest.NewRecorder()

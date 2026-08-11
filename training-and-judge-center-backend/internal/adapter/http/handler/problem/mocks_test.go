@@ -7,7 +7,6 @@ import (
 	"net/http/httptest"
 	"time"
 
-	"github.com/training-judge-center/backend/internal/adapter/auth"
 	"github.com/training-judge-center/backend/internal/adapter/http/middleware"
 	appProblem "github.com/training-judge-center/backend/internal/application/problem"
 	domainProblem "github.com/training-judge-center/backend/internal/domain/problem"
@@ -42,7 +41,7 @@ func authedRequest(method, target string, body []byte) *http.Request {
 }
 
 func wrapAuth(h http.Handler) http.Handler {
-	return middleware.Auth(&mockTokenSvc{}, &auth.NoOpSessionInvalidator{})(h)
+	return middleware.Auth(&mockTokenSvc{}, noopSessionInvalidator{})(h)
 }
 
 // ── Problem repository mock ──────────────────────────────────────────────────
@@ -81,7 +80,7 @@ func (m *mockStatsProvider) GetByProblemID(_ context.Context, _ string) (*appPro
 
 type mockFileStorageH struct{}
 
-func (m *mockFileStorageH) UploadFile(_ context.Context, _ string, _ []byte) error { return nil }
+func (m *mockFileStorageH) UploadFile(_ context.Context, _ string, _ []byte) error  { return nil }
 func (m *mockFileStorageH) DeleteFile(_ context.Context, _ string) error            { return nil }
 func (m *mockFileStorageH) DeleteFilesWithPrefix(_ context.Context, _ string) error { return nil }
 
@@ -271,4 +270,21 @@ func repoReturning(p *domainProblem.Problem) *mockProblemRepo {
 			return p, nil
 		},
 	}
+}
+
+// noopSessionInvalidator is a package-local no-op user.SessionInvalidator so
+// handler tests do not depend on the sibling adapter/auth package.
+type noopSessionInvalidator struct{}
+
+func (noopSessionInvalidator) InvalidateAllUserSessions(context.Context, string, time.Time) error {
+	return nil
+}
+func (noopSessionInvalidator) IsAllUserSessionRevoked(context.Context, string, time.Time) (bool, error) {
+	return false, nil
+}
+func (noopSessionInvalidator) InvalidateSession(context.Context, string, time.Time) error {
+	return nil
+}
+func (noopSessionInvalidator) IsSessionInvalidated(context.Context, string, time.Time) (bool, error) {
+	return false, nil
 }

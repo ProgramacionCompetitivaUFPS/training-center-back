@@ -84,6 +84,19 @@ func TestGenerateAndValidateToken_SessionIDRoundTrips(t *testing.T) {
 	if claims.SessionID != "family-xyz" {
 		t.Errorf("SessionID: got %q, want %q", claims.SessionID, "family-xyz")
 	}
+
+	// Assert — parse as generic claims to pin the raw claim name "sid"; a
+	// round-trip through jwtCustomClaims alone would not catch a JSON-tag change
+	token, err := jwt.ParseWithClaims(tokenStr, jwt.MapClaims{}, func(token *jwt.Token) (any, error) {
+		return []byte("test-secret"), nil
+	})
+	if err != nil {
+		t.Fatalf("could not parse generated token: %v", err)
+	}
+	rawClaims := token.Claims.(jwt.MapClaims)
+	if rawClaims["sid"] != "family-xyz" {
+		t.Errorf("raw sid claim: got %v, want %q", rawClaims["sid"], "family-xyz")
+	}
 }
 
 func TestValidateToken_ValidToken(t *testing.T) {

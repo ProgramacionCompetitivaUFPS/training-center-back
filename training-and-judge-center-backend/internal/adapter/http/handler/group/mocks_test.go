@@ -7,7 +7,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/training-judge-center/backend/internal/adapter/auth"
 	"github.com/training-judge-center/backend/internal/adapter/http/middleware"
 	appGroup "github.com/training-judge-center/backend/internal/application/group"
 	appshared "github.com/training-judge-center/backend/internal/application/shared"
@@ -256,11 +255,11 @@ func authedPostRequest(target, body string) *http.Request {
 }
 
 func wrapAuth(h http.Handler) http.Handler {
-	return middleware.Auth(&mockTokenSvc{}, &auth.NoOpSessionInvalidator{})(h)
+	return middleware.Auth(&mockTokenSvc{}, noopSessionInvalidator{})(h)
 }
 
 func wrapAuthAsAdmin(h http.Handler) http.Handler {
-	return middleware.Auth(&mockAdminTokenSvc{}, &auth.NoOpSessionInvalidator{})(h)
+	return middleware.Auth(&mockAdminTokenSvc{}, noopSessionInvalidator{})(h)
 }
 
 // â”€â”€ shared fixtures â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
@@ -301,4 +300,21 @@ func mockHandler() *Handler {
 		nil, /* deleteGroup */
 		nil, /* updateGroup */
 	)
+}
+
+// noopSessionInvalidator is a package-local no-op user.SessionInvalidator so
+// handler tests do not depend on the sibling adapter/auth package.
+type noopSessionInvalidator struct{}
+
+func (noopSessionInvalidator) InvalidateAllUserSessions(context.Context, string, time.Time) error {
+	return nil
+}
+func (noopSessionInvalidator) IsAllUserSessionRevoked(context.Context, string, time.Time) (bool, error) {
+	return false, nil
+}
+func (noopSessionInvalidator) InvalidateSession(context.Context, string, time.Time) error {
+	return nil
+}
+func (noopSessionInvalidator) IsSessionInvalidated(context.Context, string, time.Time) (bool, error) {
+	return false, nil
 }
