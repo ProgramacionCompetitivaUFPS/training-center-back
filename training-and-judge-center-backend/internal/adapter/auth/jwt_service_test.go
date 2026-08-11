@@ -35,7 +35,7 @@ func TestGenerateToken_ClaimsPresent(t *testing.T) {
 	u := testUser()
 
 	// Act
-	tokenStr, err := svc.GenerateToken(context.Background(), u)
+	tokenStr, err := svc.GenerateToken(context.Background(), u, "family-abc")
 	if err != nil {
 		t.Fatalf("GenerateToken returned unexpected error: %v", err)
 	}
@@ -65,11 +65,32 @@ func TestGenerateToken_ClaimsPresent(t *testing.T) {
 	}
 }
 
+func TestGenerateAndValidateToken_SessionIDRoundTrips(t *testing.T) {
+	// Arrange
+	svc := NewJWTService("test-secret", 1)
+	u := testUser()
+
+	// Act
+	tokenStr, err := svc.GenerateToken(context.Background(), u, "family-xyz")
+	if err != nil {
+		t.Fatalf("GenerateToken returned unexpected error: %v", err)
+	}
+	claims, err := svc.ValidateToken(tokenStr)
+
+	// Assert
+	if err != nil {
+		t.Fatalf("ValidateToken returned unexpected error: %v", err)
+	}
+	if claims.SessionID != "family-xyz" {
+		t.Errorf("SessionID: got %q, want %q", claims.SessionID, "family-xyz")
+	}
+}
+
 func TestValidateToken_ValidToken(t *testing.T) {
 	// Arrange
 	svc := NewJWTService("test-secret", 1)
 	u := testUser()
-	tokenStr, err := svc.GenerateToken(context.Background(), u)
+	tokenStr, err := svc.GenerateToken(context.Background(), u, "family-abc")
 	if err != nil {
 		t.Fatalf("GenerateToken returned unexpected error: %v", err)
 	}
@@ -101,7 +122,7 @@ func TestGenerateToken_ExpirationHonored(t *testing.T) {
 	u := testUser()
 
 	// Act
-	tokenStr, err := svc.GenerateToken(context.Background(), u)
+	tokenStr, err := svc.GenerateToken(context.Background(), u, "family-abc")
 	if err != nil {
 		t.Fatalf("GenerateToken returned unexpected error: %v", err)
 	}
@@ -124,7 +145,7 @@ func TestValidateToken_ExpiredToken(t *testing.T) {
 	// Arrange — negative expiration produces a token already expired
 	svc := NewJWTService("test-secret", -1)
 	u := testUser()
-	tokenStr, err := svc.GenerateToken(context.Background(), u)
+	tokenStr, err := svc.GenerateToken(context.Background(), u, "family-abc")
 	if err != nil {
 		t.Fatalf("GenerateToken returned unexpected error: %v", err)
 	}
@@ -143,7 +164,7 @@ func TestValidateToken_WrongSigningKey(t *testing.T) {
 	generator := NewJWTService("original-secret", 1)
 	validator := NewJWTService("different-secret", 1)
 	u := testUser()
-	tokenStr, _ := generator.GenerateToken(context.Background(), u)
+	tokenStr, _ := generator.GenerateToken(context.Background(), u, "family-abc")
 
 	// Act
 	_, err := validator.ValidateToken(tokenStr)
@@ -192,7 +213,7 @@ func TestValidateToken_TamperedPayload(t *testing.T) {
 	// Arrange — generate a valid token then replace the payload with forged claims
 	svc := NewJWTService("test-secret", 1)
 	u := testUser()
-	tokenStr, _ := svc.GenerateToken(context.Background(), u)
+	tokenStr, _ := svc.GenerateToken(context.Background(), u, "family-abc")
 
 	parts := strings.Split(tokenStr, ".")
 	forgedPayload := fmt.Sprintf(

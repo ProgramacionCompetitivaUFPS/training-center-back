@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/training-judge-center/backend/internal/adapter/auth"
 	"github.com/training-judge-center/backend/internal/adapter/http/middleware"
 	appuser "github.com/training-judge-center/backend/internal/application/user"
 	"github.com/training-judge-center/backend/internal/domain/shared"
@@ -29,7 +30,7 @@ func wrapWithAuth(h http.Handler, claims *domainuser.TokenClaims) http.Handler {
 			return claims, nil
 		},
 	}
-	return middleware.Auth(tokenSvc, nil)(h)
+	return middleware.Auth(tokenSvc, &auth.NoOpSessionInvalidator{})(h)
 }
 
 // activeUserWithNoEmail returns a valid ACTIVE user without an email field.

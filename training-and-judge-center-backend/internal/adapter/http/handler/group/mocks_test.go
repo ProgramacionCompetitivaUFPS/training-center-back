@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/training-judge-center/backend/internal/adapter/auth"
 	"github.com/training-judge-center/backend/internal/adapter/http/middleware"
 	appGroup "github.com/training-judge-center/backend/internal/application/group"
 	appshared "github.com/training-judge-center/backend/internal/application/shared"
@@ -223,7 +224,7 @@ func (s *mockTxManager) WithTx(ctx context.Context, fn func(context.Context) err
 
 type mockTokenSvc struct{}
 
-func (m *mockTokenSvc) GenerateToken(_ context.Context, _ *domainUser.User) (string, error) {
+func (m *mockTokenSvc) GenerateToken(_ context.Context, _ *domainUser.User, _ string) (string, error) {
 	return "tok", nil
 }
 func (m *mockTokenSvc) ValidateToken(_ string) (*domainUser.TokenClaims, error) {
@@ -232,7 +233,7 @@ func (m *mockTokenSvc) ValidateToken(_ string) (*domainUser.TokenClaims, error) 
 
 type mockAdminTokenSvc struct{}
 
-func (m *mockAdminTokenSvc) GenerateToken(_ context.Context, _ *domainUser.User) (string, error) {
+func (m *mockAdminTokenSvc) GenerateToken(_ context.Context, _ *domainUser.User, _ string) (string, error) {
 	return "tok", nil
 }
 func (m *mockAdminTokenSvc) ValidateToken(_ string) (*domainUser.TokenClaims, error) {
@@ -255,11 +256,11 @@ func authedPostRequest(target, body string) *http.Request {
 }
 
 func wrapAuth(h http.Handler) http.Handler {
-	return middleware.Auth(&mockTokenSvc{}, nil)(h)
+	return middleware.Auth(&mockTokenSvc{}, &auth.NoOpSessionInvalidator{})(h)
 }
 
 func wrapAuthAsAdmin(h http.Handler) http.Handler {
-	return middleware.Auth(&mockAdminTokenSvc{}, nil)(h)
+	return middleware.Auth(&mockAdminTokenSvc{}, &auth.NoOpSessionInvalidator{})(h)
 }
 
 // â”€â”€ shared fixtures â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€

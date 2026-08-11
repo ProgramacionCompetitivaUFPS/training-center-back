@@ -8,6 +8,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/training-judge-center/backend/internal/adapter/auth"
 	"github.com/training-judge-center/backend/internal/adapter/http/middleware"
 	appTeam "github.com/training-judge-center/backend/internal/application/team"
 	appshared "github.com/training-judge-center/backend/internal/application/shared"
@@ -124,7 +125,7 @@ func (m *mockTxManager) WithTx(ctx context.Context, fn func(context.Context) err
 
 type mockTokenSvc struct{}
 
-func (m *mockTokenSvc) GenerateToken(_ context.Context, _ *domainUser.User) (string, error) {
+func (m *mockTokenSvc) GenerateToken(_ context.Context, _ *domainUser.User, _ string) (string, error) {
 	return "tok", nil
 }
 func (m *mockTokenSvc) ValidateToken(_ string) (*domainUser.TokenClaims, error) {
@@ -138,7 +139,7 @@ func newHandlerWithCreate(teamRepo domainTeam.Repository, memberRepo domainTeam.
 }
 
 func wrapAuth(h http.Handler) http.Handler {
-	return middleware.Auth(&mockTokenSvc{}, nil)(h)
+	return middleware.Auth(&mockTokenSvc{}, &auth.NoOpSessionInvalidator{})(h)
 }
 
 func authedPostRequest(target, body string) *http.Request {

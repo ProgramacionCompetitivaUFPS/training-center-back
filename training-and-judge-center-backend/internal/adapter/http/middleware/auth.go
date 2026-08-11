@@ -32,14 +32,25 @@ func Auth(tokenService user.TokenService, sessionInvalidator user.SessionInvalid
 				return
 			}
 
-			if sessionInvalidator != nil {
-				revoked, err := sessionInvalidator.IsSessionRevoked(r.Context(), claims.UserID, claims.IssuedAt)
+			revoked, err := sessionInvalidator.IsAllUserSessionRevoked(r.Context(), claims.UserID, claims.IssuedAt)
+			if err != nil {
+				slog.ErrorContext(r.Context(), "session revocation check failed", "user_id", claims.UserID, "error", err)
+				writeError(w, http.StatusServiceUnavailable, "SERVICE_UNAVAILABLE", "Service temporarily unavailable")
+				return
+			}
+			if revoked {
+				writeError(w, http.StatusUnauthorized, "UNAUTHORIZED", "Invalid or missing authentication token")
+				return
+			}
+
+			if claims.SessionID != "" {
+				sessionRevoked, err := sessionInvalidator.IsSessionInvalidated(r.Context(), claims.SessionID, claims.IssuedAt)
 				if err != nil {
-					slog.ErrorContext(r.Context(), "session revocation check failed", "user_id", claims.UserID, "error", err)
+					slog.ErrorContext(r.Context(), "session revocation check failed", "session_id", claims.SessionID, "error", err)
 					writeError(w, http.StatusServiceUnavailable, "SERVICE_UNAVAILABLE", "Service temporarily unavailable")
 					return
 				}
-				if revoked {
+				if sessionRevoked {
 					writeError(w, http.StatusUnauthorized, "UNAUTHORIZED", "Invalid or missing authentication token")
 					return
 				}

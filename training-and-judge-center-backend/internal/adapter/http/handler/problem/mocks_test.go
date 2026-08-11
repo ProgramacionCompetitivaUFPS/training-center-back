@@ -7,6 +7,7 @@ import (
 	"net/http/httptest"
 	"time"
 
+	"github.com/training-judge-center/backend/internal/adapter/auth"
 	"github.com/training-judge-center/backend/internal/adapter/http/middleware"
 	appProblem "github.com/training-judge-center/backend/internal/application/problem"
 	domainProblem "github.com/training-judge-center/backend/internal/domain/problem"
@@ -19,7 +20,7 @@ import (
 
 type mockTokenSvc struct{}
 
-func (m *mockTokenSvc) GenerateToken(_ context.Context, _ *domainUser.User) (string, error) {
+func (m *mockTokenSvc) GenerateToken(_ context.Context, _ *domainUser.User, _ string) (string, error) {
 	return "tok", nil
 }
 func (m *mockTokenSvc) ValidateToken(_ string) (*domainUser.TokenClaims, error) {
@@ -41,7 +42,7 @@ func authedRequest(method, target string, body []byte) *http.Request {
 }
 
 func wrapAuth(h http.Handler) http.Handler {
-	return middleware.Auth(&mockTokenSvc{}, nil)(h)
+	return middleware.Auth(&mockTokenSvc{}, &auth.NoOpSessionInvalidator{})(h)
 }
 
 // ── Problem repository mock ──────────────────────────────────────────────────

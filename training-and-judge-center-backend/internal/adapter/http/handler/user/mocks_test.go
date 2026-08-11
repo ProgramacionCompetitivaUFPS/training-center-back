@@ -80,7 +80,7 @@ type mockTokenService struct {
 	validateFn func(token string) (*domainuser.TokenClaims, error)
 }
 
-func (m *mockTokenService) GenerateToken(_ context.Context, _ *domainuser.User) (string, error) {
+func (m *mockTokenService) GenerateToken(_ context.Context, _ *domainuser.User, _ string) (string, error) {
 	return "", nil
 }
 func (m *mockTokenService) ValidateToken(token string) (*domainuser.TokenClaims, error) {
@@ -168,7 +168,13 @@ func (m *mockHandlerSessionInvalidator) InvalidateAllUserSessions(ctx context.Co
 	}
 	return nil
 }
-func (m *mockHandlerSessionInvalidator) IsSessionRevoked(_ context.Context, _ string, _ time.Time) (bool, error) {
+func (m *mockHandlerSessionInvalidator) IsAllUserSessionRevoked(_ context.Context, _ string, _ time.Time) (bool, error) {
+	return false, nil
+}
+func (m *mockHandlerSessionInvalidator) InvalidateSession(_ context.Context, _ string, _ time.Time) error {
+	return nil
+}
+func (m *mockHandlerSessionInvalidator) IsSessionInvalidated(_ context.Context, _ string, _ time.Time) (bool, error) {
 	return false, nil
 }
 

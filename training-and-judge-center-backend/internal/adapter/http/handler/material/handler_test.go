@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 
+	"github.com/training-judge-center/backend/internal/adapter/auth"
 	"github.com/training-judge-center/backend/internal/adapter/http/middleware"
 	appMaterial "github.com/training-judge-center/backend/internal/application/material"
 	domainMaterial "github.com/training-judge-center/backend/internal/domain/material"
@@ -97,7 +98,7 @@ func (s *stubAuthorIDProvider) FindIDByNickname(_ context.Context, _ string) (st
 
 type mockTokenSvc struct{}
 
-func (m *mockTokenSvc) GenerateToken(_ context.Context, _ *domainUser.User) (string, error) {
+func (m *mockTokenSvc) GenerateToken(_ context.Context, _ *domainUser.User, _ string) (string, error) {
 	return "tok", nil
 }
 func (m *mockTokenSvc) ValidateToken(_ string) (*domainUser.TokenClaims, error) {
@@ -117,5 +118,5 @@ func authedRequest(method, target string, body []byte) *http.Request {
 }
 
 func wrapAuth(h http.Handler) http.Handler {
-	return middleware.Auth(&mockTokenSvc{}, nil)(h)
+	return middleware.Auth(&mockTokenSvc{}, &auth.NoOpSessionInvalidator{})(h)
 }

@@ -9,6 +9,7 @@ import (
 	"net/http/httptest"
 	"time"
 
+	"github.com/training-judge-center/backend/internal/adapter/auth"
 	"github.com/training-judge-center/backend/internal/adapter/http/middleware"
 	appsubmission "github.com/training-judge-center/backend/internal/application/submission"
 	domainshared "github.com/training-judge-center/backend/internal/domain/shared"
@@ -108,7 +109,7 @@ type mockTokenSvc struct {
 	validateFn func(token string) (*domainuser.TokenClaims, error)
 }
 
-func (m *mockTokenSvc) GenerateToken(_ context.Context, _ *domainuser.User) (string, error) {
+func (m *mockTokenSvc) GenerateToken(_ context.Context, _ *domainuser.User, _ string) (string, error) {
 	return "tok", nil
 }
 func (m *mockTokenSvc) ValidateToken(token string) (*domainuser.TokenClaims, error) {
@@ -124,7 +125,7 @@ func wrapWithAuth(h http.Handler, claims *domainuser.TokenClaims) http.Handler {
 			return claims, nil
 		},
 	}
-	return middleware.Auth(tokenSvc, nil)(h)
+	return middleware.Auth(tokenSvc, &auth.NoOpSessionInvalidator{})(h)
 }
 
 // ── mocks for get/update-visibility use cases ─────────────────────────────────

@@ -83,8 +83,9 @@ func (uc *LoginUseCase) Execute(ctx context.Context, input LoginInput) (*LoginOu
 	}
 
 	now := time.Now()
+	sessionID := uuid.New().String()
 
-	token, err := uc.tokenService.GenerateToken(ctx, foundUser)
+	token, err := uc.tokenService.GenerateToken(ctx, foundUser, sessionID)
 	if err != nil {
 		return nil, err // nothing persisted yet — no orphaned refresh token
 	}
@@ -97,7 +98,7 @@ func (uc *LoginUseCase) Execute(ctx context.Context, input LoginInput) (*LoginOu
 	newRefreshToken, err := user.NewRefreshToken(
 		uuid.New().String(),
 		foundUser.ID(),
-		uuid.New().String(),
+		sessionID,
 		hashRefreshTokenSecret(refreshSecret),
 		input.UserAgent,
 		input.IPAddress,

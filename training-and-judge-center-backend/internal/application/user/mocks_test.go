@@ -47,7 +47,9 @@ func (m *mockEmailSender) Send(ctx context.Context, msg appshared.EmailMessage) 
 
 type mockSessionInvalidator struct {
 	invalidateAllUserSessionsFn func(ctx context.Context, userID string, timestamp time.Time) error
-	isSessionRevokedFn          func(ctx context.Context, userID string, tokenIssuedAt time.Time) (bool, error)
+	isAllUserSessionRevokedFn   func(ctx context.Context, userID string, tokenIssuedAt time.Time) (bool, error)
+	invalidateSessionFn         func(ctx context.Context, sessionID string, timestamp time.Time) error
+	isSessionInvalidatedFn      func(ctx context.Context, sessionID string, tokenIssuedAt time.Time) (bool, error)
 }
 
 func (m *mockSessionInvalidator) InvalidateAllUserSessions(ctx context.Context, userID string, timestamp time.Time) error {
@@ -57,9 +59,23 @@ func (m *mockSessionInvalidator) InvalidateAllUserSessions(ctx context.Context, 
 	return nil
 }
 
-func (m *mockSessionInvalidator) IsSessionRevoked(ctx context.Context, userID string, tokenIssuedAt time.Time) (bool, error) {
-	if m.isSessionRevokedFn != nil {
-		return m.isSessionRevokedFn(ctx, userID, tokenIssuedAt)
+func (m *mockSessionInvalidator) IsAllUserSessionRevoked(ctx context.Context, userID string, tokenIssuedAt time.Time) (bool, error) {
+	if m.isAllUserSessionRevokedFn != nil {
+		return m.isAllUserSessionRevokedFn(ctx, userID, tokenIssuedAt)
+	}
+	return false, nil
+}
+
+func (m *mockSessionInvalidator) InvalidateSession(ctx context.Context, sessionID string, timestamp time.Time) error {
+	if m.invalidateSessionFn != nil {
+		return m.invalidateSessionFn(ctx, sessionID, timestamp)
+	}
+	return nil
+}
+
+func (m *mockSessionInvalidator) IsSessionInvalidated(ctx context.Context, sessionID string, tokenIssuedAt time.Time) (bool, error) {
+	if m.isSessionInvalidatedFn != nil {
+		return m.isSessionInvalidatedFn(ctx, sessionID, tokenIssuedAt)
 	}
 	return false, nil
 }

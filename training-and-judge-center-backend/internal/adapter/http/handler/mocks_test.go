@@ -81,13 +81,13 @@ func (m *mockRefreshTokenRepo) DeleteRevokedOrExpiredBefore(_ context.Context, _
 }
 
 type mockTokenService struct {
-	generateTokenFn func(ctx context.Context, u *domainuser.User) (string, error)
+	generateTokenFn func(ctx context.Context, u *domainuser.User, sessionID string) (string, error)
 	validateTokenFn func(token string) (*domainuser.TokenClaims, error)
 }
 
-func (m *mockTokenService) GenerateToken(ctx context.Context, u *domainuser.User) (string, error) {
+func (m *mockTokenService) GenerateToken(ctx context.Context, u *domainuser.User, sessionID string) (string, error) {
 	if m.generateTokenFn != nil {
-		return m.generateTokenFn(ctx, u)
+		return m.generateTokenFn(ctx, u, sessionID)
 	}
 	return "access-token", nil
 }
