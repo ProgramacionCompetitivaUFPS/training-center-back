@@ -10,7 +10,6 @@ import (
 // @Tags         auth
 // @Success      204
 // @Failure      500 {object} apperror.AppError
-// @Failure      503 {object} apperror.AppError
 // @Router       /auth/logout [post]
 func (h *AuthHandler) Logout(w http.ResponseWriter, r *http.Request) {
 	wrapped, _ := readRefreshCookie(r)

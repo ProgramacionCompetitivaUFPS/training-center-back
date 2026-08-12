@@ -27,27 +27,27 @@ func NewLogoutUseCase(refreshTokenRepo user.RefreshTokenRepository, sessionInval
 
 func (uc *LogoutUseCase) Execute(ctx context.Context, in LogoutInput) error {
 	if in.RefreshToken == "" {
-		return nil 
+		return nil
 	}
 
 	plainSecret, _, err := uc.refreshTokenCodec.Unwrap(in.RefreshToken)
 	if err != nil {
-		return nil 
+		return nil
 	}
 
 	tokenHash := hashRefreshTokenSecret(plainSecret)
 	token, err := uc.refreshTokenRepo.FindByTokenHash(ctx, tokenHash)
 	if err != nil {
-		return err 
+		return err
 	}
 	if token == nil || token.IsRevoked() {
-		return nil 
+		return nil
 	}
 
-	now := time.Now() 
+	now := time.Now()
 
 	if err := uc.sessionInvalidator.InvalidateSession(ctx, token.FamilyID(), now); err != nil {
-		return err 
+		return err
 	}
 	if err := uc.refreshTokenRepo.RevokeByFamilyID(ctx, token.FamilyID(), now); err != nil {
 		return err

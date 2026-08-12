@@ -39,7 +39,7 @@ As a logged-in user, I want to click "Log out" and have my session actually end 
 4. **Scenario**: Underlying revocation fails
    - **Given** the token is resolved and active, but persisting the revocation fails (Postgres or Redis unavailable)
    - **When** `POST /auth/logout` is called
-   - **Then** the system returns 500 Internal Server Error or 503 Service Unavailable, matching the failing dependency
+   - **Then** the system returns 500 Internal Server Error (both the Postgres and Redis adapters translate failures to a generic internal error, never a distinguishable 503)
    - **And** the cookie is NOT cleared — the client keeps presenting the same (still-valid) token and the frontend may retry
    - **And** retrying the same request completes the logout without leaving a partially-revoked session, regardless of how far the previous attempt got (see FR-004)
 
@@ -77,7 +77,7 @@ Always returned when the request is well-formed, regardless of whether there was
 |--------|-----------|--------------|
 | `refresh_token` | `HttpOnly; Secure; SameSite=Strict; Path=/auth; Max-Age=-1` | Instructs the browser to delete the cookie immediately. |
 
-#### 500 Internal Server Error / 503 Service Unavailable
+#### 500 Internal Server Error
 The revocation could not be completed because a dependency (Postgres or Redis) failed. The cookie is left untouched so the client can retry with the same token.
 
 ```json

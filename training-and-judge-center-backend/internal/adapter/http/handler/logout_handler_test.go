@@ -110,4 +110,3 @@ func TestLogout_UseCaseError_PropagatesWithoutClearingCookie(t *testing.T) {
 		}
 	}
 }
-
