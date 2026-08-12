@@ -174,7 +174,7 @@ func (m *mockHandlerSessionInvalidator) IsAllUserSessionRevoked(_ context.Contex
 func (m *mockHandlerSessionInvalidator) InvalidateSession(_ context.Context, _ string, _ time.Time) error {
 	return nil
 }
-func (m *mockHandlerSessionInvalidator) IsSessionInvalidated(_ context.Context, _ string, _ time.Time) (bool, error) {
+func (m *mockHandlerSessionInvalidator) IsSessionInvalidated(_ context.Context, _ string) (bool, error) {
 	return false, nil
 }
 

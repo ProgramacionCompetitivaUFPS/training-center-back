@@ -34,10 +34,11 @@ type userResponse struct {
 type AuthHandler struct {
 	loginUseCase   *appuser.LoginUseCase
 	refreshUseCase *appuser.RefreshUseCase
+	logoutUseCase  *appuser.LogoutUseCase
 }
 
-func NewAuthHandler(loginUseCase *appuser.LoginUseCase, refreshUseCase *appuser.RefreshUseCase) *AuthHandler {
-	return &AuthHandler{loginUseCase: loginUseCase, refreshUseCase: refreshUseCase}
+func NewAuthHandler(loginUseCase *appuser.LoginUseCase, refreshUseCase *appuser.RefreshUseCase, logoutUseCase *appuser.LogoutUseCase) *AuthHandler {
+	return &AuthHandler{loginUseCase: loginUseCase, refreshUseCase: refreshUseCase, logoutUseCase: logoutUseCase}
 }
 
 // @Summary      Login

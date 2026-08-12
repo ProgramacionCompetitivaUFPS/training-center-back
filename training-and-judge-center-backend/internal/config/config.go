@@ -49,7 +49,7 @@ func Load() *Config {
 		GCSBucket:                  getEnv("GCS_BUCKET", ""),
 		VirtualObject:              loadVirtualObject(),
 		JWTSecret:                  getRequiredEnv("JWT_SECRET"),
-		JWTExpirationHours:         getEnvAsInt("JWT_EXPIRATION_HOURS", 24),
+		JWTExpirationHours:         getEnvAsInt("JWT_EXPIRATION_HOURS", 1),
 		SMTPHost:                   getEnv("SMTP_HOST", "localhost"),
 		SMTPPort:                   getEnv("SMTP_PORT", "1025"),
 		SMTPUser:                   getEnv("SMTP_USER", ""),
@@ -90,7 +90,7 @@ func getEnv(key, fallback string) string {
 
 func getEnvAsInt(key string, fallback int) int {
 	if value := os.Getenv(key); value != "" {
-		if intVal, err := strconv.Atoi(value); err == nil {
+		if intVal, err := strconv.Atoi(value); err == nil && intVal > 0 {
 			return intVal
 		}
 	}

@@ -134,6 +134,6 @@ func (noopSessionInvalidator) IsAllUserSessionRevoked(context.Context, string, t
 func (noopSessionInvalidator) InvalidateSession(context.Context, string, time.Time) error {
 	return nil
 }
-func (noopSessionInvalidator) IsSessionInvalidated(context.Context, string, time.Time) (bool, error) {
+func (noopSessionInvalidator) IsSessionInvalidated(context.Context, string) (bool, error) {
 	return false, nil
 }

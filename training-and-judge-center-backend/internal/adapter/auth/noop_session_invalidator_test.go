@@ -27,7 +27,7 @@ func TestNoOpSessionInvalidator_AlwaysNeutral(t *testing.T) {
 		t.Errorf("InvalidateSession: expected nil error, got %v", err)
 	}
 
-	invalidated, err := n.IsSessionInvalidated(ctx, "session-1", now)
+	invalidated, err := n.IsSessionInvalidated(ctx, "session-1")
 	if err != nil {
 		t.Errorf("IsSessionInvalidated: expected nil error, got %v", err)
 	}

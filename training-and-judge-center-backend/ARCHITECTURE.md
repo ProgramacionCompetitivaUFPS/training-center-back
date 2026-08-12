@@ -1727,7 +1727,7 @@ func (n *NoOpSessionInvalidator) IsAllUserSessionRevoked(_ context.Context, _ st
 func (n *NoOpSessionInvalidator) InvalidateSession(_ context.Context, _ string, _ time.Time) error {
     return nil
 }
-func (n *NoOpSessionInvalidator) IsSessionInvalidated(_ context.Context, _ string, _ time.Time) (bool, error) {
+func (n *NoOpSessionInvalidator) IsSessionInvalidated(_ context.Context, _ string) (bool, error) {
     return false, nil
 }
 ```
