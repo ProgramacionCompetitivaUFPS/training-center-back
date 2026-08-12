@@ -47,7 +47,7 @@ func TestRefresh_Success_RotatesCookie(t *testing.T) {
 		},
 	}
 	tokenSvc := &mockTokenService{
-		generateTokenFn: func(_ context.Context, _ *domainuser.User) (string, error) { return "new-access-token", nil },
+		generateTokenFn: func(_ context.Context, _ *domainuser.User, _ string) (string, error) { return "new-access-token", nil },
 	}
 	refreshUseCase := appuser.NewRefreshUseCase(refreshTokenRepo, userRepo, tokenSvc, &mockRefreshTokenCodec{}, &mockRateLimiter{}, &mockRotationCache{})
 	h := newHandlerWithRefresh(refreshUseCase)

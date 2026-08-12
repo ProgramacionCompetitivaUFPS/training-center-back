@@ -1507,7 +1507,7 @@ func wrapWithAuth(h http.Handler, claims *domainuser.TokenClaims) http.Handler {
     tokenSvc := &mockTokenService{validateFn: func(_ string) (*domainuser.TokenClaims, error) {
         return claims, nil
     }}
-    return middleware.Auth(tokenSvc, nil)(h)
+    return middleware.Auth(tokenSvc, &auth.NoOpSessionInvalidator{})(h)
 }
 ```
 
@@ -1718,11 +1718,17 @@ El no-op vive junto a la implementación real en `adapter/auth/`:
 // adapter/auth/noop_session_invalidator.go
 type NoOpSessionInvalidator struct{}
 
-func (n *NoOpSessionInvalidator) IsSessionRevoked(_ context.Context, _ string, _ time.Time) (bool, error) {
-    return false, nil
-}
 func (n *NoOpSessionInvalidator) InvalidateAllUserSessions(_ context.Context, _ string, _ time.Time) error {
     return nil
+}
+func (n *NoOpSessionInvalidator) IsAllUserSessionRevoked(_ context.Context, _ string, _ time.Time) (bool, error) {
+    return false, nil
+}
+func (n *NoOpSessionInvalidator) InvalidateSession(_ context.Context, _ string, _ time.Time) error {
+    return nil
+}
+func (n *NoOpSessionInvalidator) IsSessionInvalidated(_ context.Context, _ string, _ time.Time) (bool, error) {
+    return false, nil
 }
 ```
 

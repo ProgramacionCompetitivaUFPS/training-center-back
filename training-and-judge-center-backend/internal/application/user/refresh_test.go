@@ -52,7 +52,7 @@ func newRefreshDeps() (*mockRefreshTokenRepository, *mockUserRepository, *mockTo
 		return newUserWithRole(testRefreshUserID, shared.RoleContestant, domain.StatusActive), nil
 	}
 	tokenSvc := &mockTokenService{
-		generateTokenFn: func(_ context.Context, _ *domain.User) (string, error) { return "new-access-token", nil },
+		generateTokenFn: func(_ context.Context, _ *domain.User, _ string) (string, error) { return "new-access-token", nil },
 	}
 	return &mockRefreshTokenRepository{}, userRepo, tokenSvc, &mockRotationCache{}
 }
@@ -80,6 +80,30 @@ func TestRefresh_Success(t *testing.T) {
 	want := activeRefreshTokenFixture().AbsoluteExpiresAt()
 	if !out.SessionExpiresAt.Equal(want) {
 		t.Errorf("expected sessionExpiresAt %v (inherited), got %v", want, out.SessionExpiresAt)
+	}
+}
+
+func TestRefresh_SessionIDMatchesFamilyID(t *testing.T) {
+	refreshRepo, userRepo, tokenSvc, cache := newRefreshDeps()
+	refreshRepo.findByTokenHashFn = func(_ context.Context, _ string) (*domain.RefreshToken, error) {
+		return activeRefreshTokenFixture(), nil
+	}
+	refreshRepo.rotateFn = func(_ context.Context, _ string, _ *domain.RefreshToken) (bool, error) {
+		return true, nil
+	}
+	var capturedSessionID string
+	tokenSvc.generateTokenFn = func(_ context.Context, _ *domain.User, sessionID string) (string, error) {
+		capturedSessionID = sessionID
+		return "new-access-token", nil
+	}
+	uc := NewRefreshUseCase(refreshRepo, userRepo, tokenSvc, &mockRefreshTokenCodec{}, &mockRateLimiter{}, cache)
+
+	_, err := uc.Execute(context.Background(), RefreshInput{RefreshToken: "raw-secret"})
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+	if capturedSessionID != testRefreshFamily {
+		t.Errorf("expected sessionID %q to match the token's familyID, got %q", testRefreshFamily, capturedSessionID)
 	}
 }
 
@@ -428,7 +452,7 @@ func TestRefresh_TokenServiceError_Propagates(t *testing.T) {
 	refreshRepo.rotateFn = func(_ context.Context, _ string, _ *domain.RefreshToken) (bool, error) {
 		return true, nil
 	}
-	tokenSvc.generateTokenFn = func(_ context.Context, _ *domain.User) (string, error) {
+	tokenSvc.generateTokenFn = func(_ context.Context, _ *domain.User, _ string) (string, error) {
 		return "", apperror.NewInternal()
 	}
 	uc := NewRefreshUseCase(refreshRepo, userRepo, tokenSvc, &mockRefreshTokenCodec{}, &mockRateLimiter{}, cache)
@@ -453,7 +477,7 @@ func TestRefresh_TokenServiceError_DoesNotRotate(t *testing.T) {
 		rotateCalled = true
 		return true, nil
 	}
-	tokenSvc.generateTokenFn = func(_ context.Context, _ *domain.User) (string, error) {
+	tokenSvc.generateTokenFn = func(_ context.Context, _ *domain.User, _ string) (string, error) {
 		return "", apperror.NewInternal()
 	}
 	uc := NewRefreshUseCase(refreshRepo, userRepo, tokenSvc, &mockRefreshTokenCodec{}, &mockRateLimiter{}, cache)

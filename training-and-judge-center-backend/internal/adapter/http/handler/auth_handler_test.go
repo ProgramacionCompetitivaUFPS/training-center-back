@@ -50,7 +50,7 @@ func TestLogin_Success_SetsRefreshCookieAndReturnsSessionExpiresAt(t *testing.T)
 	}
 	refreshTokenRepo := &mockRefreshTokenRepo{}
 	tokenSvc := &mockTokenService{
-		generateTokenFn: func(_ context.Context, _ *domainuser.User) (string, error) { return "new-access-token", nil },
+		generateTokenFn: func(_ context.Context, _ *domainuser.User, _ string) (string, error) { return "new-access-token", nil },
 	}
 	loginUseCase := appuser.NewLoginUseCase(userRepo, refreshTokenRepo, tokenSvc, &mockRefreshTokenCodec{}, &mockRateLimiter{})
 	h := newHandlerWithLogin(loginUseCase)

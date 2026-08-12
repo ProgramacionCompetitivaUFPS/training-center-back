@@ -29,7 +29,7 @@ func wrapWithAuth(h http.Handler, claims *domainuser.TokenClaims) http.Handler {
 			return claims, nil
 		},
 	}
-	return middleware.Auth(tokenSvc, nil)(h)
+	return middleware.Auth(tokenSvc, noopSessionInvalidator{})(h)
 }
 
 // activeUserWithNoEmail returns a valid ACTIVE user without an email field.
@@ -154,4 +154,21 @@ func TestConfirmDeactivation_ValidSixDigitCode_Returns204(t *testing.T) {
 	if rr.Code != http.StatusNoContent {
 		t.Errorf("expected 204, got %d — body: %s", rr.Code, rr.Body.String())
 	}
+}
+
+// noopSessionInvalidator is a package-local no-op user.SessionInvalidator so
+// handler tests do not depend on the sibling adapter/auth package.
+type noopSessionInvalidator struct{}
+
+func (noopSessionInvalidator) InvalidateAllUserSessions(context.Context, string, time.Time) error {
+	return nil
+}
+func (noopSessionInvalidator) IsAllUserSessionRevoked(context.Context, string, time.Time) (bool, error) {
+	return false, nil
+}
+func (noopSessionInvalidator) InvalidateSession(context.Context, string, time.Time) error {
+	return nil
+}
+func (noopSessionInvalidator) IsSessionInvalidated(context.Context, string, time.Time) (bool, error) {
+	return false, nil
 }

@@ -105,7 +105,7 @@ func (uc *RefreshUseCase) Execute(ctx context.Context, in RefreshInput) (*Refres
 		return nil, apperror.NewUnauthorized(apperror.ErrCodeUnauthorized, refreshUnauthorizedMessage)
 	}
 
-	accessToken, err := uc.tokenService.GenerateToken(ctx, foundUser)
+	accessToken, err := uc.tokenService.GenerateToken(ctx, foundUser, token.FamilyID())
 	if err != nil {
 		return nil, err
 	}
@@ -164,7 +164,7 @@ func (uc *RefreshUseCase) handleAlreadyRevoked(ctx context.Context, tokenHash, f
 		return nil, apperror.NewUnauthorized(apperror.ErrCodeUnauthorized, refreshUnauthorizedMessage)
 	}
 
-	accessToken, err := uc.tokenService.GenerateToken(ctx, foundUser)
+	accessToken, err := uc.tokenService.GenerateToken(ctx, foundUser, familyID)
 	if err != nil {
 		return nil, err
 	}

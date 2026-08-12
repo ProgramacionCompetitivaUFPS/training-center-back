@@ -39,7 +39,7 @@ func alwaysValidTokenSvc() *mockTokenService {
 
 func TestAuth_MissingAuthorizationHeader(t *testing.T) {
 	// Arrange
-	handler := Auth(alwaysValidTokenSvc(), nil)(okHandler())
+	handler := Auth(alwaysValidTokenSvc(), &mockSessionInvalidator{})(okHandler())
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
 	rr := httptest.NewRecorder()
 
@@ -54,7 +54,7 @@ func TestAuth_MissingAuthorizationHeader(t *testing.T) {
 
 func TestAuth_MalformedBearerPrefix(t *testing.T) {
 	// Arrange — "BearerXYZ" without the required space after "Bearer"
-	handler := Auth(alwaysValidTokenSvc(), nil)(okHandler())
+	handler := Auth(alwaysValidTokenSvc(), &mockSessionInvalidator{})(okHandler())
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
 	req.Header.Set("Authorization", "BearerXYZ some-token")
 	rr := httptest.NewRecorder()
@@ -75,7 +75,7 @@ func TestAuth_InvalidToken(t *testing.T) {
 			return nil, errors.New("invalid signature")
 		},
 	}
-	handler := Auth(tokenSvc, nil)(okHandler())
+	handler := Auth(tokenSvc, &mockSessionInvalidator{})(okHandler())
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
 	req.Header.Set("Authorization", "Bearer bad.token.here")
 	rr := httptest.NewRecorder()
@@ -92,7 +92,7 @@ func TestAuth_InvalidToken(t *testing.T) {
 func TestAuth_RevokedSession(t *testing.T) {
 	// Arrange
 	sessionInv := &mockSessionInvalidator{
-		isSessionRevokedFn: func(_ context.Context, _ string, _ time.Time) (bool, error) {
+		isAllUserSessionRevokedFn: func(_ context.Context, _ string, _ time.Time) (bool, error) {
 			return true, nil
 		},
 	}
@@ -111,9 +111,9 @@ func TestAuth_RevokedSession(t *testing.T) {
 }
 
 func TestAuth_SessionInvalidatorError(t *testing.T) {
-	// Arrange — IsSessionRevoked returns an error: Redis unavailable → 503
+	// Arrange — IsAllUserSessionRevoked returns an error: Redis unavailable → 503
 	sessionInv := &mockSessionInvalidator{
-		isSessionRevokedFn: func(_ context.Context, _ string, _ time.Time) (bool, error) {
+		isAllUserSessionRevokedFn: func(_ context.Context, _ string, _ time.Time) (bool, error) {
 			return false, errors.New("redis timeout")
 		},
 	}
@@ -131,6 +131,86 @@ func TestAuth_SessionInvalidatorError(t *testing.T) {
 	}
 }
 
+func TestAuth_InvalidatedSpecificSession(t *testing.T) {
+	// Arrange — user-level check passes, but this specific session was invalidated
+	claims := validClaims()
+	claims.SessionID = "family-123"
+	tokenSvc := &mockTokenService{
+		validateTokenFn: func(_ string) (*user.TokenClaims, error) { return claims, nil },
+	}
+	sessionInv := &mockSessionInvalidator{
+		isSessionInvalidatedFn: func(_ context.Context, sessionID string, _ time.Time) (bool, error) {
+			return sessionID == "family-123", nil
+		},
+	}
+	handler := Auth(tokenSvc, sessionInv)(okHandler())
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	req.Header.Set("Authorization", "Bearer valid.token.here")
+	rr := httptest.NewRecorder()
+
+	// Act
+	handler.ServeHTTP(rr, req)
+
+	// Assert
+	if rr.Code != http.StatusUnauthorized {
+		t.Errorf("expected 401, got %d", rr.Code)
+	}
+}
+
+func TestAuth_SpecificSessionInvalidatorError(t *testing.T) {
+	// Arrange — IsSessionInvalidated returns an error: Redis unavailable → 503
+	claims := validClaims()
+	claims.SessionID = "family-123"
+	tokenSvc := &mockTokenService{
+		validateTokenFn: func(_ string) (*user.TokenClaims, error) { return claims, nil },
+	}
+	sessionInv := &mockSessionInvalidator{
+		isSessionInvalidatedFn: func(_ context.Context, _ string, _ time.Time) (bool, error) {
+			return false, errors.New("redis timeout")
+		},
+	}
+	handler := Auth(tokenSvc, sessionInv)(okHandler())
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	req.Header.Set("Authorization", "Bearer valid.token.here")
+	rr := httptest.NewRecorder()
+
+	// Act
+	handler.ServeHTTP(rr, req)
+
+	// Assert
+	if rr.Code != http.StatusServiceUnavailable {
+		t.Errorf("expected 503, got %d", rr.Code)
+	}
+}
+
+func TestAuth_EmptySessionID_SkipsSessionCheck(t *testing.T) {
+	// Arrange — token issued before the sid claim existed (SessionID == ""); the
+	// per-session check must be skipped rather than querying Redis with an empty key.
+	claims := validClaims()
+	claims.SessionID = ""
+	tokenSvc := &mockTokenService{
+		validateTokenFn: func(_ string) (*user.TokenClaims, error) { return claims, nil },
+	}
+	sessionInv := &mockSessionInvalidator{
+		isSessionInvalidatedFn: func(_ context.Context, _ string, _ time.Time) (bool, error) {
+			t.Fatal("IsSessionInvalidated should not be called when SessionID is empty")
+			return false, nil
+		},
+	}
+	handler := Auth(tokenSvc, sessionInv)(okHandler())
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	req.Header.Set("Authorization", "Bearer valid.token.here")
+	rr := httptest.NewRecorder()
+
+	// Act
+	handler.ServeHTTP(rr, req)
+
+	// Assert
+	if rr.Code != http.StatusOK {
+		t.Errorf("expected 200, got %d", rr.Code)
+	}
+}
+
 func TestAuth_ValidToken_CurrentUserInContext(t *testing.T) {
 	// Arrange
 	expected := validClaims()
@@ -144,7 +224,7 @@ func TestAuth_ValidToken_CurrentUserInContext(t *testing.T) {
 	capturingHandler := http.HandlerFunc(func(_ http.ResponseWriter, r *http.Request) {
 		capturedUser, capturedOk = GetCurrentUser(r.Context())
 	})
-	handler := Auth(tokenSvc, nil)(capturingHandler)
+	handler := Auth(tokenSvc, &mockSessionInvalidator{})(capturingHandler)
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
 	req.Header.Set("Authorization", "Bearer valid.token.here")
 	rr := httptest.NewRecorder()
