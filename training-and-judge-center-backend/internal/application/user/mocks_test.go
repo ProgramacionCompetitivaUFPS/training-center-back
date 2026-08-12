@@ -49,7 +49,7 @@ type mockSessionInvalidator struct {
 	invalidateAllUserSessionsFn func(ctx context.Context, userID string, timestamp time.Time) error
 	isAllUserSessionRevokedFn   func(ctx context.Context, userID string, tokenIssuedAt time.Time) (bool, error)
 	invalidateSessionFn         func(ctx context.Context, sessionID string, timestamp time.Time) error
-	isSessionInvalidatedFn      func(ctx context.Context, sessionID string, tokenIssuedAt time.Time) (bool, error)
+	isSessionInvalidatedFn      func(ctx context.Context, sessionID string) (bool, error)
 }
 
 func (m *mockSessionInvalidator) InvalidateAllUserSessions(ctx context.Context, userID string, timestamp time.Time) error {
@@ -73,9 +73,9 @@ func (m *mockSessionInvalidator) InvalidateSession(ctx context.Context, sessionI
 	return nil
 }
 
-func (m *mockSessionInvalidator) IsSessionInvalidated(ctx context.Context, sessionID string, tokenIssuedAt time.Time) (bool, error) {
+func (m *mockSessionInvalidator) IsSessionInvalidated(ctx context.Context, sessionID string) (bool, error) {
 	if m.isSessionInvalidatedFn != nil {
-		return m.isSessionInvalidatedFn(ctx, sessionID, tokenIssuedAt)
+		return m.isSessionInvalidatedFn(ctx, sessionID)
 	}
 	return false, nil
 }

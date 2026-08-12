@@ -19,6 +19,6 @@ func (n *NoOpSessionInvalidator) InvalidateSession(_ context.Context, _ string, 
 	return nil
 }
 
-func (n *NoOpSessionInvalidator) IsSessionInvalidated(_ context.Context, _ string, _ time.Time) (bool, error) {
+func (n *NoOpSessionInvalidator) IsSessionInvalidated(_ context.Context, _ string) (bool, error) {
 	return false, nil
 }

@@ -44,7 +44,7 @@ func Auth(tokenService user.TokenService, sessionInvalidator user.SessionInvalid
 			}
 
 			if claims.SessionID != "" {
-				sessionRevoked, err := sessionInvalidator.IsSessionInvalidated(r.Context(), claims.SessionID, claims.IssuedAt)
+				sessionRevoked, err := sessionInvalidator.IsSessionInvalidated(r.Context(), claims.SessionID)
 				if err != nil {
 					slog.ErrorContext(r.Context(), "session revocation check failed", "session_id", claims.SessionID, "error", err)
 					writeError(w, http.StatusServiceUnavailable, "SERVICE_UNAVAILABLE", "Service temporarily unavailable")

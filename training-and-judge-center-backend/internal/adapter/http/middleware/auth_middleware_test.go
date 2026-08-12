@@ -139,7 +139,7 @@ func TestAuth_InvalidatedSpecificSession(t *testing.T) {
 		validateTokenFn: func(_ string) (*user.TokenClaims, error) { return claims, nil },
 	}
 	sessionInv := &mockSessionInvalidator{
-		isSessionInvalidatedFn: func(_ context.Context, sessionID string, _ time.Time) (bool, error) {
+		isSessionInvalidatedFn: func(_ context.Context, sessionID string) (bool, error) {
 			return sessionID == "family-123", nil
 		},
 	}
@@ -165,7 +165,7 @@ func TestAuth_SpecificSessionInvalidatorError(t *testing.T) {
 		validateTokenFn: func(_ string) (*user.TokenClaims, error) { return claims, nil },
 	}
 	sessionInv := &mockSessionInvalidator{
-		isSessionInvalidatedFn: func(_ context.Context, _ string, _ time.Time) (bool, error) {
+		isSessionInvalidatedFn: func(_ context.Context, _ string) (bool, error) {
 			return false, errors.New("redis timeout")
 		},
 	}
@@ -192,7 +192,7 @@ func TestAuth_EmptySessionID_SkipsSessionCheck(t *testing.T) {
 		validateTokenFn: func(_ string) (*user.TokenClaims, error) { return claims, nil },
 	}
 	sessionInv := &mockSessionInvalidator{
-		isSessionInvalidatedFn: func(_ context.Context, _ string, _ time.Time) (bool, error) {
+		isSessionInvalidatedFn: func(_ context.Context, _ string) (bool, error) {
 			t.Fatal("IsSessionInvalidated should not be called when SessionID is empty")
 			return false, nil
 		},

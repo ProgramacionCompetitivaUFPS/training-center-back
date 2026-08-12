@@ -55,7 +55,7 @@ func (s *RedisSessionInvalidator) InvalidateSession(ctx context.Context, session
 	return nil
 }
 
-func (s *RedisSessionInvalidator) IsSessionInvalidated(ctx context.Context, sessionID string, _ time.Time) (bool, error) {
+func (s *RedisSessionInvalidator) IsSessionInvalidated(ctx context.Context, sessionID string) (bool, error) {
 	key := fmt.Sprintf("revoked_session_family:%s", sessionID)
 
 	n, err := s.client.Exists(ctx, key).Result()

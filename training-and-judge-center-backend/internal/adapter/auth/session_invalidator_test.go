@@ -17,46 +17,29 @@ func newTestSessionInvalidator(t *testing.T) (*RedisSessionInvalidator, *minired
 	return NewRedisSessionInvalidator(client, time.Hour), mr
 }
 
-func TestIsSessionInvalidated_TokenIssuedAfterMark_StillInvalidated(t *testing.T) {
+// The invalidation mark is terminal: once a family is revoked, no legitimate token can
+// ever be minted with that sid again, so IsSessionInvalidated ignores iat entirely.
+func TestIsSessionInvalidated_MarkExists_ReturnsTrue(t *testing.T) {
 	s, _ := newTestSessionInvalidator(t)
 	ctx := context.Background()
-	mark := time.Now()
 
-	if err := s.InvalidateSession(ctx, "family-1", mark); err != nil {
+	if err := s.InvalidateSession(ctx, "family-1", time.Now()); err != nil {
 		t.Fatalf("InvalidateSession: unexpected error: %v", err)
 	}
 
-	invalidated, err := s.IsSessionInvalidated(ctx, "family-1", mark.Add(5*time.Second))
+	invalidated, err := s.IsSessionInvalidated(ctx, "family-1")
 	if err != nil {
 		t.Fatalf("IsSessionInvalidated: unexpected error: %v", err)
 	}
 	if !invalidated {
-		t.Error("expected a token issued after the invalidation mark to be rejected")
-	}
-}
-
-func TestIsSessionInvalidated_TokenIssuedBeforeMark_Invalidated(t *testing.T) {
-	s, _ := newTestSessionInvalidator(t)
-	ctx := context.Background()
-	mark := time.Now()
-
-	if err := s.InvalidateSession(ctx, "family-1", mark); err != nil {
-		t.Fatalf("InvalidateSession: unexpected error: %v", err)
-	}
-
-	invalidated, err := s.IsSessionInvalidated(ctx, "family-1", mark.Add(-5*time.Second))
-	if err != nil {
-		t.Fatalf("IsSessionInvalidated: unexpected error: %v", err)
-	}
-	if !invalidated {
-		t.Error("expected a token issued before the invalidation mark to be rejected")
+		t.Error("expected the session to be invalidated once the mark exists")
 	}
 }
 
 func TestIsSessionInvalidated_NoMark_ReturnsFalse(t *testing.T) {
 	s, _ := newTestSessionInvalidator(t)
 
-	invalidated, err := s.IsSessionInvalidated(context.Background(), "family-unknown", time.Now())
+	invalidated, err := s.IsSessionInvalidated(context.Background(), "family-unknown")
 	if err != nil {
 		t.Fatalf("IsSessionInvalidated: unexpected error: %v", err)
 	}

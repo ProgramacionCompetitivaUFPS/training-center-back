@@ -10,5 +10,5 @@ type SessionInvalidator interface {
 	IsAllUserSessionRevoked(ctx context.Context, userID string, tokenIssuedAt time.Time) (bool, error)
 
 	InvalidateSession(ctx context.Context, sessionID string, timestamp time.Time) error
-	IsSessionInvalidated(ctx context.Context, sessionID string, tokenIssuedAt time.Time) (bool, error)
+	IsSessionInvalidated(ctx context.Context, sessionID string) (bool, error)
 }
