@@ -49,7 +49,7 @@ func Load() *Config {
 		GCSBucket:                  getEnv("GCS_BUCKET", ""),
 		VirtualObject:              loadVirtualObject(),
 		JWTSecret:                  getRequiredEnv("JWT_SECRET"),
-		JWTExpirationHours:         getEnvAsInt("JWT_EXPIRATION_HOURS", 24),
+		JWTExpirationHours:         getEnvAsInt("JWT_EXPIRATION_HOURS", 1),
 		SMTPHost:                   getEnv("SMTP_HOST", "localhost"),
 		SMTPPort:                   getEnv("SMTP_PORT", "1025"),
 		SMTPUser:                   getEnv("SMTP_USER", ""),
