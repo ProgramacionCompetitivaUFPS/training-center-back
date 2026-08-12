@@ -55,17 +55,13 @@ func (s *RedisSessionInvalidator) InvalidateSession(ctx context.Context, session
 	return nil
 }
 
-func (s *RedisSessionInvalidator) IsSessionInvalidated(ctx context.Context, sessionID string, tokenIssuedAt time.Time) (bool, error) {
+func (s *RedisSessionInvalidator) IsSessionInvalidated(ctx context.Context, sessionID string, _ time.Time) (bool, error) {
 	key := fmt.Sprintf("revoked_session_family:%s", sessionID)
 
-	val, err := s.client.Get(ctx, key).Int64()
+	n, err := s.client.Exists(ctx, key).Result()
 	if err != nil {
-		if errors.Is(err, redis.Nil) {
-			return false, nil
-		}
 		slog.ErrorContext(ctx, "failed to check session revocation", "session_id", sessionID, "error", err)
 		return false, apperror.NewInternal()
 	}
-
-	return tokenIssuedAt.Unix() <= val, nil
+	return n > 0, nil
 }
