@@ -90,7 +90,7 @@ func getEnv(key, fallback string) string {
 
 func getEnvAsInt(key string, fallback int) int {
 	if value := os.Getenv(key); value != "" {
-		if intVal, err := strconv.Atoi(value); err == nil {
+		if intVal, err := strconv.Atoi(value); err == nil && intVal > 0 {
 			return intVal
 		}
 	}
