@@ -84,11 +84,13 @@ func parseTestCasesZip(data []byte) ([]appJudge.TestCase, error) {
 		cleanPath := filepath.ToSlash(filepath.Clean(f.Name))
 
 		// strings.Index handles optional root-prefix dirs (e.g. "problem-abc/data/secret/001.in").
+		// Stripping only "data/" (not "data/sample/"/"data/secret/") keeps the
+		// sample/secret group as part of relPath, e.g. "secret/001.in".
 		var relPath string
 		if idx := strings.Index(cleanPath, "data/sample/"); idx >= 0 {
-			relPath = cleanPath[idx+len("data/sample/"):]
+			relPath = cleanPath[idx+len("data/"):]
 		} else if idx := strings.Index(cleanPath, "data/secret/"); idx >= 0 {
-			relPath = cleanPath[idx+len("data/secret/"):]
+			relPath = cleanPath[idx+len("data/"):]
 		} else {
 			continue
 		}
@@ -129,6 +131,7 @@ func parseTestCasesZip(data []byte) ([]appJudge.TestCase, error) {
 	testCases := make([]appJudge.TestCase, 0, len(names))
 	for _, name := range names {
 		testCases = append(testCases, appJudge.TestCase{
+			Name:           name,
 			Input:          inputs[name],
 			ExpectedOutput: answers[name],
 		})

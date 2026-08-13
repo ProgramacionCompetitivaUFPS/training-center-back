@@ -89,9 +89,9 @@ func (m *mockExecutor) BeginSession(ctx context.Context, language submission.Lan
 // ── ExecutionSession mock ────────────────────────────────────────────────────
 
 type mockExecutionSession struct {
-	compileFn      func(ctx context.Context, req CompileRequest) (CompileResult, error)
-	runTestCaseFn  func(ctx context.Context, req RunRequest) (RunResult, error)
-	closeFn        func(ctx context.Context) error
+	compileFn     func(ctx context.Context, req CompileRequest) (CompileResult, error)
+	runTestCaseFn func(ctx context.Context, req RunRequest) (RunResult, error)
+	closeFn       func(ctx context.Context) error
 }
 
 func (m *mockExecutionSession) Compile(ctx context.Context, req CompileRequest) (CompileResult, error) {
@@ -126,6 +126,84 @@ func (m *mockOutputChecker) Check(ctx context.Context, req CheckRequest) (CheckR
 		return m.checkFn(ctx, req)
 	}
 	return CheckResult{Accepted: true}, nil
+}
+
+// ── JudgingSourceProvider mock ───────────────────────────────────────────────
+
+type mockJudgingSourceProvider struct {
+	getCheckerSourceFn   func(ctx context.Context, problemID string) (*JudgingSource, error)
+	getValidatorSourceFn func(ctx context.Context, problemID string) (*JudgingSource, error)
+}
+
+func (m *mockJudgingSourceProvider) GetCheckerSource(ctx context.Context, problemID string) (*JudgingSource, error) {
+	if m.getCheckerSourceFn != nil {
+		return m.getCheckerSourceFn(ctx, problemID)
+	}
+	return nil, nil
+}
+
+func (m *mockJudgingSourceProvider) GetValidatorSource(ctx context.Context, problemID string) (*JudgingSource, error) {
+	if m.getValidatorSourceFn != nil {
+		return m.getValidatorSourceFn(ctx, problemID)
+	}
+	return nil, nil
+}
+
+// ── NativeCompiler mock ──────────────────────────────────────────────────────
+
+type mockNativeCompiler struct {
+	compileFn func(ctx context.Context, req CompileArtifactRequest) (CompileArtifactResult, error)
+}
+
+func (m *mockNativeCompiler) Compile(ctx context.Context, req CompileArtifactRequest) (CompileArtifactResult, error) {
+	if m.compileFn != nil {
+		return m.compileFn(ctx, req)
+	}
+	return CompileArtifactResult{Success: true, Artifact: []byte("artifact")}, nil
+}
+
+// ── ArtifactUploader mock ────────────────────────────────────────────────────
+
+type mockArtifactUploader struct {
+	uploadFn func(ctx context.Context, path string, content []byte) error
+	uploaded map[string][]byte
+}
+
+func (m *mockArtifactUploader) Upload(ctx context.Context, path string, content []byte) error {
+	if m.uploaded == nil {
+		m.uploaded = map[string][]byte{}
+	}
+	m.uploaded[path] = content
+	if m.uploadFn != nil {
+		return m.uploadFn(ctx, path, content)
+	}
+	return nil
+}
+
+// ── ValidatorRunner mock ─────────────────────────────────────────────────────
+
+type mockValidatorRunner struct {
+	runFn func(ctx context.Context, req ValidatorRunRequest) (ValidatorRunResult, error)
+}
+
+func (m *mockValidatorRunner) Run(ctx context.Context, req ValidatorRunRequest) (ValidatorRunResult, error) {
+	if m.runFn != nil {
+		return m.runFn(ctx, req)
+	}
+	return ValidatorRunResult{Accepted: true}, nil
+}
+
+// ── SolutionProvider mock ────────────────────────────────────────────────────
+
+type mockSolutionProvider struct {
+	getSolutionsFn func(ctx context.Context, problemID string) ([]Solution, error)
+}
+
+func (m *mockSolutionProvider) GetSolutions(ctx context.Context, problemID string) ([]Solution, error) {
+	if m.getSolutionsFn != nil {
+		return m.getSolutionsFn(ctx, problemID)
+	}
+	return []Solution{{FileKey: "solutions/sol.cpp", Language: submission.RestoreLanguage("cpp20")}}, nil
 }
 
 // ── TransactionManager mock ──────────────────────────────────────────────────

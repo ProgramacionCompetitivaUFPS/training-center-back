@@ -349,7 +349,7 @@ Validation failed. Returns detailed logs of what failed.
     "  Got: 41",
     "✗ Solution failed test case: secret/12",
     "  Expected: 100",
-    "  Got: Runtime Error (SIGSEGV)"
+    "  Got: Runtime Error"
   ],
   "failedTestCases": [
     {
@@ -360,8 +360,7 @@ Validation failed. Returns detailed logs of what failed.
     },
     {
       "case": "secret/12",
-      "status": "RUNTIME_EXCEPTION",
-      "details": "SIGSEGV"
+      "verdict": "RUNTIME_ERROR"
     }
   ]
 }
@@ -484,6 +483,107 @@ Problem is already PUBLISHED.
 {
   "error": "ALREADY_PUBLISHED",
   "message": "Problem is already published"
+}
+```
+
+---
+
+### GET /problems/p/{slug}/validation
+
+Get the most recent validation attempt for a problem, so a client that lost track of an in-progress `POST /publish` call (e.g. the tab was closed while the request was waiting) can recover its status without holding onto a validation ID.
+
+> **Important**: This endpoint never blocks — it reads the current state of the latest attempt and returns immediately, whether that attempt is still `RUNNING` or already finished. It always responds `200 OK`; a problem with no publish attempts yet is not an error.
+
+**Headers**:
+
+| Header | Type | Required | Description |
+|--------|------|----------|-------------|
+| Authorization | string | Yes | Bearer token for authentication |
+
+**Path Parameters**:
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| slug | string | Yes | The unique slug of the problem |
+
+**Responses**:
+
+#### 200 OK — no attempt yet
+No validation has ever been requested for this problem.
+
+```json
+{
+  "found": false,
+  "terminal": false,
+  "passed": false
+}
+```
+
+#### 200 OK — still running
+The latest attempt has not finished yet. `status` is omitted while the attempt is in progress — it only reflects the problem's `DRAFT`/`PUBLISHED` status once the attempt reaches a terminal state.
+
+```json
+{
+  "found": true,
+  "terminal": false,
+  "passed": false
+}
+```
+
+#### 200 OK — finished
+The latest attempt reached a terminal state (`PASSED`, `FAILED`, or `SYSTEM_ERROR`). Same report shape as the `200`/`400` bodies of `POST /publish`.
+
+```json
+{
+  "found": true,
+  "terminal": true,
+  "passed": true,
+  "status": "PUBLISHED",
+  "validationLogs": [
+    "✓ Required fields validated",
+    "✓ Test cases ZIP structure valid (5 sample, 20 secret cases)",
+    "✓ Solution compiled successfully",
+    "✓ Solution passed all 25 test cases",
+    "✓ Problem is now PUBLISHED"
+  ],
+  "validationSummary": {
+    "sampleCases": 5,
+    "secretCases": 20,
+    "solutionsTested": 1,
+    "allPassed": true
+  }
+}
+```
+
+A failed attempt reports the same `validationLogs`/`failedTestCases`/`compilationErrors`/`failedInputs` fields as the `400` bodies of `POST /publish`, with `passed: false`.
+
+#### 401 Unauthorized
+Authentication failed.
+
+```json
+{
+  "error": "UNAUTHORIZED",
+  "message": "Invalid or missing authentication token"
+}
+```
+
+#### 403 Forbidden
+User does not have permission to view this problem's validation state (same rule as editing it).
+
+```json
+{
+  "error": "INSUFFICIENT_PERMISSIONS",
+  "message": "Only the problem author, Admin, or assigned modifiers can view this problem's validation status"
+}
+```
+
+#### 404 Not Found
+Problem not found.
+
+```json
+{
+  "error": "NOT_FOUND",
+  "message": "Problem not found"
 }
 ```
 

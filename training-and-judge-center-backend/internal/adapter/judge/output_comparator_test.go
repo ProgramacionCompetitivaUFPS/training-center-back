@@ -12,6 +12,7 @@ import (
 
 	"cloud.google.com/go/storage"
 	appJudge "github.com/training-judge-center/backend/internal/application/judge"
+	"github.com/training-judge-center/backend/internal/domain/submission"
 	"github.com/training-judge-center/backend/pkg/apperror"
 )
 
@@ -138,6 +139,7 @@ func TestCheck_CustomChecker_AC(t *testing.T) {
 		ExpectedOutput:   []byte("3"),
 		ContestantOutput: []byte("3"),
 		CheckerPath:      "problems/abc/checker",
+		CheckerLanguage:  submission.RestoreLanguage("cpp20"),
 	})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -165,6 +167,7 @@ func TestCheck_CustomChecker_WA(t *testing.T) {
 		ExpectedOutput:   []byte("3"),
 		ContestantOutput: []byte("4"),
 		CheckerPath:      "problems/abc/checker",
+		CheckerLanguage:  submission.RestoreLanguage("cpp20"),
 	})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)

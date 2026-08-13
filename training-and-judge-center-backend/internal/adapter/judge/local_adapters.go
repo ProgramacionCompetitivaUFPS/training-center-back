@@ -13,3 +13,7 @@ func NewTestCaseProviderLocal(dir string, db infraPostgres.Querier) *TestCasePro
 func NewOutputComparatorLocal(dir string) *OutputComparator {
 	return &OutputComparator{reader: newLocalReader(dir)}
 }
+
+func NewArtifactUploaderLocal(dir string) *ArtifactUploader {
+	return &ArtifactUploader{writer: newLocalWriter(dir)}
+}

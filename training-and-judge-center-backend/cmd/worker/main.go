@@ -18,9 +18,11 @@ import (
 	adapterjudge "github.com/training-judge-center/backend/internal/adapter/judge"
 	judgepool "github.com/training-judge-center/backend/internal/adapter/judge/pool"
 	infrapostgres "github.com/training-judge-center/backend/internal/adapter/postgres"
+	adapterproblem "github.com/training-judge-center/backend/internal/adapter/problem"
 	adapterqueue "github.com/training-judge-center/backend/internal/adapter/queue"
 	adaptersubmission "github.com/training-judge-center/backend/internal/adapter/submission"
 	appjudge "github.com/training-judge-center/backend/internal/application/judge"
+	appproblem "github.com/training-judge-center/backend/internal/application/problem"
 	appsubmission "github.com/training-judge-center/backend/internal/application/submission"
 )
 
@@ -121,6 +123,7 @@ func main() {
 	var sourceCodeDownloader appjudge.SourceCodeDownloader
 	var testCaseProvider appjudge.TestCaseProvider
 	var outputChecker appjudge.OutputChecker
+	var artifactUploader appjudge.ArtifactUploader
 
 	switch storageBackend {
 	case "gcs":
@@ -137,15 +140,21 @@ func main() {
 		sourceCodeDownloader = adapterjudge.NewSourceCodeDownloader(gcsClient, gcsBucket)
 		testCaseProvider = adapterjudge.NewTestCaseProvider(gcsClient, gcsBucket, dbPool)
 		outputChecker = adapterjudge.NewOutputComparator(gcsClient, gcsBucket)
+		artifactUploader = adapterjudge.NewArtifactUploader(gcsClient, gcsBucket)
 		slog.Info("worker: using GCS storage backend", "bucket", gcsBucket)
 	default:
 		sourceCodeDownloader = adapterjudge.NewSourceCodeDownloaderLocal(storageLocalDir)
 		testCaseProvider = adapterjudge.NewTestCaseProviderLocal(storageLocalDir, dbPool)
 		outputChecker = adapterjudge.NewOutputComparatorLocal(storageLocalDir)
+		artifactUploader = adapterjudge.NewArtifactUploaderLocal(storageLocalDir)
 		slog.Info("worker: using local storage backend", "dir", storageLocalDir)
 	}
 
 	problemProvider := adapterjudge.NewProblemProvider(dbPool)
+	solutionProvider := adapterjudge.NewSolutionProvider(dbPool)
+	judgingSourceProvider := adapterjudge.NewJudgingSourceProvider(dbPool)
+	nativeCompiler := adapterjudge.NewNativeCompiler()
+	validatorRunner := adapterjudge.NewValidatorRunner()
 	submissionRepo := adaptersubmission.NewRepository(dbPool)
 	submissionUpdater := adapterjudge.NewSubmissionUpdater(submissionRepo)
 	staleSubmissionRecoverer := adapterjudge.NewStaleSubmissionRecoverer(dbPool)
@@ -166,6 +175,48 @@ func main() {
 	recoverStaleSubmissionsUseCase := appjudge.NewRecoverStaleSubmissionsUseCase(
 		staleSubmissionRecoverer,
 		time.Duration(judgeCfg.Judge.StaleRunningAfterMinutes)*time.Minute,
+	)
+
+	// problem validation use case
+
+	validateSolutionsUseCase := appjudge.NewValidateSolutionsUseCase(
+		solutionProvider,
+		sourceCodeDownloader,
+		problemProvider,
+		testCaseProvider,
+		executor,
+		outputChecker,
+		appjudge.DefaultRetryConfig(),
+	)
+	solutionValidator := adapterproblem.NewSolutionValidator(validateSolutionsUseCase)
+
+	prepareJudgingUseCase := appjudge.NewPrepareJudgingUseCase(
+		judgingSourceProvider,
+		sourceCodeDownloader,
+		nativeCompiler,
+		artifactUploader,
+		testCaseProvider,
+		validatorRunner,
+	)
+	judgingPreparer := adapterproblem.NewJudgingPreparer(prepareJudgingUseCase)
+	judgingArtifactWriter := adapterproblem.NewJudgingArtifactWriter(dbPool)
+
+	problemValidationRepo := adapterproblem.NewProblemValidationRepository(dbPool)
+	problemPublisher := adapterproblem.NewProblemPublisher(dbPool)
+
+	validateProblemUseCase := appproblem.NewValidateProblemUseCase(
+		problemValidationRepo,
+		judgingPreparer,
+		judgingArtifactWriter,
+		solutionValidator,
+		problemPublisher,
+		txManager,
+	)
+
+	staleValidationRecoverer := adapterproblem.NewStaleValidationRecoverer(dbPool)
+	recoverStaleValidationsUseCase := appproblem.NewRecoverStaleValidationsUseCase(
+		staleValidationRecoverer,
+		time.Duration(judgeCfg.Judge.StaleValidationAfterMinutes)*time.Minute,
 	)
 
 	// background guardians
@@ -208,18 +259,45 @@ func main() {
 		}
 	}()
 
+	go func() {
+		ticker := time.NewTicker(5 * time.Minute)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-ticker.C:
+				count, err := recoverStaleValidationsUseCase.Execute(ctx)
+				if err == nil && count > 0 {
+					slog.Info("worker: stale problem validations recovered", "count", count)
+				}
+			}
+		}
+	}()
+
 	// consume loop
 
 	slog.Info("worker: listening for submissions")
 
-	if err := queue.Consume(ctx, maxConcurrent, func(ctx context.Context, msg appsubmission.SubmissionQueueMessage) error {
-		if err := judgeSubmissionUseCase.Execute(ctx, appjudge.JudgeSubmissionInput{
-			SubmissionID: msg.SubmissionID,
-		}); err != nil {
-			slog.ErrorContext(ctx, "worker: judge execution failed", "error", err, "submission_id", msg.SubmissionID)
-		}
-		return nil
-	}); err != nil {
+	if err := queue.Consume(ctx, maxConcurrent,
+		adapterqueue.NewSubmissionPayloadHandler(func(ctx context.Context, msg appsubmission.SubmissionQueueMessage) error {
+			if err := judgeSubmissionUseCase.Execute(ctx, appjudge.JudgeSubmissionInput{
+				SubmissionID: msg.SubmissionID,
+			}); err != nil {
+				slog.ErrorContext(ctx, "worker: judge execution failed", "error", err, "submission_id", msg.SubmissionID)
+			}
+			return nil
+		}),
+		adapterqueue.NewValidationPayloadHandler(func(ctx context.Context, msg appproblem.ValidationQueueMessage) error {
+			if err := validateProblemUseCase.Execute(ctx, appproblem.ValidateProblemInput{
+				ValidationID: msg.ValidationID,
+				Slug:         msg.Slug,
+			}); err != nil {
+				slog.ErrorContext(ctx, "worker: problem validation failed", "error", err, "validation_id", msg.ValidationID)
+			}
+			return nil
+		}),
+	); err != nil {
 		slog.Error("worker: consume loop ended with error", "error", err)
 		os.Exit(1)
 	}
@@ -237,11 +315,12 @@ type judgeLanguageConfig struct {
 }
 
 type judgeSection struct {
-	IdleTimeoutMinutes       int                            `yaml:"idleTimeoutMinutes"`
-	MemoryOverheadBytes      int64                          `yaml:"memoryOverheadBytes"`
-	CPUOverheadCores         int                            `yaml:"cpuOverheadCores"`
-	StaleRunningAfterMinutes int                            `yaml:"staleRunningAfterMinutes"`
-	Languages                map[string]judgeLanguageConfig `yaml:"languages"`
+	IdleTimeoutMinutes          int                            `yaml:"idleTimeoutMinutes"`
+	MemoryOverheadBytes         int64                          `yaml:"memoryOverheadBytes"`
+	CPUOverheadCores            int                            `yaml:"cpuOverheadCores"`
+	StaleRunningAfterMinutes    int                            `yaml:"staleRunningAfterMinutes"`
+	StaleValidationAfterMinutes int                            `yaml:"staleValidationAfterMinutes"`
+	Languages                   map[string]judgeLanguageConfig `yaml:"languages"`
 }
 
 type judgeConfigFile struct {
@@ -269,6 +348,9 @@ func loadJudgeConfig() judgeConfigFile {
 	}
 	if cfg.Judge.StaleRunningAfterMinutes <= 0 {
 		cfg.Judge.StaleRunningAfterMinutes = 10
+	}
+	if cfg.Judge.StaleValidationAfterMinutes <= 0 {
+		cfg.Judge.StaleValidationAfterMinutes = 20
 	}
 	return cfg
 }

@@ -250,9 +250,11 @@ func (r *Repository) ExistsBySlug(ctx context.Context, slug domainProblem.Slug) 
 }
 
 type dbJudgingFile struct {
-	Filename string `json:"filename"`
-	FileKey  string `json:"fileKey"`
-	Language string `json:"language"`
+	Filename    string     `json:"filename"`
+	FileKey     string     `json:"fileKey"`
+	Language    string     `json:"language"`
+	CompiledKey *string    `json:"compiledKey,omitempty"`
+	CompiledAt  *time.Time `json:"compiledAt,omitempty"`
 }
 
 type dbLangOverride struct {
@@ -280,6 +282,9 @@ func mapSolutionsToDB(solutions []domainProblem.JudgingFile) ([]byte, error) {
 			Filename: sol.Filename(),
 			FileKey:  sol.FileKey(),
 			Language: sol.Language(),
+			// CompiledKey/CompiledAt quedan sin usar a propósito: las soluciones
+			// las sigue compilando el Executor en cada ejecución, no se compilan
+			// de forma nativa como sí ocurre con checker/validator.
 		})
 	}
 	return json.Marshal(dbSolutions)
@@ -290,9 +295,11 @@ func mapJudgingFileToDB(file *domainProblem.JudgingFile) ([]byte, error) {
 		return nil, nil // SQL NULL
 	}
 	return json.Marshal(dbJudgingFile{
-		Filename: file.Filename(),
-		FileKey:  file.FileKey(),
-		Language: file.Language(),
+		Filename:    file.Filename(),
+		FileKey:     file.FileKey(),
+		Language:    file.Language(),
+		CompiledKey: file.CompiledKey(),
+		CompiledAt:  file.CompiledAt(),
 	})
 }
 
@@ -321,7 +328,7 @@ func solutionsFromDB(data []byte) ([]domainProblem.JudgingFile, error) {
 	}
 	solutions := make([]domainProblem.JudgingFile, len(dbSolutions))
 	for i, sol := range dbSolutions {
-		solutions[i] = domainProblem.RestoreJudgingFile(sol.Filename, sol.FileKey, sol.Language)
+		solutions[i] = domainProblem.RestoreJudgingFile(sol.Filename, sol.FileKey, sol.Language, nil, nil)
 	}
 	return solutions, nil
 }
@@ -334,7 +341,7 @@ func judgingFileFromDB(data []byte) (*domainProblem.JudgingFile, error) {
 	if err := json.Unmarshal(data, &dbFile); err != nil {
 		return nil, err
 	}
-	j := domainProblem.RestoreJudgingFile(dbFile.Filename, dbFile.FileKey, dbFile.Language)
+	j := domainProblem.RestoreJudgingFile(dbFile.Filename, dbFile.FileKey, dbFile.Language, dbFile.CompiledKey, dbFile.CompiledAt)
 	return &j, nil
 }
 
