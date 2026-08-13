@@ -53,6 +53,12 @@ func TestParseTestCasesZip_SampleAndSecret(t *testing.T) {
 	if string(testCases[1].Input) != "4 5" || string(testCases[1].ExpectedOutput) != "9" {
 		t.Errorf("test case 1: got input=%q expected=%q", testCases[1].Input, testCases[1].ExpectedOutput)
 	}
+	if testCases[0].Name != "sample/001" {
+		t.Errorf("test case 0 Name: got %q, want %q", testCases[0].Name, "sample/001")
+	}
+	if testCases[1].Name != "secret/002" {
+		t.Errorf("test case 1 Name: got %q, want %q", testCases[1].Name, "secret/002")
+	}
 }
 
 func TestParseTestCasesZip_RootPrefix(t *testing.T) {
@@ -71,6 +77,9 @@ func TestParseTestCasesZip_RootPrefix(t *testing.T) {
 	}
 	if string(testCases[0].Input) != "hello" {
 		t.Errorf("input: got %q, want %q", testCases[0].Input, "hello")
+	}
+	if testCases[0].Name != "secret/001" {
+		t.Errorf("Name: got %q, want %q", testCases[0].Name, "secret/001")
 	}
 }
 

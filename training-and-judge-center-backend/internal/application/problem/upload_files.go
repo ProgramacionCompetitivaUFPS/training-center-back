@@ -1,4 +1,4 @@
-﻿package problem
+package problem
 
 import (
 	"context"
@@ -11,9 +11,9 @@ import (
 	"github.com/google/uuid"
 	"golang.org/x/sync/errgroup"
 
+	appshared "github.com/training-judge-center/backend/internal/application/shared"
 	"github.com/training-judge-center/backend/internal/domain/problem"
 	"github.com/training-judge-center/backend/internal/domain/shared"
-	appshared "github.com/training-judge-center/backend/internal/application/shared"
 	"github.com/training-judge-center/backend/pkg/apperror"
 )
 
@@ -46,23 +46,26 @@ type fileAction struct {
 }
 
 type UploadProblemFilesUseCase struct {
-	repo      problem.Repository
-	storage   ProblemFileRepository
-	zipParser ZipParser
-	settings  problem.PlatformSettings
+	repo           problem.Repository
+	validationRepo problem.ProblemValidationRepository
+	storage        ProblemFileRepository
+	zipParser      ZipParser
+	settings       problem.PlatformSettings
 }
 
 func NewUploadProblemFilesUseCase(
 	repo problem.Repository,
+	validationRepo problem.ProblemValidationRepository,
 	storage ProblemFileRepository,
 	zipParser ZipParser,
 	settings problem.PlatformSettings,
 ) *UploadProblemFilesUseCase {
 	return &UploadProblemFilesUseCase{
-		repo:      repo,
-		storage:   storage,
-		zipParser: zipParser,
-		settings:  settings,
+		repo:           repo,
+		validationRepo: validationRepo,
+		storage:        storage,
+		zipParser:      zipParser,
+		settings:       settings,
 	}
 }
 
@@ -83,6 +86,10 @@ func (uc *UploadProblemFilesUseCase) Execute(ctx context.Context, input UploadPr
 
 	if !p.CanBeEditedBy(shared.RestoreUserID(input.CurrentUser.ID), input.CurrentUser.IsAdmin()) {
 		return nil, apperror.NewForbidden(ErrCodeInsufficientPermissions, "Only the problem author, Admin, or assigned modifiers can update this problem")
+	}
+
+	if err := ensureNoActiveValidation(ctx, uc.validationRepo, p.ID()); err != nil {
+		return nil, err
 	}
 
 	now := time.Now()

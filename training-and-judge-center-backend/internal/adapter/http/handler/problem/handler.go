@@ -6,25 +6,28 @@ import (
 )
 
 type Handler struct {
-	createProblem        *appProblem.CreateProblemUseCase
-	importProblem        *appProblem.ImportProblemUseCase
-	updateProblem        *appProblem.UpdateProblemUseCase
-	uploadProblemFiles   *appProblem.UploadProblemFilesUseCase
-	deleteProblemFile    *appProblem.DeleteProblemFileUseCase
-	addModifier          *appProblem.AddModifierUseCase
-	removeModifier       *appProblem.RemoveModifierUseCase
-	listModifiers        *appProblem.ListModifiersUseCase
-	getProblem           *appProblem.GetProblemUseCase
-	listProblems         *appProblem.ListProblemsUseCase
-	unpublishProblem     *appProblem.UnpublishProblemUseCase
-	changeAccessibility  *appProblem.ChangeAccessibilityUseCase
-	deleteProblem        *appProblem.DeleteProblemUseCase
-	getProblemStatistics         *appProblem.GetProblemStatisticsUseCase
-	rejudgeSubmissions           *appProblem.RejudgeSubmissionsUseCase
-	rejudgeContestSubmissions    *appProblem.RejudgeContestSubmissionsUseCase
-	adminRejudgeSubmissions      *appProblem.AdminRejudgeSubmissionsUseCase
-	userProvider                 appProblem.UserProvider
-	settings                     domainProblem.PlatformSettings
+	createProblem              *appProblem.CreateProblemUseCase
+	importProblem              *appProblem.ImportProblemUseCase
+	updateProblem              *appProblem.UpdateProblemUseCase
+	uploadProblemFiles         *appProblem.UploadProblemFilesUseCase
+	deleteProblemFile          *appProblem.DeleteProblemFileUseCase
+	addModifier                *appProblem.AddModifierUseCase
+	removeModifier             *appProblem.RemoveModifierUseCase
+	listModifiers              *appProblem.ListModifiersUseCase
+	getProblem                 *appProblem.GetProblemUseCase
+	listProblems               *appProblem.ListProblemsUseCase
+	unpublishProblem           *appProblem.UnpublishProblemUseCase
+	publishProblem             *appProblem.PublishProblemUseCase
+	awaitProblemValidation     *appProblem.AwaitProblemValidationUseCase
+	getLatestProblemValidation *appProblem.GetLatestProblemValidationUseCase
+	changeAccessibility        *appProblem.ChangeAccessibilityUseCase
+	deleteProblem              *appProblem.DeleteProblemUseCase
+	getProblemStatistics       *appProblem.GetProblemStatisticsUseCase
+	rejudgeSubmissions         *appProblem.RejudgeSubmissionsUseCase
+	rejudgeContestSubmissions  *appProblem.RejudgeContestSubmissionsUseCase
+	adminRejudgeSubmissions    *appProblem.AdminRejudgeSubmissionsUseCase
+	userProvider               appProblem.UserProvider
+	settings                   domainProblem.PlatformSettings
 }
 
 func NewHandler(
@@ -39,6 +42,9 @@ func NewHandler(
 	getProblem *appProblem.GetProblemUseCase,
 	listProblems *appProblem.ListProblemsUseCase,
 	unpublishProblem *appProblem.UnpublishProblemUseCase,
+	publishProblem *appProblem.PublishProblemUseCase,
+	awaitProblemValidation *appProblem.AwaitProblemValidationUseCase,
+	getLatestProblemValidation *appProblem.GetLatestProblemValidationUseCase,
 	changeAccessibility *appProblem.ChangeAccessibilityUseCase,
 	deleteProblem *appProblem.DeleteProblemUseCase,
 	getProblemStatistics *appProblem.GetProblemStatisticsUseCase,
@@ -49,24 +55,27 @@ func NewHandler(
 	settings domainProblem.PlatformSettings,
 ) *Handler {
 	return &Handler{
-		createProblem:             createProblem,
-		importProblem:             importProblem,
-		updateProblem:             updateProblem,
-		uploadProblemFiles:        uploadProblemFiles,
-		deleteProblemFile:         deleteProblemFile,
-		addModifier:               addModifier,
-		removeModifier:            removeModifier,
-		listModifiers:             listModifiers,
-		getProblem:                getProblem,
-		listProblems:              listProblems,
-		unpublishProblem:          unpublishProblem,
-		changeAccessibility:       changeAccessibility,
-		deleteProblem:             deleteProblem,
-		getProblemStatistics:      getProblemStatistics,
-		rejudgeSubmissions:        rejudgeSubmissions,
-		rejudgeContestSubmissions: rejudgeContestSubmissions,
-		adminRejudgeSubmissions:   adminRejudgeSubmissions,
-		userProvider:              userProvider,
-		settings:                  settings,
+		createProblem:              createProblem,
+		importProblem:              importProblem,
+		updateProblem:              updateProblem,
+		uploadProblemFiles:         uploadProblemFiles,
+		deleteProblemFile:          deleteProblemFile,
+		addModifier:                addModifier,
+		removeModifier:             removeModifier,
+		listModifiers:              listModifiers,
+		getProblem:                 getProblem,
+		listProblems:               listProblems,
+		unpublishProblem:           unpublishProblem,
+		publishProblem:             publishProblem,
+		awaitProblemValidation:     awaitProblemValidation,
+		getLatestProblemValidation: getLatestProblemValidation,
+		changeAccessibility:        changeAccessibility,
+		deleteProblem:              deleteProblem,
+		getProblemStatistics:       getProblemStatistics,
+		rejudgeSubmissions:         rejudgeSubmissions,
+		rejudgeContestSubmissions:  rejudgeContestSubmissions,
+		adminRejudgeSubmissions:    adminRejudgeSubmissions,
+		userProvider:               userProvider,
+		settings:                   settings,
 	}
 }

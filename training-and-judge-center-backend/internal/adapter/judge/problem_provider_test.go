@@ -11,10 +11,10 @@ import (
 
 const testProblemID = "bbbbbbbb-0000-0000-0000-000000000001"
 
-func TestGetLimits_WithLimitsAndChecker(t *testing.T) {
+func TestGetLimits_CheckerCompiled_ReturnsCompiledPathAndLanguage(t *testing.T) {
 	tl := 2000
 	mb := 256
-	checkerJSON := []byte(`{"filename":"checker.cpp","fileKey":"problems/abc/checker","language":"cpp20"}`)
+	checkerJSON := []byte(`{"filename":"checker.cpp","fileKey":"problems/abc/checker/checker.cpp","language":"cpp20","compiledKey":"problems/abc/checker/compiled"}`)
 
 	provider := NewProblemProvider(&mockQuerier{
 		queryRowFn: func(_ context.Context, _ string, _ ...interface{}) pgx.Row {
@@ -40,9 +40,68 @@ func TestGetLimits_WithLimitsAndChecker(t *testing.T) {
 	if !limits.HasCustomChecker {
 		t.Error("HasCustomChecker: got false, want true")
 	}
-	if limits.CheckerPath != "problems/abc/checker" {
-		t.Errorf("CheckerPath: got %q, want %q", limits.CheckerPath, "problems/abc/checker")
+	if limits.CheckerPath != "problems/abc/checker/compiled" {
+		t.Errorf("CheckerPath: got %q, want the compiled key, not the source fileKey", limits.CheckerPath)
 	}
+	if limits.CheckerLanguage.String() != "cpp20" {
+		t.Errorf("CheckerLanguage: got %q, want cpp20", limits.CheckerLanguage.String())
+	}
+	if limits.CheckerFilename != "checker.cpp" {
+		t.Errorf("CheckerFilename: got %q, want checker.cpp", limits.CheckerFilename)
+	}
+}
+
+// TestGetLimits_CheckerNotYetCompiled_FallsBackToTokenComparison covers an
+// anomaly that publish validation should prevent (a checker that reached
+// PUBLISHED without ever compiling) — CheckerPath stays empty rather than
+// pointing at unusable source, so judging falls back to token comparison
+// instead of failing every submission for this problem.
+func TestGetLimits_CheckerNotYetCompiled_FallsBackToTokenComparison(t *testing.T) {
+	tl := 2000
+	mb := 256
+	checkerJSON := []byte(`{"filename":"checker.cpp","fileKey":"problems/abc/checker/checker.cpp","language":"cpp20"}`)
+
+	provider := NewProblemProvider(&mockQuerier{
+		queryRowFn: func(_ context.Context, _ string, _ ...interface{}) pgx.Row {
+			return &mockRow{scanFn: func(dest ...any) error {
+				*(dest[0].(**int)) = &tl
+				*(dest[1].(**int)) = &mb
+				*(dest[2].(*[]byte)) = checkerJSON
+				return nil
+			}}
+		},
+	})
+
+	limits, err := provider.GetLimits(context.Background(), testProblemID)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !limits.HasCustomChecker {
+		t.Error("HasCustomChecker: got false, want true")
+	}
+	if limits.CheckerPath != "" {
+		t.Errorf("CheckerPath: got %q, want empty", limits.CheckerPath)
+	}
+}
+
+func TestGetLimits_CheckerInvalidLanguage_ReturnsInternal(t *testing.T) {
+	tl := 2000
+	mb := 256
+	checkerJSON := []byte(`{"filename":"checker.rs","fileKey":"problems/abc/checker/checker.rs","language":"rust","compiledKey":"problems/abc/checker/compiled"}`)
+
+	provider := NewProblemProvider(&mockQuerier{
+		queryRowFn: func(_ context.Context, _ string, _ ...interface{}) pgx.Row {
+			return &mockRow{scanFn: func(dest ...any) error {
+				*(dest[0].(**int)) = &tl
+				*(dest[1].(**int)) = &mb
+				*(dest[2].(*[]byte)) = checkerJSON
+				return nil
+			}}
+		},
+	})
+
+	_, err := provider.GetLimits(context.Background(), testProblemID)
+	assertAppErrorKind(t, err, apperror.KindInternal)
 }
 
 func TestGetLimits_NullChecker(t *testing.T) {

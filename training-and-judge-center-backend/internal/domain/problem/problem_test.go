@@ -9,15 +9,6 @@ import (
 	"github.com/training-judge-center/backend/internal/domain/shared"
 )
 
-var testNow = time.Date(2024, 1, 15, 12, 0, 0, 0, time.UTC)
-
-const (
-	testAuthorID   = "aaaaaaaa-0000-0000-0000-000000000001"
-	testModifierID = "aaaaaaaa-0000-0000-0000-000000000002"
-	testStrangerID = "aaaaaaaa-0000-0000-0000-000000000003"
-	testProblemID  = "bbbbbbbb-0000-0000-0000-000000000001"
-)
-
 func newDraftProblem() *problem.Problem {
 	return problem.RestoreProblem(
 		testProblemID, "test-slug", "Test Title", nil,
@@ -267,7 +258,7 @@ func TestRemoveTestCases_ClearsKey(t *testing.T) {
 
 func TestAddSolution_NewFile_Appends(t *testing.T) {
 	p := newDraftProblem()
-	sol := problem.RestoreJudgingFile("sol.cpp", "key-1", "cpp20")
+	sol := problem.RestoreJudgingFile("sol.cpp", "key-1", "cpp20", nil, nil)
 	later := testNow.Add(time.Hour)
 
 	replaced := p.AddSolution(sol, later)
@@ -288,8 +279,8 @@ func TestAddSolution_NewFile_Appends(t *testing.T) {
 
 func TestAddSolution_DuplicateFilename_Replaces(t *testing.T) {
 	p := newDraftProblem()
-	original := problem.RestoreJudgingFile("sol.cpp", "key-1", "cpp20")
-	updated := problem.RestoreJudgingFile("sol.cpp", "key-2", "cpp20")
+	original := problem.RestoreJudgingFile("sol.cpp", "key-1", "cpp20", nil, nil)
+	updated := problem.RestoreJudgingFile("sol.cpp", "key-2", "cpp20", nil, nil)
 	later := testNow.Add(time.Hour)
 
 	p.AddSolution(original, testNow)
@@ -314,7 +305,7 @@ func TestAddSolution_DuplicateFilename_Replaces(t *testing.T) {
 
 func TestRemoveSolution_RemovesMatchingFile(t *testing.T) {
 	p := newDraftProblem()
-	sol := problem.RestoreJudgingFile("sol.cpp", "key-1", "cpp20")
+	sol := problem.RestoreJudgingFile("sol.cpp", "key-1", "cpp20", nil, nil)
 	p.AddSolution(sol, testNow)
 	later := testNow.Add(time.Hour)
 
@@ -380,7 +371,7 @@ func TestUpdateAccessibility_SetsAccessibility(t *testing.T) {
 
 func TestSetChecker_SetsCheckerAndUpdatesTimestamps(t *testing.T) {
 	p := newDraftProblem()
-	checker := problem.RestoreJudgingFile("checker.cpp", "key-c", "cpp20")
+	checker := problem.RestoreJudgingFile("checker.cpp", "key-c", "cpp20", nil, nil)
 	later := testNow.Add(time.Hour)
 
 	p.SetChecker(checker, later)
@@ -401,7 +392,7 @@ func TestSetChecker_SetsCheckerAndUpdatesTimestamps(t *testing.T) {
 
 func TestRemoveChecker_ClearsCheckerAndUpdatesTimestamps(t *testing.T) {
 	p := newDraftProblem()
-	p.SetChecker(problem.RestoreJudgingFile("checker.cpp", "key-c", "cpp20"), testNow)
+	p.SetChecker(problem.RestoreJudgingFile("checker.cpp", "key-c", "cpp20", nil, nil), testNow)
 	later := testNow.Add(time.Hour)
 
 	p.RemoveChecker(later)
@@ -419,7 +410,7 @@ func TestRemoveChecker_ClearsCheckerAndUpdatesTimestamps(t *testing.T) {
 
 func TestSetValidator_SetsValidatorAndUpdatesTimestamps(t *testing.T) {
 	p := newDraftProblem()
-	validator := problem.RestoreJudgingFile("validator.cpp", "key-v", "cpp20")
+	validator := problem.RestoreJudgingFile("validator.cpp", "key-v", "cpp20", nil, nil)
 	later := testNow.Add(time.Hour)
 
 	p.SetValidator(validator, later)
@@ -440,7 +431,7 @@ func TestSetValidator_SetsValidatorAndUpdatesTimestamps(t *testing.T) {
 
 func TestRemoveValidator_ClearsValidatorAndUpdatesTimestamps(t *testing.T) {
 	p := newDraftProblem()
-	p.SetValidator(problem.RestoreJudgingFile("validator.cpp", "key-v", "cpp20"), testNow)
+	p.SetValidator(problem.RestoreJudgingFile("validator.cpp", "key-v", "cpp20", nil, nil), testNow)
 	later := testNow.Add(time.Hour)
 
 	p.RemoveValidator(later)

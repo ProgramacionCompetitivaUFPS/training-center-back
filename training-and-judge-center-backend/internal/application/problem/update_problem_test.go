@@ -1,4 +1,4 @@
-﻿package problem
+package problem
 
 import (
 	"context"
@@ -10,7 +10,7 @@ import (
 
 func TestUpdateProblem_Success_Author(t *testing.T) {
 	repo := repoWith(newDraftProblem())
-	uc := NewUpdateProblemUseCase(repo, newDefaultSettings())
+	uc := NewUpdateProblemUseCase(repo, &mockValidationRepository{}, newDefaultSettings())
 
 	newTitle := "Updated Title"
 	result, err := uc.Execute(context.Background(), UpdateProblemInput{
@@ -28,7 +28,7 @@ func TestUpdateProblem_Success_Author(t *testing.T) {
 
 func TestUpdateProblem_Success_Modifier(t *testing.T) {
 	repo := repoWith(newDraftProblemWithModifier())
-	uc := NewUpdateProblemUseCase(repo, newDefaultSettings())
+	uc := NewUpdateProblemUseCase(repo, &mockValidationRepository{}, newDefaultSettings())
 
 	newTitle := "Modifier's Title"
 	_, err := uc.Execute(context.Background(), UpdateProblemInput{
@@ -43,7 +43,7 @@ func TestUpdateProblem_Success_Modifier(t *testing.T) {
 
 func TestUpdateProblem_Success_Admin(t *testing.T) {
 	repo := repoWith(newDraftProblem())
-	uc := NewUpdateProblemUseCase(repo, newDefaultSettings())
+	uc := NewUpdateProblemUseCase(repo, &mockValidationRepository{}, newDefaultSettings())
 
 	newTitle := "Admin Title"
 	_, err := uc.Execute(context.Background(), UpdateProblemInput{
@@ -58,7 +58,7 @@ func TestUpdateProblem_Success_Admin(t *testing.T) {
 
 func TestUpdateProblem_Forbidden_Stranger(t *testing.T) {
 	repo := repoWith(newDraftProblem())
-	uc := NewUpdateProblemUseCase(repo, newDefaultSettings())
+	uc := NewUpdateProblemUseCase(repo, &mockValidationRepository{}, newDefaultSettings())
 
 	newTitle := "Stolen Title"
 	_, err := uc.Execute(context.Background(), UpdateProblemInput{
@@ -81,7 +81,7 @@ func TestUpdateProblem_Forbidden_Stranger(t *testing.T) {
 
 func TestUpdateProblem_CannotUpdatePublished(t *testing.T) {
 	repo := repoWith(newPublishedProblem())
-	uc := NewUpdateProblemUseCase(repo, newDefaultSettings())
+	uc := NewUpdateProblemUseCase(repo, &mockValidationRepository{}, newDefaultSettings())
 
 	newTitle := "New Title"
 	_, err := uc.Execute(context.Background(), UpdateProblemInput{
@@ -104,7 +104,7 @@ func TestUpdateProblem_CannotUpdatePublished(t *testing.T) {
 
 func TestUpdateProblem_InvalidTimeLimit(t *testing.T) {
 	repo := repoWith(newDraftProblem())
-	uc := NewUpdateProblemUseCase(repo, newDefaultSettings())
+	uc := NewUpdateProblemUseCase(repo, &mockValidationRepository{}, newDefaultSettings())
 
 	tooHigh := 999999 // exceeds global max of 10000
 	_, err := uc.Execute(context.Background(), UpdateProblemInput{
@@ -125,13 +125,37 @@ func TestUpdateProblem_InvalidTimeLimit(t *testing.T) {
 	}
 }
 
+func TestUpdateProblem_ActiveValidation_ReturnsConflict(t *testing.T) {
+	repo := repoWith(newDraftProblem())
+	validationRepo := &mockValidationRepository{
+		findLatestByProblemIDFn: func(_ context.Context, _ string) (*domainProblem.ProblemValidation, bool, error) {
+			return runningValidationFixture(), true, nil
+		},
+	}
+	uc := NewUpdateProblemUseCase(repo, validationRepo, newDefaultSettings())
+
+	newTitle := "New Title"
+	_, err := uc.Execute(context.Background(), UpdateProblemInput{
+		Slug:        testSlug,
+		Title:       &newTitle,
+		CurrentUser: asCoach(authorID),
+	})
+	appErr, ok := err.(*apperror.AppError)
+	if !ok {
+		t.Fatalf("expected *apperror.AppError, got %T", err)
+	}
+	if appErr.Code != domainProblem.ErrCodeValidationInProgress {
+		t.Errorf("expected %q, got %q", domainProblem.ErrCodeValidationInProgress, appErr.Code)
+	}
+}
+
 func TestUpdateProblem_NotFound(t *testing.T) {
 	repo := &mockProblemRepository{
 		findBySlugFn: func(_ context.Context, _ domainProblem.Slug) (*domainProblem.Problem, error) {
 			return nil, apperror.NewNotFound(apperror.ErrCodeNotFound, "problem not found")
 		},
 	}
-	uc := NewUpdateProblemUseCase(repo, newDefaultSettings())
+	uc := NewUpdateProblemUseCase(repo, &mockValidationRepository{}, newDefaultSettings())
 
 	newTitle := "Title"
 	_, err := uc.Execute(context.Background(), UpdateProblemInput{
@@ -153,7 +177,7 @@ func TestUpdateProblem_RepositoryError(t *testing.T) {
 			return apperror.NewInternal()
 		},
 	}
-	uc := NewUpdateProblemUseCase(repo, newDefaultSettings())
+	uc := NewUpdateProblemUseCase(repo, &mockValidationRepository{}, newDefaultSettings())
 
 	newTitle := "Title"
 	_, err := uc.Execute(context.Background(), UpdateProblemInput{

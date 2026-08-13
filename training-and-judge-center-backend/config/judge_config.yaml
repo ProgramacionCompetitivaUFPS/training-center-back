@@ -3,6 +3,7 @@ judge:
   memoryOverheadBytes: 536870912  # 512 MiB reservado para el proceso worker
   cpuOverheadCores: 1             # cores reservados para worker + daemon Docker (se restan del semáforo)
   staleRunningAfterMinutes: 10    # submissions en RUNNING más viejas que esto se marcan SYSTEM_ERROR
+  staleValidationAfterMinutes: 20 # validaciones de publish en RUNNING más viejas que esto se marcan SYSTEM_ERROR (> los 9 min de timeout del cliente HTTP)
 
   languages:
     cpp20:

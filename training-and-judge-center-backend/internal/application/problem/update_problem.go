@@ -1,13 +1,13 @@
-﻿package problem
+package problem
 
 import (
 	"context"
 
 	"time"
 
+	appshared "github.com/training-judge-center/backend/internal/application/shared"
 	"github.com/training-judge-center/backend/internal/domain/problem"
 	"github.com/training-judge-center/backend/internal/domain/shared"
-	appshared "github.com/training-judge-center/backend/internal/application/shared"
 	"github.com/training-judge-center/backend/pkg/apperror"
 )
 
@@ -29,12 +29,14 @@ type UpdateProblemOutput struct {
 
 type UpdateProblemUseCase struct {
 	repo             problem.Repository
+	validationRepo   problem.ProblemValidationRepository
 	platformSettings problem.PlatformSettings
 }
 
-func NewUpdateProblemUseCase(repo problem.Repository, platformSettings problem.PlatformSettings) *UpdateProblemUseCase {
+func NewUpdateProblemUseCase(repo problem.Repository, validationRepo problem.ProblemValidationRepository, platformSettings problem.PlatformSettings) *UpdateProblemUseCase {
 	return &UpdateProblemUseCase{
 		repo:             repo,
+		validationRepo:   validationRepo,
 		platformSettings: platformSettings,
 	}
 }
@@ -56,6 +58,10 @@ func (uc *UpdateProblemUseCase) Execute(ctx context.Context, input UpdateProblem
 
 	if !p.CanBeEditedBy(shared.RestoreUserID(input.CurrentUser.ID), input.CurrentUser.IsAdmin()) {
 		return nil, apperror.NewForbidden(ErrCodeInsufficientPermissions, "Only the problem author, Admin, or assigned modifiers can update this problem")
+	}
+
+	if err := ensureNoActiveValidation(ctx, uc.validationRepo, p.ID()); err != nil {
+		return nil, err
 	}
 
 	var fieldErrs []apperror.FieldError

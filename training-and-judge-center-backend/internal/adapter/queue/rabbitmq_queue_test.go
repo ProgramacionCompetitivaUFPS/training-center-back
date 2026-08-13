@@ -56,14 +56,24 @@ func consume(t *testing.T, url string) []byte {
 	}
 	select {
 	case msg := <-msgs:
-		return msg.Body
+		var env struct {
+			Kind    string          `json:"kind"`
+			Payload json.RawMessage `json:"payload"`
+		}
+		if err := json.Unmarshal(msg.Body, &env); err != nil {
+			t.Fatalf("consume: unmarshal envelope: %v", err)
+		}
+		return env.Payload
 	case <-time.After(5 * time.Second):
 		t.Fatal("timeout waiting for message")
 		return nil
 	}
 }
 
-func consumeN(t *testing.T, url string, n int) []struct{ ID string; Priority int } {
+func consumeN(t *testing.T, url string, n int) []struct {
+	ID       string
+	Priority int
+} {
 	t.Helper()
 	conn, err := amqp.Dial(url)
 	if err != nil {
@@ -81,18 +91,31 @@ func consumeN(t *testing.T, url string, n int) []struct{ ID string; Priority int
 		t.Fatalf("consumeN: %v", err)
 	}
 
-	result := make([]struct{ ID string; Priority int }, 0, n)
+	result := make([]struct {
+		ID       string
+		Priority int
+	}, 0, n)
 	for len(result) < n {
 		select {
 		case raw := <-msgs:
+			var env struct {
+				Kind    string          `json:"kind"`
+				Payload json.RawMessage `json:"payload"`
+			}
+			if err := json.Unmarshal(raw.Body, &env); err != nil {
+				t.Fatalf("consumeN: unmarshal envelope: %v", err)
+			}
 			var m struct {
 				ID       string `json:"submissionId"`
 				Priority int    `json:"priority"`
 			}
-			if err := json.Unmarshal(raw.Body, &m); err != nil {
+			if err := json.Unmarshal(env.Payload, &m); err != nil {
 				t.Fatalf("consumeN unmarshal: %v", err)
 			}
-			result = append(result, struct{ ID string; Priority int }{m.ID, m.Priority})
+			result = append(result, struct {
+				ID       string
+				Priority int
+			}{m.ID, m.Priority})
 		case <-time.After(5 * time.Second):
 			t.Fatalf("consumeN: timeout after receiving %d of %d messages", len(result), n)
 		}
@@ -108,6 +131,7 @@ func TestPublish_DeliversPriorityMessage(t *testing.T) {
 		t.Fatalf("NewRabbitMQQueue: %v", err)
 	}
 	defer q.Close()
+	sq := adapterqueue.NewRabbitMQSubmissionQueue(q)
 
 	contestID := "contest-abc"
 	msg := appsubmission.SubmissionQueueMessage{
@@ -122,7 +146,7 @@ func TestPublish_DeliversPriorityMessage(t *testing.T) {
 		},
 	}
 
-	if err := q.Publish(context.Background(), msg); err != nil {
+	if err := sq.Publish(context.Background(), msg); err != nil {
 		t.Fatalf("Publish: %v", err)
 	}
 
@@ -168,6 +192,7 @@ func TestPublish_NilContestID_OmitsField(t *testing.T) {
 		t.Fatalf("NewRabbitMQQueue: %v", err)
 	}
 	defer q.Close()
+	sq := adapterqueue.NewRabbitMQSubmissionQueue(q)
 
 	msg := appsubmission.SubmissionQueueMessage{
 		SubmissionID: "sub-002",
@@ -181,7 +206,7 @@ func TestPublish_NilContestID_OmitsField(t *testing.T) {
 		},
 	}
 
-	if err := q.Publish(context.Background(), msg); err != nil {
+	if err := sq.Publish(context.Background(), msg); err != nil {
 		t.Fatalf("Publish: %v", err)
 	}
 
@@ -209,6 +234,7 @@ func TestPublish_PriorityOrdering_HighestFirst(t *testing.T) {
 		t.Fatalf("NewRabbitMQQueue: %v", err)
 	}
 	defer q.Close()
+	sq := adapterqueue.NewRabbitMQSubmissionQueue(q)
 
 	ctx := context.Background()
 	now := time.Now()
@@ -222,7 +248,7 @@ func TestPublish_PriorityOrdering_HighestFirst(t *testing.T) {
 		{SubmissionID: "sub-contest", Priority: appsubmission.QueuePriorityContest, EnqueuedAt: now, Metadata: meta},
 	}
 	for _, msg := range messages {
-		if err := q.Publish(ctx, msg); err != nil {
+		if err := sq.Publish(ctx, msg); err != nil {
 			t.Fatalf("Publish %s: %v", msg.SubmissionID, err)
 		}
 	}

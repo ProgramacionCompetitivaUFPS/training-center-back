@@ -2,6 +2,7 @@ package problem_test
 
 import (
 	"testing"
+	"time"
 
 	"github.com/training-judge-center/backend/internal/domain/problem"
 )
@@ -42,7 +43,9 @@ func TestNewSolutionFile(t *testing.T) {
 }
 
 func TestRestoreJudgingFile_PreservesFields(t *testing.T) {
-	f := problem.RestoreJudgingFile("sol.cpp", "key-1", "cpp20")
+	compiledKey := "key-1-compiled"
+	compiledAt := time.Date(2024, 1, 15, 12, 0, 0, 0, time.UTC)
+	f := problem.RestoreJudgingFile("sol.cpp", "key-1", "cpp20", &compiledKey, &compiledAt)
 	if f.Filename() != "sol.cpp" {
 		t.Errorf("Filename(): got %q, want sol.cpp", f.Filename())
 	}
@@ -51,6 +54,12 @@ func TestRestoreJudgingFile_PreservesFields(t *testing.T) {
 	}
 	if f.Language() != "cpp20" {
 		t.Errorf("Language(): got %q, want cpp20", f.Language())
+	}
+	if f.CompiledKey() == nil || *f.CompiledKey() != compiledKey {
+		t.Errorf("CompiledKey(): got %v, want %q", f.CompiledKey(), compiledKey)
+	}
+	if f.CompiledAt() == nil || !f.CompiledAt().Equal(compiledAt) {
+		t.Errorf("CompiledAt(): got %v, want %v", f.CompiledAt(), compiledAt)
 	}
 }
 
