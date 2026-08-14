@@ -58,9 +58,9 @@ func NewPassword(raw string) (Password, error) {
 	return Password{hash: string(hashed)}, nil
 }
 
-// NoPassword represents a user with no local password — e.g. one authenticated
+// NewPasswordNone represents a user with no local password — e.g. one authenticated
 // only through an external provider such as Google.
-func NoPassword() Password {
+func NewPasswordNone() Password {
 	return Password{}
 }
 

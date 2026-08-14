@@ -100,7 +100,7 @@ func TestPassword_CompareEmpty(t *testing.T) {
 }
 
 func TestPassword_NoPassword(t *testing.T) {
-	pw := user.NoPassword()
+	pw := user.NewPasswordNone()
 
 	if pw.HasPassword() {
 		t.Error("expected HasPassword() == false")
