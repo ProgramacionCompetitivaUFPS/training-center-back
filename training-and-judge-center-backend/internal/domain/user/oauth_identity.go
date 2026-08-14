@@ -6,10 +6,6 @@ import (
 	"github.com/training-judge-center/backend/pkg/apperror"
 )
 
-type OAuthProvider string
-
-const OAuthProviderGoogle OAuthProvider = "GOOGLE"
-
 type OAuthIdentity struct {
 	id             string
 	userID         string

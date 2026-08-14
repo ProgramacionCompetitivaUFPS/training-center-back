@@ -58,8 +58,6 @@ func NewPassword(raw string) (Password, error) {
 	return Password{hash: string(hashed)}, nil
 }
 
-const SystemNoLoginHash = "$SYSTEM_NO_LOGIN$"
-
 // NoPassword represents a user with no local password — e.g. one authenticated
 // only through an external provider such as Google.
 func NoPassword() Password {
