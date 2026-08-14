@@ -11,4 +11,6 @@ const (
 	ErrCodeUserNotFound               = "USER_NOT_FOUND"
 	ErrCodeRefreshTokenAlreadyRevoked = "REFRESH_TOKEN_ALREADY_REVOKED"
 	ErrCodeRefreshTokenExpired        = "REFRESH_TOKEN_EXPIRED"
+	ErrCodeOAuthIdentityConflict      = "OAUTH_IDENTITY_CONFLICT"
+	ErrCodeOAuthIdentityAlreadyLinked = "OAUTH_IDENTITY_ALREADY_LINKED"
 )
