@@ -98,3 +98,24 @@ func TestPassword_CompareEmpty(t *testing.T) {
 		t.Error("Compare should return false for empty string")
 	}
 }
+
+func TestPassword_NoPassword(t *testing.T) {
+	pw := user.NoPassword()
+
+	if pw.HasPassword() {
+		t.Error("expected HasPassword() == false")
+	}
+	if pw.Compare("anything") {
+		t.Error("expected Compare() == false when there is no local password")
+	}
+}
+
+func TestPassword_HasPassword(t *testing.T) {
+	pw, err := user.NewPassword("Secret1!")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !pw.HasPassword() {
+		t.Error("expected HasPassword() == true")
+	}
+}
