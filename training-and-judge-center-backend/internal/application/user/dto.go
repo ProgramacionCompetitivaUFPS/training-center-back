@@ -23,6 +23,13 @@ type UserDTO struct {
 	DeactivatedAt *time.Time
 }
 
+type SessionOutput struct {
+	Token            string
+	RefreshToken     string
+	SessionExpiresAt time.Time
+	User             UserDTO
+}
+
 func userToDTO(u *user.User) UserDTO {
 	dto := UserDTO{
 		ID:            u.ID(),

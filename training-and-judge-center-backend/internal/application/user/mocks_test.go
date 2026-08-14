@@ -392,6 +392,40 @@ func (m *mockRefreshTokenCodec) Unwrap(wrapped string) (string, string, error) {
 	return wrapped, testRefreshUserID, nil
 }
 
+// ── mockOAuthIdentityRepository ──────────────────────────────────────────────
+
+type mockOAuthIdentityRepository struct {
+	saveFn           func(ctx context.Context, identity *domain.OAuthIdentity) error
+	findByProviderFn func(ctx context.Context, provider domain.OAuthProvider, providerUserID string) (*domain.OAuthIdentity, error)
+}
+
+func (m *mockOAuthIdentityRepository) Save(ctx context.Context, identity *domain.OAuthIdentity) error {
+	if m.saveFn != nil {
+		return m.saveFn(ctx, identity)
+	}
+	return nil
+}
+
+func (m *mockOAuthIdentityRepository) FindByProvider(ctx context.Context, provider domain.OAuthProvider, providerUserID string) (*domain.OAuthIdentity, error) {
+	if m.findByProviderFn != nil {
+		return m.findByProviderFn(ctx, provider, providerUserID)
+	}
+	return nil, nil
+}
+
+// ── mockGoogleIDTokenVerifier ────────────────────────────────────────────────
+
+type mockGoogleIDTokenVerifier struct {
+	verifyFn func(ctx context.Context, idToken string) (*GoogleClaims, error)
+}
+
+func (m *mockGoogleIDTokenVerifier) Verify(ctx context.Context, idToken string) (*GoogleClaims, error) {
+	if m.verifyFn != nil {
+		return m.verifyFn(ctx, idToken)
+	}
+	return &GoogleClaims{Sub: "google-sub", Email: "google@example.com", EmailVerified: true, Name: "Google User"}, nil
+}
+
 // ── helpers ───────────────────────────────────────────────────────────────────
 
 func strPtr(s string) *string { return &s }
