@@ -2,13 +2,12 @@ package user_test
 
 import (
 	"testing"
-	"time"
 
 	"github.com/training-judge-center/backend/internal/domain/user"
 )
 
 func TestNewOAuthIdentity_Valid(t *testing.T) {
-	now := time.Now()
+	now := testNow
 	identity, err := user.NewOAuthIdentity("identity-1", "user-1", user.OAuthProviderGoogle, "google-sub-123", now)
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
@@ -31,7 +30,7 @@ func TestNewOAuthIdentity_Valid(t *testing.T) {
 }
 
 func TestNewOAuthIdentity_Invalid(t *testing.T) {
-	now := time.Now()
+	now := testNow
 	tests := []struct {
 		name           string
 		id             string
@@ -53,7 +52,7 @@ func TestNewOAuthIdentity_Invalid(t *testing.T) {
 }
 
 func TestRestoreOAuthIdentity(t *testing.T) {
-	createdAt := time.Now().UTC()
+	createdAt := testNow
 	identity := user.RestoreOAuthIdentity("identity-1", "user-1", user.OAuthProviderGoogle, "google-sub-123", createdAt)
 
 	if identity.ID() != "identity-1" {

@@ -15,13 +15,8 @@ type OAuthIdentity struct {
 }
 
 func NewOAuthIdentity(id, userID string, provider OAuthProvider, providerUserID string, now time.Time) (*OAuthIdentity, error) {
-	if id == "" || userID == "" {
+	if id == "" || userID == "" || providerUserID == "" {
 		return nil, apperror.NewInternal()
-	}
-	if providerUserID == "" {
-		return nil, apperror.NewValidation([]apperror.FieldError{
-			{Field: "providerUserID", Message: "providerUserID is required"},
-		})
 	}
 	return &OAuthIdentity{
 		id:             id,
