@@ -58,7 +58,15 @@ func NewPassword(raw string) (Password, error) {
 	return Password{hash: string(hashed)}, nil
 }
 
-const SystemNoLoginHash = "$SYSTEM_NO_LOGIN$"
+// NewPasswordNone represents a user with no local password — e.g. one authenticated
+// only through an external provider such as Google.
+func NewPasswordNone() Password {
+	return Password{}
+}
+
+func (p Password) HasPassword() bool {
+	return p.hash != ""
+}
 
 func RestorePassword(hash string) Password {
 	return Password{hash: hash}
@@ -69,5 +77,8 @@ func (p Password) Hash() string {
 }
 
 func (p Password) Compare(raw string) bool {
+	if !p.HasPassword() {
+		return false
+	}
 	return bcrypt.CompareHashAndPassword([]byte(p.hash), []byte(raw)) == nil
 }
