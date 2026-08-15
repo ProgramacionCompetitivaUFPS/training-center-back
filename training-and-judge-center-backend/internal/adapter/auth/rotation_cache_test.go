@@ -3,6 +3,7 @@ package auth_test
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"strings"
 	"testing"
 	"time"
@@ -182,7 +183,7 @@ func TestSave_RawRedisValue_IsNotReadableJSON(t *testing.T) {
 	if strings.Contains(raw, output.Token) || strings.Contains(raw, output.RefreshToken) {
 		t.Error("expected the raw Redis value to not contain the plaintext tokens")
 	}
-	if bytes.HasPrefix([]byte(raw), []byte("{")) {
+	if json.Valid([]byte(raw)) {
 		t.Error("expected the raw Redis value to not be readable JSON")
 	}
 }
