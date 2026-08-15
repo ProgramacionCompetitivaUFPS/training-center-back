@@ -203,10 +203,13 @@ func googleNicknameFromEmail(email string) (user.Nickname, error) {
 		}
 	}
 	sanitized := b.String()
+	if sanitized == "" {
+		sanitized = "user"
+	}
 
 	suffix := strings.ReplaceAll(uuid.New().String(), "-", "")[:8]
 
-	maxLocalLen := 30 - 1 - len(suffix)
+	maxLocalLen := user.MaxNicknameLength - 1 - len(suffix)
 	if len(sanitized) > maxLocalLen {
 		sanitized = sanitized[:maxLocalLen]
 	}
