@@ -14,4 +14,7 @@ const (
 	ErrCodeInvalidRecoveryAttempt         = "INVALID_RECOVERY_ATTEMPT"
 	ErrCodeCannotSelfDeactivate           = "CANNOT_SELF_DEACTIVATE"
 	ErrCodeCannotDeactivateAdmin          = "CANNOT_DEACTIVATE_ADMIN"
+	ErrCodeInvalidGoogleToken             = "INVALID_GOOGLE_TOKEN"
+	ErrCodeGoogleEmailNotVerified         = "GOOGLE_EMAIL_NOT_VERIFIED"
+	ErrCodeInvalidGoogleEmail             = "INVALID_GOOGLE_EMAIL"
 )

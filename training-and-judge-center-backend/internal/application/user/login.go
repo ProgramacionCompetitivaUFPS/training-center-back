@@ -4,8 +4,6 @@ import (
 	"context"
 	"time"
 
-	"github.com/google/uuid"
-
 	appshared "github.com/training-judge-center/backend/internal/application/shared"
 	"github.com/training-judge-center/backend/internal/domain/user"
 	"github.com/training-judge-center/backend/pkg/apperror"
@@ -19,12 +17,7 @@ type LoginInput struct {
 	IPAddress       *string
 }
 
-type LoginOutput struct {
-	Token            string
-	RefreshToken     string
-	SessionExpiresAt time.Time
-	User             UserDTO
-}
+type LoginOutput = SessionOutput
 
 type LoginUseCase struct {
 	repo              user.Repository
@@ -82,39 +75,9 @@ func (uc *LoginUseCase) Execute(ctx context.Context, input LoginInput) (*LoginOu
 		return nil, apperror.NewUnauthorized(ErrCodeInvalidCredentials, "Invalid email or password")
 	}
 
-	now := time.Now()
-	sessionID := uuid.New().String()
-
-	token, err := uc.tokenService.GenerateToken(ctx, foundUser, sessionID)
+	session, err := issueSession(ctx, foundUser, input.RememberSession, input.UserAgent, input.IPAddress,
+		uc.tokenService, uc.refreshTokenRepo, uc.refreshTokenCodec, time.Now())
 	if err != nil {
-		return nil, err // nothing persisted yet — no orphaned refresh token
-	}
-
-	refreshSecret, err := generateRefreshTokenSecret()
-	if err != nil {
-		return nil, apperror.NewInternal()
-	}
-
-	newRefreshToken, err := user.NewRefreshToken(
-		uuid.New().String(),
-		foundUser.ID(),
-		sessionID,
-		hashRefreshTokenSecret(refreshSecret),
-		input.UserAgent,
-		input.IPAddress,
-		input.RememberSession,
-		now,
-	)
-	if err != nil {
-		return nil, err
-	}
-
-	wrapped, err := uc.refreshTokenCodec.Wrap(ctx, refreshSecret, foundUser.ID())
-	if err != nil {
-		return nil, err
-	}
-
-	if err := uc.refreshTokenRepo.Save(ctx, newRefreshToken); err != nil {
 		return nil, err
 	}
 
@@ -125,9 +88,9 @@ func (uc *LoginUseCase) Execute(ctx context.Context, input LoginInput) (*LoginOu
 	}
 
 	return &LoginOutput{
-		Token:            token,
-		RefreshToken:     wrapped,
-		SessionExpiresAt: newRefreshToken.AbsoluteExpiresAt(),
+		Token:            session.Token,
+		RefreshToken:     session.RefreshToken,
+		SessionExpiresAt: session.SessionExpiresAt,
 		User:             userToDTO(foundUser),
 	}, nil
 }
