@@ -23,6 +23,7 @@ type Config struct {
 	VirtualObject              *VirtualObject
 	JWTSecret                  string
 	JWTExpirationHours         int
+	GoogleClientID             string
 	SMTPHost                   string
 	SMTPPort                   string
 	SMTPUser                   string
@@ -50,6 +51,7 @@ func Load() *Config {
 		VirtualObject:              loadVirtualObject(),
 		JWTSecret:                  getRequiredEnv("JWT_SECRET"),
 		JWTExpirationHours:         getEnvAsInt("JWT_EXPIRATION_HOURS", 1),
+		GoogleClientID:             getRequiredEnv("GOOGLE_CLIENT_ID"),
 		SMTPHost:                   getEnv("SMTP_HOST", "localhost"),
 		SMTPPort:                   getEnv("SMTP_PORT", "1025"),
 		SMTPUser:                   getEnv("SMTP_USER", ""),

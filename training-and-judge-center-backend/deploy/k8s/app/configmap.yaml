@@ -19,3 +19,4 @@ data:
   SMTP_FROM: Training Center <trainingcenter.ufps@gmail.com>
   ALLOWED_ORIGINS: http://localhost:5173,https://training-and-judge-center-frontend.vercel.app,https://trainingjudgecenter.com,https://www.trainingjudgecenter.com
   FRONTEND_BASE_URL: https://training-and-judge-center-frontend.vercel.app
+  GOOGLE_CLIENT_ID: 761308836199-a3anvb632vljmoefjcrq5dco8t958mr9.apps.googleusercontent.com
