@@ -2,6 +2,7 @@ package user
 
 import (
 	"context"
+	"log/slog"
 	"strings"
 	"time"
 
@@ -76,8 +77,8 @@ func (uc *LoginWithGoogleUseCase) Execute(ctx context.Context, in LoginWithGoogl
 		return nil, err
 	}
 
-	if foundUser.Status() != user.StatusActive {
-		return nil, apperror.NewForbidden(ErrCodeAccountDeactivated, "This account has been deactivated")
+	if err := requireActiveUser(foundUser); err != nil {
+		return nil, err
 	}
 
 	session, err := issueSession(ctx, foundUser, in.RememberSession, in.UserAgent, in.IPAddress,
@@ -117,6 +118,8 @@ func (uc *LoginWithGoogleUseCase) findOrCreateUser(ctx context.Context, claims *
 		if err != nil {
 			return nil, err
 		}
+	} else if err := requireActiveUser(foundUser); err != nil {
+		return nil, err
 	}
 
 	identity, err := user.NewOAuthIdentity(uuid.New().String(), foundUser.ID(), user.OAuthProviderGoogle, claims.Sub, now)
@@ -146,9 +149,17 @@ func (uc *LoginWithGoogleUseCase) findOrCreateUser(ctx context.Context, claims *
 		return nil, findErr
 	}
 	if winnerIdentity == nil {
+		slog.ErrorContext(ctx, "oauth identity save conflicted but no winning identity was found", "error", err)
 		return nil, apperror.NewInternal()
 	}
 	return uc.userByIdentity(ctx, winnerIdentity)
+}
+
+func requireActiveUser(u *user.User) error {
+	if u.Status() != user.StatusActive {
+		return apperror.NewForbidden(ErrCodeAccountDeactivated, "This account has been deactivated")
+	}
+	return nil
 }
 
 func (uc *LoginWithGoogleUseCase) userByIdentity(ctx context.Context, identity *user.OAuthIdentity) (*user.User, error) {

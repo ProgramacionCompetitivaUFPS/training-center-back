@@ -207,7 +207,9 @@ func TestLoginWithGoogle_EmailNotVerified_ReturnsUnauthorized(t *testing.T) {
 func TestLoginWithGoogle_DeactivatedAccount_ReturnsForbidden(t *testing.T) {
 	repo, oauthRepo, tokenSvc, googleVerifier := newGoogleLoginDeps()
 	deactivatedUser := newActiveUser()
-	deactivatedUser.Deactivate("test_suffix", time.Now())
+	if err := deactivatedUser.Deactivate("test_suffix", time.Now()); err != nil {
+		t.Fatalf("unexpected error deactivating user: %v", err)
+	}
 
 	oauthRepo.findByProviderFn = func(_ context.Context, _ domain.OAuthProvider, _ string) (*domain.OAuthIdentity, error) {
 		identity, _ := domain.NewOAuthIdentity("identity-1", deactivatedUser.ID(), domain.OAuthProviderGoogle, "google-sub-123", time.Now())
@@ -232,6 +234,51 @@ func TestLoginWithGoogle_DeactivatedAccount_ReturnsForbidden(t *testing.T) {
 	}
 	if appErr.Kind != apperror.KindForbidden {
 		t.Errorf("expected kind FORBIDDEN, got %s", appErr.Kind)
+	}
+}
+
+func TestLoginWithGoogle_DeactivatedAccountFoundByEmail_ReturnsForbiddenWithoutLinking(t *testing.T) {
+	repo, oauthRepo, tokenSvc, googleVerifier := newGoogleLoginDeps()
+	deactivatedUser := newActiveUser()
+	if err := deactivatedUser.Deactivate("test_suffix", time.Now()); err != nil {
+		t.Fatalf("unexpected error deactivating user: %v", err)
+	}
+
+	oauthRepo.findByProviderFn = func(_ context.Context, _ domain.OAuthProvider, _ string) (*domain.OAuthIdentity, error) {
+		return nil, nil // no identity linked yet
+	}
+	repo.findByEmailFn = func(_ context.Context, _ domain.Email) (*domain.User, error) {
+		return deactivatedUser, nil
+	}
+
+	saveIdentityCalled := false
+	oauthRepo.saveFn = func(_ context.Context, _ *domain.OAuthIdentity) error {
+		saveIdentityCalled = true
+		return nil
+	}
+
+	googleVerifier.verifyFn = func(_ context.Context, _ string) (*GoogleClaims, error) {
+		return &GoogleClaims{Sub: "google-sub-123", Email: "test@example.com", EmailVerified: true, Name: "Test User"}, nil
+	}
+
+	uc := newGoogleLoginUseCase(repo, oauthRepo, tokenSvc, googleVerifier)
+
+	_, err := uc.Execute(context.Background(), LoginWithGoogleInput{IDToken: "valid-token"})
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+	appErr, ok := err.(*apperror.AppError)
+	if !ok {
+		t.Fatalf("expected *apperror.AppError, got %T", err)
+	}
+	if appErr.Code != ErrCodeAccountDeactivated {
+		t.Errorf("expected code %q, got %q", ErrCodeAccountDeactivated, appErr.Code)
+	}
+	if appErr.Kind != apperror.KindForbidden {
+		t.Errorf("expected kind FORBIDDEN, got %s", appErr.Kind)
+	}
+	if saveIdentityCalled {
+		t.Error("expected oauthIdentityRepo.Save NOT to be called for a deactivated account")
 	}
 }
 
@@ -264,15 +311,13 @@ func TestLoginWithGoogle_OrphanedIdentity_ReturnsInternalNotPanic(t *testing.T) 
 func TestLoginWithGoogle_ConcurrentSignup_LosesRaceAndRecovers(t *testing.T) {
 	repo, oauthRepo, tokenSvc, googleVerifier := newGoogleLoginDeps()
 
-	oauthRepo.findByProviderFn = func(_ context.Context, _ domain.OAuthProvider, _ string) (*domain.OAuthIdentity, error) {
-		return nil, nil // no identity yet, on both attempts
-	}
 	repo.findByEmailFn = func(_ context.Context, _ domain.Email) (*domain.User, error) {
 		return nil, nil // this request thinks the account doesn't exist either
 	}
 
 	txManager := &mockTransactionManager{
-		withTxFn: func(_ context.Context, fn func(txCtx context.Context) error) error {
+		withTxFn: func(ctx context.Context, fn func(txCtx context.Context) error) error {
+			_ = fn(ctx)                                                                      // exercise the transaction body
 			return apperror.NewConflict(domain.ErrCodeEmailConflict, "email already in use") // lost the race
 		},
 	}
