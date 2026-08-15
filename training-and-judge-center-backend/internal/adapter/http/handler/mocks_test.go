@@ -180,3 +180,43 @@ func (m *mockRotationCache) Get(ctx context.Context, oldTokenHash string) (*appu
 	}
 	return nil, nil
 }
+
+type mockTransactionManager struct {
+	withTxFn func(ctx context.Context, fn func(txCtx context.Context) error) error
+}
+
+func (m *mockTransactionManager) WithTx(ctx context.Context, fn func(txCtx context.Context) error) error {
+	if m.withTxFn != nil {
+		return m.withTxFn(ctx, fn)
+	}
+	return fn(ctx)
+}
+
+type mockOAuthIdentityRepo struct {
+	saveFn           func(ctx context.Context, identity *domainuser.OAuthIdentity) error
+	findByProviderFn func(ctx context.Context, provider domainuser.OAuthProvider, providerUserID string) (*domainuser.OAuthIdentity, error)
+}
+
+func (m *mockOAuthIdentityRepo) Save(ctx context.Context, identity *domainuser.OAuthIdentity) error {
+	if m.saveFn != nil {
+		return m.saveFn(ctx, identity)
+	}
+	return nil
+}
+func (m *mockOAuthIdentityRepo) FindByProvider(ctx context.Context, provider domainuser.OAuthProvider, providerUserID string) (*domainuser.OAuthIdentity, error) {
+	if m.findByProviderFn != nil {
+		return m.findByProviderFn(ctx, provider, providerUserID)
+	}
+	return nil, nil
+}
+
+type mockGoogleVerifier struct {
+	verifyFn func(ctx context.Context, idToken string) (*appuser.GoogleClaims, error)
+}
+
+func (m *mockGoogleVerifier) Verify(ctx context.Context, idToken string) (*appuser.GoogleClaims, error) {
+	if m.verifyFn != nil {
+		return m.verifyFn(ctx, idToken)
+	}
+	return &appuser.GoogleClaims{Sub: "google-sub-123", Email: "test@example.com", EmailVerified: true, Name: "Test User"}, nil
+}

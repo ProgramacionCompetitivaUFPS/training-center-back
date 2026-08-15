@@ -183,6 +183,7 @@ func main() {
 	emailChangeRepo := user.NewEmailChangeRepository(dbPool)
 	deactivationRequestRepo := user.NewDeactivationRequestRepository(dbPool)
 	deactivationAuditLogRepo := user.NewDeactivationAuditLogRepository(dbPool)
+	oauthIdentityRepo := user.NewOAuthIdentityRepository(dbPool)
 
 	// Infrastructure and cross-cutting services
 	txManager := postgres.NewTransactionManager(dbPool)
@@ -196,10 +197,12 @@ func main() {
 		os.Exit(1)
 	}
 	refreshTokenCodec := auth.NewJWTRefreshTokenCodec(cfg.JWTSecret)
+	googleVerifier := auth.NewGoogleVerifier(cfg.GoogleClientID)
 
 	// User use cases
 	createUserUseCase := appuser.NewCreateUserUseCase(userRepo)
 	loginUseCase := appuser.NewLoginUseCase(userRepo, refreshTokenRepo, jwtService, refreshTokenCodec, redisRateLimiter)
+	loginWithGoogleUseCase := appuser.NewLoginWithGoogleUseCase(userRepo, oauthIdentityRepo, refreshTokenRepo, jwtService, refreshTokenCodec, googleVerifier, txManager)
 	refreshUseCase := appuser.NewRefreshUseCase(refreshTokenRepo, userRepo, jwtService, refreshTokenCodec, redisRateLimiter, rotationCache)
 	logoutUseCase := appuser.NewLogoutUseCase(refreshTokenRepo, sessionInvalidator, refreshTokenCodec)
 	getMyProfileUseCase := appuser.NewGetMyProfileUseCase(userRepo)
@@ -236,7 +239,7 @@ func main() {
 
 	// Handlers
 	userHandler := handlerUser.NewHandler(createUserUseCase, getMyProfileUseCase, getUserByNicknameUseCase, updateUserUseCase, updatePasswordUseCase, adminUpdateUserUseCase, adminDeactivateUserUseCase, listUsersUseCase, requestEmailChangeUseCase, confirmEmailChangeUseCase, requestPasswordRecoveryUseCase, resetPasswordUseCase, requestDeactivationUseCase, confirmDeactivationUseCase, getDashboardUseCase, getProfileStatsUseCase)
-	authHandler := handler.NewAuthHandler(loginUseCase, refreshUseCase, logoutUseCase)
+	authHandler := handler.NewAuthHandler(loginUseCase, loginWithGoogleUseCase, refreshUseCase, logoutUseCase)
 
 	// Group repositories & platform adapters
 	groupRepo := group.NewRepository(dbPool)

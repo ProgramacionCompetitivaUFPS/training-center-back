@@ -32,13 +32,41 @@ type userResponse struct {
 }
 
 type AuthHandler struct {
-	loginUseCase   *appuser.LoginUseCase
-	refreshUseCase *appuser.RefreshUseCase
-	logoutUseCase  *appuser.LogoutUseCase
+	loginUseCase           *appuser.LoginUseCase
+	loginWithGoogleUseCase *appuser.LoginWithGoogleUseCase
+	refreshUseCase         *appuser.RefreshUseCase
+	logoutUseCase          *appuser.LogoutUseCase
 }
 
-func NewAuthHandler(loginUseCase *appuser.LoginUseCase, refreshUseCase *appuser.RefreshUseCase, logoutUseCase *appuser.LogoutUseCase) *AuthHandler {
-	return &AuthHandler{loginUseCase: loginUseCase, refreshUseCase: refreshUseCase, logoutUseCase: logoutUseCase}
+func NewAuthHandler(
+	loginUseCase *appuser.LoginUseCase,
+	loginWithGoogleUseCase *appuser.LoginWithGoogleUseCase,
+	refreshUseCase *appuser.RefreshUseCase,
+	logoutUseCase *appuser.LogoutUseCase,
+) *AuthHandler {
+	return &AuthHandler{
+		loginUseCase:           loginUseCase,
+		loginWithGoogleUseCase: loginWithGoogleUseCase,
+		refreshUseCase:         refreshUseCase,
+		logoutUseCase:          logoutUseCase,
+	}
+}
+
+func toUserResponse(u appuser.UserDTO) userResponse {
+	var email string
+	if u.Email != nil {
+		email = *u.Email
+	}
+	return userResponse{
+		Email:       email,
+		Name:        u.Name,
+		Nickname:    u.Nickname,
+		Country:     u.Country,
+		City:        u.City,
+		Institution: u.Institution,
+		Role:        u.Role,
+		CreatedAt:   u.CreatedAt.UTC().Format(time.RFC3339),
+	}
 }
 
 // @Summary      Login
@@ -74,22 +102,9 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 
 	setRefreshCookie(w, out.RefreshToken, out.SessionExpiresAt)
 
-	var email string
-	if out.User.Email != nil {
-		email = *out.User.Email
-	}
 	WriteJSON(r.Context(), w, http.StatusOK, loginResponse{
 		Token:            out.Token,
 		SessionExpiresAt: out.SessionExpiresAt.UTC().Format(time.RFC3339),
-		User: userResponse{
-			Email:       email,
-			Name:        out.User.Name,
-			Nickname:    out.User.Nickname,
-			Country:     out.User.Country,
-			City:        out.User.City,
-			Institution: out.User.Institution,
-			Role:        out.User.Role,
-			CreatedAt:   out.User.CreatedAt.UTC().Format(time.RFC3339),
-		},
+		User:             toUserResponse(out.User),
 	})
 }

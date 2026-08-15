@@ -60,6 +60,7 @@ func NewRouter(h *Handlers, s *Services, allowedOrigins []string) *chi.Mux {
 	r.Post("/password/reset", h.User.ResetPassword)
 	r.Route("/auth", func(r chi.Router) {
 		r.Post("/login", h.Auth.Login)
+		r.Post("/google", h.Auth.LoginWithGoogle)
 		r.Post("/refresh", h.Auth.Refresh)
 		r.Post("/logout", h.Auth.Logout)
 	})
