@@ -21,6 +21,7 @@ type Handler struct {
 	confirmDeactivation     *appuser.ConfirmDeactivationUseCase
 	getDashboard            *appuser.GetDashboardUseCase
 	getProfileStats         *appuser.GetProfileStatsUseCase
+	linkGoogle              *appuser.LinkGoogleIdentityUseCase
 }
 
 func NewHandler(
