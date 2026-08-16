@@ -13,4 +13,5 @@ const (
 	ErrCodeRefreshTokenExpired        = "REFRESH_TOKEN_EXPIRED"
 	ErrCodeOAuthIdentityConflict      = "OAUTH_IDENTITY_CONFLICT"
 	ErrCodeOAuthIdentityAlreadyLinked = "OAUTH_IDENTITY_ALREADY_LINKED"
+	ErrCodeOAuthIdentityNotFound      = "OAUTH_IDENTITY_NOT_FOUND"
 )

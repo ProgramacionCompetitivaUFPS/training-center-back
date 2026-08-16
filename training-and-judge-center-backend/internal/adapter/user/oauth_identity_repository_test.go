@@ -159,6 +159,93 @@ func TestOAuthIdentityRepository_FindByProvider_DBError_ReturnsInternal(t *testi
 	assertAppErrorKind(t, err, apperror.KindInternal)
 }
 
+// ── FindByUserID ──────────────────────────────────────────────────────────────
+
+func TestOAuthIdentityRepository_FindByUserID_Success(t *testing.T) {
+	repo := NewOAuthIdentityRepository(&mockQuerier{
+		queryRowFn: func(_ context.Context, _ string, _ ...interface{}) pgx.Row {
+			return &mockRow{scanFn: func(dest ...any) error {
+				*(dest[0].(*string)) = testIdentityID
+				*(dest[1].(*string)) = domainUser.OAuthProviderGoogle.String()
+				*(dest[2].(*string)) = testProviderUserID
+				*(dest[3].(*time.Time)) = testNow
+				return nil
+			}}
+		},
+	})
+
+	identity, err := repo.FindByUserID(context.Background(), testIdentityUserID)
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+	if identity.Provider() != domainUser.OAuthProviderGoogle {
+		t.Errorf("expected provider %q, got %q", domainUser.OAuthProviderGoogle, identity.Provider())
+	}
+	if identity.ProviderUserID() != testProviderUserID {
+		t.Errorf("expected providerUserID %q, got %q", testProviderUserID, identity.ProviderUserID())
+	}
+	if identity.UserID() != testIdentityUserID {
+		t.Errorf("expected userID %q, got %q", testIdentityUserID, identity.UserID())
+	}
+}
+
+func TestOAuthIdentityRepository_FindByUserID_NotFound(t *testing.T) {
+	repo := NewOAuthIdentityRepository(&mockQuerier{
+		queryRowFn: func(_ context.Context, _ string, _ ...interface{}) pgx.Row {
+			return &mockRow{scanFn: func(_ ...any) error { return pgx.ErrNoRows }}
+		},
+	})
+
+	identity, err := repo.FindByUserID(context.Background(), "no-such-user")
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+	if identity != nil {
+		t.Errorf("expected nil identity, got %+v", identity)
+	}
+}
+
+func TestOAuthIdentityRepository_FindByUserID_DBError_ReturnsInternal(t *testing.T) {
+	repo := NewOAuthIdentityRepository(&mockQuerier{
+		queryRowFn: func(_ context.Context, _ string, _ ...interface{}) pgx.Row {
+			return &mockRow{scanFn: func(_ ...any) error { return errors.New("db failure") }}
+		},
+	})
+
+	_, err := repo.FindByUserID(context.Background(), testIdentityUserID)
+	assertAppErrorKind(t, err, apperror.KindInternal)
+}
+
+// ── DeleteByUserID ────────────────────────────────────────────────────────────
+
+func TestOAuthIdentityRepository_DeleteByUserID_Success(t *testing.T) {
+	var capturedArgs []interface{}
+	repo := NewOAuthIdentityRepository(&mockQuerier{
+		execFn: func(_ context.Context, _ string, args ...interface{}) (pgconn.CommandTag, error) {
+			capturedArgs = args
+			return pgconn.NewCommandTag("DELETE 1"), nil
+		},
+	})
+
+	if err := repo.DeleteByUserID(context.Background(), testIdentityUserID); err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+	if capturedArgs[0] != testIdentityUserID {
+		t.Errorf("expected user_id arg %q, got %v", testIdentityUserID, capturedArgs[0])
+	}
+}
+
+func TestOAuthIdentityRepository_DeleteByUserID_DBError_ReturnsInternal(t *testing.T) {
+	repo := NewOAuthIdentityRepository(&mockQuerier{
+		execFn: func(_ context.Context, _ string, _ ...interface{}) (pgconn.CommandTag, error) {
+			return pgconn.CommandTag{}, errors.New("db failure")
+		},
+	})
+
+	err := repo.DeleteByUserID(context.Background(), testIdentityUserID)
+	assertAppErrorKind(t, err, apperror.KindInternal)
+}
+
 // ── test helpers ──────────────────────────────────────────────────────────────
 
 func assertOAuthConflict(t *testing.T, err error, wantCode string) {
