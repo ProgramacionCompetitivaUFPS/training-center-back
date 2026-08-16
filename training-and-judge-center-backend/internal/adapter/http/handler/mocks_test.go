@@ -195,6 +195,8 @@ func (m *mockTransactionManager) WithTx(ctx context.Context, fn func(txCtx conte
 type mockOAuthIdentityRepo struct {
 	saveFn           func(ctx context.Context, identity *domainuser.OAuthIdentity) error
 	findByProviderFn func(ctx context.Context, provider domainuser.OAuthProvider, providerUserID string) (*domainuser.OAuthIdentity, error)
+	findByUserIDFn   func(ctx context.Context, userID string) (*domainuser.OAuthIdentity, error)
+	deleteByUserIDFn func(ctx context.Context, userID string) error
 }
 
 func (m *mockOAuthIdentityRepo) Save(ctx context.Context, identity *domainuser.OAuthIdentity) error {
@@ -208,6 +210,18 @@ func (m *mockOAuthIdentityRepo) FindByProvider(ctx context.Context, provider dom
 		return m.findByProviderFn(ctx, provider, providerUserID)
 	}
 	return nil, nil
+}
+func (m *mockOAuthIdentityRepo) FindByUserID(ctx context.Context, userID string) (*domainuser.OAuthIdentity, error) {
+	if m.findByUserIDFn != nil {
+		return m.findByUserIDFn(ctx, userID)
+	}
+	return nil, nil
+}
+func (m *mockOAuthIdentityRepo) DeleteByUserID(ctx context.Context, userID string) error {
+	if m.deleteByUserIDFn != nil {
+		return m.deleteByUserIDFn(ctx, userID)
+	}
+	return nil
 }
 
 type mockGoogleVerifier struct {
