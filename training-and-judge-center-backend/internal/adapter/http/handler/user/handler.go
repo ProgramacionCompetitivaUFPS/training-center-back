@@ -22,6 +22,7 @@ type Handler struct {
 	getDashboard            *appuser.GetDashboardUseCase
 	getProfileStats         *appuser.GetProfileStatsUseCase
 	linkGoogle              *appuser.LinkGoogleIdentityUseCase
+	unlinkGoogle            *appuser.UnlinkGoogleIdentityUseCase
 }
 
 func NewHandler(
@@ -42,6 +43,7 @@ func NewHandler(
 	getDashboard *appuser.GetDashboardUseCase,
 	getProfileStats *appuser.GetProfileStatsUseCase,
 	linkGoogle *appuser.LinkGoogleIdentityUseCase,
+	unlinkGoogle *appuser.UnlinkGoogleIdentityUseCase,
 ) *Handler {
 	return &Handler{
 		createUser:              createUser,
@@ -61,5 +63,6 @@ func NewHandler(
 		getDashboard:            getDashboard,
 		getProfileStats:         getProfileStats,
 		linkGoogle:              linkGoogle,
+		unlinkGoogle:            unlinkGoogle,
 	}
 }
