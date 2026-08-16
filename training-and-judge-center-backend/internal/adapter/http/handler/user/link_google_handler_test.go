@@ -22,7 +22,7 @@ func TestLinkGoogle_ValidToken_Returns204(t *testing.T) {
 	const userID = "user-abc"
 
 	oauthRepo := &mockHandlerOAuthIdentityRepo{}
-	uc := appuser.NewLinkGoogleIdentityUseCase(oauthRepo, &mockHandlerGoogleVerifier{})
+	uc := appuser.NewLinkGoogleIdentityUseCase(&mockHandlerUserRepo{}, oauthRepo, &mockHandlerGoogleVerifier{}, &mockHandlerEmailSender{})
 	h := newHandlerWithLinkGoogle(uc)
 	wrapped := wrapWithAuth(
 		http.HandlerFunc(h.LinkGoogle),
@@ -42,7 +42,7 @@ func TestLinkGoogle_ValidToken_Returns204(t *testing.T) {
 }
 
 func TestLinkGoogle_MissingIDToken_Returns400(t *testing.T) {
-	uc := appuser.NewLinkGoogleIdentityUseCase(&mockHandlerOAuthIdentityRepo{}, &mockHandlerGoogleVerifier{})
+	uc := appuser.NewLinkGoogleIdentityUseCase(&mockHandlerUserRepo{}, &mockHandlerOAuthIdentityRepo{}, &mockHandlerGoogleVerifier{}, &mockHandlerEmailSender{})
 	h := newHandlerWithLinkGoogle(uc)
 	wrapped := wrapWithAuth(
 		http.HandlerFunc(h.LinkGoogle),
@@ -67,7 +67,7 @@ func TestLinkGoogle_AlreadyLinkedElsewhere_Returns409(t *testing.T) {
 			return apperror.NewConflict(domainuser.ErrCodeOAuthIdentityConflict, "this Google account is already linked to a user")
 		},
 	}
-	uc := appuser.NewLinkGoogleIdentityUseCase(oauthRepo, &mockHandlerGoogleVerifier{})
+	uc := appuser.NewLinkGoogleIdentityUseCase(&mockHandlerUserRepo{}, oauthRepo, &mockHandlerGoogleVerifier{}, &mockHandlerEmailSender{})
 	h := newHandlerWithLinkGoogle(uc)
 	wrapped := wrapWithAuth(
 		http.HandlerFunc(h.LinkGoogle),

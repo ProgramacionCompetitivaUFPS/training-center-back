@@ -203,7 +203,7 @@ func main() {
 	createUserUseCase := appuser.NewCreateUserUseCase(userRepo)
 	loginUseCase := appuser.NewLoginUseCase(userRepo, refreshTokenRepo, jwtService, refreshTokenCodec, redisRateLimiter)
 	loginWithGoogleUseCase := appuser.NewLoginWithGoogleUseCase(userRepo, oauthIdentityRepo, refreshTokenRepo, jwtService, refreshTokenCodec, googleVerifier, txManager)
-	linkGoogleIdentityUseCase := appuser.NewLinkGoogleIdentityUseCase(oauthIdentityRepo, googleVerifier)
+	linkGoogleIdentityUseCase := appuser.NewLinkGoogleIdentityUseCase(userRepo, oauthIdentityRepo, googleVerifier, emailSender)
 	refreshUseCase := appuser.NewRefreshUseCase(refreshTokenRepo, userRepo, jwtService, refreshTokenCodec, redisRateLimiter, rotationCache)
 	logoutUseCase := appuser.NewLogoutUseCase(refreshTokenRepo, sessionInvalidator, refreshTokenCodec)
 	getMyProfileUseCase := appuser.NewGetMyProfileUseCase(userRepo)

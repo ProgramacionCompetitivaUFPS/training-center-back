@@ -4,6 +4,7 @@ import (
 	"context"
 	"testing"
 
+	appshared "github.com/training-judge-center/backend/internal/application/shared"
 	domain "github.com/training-judge-center/backend/internal/domain/user"
 	"github.com/training-judge-center/backend/pkg/apperror"
 )
@@ -22,7 +23,7 @@ func TestLinkGoogleIdentity_ValidToken_SavesIdentityForCurrentUser(t *testing.T)
 		return nil
 	}
 
-	uc := NewLinkGoogleIdentityUseCase(oauthRepo, googleVerifier)
+	uc := NewLinkGoogleIdentityUseCase(&mockUserRepository{}, oauthRepo, googleVerifier, &mockEmailSender{})
 
 	err := uc.Execute(context.Background(), LinkGoogleIdentityInput{UserID: "user-abc", IDToken: "valid-token"})
 	if err != nil {
@@ -42,8 +43,44 @@ func TestLinkGoogleIdentity_ValidToken_SavesIdentityForCurrentUser(t *testing.T)
 	}
 }
 
+func TestLinkGoogleIdentity_ValidToken_SendsSecurityAlertEmail(t *testing.T) {
+	oauthRepo := &mockOAuthIdentityRepository{}
+	userRepo := &mockUserRepository{
+		findByIDFn: func(_ context.Context, _ string) (*domain.User, error) {
+			return newActiveUser(), nil
+		},
+	}
+	googleVerifier := &mockGoogleIDTokenVerifier{
+		verifyFn: func(_ context.Context, _ string) (*GoogleClaims, error) {
+			return &GoogleClaims{Sub: "google-sub-999", Email: "linked@example.com", EmailVerified: true}, nil
+		},
+	}
+
+	var sentTo, sentSubject string
+	emailSender := &mockEmailSender{
+		sendFn: func(_ context.Context, msg appshared.EmailMessage) error {
+			sentTo = msg.To
+			sentSubject = msg.Subject
+			return nil
+		},
+	}
+
+	uc := NewLinkGoogleIdentityUseCase(userRepo, oauthRepo, googleVerifier, emailSender)
+
+	err := uc.Execute(context.Background(), LinkGoogleIdentityInput{UserID: "user-uuid-123", IDToken: "valid-token"})
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+	if sentTo != "test@example.com" {
+		t.Errorf("expected notification email to %q, got %q", "test@example.com", sentTo)
+	}
+	if sentSubject != "Security Alert: Google Account Linked" {
+		t.Errorf("expected subject %q, got %q", "Security Alert: Google Account Linked", sentSubject)
+	}
+}
+
 func TestLinkGoogleIdentity_MissingIDToken_ReturnsValidation(t *testing.T) {
-	uc := NewLinkGoogleIdentityUseCase(&mockOAuthIdentityRepository{}, &mockGoogleIDTokenVerifier{})
+	uc := NewLinkGoogleIdentityUseCase(&mockUserRepository{}, &mockOAuthIdentityRepository{}, &mockGoogleIDTokenVerifier{}, &mockEmailSender{})
 
 	err := uc.Execute(context.Background(), LinkGoogleIdentityInput{UserID: "user-abc", IDToken: ""})
 	if err == nil {
@@ -64,7 +101,7 @@ func TestLinkGoogleIdentity_InvalidToken_ReturnsUnauthorized(t *testing.T) {
 			return nil, apperror.NewUnauthorized("IGNORED", "google rejected the token")
 		},
 	}
-	uc := NewLinkGoogleIdentityUseCase(&mockOAuthIdentityRepository{}, googleVerifier)
+	uc := NewLinkGoogleIdentityUseCase(&mockUserRepository{}, &mockOAuthIdentityRepository{}, googleVerifier, &mockEmailSender{})
 
 	err := uc.Execute(context.Background(), LinkGoogleIdentityInput{UserID: "user-abc", IDToken: "bad-token"})
 	if err == nil {
@@ -88,7 +125,7 @@ func TestLinkGoogleIdentity_EmailNotVerified_ReturnsUnauthorized(t *testing.T) {
 			return &GoogleClaims{Sub: "google-sub-999", Email: "unverified@example.com", EmailVerified: false}, nil
 		},
 	}
-	uc := NewLinkGoogleIdentityUseCase(&mockOAuthIdentityRepository{}, googleVerifier)
+	uc := NewLinkGoogleIdentityUseCase(&mockUserRepository{}, &mockOAuthIdentityRepository{}, googleVerifier, &mockEmailSender{})
 
 	err := uc.Execute(context.Background(), LinkGoogleIdentityInput{UserID: "user-abc", IDToken: "valid-token"})
 	if err == nil {
@@ -114,7 +151,7 @@ func TestLinkGoogleIdentity_AlreadyLinkedElsewhere_PropagatesConflict(t *testing
 			return apperror.NewConflict(domain.ErrCodeOAuthIdentityConflict, "this Google account is already linked to a user")
 		},
 	}
-	uc := NewLinkGoogleIdentityUseCase(oauthRepo, googleVerifier)
+	uc := NewLinkGoogleIdentityUseCase(&mockUserRepository{}, oauthRepo, googleVerifier, &mockEmailSender{})
 
 	err := uc.Execute(context.Background(), LinkGoogleIdentityInput{UserID: "user-abc", IDToken: "valid-token"})
 	if err == nil {
