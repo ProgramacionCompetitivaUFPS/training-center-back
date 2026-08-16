@@ -111,32 +111,29 @@ func (uc *LoginWithGoogleUseCase) findOrCreateUser(ctx context.Context, claims *
 	if err != nil {
 		return nil, err
 	}
+	if foundUser != nil {
+		return nil, apperror.NewConflict(ErrCodeGoogleAccountLinkRequired,
+			"An account with this email already exists. Log in with your password and link your Google account from your profile settings.")
+	}
 
-	isNewUser := foundUser == nil
-	if isNewUser {
-		foundUser, err = uc.newUserFromGoogle(claims, email, now)
-		if err != nil {
-			return nil, err
-		}
-	} else if err := requireActiveUser(foundUser); err != nil {
+	newUser, err := uc.newUserFromGoogle(claims, email, now)
+	if err != nil {
 		return nil, err
 	}
 
-	identity, err := user.NewOAuthIdentity(uuid.New().String(), foundUser.ID(), user.OAuthProviderGoogle, claims.Sub, now)
+	identity, err := user.NewOAuthIdentity(uuid.New().String(), newUser.ID(), user.OAuthProviderGoogle, claims.Sub, now)
 	if err != nil {
 		return nil, err
 	}
 
 	err = uc.txManager.WithTx(ctx, func(txCtx context.Context) error {
-		if isNewUser {
-			if err := uc.userRepo.Save(txCtx, foundUser); err != nil {
-				return err
-			}
+		if err := uc.userRepo.Save(txCtx, newUser); err != nil {
+			return err
 		}
 		return uc.oauthIdentityRepo.Save(txCtx, identity)
 	})
 	if err == nil {
-		return foundUser, nil
+		return newUser, nil
 	}
 
 	ae, ok := err.(*apperror.AppError)

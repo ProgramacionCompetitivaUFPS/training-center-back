@@ -17,4 +17,5 @@ const (
 	ErrCodeInvalidGoogleToken             = "INVALID_GOOGLE_TOKEN"
 	ErrCodeGoogleEmailNotVerified         = "GOOGLE_EMAIL_NOT_VERIFIED"
 	ErrCodeInvalidGoogleEmail             = "INVALID_GOOGLE_EMAIL"
+	ErrCodeGoogleAccountLinkRequired      = "GOOGLE_ACCOUNT_LINK_REQUIRED"
 )

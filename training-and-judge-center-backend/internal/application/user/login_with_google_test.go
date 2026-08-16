@@ -64,7 +64,7 @@ func TestLoginWithGoogle_ExistingIdentity_IssuesSession(t *testing.T) {
 	}
 }
 
-func TestLoginWithGoogle_ExistingEmailNoIdentity_LinksAccount(t *testing.T) {
+func TestLoginWithGoogle_ExistingEmailNoIdentity_ReturnsConflictWithoutLinking(t *testing.T) {
 	repo, oauthRepo, tokenSvc, googleVerifier := newGoogleLoginDeps()
 	activeUser := newActiveUser()
 
@@ -75,9 +75,9 @@ func TestLoginWithGoogle_ExistingEmailNoIdentity_LinksAccount(t *testing.T) {
 		return activeUser, nil
 	}
 
-	var savedIdentity *domain.OAuthIdentity
-	oauthRepo.saveFn = func(_ context.Context, identity *domain.OAuthIdentity) error {
-		savedIdentity = identity
+	identitySaved := false
+	oauthRepo.saveFn = func(_ context.Context, _ *domain.OAuthIdentity) error {
+		identitySaved = true
 		return nil
 	}
 	userSaveCalled := false
@@ -92,24 +92,25 @@ func TestLoginWithGoogle_ExistingEmailNoIdentity_LinksAccount(t *testing.T) {
 
 	uc := newGoogleLoginUseCase(repo, oauthRepo, tokenSvc, googleVerifier)
 
-	result, err := uc.Execute(context.Background(), LoginWithGoogleInput{IDToken: "valid-token"})
-	if err != nil {
-		t.Fatalf("expected no error, got %v", err)
+	_, err := uc.Execute(context.Background(), LoginWithGoogleInput{IDToken: "valid-token"})
+	if err == nil {
+		t.Fatal("expected error, got nil")
 	}
-	if result.User.ID != activeUser.ID() {
-		t.Errorf("expected user ID %q, got %q", activeUser.ID(), result.User.ID)
+	appErr, ok := err.(*apperror.AppError)
+	if !ok {
+		t.Fatalf("expected *apperror.AppError, got %T", err)
+	}
+	if appErr.Code != ErrCodeGoogleAccountLinkRequired {
+		t.Errorf("expected code %q, got %q", ErrCodeGoogleAccountLinkRequired, appErr.Code)
+	}
+	if appErr.Kind != apperror.KindConflict {
+		t.Errorf("expected kind CONFLICT, got %s", appErr.Kind)
+	}
+	if identitySaved {
+		t.Error("expected oauthIdentityRepo.Save NOT to be called — linking requires an explicit authenticated request")
 	}
 	if userSaveCalled {
 		t.Error("expected userRepo.Save NOT to be called for an already-existing account")
-	}
-	if savedIdentity == nil {
-		t.Fatal("expected oauthIdentityRepo.Save to be called to link the account")
-	}
-	if savedIdentity.UserID() != activeUser.ID() {
-		t.Errorf("expected linked identity userID %q, got %q", activeUser.ID(), savedIdentity.UserID())
-	}
-	if savedIdentity.ProviderUserID() != "google-sub-123" {
-		t.Errorf("expected linked identity providerUserID %q, got %q", "google-sub-123", savedIdentity.ProviderUserID())
 	}
 }
 
@@ -237,7 +238,7 @@ func TestLoginWithGoogle_DeactivatedAccount_ReturnsForbidden(t *testing.T) {
 	}
 }
 
-func TestLoginWithGoogle_DeactivatedAccountFoundByEmail_ReturnsForbiddenWithoutLinking(t *testing.T) {
+func TestLoginWithGoogle_DeactivatedAccountFoundByEmail_ReturnsConflictWithoutLinking(t *testing.T) {
 	repo, oauthRepo, tokenSvc, googleVerifier := newGoogleLoginDeps()
 	deactivatedUser := newActiveUser()
 	if err := deactivatedUser.Deactivate("test_suffix", time.Now()); err != nil {
@@ -271,14 +272,14 @@ func TestLoginWithGoogle_DeactivatedAccountFoundByEmail_ReturnsForbiddenWithoutL
 	if !ok {
 		t.Fatalf("expected *apperror.AppError, got %T", err)
 	}
-	if appErr.Code != ErrCodeAccountDeactivated {
-		t.Errorf("expected code %q, got %q", ErrCodeAccountDeactivated, appErr.Code)
+	if appErr.Code != ErrCodeGoogleAccountLinkRequired {
+		t.Errorf("expected code %q, got %q", ErrCodeGoogleAccountLinkRequired, appErr.Code)
 	}
-	if appErr.Kind != apperror.KindForbidden {
-		t.Errorf("expected kind FORBIDDEN, got %s", appErr.Kind)
+	if appErr.Kind != apperror.KindConflict {
+		t.Errorf("expected kind CONFLICT, got %s", appErr.Kind)
 	}
 	if saveIdentityCalled {
-		t.Error("expected oauthIdentityRepo.Save NOT to be called for a deactivated account")
+		t.Error("expected oauthIdentityRepo.Save NOT to be called for an existing account match")
 	}
 }
 
