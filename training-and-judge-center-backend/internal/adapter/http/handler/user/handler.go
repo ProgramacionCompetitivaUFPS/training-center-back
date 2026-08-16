@@ -41,6 +41,7 @@ func NewHandler(
 	confirmDeactivation *appuser.ConfirmDeactivationUseCase,
 	getDashboard *appuser.GetDashboardUseCase,
 	getProfileStats *appuser.GetProfileStatsUseCase,
+	linkGoogle *appuser.LinkGoogleIdentityUseCase,
 ) *Handler {
 	return &Handler{
 		createUser:              createUser,
@@ -59,5 +60,6 @@ func NewHandler(
 		confirmDeactivation:     confirmDeactivation,
 		getDashboard:            getDashboard,
 		getProfileStats:         getProfileStats,
+		linkGoogle:              linkGoogle,
 	}
 }

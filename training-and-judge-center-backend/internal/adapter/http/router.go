@@ -204,6 +204,7 @@ func NewRouter(h *Handlers, s *Services, allowedOrigins []string) *chi.Mux {
 		r.Post("/users/email-change/confirm", h.User.ConfirmEmailChange)
 		r.Post("/users/deactivation", h.User.RequestDeactivation)
 		r.Post("/users/deactivation/confirm", h.User.ConfirmDeactivation)
+		r.Post("/users/google", h.User.LinkGoogle)
 	})
 
 	// Protected routes — admin only
