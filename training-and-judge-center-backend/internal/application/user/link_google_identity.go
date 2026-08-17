@@ -2,6 +2,7 @@ package user
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"github.com/google/uuid"
@@ -54,7 +55,7 @@ func (uc *LinkGoogleIdentityUseCase) Execute(ctx context.Context, in LinkGoogleI
 		_ = uc.emailSender.Send(ctx, appshared.EmailMessage{
 			To:      foundUser.Email().String(),
 			Subject: "Security Alert: Google Account Linked",
-			Body:    "Your Google account has been linked to your account and can now be used to log in. If you did not make this change, unlink it from your account settings immediately or contact support.",
+			Body:    fmt.Sprintf("The Google account %s has been linked to your account and can now be used to log in. If you did not make this change, unlink it from your account settings immediately or contact support.", claims.Email),
 		})
 	}
 

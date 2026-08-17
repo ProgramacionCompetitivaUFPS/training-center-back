@@ -334,8 +334,8 @@ func (m *mockTopicStatsProvider) GetTopicBreakdown(ctx context.Context, userID s
 type mockHandlerOAuthIdentityRepo struct {
 	saveFn           func(ctx context.Context, identity *domainuser.OAuthIdentity) error
 	findByProviderFn func(ctx context.Context, provider domainuser.OAuthProvider, providerUserID string) (*domainuser.OAuthIdentity, error)
-	findByUserIDFn   func(ctx context.Context, userID string) (*domainuser.OAuthIdentity, error)
-	deleteByUserIDFn func(ctx context.Context, userID string) error
+	findByUserIDFn   func(ctx context.Context, userID string, provider domainuser.OAuthProvider) (*domainuser.OAuthIdentity, error)
+	deleteByUserIDFn func(ctx context.Context, userID string, provider domainuser.OAuthProvider) error
 }
 
 func (m *mockHandlerOAuthIdentityRepo) Save(ctx context.Context, identity *domainuser.OAuthIdentity) error {
@@ -350,15 +350,15 @@ func (m *mockHandlerOAuthIdentityRepo) FindByProvider(ctx context.Context, provi
 	}
 	return nil, nil
 }
-func (m *mockHandlerOAuthIdentityRepo) FindByUserID(ctx context.Context, userID string) (*domainuser.OAuthIdentity, error) {
+func (m *mockHandlerOAuthIdentityRepo) FindByUserID(ctx context.Context, userID string, provider domainuser.OAuthProvider) (*domainuser.OAuthIdentity, error) {
 	if m.findByUserIDFn != nil {
-		return m.findByUserIDFn(ctx, userID)
+		return m.findByUserIDFn(ctx, userID, provider)
 	}
 	return nil, nil
 }
-func (m *mockHandlerOAuthIdentityRepo) DeleteByUserID(ctx context.Context, userID string) error {
+func (m *mockHandlerOAuthIdentityRepo) DeleteByUserID(ctx context.Context, userID string, provider domainuser.OAuthProvider) error {
 	if m.deleteByUserIDFn != nil {
-		return m.deleteByUserIDFn(ctx, userID)
+		return m.deleteByUserIDFn(ctx, userID, provider)
 	}
 	return nil
 }

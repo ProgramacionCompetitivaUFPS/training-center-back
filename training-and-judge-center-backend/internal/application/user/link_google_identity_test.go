@@ -2,6 +2,7 @@ package user
 
 import (
 	"context"
+	"strings"
 	"testing"
 
 	appshared "github.com/training-judge-center/backend/internal/application/shared"
@@ -56,11 +57,12 @@ func TestLinkGoogleIdentity_ValidToken_SendsSecurityAlertEmail(t *testing.T) {
 		},
 	}
 
-	var sentTo, sentSubject string
+	var sentTo, sentSubject, sentBody string
 	emailSender := &mockEmailSender{
 		sendFn: func(_ context.Context, msg appshared.EmailMessage) error {
 			sentTo = msg.To
 			sentSubject = msg.Subject
+			sentBody = msg.Body
 			return nil
 		},
 	}
@@ -76,6 +78,9 @@ func TestLinkGoogleIdentity_ValidToken_SendsSecurityAlertEmail(t *testing.T) {
 	}
 	if sentSubject != "Security Alert: Google Account Linked" {
 		t.Errorf("expected subject %q, got %q", "Security Alert: Google Account Linked", sentSubject)
+	}
+	if !strings.Contains(sentBody, "linked@example.com") {
+		t.Errorf("expected notification body to mention the linked Google email %q, got %q", "linked@example.com", sentBody)
 	}
 }
 

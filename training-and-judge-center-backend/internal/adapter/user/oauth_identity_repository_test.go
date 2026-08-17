@@ -166,15 +166,14 @@ func TestOAuthIdentityRepository_FindByUserID_Success(t *testing.T) {
 		queryRowFn: func(_ context.Context, _ string, _ ...interface{}) pgx.Row {
 			return &mockRow{scanFn: func(dest ...any) error {
 				*(dest[0].(*string)) = testIdentityID
-				*(dest[1].(*string)) = domainUser.OAuthProviderGoogle.String()
-				*(dest[2].(*string)) = testProviderUserID
-				*(dest[3].(*time.Time)) = testNow
+				*(dest[1].(*string)) = testProviderUserID
+				*(dest[2].(*time.Time)) = testNow
 				return nil
 			}}
 		},
 	})
 
-	identity, err := repo.FindByUserID(context.Background(), testIdentityUserID)
+	identity, err := repo.FindByUserID(context.Background(), testIdentityUserID, domainUser.OAuthProviderGoogle)
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
@@ -196,7 +195,7 @@ func TestOAuthIdentityRepository_FindByUserID_NotFound(t *testing.T) {
 		},
 	})
 
-	identity, err := repo.FindByUserID(context.Background(), "no-such-user")
+	identity, err := repo.FindByUserID(context.Background(), "no-such-user", domainUser.OAuthProviderGoogle)
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
@@ -212,7 +211,7 @@ func TestOAuthIdentityRepository_FindByUserID_DBError_ReturnsInternal(t *testing
 		},
 	})
 
-	_, err := repo.FindByUserID(context.Background(), testIdentityUserID)
+	_, err := repo.FindByUserID(context.Background(), testIdentityUserID, domainUser.OAuthProviderGoogle)
 	assertAppErrorKind(t, err, apperror.KindInternal)
 }
 
@@ -227,7 +226,7 @@ func TestOAuthIdentityRepository_DeleteByUserID_Success(t *testing.T) {
 		},
 	})
 
-	if err := repo.DeleteByUserID(context.Background(), testIdentityUserID); err != nil {
+	if err := repo.DeleteByUserID(context.Background(), testIdentityUserID, domainUser.OAuthProviderGoogle); err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
 	if capturedArgs[0] != testIdentityUserID {
@@ -242,7 +241,7 @@ func TestOAuthIdentityRepository_DeleteByUserID_DBError_ReturnsInternal(t *testi
 		},
 	})
 
-	err := repo.DeleteByUserID(context.Background(), testIdentityUserID)
+	err := repo.DeleteByUserID(context.Background(), testIdentityUserID, domainUser.OAuthProviderGoogle)
 	assertAppErrorKind(t, err, apperror.KindInternal)
 }
 

@@ -204,7 +204,7 @@ func main() {
 	loginUseCase := appuser.NewLoginUseCase(userRepo, refreshTokenRepo, jwtService, refreshTokenCodec, redisRateLimiter)
 	loginWithGoogleUseCase := appuser.NewLoginWithGoogleUseCase(userRepo, oauthIdentityRepo, refreshTokenRepo, jwtService, refreshTokenCodec, googleVerifier, txManager)
 	linkGoogleIdentityUseCase := appuser.NewLinkGoogleIdentityUseCase(userRepo, oauthIdentityRepo, googleVerifier, emailSender)
-	unlinkGoogleIdentityUseCase := appuser.NewUnlinkGoogleIdentityUseCase(oauthIdentityRepo)
+	unlinkGoogleIdentityUseCase := appuser.NewUnlinkGoogleIdentityUseCase(userRepo, oauthIdentityRepo, emailSender)
 	refreshUseCase := appuser.NewRefreshUseCase(refreshTokenRepo, userRepo, jwtService, refreshTokenCodec, redisRateLimiter, rotationCache)
 	logoutUseCase := appuser.NewLogoutUseCase(refreshTokenRepo, sessionInvalidator, refreshTokenCodec)
 	getMyProfileUseCase := appuser.NewGetMyProfileUseCase(userRepo)
