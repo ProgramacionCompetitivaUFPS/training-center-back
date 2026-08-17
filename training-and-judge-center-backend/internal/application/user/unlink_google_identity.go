@@ -6,6 +6,7 @@ import (
 	appshared "github.com/training-judge-center/backend/internal/application/shared"
 	"github.com/training-judge-center/backend/internal/domain/user"
 	"github.com/training-judge-center/backend/pkg/apperror"
+	"github.com/training-judge-center/backend/pkg/emailtemplate"
 )
 
 type UnlinkGoogleIdentityInput struct {
@@ -40,6 +41,9 @@ func (uc *UnlinkGoogleIdentityUseCase) Execute(ctx context.Context, in UnlinkGoo
 			To:      foundUser.Email().String(),
 			Subject: "Security Alert: Google Account Unlinked",
 			Body:    "Your Google account has been unlinked from your account and can no longer be used to log in. If you did not make this change, please review your account security immediately.",
+			HTMLBody: emailtemplate.Wrap("Security Alert: Google Account Unlinked",
+				"<p style=\"margin:0 0 12px;\">Your Google account has been unlinked from your Training Center account and can no longer be used to log in.</p>"+
+					"<p style=\"margin:0;color:#b91c1c;font-size:14px;\"><strong>If you did not make this change</strong>, please review your account security immediately.</p>"),
 		})
 	}
 

@@ -9,6 +9,7 @@ import (
 	appshared "github.com/training-judge-center/backend/internal/application/shared"
 	"github.com/training-judge-center/backend/internal/domain/user"
 	"github.com/training-judge-center/backend/pkg/apperror"
+	"github.com/training-judge-center/backend/pkg/emailtemplate"
 )
 
 type LinkGoogleIdentityInput struct {
@@ -56,6 +57,9 @@ func (uc *LinkGoogleIdentityUseCase) Execute(ctx context.Context, in LinkGoogleI
 			To:      foundUser.Email().String(),
 			Subject: "Security Alert: Google Account Linked",
 			Body:    fmt.Sprintf("The Google account %s has been linked to your account and can now be used to log in. If you did not make this change, unlink it from your account settings immediately or contact support.", claims.Email),
+			HTMLBody: emailtemplate.Wrap("Security Alert: Google Account Linked",
+				fmt.Sprintf("<p style=\"margin:0 0 12px;\">The Google account <strong>%s</strong> has been linked to your Training Center account and can now be used to log in.</p>"+
+					"<p style=\"margin:0;color:#b91c1c;font-size:14px;\"><strong>If you did not make this change</strong>, unlink it from your account settings immediately or contact support.</p>", claims.Email)),
 		})
 	}
 
