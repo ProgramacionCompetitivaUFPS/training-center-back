@@ -16,6 +16,10 @@ type Repository interface {
 	FindByID(ctx context.Context, id string) (*User, error)
 	FindByNickname(ctx context.Context, nickname Nickname) (*User, error)
 	FindAll(ctx context.Context, filter UserFilter) ([]*User, int, error)
+	// SearchActive finds active users whose name or nickname partially matches
+	// term, ordered by name. Intended for lightweight autocomplete — unlike
+	// FindAll it never matches email/institution and never computes a total count.
+	SearchActive(ctx context.Context, term string, limit int) ([]*User, error)
 }
 
 type SortField string

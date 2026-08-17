@@ -471,6 +471,12 @@ const docTemplate = `{
                     },
                     {
                         "type": "string",
+                        "description": "Filter by name (partial match)",
+                        "name": "search",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
                         "description": "Sort field (name, startTime, createdAt)",
                         "name": "sortBy",
                         "in": "query"
@@ -837,6 +843,12 @@ const docTemplate = `{
                         "type": "string",
                         "description": "Filter by status (SCHEDULED, ACTIVE, FINISHED)",
                         "name": "status",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Filter by name (partial match)",
+                        "name": "search",
                         "in": "query"
                     },
                     {
@@ -3718,6 +3730,12 @@ const docTemplate = `{
                         "description": "Filter by author nickname",
                         "name": "author",
                         "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Filter by title (partial match)",
+                        "name": "search",
+                        "in": "query"
                     }
                 ],
                 "responses": {
@@ -5902,6 +5920,63 @@ const docTemplate = `{
                 }
             }
         },
+        "/users/search": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "users"
+                ],
+                "summary": "Search users (autocomplete, Coach/Admin only)",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Search query (min 2 characters)",
+                        "name": "q",
+                        "in": "query",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Max results (default 10, max 20)",
+                        "name": "limit",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/user.searchUsersResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/apperror.AppError"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/apperror.AppError"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/apperror.AppError"
+                        }
+                    }
+                }
+            }
+        },
         "/users/{nickname}": {
             "get": {
                 "security": [
@@ -6075,6 +6150,9 @@ const docTemplate = `{
                         "$ref": "#/definitions/contest.problemDisplay"
                     }
                 },
+                "showTeamMembers": {
+                    "type": "boolean"
+                },
                 "startTime": {
                     "type": "string"
                 },
@@ -6183,6 +6261,9 @@ const docTemplate = `{
                     "items": {
                         "$ref": "#/definitions/contest.problemDetail"
                     }
+                },
+                "showTeamMembers": {
+                    "type": "boolean"
                 },
                 "startTime": {
                     "type": "string"
@@ -6680,6 +6761,9 @@ const docTemplate = `{
                     "items": {
                         "$ref": "#/definitions/contest.problemOrderRequest"
                     }
+                },
+                "showTeamMembers": {
+                    "type": "boolean"
                 },
                 "startTime": {
                     "type": "string"
@@ -9060,6 +9144,17 @@ const docTemplate = `{
                 }
             }
         },
+        "user.searchUsersResponse": {
+            "type": "object",
+            "properties": {
+                "users": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/user.userSearchResultResp"
+                    }
+                }
+            }
+        },
         "user.setPasswordRequest": {
             "type": "object",
             "properties": {
@@ -9204,6 +9299,20 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "updatedAt": {
+                    "type": "string"
+                }
+            }
+        },
+        "user.userSearchResultResp": {
+            "type": "object",
+            "properties": {
+                "id": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "nickname": {
                     "type": "string"
                 }
             }

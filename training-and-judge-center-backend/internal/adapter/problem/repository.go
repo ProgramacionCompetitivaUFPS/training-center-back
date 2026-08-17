@@ -390,6 +390,10 @@ func (r *Repository) List(ctx context.Context, filters domainProblem.ListFilters
 		conds = append(conds, fmt.Sprintf("accessibility = %s", nextArg(filters.Accessibility.String())))
 	}
 
+	if filters.Search != "" {
+		conds = append(conds, fmt.Sprintf("title ILIKE %s", nextArg("%"+infraPostgres.EscapeILIKE(filters.Search)+"%")))
+	}
+
 	var where string
 	if len(conds) > 0 {
 		where = "WHERE " + strings.Join(conds, " AND ")

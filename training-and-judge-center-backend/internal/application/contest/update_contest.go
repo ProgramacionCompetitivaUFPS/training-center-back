@@ -31,6 +31,7 @@ type UpdateContestInput struct {
 	ParticipationMode *string // "INDIVIDUAL" | "TEAM" | "MIXED"
 	TeamSizeMin       *int
 	TeamSizeMax       *int
+	ShowTeamMembers   *bool
 }
 
 type ProblemOrderInput struct {
@@ -169,6 +170,10 @@ func (uc *UpdateContestUseCase) Execute(ctx context.Context, in UpdateContestInp
 
 	if in.Locked != nil {
 		c.SetLocked(*in.Locked, now)
+	}
+
+	if in.ShowTeamMembers != nil {
+		c.SetShowTeamMembers(*in.ShowTeamMembers, now)
 	}
 
 	if err := uc.txManager.WithTx(ctx, func(txCtx context.Context) error {
@@ -347,7 +352,8 @@ func hasAnyField(in UpdateContestInput) bool {
 	return in.Name != nil || in.Description != nil || in.StartTime != nil ||
 		in.EndTime != nil || in.Penalty != nil || in.FreezeMinutes != nil ||
 		in.EnablePostContest != nil || in.Problems != nil || in.Locked != nil ||
-		in.ParticipationMode != nil || in.TeamSizeMin != nil || in.TeamSizeMax != nil
+		in.ParticipationMode != nil || in.TeamSizeMin != nil || in.TeamSizeMax != nil ||
+		in.ShowTeamMembers != nil
 }
 
 func deduplicateBySlug(entries []ProblemOrderInput) []ProblemOrderInput {

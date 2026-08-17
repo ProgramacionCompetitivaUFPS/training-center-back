@@ -215,6 +215,7 @@ func main() {
 	adminUpdateUserUseCase := appuser.NewAdminUpdateUserUseCase(userRepo)
 	adminDeactivateUserUseCase := appuser.NewAdminDeactivateUserUseCase(userRepo, sessionInvalidator, refreshTokenRepo)
 	listUsersUseCase := appuser.NewListUsersUseCase(userRepo)
+	searchUsersUseCase := appuser.NewSearchUsersUseCase(userRepo)
 	requestEmailChangeUseCase := appuser.NewRequestEmailChangeUseCase(userRepo, emailChangeRepo, emailSender, redisRateLimiter)
 	confirmEmailChangeUseCase := appuser.NewConfirmEmailChangeUseCase(userRepo, emailChangeRepo, emailSender, txManager)
 	requestPasswordRecoveryUseCase := appuser.NewRequestPasswordRecoveryUseCase(userRepo, passwordRecoveryRepo, emailSender, redisRateLimiter)
@@ -241,7 +242,7 @@ func main() {
 	getProfileStatsUseCase := appuser.NewGetProfileStatsUseCase(rankingProvider, submissionStatsProvider, contestParticipationProvider, topicStatsProvider)
 
 	// Handlers
-	userHandler := handlerUser.NewHandler(createUserUseCase, getMyProfileUseCase, getUserByNicknameUseCase, updateUserUseCase, updatePasswordUseCase, adminUpdateUserUseCase, adminDeactivateUserUseCase, listUsersUseCase, requestEmailChangeUseCase, confirmEmailChangeUseCase, requestPasswordRecoveryUseCase, resetPasswordUseCase, requestDeactivationUseCase, confirmDeactivationUseCase, getDashboardUseCase, getProfileStatsUseCase, linkGoogleIdentityUseCase, unlinkGoogleIdentityUseCase, setPasswordUseCase)
+	userHandler := handlerUser.NewHandler(createUserUseCase, getMyProfileUseCase, getUserByNicknameUseCase, updateUserUseCase, updatePasswordUseCase, adminUpdateUserUseCase, adminDeactivateUserUseCase, listUsersUseCase, requestEmailChangeUseCase, confirmEmailChangeUseCase, requestPasswordRecoveryUseCase, resetPasswordUseCase, requestDeactivationUseCase, confirmDeactivationUseCase, getDashboardUseCase, getProfileStatsUseCase, searchUsersUseCase, linkGoogleIdentityUseCase, unlinkGoogleIdentityUseCase, setPasswordUseCase)
 	authHandler := handler.NewAuthHandler(loginUseCase, loginWithGoogleUseCase, refreshUseCase, logoutUseCase)
 
 	// Group repositories & platform adapters

@@ -21,6 +21,7 @@ const (
 // @Security     BearerAuth
 // @Param        groupId path   string true  "Group ID"
 // @Param        status  query  string false "Filter by status (SCHEDULED, ACTIVE, FINISHED)"
+// @Param        search  query  string false "Filter by name (partial match)"
 // @Param        sortBy  query  string false "Sort field (name, startTime, createdAt)"
 // @Param        order   query  string false "Sort order (asc, desc)"
 // @Param        page    query  int    false "Page number (default 1)"
@@ -66,6 +67,7 @@ func (h *Handler) List(w http.ResponseWriter, r *http.Request) {
 		CurrentUser: *caller,
 		GroupID:     groupID,
 		Status:      statusFilter,
+		Search:      q.Get("search"),
 		SortBy:      q.Get("sortBy"),
 		Order:       q.Get("order"),
 		Page:        page,

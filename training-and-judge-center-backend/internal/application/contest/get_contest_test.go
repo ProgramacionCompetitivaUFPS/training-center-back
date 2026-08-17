@@ -79,6 +79,20 @@ func TestGetContest_MemberDoesNotSeeProblemsInScheduled(t *testing.T) {
 	}
 }
 
+func TestGetContest_LeadSeesProblemsInScheduled(t *testing.T) {
+	contest := newTestContestWithProblems(callerID)
+	uc := newGetContestUseCase(repoWith(contest), groupFound(), isLead(), defaultProblemProvider(), mockParticipants())
+
+	out, err := uc.Execute(context.Background(), validGetInput())
+
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(out.Problems) == 0 {
+		t.Error("lead should see problems even in SCHEDULED status")
+	}
+}
+
 func TestGetContest_LeadSeesLockedField(t *testing.T) {
 	uc := newGetContestUseCase(repoWith(newTestContest(callerID)), groupFound(), isLead(), defaultProblemProvider(), mockParticipants())
 

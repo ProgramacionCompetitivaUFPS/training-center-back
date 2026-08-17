@@ -197,6 +197,7 @@ func NewRouter(h *Handlers, s *Services, allowedOrigins []string) *chi.Mux {
 		r.Get("/users/me/teams", h.Team.ListMyTeams)
 		r.Get("/users/me/team-invitations", h.Team.ListMyInvitations)
 		r.Get("/users/me/submissions", h.Submission.ListMySubmissions)
+		r.With(middleware.RequireAnyRole(shared.RoleCoach, shared.RoleAdmin)).Get("/users/search", h.User.SearchUsers)
 		r.Get("/users/{nickname}", h.User.GetByNickname)
 		r.Put("/users", h.User.UpdateProfile)
 		r.Put("/users/password", h.User.UpdatePassword)

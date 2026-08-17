@@ -266,6 +266,13 @@ func (c *Contest) SetLocked(locked bool, now time.Time) {
 	c.updatedAt = &t
 }
 
+// SetShowTeamMembers sets the show-team-members flag and touches updatedAt.
+func (c *Contest) SetShowTeamMembers(showTeamMembers bool, now time.Time) {
+	c.showTeamMembers = showTeamMembers
+	t := now.UTC()
+	c.updatedAt = &t
+}
+
 // SetProblems replaces the entire problem list atomically.
 func (c *Contest) SetProblems(problems []ContestProblem, now time.Time) {
 	if problems == nil {
