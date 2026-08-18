@@ -1,31 +1,47 @@
 judge:
   idleTimeoutMinutes: 10
-  memoryOverheadBytes: 536870912  # 512 MiB reservado para el proceso worker
-  cpuOverheadCores: 1             # cores reservados para worker + daemon Docker (se restan del semáforo)
+
+  # Los dos "reserve" se recortan del presupuesto del container dind, que es donde
+  # corre el demonio Docker y los containers que crea. NO tienen nada que ver con el
+  # proceso worker: ese vive en otro container, con su propio cgroup y sus propios
+  # límites. (Sus nombres anteriores —memoryOverheadBytes/cpuOverheadCores— decían
+  # "para el proceso worker", que era falso.)
+  dockerDaemonReserveBytes: 536870912  # 512 MiB para el demonio Docker
+  dockerDaemonReserveCores: 1          # cores del demonio Docker (se restan del semáforo)
+
   staleRunningAfterMinutes: 10    # submissions en RUNNING más viejas que esto se marcan SYSTEM_ERROR
   staleValidationAfterMinutes: 20 # validaciones de publish en RUNNING más viejas que esto se marcan SYSTEM_ERROR (> los 9 min de timeout del cliente HTTP)
 
+  # Propiedades del LENGUAJE: valen igual sin importar en qué pool se ejecute.
   languages:
     cpp20:
       image: "judge-runner:cpp20"
-      cpu: "1"
-      memoryBytes: 2147483648  # 2 GiB
+      extension: "cpp"
       compileCmd: "g++ -std=c++20 -O2 -o /sandbox/solution /sandbox/solution.cpp"
       runCmd: "/sandbox/solution"
-      extension: "cpp"
 
     java17:
       image: "judge-runner:java17"
-      cpu: "1"
-      memoryBytes: 2147483648  # 2 GiB — más alto por la JVM
-      compileCmd: "javac -encoding UTF-8 /sandbox/solution.java"
-      runCmd: "java -cp /sandbox solution"
       extension: "java"
+      compileCmd: "javac -encoding UTF-8 /sandbox/solution.java"
+      # MaxRAMPercentage es imprescindible: sin él la JVM detecta el cgroup y se
+      # queda con el 25% del container como heap (medido: 512 MiB en un container
+      # de 2 GiB), o sea la cuarta parte de lo que recibe una solución en C++ con
+      # el mismo memoryBytes. Con 75% queda margen para el overhead propio de la
+      # JVM (metaspace, code cache, stacks), que no entra en el heap.
+      runCmd: "java -XX:MaxRAMPercentage=75 -cp /sandbox solution"
 
     python310:
       image: "judge-runner:python310"
-      cpu: "1"
-      memoryBytes: 1073741824  # 1 GiB
+      extension: "py"
       compileCmd: ""           # vacío = lenguaje interpretado, se omite la compilación
       runCmd: "python3 /sandbox/solution.py"
-      extension: "py"
+
+  # Dimensionamiento: es propiedad del POOL, no del lenguaje. El mismo lenguaje puede
+  # necesitar tamaños distintos según para qué se use el container.
+  pools:
+    solutions:
+      languages:
+        cpp20:     { cpu: "1", memoryBytes: 2147483648 }  # 2 GiB
+        java17:    { cpu: "1", memoryBytes: 2147483648 }  # 2 GiB (la JVM ve el 75%, ver runCmd)
+        python310: { cpu: "1", memoryBytes: 1073741824 }  # 1 GiB

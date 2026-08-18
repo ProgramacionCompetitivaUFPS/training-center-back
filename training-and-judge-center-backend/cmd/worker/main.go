@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"log/slog"
@@ -24,6 +25,20 @@ import (
 	appjudge "github.com/training-judge-center/backend/internal/application/judge"
 	appproblem "github.com/training-judge-center/backend/internal/application/problem"
 	appsubmission "github.com/training-judge-center/backend/internal/application/submission"
+)
+
+// poolSolutions keys the pool that compiles and runs contestant code. It is a
+// map key, so a typo would silently read a zero-valued pool instead of failing.
+const poolSolutions = "solutions"
+
+// Floors applied when the matching judge config key is missing or non-positive.
+// KnownFields rejects unknown keys but says nothing about absent ones, so every
+// optional value needs one.
+const (
+	defaultDockerDaemonReserveBytes    = 512 << 20 // 512 MiB
+	defaultDockerDaemonReserveCores    = 1
+	defaultStaleRunningAfterMinutes    = 10
+	defaultStaleValidationAfterMinutes = 20
 )
 
 func main() {
@@ -80,23 +95,30 @@ func main() {
 	poolMemLimit := getRequiredEnvInt64("POD_MEMORY_LIMIT")
 
 	podCPUMillis := getRequiredEnvInt64("POD_CPU_LIMIT")
-	maxConcurrent := int(podCPUMillis/1000) - judgeCfg.Judge.CPUOverheadCores
+	maxConcurrent := int(podCPUMillis/1000) - judgeCfg.Judge.DockerDaemonReserveCores
 	if maxConcurrent < 1 {
 		maxConcurrent = 1
 	}
 	slog.Info("worker: concurrency derived",
 		"pod_cpu_millicores", podCPUMillis,
-		"cpu_overhead_cores", judgeCfg.Judge.CPUOverheadCores,
+		"docker_daemon_reserve_cores", judgeCfg.Judge.DockerDaemonReserveCores,
 		"max_concurrent", maxConcurrent)
 
-	poolLanguages := make(map[string]judgepool.LanguageConfig, len(judgeCfg.Judge.Languages))
+	// Sizing and image now come from different sections, so they are joined
+	// here: the pool decides how big a container is, the language which image
+	// it runs.
+	solutionSizing := judgeCfg.Judge.Pools[poolSolutions].Languages
+	poolLanguages := make(map[string]judgepool.LanguageConfig, len(solutionSizing))
+	for lang, sizing := range solutionSizing {
+		poolLanguages[lang] = judgepool.LanguageConfig{
+			Image:       judgeCfg.Judge.Languages[lang].Image,
+			CPU:         sizing.CPU,
+			MemoryBytes: sizing.MemoryBytes,
+		}
+	}
+
 	execLanguages := make(map[string]adapterjudge.LanguageExecConfig, len(judgeCfg.Judge.Languages))
 	for lang, lc := range judgeCfg.Judge.Languages {
-		poolLanguages[lang] = judgepool.LanguageConfig{
-			Image:       lc.Image,
-			CPU:         lc.CPU,
-			MemoryBytes: lc.MemoryBytes,
-		}
 		execLanguages[lang] = adapterjudge.LanguageExecConfig{
 			CompileCmd: lc.CompileCmd,
 			RunCmd:     lc.RunCmd,
@@ -106,7 +128,7 @@ func main() {
 
 	poolCfg := judgepool.PoolConfig{
 		MemLimitBytes: poolMemLimit,
-		OverheadBytes: judgeCfg.Judge.MemoryOverheadBytes,
+		OverheadBytes: judgeCfg.Judge.DockerDaemonReserveBytes,
 		IdleTimeout:   time.Duration(judgeCfg.Judge.IdleTimeoutMinutes) * time.Minute,
 		ReapInterval:  time.Minute,
 		Languages:     poolLanguages,
@@ -305,22 +327,39 @@ func main() {
 	slog.Info("worker: shutdown complete")
 }
 
+// judgeLanguageConfig holds what is true of a language regardless of which pool
+// runs it: its image and how its code is compiled and executed.
 type judgeLanguageConfig struct {
-	Image       string `yaml:"image"`
+	Image      string `yaml:"image"`
+	Extension  string `yaml:"extension"`
+	CompileCmd string `yaml:"compileCmd"`
+	RunCmd     string `yaml:"runCmd"`
+}
+
+// judgePoolLanguageConfig is the sizing of one language's containers inside one
+// pool. The same language can need different limits depending on what the
+// container is used for, so this lives under the pool, not under the language.
+type judgePoolLanguageConfig struct {
 	CPU         string `yaml:"cpu"`
 	MemoryBytes int64  `yaml:"memoryBytes"`
-	CompileCmd  string `yaml:"compileCmd"`
-	RunCmd      string `yaml:"runCmd"`
-	Extension   string `yaml:"extension"`
+}
+
+type judgePoolConfig struct {
+	Languages map[string]judgePoolLanguageConfig `yaml:"languages"`
 }
 
 type judgeSection struct {
-	IdleTimeoutMinutes          int                            `yaml:"idleTimeoutMinutes"`
-	MemoryOverheadBytes         int64                          `yaml:"memoryOverheadBytes"`
-	CPUOverheadCores            int                            `yaml:"cpuOverheadCores"`
+	IdleTimeoutMinutes int `yaml:"idleTimeoutMinutes"`
+	// Both reserves are carved out of the dind container's limits, where the
+	// Docker daemon and the containers it spawns live. Neither has anything to
+	// do with the worker process, which runs in a separate container with its
+	// own cgroup and its own limits.
+	DockerDaemonReserveBytes    int64                          `yaml:"dockerDaemonReserveBytes"`
+	DockerDaemonReserveCores    int                            `yaml:"dockerDaemonReserveCores"`
 	StaleRunningAfterMinutes    int                            `yaml:"staleRunningAfterMinutes"`
 	StaleValidationAfterMinutes int                            `yaml:"staleValidationAfterMinutes"`
 	Languages                   map[string]judgeLanguageConfig `yaml:"languages"`
+	Pools                       map[string]judgePoolConfig     `yaml:"pools"`
 }
 
 type judgeConfigFile struct {
@@ -335,7 +374,11 @@ func loadJudgeConfig() judgeConfigFile {
 		os.Exit(1)
 	}
 	var cfg judgeConfigFile
-	if err := yaml.Unmarshal(data, &cfg); err != nil {
+	// Strict: an unknown key means the file and these structs have drifted, and
+	// a silently ignored key would show up much later as a zero-valued limit.
+	dec := yaml.NewDecoder(bytes.NewReader(data))
+	dec.KnownFields(true)
+	if err := dec.Decode(&cfg); err != nil {
 		slog.Error("worker: failed to parse judge config", "path", path, "error", err)
 		os.Exit(1)
 	}
@@ -343,14 +386,39 @@ func loadJudgeConfig() judgeConfigFile {
 		slog.Error("worker: judge config has no languages defined", "path", path)
 		os.Exit(1)
 	}
-	if cfg.Judge.CPUOverheadCores <= 0 {
-		cfg.Judge.CPUOverheadCores = 1
+	// A pool sizes a subset of the declared languages. One naming a language
+	// with no image would only fail when that language is first claimed —
+	// mid-judging — so it is rejected at startup instead.
+	for poolName, pool := range cfg.Judge.Pools {
+		if len(pool.Languages) == 0 {
+			slog.Error("worker: judge pool has no languages defined", "path", path, "pool", poolName)
+			os.Exit(1)
+		}
+		for lang := range pool.Languages {
+			if _, ok := cfg.Judge.Languages[lang]; !ok {
+				slog.Error("worker: judge pool sizes an undeclared language", "path", path, "pool", poolName, "language", lang)
+				os.Exit(1)
+			}
+		}
+	}
+	if _, ok := cfg.Judge.Pools[poolSolutions]; !ok {
+		slog.Error("worker: judge config has no solutions pool", "path", path, "pool", poolSolutions)
+		os.Exit(1)
+	}
+	// KnownFields rejects unknown keys but says nothing about missing ones, so
+	// this would otherwise stay at zero and let the pool allocate the dind
+	// container's whole budget, starving the very daemon it runs on.
+	if cfg.Judge.DockerDaemonReserveBytes <= 0 {
+		cfg.Judge.DockerDaemonReserveBytes = defaultDockerDaemonReserveBytes
+	}
+	if cfg.Judge.DockerDaemonReserveCores <= 0 {
+		cfg.Judge.DockerDaemonReserveCores = defaultDockerDaemonReserveCores
 	}
 	if cfg.Judge.StaleRunningAfterMinutes <= 0 {
-		cfg.Judge.StaleRunningAfterMinutes = 10
+		cfg.Judge.StaleRunningAfterMinutes = defaultStaleRunningAfterMinutes
 	}
 	if cfg.Judge.StaleValidationAfterMinutes <= 0 {
-		cfg.Judge.StaleValidationAfterMinutes = 20
+		cfg.Judge.StaleValidationAfterMinutes = defaultStaleValidationAfterMinutes
 	}
 	return cfg
 }

@@ -396,12 +396,14 @@ Para que dind pueda descargarlas hay que subirlas al registro con el nombre de r
 # 1. construir localmente (requiere Docker corriendo)
 bash scripts/build-judge-images.sh
 
-# 2. etiquetar cada lenguaje con el nombre de registro y subir (bucle sobre los 3)
+# 2. etiquetar cada imagen con el nombre de registro y subir (las 4)
 #    NOTA: no se sube judge-runner:base — es solo capa intermedia; las de lenguaje ya la incluyen.
 REG=us-east1-docker.pkg.dev/training-center-502916/training-center
-for lang in cpp20 java17 python310; do
-  docker tag  "judge-runner:$lang" "$REG/judge-runner-$lang:v0.1.0"
-  docker push "$REG/judge-runner-$lang:v0.1.0"
+eval $(grep -E '^ +(RUNNER|COMPARE)_VERSION:' deploy/k8s/judge/images-configmap.yaml | tr -d ' "' | tr ':' '=')
+for entry in "cpp20:$RUNNER_VERSION" "java17:$RUNNER_VERSION" "python310:$RUNNER_VERSION" "compare:$COMPARE_VERSION"; do
+  lang="${entry%%:*}"; version="${entry##*:}"
+  docker tag  "judge-runner:$lang" "$REG/judge-runner-$lang:$version"
+  docker push "$REG/judge-runner-$lang:$version"
 done
 
 # 3. verificar que quedaron en el registro
@@ -409,7 +411,7 @@ gcloud artifacts docker images list "$REG" --include-tags | grep judge-runner
 ```
 
 > Convención de nombres: el registro no admite `:` en el path, así que `judge-runner:cpp20`
-> (nombre corto local) se sube como `judge-runner-cpp20:v0.1.0` (repo distinto, tag de versión).
+> (nombre corto local) se sube como `judge-runner-cpp20:$RUNNER_VERSION` (repo distinto, tag de versión).
 > El initContainer `prepull-language-images` deshace esta traducción dentro de dind.
 
 **El pod (dos containers):**
