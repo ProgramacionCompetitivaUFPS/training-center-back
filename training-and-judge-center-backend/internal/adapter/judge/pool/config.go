@@ -9,8 +9,8 @@ type LanguageConfig struct {
 }
 
 type PoolConfig struct {
-	MemLimitBytes int64         // set from POD_MEMORY_LIMIT (K8s Downward API)
-	OverheadBytes int64         // set from POD_MEMORY_OVERHEAD
+	MemLimitBytes int64 // set from POD_MEMORY_LIMIT (K8s Downward API)
+	OverheadBytes int64 // carved out for the Docker daemon itself (judge config)
 	IdleTimeout   time.Duration
 	ReapInterval  time.Duration
 	Languages     map[string]LanguageConfig

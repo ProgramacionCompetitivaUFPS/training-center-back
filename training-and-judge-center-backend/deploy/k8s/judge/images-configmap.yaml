@@ -1,0 +1,19 @@
+# Versiones de las imagenes del sandbox del judge. Fijas a proposito (nunca
+# "latest"): el toolchain no puede cambiar solo bajo una competencia en curso, o
+# los veredictos podrian moverse.
+#
+# RUNNER_VERSION cubre las tres imagenes de lenguaje. Son toolchains: cambian
+# casi nunca y se construyen y suben a mano (ver GKE_DEPLOY_ROADMAP.md).
+#
+# COMPARE_VERSION es independiente porque el comparador por defecto es codigo
+# nuestro (cmd/compare), no un toolchain. Lo construye el CI: al declarar aca una
+# version nueva en el mismo PR que cambia el comparador, el pipeline de deploy la
+# construye y la sube. Si el comparador cambia y esta version no, el CI falla.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: judge-images
+  namespace: training-center
+data:
+  RUNNER_VERSION: "v0.1.0"
+  COMPARE_VERSION: "v0.1.0"

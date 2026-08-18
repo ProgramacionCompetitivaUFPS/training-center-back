@@ -59,7 +59,7 @@ docker push us-east1-docker.pkg.dev/training-center-502916/training-center/backe
 ```
 This is the manual equivalent of the CI's build-and-push. The CI *deploy* job additionally runs migrations and `set image`, which fail against a brand-new cluster on its first run — that's why the initial push is manual and the app instead comes up through step 7.
 
-**Judge language images — check these too, same condition (empty registry).** The judge-worker's `prepull-language-images` init container pulls `judge-runner-{cpp20,java17,python310}:v0.1.0` from this **same registry**, so they're wiped right along with the backend image. This doesn't fail loudly here — the pod schedules fine and `dind` passes, then `prepull-language-images` crash-loops on "manifest unknown" only once a judge-worker pod actually tries to start (step 10, or KEDA's first real scale-up), which makes it easy to miss until later. Check and fix it now, not then:
+**Judge language images — check these too, same condition (empty registry).** The judge-worker's `prepull-language-images` init container pulls `judge-runner-{cpp20,java17,python310,compare}` at the versions pinned in `deploy/k8s/judge/images-configmap.yaml` from this **same registry**, so they're wiped right along with the backend image. This doesn't fail loudly here — the pod schedules fine and `dind` passes, then `prepull-language-images` crash-loops on "manifest unknown" only once a judge-worker pod actually tries to start (step 10, or KEDA's first real scale-up), which makes it easy to miss until later. Check and fix it now, not then:
 ```
 gcloud artifacts docker images list <registry> --include-tags --filter="tags~^judge-runner" --limit=1
 ```
@@ -67,12 +67,22 @@ If empty, rebuild and push (from `training-and-judge-center-backend/`, Docker ru
 ```
 bash scripts/build-judge-images.sh
 ```
-then tag and push the 3 language images (not `base` — that's just an intermediate layer, never pushed):
+then tag and push the 4 sandbox images (not `base` — that's just an intermediate layer, never pushed). The versions come from `deploy/k8s/judge/images-configmap.yaml`, the single source of truth — never hardcode them:
 ```
 $REG = "us-east1-docker.pkg.dev/training-center-502916/training-center"
-foreach ($lang in @("cpp20","java17","python310")) {
-  docker tag "judge-runner:$lang" "$REG/judge-runner-${lang}:v0.1.0"
-  docker push "$REG/judge-runner-${lang}:v0.1.0"
+$v = @{}
+Select-String '^\s{2}([A-Z_]+):\s*"(.+)"$' deploy/k8s/judge/images-configmap.yaml | ForEach-Object {
+  $v[$_.Matches.Groups[1].Value] = $_.Matches.Groups[2].Value
+}
+$images = [ordered]@{
+  cpp20     = $v['RUNNER_VERSION']
+  java17    = $v['RUNNER_VERSION']
+  python310 = $v['RUNNER_VERSION']
+  compare   = $v['COMPARE_VERSION']
+}
+foreach ($lang in $images.Keys) {
+  docker tag  "judge-runner:$lang" "$REG/judge-runner-${lang}:$($images[$lang])"
+  docker push "$REG/judge-runner-${lang}:$($images[$lang])"
 }
 ```
 

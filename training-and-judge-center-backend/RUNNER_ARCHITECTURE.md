@@ -106,18 +106,22 @@ El semáforo previene este caso acotando los judgings activos al número de CPU 
 ### Derivación del semáforo desde el pod
 
 ```
-maxConcurrent = max(1, POD_CPU_LIMIT/1000 - cpuOverheadCores)   # cada judging ocupa 1 core
+maxConcurrent = max(1, POD_CPU_LIMIT/1000 - dockerDaemonReserveCores)   # cada judging ocupa 1 core
 ```
 
 `POD_CPU_LIMIT` viene en **millicores** (entero, ej: 3500). En el pod spec, el Downward API debe
 usar `divisor: 1m` — con divisor `1`, Kubernetes redondea los cores **hacia arriba** (3.5 → "4")
 y el semáforo quedaría sobrevendido. La división entera hace el floor.
 
-`cpuOverheadCores` (default 1) reserva capacidad para los otros dos consumidores de CPU del pod:
-el proceso worker (descarga de test cases, comparación de salidas, escritura de veredictos) y el
-daemon Docker (creación de execs, streaming). Es el análogo en CPU del `memoryOverheadBytes` que
-la contabilidad de memoria ya reserva para el worker: ningún recurso del pod se reparte al 100%
-entre los judgings — la casa siempre come primero.
+`dockerDaemonReserveCores` (default 1) reserva capacidad para el **demonio Docker** (creación de
+execs, streaming), que corre dentro del container `dind` junto a los containers que crea. Es el
+análogo en CPU del `dockerDaemonReserveBytes` que la contabilidad de memoria ya recorta del mismo
+presupuesto: ningún recurso del pod se reparte al 100% entre los judgings — la casa siempre come
+primero.
+
+> Estos dos valores **no** tienen que ver con el proceso worker, aunque sus nombres anteriores
+> (`cpuOverheadCores`/`memoryOverheadBytes`) lo sugerían: el worker corre en otro container, con
+> su propio cgroup y sus propios límites, fuera del presupuesto del `dind`.
 
 Pod con 4 CPUs → semáforo de 3. Pod con 8 CPUs → semáforo de 7. Si se cambia el CPU limit del pod en K8s, el semáforo se ajusta en el siguiente arranque sin tocar configuración.
 
@@ -346,35 +350,38 @@ func (p *Pool) init(cfg Config) {
 ```yaml
 judge:
   # maxConcurrent se deriva de POD_CPU_LIMIT al arrancar — no se configura aquí
-  idleTimeoutMinutes: 10         # timeout de container idle (por container individual)
-  memoryOverheadBytes: 536870912 # 512Mi reservado para el proceso worker
-  cpuOverheadCores: 1            # cores reservados para worker + daemon Docker (se restan del semáforo)
+  idleTimeoutMinutes: 10                # timeout de container idle (por container individual)
+  dockerDaemonReserveBytes: 536870912   # 512Mi para el demonio Docker
+  dockerDaemonReserveCores: 1           # cores del demonio Docker (se restan del semáforo)
 
+  # Propiedades del LENGUAJE: valen igual sin importar en qué pool se ejecute.
   languages:
     cpp20:
       image: "judge-runner:cpp20"
-      cpu: "1"
-      memoryBytes: 2147483648        # 2Gi
+      extension: "cpp"
       compileCmd: "g++ -std=c++20 -O2 -o /sandbox/solution /sandbox/solution.cpp"
       runCmd: "/sandbox/solution"
-      extension: "cpp"
 
     java17:
       image: "judge-runner:java17"
-      cpu: "1"
-      memoryBytes: 2147483648        # 2Gi — más alto por el JVM
-      compileCmd: "javac -encoding UTF-8 /sandbox/Solution.java"
-      runCmd: "java -Xmx{memoryLimit}m Solution"
       extension: "java"
+      compileCmd: "javac -encoding UTF-8 /sandbox/solution.java"
+      runCmd: "java -XX:MaxRAMPercentage=75 -cp /sandbox solution"
 
     python310:
       image: "judge-runner:python310"
-      cpu: "1"
-      memoryBytes: 1073741824        # 1Gi
-      compileCmd: ""                 # vacío = lenguaje interpretado
-      syntaxCheckCmd: "pypy3 -m py_compile /sandbox/solution.py"
-      runCmd: "pypy3 /sandbox/solution.py"
       extension: "py"
+      compileCmd: ""                    # vacío = lenguaje interpretado
+      runCmd: "python3 /sandbox/solution.py"
+
+  # Dimensionamiento: es propiedad del POOL, no del lenguaje. El mismo lenguaje
+  # puede necesitar tamaños distintos según para qué se use el container.
+  pools:
+    solutions:
+      languages:
+        cpp20:     { cpu: "1", memoryBytes: 2147483648 }  # 2Gi
+        java17:    { cpu: "1", memoryBytes: 2147483648 }  # 2Gi (la JVM ve el 75%, ver runCmd)
+        python310: { cpu: "1", memoryBytes: 1073741824 }  # 1Gi
 ```
 
 ---
