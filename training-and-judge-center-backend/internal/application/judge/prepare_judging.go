@@ -40,7 +40,7 @@ type PrepareJudgingOutput struct {
 
 // compiledValidator carries a just-compiled validator's artifact forward to
 // the input-checking step — the artifact is used in memory, straight from
-// NativeCompiler's output, never re-downloaded from storage.
+// ArtifactCompiler's output, never re-downloaded from storage.
 type compiledValidator struct {
 	compiledKey string
 	artifact    []byte
@@ -51,7 +51,7 @@ type compiledValidator struct {
 type PrepareJudgingUseCase struct {
 	sourceProvider   JudgingSourceProvider
 	downloader       SourceCodeDownloader
-	compiler         NativeCompiler
+	compiler         ArtifactCompiler
 	uploader         ArtifactUploader
 	testCaseProvider TestCaseProvider
 	runner           ValidatorRunner
@@ -60,7 +60,7 @@ type PrepareJudgingUseCase struct {
 func NewPrepareJudgingUseCase(
 	sourceProvider JudgingSourceProvider,
 	downloader SourceCodeDownloader,
-	compiler NativeCompiler,
+	compiler ArtifactCompiler,
 	uploader ArtifactUploader,
 	testCaseProvider TestCaseProvider,
 	runner ValidatorRunner,
@@ -144,7 +144,7 @@ func (uc *PrepareJudgingUseCase) prepareChecker(ctx context.Context, problemID, 
 	}
 
 	result, err := uc.compiler.Compile(ctx, CompileArtifactRequest{
-		Filename:   source.Filename,
+		Role:       NewArtifactRoleChecker(),
 		Language:   source.Language,
 		SourceCode: sourceCode,
 	})
@@ -181,7 +181,7 @@ func (uc *PrepareJudgingUseCase) prepareValidator(ctx context.Context, problemID
 	}
 
 	result, err := uc.compiler.Compile(ctx, CompileArtifactRequest{
-		Filename:   source.Filename,
+		Role:       NewArtifactRoleValidator(),
 		Language:   source.Language,
 		SourceCode: sourceCode,
 	})

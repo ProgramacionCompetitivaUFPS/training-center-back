@@ -7,11 +7,11 @@ import (
 )
 
 type ValidatorRunRequest struct {
-	// Filename is the original uploaded name — needed to derive the class
-	// name for java, same reasoning as CompileArtifactRequest.
+	// Filename is the original uploaded name, which java needs to derive the
+	// class name from.
 	Filename string
 	Language submission.Language
-	Artifact []byte // the compiled validator, from NativeCompiler
+	Artifact []byte // the compiled validator, from ArtifactCompiler
 	Input    []byte // the test case input to validate
 }
 

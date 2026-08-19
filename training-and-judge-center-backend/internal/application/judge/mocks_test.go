@@ -149,13 +149,13 @@ func (m *mockJudgingSourceProvider) GetValidatorSource(ctx context.Context, prob
 	return nil, nil
 }
 
-// ── NativeCompiler mock ──────────────────────────────────────────────────────
+// ── ArtifactCompiler mock ──────────────────────────────────────────────────────
 
-type mockNativeCompiler struct {
+type mockArtifactCompiler struct {
 	compileFn func(ctx context.Context, req CompileArtifactRequest) (CompileArtifactResult, error)
 }
 
-func (m *mockNativeCompiler) Compile(ctx context.Context, req CompileArtifactRequest) (CompileArtifactResult, error) {
+func (m *mockArtifactCompiler) Compile(ctx context.Context, req CompileArtifactRequest) (CompileArtifactResult, error) {
 	if m.compileFn != nil {
 		return m.compileFn(ctx, req)
 	}

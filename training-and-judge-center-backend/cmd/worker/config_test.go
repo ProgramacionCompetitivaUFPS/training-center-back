@@ -3,12 +3,16 @@ package main
 import (
 	"bytes"
 	"os"
+	"strings"
 	"testing"
 
 	"gopkg.in/yaml.v3"
 )
 
-const realConfigPath = "../../config/judge_config.yaml"
+const (
+	realConfigPath = "../../config/judge_config.yaml"
+	testLang       = "cpp20"
+)
 
 // decodeRealConfig parses the config the worker actually ships with, the same
 // strict way loadJudgeConfig does. loadJudgeConfig itself calls os.Exit on
@@ -28,10 +32,209 @@ func decodeRealConfig(t *testing.T) judgeConfigFile {
 	return cfg
 }
 
-// A mistyped struct tag does not fail the decode — the field just stays zero,
-// and a zero reserve or timeout only shows up as a wrong limit much later. Each
-// scalar is asserted to be populated so that drift is caught here.
-func TestRealConfig_ScalarsArePopulated(t *testing.T) {
+// validConfig is the smallest config satisfying every rule. Each rule test
+// breaks exactly one thing in it.
+func validConfig() judgeConfigFile {
+	return judgeConfigFile{Judge: judgeSection{
+		Languages: map[string]judgeLanguageConfig{
+			testLang: {
+				Image:           "judge-runner:cpp20",
+				Extension:       "cpp",
+				CompileCmd:      "g++ -o /sandbox/Solution /sandbox/Solution.cpp",
+				RunCmd:          "/sandbox/Solution",
+				ArtifactSource:  "/sandbox/{name}.cpp",
+				ArtifactCompile: "g++ -o /sandbox/{name} /sandbox/{name}.cpp",
+				ArtifactPath:    "/sandbox/{name}",
+				ArtifactRun:     "/sandbox/{name}",
+			},
+		},
+		Pools: map[string]judgePoolConfig{
+			poolSolutions: {Languages: map[string]judgePoolLanguageConfig{
+				testLang: {CPU: "1", MemoryBytes: 1 << 30},
+			}},
+		},
+	}}
+}
+
+// withLang replaces a language entry: map values are not addressable in Go, so
+// a field cannot be assigned in place.
+func withLang(cfg *judgeConfigFile, mutate func(*judgeLanguageConfig)) {
+	lc := cfg.Judge.Languages[testLang]
+	mutate(&lc)
+	cfg.Judge.Languages[testLang] = lc
+}
+
+func TestValidateJudgeConfig_AcceptsAValidConfig(t *testing.T) {
+	if err := validateJudgeConfig(validConfig()); err != nil {
+		t.Fatalf("expected the valid config to pass, got: %v", err)
+	}
+}
+
+// The config the worker ships with has to satisfy the rules the worker enforces
+// at startup, asserted by calling the real function instead of restating them.
+func TestValidateJudgeConfig_AcceptsTheShippedConfig(t *testing.T) {
+	if err := validateJudgeConfig(decodeRealConfig(t)); err != nil {
+		t.Fatalf("%s does not pass startup validation: %v", realConfigPath, err)
+	}
+}
+
+func TestValidateJudgeConfig_RejectsBrokenConfigs(t *testing.T) {
+	tests := []struct {
+		name    string
+		breaks  func(*judgeConfigFile)
+		wantErr string
+	}{
+		{
+			name:    "no languages at all",
+			breaks:  func(c *judgeConfigFile) { c.Judge.Languages = nil },
+			wantErr: "no languages defined",
+		},
+		{
+			name:    "no solutions pool",
+			breaks:  func(c *judgeConfigFile) { delete(c.Judge.Pools, poolSolutions) },
+			wantErr: `no "solutions" pool defined`,
+		},
+		{
+			name:    "a pool sizes nothing",
+			breaks:  func(c *judgeConfigFile) { c.Judge.Pools["checkers"] = judgePoolConfig{} },
+			wantErr: `pool "checkers" sizes no languages`,
+		},
+		{
+			name: "a pool sizes a language that is not declared",
+			breaks: func(c *judgeConfigFile) {
+				c.Judge.Pools[poolSolutions].Languages["rust"] = judgePoolLanguageConfig{CPU: "1", MemoryBytes: 1}
+			},
+			wantErr: `sizes undeclared language "rust"`,
+		},
+		{
+			name: "a sized language has no cpu",
+			breaks: func(c *judgeConfigFile) {
+				c.Judge.Pools[poolSolutions].Languages[testLang] = judgePoolLanguageConfig{MemoryBytes: 1}
+			},
+			wantErr: "no cpu",
+		},
+		{
+			name: "a sized language has no memory",
+			breaks: func(c *judgeConfigFile) {
+				c.Judge.Pools[poolSolutions].Languages[testLang] = judgePoolLanguageConfig{CPU: "1"}
+			},
+			wantErr: "memoryBytes is not positive",
+		},
+		{
+			name:    "a language has no image",
+			breaks:  func(c *judgeConfigFile) { withLang(c, func(l *judgeLanguageConfig) { l.Image = "" }) },
+			wantErr: `language "cpp20" has no image`,
+		},
+		{
+			name:    "a language that runs solutions has no extension",
+			breaks:  func(c *judgeConfigFile) { withLang(c, func(l *judgeLanguageConfig) { l.Extension = "" }) },
+			wantErr: "has no extension",
+		},
+		{
+			// Added rather than removed: emptying the pool would trip the
+			// "sizes no languages" rule first.
+			name: "the solutions pool does not size a language that runs solutions",
+			breaks: func(c *judgeConfigFile) {
+				c.Judge.Languages["python310"] = judgeLanguageConfig{
+					Image:           "judge-runner:python310",
+					Extension:       "py",
+					RunCmd:          "python3 /sandbox/Solution.py",
+					ArtifactSource:  "/sandbox/{name}.py",
+					ArtifactCompile: "python3 -m py_compile /sandbox/{name}.py",
+					ArtifactPath:    "/sandbox/{name}.py",
+					ArtifactRun:     "python3 /sandbox/{name}.py",
+				}
+			},
+			wantErr: `language "python310" runs solutions but pool "solutions" does not size it`,
+		},
+		{
+			name:    "an artifact field is empty",
+			breaks:  func(c *judgeConfigFile) { withLang(c, func(l *judgeLanguageConfig) { l.ArtifactPath = "" }) },
+			wantErr: "artifactPath is empty",
+		},
+		{
+			name: "an artifact field lost the name placeholder",
+			breaks: func(c *judgeConfigFile) {
+				withLang(c, func(l *judgeLanguageConfig) { l.ArtifactCompile = "g++ -o /sandbox/{nombre} /sandbox/x.cpp" })
+			},
+			wantErr: "artifactCompile has no {name}",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cfg := validConfig()
+			tt.breaks(&cfg)
+
+			err := validateJudgeConfig(cfg)
+			if err == nil {
+				t.Fatal("expected an error, got nil")
+			}
+			if !strings.Contains(err.Error(), tt.wantErr) {
+				t.Errorf("expected the error to mention %q, got: %v", tt.wantErr, err)
+			}
+		})
+	}
+}
+
+// A language with no runCmd is not one solutions are written in, so none of the
+// solution-side rules reach it. That is what will keep the compare image, which
+// only runs a fixed binary, from needing a solutions pool entry.
+func TestValidateJudgeConfig_ExemptsLanguagesWithoutRunCmd(t *testing.T) {
+	cfg := validConfig()
+	cfg.Judge.Languages["compare"] = judgeLanguageConfig{Image: "judge-runner:compare"}
+
+	if err := validateJudgeConfig(cfg); err != nil {
+		t.Fatalf("expected a language without runCmd to be exempt, got: %v", err)
+	}
+}
+
+func TestApplyJudgeConfigDefaults_FloorsAbsentValues(t *testing.T) {
+	var cfg judgeConfigFile
+
+	applyJudgeConfigDefaults(&cfg)
+
+	for _, f := range []struct {
+		name string
+		got  int
+		want int
+	}{
+		{"idleTimeoutMinutes", cfg.Judge.IdleTimeoutMinutes, defaultIdleTimeoutMinutes},
+		{"dockerDaemonReserveCores", cfg.Judge.DockerDaemonReserveCores, defaultDockerDaemonReserveCores},
+		{"staleRunningAfterMinutes", cfg.Judge.StaleRunningAfterMinutes, defaultStaleRunningAfterMinutes},
+		{"staleValidationAfterMinutes", cfg.Judge.StaleValidationAfterMinutes, defaultStaleValidationAfterMinutes},
+	} {
+		if f.got != f.want {
+			t.Errorf("%s: got %d, want the default %d", f.name, f.got, f.want)
+		}
+	}
+	if cfg.Judge.DockerDaemonReserveBytes != defaultDockerDaemonReserveBytes {
+		t.Errorf("dockerDaemonReserveBytes: got %d, want the default %d", cfg.Judge.DockerDaemonReserveBytes, defaultDockerDaemonReserveBytes)
+	}
+}
+
+func TestApplyJudgeConfigDefaults_KeepsProvidedValues(t *testing.T) {
+	cfg := judgeConfigFile{Judge: judgeSection{
+		IdleTimeoutMinutes:          1,
+		DockerDaemonReserveBytes:    2,
+		DockerDaemonReserveCores:    3,
+		StaleRunningAfterMinutes:    4,
+		StaleValidationAfterMinutes: 5,
+	}}
+
+	applyJudgeConfigDefaults(&cfg)
+
+	if cfg.Judge.IdleTimeoutMinutes != 1 || cfg.Judge.DockerDaemonReserveBytes != 2 ||
+		cfg.Judge.DockerDaemonReserveCores != 3 || cfg.Judge.StaleRunningAfterMinutes != 4 ||
+		cfg.Judge.StaleValidationAfterMinutes != 5 {
+		t.Errorf("a provided value was overwritten by a default: %+v", cfg.Judge)
+	}
+}
+
+// Not covered by the defaults test: a mistyped struct tag leaves the field at
+// zero, and applyJudgeConfigDefaults would then hide that behind a default.
+// This reads the shipped file before any defaulting happens.
+func TestRealConfig_ScalarsComeFromTheFile(t *testing.T) {
 	j := decodeRealConfig(t).Judge
 
 	for _, f := range []struct {
@@ -49,51 +252,5 @@ func TestRealConfig_ScalarsArePopulated(t *testing.T) {
 	}
 	if j.DockerDaemonReserveBytes <= 0 {
 		t.Errorf("dockerDaemonReserveBytes: got %d, want > 0", j.DockerDaemonReserveBytes)
-	}
-}
-
-// Languages carry the image and the commands; pools carry the sizing. Both
-// halves are needed to build a container, so neither can be missing.
-func TestRealConfig_LanguagesAreComplete(t *testing.T) {
-	langs := decodeRealConfig(t).Judge.Languages
-	if len(langs) == 0 {
-		t.Fatal("no languages declared")
-	}
-	for name, lc := range langs {
-		if lc.Image == "" {
-			t.Errorf("%s: no image", name)
-		}
-		if lc.RunCmd == "" {
-			t.Errorf("%s: no runCmd", name)
-		}
-		if lc.Extension == "" {
-			t.Errorf("%s: no extension", name)
-		}
-	}
-}
-
-// Mirrors the startup check: a pool sizing a language that has no image would
-// only fail when that language is first claimed, mid-judging.
-func TestRealConfig_PoolsOnlySizeDeclaredLanguages(t *testing.T) {
-	j := decodeRealConfig(t).Judge
-
-	if _, ok := j.Pools[poolSolutions]; !ok {
-		t.Fatalf("no %q pool declared", poolSolutions)
-	}
-	for poolName, pool := range j.Pools {
-		if len(pool.Languages) == 0 {
-			t.Errorf("pool %s: no languages sized", poolName)
-		}
-		for lang, sizing := range pool.Languages {
-			if _, ok := j.Languages[lang]; !ok {
-				t.Errorf("pool %s sizes %q, which is not a declared language", poolName, lang)
-			}
-			if sizing.CPU == "" {
-				t.Errorf("pool %s, %s: no cpu", poolName, lang)
-			}
-			if sizing.MemoryBytes <= 0 {
-				t.Errorf("pool %s, %s: memoryBytes is %d", poolName, lang, sizing.MemoryBytes)
-			}
-		}
 	}
 }

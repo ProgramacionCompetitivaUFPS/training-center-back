@@ -35,3 +35,70 @@ func TestUploadProblemFiles_ActiveValidation_ReturnsConflict(t *testing.T) {
 		t.Errorf("expected ErrCodeValidationInProgress, got %v", err)
 	}
 }
+
+// A verifier is stored under the fixed name the judge writes it as inside the
+// sandbox, so the bucket can be walked without the database. The name the
+// problem setter chose survives in the record, for display.
+func TestUploadProblemFiles_VerifierIsStoredUnderItsFixedName(t *testing.T) {
+	tests := []struct {
+		name       string
+		fileType   string
+		uploadedAs string
+		wantKey    string
+		stored     func(*domainProblem.Problem) *domainProblem.JudgingFile
+	}{
+		{
+			name:       "checker",
+			fileType:   FileTypeChecker,
+			uploadedAs: "MiChecker_v2.cpp",
+			wantKey:    "problems/" + testSlug + "/checker/Checker.cpp",
+			stored:     func(p *domainProblem.Problem) *domainProblem.JudgingFile { return p.Checker() },
+		},
+		{
+			name:       "validator",
+			fileType:   FileTypeValidator,
+			uploadedAs: "gen_validator.cpp",
+			wantKey:    "problems/" + testSlug + "/validator/Validator.cpp",
+			stored:     func(p *domainProblem.Problem) *domainProblem.JudgingFile { return p.Validator() },
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var gotKey string
+			storage := &mockFileStorage{
+				uploadFileFn: func(_ context.Context, path string, _ []byte) error {
+					gotKey = path
+					return nil
+				},
+			}
+			p := newDraftProblem()
+			uc := NewUploadProblemFilesUseCase(repoWith(p), &mockValidationRepository{}, storage, nil, newDefaultSettings())
+
+			_, err := uc.Execute(context.Background(), UploadProblemFilesInput{
+				Slug:        testSlug,
+				FileType:    tt.fileType,
+				FileName:    tt.uploadedAs,
+				FileData:    []byte("int main(){}"),
+				CurrentUser: asCoach(authorID),
+			})
+
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if gotKey != tt.wantKey {
+				t.Errorf("storage key: got %q, want %q", gotKey, tt.wantKey)
+			}
+			saved := tt.stored(p)
+			if saved == nil {
+				t.Fatal("nothing was recorded on the problem")
+			}
+			if saved.FileKey() != tt.wantKey {
+				t.Errorf("recorded key: got %q, want %q", saved.FileKey(), tt.wantKey)
+			}
+			if saved.Filename() != tt.uploadedAs {
+				t.Errorf("recorded filename: got %q, want the uploaded %q", saved.Filename(), tt.uploadedAs)
+			}
+		})
+	}
+}
