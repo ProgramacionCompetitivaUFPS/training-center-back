@@ -10,7 +10,7 @@ import (
 func newPrepareJudgingUseCase(
 	sources *mockJudgingSourceProvider,
 	downloader *mockSourceCodeDownloader,
-	compiler *mockNativeCompiler,
+	compiler *mockArtifactCompiler,
 	uploader *mockArtifactUploader,
 	testCases *mockTestCaseProvider,
 	runner *mockValidatorRunner,
@@ -33,7 +33,7 @@ func TestPrepareJudging_NoCheckerNoValidator_ReturnsEmptyOutput(t *testing.T) {
 			return nil, nil
 		},
 	}
-	uc := newPrepareJudgingUseCase(&mockJudgingSourceProvider{}, &mockSourceCodeDownloader{}, &mockNativeCompiler{}, &mockArtifactUploader{}, testCases, &mockValidatorRunner{})
+	uc := newPrepareJudgingUseCase(&mockJudgingSourceProvider{}, &mockSourceCodeDownloader{}, &mockArtifactCompiler{}, &mockArtifactUploader{}, testCases, &mockValidatorRunner{})
 
 	out, err := uc.Execute(context.Background(), PrepareJudgingInput{ProblemID: problemID, Slug: "sum-of-two-numbers"})
 	if err != nil {
@@ -49,7 +49,7 @@ func TestPrepareJudging_CheckerCompiles_UploadsAndReturnsKey(t *testing.T) {
 		getCheckerSourceFn: func(_ context.Context, _ string) (*JudgingSource, error) { return checkerSource(), nil },
 	}
 	uploader := &mockArtifactUploader{}
-	uc := newPrepareJudgingUseCase(sources, &mockSourceCodeDownloader{}, &mockNativeCompiler{}, uploader, &mockTestCaseProvider{}, &mockValidatorRunner{})
+	uc := newPrepareJudgingUseCase(sources, &mockSourceCodeDownloader{}, &mockArtifactCompiler{}, uploader, &mockTestCaseProvider{}, &mockValidatorRunner{})
 
 	out, err := uc.Execute(context.Background(), PrepareJudgingInput{ProblemID: problemID, Slug: "sum-of-two-numbers"})
 	if err != nil {
@@ -75,7 +75,7 @@ func TestPrepareJudging_CheckerCompileFails_StopsBeforeValidator(t *testing.T) {
 			return nil, nil
 		},
 	}
-	compiler := &mockNativeCompiler{
+	compiler := &mockArtifactCompiler{
 		compileFn: func(_ context.Context, _ CompileArtifactRequest) (CompileArtifactResult, error) {
 			return CompileArtifactResult{Success: false, Log: "checker.cpp:3:1: error: expected ';'"}, nil
 		},
@@ -98,7 +98,7 @@ func TestPrepareJudging_ValidatorCompileFails_ReturnsFailure(t *testing.T) {
 	sources := &mockJudgingSourceProvider{
 		getValidatorSourceFn: func(_ context.Context, _ string) (*JudgingSource, error) { return validatorSource(), nil },
 	}
-	compiler := &mockNativeCompiler{
+	compiler := &mockArtifactCompiler{
 		compileFn: func(_ context.Context, _ CompileArtifactRequest) (CompileArtifactResult, error) {
 			return CompileArtifactResult{Success: false, Log: "SyntaxError: invalid syntax"}, nil
 		},
@@ -119,7 +119,7 @@ func TestPrepareJudging_ValidatorCompiles_AllInputsAccepted(t *testing.T) {
 		getValidatorSourceFn: func(_ context.Context, _ string) (*JudgingSource, error) { return validatorSource(), nil },
 	}
 	uploader := &mockArtifactUploader{}
-	uc := newPrepareJudgingUseCase(sources, &mockSourceCodeDownloader{}, &mockNativeCompiler{}, uploader, &mockTestCaseProvider{}, &mockValidatorRunner{})
+	uc := newPrepareJudgingUseCase(sources, &mockSourceCodeDownloader{}, &mockArtifactCompiler{}, uploader, &mockTestCaseProvider{}, &mockValidatorRunner{})
 
 	out, err := uc.Execute(context.Background(), PrepareJudgingInput{ProblemID: problemID, Slug: "sum-of-two-numbers"})
 	if err != nil {
@@ -156,7 +156,7 @@ func TestPrepareJudging_ValidatorRejectsInput_StopsAtFirstRejection(t *testing.T
 			return ValidatorRunResult{Accepted: false, Message: "value exceeds constraint"}, nil
 		},
 	}
-	uc := newPrepareJudgingUseCase(sources, &mockSourceCodeDownloader{}, &mockNativeCompiler{}, &mockArtifactUploader{}, testCases, runner)
+	uc := newPrepareJudgingUseCase(sources, &mockSourceCodeDownloader{}, &mockArtifactCompiler{}, &mockArtifactUploader{}, testCases, runner)
 
 	out, err := uc.Execute(context.Background(), PrepareJudgingInput{ProblemID: problemID, Slug: "sum-of-two-numbers"})
 	if err != nil {

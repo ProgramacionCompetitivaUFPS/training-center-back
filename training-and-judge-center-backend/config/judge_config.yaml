@@ -1,47 +1,54 @@
 judge:
   idleTimeoutMinutes: 10
 
-  # Los dos "reserve" se recortan del presupuesto del container dind, que es donde
-  # corre el demonio Docker y los containers que crea. NO tienen nada que ver con el
-  # proceso worker: ese vive en otro container, con su propio cgroup y sus propios
-  # límites. (Sus nombres anteriores —memoryOverheadBytes/cpuOverheadCores— decían
-  # "para el proceso worker", que era falso.)
-  dockerDaemonReserveBytes: 536870912  # 512 MiB para el demonio Docker
-  dockerDaemonReserveCores: 1          # cores del demonio Docker (se restan del semáforo)
+  # Both reserves are carved out of the dind container's budget, where the Docker
+  # daemon and the containers it creates live — not out of the worker's.
+  dockerDaemonReserveBytes: 536870912  # 512 MiB
+  dockerDaemonReserveCores: 1          # subtracted from the concurrency semaphore
 
-  staleRunningAfterMinutes: 10    # submissions en RUNNING más viejas que esto se marcan SYSTEM_ERROR
-  staleValidationAfterMinutes: 20 # validaciones de publish en RUNNING más viejas que esto se marcan SYSTEM_ERROR (> los 9 min de timeout del cliente HTTP)
+  staleRunningAfterMinutes: 10    # RUNNING submissions older than this become SYSTEM_ERROR
+  staleValidationAfterMinutes: 20 # same for publish validations; above the client's 9 min HTTP timeout
 
-  # Propiedades del LENGUAJE: valen igual sin importar en qué pool se ejecute.
+  # Language properties: true no matter which pool runs the container.
+  # In the artifact* fields, {name} is replaced with Checker or Validator.
   languages:
     cpp20:
       image: "judge-runner:cpp20"
       extension: "cpp"
-      compileCmd: "g++ -std=c++20 -O2 -o /sandbox/solution /sandbox/solution.cpp"
-      runCmd: "/sandbox/solution"
+      compileCmd: "g++ -std=c++20 -O2 -o /sandbox/Solution /sandbox/Solution.cpp"
+      runCmd: "/sandbox/Solution"
+      artifactSource:  "/sandbox/{name}.cpp"
+      artifactCompile: "g++ -std=c++20 -O2 -o /sandbox/{name} /sandbox/{name}.cpp"
+      artifactPath:    "/sandbox/{name}"
+      artifactRun:     "/sandbox/{name}"
 
     java17:
       image: "judge-runner:java17"
       extension: "java"
-      compileCmd: "javac -encoding UTF-8 /sandbox/solution.java"
-      # MaxRAMPercentage es imprescindible: sin él la JVM detecta el cgroup y se
-      # queda con el 25% del container como heap (medido: 512 MiB en un container
-      # de 2 GiB), o sea la cuarta parte de lo que recibe una solución en C++ con
-      # el mismo memoryBytes. Con 75% queda margen para el overhead propio de la
-      # JVM (metaspace, code cache, stacks), que no entra en el heap.
-      runCmd: "java -XX:MaxRAMPercentage=75 -cp /sandbox solution"
+      compileCmd: "javac -encoding UTF-8 /sandbox/Solution.java"
+      # Without MaxRAMPercentage the JVM caps its heap at 25% of the container.
+      runCmd: "java -XX:MaxRAMPercentage=75 -cp /sandbox Solution"
+      artifactSource:  "/sandbox/{name}.java"
+      # -d keeps the .class files out of /sandbox, so the JAR cannot pick up the source.
+      artifactCompile: "javac -encoding UTF-8 -d /sandbox/classes /sandbox/{name}.java && jar --create --file /sandbox/{name}.jar --main-class {name} -C /sandbox/classes ."
+      artifactPath:    "/sandbox/{name}.jar"
+      artifactRun:     "java -jar /sandbox/{name}.jar"
 
     python310:
       image: "judge-runner:python310"
       extension: "py"
-      compileCmd: ""           # vacío = lenguaje interpretado, se omite la compilación
-      runCmd: "python3 /sandbox/solution.py"
+      compileCmd: ""           # empty = interpreted language, compilation is skipped
+      runCmd: "python3 /sandbox/Solution.py"
+      artifactSource:  "/sandbox/{name}.py"
+      artifactCompile: "python3 -m py_compile /sandbox/{name}.py"
+      artifactPath:    "/sandbox/{name}.py"   # the artifact is the source itself
+      artifactRun:     "python3 /sandbox/{name}.py"
 
-  # Dimensionamiento: es propiedad del POOL, no del lenguaje. El mismo lenguaje puede
-  # necesitar tamaños distintos según para qué se use el container.
+  # Sizing belongs to the POOL, not to the language: the same language can need
+  # different limits depending on what the container is used for.
   pools:
     solutions:
       languages:
         cpp20:     { cpu: "1", memoryBytes: 2147483648 }  # 2 GiB
-        java17:    { cpu: "1", memoryBytes: 2147483648 }  # 2 GiB (la JVM ve el 75%, ver runCmd)
+        java17:    { cpu: "1", memoryBytes: 2147483648 }  # 2 GiB (the JVM sees 75%, see runCmd)
         python310: { cpu: "1", memoryBytes: 1073741824 }  # 1 GiB

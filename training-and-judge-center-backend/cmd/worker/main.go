@@ -3,11 +3,13 @@ package main
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"os"
 	"os/signal"
 	"strconv"
+	"strings"
 	"syscall"
 	"time"
 
@@ -35,6 +37,7 @@ const poolSolutions = "solutions"
 // KnownFields rejects unknown keys but says nothing about absent ones, so every
 // optional value needs one.
 const (
+	defaultIdleTimeoutMinutes          = 10
 	defaultDockerDaemonReserveBytes    = 512 << 20 // 512 MiB
 	defaultDockerDaemonReserveCores    = 1
 	defaultStaleRunningAfterMinutes    = 10
@@ -118,11 +121,17 @@ func main() {
 	}
 
 	execLanguages := make(map[string]adapterjudge.LanguageExecConfig, len(judgeCfg.Judge.Languages))
+	artifactLanguages := make(map[string]adapterjudge.ArtifactLanguageConfig, len(judgeCfg.Judge.Languages))
 	for lang, lc := range judgeCfg.Judge.Languages {
 		execLanguages[lang] = adapterjudge.LanguageExecConfig{
 			CompileCmd: lc.CompileCmd,
 			RunCmd:     lc.RunCmd,
 			Extension:  lc.Extension,
+		}
+		artifactLanguages[lang] = adapterjudge.ArtifactLanguageConfig{
+			SourcePath:   lc.ArtifactSource,
+			CompileCmd:   lc.ArtifactCompile,
+			ArtifactPath: lc.ArtifactPath,
 		}
 	}
 
@@ -141,6 +150,7 @@ func main() {
 	defer pool.Stop()
 
 	executor := adapterjudge.NewExecutor(pool, dockerClient, executorCfg)
+	artifactCompiler := adapterjudge.NewArtifactCompiler(pool, dockerClient, adapterjudge.ArtifactCompilerConfig{Languages: artifactLanguages})
 
 	var sourceCodeDownloader appjudge.SourceCodeDownloader
 	var testCaseProvider appjudge.TestCaseProvider
@@ -175,7 +185,6 @@ func main() {
 	problemProvider := adapterjudge.NewProblemProvider(dbPool)
 	solutionProvider := adapterjudge.NewSolutionProvider(dbPool)
 	judgingSourceProvider := adapterjudge.NewJudgingSourceProvider(dbPool)
-	nativeCompiler := adapterjudge.NewNativeCompiler()
 	validatorRunner := adapterjudge.NewValidatorRunner()
 	submissionRepo := adaptersubmission.NewRepository(dbPool)
 	submissionUpdater := adapterjudge.NewSubmissionUpdater(submissionRepo)
@@ -215,7 +224,7 @@ func main() {
 	prepareJudgingUseCase := appjudge.NewPrepareJudgingUseCase(
 		judgingSourceProvider,
 		sourceCodeDownloader,
-		nativeCompiler,
+		artifactCompiler,
 		artifactUploader,
 		testCaseProvider,
 		validatorRunner,
@@ -330,10 +339,14 @@ func main() {
 // judgeLanguageConfig holds what is true of a language regardless of which pool
 // runs it: its image and how its code is compiled and executed.
 type judgeLanguageConfig struct {
-	Image      string `yaml:"image"`
-	Extension  string `yaml:"extension"`
-	CompileCmd string `yaml:"compileCmd"`
-	RunCmd     string `yaml:"runCmd"`
+	Image           string `yaml:"image"`
+	Extension       string `yaml:"extension"`
+	CompileCmd      string `yaml:"compileCmd"`
+	RunCmd          string `yaml:"runCmd"`
+	ArtifactSource  string `yaml:"artifactSource"`
+	ArtifactCompile string `yaml:"artifactCompile"`
+	ArtifactPath    string `yaml:"artifactPath"`
+	ArtifactRun     string `yaml:"artifactRun"`
 }
 
 // judgePoolLanguageConfig is the sizing of one language's containers inside one
@@ -382,32 +395,82 @@ func loadJudgeConfig() judgeConfigFile {
 		slog.Error("worker: failed to parse judge config", "path", path, "error", err)
 		os.Exit(1)
 	}
-	if len(cfg.Judge.Languages) == 0 {
-		slog.Error("worker: judge config has no languages defined", "path", path)
+	if err := validateJudgeConfig(cfg); err != nil {
+		slog.Error("worker: invalid judge config", "path", path, "error", err)
 		os.Exit(1)
 	}
-	// A pool sizes a subset of the declared languages. One naming a language
-	// with no image would only fail when that language is first claimed —
-	// mid-judging — so it is rejected at startup instead.
+	applyJudgeConfigDefaults(&cfg)
+	return cfg
+}
+
+// validateJudgeConfig reports the first inconsistency found. It is separate from
+// loadJudgeConfig, which exits the process, so it can be tested.
+func validateJudgeConfig(cfg judgeConfigFile) error {
+	if len(cfg.Judge.Languages) == 0 {
+		return errors.New("no languages defined")
+	}
+	if _, ok := cfg.Judge.Pools[poolSolutions]; !ok {
+		return fmt.Errorf("no %q pool defined", poolSolutions)
+	}
+	// A pool sizing a language with no image would only fail when that language
+	// is first claimed, mid-judging.
 	for poolName, pool := range cfg.Judge.Pools {
 		if len(pool.Languages) == 0 {
-			slog.Error("worker: judge pool has no languages defined", "path", path, "pool", poolName)
-			os.Exit(1)
+			return fmt.Errorf("pool %q sizes no languages", poolName)
 		}
-		for lang := range pool.Languages {
+		for lang, sizing := range pool.Languages {
 			if _, ok := cfg.Judge.Languages[lang]; !ok {
-				slog.Error("worker: judge pool sizes an undeclared language", "path", path, "pool", poolName, "language", lang)
-				os.Exit(1)
+				return fmt.Errorf("pool %q sizes undeclared language %q", poolName, lang)
+			}
+			// An empty cpu parses as no limit at all, which silently breaks the
+			// one-CPU-per-container assumption the concurrency formula rests on.
+			if sizing.CPU == "" {
+				return fmt.Errorf("pool %q, language %q: no cpu", poolName, lang)
+			}
+			if sizing.MemoryBytes <= 0 {
+				return fmt.Errorf("pool %q, language %q: memoryBytes is not positive", poolName, lang)
 			}
 		}
 	}
-	if _, ok := cfg.Judge.Pools[poolSolutions]; !ok {
-		slog.Error("worker: judge config has no solutions pool", "path", path, "pool", poolSolutions)
-		os.Exit(1)
+	for lang, lc := range cfg.Judge.Languages {
+		if lc.Image == "" {
+			return fmt.Errorf("language %q has no image", lang)
+		}
+		// A language with a runCmd is one solutions are written in, so it must
+		// be sized by the solutions pool and able to build a checker or
+		// validator. Entries without one are not languages code is sent in.
+		if lc.RunCmd == "" {
+			continue
+		}
+		if lc.Extension == "" {
+			return fmt.Errorf("language %q runs solutions but has no extension", lang)
+		}
+		if _, ok := cfg.Judge.Pools[poolSolutions].Languages[lang]; !ok {
+			return fmt.Errorf("language %q runs solutions but pool %q does not size it", lang, poolSolutions)
+		}
+		for _, f := range []struct{ name, value string }{
+			{"artifactSource", lc.ArtifactSource},
+			{"artifactCompile", lc.ArtifactCompile},
+			{"artifactPath", lc.ArtifactPath},
+			{"artifactRun", lc.ArtifactRun},
+		} {
+			if f.value == "" {
+				return fmt.Errorf("language %q: %s is empty", lang, f.name)
+			}
+			if !strings.Contains(f.value, adapterjudge.ArtifactNamePlaceholder) {
+				return fmt.Errorf("language %q: %s has no %s", lang, f.name, adapterjudge.ArtifactNamePlaceholder)
+			}
+		}
 	}
-	// KnownFields rejects unknown keys but says nothing about missing ones, so
-	// this would otherwise stay at zero and let the pool allocate the dind
-	// container's whole budget, starving the very daemon it runs on.
+	return nil
+}
+
+// applyJudgeConfigDefaults floors the optional values. KnownFields rejects
+// unknown keys but says nothing about absent ones.
+func applyJudgeConfigDefaults(cfg *judgeConfigFile) {
+	if cfg.Judge.IdleTimeoutMinutes <= 0 {
+		cfg.Judge.IdleTimeoutMinutes = defaultIdleTimeoutMinutes
+	}
 	if cfg.Judge.DockerDaemonReserveBytes <= 0 {
 		cfg.Judge.DockerDaemonReserveBytes = defaultDockerDaemonReserveBytes
 	}
@@ -420,7 +483,6 @@ func loadJudgeConfig() judgeConfigFile {
 	if cfg.Judge.StaleValidationAfterMinutes <= 0 {
 		cfg.Judge.StaleValidationAfterMinutes = defaultStaleValidationAfterMinutes
 	}
-	return cfg
 }
 
 func getEnv(key, fallback string) string {

@@ -1,4 +1,4 @@
-﻿package problem
+package problem
 
 import (
 	"context"
@@ -9,9 +9,9 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	appshared "github.com/training-judge-center/backend/internal/application/shared"
 	"github.com/training-judge-center/backend/internal/domain/problem"
 	"github.com/training-judge-center/backend/internal/domain/shared"
-	appshared "github.com/training-judge-center/backend/internal/application/shared"
 	"github.com/training-judge-center/backend/pkg/apperror"
 	"golang.org/x/sync/errgroup"
 )
@@ -114,8 +114,6 @@ func (uc *ImportProblemUseCase) Execute(ctx context.Context, input ImportProblem
 		return nil, apperror.NewValidation(fieldErrs)
 	}
 
-
-
 	var uploadedKeys []string
 	cleanup := func() {
 		for _, key := range uploadedKeys {
@@ -195,13 +193,13 @@ func (uc *ImportProblemUseCase) Execute(ctx context.Context, input ImportProblem
 	}
 
 	if pkg.Checker != nil {
-		if err := uc.uploadVerifier(ctx, slug.String(), FileTypeChecker, pkg.Checker, newProblem, &uploadedKeys, cleanup, now); err != nil {
+		if err := uc.uploadVerifier(ctx, slug.String(), FileTypeChecker, verifierBaseNameChecker, pkg.Checker, newProblem, &uploadedKeys, cleanup, now); err != nil {
 			return nil, err
 		}
 	}
 
 	if pkg.Validator != nil {
-		if err := uc.uploadVerifier(ctx, slug.String(), FileTypeValidator, pkg.Validator, newProblem, &uploadedKeys, cleanup, now); err != nil {
+		if err := uc.uploadVerifier(ctx, slug.String(), FileTypeValidator, verifierBaseNameValidator, pkg.Validator, newProblem, &uploadedKeys, cleanup, now); err != nil {
 			return nil, err
 		}
 	}
@@ -216,7 +214,7 @@ func (uc *ImportProblemUseCase) Execute(ctx context.Context, input ImportProblem
 
 func (uc *ImportProblemUseCase) uploadVerifier(
 	ctx context.Context,
-	slugStr, fileType string,
+	slugStr, fileType, baseName string,
 	f *ParsedFile,
 	p *problem.Problem,
 	uploadedKeys *[]string,
@@ -229,7 +227,7 @@ func (uc *ImportProblemUseCase) uploadVerifier(
 	if !ok {
 		return apperror.NewBadRequest(ErrCodeProblemUnsupportedFileExt, fmt.Sprintf("Unsupported %s file extension: %s", fileType, ext))
 	}
-	fileKey := fmt.Sprintf("problems/%s/%s/%s", slugStr, fileType, cleanName)
+	fileKey := fmt.Sprintf("problems/%s/%s/%s%s", slugStr, fileType, baseName, ext)
 
 	verifierObj, err := problem.NewVerifierFile(cleanName, fileKey, lang)
 	if err != nil {

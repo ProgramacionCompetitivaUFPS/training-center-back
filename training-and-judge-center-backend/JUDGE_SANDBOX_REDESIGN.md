@@ -410,6 +410,11 @@ Y gracias a la normalización el artefacto es **un solo archivo con ruta conocid
 
 **A verificar antes de dar por hecho**: que `jar` venga incluido en `openjdk-17-jdk-headless` (debería, "headless" refiere a las librerías gráficas y no a las herramientas), y acotar el `-C /sandbox .` a los `.class` para no meter el fuente dentro del JAR.
 
+
+**Corregido al ejecutar (ver Paso 3).** El nombre fijo terminó siendo **uno por rol** —`Checker` y `Validator`, en PascalCase— con un token `{name}` en los cuatro campos, y no el `checker` único que fija esta decisión. El motivo: los mismos cuatro campos compilan también el validator, así que el nombre único obligaba a que un validator Java declarara `public class checker`, que es falso de frente. El título de esta decisión ("la config queda 100% estática") queda entonces desactualizado: hay exactamente una sustitución, uniforme en los tres lenguajes y con valor tomado de un enum nuestro de dos elementos. Los dos beneficios que la decisión realmente compraba —cero lógica por lenguaje en Go, cero sorpresas en runtime— se conservan.
+
+Y el comando de Java de esta decisión **está mal como está escrito acá**: `-C /sandbox .` mete el fuente dentro del JAR. Verificado corriéndolo. La versión correcta compila con `-d /sandbox/classes` y empaqueta desde ahí.
+
 ### D10 — `judge_config.yaml`: separar propiedades del lenguaje de dimensionamiento del pool ✅
 
 Hoy la sección `languages:` mezcla dos cosas independientes: **propiedades del lenguaje** (imagen, extensión, comandos) y **dimensionamiento** (`cpu`, `memoryBytes`). Con dos pools eso deja de funcionar, porque el mismo lenguaje tiene tamaños distintos según el pool. Y los campos de artefacto de D9 **se reparten entre los pools**: `artifactSource`/`artifactCompile`/`artifactPath` se usan al compilar (pool A) y `artifactRun` al ejecutar (pool B).
@@ -545,25 +550,47 @@ Ninguno bloquea el diseño; son elecciones que conviene hacer con el código del
 - **Limpieza del directorio del judging**: hoy `Session.Close` hace `rm -rf /sandbox/*`; hay que sumar el borrado de `<raíz>/<uuid>` por parte del worker.
 - **`maxOutputBytes`**: hoy 64 MiB. Con D7 deja de presionar al worker, pero sigue acotando cuánto disco del `emptyDir` puede consumir un judging. Bajarlo a ~8 MiB sigue siendo generosísimo para programación competitiva.
 - **Qué reportar como KB consumidos** (ver D11): el veredicto de MLE queda correcto porque lo hace cumplir el kernel, pero el número que se muestra vendría de `MaxUsage`, contaminado por corridas anteriores en el mismo container.
-- **Verificar que `jar` venga en `openjdk-17-jdk-headless`** y acotar el `-C /sandbox .` a los `.class`, para no meter el fuente dentro del JAR (ver D9).
+- ~~**Verificar que `jar` venga en `openjdk-17-jdk-headless`** y acotar el `-C /sandbox .` a los `.class`.~~ **Resuelto en el Paso 3**, verificado corriéndolo en la imagen real: `jar` viene incluido, y el `-C /sandbox .` efectivamente metía el `.java` en el JAR. Se compila con `-d /sandbox/classes` y se empaqueta desde ahí.
+- **Un checker Java con la clase no pública falla tarde y disfrazado.** Verificado en `judge-runner:java17`: si la clase no es `public`, javac acepta cualquier nombre de archivo y `jar` no verifica que la main-class exista, así que la compilación pasa y revienta al ejecutar con `Could not find or load main class Checker`. Se decidió (Paso 3) no validar nada al subir, porque el mensaje nombra la clase esperada y una regex sobre fuente Java es código que se pudre. Si el caso aparece en la práctica, el lugar para atajarlo es el Paso 5, con el checker corriendo de verdad.
+
+- **Documentar la convención de nombres de clase.** Con el Paso 3, un archivo Java debe declarar `Solution`, `Checker` o `Validator` según su rol. `README.md:133` y `specs/Judge System/README.md:161` ya documentaban `Solution.java` con mayúscula, así que la deriva contra el código se cierra sola — pero falta escribir en algún lado la convención completa, incluida la salida de la clase no pública para poder subir varias soluciones Java (ver la sección de bugs).
 - **Nombre e imagen del binario de comparación** (`cmd/compare`, `docker/judge/compare.Dockerfile`), y sumarlo al init container `prepull-language-images` y al pipeline de build/push (ver D6).
-- **Falta una validación de arranque, sacada a propósito**: hoy se rechaza que un pool dimensione un lenguaje sin imagen declarada, pero **no el caso inverso** — un lenguaje que sí puede recibir soluciones y que ningún pool de soluciones dimensiona. Ese hueco no falla al arrancar: aparece como `pool: unknown language` recién cuando alguien envía en ese lenguaje, en medio de un judging.
+- ~~**Falta una validación de arranque, sacada a propósito**: el caso inverso — un lenguaje que puede recibir soluciones y que ningún pool dimensiona.~~ **Resuelto en el Paso 3** con la alternativa que había quedado pendiente: se deriva de `runCmd`, sin tocar el dominio. Ahí está también por qué se descartó el chequeo cruzado contra `virtual_object.json`, y qué hueco deja abierto.
 
   Se implementó y **se revirtió**: la versión que se escribió preguntaba `submission.NewLanguage(lang)` para saber si un lenguaje era enviable, y eso metía dominio dentro de `cmd/worker` — que quedaba como el único cmd importándolo (`cmd/api` no importa dominio en absoluto) — además de usar un constructor como predicado, que no es para lo que existe.
 
   La alternativa que quedó pendiente de evaluar: derivarlo de la propia config, sin dominio. Un lenguaje en el que se escriben soluciones es el que declara `runCmd`, y `compare` (que llega en el Paso 4) no va a tener uno — solo `image` y `artifactRun`. Así la exención sale sola de la forma del archivo. Su punto débil: si alguien agrega un lenguaje al dominio pero olvida el `runCmd` en el YAML, el chequeo no salta.
-- **Partir `loadJudgeConfig`, que hoy hace tres cosas** (leer el archivo, validar, aplicar defaults) en ~60 líneas. Lo importante no es el largo: mientras la función haga `os.Exit` al fallar, **los defaults no se pueden testear**. Los tests actuales leen el `judge_config.yaml` real, que tiene todas las claves, así que el camino del default nunca se ejecuta — de hecho un borrado accidental de dos de los cuatro defaults pasó desapercibido para la suite y se detectó a ojo. Extraer la validación y el defaulting a funciones que devuelvan error en vez de salir del proceso los vuelve testeables.
+- ~~**Partir `loadJudgeConfig`, que hoy hace tres cosas**~~ **Resuelto en el Paso 3**: `validateJudgeConfig` y `applyJudgeConfigDefaults` son funciones propias que devuelven error, y los tests las llaman directo en vez de reimplementar las reglas. Queda pendiente **mover las tres a `internal/config/judge_config.go`**, anotado más abajo con el resto de la revisión de configuración.
 
-- **El wiring del pool depende de una invariante que no expresa**: `Image: judgeCfg.Judge.Languages[lang].Image` es seguro *solo porque* la validación de arranque ya garantizó que ese lenguaje existe. Si alguien reordena o quita esa validación, el acceso al mapa no falla — devuelve `Image: ""` y el pool intenta crear containers desde un nombre de imagen vacío, con un error de Docker incomprensible. El acceso ignora el `ok`.
+- **El wiring del pool depende de una invariante que no expresa**: `Image: judgeCfg.Judge.Languages[lang].Image` es seguro *solo porque* la validación de arranque ya garantizó que ese lenguaje existe. El Paso 3 lo acotó agregando una regla de que todo lenguaje declare imagen no vacía, así que el peor caso ya no es un nombre de imagen vacío; pero **el acceso al mapa sigue ignorando el `ok`**, y sigue dependiendo de que nadie reordene ni quite esa validación.
 
 - **Tres cosas menores de `judge_config.yaml`**, sin decidir:
   - La sección `pools` usa notación inline (`{ cpu: "1", ... }`) mientras el resto del archivo es bloque. Uniformar, o asumir el inline como convención para los mapas chicos de dimensionamiento.
-  - El comentario que explica los nombres anteriores (`memoryOverheadBytes`/`cpuOverheadCores`) sirve hoy para quien conocía la config vieja, pero en unos meses es ruido: esa explicación pertenece al historial de git y a este documento, no al archivo de config para siempre.
+  - ~~El comentario que explica los nombres anteriores (`memoryOverheadBytes`/`cpuOverheadCores`) es ruido a futuro.~~ **Resuelto en el Paso 3**: los comentarios del archivo se reescribieron en inglés y en una línea, y esa explicación se fue al historial de git y a este documento.
   - `memoryBytes: 2147483648` son bytes crudos, ilegibles sin el comentario de al lado. Kubernetes acepta `2Gi` en sus manifests; acá no, porque el parser es un `int64` pelado.
 
 - **Revisión propia de `RUNNER_ARCHITECTURE.md`**: al actualizarlo por el renombre aparecieron discrepancias **preexistentes** que no se tocaron, porque merecen su propia pasada. `syntaxCheckCmd: "pypy3 -m py_compile ..."` es un campo que **no existe en el código** y además nombra `pypy3` en vez de `python3`; y `compileCmd: "javac ... /sandbox/Solution.java"` usa mayúscula contra el `solution.java` real. Sugiere que ese documento describe un diseño previsto que la implementación no siguió en varios puntos — el `-Xmx{memoryLimit}m` (ver la sección de bugs) es el caso más consecuente.
 
 ---
+
+
+- **Revisar la configuración de la plataforma entera — fuera de este rediseño, pero pedido explícitamente.** Hoy hay **tres superficies de configuración** que nadie coordina:
+
+  | Dónde | Qué tiene | Quién lo lee | Cómo valida |
+  |---|---|---|---|
+  | variables de entorno → `internal/config/config.go` | 22 campos: DB, storage, JWT, SMTP, Redis, RabbitMQ, CORS, URL del frontend, clave de cifrado | `cmd/api` | `os.Exit` dentro de los getters |
+  | `config/virtual_object.json` | lenguajes soportados, extensiones, límites de tiempo/memoria, tags, límites de subida | `cmd/api` | ninguna |
+  | `config/judge_config.yaml` | lenguajes del judge, comandos, dimensionamiento de pools | `cmd/worker` | decode estricto + validación al arrancar |
+
+  Los problemas concretos, para no partir de cero cuando se encare:
+
+  - **El punto de partida: `cmd/worker/main.go` define adentro el esquema, la carga y la validación de `judge_config.yaml`** — cinco structs (`judgeConfigFile`, `judgeSection`, `judgeLanguageConfig`, `judgePoolConfig`, `judgePoolLanguageConfig`), la función `loadJudgeConfig`, cuatro constantes de default, y copias propias de `getEnv`/`getRequiredEnv`/`getRequiredEnvInt64`. El composition root debería **enchufar** piezas, no definir el formato de un archivo. Y `cmd/api` ya delega eso en `internal/config` (`Load()` + `loadVirtualObject()`), así que el worker es la asimetría. Propuesta concreta: mover esquema, carga y validación a `internal/config/judge_config.go`, espejando `virtual_object.go`, y dejar en `main.go` solo el wiring. Sus tests se mudan con él, y dejan de vivir en `package main`.
+
+  - **`Config` es un struct único de 22 campos** que se pasa entero: ningún consumidor declara qué necesita realmente, así que no se puede saber quién usa qué sin leer todo.
+  - **`cmd/worker/main.go` reimplementa `getEnv`/`getRequiredEnv`** porque no usa `internal/config`. Misma función, dos copias.
+  - **El conjunto de lenguajes vive en dos archivos que tienen que coincidir y nadie cruza**: `supportedLanguages`/`languageExtensions` en el JSON y `languages` en el YAML. Es el hueco que la validación del Paso 3 deja abierto a propósito (ver ahí la opción (B) descartada).
+  - **Tres formatos y tres estilos de carga** (env, JSON, YAML), con tres niveles de rigor distintos: el YAML rechaza claves desconocidas, el JSON no valida nada.
+  - **`virtual_object` no dice qué contiene.** El nombre no describe ni límites de problema ni lenguajes ni tags.
 
 ## Consecuencias
 
@@ -611,7 +638,7 @@ De la Fase 5 sobreviven dos cosas, ninguna relacionada con esto: el `BackendConf
 
 ## Bugs encontrados en el camino
 
-Los tres son preexistentes y ninguno lo introdujo este rediseño, pero **los tres se arreglan dentro de él** (ver D11 para los de memoria, y D8/D9 para el tercero).
+Todos son preexistentes y ninguno lo introdujo este rediseño, pero no todos se arreglan dentro de él: los dos de memoria sí (D11), y el de `CheckerFilename` desaparece por construcción (D8/D9). El MLE de Java y la colisión de soluciones Java quedan **sin arreglar**, cada uno con su nota.
 
 
 ### El MLE de Java no se puede detectar — solución pendiente de rediseño
@@ -687,6 +714,34 @@ O sea: **toda submission real contra un problema con checker personalizado falla
 
 Los tests no lo agarran porque `judge_submission_test.go` mockea `OutputChecker` (al mock no le importan los campos) y `output_comparator_test.go` prueba el adapter directo con los campos ya puestos. Ninguno cruza la frontera donde se pierden. **El rediseño tiene que incluir un test que cruce esa frontera**, no solo el arreglo.
 
+### Varias soluciones Java en un mismo problema colisionan al subir — pendiente, fuera de este rediseño
+
+Encontrado al cerrar el nombre fijo del Paso 3. **No se arregla acá**: el arreglo real toca la identidad de las soluciones en el dominio, no la mecánica de ejecución.
+
+La cadena que lo produce:
+
+1. Convención de la plataforma: la clase de una solución Java tiene que llamarse `Solution` (antes `solution`, ver Paso 3).
+2. Regla de javac: una clase **pública** `Solution` solo compila en un archivo llamado `Solution.java`.
+3. Identidad al subir: el filename. `Problem.AddSolution` **reemplaza** cuando `Filename()` coincide, y `RemoveSolution` / `DELETE /problems/{slug}/files` direccionan por `fileName`.
+
+Un problem setter que hace lo obvio —clase pública— termina con todas sus soluciones Java llamadas `Solution.java`, así que al subir la segunda **reemplaza** la primera. El caso típico de validar un problema con varias soluciones (una correcta, una lenta, una incorrecta) queda reducido a una sola.
+
+**La salida existe, y está verificada corriéndola en `judge-runner:java17`**: si la clase **no es pública**, javac acepta cualquier nombre de archivo. Un `BruteForce.java` que declara `class Solution { public static void main... }` compila a `Solution.class` y corre con `java -cp <dir> Solution`. O sea que el setter puede mantener nombres distintos en su máquina y subir los tres sin colisión, a costa de una convención que hay que documentar.
+
+**Es preexistente**: hoy la convención es `solution` en minúscula con exactamente la misma mecánica. El Paso 3 le cambia la caja a una letra; no introduce ni empeora la colisión.
+
+**Qué costaría arreglarlo de verdad**: que las soluciones dejen de identificarse por filename. Toca `AddSolution`, `RemoveSolution`, el endpoint de borrado y el contrato de la API. Es una decisión propia, no un detalle de este rediseño.
+
+### `testlib.h` no está en la imagen de C++ — pendiente, fuera de este rediseño
+
+Encontrado al preparar el Paso 3 y verificado adentro de `judge-runner:cpp20`: no existe `/usr/include/testlib.h`, ni ninguna copia en el repositorio. `cpp20.Dockerfile` instala únicamente `g++`.
+
+Un checker o validator escrito con testlib —que es el caso normal en programación competitiva, y el que este mismo documento asume cuando estima el costo de compilar ("testlib son ~10k líneas de C++ con templates")— falla con `testlib.h: No such file or directory`. O sea que la funcionalidad de checkers personalizados no es usable de verdad hasta que el header esté en la imagen.
+
+**Por qué no se arregla acá**: implica agregar el header a la imagen de C++, reconstruirla y subir `RUNNER_VERSION` en `deploy/k8s/judge/images-configmap.yaml`. Es trabajo de imágenes, no de código, y el rediseño no lo empeora — la compilación nativa tampoco lo tenía.
+
+**Decisión pendiente al hacerlo**: si el header se vendorea en el repo (reproducible, versión congelada) o se baja en el build (más simple, dependencia de red en el build).
+
 ---
 
 ## Plan de ejecución
@@ -725,12 +780,49 @@ Se sigue construyendo **un solo pool** (desde `pools.solutions`). Sin cambio de 
 
 **Tests**: `cmd/worker/config_test.go`, tres tests que parsean el `judge_config.yaml` real. Verificados rompiendo el archivo a propósito: una clave desconocida hace fallar el decode estricto, y un pool que dimensiona un lenguaje inexistente falla con mensaje claro.
 
-### Paso 3 — La compilación de artefactos al sandbox (D9)
+### Paso 3 — La compilación de artefactos al sandbox (D9) ✅ COMPLETO
 
-Renombrar `NativeCompiler` → `ArtifactCompiler`, y un adapter nuevo que reclama de pool A, escribe el fuente en `artifactSource`, corre `artifactCompile` y extrae `artifactPath`. Se borran `native_compiler.go` y sus tres variantes por lenguaje.
+El puerto `NativeCompiler` pasó a `ArtifactCompiler`, con un adapter que reclama un container de pool A del lenguaje del artefacto, escribe el fuente, corre el comando de compilación vía `sh -c` y extrae el artefacto con `CopyFromContainer` + `extractFirstFile`. Se borraron once archivos del camino nativo. `PrepareJudgingUseCase` no cambió más allá de un campo del request: la firma del puerto sobrevivió, como el plan preveía.
 
-`PrepareJudgingUseCase` **no cambia**: la firma del puerto sobrevive. Lo que se gana acá es cerrar la superficie de ataque **de tiempo de compilación** (los *annotation processors* de `javac`, el `#include` de `g++` que vuelca archivos del sistema en el log de error).
+**Con esto, el código del problem setter ya no se compila con los privilegios del worker.** Cae la superficie de ataque de tiempo de compilación (los *annotation processors* de `javac`, el `#include` de `g++` que vuelca archivos del sistema en el log de error). Queda la de ejecución, que cierran los Pasos 4 y 5.
 
+#### Lo que se decidió en el camino
+
+**1. Nombres por rol con un token `{name}`, en vez del nombre único de D9.** Ver la nota agregada en D9. Alternativas descartadas: **una sola palabra para los dos roles** (`verifier`, `artifact`) — obliga al autor de un checker Java a aprender una palabra que no es la de su rol, y el argumento de D9 sobre la consistencia con `solution` en realidad apunta en contra, porque `solution` funciona justamente por tener correspondencia 1 a 1 entre rol y palabra; y **ocho campos por lenguaje**, uno por rol — idénticos salvo la palabra, duplicación pura. El token preserva los dos beneficios reales de D9, y su riesgo se ataja con una regla de arranque que exige `{name}` en los cuatro campos.
+
+**2. `solution` → `Solution`, en PascalCase como los otros dos.** Cierra de paso una deriva preexistente: `README.md:133` y `specs/Judge System/README.md:161` **ya documentaban** `Solution.java` con mayúscula contra el `solution.java` del código, así que hoy un concursante que sigue el README no compila. Es un cambio incompatible para Java (`public class solution` deja de compilar) sin datos productivos en riesgo, porque todo el pipeline es de esta rama.
+
+**3. La clave de GCS del checker y el validator se normaliza** a `problems/{slug}/checker/Checker.<ext>`. D9 proponía `source.{ext}`; se descartó porque deja **dos nombres para el mismo archivo** —uno en el bucket, otro en el sandbox— y eso hay que explicarlo cada vez, mientras que la repetición de `checker/Checker.cpp` es fea una sola vez. El nombre que subió el problem setter **se conserva en la base** para mostrarlo. Las soluciones no se tocan: son varias por problema y se identifican por filename (ver la sección de bugs).
+
+El nombre lo pasa quien ya sabe qué está subiendo (`handleChecker`/`handleValidator` y sus equivalentes del import ICPC), no una tabla `fileType → nombre`: un mapa devuelve `""` en silencio ante una clave inesperada y produciría `problems/abc/checker/.cpp`; un parámetro no se puede olvidar sin que el compilador avise.
+
+**4. Ninguna validación al subir el archivo.** La que D9 proponía —exigir que el archivo se llame `checker.java`— **valida lo que no rompe**: con la normalización el nombre del archivo subido es irrelevante, y lo único que importa es el nombre de la clase pública adentro del fuente. Verificado en la imagen real: `MiChecker.java` con `public class Checker` compila perfecto, y `Checker.java` con `public class Foo` falla. Descartada también una regex sobre el fuente al subir: parseo de Java en la capa de aplicación, que el día que falle mal va a rechazar un archivo válido. El mensaje de javac ya nombra el arreglo y le llega al problem setter en el log de compilación.
+
+**5. `Filename` sale de `CompileArtifactRequest`.** No es solo que dejaba de tener lectores: su comentario describía exactamente el comportamiento que este paso invierte. En su lugar entra `ArtifactRole`, un value object según D4 (campo privado, factorías de estado conocido, `String()`), cuyo **valor es el nombre fijo** — así no hay tabla rol → nombre de archivo que se pueda desincronizar del YAML. Lo que el value object no puede impedir es su valor cero, así que el adapter rechaza el rol vacío explícitamente.
+
+**6. La validación de arranque que faltaba: proxy interno por `runCmd`.** Un lenguaje que declara `runCmd` es uno en el que se ejecutan soluciones, así que debe estar dimensionado por `pools.solutions` y declarar los cuatro campos de artefacto con el token. `compare` (Paso 4) no tendrá `runCmd` y queda exento sin ningún caso especial.
+
+Se descartó el **chequeo cruzado** contra `config/virtual_object.json`, que sería el invariante de verdad: el conjunto de lenguajes que la plataforma acepta vive en ese archivo de la API, no en el del judge, así que **todo lo que validemos dentro de `judge_config.yaml` es un proxy**. Los dos archivos viajan en la misma imagen, así que es viable, pero acopla el arranque del worker a un archivo de configuración de la API y eso merece su propia decisión. El hueco que queda abierto: la API acepta un `.rs`, el worker no sabe compilarlo, y el publish explota a mitad de la validación.
+
+Las ocho reglas quedaron: hay lenguajes; existe el pool `solutions`; ningún pool vacío; ningún pool dimensiona un lenguaje no declarado; toda entrada dimensionada tiene `cpu` y `memoryBytes` positivo; todo lenguaje tiene imagen; y todo lenguaje con `runCmd` tiene extensión, está dimensionado por `solutions`, y tiene los cuatro campos de artefacto con `{name}`.
+
+La regla del `cpu` no vacío importa más de lo que parece: un `cpu` vacío se parsea como *sin límite*, y eso rompe en silencio el supuesto de 1 CPU por container sobre el que se apoya la fórmula de concurrencia de D5.
+
+**7. `validateJudgeConfig` y `applyJudgeConfigDefaults` extraídas de `loadJudgeConfig`.** Cierra el pendiente de este documento sobre partir esa función: mientras hacía `os.Exit`, ni la validación ni el defaulting se podían testear, y por eso `config_test.go` reimplementaba las reglas a mano. Ahora el test llama a la función real. **Y apareció un default que faltaba**: `idleTimeoutMinutes` no tenía piso, así que borrar esa clave del YAML dejaba el timeout en `0` y el reaper habría destruido cada container ocioso apenas se liberaba, pagando la creación en cada judging, sin que nada avisara.
+
+**8. El empaquetado de Java, verificado corriéndolo** en `judge-runner:java17`, no deducido: `jar` **sí** viene en `openjdk-17-jdk-headless` (17.0.19); `-C /sandbox .` **sí** mete el `.java` dentro del JAR; `javac -d /sandbox/classes` crea el directorio solo y aísla los `.class`, con lo que el JAR queda limpio; y un checker multi-clase se empaqueta y corre bien.
+
+**9. Los helpers compartidos salieron a un archivo propio.** `buildTar` y `extractFirstFile` vivían dentro de `session.go` porque hasta ahora los usaba solo `Session`. Con un segundo consumidor, Ad8 pide un archivo nombrado por el concepto que agrupan: `docker_exec.go`, junto a `docker_exec_client.go`. `truncateString` no era una operación de Docker sino una utilidad genérica, así que fue a `pkg/strutil` — y al moverla apareció un bug: `s[:maxBytes]` **parte un carácter UTF-8 al medio**, así que un log de compilación con acentos quedaba inválido en el corte. Corregido, con test.
+
+**10. El sandbox se limpia antes de devolver el container al pool**, y si la limpieza falla el container **se destruye** en vez de devolverse. No es prolijidad: ese container vuelve al pool de soluciones, donde lo va a reclamar código de un concursante, que podría leer `/sandbox/Checker.cpp` y deducir la respuesta. La limpieza corre con su propio deadline, para que una compilación que agotó el suyo igual se limpie.
+
+#### Tests
+
+Cada test se verificó **rompiendo lo que prueba**: 15 mutaciones sobre la validación de config y sus defaults, 7 sobre el adapter, 2 sobre la clave de GCS. Cada una pone en rojo exactamente el test que le corresponde y ninguno más. Dos tests estaban mal escritos y los agarró justamente esa verificación: uno borraba el único lenguaje del pool y hacía saltar antes otra regla, y otro usaba un lenguaje que el pool tampoco conocía, con lo que el error podía venir del pool y no de la guarda que quería probar.
+
+Los tests del validator runner nativo por lenguaje (`validator_runner_{cpp,java,python}_test.go`) se borraron junto con el compilador nativo: usaban `NewNativeCompiler()` para fabricar su artefacto. Sobrevive `validator_runner_test.go`, así que ese adapter conserva test hasta que el Paso 4 lo borre entero. Se descartó sostenerlos con un compilador de juguete en el archivo de test: trabajo que se tira en el paso siguiente.
+
+**Nota para el Paso 9**: el roadmap anota que "los tests de compilación en Java se saltean por falta de JDK en el entorno de este equipo" y que con la compilación en container pasarían a poder correrse. Es cierto a medias — el test del adapter mockea el cliente de Docker, así que no ejecuta `javac` de verdad. Lo que sí se puede correr contra las imágenes reales, y se hizo a mano en este paso, es la verificación del punto 8.
 ### Paso 4 — El validator al sandbox (D3, D4, D13)
 
 Puertos `ValidatorRunner`/`ValidatorSession` con forma de sesión, y su adapter sobre pool B. **Acá se construye el segundo pool** y se agrega la validación del invariante al arrancar. `PrepareJudgingUseCase` abre la sesión antes del loop de inputs. Se borra el `validator_runner.go` nativo.

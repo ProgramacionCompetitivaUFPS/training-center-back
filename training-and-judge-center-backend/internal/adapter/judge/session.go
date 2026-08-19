@@ -1,7 +1,6 @@
 package judge
 
 import (
-	"archive/tar"
 	"bytes"
 	"context"
 	"encoding/json"
@@ -18,6 +17,7 @@ import (
 	"github.com/training-judge-center/backend/internal/adapter/judge/pool"
 	appjudge "github.com/training-judge-center/backend/internal/application/judge"
 	"github.com/training-judge-center/backend/pkg/apperror"
+	"github.com/training-judge-center/backend/pkg/strutil"
 )
 
 const (
@@ -77,7 +77,7 @@ func (s *Session) Compile(ctx context.Context, req appjudge.CompileRequest) (app
 
 	return appjudge.CompileResult{
 		Success: inspectRes.ExitCode == 0,
-		Log:     truncateString(outBuf.String()+errBuf.String(), maxCompileLogBytes),
+		Log:     strutil.Truncate(outBuf.String()+errBuf.String(), maxCompileLogBytes),
 	}, nil
 }
 
@@ -153,7 +153,9 @@ func (s *Session) Close(ctx context.Context) error {
 	if s.container == nil {
 		return nil
 	}
-	s.runWait(ctx, []string{"sh", "-c", "rm -rf /sandbox/*"})
+	if err := runAndWait(ctx, s.docker, s.container.ID(), []string{"sh", "-c", "rm -rf /sandbox/*"}); err != nil {
+		slog.ErrorContext(ctx, "executor: sandbox cleanup failed", "container_id", s.container.ID(), "error", err)
+	}
 	s.pool.Release(s.container)
 	return nil
 }
@@ -183,43 +185,7 @@ func (s *Session) copyOutput(ctx context.Context) []byte {
 }
 
 func (s *Session) cleanup(ctx context.Context) {
-	s.runWait(ctx, []string{"sh", "-c", "rm -f /sandbox/input.txt /sandbox/output.txt"})
-}
-
-func (s *Session) runWait(ctx context.Context, cmd []string) {
-	execRes, err := s.docker.ExecCreate(ctx, s.container.ID(), client.ExecCreateOptions{Cmd: cmd})
-	if err != nil {
-		return
+	if err := runAndWait(ctx, s.docker, s.container.ID(), []string{"sh", "-c", "rm -f /sandbox/input.txt /sandbox/output.txt"}); err != nil {
+		slog.ErrorContext(ctx, "executor: test case cleanup failed", "container_id", s.container.ID(), "error", err)
 	}
-	att, err := s.docker.ExecAttach(ctx, execRes.ID, client.ExecAttachOptions{})
-	if err != nil {
-		return
-	}
-	_, _ = io.Copy(io.Discard, att.Reader)
-	att.Conn.Close()
-}
-
-func buildTar(filename string, content []byte) io.Reader {
-	var buf bytes.Buffer
-	tw := tar.NewWriter(&buf)
-	_ = tw.WriteHeader(&tar.Header{Name: filename, Mode: 0644, Size: int64(len(content))})
-	_, _ = tw.Write(content)
-	_ = tw.Close()
-	return &buf
-}
-
-func extractFirstFile(r io.Reader, maxBytes int64) []byte {
-	tr := tar.NewReader(r)
-	if _, err := tr.Next(); err != nil {
-		return nil
-	}
-	data, _ := io.ReadAll(&io.LimitedReader{R: tr, N: maxBytes})
-	return data
-}
-
-func truncateString(s string, maxBytes int) string {
-	if len(s) <= maxBytes {
-		return s
-	}
-	return s[:maxBytes]
 }

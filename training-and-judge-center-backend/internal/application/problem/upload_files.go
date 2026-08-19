@@ -22,6 +22,11 @@ const (
 	FileTypeSolution  = "solution"
 	FileTypeChecker   = "checker"
 	FileTypeValidator = "validator"
+
+	// Verifier sources are stored under the same name the judge writes them as
+	// inside the sandbox, so the bucket can be navigated without the database.
+	verifierBaseNameChecker   = "Checker"
+	verifierBaseNameValidator = "Validator"
 )
 
 type UploadProblemFilesInput struct {
@@ -225,11 +230,11 @@ func (uc *UploadProblemFilesUseCase) handleSolution(ctx context.Context, p *prob
 }
 
 func (uc *UploadProblemFilesUseCase) handleChecker(ctx context.Context, p *problem.Problem, input UploadProblemFilesInput, now time.Time) (fileAction, error) {
-	return uc.handleVerifier(ctx, p, input, FileTypeChecker, p.Checker, func(f problem.JudgingFile) { p.SetChecker(f, now) }, now)
+	return uc.handleVerifier(ctx, p, input, FileTypeChecker, verifierBaseNameChecker, p.Checker, func(f problem.JudgingFile) { p.SetChecker(f, now) }, now)
 }
 
 func (uc *UploadProblemFilesUseCase) handleValidator(ctx context.Context, p *problem.Problem, input UploadProblemFilesInput, now time.Time) (fileAction, error) {
-	return uc.handleVerifier(ctx, p, input, FileTypeValidator, p.Validator, func(f problem.JudgingFile) { p.SetValidator(f, now) }, now)
+	return uc.handleVerifier(ctx, p, input, FileTypeValidator, verifierBaseNameValidator, p.Validator, func(f problem.JudgingFile) { p.SetValidator(f, now) }, now)
 }
 
 func (uc *UploadProblemFilesUseCase) handleVerifier(
@@ -237,6 +242,7 @@ func (uc *UploadProblemFilesUseCase) handleVerifier(
 	p *problem.Problem,
 	input UploadProblemFilesInput,
 	fileType string,
+	baseName string,
 	getVerifier func() *problem.JudgingFile,
 	setVerifier func(problem.JudgingFile),
 	now time.Time,
@@ -253,7 +259,7 @@ func (uc *UploadProblemFilesUseCase) handleVerifier(
 		return fileAction{}, err
 	}
 
-	fileKey := fmt.Sprintf("problems/%s/%s/%s", p.Slug().String(), fileType, cleanName)
+	fileKey := fmt.Sprintf("problems/%s/%s/%s%s", p.Slug().String(), fileType, baseName, filepath.Ext(cleanName))
 	verifierObj, err := problem.NewVerifierFile(cleanName, fileKey, lang)
 	if err != nil {
 		return fileAction{}, err
