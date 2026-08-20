@@ -14,11 +14,9 @@ type ProblemLimits struct {
 	// empty (forcing token comparison) until the checker has been compiled,
 	// which publish validation guarantees for any PUBLISHED problem.
 	CheckerPath string
-	// CheckerLanguage/CheckerFilename are only meaningful when CheckerPath
-	// is set. CheckerFilename is needed to invoke a compiled Java checker —
-	// its class name must match the original uploaded filename.
+	// CheckerLanguage is only meaningful when CheckerPath is set: it picks which
+	// light pool image runs the artifact.
 	CheckerLanguage submission.Language
-	CheckerFilename string
 }
 
 type ProblemProvider interface {

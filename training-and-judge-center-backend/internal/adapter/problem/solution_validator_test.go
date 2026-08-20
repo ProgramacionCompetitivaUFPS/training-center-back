@@ -70,9 +70,17 @@ func (m *mockJudgeExecutor) BeginSession(_ context.Context, _ submission.Languag
 
 type mockJudgeOutputChecker struct{}
 
-func (m *mockJudgeOutputChecker) Check(_ context.Context, _ appJudge.CheckRequest) (appJudge.CheckResult, error) {
+func (m *mockJudgeOutputChecker) BeginChecking(_ context.Context, _ string, _ submission.Language) (appJudge.CheckerSession, error) {
+	return &mockJudgeCheckerSession{}, nil
+}
+
+type mockJudgeCheckerSession struct{}
+
+func (m *mockJudgeCheckerSession) Check(_ context.Context, _ appJudge.CheckRequest) (appJudge.CheckResult, error) {
 	return appJudge.CheckResult{Accepted: true}, nil
 }
+
+func (m *mockJudgeCheckerSession) Close(context.Context) error { return nil }
 
 func newTestSolutionValidator(
 	solutions appJudge.SolutionProvider,

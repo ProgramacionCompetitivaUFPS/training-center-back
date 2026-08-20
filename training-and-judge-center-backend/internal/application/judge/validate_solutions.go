@@ -189,6 +189,14 @@ func (uc *ValidateSolutionsUseCase) checkSolution(ctx context.Context, sol Solut
 		return &SolutionFailure{FileKey: sol.FileKey, Kind: FailureCompileError, CompileLog: string(truncatePreview([]byte(compileResult.Log)))}, nil
 	}
 
+	// Opened after compiling: a solution that does not build produces no output
+	// to check, so no checker container is held during the compile.
+	checkerSession, err := uc.outputChecker.BeginChecking(ctx, limits.CheckerPath, limits.CheckerLanguage)
+	if err != nil {
+		return nil, err
+	}
+	defer checkerSession.Close(ctx)
+
 	for _, tc := range testCases {
 		runResult, err := session.RunTestCase(ctx, RunRequest{
 			Input:       tc.Input,
@@ -208,13 +216,10 @@ func (uc *ValidateSolutionsUseCase) checkSolution(ctx context.Context, sol Solut
 			if runResult.TimeMs > limits.TimeLimitMs {
 				return &SolutionFailure{FileKey: sol.FileKey, Kind: FailureTimeLimitExceeded, TestCase: tc.Name, TimeMs: runResult.TimeMs, TimeLimitMs: limits.TimeLimitMs}, nil
 			}
-			checkResult, err := uc.outputChecker.Check(ctx, CheckRequest{
+			checkResult, err := checkerSession.Check(ctx, CheckRequest{
 				Input:            tc.Input,
 				ExpectedOutput:   tc.ExpectedOutput,
 				ContestantOutput: runResult.Output,
-				CheckerPath:      limits.CheckerPath,
-				CheckerLanguage:  limits.CheckerLanguage,
-				CheckerFilename:  limits.CheckerFilename,
 			})
 			if err != nil {
 				return nil, err

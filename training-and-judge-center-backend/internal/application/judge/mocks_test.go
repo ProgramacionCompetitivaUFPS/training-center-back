@@ -118,14 +118,42 @@ func (m *mockExecutionSession) Close(ctx context.Context) error {
 // ── OutputChecker mock ───────────────────────────────────────────────────────
 
 type mockOutputChecker struct {
+	beginCheckingFn func(ctx context.Context, checkerPath string, language submission.Language) (CheckerSession, error)
+	// checkFn is a shortcut for the common case: a session that always answers
+	// the same way, without having to build one.
 	checkFn func(ctx context.Context, req CheckRequest) (CheckResult, error)
+	session *mockCheckerSession
 }
 
-func (m *mockOutputChecker) Check(ctx context.Context, req CheckRequest) (CheckResult, error) {
+func (m *mockOutputChecker) BeginChecking(ctx context.Context, checkerPath string, language submission.Language) (CheckerSession, error) {
+	if m.beginCheckingFn != nil {
+		return m.beginCheckingFn(ctx, checkerPath, language)
+	}
+	if m.session == nil {
+		m.session = &mockCheckerSession{checkFn: m.checkFn}
+	}
+	return m.session, nil
+}
+
+// ── CheckerSession mock ──────────────────────────────────────────────────────
+
+type mockCheckerSession struct {
+	checkFn    func(ctx context.Context, req CheckRequest) (CheckResult, error)
+	checkCalls int
+	closeCalls int
+}
+
+func (m *mockCheckerSession) Check(ctx context.Context, req CheckRequest) (CheckResult, error) {
+	m.checkCalls++
 	if m.checkFn != nil {
 		return m.checkFn(ctx, req)
 	}
 	return CheckResult{Accepted: true}, nil
+}
+
+func (m *mockCheckerSession) Close(context.Context) error {
+	m.closeCalls++
+	return nil
 }
 
 // ── JudgingSourceProvider mock ───────────────────────────────────────────────
