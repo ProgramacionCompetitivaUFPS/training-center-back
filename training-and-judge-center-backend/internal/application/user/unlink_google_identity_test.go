@@ -25,7 +25,12 @@ func TestUnlinkGoogleIdentity_LinkedAccount_DeletesIdentity(t *testing.T) {
 			return nil
 		},
 	}
-	uc := NewUnlinkGoogleIdentityUseCase(&mockUserRepository{}, oauthRepo, &mockEmailSender{})
+	userRepo := &mockUserRepository{
+		findByIDFn: func(_ context.Context, _ string) (*domain.User, error) {
+			return newActiveUser(), nil
+		},
+	}
+	uc := NewUnlinkGoogleIdentityUseCase(userRepo, oauthRepo, &mockEmailSender{})
 
 	err := uc.Execute(context.Background(), UnlinkGoogleIdentityInput{UserID: "user-abc"})
 	if err != nil {
@@ -33,6 +38,40 @@ func TestUnlinkGoogleIdentity_LinkedAccount_DeletesIdentity(t *testing.T) {
 	}
 	if deleteCalledFor != "user-abc" {
 		t.Errorf("expected DeleteByUserID called with %q, got %q", "user-abc", deleteCalledFor)
+	}
+}
+
+func TestUnlinkGoogleIdentity_NoPasswordSet_ReturnsConflict(t *testing.T) {
+	deleteCalled := false
+	oauthRepo := &mockOAuthIdentityRepository{
+		deleteByUserIDFn: func(_ context.Context, _ string, _ domain.OAuthProvider) error {
+			deleteCalled = true
+			return nil
+		},
+	}
+	userRepo := &mockUserRepository{
+		findByIDFn: func(_ context.Context, _ string) (*domain.User, error) {
+			return newGoogleOnlyUser("user-abc", domain.StatusActive), nil
+		},
+	}
+	uc := NewUnlinkGoogleIdentityUseCase(userRepo, oauthRepo, &mockEmailSender{})
+
+	err := uc.Execute(context.Background(), UnlinkGoogleIdentityInput{UserID: "user-abc"})
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+	appErr, ok := err.(*apperror.AppError)
+	if !ok {
+		t.Fatalf("expected *apperror.AppError, got %T", err)
+	}
+	if appErr.Code != ErrCodeCannotUnlinkLastCredential {
+		t.Errorf("expected code %q, got %q", ErrCodeCannotUnlinkLastCredential, appErr.Code)
+	}
+	if appErr.Kind != apperror.KindConflict {
+		t.Errorf("expected kind CONFLICT, got %s", appErr.Kind)
+	}
+	if deleteCalled {
+		t.Error("expected DeleteByUserID NOT to be called when the user has no password")
 	}
 }
 
@@ -87,7 +126,12 @@ func TestUnlinkGoogleIdentity_NoLinkedAccount_ReturnsNotFound(t *testing.T) {
 			return nil
 		},
 	}
-	uc := NewUnlinkGoogleIdentityUseCase(&mockUserRepository{}, oauthRepo, &mockEmailSender{})
+	userRepo := &mockUserRepository{
+		findByIDFn: func(_ context.Context, _ string) (*domain.User, error) {
+			return newActiveUser(), nil
+		},
+	}
+	uc := NewUnlinkGoogleIdentityUseCase(userRepo, oauthRepo, &mockEmailSender{})
 
 	err := uc.Execute(context.Background(), UnlinkGoogleIdentityInput{UserID: "user-abc"})
 	if err == nil {
@@ -114,7 +158,12 @@ func TestUnlinkGoogleIdentity_FindError_PropagatesError(t *testing.T) {
 			return nil, apperror.NewInternal()
 		},
 	}
-	uc := NewUnlinkGoogleIdentityUseCase(&mockUserRepository{}, oauthRepo, &mockEmailSender{})
+	userRepo := &mockUserRepository{
+		findByIDFn: func(_ context.Context, _ string) (*domain.User, error) {
+			return newActiveUser(), nil
+		},
+	}
+	uc := NewUnlinkGoogleIdentityUseCase(userRepo, oauthRepo, &mockEmailSender{})
 
 	err := uc.Execute(context.Background(), UnlinkGoogleIdentityInput{UserID: "user-abc"})
 	if err == nil {
@@ -122,5 +171,26 @@ func TestUnlinkGoogleIdentity_FindError_PropagatesError(t *testing.T) {
 	}
 	if _, ok := err.(*apperror.AppError); !ok {
 		t.Fatalf("expected *apperror.AppError, got %T", err)
+	}
+}
+
+func TestUnlinkGoogleIdentity_UserNotFound_ReturnsNotFound(t *testing.T) {
+	userRepo := &mockUserRepository{
+		findByIDFn: func(_ context.Context, _ string) (*domain.User, error) {
+			return nil, nil
+		},
+	}
+	uc := NewUnlinkGoogleIdentityUseCase(userRepo, &mockOAuthIdentityRepository{}, &mockEmailSender{})
+
+	err := uc.Execute(context.Background(), UnlinkGoogleIdentityInput{UserID: "user-abc"})
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+	appErr, ok := err.(*apperror.AppError)
+	if !ok {
+		t.Fatalf("expected *apperror.AppError, got %T", err)
+	}
+	if appErr.Code != domain.ErrCodeUserNotFound {
+		t.Errorf("expected code %q, got %q", domain.ErrCodeUserNotFound, appErr.Code)
 	}
 }

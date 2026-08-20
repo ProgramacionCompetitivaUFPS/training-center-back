@@ -16,6 +16,7 @@ import (
 // @Success      204
 // @Failure      401 {object} apperror.AppError
 // @Failure      404 {object} apperror.AppError
+// @Failure      409 {object} apperror.AppError
 // @Router       /users/google [delete]
 func (h *Handler) UnlinkGoogle(w http.ResponseWriter, r *http.Request) {
 	cu, ok := middleware.GetCurrentUser(r.Context())

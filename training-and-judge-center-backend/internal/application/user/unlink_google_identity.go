@@ -24,6 +24,17 @@ func NewUnlinkGoogleIdentityUseCase(userRepo user.Repository, oauthIdentityRepo 
 }
 
 func (uc *UnlinkGoogleIdentityUseCase) Execute(ctx context.Context, in UnlinkGoogleIdentityInput) error {
+	foundUser, err := uc.userRepo.FindByID(ctx, in.UserID)
+	if err != nil {
+		return err
+	}
+	if foundUser == nil {
+		return apperror.NewNotFound(user.ErrCodeUserNotFound, "User not found")
+	}
+	if !foundUser.Password().HasPassword() {
+		return apperror.NewConflict(ErrCodeCannotUnlinkLastCredential, "cannot unlink Google account without a password set; set a password first")
+	}
+
 	identity, err := uc.oauthIdentityRepo.FindByUserID(ctx, in.UserID, user.OAuthProviderGoogle)
 	if err != nil {
 		return err
@@ -36,16 +47,14 @@ func (uc *UnlinkGoogleIdentityUseCase) Execute(ctx context.Context, in UnlinkGoo
 		return err
 	}
 
-	if foundUser, findErr := uc.userRepo.FindByID(ctx, in.UserID); findErr == nil && foundUser != nil {
-		_ = uc.emailSender.Send(ctx, appshared.EmailMessage{
-			To:      foundUser.Email().String(),
-			Subject: "Security Alert: Google Account Unlinked",
-			Body:    "Your Google account has been unlinked from your account and can no longer be used to log in. If you did not make this change, please review your account security immediately.",
-			HTMLBody: emailtemplate.Wrap("Security Alert: Google Account Unlinked",
-				"<p style=\"margin:0 0 12px;\">Your Google account has been unlinked from your Training Center account and can no longer be used to log in.</p>"+
-					"<p style=\"margin:0;color:#b91c1c;font-size:14px;\"><strong>If you did not make this change</strong>, please review your account security immediately.</p>"),
-		})
-	}
+	_ = uc.emailSender.Send(ctx, appshared.EmailMessage{
+		To:      foundUser.Email().String(),
+		Subject: "Security Alert: Google Account Unlinked",
+		Body:    "Your Google account has been unlinked from your account and can no longer be used to log in. If you did not make this change, please review your account security immediately.",
+		HTMLBody: emailtemplate.Wrap("Security Alert: Google Account Unlinked",
+			"<p style=\"margin:0 0 12px;\">Your Google account has been unlinked from your Training Center account and can no longer be used to log in.</p>"+
+				"<p style=\"margin:0;color:#b91c1c;font-size:14px;\"><strong>If you did not make this change</strong>, please review your account security immediately.</p>"),
+	})
 
 	return nil
 }
