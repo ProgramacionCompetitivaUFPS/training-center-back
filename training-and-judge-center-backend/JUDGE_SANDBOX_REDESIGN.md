@@ -102,7 +102,7 @@ Se mantiene el modelo de datos de la Fase 6 (`compiledKey`/`compiledAt`, `Artifa
 
 Cae directo de D1. La razón para indexar por `(problema, lenguaje)` era evitar que un container caliente tuviera compilado el checker del problema A y lo reusara para el B — pero con D1 el checker viene precompilado y se inyecta al abrir la sesión, así que el container no guarda estado específico del problema. No hay que tocar la estructura del `Pool`.
 
-### D3 — Los puertos de pool B pasan a forma de sesión, como interfaces separadas ✅
+### D3 — Los puertos de pool liviano pasan a forma de sesión, como interfaces separadas ✅
 
 Hoy `OutputChecker.Check` es sin estado y se llama **dentro del loop de casos de prueba**, en los dos caminos (`judge_submission.go` y `validate_solutions.go`). Y `customCheckerCompare` hace `readObject()` contra GCS en cada llamada: con 25 casos son **25 descargas del mismo binario por submission**. `ValidatorRunner.Run` tiene el mismo patrón por caso.
 
@@ -128,7 +128,7 @@ type ValidatorSession interface {
 }
 ```
 
-**Son interfaces separadas, no una compartida ni una extensión de `ExecutionSession`.** Pool A y pool B hacen cosas distintas (compilar y correr soluciones vs. ejecutar un artefacto ya compilado con argumentos de archivo), y meterle a la sesión de soluciones métodos que solo sirven para checkers rompería los puertos angostos que el proyecto ya usa: `JudgeSubmissionUseCase` cargaría con métodos que no llama y cada mock tendría que implementarlos. La reutilización ocurre en el **adapter** (helpers privados `buildTar`, `extractFirstFile`, el patrón `ExecCreate`/`ExecAttach`/`ExecInspect`), no en el puerto.
+**Son interfaces separadas, no una compartida ni una extensión de `ExecutionSession`.** Pool pesado y pool liviano hacen cosas distintas (compilar y correr soluciones vs. ejecutar un artefacto ya compilado con argumentos de archivo), y meterle a la sesión de soluciones métodos que solo sirven para checkers rompería los puertos angostos que el proyecto ya usa: `JudgeSubmissionUseCase` cargaría con métodos que no llama y cada mock tendría que implementarlos. La reutilización ocurre en el **adapter** (helpers privados `buildTar`, `extractFirstFile`, el patrón `ExecCreate`/`ExecAttach`/`ExecInspect`), no en el puerto.
 
 **Se descartó una tercera vía**: una sesión genérica de bajo nivel (`PutFiles` / `Exec(cmd)` / `GetFile`) sobre la que ambos casos de uso construyan. Empujaría la mecánica de containers hacia arriba — la capa de aplicación armando comandos de shell. Hoy el saber "cómo se compila en C++" vive en el adapter y en `judge_config.yaml`, que es donde corresponde.
 
@@ -136,14 +136,16 @@ type ValidatorSession interface {
 
 **Toca la capa de aplicación**: `ValidateSolutionsUseCase`, `JudgeSubmissionUseCase` y `PrepareJudgingUseCase` abren la sesión antes del loop.
 
-El puerto `NativeCompiler` conserva su firma tal cual; solo cambia el adapter (de `exec.Command` al pool A).
+El puerto `NativeCompiler` conserva su firma tal cual; solo cambia el adapter (de `exec.Command` al pool pesado).
 
-### D4 — Dos pools: A (grande) compila y corre soluciones, B (chico) solo ejecuta checkers ✅
+### D4 — Dos pools: el pesado compila y corre soluciones, el liviano solo ejecuta checkers ✅
 
-- **Pool A** — containers grandes. Compila **todo** (checkers, validators y soluciones) y ejecuta las soluciones.
-- **Pool B** — containers chicos. **Solo ejecuta** checkers y validators ya compilados. Nunca compila.
+- **Pool pesado** — containers grandes. Compila **todo** (checkers, validators y soluciones) y ejecuta las soluciones.
+- **Pool liviano** — containers chicos. **Solo ejecuta** checkers y validators ya compilados. Nunca compila.
 
-La clave que hace que esto funcione es D1: como el artefacto queda guardado en GCS al publicar, en el judging de una submission real el checker ya viene compilado — a B solo se le inyecta el binario y se lo ejecuta. Por eso B puede dimensionarse para **ejecución pura**, que era exactamente el beneficio que motivaba separarlo. La objeción de "hay que sobredimensionar B para que aguante compilar" desaparece.
+En `judge_config.yaml` y en el código se llaman `heavy` y `light` (ver el Paso 4 para por qué esos nombres y no `solutions`/`checkers`).
+
+La clave que hace que esto funcione es D1: como el artefacto queda guardado en GCS al publicar, en el judging de una submission real el checker ya viene compilado — al liviano solo se le inyecta el binario y se lo ejecuta. Por eso puede dimensionarse para **ejecución pura**, que era exactamente el beneficio que motivaba separarlo. La objeción de "hay que sobredimensionar el liviano para que aguante compilar" desaparece.
 
 | Operación | Pool | Cuándo |
 |---|---|---|
@@ -155,19 +157,19 @@ La clave que hace que esto funcione es D1: como el artefacto queda guardado en G
 
 **Los dos pools son necesarios, no solo prolijos — evitan un deadlock.** Con la forma de sesión de D3, un judging tiene **dos containers tomados a la vez**: el de la solución (abierto durante todo el loop de casos) y el de checker (también abierto durante todo el loop, para no re-descargar el binario en cada caso). Si los dos salieran del mismo pool, con capacidad C y `maxConcurrent = C`, los C judgings tomarían su container de solución y después todos pedirían uno de checker; no queda ninguno y nadie puede avanzar ni liberar. Con pools separados, cada judging pide uno de cada uno y nunca compiten entre sí.
 
-**Corrección sobre "compilar en el mismo container que corre la solución"**: no siempre se puede, porque **cada imagen de lenguaje tiene un solo toolchain** (`cpp20.Dockerfile` instala únicamente `g++`, `java17` únicamente el JDK, `python310` únicamente `python3`). Si el checker es C++ y la solución es Java, el container de A de la solución no tiene `g++`. Así que la compilación del checker es su propio `Claim` de pool A, con el lenguaje **del checker**. Con D1 eso ocurre una sola vez por publish, así que el costo es despreciable.
+**Corrección sobre "compilar en el mismo container que corre la solución"**: no siempre se puede, porque **cada imagen de lenguaje tiene un solo toolchain** (`cpp20.Dockerfile` instala únicamente `g++`, `java17` únicamente el JDK, `python310` únicamente `python3`). Si el checker es C++ y la solución es Java, el container pesado de la solución no tiene `g++`. Así que la compilación del checker es su propio `Claim` de pool pesado, con el lenguaje **del checker**. Con D1 eso ocurre una sola vez por publish, así que el costo es despreciable.
 
 **Flujo resultante:**
 
 *Al publicar*
-1. `Claim` en A (lenguaje del checker) → compilar → extraer binario → subir a GCS → `Release`
+1. `Claim` en el pesado (lenguaje del checker) → compilar → extraer binario → subir a GCS → `Release`
 2. Ídem para el validator
-3. `Claim` en B (lenguaje del validator) → inyectar → correr contra cada input → `Release`
-4. Por cada solución: `Claim` en A (lenguaje de la solución) → compilar y correr; y `Claim` en B para chequear cada salida
+3. `Claim` en el liviano (lenguaje del validator) → inyectar → correr contra cada input → `Release`
+4. Por cada solución: `Claim` en el pesado (lenguaje de la solución) → compilar y correr; y `Claim` en el liviano para chequear cada salida
 
 *Al juzgar una submission*
-1. `Claim` en A (lenguaje de la submission) → compilar y correr
-2. `Claim` en B (lenguaje del checker) → inyectar el binario precompilado → chequear cada salida
+1. `Claim` en el pesado (lenguaje de la submission) → compilar y correr
+2. `Claim` en el liviano (lenguaje del checker) → inyectar el binario precompilado → chequear cada salida
 
 ---
 
@@ -175,8 +177,8 @@ La clave que hace que esto funcione es D1: como el artefacto queda guardado en G
 
 | | CPU | Memoria |
 |---|---|---|
-| Pool A | `cpu: "1"` | 2 GiB |
-| Pool B | `cpu: "1"` | 512 MiB de base, más para Java (la JVM) |
+| Pool pesado | `cpu: "1"` | 2 GiB |
+| Pool liviano | `cpu: "1"` | 512 MiB de base, más para Java (la JVM) |
 
 Los tamaños son **por lenguaje dentro de cada pool** — ver la estructura de config en D10 y los números concretos en D13.
 
@@ -192,11 +194,11 @@ Un límite **no es un permiso para usar recursos, es un techo**. Un container ca
 
 #### Por qué la memoria es distinta y la CPU es igual
 
-**Memoria distinta**: en pool A el número es el techo donde una solución recibe MLE, así que tiene que ser al menos tan grande como el mayor `memoryLimit` que un problema pueda declarar — no es un número libre. En pool B, 512 MiB le sobran a un checker que lee tres archivos y compara tokens. Igualarlo a 2 GiB no le daría capacidad útil: gastaría presupuesto y haría entrar menos containers en total, con lo que el LRU evictaría más seguido — justo lo contrario de lo que se busca al mantener containers calientes.
+**Memoria distinta**: en pool pesado el número es el techo donde una solución recibe MLE, así que tiene que ser al menos tan grande como el mayor `memoryLimit` que un problema pueda declarar — no es un número libre. En pool liviano, 512 MiB le sobran a un checker que lee tres archivos y compara tokens. Igualarlo a 2 GiB no le daría capacidad útil: gastaría presupuesto y haría entrar menos containers en total, con lo que el LRU evictaría más seguido — justo lo contrario de lo que se busca al mantener containers calientes.
 
-**CPU igual**: el cap de 1 CPU en pool A existe para que el **veredicto sea justo**, no para proteger la infraestructura. Como se mide tiempo de CPU acumulado, una solución multi-hilo sin techo consumiría 4 segundos de CPU por segundo de reloj en un nodo de 4 cores y llegaría al TLE cuatro veces más rápido; con el techo en 1, lanzar hilos no ayuda ni perjudica y los tiempos son comparables entre submissions.
+**CPU igual**: el cap de 1 CPU en pool pesado existe para que el **veredicto sea justo**, no para proteger la infraestructura. Como se mide tiempo de CPU acumulado, una solución multi-hilo sin techo consumiría 4 segundos de CPU por segundo de reloj en un nodo de 4 cores y llegaría al TLE cuatro veces más rápido; con el techo en 1, lanzar hilos no ayuda ni perjudica y los tiempos son comparables entre submissions.
 
-En pool B no hay veredicto que proteger (el tiempo del checker no se compara contra nada), pero el techo **sirve como contención**: un checker con un bucle infinito no puede pasar de un core. Y como los dos containers se alternan, igualarlos no altera la cuenta:
+En pool liviano no hay veredicto que proteger (el tiempo del checker no se compara contra nada), pero el techo **sirve como contención**: un checker con un bucle infinito no puede pasar de un core. Y como los dos containers se alternan, igualarlos no altera la cuenta:
 
 ```
 max(cpuA, cpuB) = max(1, 1) = 1 CPU por judging
@@ -206,11 +208,11 @@ Se descartaron dos alternativas: `0.5` (número arbitrario, y frena el arranque 
 
 #### La asimetría memoria/CPU
 
-Dentro de **un mismo judging**, A y B **nunca computan a la vez**:
+Dentro de **un mismo judging**, el pesado y el liviano **nunca computan a la vez**:
 
 ```
-solución corre caso 1    → A ocupado, B ocioso
-checker compara salida 1 → B ocupado, A ocioso
+solución corre caso 1    → pesado ocupado, liviano ocioso
+checker compara salida 1 → liviano ocupado, pesado ocioso
 ```
 
 No es casualidad estadística: es una **dependencia de datos** — la entrada del checker *es* la salida de la solución. De ahí que **la memoria se sume** (ambos containers están tomados todo el judging, aunque uno esté ocioso) pero **la CPU no** (solo uno computa por vez, y un techo no es una reserva).
@@ -221,9 +223,9 @@ No es casualidad estadística: es una **dependencia de datos** — la entrada de
 maxConcurrent = dindCPU/1000 − dockerDaemonReserveCores     ← sin cambios
 ```
 
-Calcula "cuántos cores quedan para judging" y los cuenta como judgings, asumiendo **1 CPU por judging**. Con pool B agregado la demanda pico por judging sigue siendo 1 CPU, así que lo que garantiza —una solución corriendo por CPU— se cumple igual.
+Calcula "cuántos cores quedan para judging" y los cuenta como judgings, asumiendo **1 CPU por judging**. Con pool liviano agregado la demanda pico por judging sigue siendo 1 CPU, así que lo que garantiza —una solución corriendo por CPU— se cumple igual.
 
-**Supuesto a documentar en el código**, porque pasa a ser carga estructural y hoy es implícito: la fórmula solo vale mientras los containers de pool A estén capados en `cpu: "1"`. Si alguien pusiera un lenguaje en 2 CPU, la fórmula mentiría sin que nada avise.
+**Supuesto a documentar en el código**, porque pasa a ser carga estructural y hoy es implícito: la fórmula solo vale mientras los containers de pool pesado estén capados en `cpu: "1"`. Si alguien pusiera un lenguaje en 2 CPU, la fórmula mentiría sin que nada avise.
 
 #### Reparto de memoria
 
@@ -250,19 +252,19 @@ cpuOverheadCores: 1             # dice "worker + daemon Docker"
 
 Que `memoryOverheadBytes` (512 MiB, recortado de los 10 GiB del dind) coincida en valor con `worker.limits.memory` (512 MiB, techo del container del worker) es casualidad. Conviene además renombrar `cpuOverheadCores` a `dockerDaemonReserveCores`.
 
-### D6 — La comparación por tokens también corre en pool B, con imagen y binario propios ✅
+### D6 — La comparación por tokens también corre en pool liviano, con imagen y binario propios ✅
 
 **Nada de comparar en el worker.** El caso sin checker personalizado es la mayoría del tráfico; si se quedara en el worker, el volumen compartido (D7) no serviría para casi nada y el worker seguiría siendo el cuello de botella de CPU que motivó todo esto.
 
-**Imagen propia y mínima.** Una comparación por tokens no tiene lenguaje —no hay checker—, así que no puede salir de una imagen de lenguaje. Se agrega una cuarta imagen, chica, dedicada a este caso. Arranca rápido y ocupa poca memoria, así que se pueden mantener varias calientes, que importa ahora que pool B es camino caliente. Se descartó fijar un lenguaje (p. ej. usar siempre `cpp20`) porque reservaría un container con un toolchain entero para comparar texto.
+**Imagen propia y mínima.** Una comparación por tokens no tiene lenguaje —no hay checker—, así que no puede salir de una imagen de lenguaje. Se agrega una cuarta imagen, chica, dedicada a este caso. Arranca rápido y ocupa poca memoria, así que se pueden mantener varias calientes, que importa ahora que pool liviano es camino caliente. Se descartó fijar un lenguaje (p. ej. usar siempre `cpp20`) porque reservaría un container con un toolchain entero para comparar texto.
 
 **Binario propio, no comando de shell.** Replica exactamente el `tokenCompare` actual, así que el comportamiento no cambia respecto de lo que hoy está en producción. Un `tr` + `cmp` no habría que construirlo, pero es fácil que difiera en casos borde (espacios iniciales, líneas vacías, `\r\n`).
 
 **Encaja en lo que ya existe**: `cmd/compare/` en el mismo módulo Go, con su `docker/judge/compare.Dockerfile` construido con el mismo contexto que las otras tres (`build-judge-images.sh` ya usa el directorio del backend como contexto).
 
-**Y el pool no necesita ningún caso especial**: pool B se indexa por lenguaje igual que pool A, y el caso sin checker es una entrada más en ese mapa (`compare` → imagen mínima). `BeginChecking` con ruta vacía reclama la "lengua" `compare`.
+**Y el pool no necesita ningún caso especial**: pool liviano se indexa por lenguaje igual que pool pesado, y el caso sin checker es una entrada más en ese mapa (`compare` → imagen mínima). `BeginChecking` con ruta vacía reclama la "lengua" `compare`.
 
-**Consecuencia sobre el dimensionamiento**: pool B deja de ser ocasional. Lo usan **todas** las submissions, no solo las de problemas con checker personalizado. Su tamaño importa tanto como el de pool A.
+**Consecuencia sobre el dimensionamiento**: pool liviano deja de ser ocasional. Lo usan **todas** las submissions, no solo las de problemas con checker personalizado. Su tamaño importa tanto como el de pool pesado.
 
 **Pendiente**: agregar la cuarta imagen al init container `prepull-language-images` (hoy recorre solo `cpp20 java17 python310`) y al pipeline de build/push.
 
@@ -280,11 +282,11 @@ Que `memoryOverheadBytes` (512 MiB, recortado de los 10 GiB del dind) coincida e
 
 2. **Todos los containers montan la misma raíz compartida** — montaje uniforme, sin bind mounts distintos por container.
 
-3. **El worker genera un UUID por judging**, crea `<raíz>/<uuid>/` y les pasa esa ruta a los containers que participan. Pool A escribe ahí su salida; pool B lee de ahí. Cada uno alcanza únicamente el directorio cuya ruta recibió.
+3. **El worker genera un UUID por judging**, crea `<raíz>/<uuid>/` y les pasa esa ruta a los containers que participan. Pool pesado escribe ahí su salida; pool liviano lee de ahí. Cada uno alcanza únicamente el directorio cuya ruta recibió.
 
 4. **La raíz no puede listarse.** Acá se sostiene todo el aislamiento: en un directorio, `r` habilita *listar* y `x` habilita *atravesar*. La raíz queda dueño `root` con modo `0711` — el usuario `judge` (uid 1000, fijo en la imagen base) puede entrar a una ruta que conoce, pero `ls` no le devuelve nada. Cada directorio de UUID sí accesible para ese usuario.
 
-5. **La salida esperada NUNCA va al volumen compartido.** Es lo único verdaderamente secreto: si el código del concursante pudiera leerla, le bastaría imprimirla para pasar todo. La salida esperada y el artefacto del checker viajan del worker al container de pool B directamente.
+5. **La salida esperada NUNCA va al volumen compartido.** Es lo único verdaderamente secreto: si el código del concursante pudiera leerla, le bastaría imprimirla para pasar todo. La salida esperada y el artefacto del checker viajan del worker al container de pool liviano directamente.
 
 6. **Limpia el worker**: un `rm -rf <raíz>/<uuid>` al terminar el judging, sobre una ruta que ya conoce.
 
@@ -292,11 +294,11 @@ Que `memoryOverheadBytes` (512 MiB, recortado de los 10 GiB del dind) coincida e
 
 La primera versión montaba un subdirectorio distinto en cada container, buscando aislamiento por namespace de montaje. Se descartó por tres razones:
 
-- **No cerraba el lado de pool B**: como el emparejamiento es dinámico (cualquier container de B con cualquiera de A), B habría tenido que montar el árbol entero de A, dejando a un checker malicioso leer las salidas de todos los judgings. Con el UUID por judging y la raíz no listable, B tampoco puede enumerar: solo alcanza el UUID que le pasaron.
+- **No cerraba el lado de pool liviano**: como el emparejamiento es dinámico (cualquier container liviano con cualquiera pesado), el liviano habría tenido que montar el árbol entero del pesado, dejando a un checker malicioso leer las salidas de todos los judgings. Con el UUID por judging y la raíz no listable, el liviano tampoco puede enumerar: solo alcanza el UUID que le pasaron.
 - **El ciclo de vida no coincidía**: los containers se reusan entre judgings, así que un directorio por container arrastraría la salida del judging anterior y habría que limpiarlo aparte. Un directorio por UUID nace y muere con el judging.
 - **Era más invasivo**: obligaba al pool a armar un bind mount distinto al crear cada container.
 
-**Tampoco alcanzaba con permisos POSIX del estilo "pool A escribe pero no lee"**: un directorio en modo `-wx` impide listar pero **no** impide abrir un archivo cuya ruta conozcas, y como todos los containers de pool A corren con el mismo uid, los permisos de archivo tampoco los separan entre sí.
+**Tampoco alcanzaba con permisos POSIX del estilo "pool pesado escribe pero no lee"**: un directorio en modo `-wx` impide listar pero **no** impide abrir un archivo cuya ruta conozcas, y como todos los containers de pool pesado corren con el mismo uid, los permisos de archivo tampoco los separan entre sí.
 
 #### De qué depende la seguridad
 
@@ -308,7 +310,7 @@ Es el mismo principio que una URL-capacidad: **la ruta es la credencial**. Se so
 #### Lo que se gana
 
 - **`copyOutput` desaparece del worker**: de 64 MiB por caso de prueba a través de la API de Docker, a leer ~2 KB del filesystem para el preview de wrong answer (`Actual: truncatePreview(...)`).
-- Con esto más D6 (comparación en pool B), el worker vuelve a ser lo que su config ya decía: solo coordinación. Los `500m` dejan de ser un problema.
+- Con esto más D6 (comparación en pool liviano), el worker vuelve a ser lo que su config ya decía: solo coordinación. Los `500m` dejan de ser un problema.
 
 #### Sub-decisiones pendientes
 
@@ -417,7 +419,7 @@ Y el comando de Java de esta decisión **está mal como está escrito acá**: `-
 
 ### D10 — `judge_config.yaml`: separar propiedades del lenguaje de dimensionamiento del pool ✅
 
-Hoy la sección `languages:` mezcla dos cosas independientes: **propiedades del lenguaje** (imagen, extensión, comandos) y **dimensionamiento** (`cpu`, `memoryBytes`). Con dos pools eso deja de funcionar, porque el mismo lenguaje tiene tamaños distintos según el pool. Y los campos de artefacto de D9 **se reparten entre los pools**: `artifactSource`/`artifactCompile`/`artifactPath` se usan al compilar (pool A) y `artifactRun` al ejecutar (pool B).
+Hoy la sección `languages:` mezcla dos cosas independientes: **propiedades del lenguaje** (imagen, extensión, comandos) y **dimensionamiento** (`cpu`, `memoryBytes`). Con dos pools eso deja de funcionar, porque el mismo lenguaje tiene tamaños distintos según el pool. Y los campos de artefacto de D9 **se reparten entre los pools**: `artifactSource`/`artifactCompile`/`artifactPath` se usan al compilar (pool pesado) y `artifactRun` al ejecutar (pool liviano).
 
 ```yaml
 languages:                    # propiedades del LENGUAJE, sin importar el pool
@@ -426,10 +428,10 @@ languages:                    # propiedades del LENGUAJE, sin importar el pool
     extension: "cpp"
     compileCmd: "..."         # soluciones
     runCmd: "..."             # soluciones
-    artifactSource:  "..."    # checker: usado en pool A
-    artifactCompile: "..."    # checker: usado en pool A
-    artifactPath:    "..."    # checker: usado en pool A
-    artifactRun:     "..."    # checker: usado en pool B
+    artifactSource:  "..."    # checker: usado en pool pesado
+    artifactCompile: "..."    # checker: usado en pool pesado
+    artifactPath:    "..."    # checker: usado en pool pesado
+    artifactRun:     "..."    # checker: usado en pool liviano
   java17: ...
   python310: ...
   compare:
@@ -457,7 +459,7 @@ pools:                        # dimensionamiento, propiedad del POOL
 
 **A documentar**: `compare` aparece en `languages` con solo una imagen y ningún comando. Es coherente —no compila ni interpreta nada, ejecuta un binario fijo— pero conviene aclararlo para que no parezca una entrada a medio llenar.
 
-**Los tamaños del ejemplo son ilustrativos.** El de `java17` en pool B va más alto porque una JVM en 512 MiB es ajustada, pero eso hay que medirlo (ver A3).
+**Los tamaños del ejemplo son ilustrativos.** El de `java17` en pool liviano va más alto porque una JVM en 512 MiB es ajustada, pero eso hay que medirlo (ver A3).
 
 ### D11 — Los dos bugs de memoria se arreglan dentro del rediseño ✅
 
@@ -527,18 +529,50 @@ El **máximo** porque no se sabe qué lenguaje va a tocar: el peor caso es que l
 
 Que entre un container ocioso de cada lenguaje en cada pool es **comodidad, no requisito**. El LRU existe justamente para eso: si se agregan muchos lenguajes y no entran todos, evictar es el comportamiento normal y esperado, no una falla. Se paga recrear un container de vez en cuando y nada más.
 
-El objetivo razonable es que quepan los **lenguajes principales** con holgura. Sobre el nodo actual (budget 9.5 GiB, `maxConcurrent` = 2):
+El objetivo razonable es que quepan los **lenguajes principales** con holgura. Sobre el nodo actual (10 GiB en el dind, menos 0.5 GiB de reserva del demonio = **9.5 GiB a repartir**, `maxConcurrent` = 2):
 
 | | Mínimo obligatorio | Con los 3 lenguajes calientes |
 |---|---|---|
-| Pool A | 2 × 2 GiB = 4 GiB | 2 + 2 + 1 = **5 GiB** |
-| Pool B | 2 × 1 GiB = 2 GiB | 0.5 + 1 + 0.5 + 0.125 = **2.125 GiB** |
-| Demonio Docker | — | 0.5 GiB |
-| **Total** | 6.5 GiB | **7.6 GiB ≤ 9.5** ✓ |
+| Pool pesado | 2 × 2 GiB = 4 GiB | 2 + 2 + 1 = **5 GiB** |
+| Pool liviano | 2 × 1 GiB = 2 GiB | 0.5 + 1 + 0.5 + 0.125 = **2.125 GiB** |
+| **Total** | 6 GiB | **7.125 GiB ≤ 9.5** ✓ |
+
+**Corregido al ejecutar el Paso 4**: la versión anterior de esta tabla sumaba la reserva del demonio (0.5 GiB) *además* de los 9.5 GiB, que ya la tenían descontada, y daba 7.6. La conclusión no cambia.
 
 El `e2-standard-4` actual cumple el invariante con margen y además mantiene calientes los tres lenguajes en ambos pools. Crecer la máquina sirve solo para subir `maxConcurrent` y procesar más submissions en paralelo: es una decisión de throughput para la competencia, separada de este rediseño.
 
-**Dato que falta medir** para afinar los tamaños por container: el pico real de memoria de `g++` compilando un checker testlib, de `javac`, y de una JVM ejecutando un checker en pool B. Los valores de este documento son estimaciones sin medir.
+#### Medición del pool liviano (hecha en el Paso 4)
+
+Reemplaza el "dato que falta medir" que decía este documento. Todo medido contra las imágenes reales del proyecto (`judge-runner:{cpp20,java17,python310}`), con el container capado igual que lo capa el pool (`--memory` = `--memory-swap`, `--cpus=1`, `--network=none`) y leyendo `/sys/fs/cgroup/memory.peak`.
+
+**Ejecutar un validator** — input de 1.3 MB con 200 000 enteros, el validator recorriéndolos y verificando rangos:
+
+| | pico | tamaño propuesto en D13 |
+|---|---|---|
+| cpp20 | 5 MiB | 512 MiB |
+| python310 | 25 MiB | 512 MiB |
+| java17 | 21 MiB | 1 GiB |
+
+La JVM arrancó y terminó bien **incluso con el container en 32 MiB**: detecta el cgroup y ajusta su heap. O sea que para el validator los tamaños de D13 sobran por un factor de ~20.
+
+**Ejecutar un checker** — el mismo algoritmo en los tres lenguajes (leer las dos salidas enteras, partir en tokens, comparar), que es lo que llega en el Paso 5:
+
+| salida del concursante | cpp20 @ 512 MiB | python310 @ 512 MiB | java17 @ 1 GiB |
+|---|---|---|---|
+| 8 MiB | 119 MiB ✓ | 162 MiB ✓ | 88 MiB ✓ |
+| 16 MiB | 178 MiB ✓ | 320 MiB ✓ | 154 MiB ✓ |
+| 64 MiB | **OOM, exit 137** | **OOM, exit 137** | **OOM, exit 1** |
+
+Los picos incluyen las dos salidas en el page cache del cgroup (~2× su tamaño), así que no son todos memoria del proceso.
+
+**La conclusión que cambia el diseño**: el dimensionamiento del pool liviano **está acoplado a `maxOutputBytes`**, y hasta acá el documento los trataba como independientes. Con los 64 MiB de hoy, ningún tamaño razonable de pool liviano alcanza. Con los ~8 MiB que este mismo documento propone para el Paso 7, los tres sobran cómodos. **El Paso 5 no puede fijar los tamaños del pool liviano sin decidir antes `maxOutputBytes`.**
+
+Los números del YAML **no se tocaron en el Paso 4**: lo único que el pool liviano ejecuta hoy es el validator, donde sobran; subirlos habría gastado presupuesto sin consumidor y la decisión correcta depende de `maxOutputBytes`.
+
+**Y confirma el bug de MLE de Java en un lugar nuevo** (ver la sección de bugs): quedarse sin memoria da 137 en C++ y Python, pero **exit 1** en Java. Un checker Java que agota la memoria no se distingue hoy de un checker que rechaza la salida.
+
+**Sigue sin medirse**: el pico de `g++` compilando un checker con testlib y el de `javac`, o sea el lado del pool pesado. No se pudo porque `testlib.h` no está en la imagen de C++ (ver la sección de bugs), así que no hay forma de compilar el caso que motiva la estimación.
+
 
 ---
 
@@ -563,6 +597,11 @@ Ninguno bloquea el diseño; son elecciones que conviene hacer con el código del
 - ~~**Partir `loadJudgeConfig`, que hoy hace tres cosas**~~ **Resuelto en el Paso 3**: `validateJudgeConfig` y `applyJudgeConfigDefaults` son funciones propias que devuelven error, y los tests las llaman directo en vez de reimplementar las reglas. Queda pendiente **mover las tres a `internal/config/judge_config.go`**, anotado más abajo con el resto de la revisión de configuración.
 
 - **El wiring del pool depende de una invariante que no expresa**: `Image: judgeCfg.Judge.Languages[lang].Image` es seguro *solo porque* la validación de arranque ya garantizó que ese lenguaje existe. El Paso 3 lo acotó agregando una regla de que todo lenguaje declare imagen no vacía, así que el peor caso ya no es un nombre de imagen vacío; pero **el acceso al mapa sigue ignorando el `ok`**, y sigue dependiendo de que nadie reordene ni quite esa validación.
+ El Paso 4 lo movió a `poolConfigFor`, así que ahora está en un solo lugar en vez de inline — arreglarlo cuesta un `ok` y un error, no una pasada por dos bloques.
+
+- **Nada impide mal-cablear un adapter al pool equivocado** (encontrado en el Paso 4). Los dos pools tienen el mismo tipo `*pool.Pool` y dimensionan los mismos lenguajes, así que `NewValidatorRunner(heavyPool, ...)` compila, pasa los tests y funciona con poca carga. Recién produciría el **deadlock que D4 describe** con `maxConcurrent` operaciones simultáneas, en medio de una competencia. Ni el compilador ni la validación de arranque lo detectan. Se descartó darle un tipo distinto a cada pool: es sobre-ingeniería para tres líneas del composition root. Queda cubierto solo por nombres de variable inequívocos (`heavyPool` / `lightPool`).
+
+- **Los presupuestos explícitos no siguen a un cambio de tamaño del dind** (decidido en el Paso 4). `budgetBytes` es absoluto en el YAML y `POD_MEMORY_LIMIT` viene de la Downward API, así que si alguien sube `limits.memory` del dind en `worker.yaml`, la memoria nueva queda sin usar y la validación no dice nada: `suma <= límite` se sigue cumpliendo. Se eligió lo explícito igual, porque usar de menos degrada y usar de más rompe, y porque la alternativa —derivar el presupuesto de un pool y darle el resto al otro— vuelve invisible el reparto. Si el tamaño del dind empieza a cambiar seguido, el arreglo es que la validación también avise cuando **sobra** presupuesto sin asignar.
 
 - **Tres cosas menores de `judge_config.yaml`**, sin decidir:
   - La sección `pools` usa notación inline (`{ cpu: "1", ... }`) mientras el resto del archivo es bloque. Uniformar, o asumir el inline como convención para los mapas chicos de dimensionamiento.
@@ -609,8 +648,8 @@ De la Fase 5 sobreviven dos cosas, ninguna relacionada con esto: el `BackendConf
 
 | Archivo | Motivo |
 |---|---|
-| `adapter/judge/native_compiler.go` + `_cpp/_java/_python` + tests | la compilación pasa al sandbox (pool A) |
-| `adapter/judge/validator_runner.go` + tests | pasa al sandbox (pool B) con forma de sesión |
+| `adapter/judge/native_compiler.go` + `_cpp/_java/_python` + tests | la compilación pasa al sandbox (pool pesado) |
+| `adapter/judge/validator_runner.go` + tests | pasa al sandbox (pool liviano) con forma de sesión |
 | `adapter/judge/judging_timeouts.go` (`isTimeoutErr`) | era para `exec.CommandContext` nativo |
 | `adapter/judge/artifact_invocation.go` + tests | la lógica por lenguaje se va a `judge_config.yaml` (D8/D9) |
 
@@ -625,7 +664,7 @@ De la Fase 5 sobreviven dos cosas, ninguna relacionada con esto: el `BackendConf
 
 **Se construye nuevo:**
 
-- Los puertos de sesión de pool B y sus adapters (D3).
+- Los puertos de sesión de pool liviano y sus adapters (D3).
 - `cmd/compare/` y `docker/judge/compare.Dockerfile` — el binario de comparación por tokens y su imagen mínima (D6).
 - El `emptyDir` compartido en `worker.yaml`, montado en `dind` y en `worker` (D7).
 - La validación al arrancar del invariante de dimensionamiento (D13).
@@ -782,7 +821,7 @@ Se sigue construyendo **un solo pool** (desde `pools.solutions`). Sin cambio de 
 
 ### Paso 3 — La compilación de artefactos al sandbox (D9) ✅ COMPLETO
 
-El puerto `NativeCompiler` pasó a `ArtifactCompiler`, con un adapter que reclama un container de pool A del lenguaje del artefacto, escribe el fuente, corre el comando de compilación vía `sh -c` y extrae el artefacto con `CopyFromContainer` + `extractFirstFile`. Se borraron once archivos del camino nativo. `PrepareJudgingUseCase` no cambió más allá de un campo del request: la firma del puerto sobrevivió, como el plan preveía.
+El puerto `NativeCompiler` pasó a `ArtifactCompiler`, con un adapter que reclama un container de pool pesado del lenguaje del artefacto, escribe el fuente, corre el comando de compilación vía `sh -c` y extrae el artefacto con `CopyFromContainer` + `extractFirstFile`. Se borraron once archivos del camino nativo. `PrepareJudgingUseCase` no cambió más allá de un campo del request: la firma del puerto sobrevivió, como el plan preveía.
 
 **Con esto, el código del problem setter ya no se compila con los privilegios del worker.** Cae la superficie de ataque de tiempo de compilación (los *annotation processors* de `javac`, el `#include` de `g++` que vuelca archivos del sistema en el log de error). Queda la de ejecución, que cierran los Pasos 4 y 5.
 
@@ -823,17 +862,66 @@ Cada test se verificó **rompiendo lo que prueba**: 15 mutaciones sobre la valid
 Los tests del validator runner nativo por lenguaje (`validator_runner_{cpp,java,python}_test.go`) se borraron junto con el compilador nativo: usaban `NewNativeCompiler()` para fabricar su artefacto. Sobrevive `validator_runner_test.go`, así que ese adapter conserva test hasta que el Paso 4 lo borre entero. Se descartó sostenerlos con un compilador de juguete en el archivo de test: trabajo que se tira en el paso siguiente.
 
 **Nota para el Paso 9**: el roadmap anota que "los tests de compilación en Java se saltean por falta de JDK en el entorno de este equipo" y que con la compilación en container pasarían a poder correrse. Es cierto a medias — el test del adapter mockea el cliente de Docker, así que no ejecuta `javac` de verdad. Lo que sí se puede correr contra las imágenes reales, y se hizo a mano en este paso, es la verificación del punto 8.
-### Paso 4 — El validator al sandbox (D3, D4, D13)
+### Paso 4 — El validator al sandbox (D3, D4, D13) ✅ COMPLETO
 
-Puertos `ValidatorRunner`/`ValidatorSession` con forma de sesión, y su adapter sobre pool B. **Acá se construye el segundo pool** y se agrega la validación del invariante al arrancar. `PrepareJudgingUseCase` abre la sesión antes del loop de inputs. Se borra el `validator_runner.go` nativo.
+Los puertos `ValidatorRunner`/`ValidatorSession` pasaron a forma de sesión y su adapter corre sobre el pool liviano, que **se construye acá**, junto con la validación de arranque del invariante de dimensionamiento. `PrepareJudgingUseCase` abre la sesión antes del loop de inputs. El adapter nativo se reemplazó en su mismo archivo, así que `exec.Command` desapareció del camino del validator.
+
+**Con esto, un validator ya no corre con las credenciales del worker.** Queda el checker, que cierra el Paso 5.
+
+#### Lo que se decidió en el camino
+
+**1. Los pools se llaman `heavy` y `light`, no `solutions` y `checkers`.** D10 fijaba `solutions`/`checkers` y resultaron los dos malos. `checkers` es demasiado angosto —el primer usuario del pool liviano es el **validator**, no un checker, y en el Paso 7 lo va a ser también el comparador por tokens—, y es la misma angostura que el Paso 3 ya había corregido al pasar de un nombre único a `ArtifactRole`. Pero además **`solutions` ya era inexacto**: D4 dice que el pool pesado *compila todo* (soluciones, checkers y validators) y lo único exclusivamente suyo es ejecutar soluciones.
+
+El criterio que sí describe la división lo dice este mismo documento en "Cómo funciona hoy el pool": *"la división real no es soluciones vs checkers, es pesado vs liviano"*. Un pool **es** un presupuesto más una tabla de tamaños, así que nombrarlo por el tamaño es literal, no vago. Y aguanta el Paso 7 sin forzar nada: `compare` es liviano y entra sin explicación.
+
+Alternativas descartadas: **`artifacts`** (usa el vocabulario del Paso 3, pero el binario de comparación es código nuestro, no el artefacto de ningún problem setter); **`runner`** (ya significa otra cosa, y significa las dos: las imágenes se llaman `judge-runner:*` y hay un `RUNNER_VERSION` en `images-configmap.yaml`); **`validation`** (colisiona con un concepto propio y distinto —la tabla `problem_validations`, `staleValidationAfterMinutes`, el endpoint de validación— y además nombraría al pool por la minoría de su tráfico, porque el checker corre en cada submission, no solo al publicar); **`judge`** (todo esto es el judge: el archivo, la sección, los paquetes); y **`verifiers`** (palabra que el Paso 3 ya había descartado por otro motivo; reusarla invita a confusión).
+
+**2. Cada pool declara su presupuesto en el YAML, y `PoolConfig` pasa de dos campos a uno.** Los dos pools crean containers en el **mismo demonio**, dentro del mismo cgroup de 10 GiB. Pasarle a cada uno `MemLimitBytes: POD_MEMORY_LIMIT` habría hecho que cada uno se creyera dueño de los 9.5 GiB y entre los dos admitieran 19: la contabilidad del pool es local y no se entera. Además `MemLimitBytes`/`OverheadBytes` describen **el pod**, no el pool. Quedó un solo `BudgetBytes`, y quién resta qué es asunto del worker. De paso se borró el campo derivado `p.budget`, que solo guardaba el resultado de la resta.
+
+Se descartó **derivar** el presupuesto de un pool y darle el resto al otro. Se auto-ajustaría ante un cambio de tamaño del dind y evitaría dos números que mantener sincronizados, pero vuelve invisible el reparto: para saber cuánta memoria tiene el pesado habría que reconstruir mentalmente la cuenta del liviano, y su LRU empezaría a evictar por un cambio en la config del otro. El precio de lo explícito quedó anotado en la sección de detalles pendientes.
+
+**3. La validación de arranque quedó partida en dos funciones.** `validateJudgeConfig` mira el archivo contra sí mismo; el invariante de D13 y la suma de presupuestos necesitan `POD_MEMORY_LIMIT` y `maxConcurrent`, que salen del entorno, así que viven en `validatePoolBudgets(cfg, dindMemBytes, maxConcurrent)`, llamada desde `main` después de calcular la concurrencia. Mezclarlas habría obligado a los tests de reglas —hoy mutaciones puras sobre un struct— a poner variables de entorno. La suma recorre el mapa entero de pools y no la lista fija de dos nombres, para que un tercer pool entre en la cuenta solo; y el invariante itera ordenado, porque el orden de un mapa en Go es aleatorio y el mensaje de error cambiaría entre corridas.
+
+**4. Una regla de arranque que faltaba, encontrada al revisar cómo se elige el pool.** El Paso 3 exigía que un lenguaje con `runCmd` estuviera dimensionado por el pool de soluciones. Con dos pools eso queda a medias: los cuatro campos de artefacto significan "en este lenguaje se puede escribir un checker o un validator", y eso implica que **el pool liviano también tiene que dimensionarlo**. Sin la regla, `Claim` falla con `unknown language` en medio de un publish. Ahora un lenguaje con `runCmd` tiene que estar dimensionado por **los dos** pools.
+
+**5. La elección de pool se confirmó bien planteada, con un hueco anotado.** Cada adapter nace atado a un pool por argumento del constructor, en el composition root: `NewExecutor(heavyPool, ...)`, `NewArtifactCompiler(heavyPool, ...)`, `NewValidatorRunner(lightPool, ...)`. El mapeo es estático de verdad —ningún adapter necesita a veces uno y a veces el otro— y mantiene al pool ignorante de qué clase de código corre, que es lo que el diseño quiere. Se descartó un registro (`registry.Get("light")`): mete una clave string en cada adapter y reintroduce el modo de falla del typo que devuelve un pool en cero. El hueco que deja —mal-cablear un adapter al pool equivocado— está anotado en los detalles pendientes.
+
+**6. D3 dibuja el puerto con un `filename` que D8 ya había eliminado.** El sketch de D3 dice `BeginValidating(ctx, validatorPath, lang, filename)`, pero D8 sacó el filename de los puertos de ejecución al normalizar el artefacto, y el Paso 3 lo ejecutó así. Gana D8: el parámetro no existe. `ValidatorRunRequest` desapareció entero — de sus cuatro campos, dos se fueron a la apertura de la sesión, uno es el parámetro de `Validate` y el cuarto ya no tiene función.
+
+**7. D10 dice que `artifactPath` solo lo usa el pool pesado, y es falso.** El pool liviano lo necesita como **destino** donde escribir el artefacto que baja de GCS. Mismo campo, mismo valor, en un sentido al compilar y en el otro al ejecutar. No cambia el YAML, pero sí el wiring, y explica por qué no se partió la config de artefactos en dos structs.
+
+**8. Un solo `ArtifactConfig` para los dos lados.** Los cuatro campos son una sola cosa —cómo se construye y se corre el artefacto de un lenguaje— y viven juntos bajo el lenguaje en el YAML. `ValidatorRunner` carga con `SourcePath` y `CompileCmd` que no usa, con el precedente exacto de `LanguageExecConfig`, que `Session` también usa a medias. La alternativa —dos structs, uno de compilación y otro de ejecución— obligaba a `main.go` a armar dos mapas de los mismos campos y a poner `artifactPath` en los dos.
+
+**9. Un bug que el diseño habría introducido: el artefacto entraba sin permiso de ejecución.** `buildTar` tenía `Mode: 0644` quemado, y hasta acá daba igual porque lo único que se copiaba hacia adentro eran fuentes e inputs, que solo se leen. **Verificado corriéndolo**: un tar con modo 0644 aterriza como `-rw-r--r-- root root` y ejecutarlo da `Permission denied` (exit 126). Habría roto justo el caso más común, porque testlib es C++ y su artefacto es un ELF. `buildTar` pasa a recibir el modo, con constantes `modeSource`/`modeExecutable` para que no queden números sueltos en los call sites — un `buildTarExecutable` aparte se descartó porque deja el modo implícito en los call sites viejos, que es lo que hizo invisible el bug. El artefacto va en 0755 en los tres lenguajes: el `.jar` y el `.py` no lo necesitan, pero ramificar por lenguaje en Go es lo que D9 saca del código.
+
+De paso quedó verificado que los archivos que entran por la API de Docker son de **root** (no del usuario `judge`) y que los `docker exec` corren como `judge`, uid 1000.
+
+**10. Se borró la limpieza por caso de prueba de `Session`** (`rm -f /sandbox/input.txt /sandbox/output.txt` al final de cada `RunTestCase`). Apareció al preguntarse por qué la sesión del validator no la necesitaba, y la respuesta fue que ninguna de las dos la necesita. **Verificado corriéndolo**: la redirección `>` del shell trunca `output.txt` *antes* de ejecutar el programa, incluso cuando el binario no existe (exit 127, archivo en 0 bytes), así que nunca se puede leer una salida vieja como la de este caso; `CopyToContainer` sobreescribe `input.txt`; `Close` limpia todo; y entre casos de la misma sesión son datos de la misma submission. Era un `docker exec` por caso de prueba que no compraba nada, sin ningún test que lo cubriera. En el Paso 7 la limpieza vuelve a hacer falta, pero sobre el directorio del volumen compartido, no sobre `/sandbox`.
+
+**11. En `BeginValidating` se baja el artefacto antes de reclamar el container.** Deja el camino de error sin un container tomado que haya que devolver. Tiene test propio, porque es un orden que se puede invertir sin que nada se rompa a la vista.
+
+**12. `compare` no entra todavía; llega en el Paso 7.** Es de dos líneas y queda exenta de las reglas de arranque por construcción (no tiene `runCmd`), pero nadie la reclama hasta que la comparación por tokens se mude al pool liviano. Mismo criterio que el Paso 2 usó para no dejar config sin lector. **El Paso 7 tiene que agregarla a los dos lugares** —`languages` y `pools.light.languages`—: si falta el segundo, `BeginChecking` sin checker personalizado falla con `unknown language` en la primera submission.
+
+**13. `judging_timeouts.go` no se borró**, como el plan preveía, pero su comentario nombraba a `ValidatorRunner` entre los subprocesos nativos que acota. Ahora solo queda `OutputComparator`, hasta el Paso 5.
+
+#### Tests
+
+Cada test se verificó **rompiendo lo que prueba**: 7 mutaciones sobre las reglas de config y el invariante de D13, más 4 sobre el `judge_config.yaml` despachado, 3 sobre el caso de uso y 9 sobre el adapter. Cada una pone en rojo exactamente el test que le corresponde.
+
+**Y la verificación encontró un test que no probaba lo que decía**: el invariante de D13 toma el lenguaje **más grande** del pool, pero todos los pools del `validConfig` dimensionaban un solo lenguaje, así que "el más grande" y "el más chico" eran indistinguibles — una mutación que tomaba el menor pasaba en verde. Se agregó un caso donde el pool dimensiona dos lenguajes y el presupuesto alcanza para el chico pero no para el grande.
+
+Hay además un test que corre la config despachada contra **los números reales del cluster** (10 GiB y 3 cores, copiados de `deploy/k8s/judge/worker.yaml` con un comentario que lo dice). Agarra el caso de escribir presupuestos que no entran en la máquina real; **no** agarra el inverso, que alguien agrande el dind y el YAML no lo siga.
+
 
 ### Paso 5 — El checker al sandbox (D3)
 
-Puertos `OutputChecker`/`CheckerSession`, se reescribe `output_comparator.go` sobre pool B, y `ValidateSolutionsUseCase` y `JudgeSubmissionUseCase` abren la sesión antes de sus loops. Se borran `artifact_invocation.go` y `judging_timeouts.go`.
+Puertos `OutputChecker`/`CheckerSession`, se reescribe `output_comparator.go` sobre pool liviano, y `ValidateSolutionsUseCase` y `JudgeSubmissionUseCase` abren la sesión antes de sus loops. Se borran `artifact_invocation.go` y `judging_timeouts.go`.
 
 **La comparación por tokens se queda en el worker por ahora**: moverla sin el volumen del paso 7 empeoraría la CPU del worker en vez de mejorarla, porque habría que empujar los bytes hacia adentro del container.
 
 Acá **desaparece por construcción** el bug de `CheckerLanguage`/`CheckerFilename`. Y hay que escribir el test que hoy no existe: uno que cruce la frontera caso de uso → adapter, porque los actuales mockean justo el punto donde se perdían los campos.
+
+**Y hay que decidir `maxOutputBytes` antes de fijar los tamaños del pool liviano.** La medición del Paso 4 (ver D13) muestra que con los 64 MiB de hoy ningún tamaño razonable alcanza: un checker que lee las dos salidas y compara por tokens muere por OOM en los tres lenguajes. Con 8 o 16 MiB, los tamaños actuales sobran.
 
 ### Paso 6 — Límites de memoria reales (D11)
 
@@ -841,9 +929,9 @@ Acá **desaparece por construcción** el bug de `CheckerLanguage`/`CheckerFilena
 
 **Y acá hay que resolver el MLE de Java**, que está en la sección de bugs: la JVM nunca deja que el cgroup la mate por heap, así que el `exitCodeMLE = 137` es inalcanzable y todo MLE de Java se reporta hoy como runtime error. La vía del exit code por lenguaje se evaluó y **se descartó**; hace falta pensar otra o refinarla. Una pista: si acá el límite pasa a aplicarse con `docker update --memory`, quizás la señal deba salir del propio cgroup (`memory.events`) en vez del código de salida, lo que además sería uniforme para los tres lenguajes.
 
-### Paso 7 — Volumen compartido y comparación por tokens a pool B (D7, D6)
+### Paso 7 — Volumen compartido y comparación por tokens a pool liviano (D7, D6)
 
-El `emptyDir` en `worker.yaml` montado en `dind` y en `worker`, el UUID por judging con la raíz no listable, `RunTestCase` escribiendo al volumen, y `copyOutput` eliminado. `CheckRequest` pasa de recibir bytes a recibir una ruta, y la comparación por tokens se muda a pool B con la imagen del paso 1.
+El `emptyDir` en `worker.yaml` montado en `dind` y en `worker`, el UUID por judging con la raíz no listable, `RunTestCase` escribiendo al volumen, y `copyOutput` eliminado. `CheckRequest` pasa de recibir bytes a recibir una ruta, y la comparación por tokens se muda a pool liviano con la imagen del paso 1.
 
 **Es el paso más difícil de verificar localmente** — los tests del pool mockean Docker, así que la prueba real cae en la Fase 8 contra el cluster. Por eso va último: si algo queda mal, no contamina los pasos anteriores.
 

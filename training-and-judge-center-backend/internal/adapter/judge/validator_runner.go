@@ -1,61 +1,99 @@
 package judge
 
 import (
-	"bytes"
 	"context"
+	"errors"
+	"io"
 	"log/slog"
-	"os"
-	"os/exec"
-	"time"
+	"path"
 
-	appJudge "github.com/training-judge-center/backend/internal/application/judge"
+	"cloud.google.com/go/storage"
+	"github.com/moby/moby/client"
+
+	"github.com/training-judge-center/backend/internal/adapter/judge/pool"
+	appjudge "github.com/training-judge-center/backend/internal/application/judge"
+	"github.com/training-judge-center/backend/internal/domain/submission"
 	"github.com/training-judge-center/backend/pkg/apperror"
 )
 
+var _ appjudge.ValidatorRunner = (*ValidatorRunner)(nil)
+
 type ValidatorRunner struct {
-	timeout time.Duration
+	pool   *pool.Pool
+	docker dockerExecClient
+	reader gcsReader
+	cfg    ArtifactConfig
 }
 
-func NewValidatorRunner() *ValidatorRunner {
-	return &ValidatorRunner{timeout: trustedSubprocessTimeout}
+func NewValidatorRunner(p *pool.Pool, docker dockerExecClient, cfg ArtifactConfig, client *storage.Client, bucket string) *ValidatorRunner {
+	return &ValidatorRunner{pool: p, docker: docker, reader: newGCSReader(client, bucket), cfg: cfg}
 }
 
-// Run writes the compiled validator to disk via artifactInvocation and runs
-// it with req.Input on stdin — testlib convention: exit code 0 means
-// accepted. Running is identical across languages once artifactInvocation
-// resolves how to invoke each one; only that resolution is language-specific.
-func (r *ValidatorRunner) Run(ctx context.Context, req appJudge.ValidatorRunRequest) (appJudge.ValidatorRunResult, error) {
-	tmpDir, err := os.MkdirTemp("", "validator-run-*")
+// BeginValidating downloads the compiled validator and injects it into a light
+// pool container, which then runs it against every input of the problem.
+func (r *ValidatorRunner) BeginValidating(ctx context.Context, validatorPath string, language submission.Language) (appjudge.ValidatorSession, error) {
+	lang := language.String()
+	langCfg, ok := r.cfg.Languages[lang]
+	if !ok {
+		slog.ErrorContext(ctx, "validator_runner: unknown language in config", "language", lang)
+		return nil, apperror.NewInternal()
+	}
+
+	// Downloading first keeps the failure path simple: no container is held
+	// while storage is being read.
+	artifact, err := r.download(ctx, validatorPath)
 	if err != nil {
-		slog.ErrorContext(ctx, "validator_runner: failed to create temp dir", "error", err)
-		return appJudge.ValidatorRunResult{}, apperror.NewInternal()
+		return nil, err
 	}
-	defer os.RemoveAll(tmpDir)
 
-	program, argsPrefix, err := artifactInvocation(tmpDir, req.Filename, req.Language, req.Artifact)
+	container, err := r.pool.Claim(ctx, lang)
 	if err != nil {
-		slog.ErrorContext(ctx, "validator_runner: failed to prepare artifact", "error", err, "language", req.Language.String())
-		return appJudge.ValidatorRunResult{}, apperror.NewInternal()
+		slog.ErrorContext(ctx, "validator_runner: claim container failed", "language", lang, "error", err)
+		return nil, apperror.NewInternal()
 	}
 
-	runCtx, cancel := context.WithTimeout(ctx, r.timeout)
-	defer cancel()
-
-	var stderr bytes.Buffer
-	cmd := exec.CommandContext(runCtx, program, argsPrefix...)
-	cmd.Stdin = bytes.NewReader(req.Input)
-	cmd.Stderr = &stderr
-
-	if err := cmd.Run(); err != nil {
-		if isTimeoutErr(runCtx, err) {
-			slog.ErrorContext(ctx, "validator_runner: validator timed out", "error", runCtx.Err())
-			return appJudge.ValidatorRunResult{}, apperror.NewInternal()
-		}
-		if _, ok := err.(*exec.ExitError); ok {
-			return appJudge.ValidatorRunResult{Accepted: false, Message: stderr.String()}, nil
-		}
-		slog.ErrorContext(ctx, "validator_runner: failed to run validator", "error", err)
-		return appJudge.ValidatorRunResult{}, apperror.NewInternal()
+	name := appjudge.NewArtifactRoleValidator().String()
+	s := &ValidatorSession{
+		container: container,
+		pool:      r.pool,
+		docker:    r.docker,
+		runCmd:    withArtifactName(langCfg.RunCmd, name),
 	}
-	return appJudge.ValidatorRunResult{Accepted: true}, nil
+
+	artifactPath := withArtifactName(langCfg.ArtifactPath, name)
+	if _, err := r.docker.CopyToContainer(ctx, container.ID(), client.CopyToContainerOptions{
+		DestinationPath: path.Dir(artifactPath),
+		Content:         buildTar(path.Base(artifactPath), artifact, modeExecutable),
+	}); err != nil {
+		slog.ErrorContext(ctx, "validator_runner: copy artifact failed", "container_id", container.ID(), "error", err)
+		// The container cannot go back dirty, so it is returned the same way a
+		// finished session returns it.
+		_ = s.Close(ctx)
+		return nil, apperror.NewInternal()
+	}
+	return s, nil
+}
+
+func (r *ValidatorRunner) download(ctx context.Context, validatorPath string) ([]byte, error) {
+	rc, err := r.reader.readObject(ctx, validatorPath)
+	if err != nil {
+		if errors.Is(err, storage.ErrObjectNotExist) {
+			slog.ErrorContext(ctx, "validator_runner: compiled validator not found", "path", validatorPath)
+		} else {
+			slog.ErrorContext(ctx, "validator_runner: failed to open the compiled validator", "path", validatorPath, "error", err)
+		}
+		return nil, apperror.NewInternal()
+	}
+	defer rc.Close()
+
+	artifact, err := io.ReadAll(&io.LimitedReader{R: rc, N: maxArtifactBytes})
+	if err != nil {
+		slog.ErrorContext(ctx, "validator_runner: failed to read the compiled validator", "path", validatorPath, "error", err)
+		return nil, apperror.NewInternal()
+	}
+	if len(artifact) == 0 {
+		slog.ErrorContext(ctx, "validator_runner: the compiled validator is empty", "path", validatorPath)
+		return nil, apperror.NewInternal()
+	}
+	return artifact, nil
 }

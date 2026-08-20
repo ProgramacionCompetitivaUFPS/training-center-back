@@ -150,12 +150,13 @@ func TestPrepareJudging_ValidatorRejectsInput_StopsAtFirstRejection(t *testing.T
 		},
 	}
 	runCalls := 0
-	runner := &mockValidatorRunner{
-		runFn: func(_ context.Context, _ ValidatorRunRequest) (ValidatorRunResult, error) {
+	session := &mockValidatorSession{
+		validateFn: func(_ context.Context, _ []byte) (ValidatorRunResult, error) {
 			runCalls++
 			return ValidatorRunResult{Accepted: false, Message: "value exceeds constraint"}, nil
 		},
 	}
+	runner := &mockValidatorRunner{session: session}
 	uc := newPrepareJudgingUseCase(sources, &mockSourceCodeDownloader{}, &mockArtifactCompiler{}, &mockArtifactUploader{}, testCases, runner)
 
 	out, err := uc.Execute(context.Background(), PrepareJudgingInput{ProblemID: problemID, Slug: "sum-of-two-numbers"})
@@ -173,5 +174,59 @@ func TestPrepareJudging_ValidatorRejectsInput_StopsAtFirstRejection(t *testing.T
 	}
 	if runCalls != 1 {
 		t.Errorf("expected the runner to stop after the first rejection, got %d calls", runCalls)
+	}
+	// The container is held for the whole loop, so an early return must not
+	// leave it claimed.
+	if session.closeCalls != 1 {
+		t.Errorf("expected the session to be closed once, got %d", session.closeCalls)
+	}
+}
+
+// The session runs the validator that was stored, not the bytes still in
+// memory, which is what makes a botched upload surface during the publish.
+func TestPrepareJudging_ValidatorSessionOpensOnTheStoredArtifact(t *testing.T) {
+	sources := &mockJudgingSourceProvider{
+		getValidatorSourceFn: func(_ context.Context, _ string) (*JudgingSource, error) { return validatorSource(), nil },
+	}
+	testCases := &mockTestCaseProvider{
+		getTestCasesFn: func(_ context.Context, _ string) ([]TestCase, error) {
+			return []TestCase{
+				{Name: "secret/001", Input: []byte("1")},
+				{Name: "secret/002", Input: []byte("2")},
+			}, nil
+		},
+	}
+	var gotPath string
+	var gotLanguage submission.Language
+	beginCalls := 0
+	session := &mockValidatorSession{}
+	runner := &mockValidatorRunner{
+		beginValidatingFn: func(_ context.Context, validatorPath string, language submission.Language) (ValidatorSession, error) {
+			beginCalls++
+			gotPath, gotLanguage = validatorPath, language
+			return session, nil
+		},
+	}
+	uc := newPrepareJudgingUseCase(sources, &mockSourceCodeDownloader{}, &mockArtifactCompiler{}, &mockArtifactUploader{}, testCases, runner)
+
+	out, err := uc.Execute(context.Background(), PrepareJudgingInput{ProblemID: problemID, Slug: "sum-of-two-numbers"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if out.Failure != nil {
+		t.Fatalf("expected no failure, got %+v", out.Failure)
+	}
+	if gotPath != out.ValidatorCompiledKey {
+		t.Errorf("session opened on %q, want the stored key %q", gotPath, out.ValidatorCompiledKey)
+	}
+	if gotLanguage.String() != "python310" {
+		t.Errorf("language: got %q, want python310", gotLanguage.String())
+	}
+	// One session for every input is the whole point of the session shape.
+	if beginCalls != 1 {
+		t.Errorf("expected one session for both inputs, got %d", beginCalls)
+	}
+	if session.closeCalls != 1 {
+		t.Errorf("expected the session to be closed once, got %d", session.closeCalls)
 	}
 }

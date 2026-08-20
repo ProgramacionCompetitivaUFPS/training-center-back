@@ -5,10 +5,9 @@ import (
 	"time"
 )
 
-// trustedSubprocessTimeout bounds how long we wait for the checker/validator
-// subprocesses still running natively: ValidatorRunner and OutputComparator.
-// Without it a stuck subprocess would leak a worker slot forever instead of
-// failing the validation attempt.
+// trustedSubprocessTimeout bounds how long we wait for OutputComparator, the
+// last checker subprocess still running natively. Without it a stuck subprocess
+// would leak a worker slot forever instead of failing the validation attempt.
 const trustedSubprocessTimeout = 30 * time.Second
 
 // isTimeoutErr reports whether cmd.Run()'s error actually came from ctx's

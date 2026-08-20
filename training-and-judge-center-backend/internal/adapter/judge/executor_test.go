@@ -26,11 +26,11 @@ import (
 type pipeConn struct{ *io.PipeReader }
 
 func (pipeConn) Write(b []byte) (int, error)        { return len(b), nil }
-func (pipeConn) LocalAddr() net.Addr                 { return nil }
-func (pipeConn) RemoteAddr() net.Addr                { return nil }
-func (pipeConn) SetDeadline(_ time.Time) error       { return nil }
-func (pipeConn) SetReadDeadline(_ time.Time) error   { return nil }
-func (pipeConn) SetWriteDeadline(_ time.Time) error  { return nil }
+func (pipeConn) LocalAddr() net.Addr                { return nil }
+func (pipeConn) RemoteAddr() net.Addr               { return nil }
+func (pipeConn) SetDeadline(_ time.Time) error      { return nil }
+func (pipeConn) SetReadDeadline(_ time.Time) error  { return nil }
+func (pipeConn) SetWriteDeadline(_ time.Time) error { return nil }
 
 // --- attach helpers ---
 
@@ -182,9 +182,9 @@ const (
 
 func testPoolCfg() judgepool.PoolConfig {
 	return judgepool.PoolConfig{
-		MemLimitBytes: 4 * testMemBytes,
-		IdleTimeout:   time.Hour,
-		ReapInterval:  time.Hour,
+		BudgetBytes:  4 * testMemBytes,
+		IdleTimeout:  time.Hour,
+		ReapInterval: time.Hour,
 		Languages: map[string]judgepool.LanguageConfig{
 			testLang: {Image: "judge:cpp20", MemoryBytes: testMemBytes},
 		},

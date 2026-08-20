@@ -39,7 +39,7 @@ func (s *Session) Compile(ctx context.Context, req appjudge.CompileRequest) (app
 
 	if _, err := s.docker.CopyToContainer(ctx30, s.container.ID(), client.CopyToContainerOptions{
 		DestinationPath: "/sandbox",
-		Content:         buildTar("solution."+s.langCfg.Extension, req.SourceCode),
+		Content:         buildTar("solution."+s.langCfg.Extension, req.SourceCode, modeSource),
 	}); err != nil {
 		slog.ErrorContext(ctx, "executor: copy source failed", "container_id", s.container.ID(), "error", err)
 		return appjudge.CompileResult{}, apperror.NewInternal()
@@ -84,7 +84,7 @@ func (s *Session) Compile(ctx context.Context, req appjudge.CompileRequest) (app
 func (s *Session) RunTestCase(ctx context.Context, req appjudge.RunRequest) (appjudge.RunResult, error) {
 	if _, err := s.docker.CopyToContainer(ctx, s.container.ID(), client.CopyToContainerOptions{
 		DestinationPath: "/sandbox",
-		Content:         buildTar("input.txt", req.Input),
+		Content:         buildTar("input.txt", req.Input, modeSource),
 	}); err != nil {
 		slog.ErrorContext(ctx, "executor: copy input failed", "container_id", s.container.ID(), "error", err)
 		return appjudge.RunResult{}, apperror.NewInternal()
@@ -145,7 +145,8 @@ func (s *Session) RunTestCase(ctx context.Context, req appjudge.RunRequest) (app
 		MemoryKb: memoryKb,
 		Output:   s.copyOutput(ctx),
 	}
-	s.cleanup(ctx)
+	// No per-case cleanup: the shell redirection truncates output.txt before the
+	// program starts, CopyToContainer overwrites input.txt, and Close wipes both.
 	return result, nil
 }
 
@@ -182,10 +183,4 @@ func (s *Session) copyOutput(ctx context.Context) []byte {
 	}
 	defer res.Content.Close()
 	return extractFirstFile(res.Content, maxOutputBytes)
-}
-
-func (s *Session) cleanup(ctx context.Context) {
-	if err := runAndWait(ctx, s.docker, s.container.ID(), []string{"sh", "-c", "rm -f /sandbox/input.txt /sandbox/output.txt"}); err != nil {
-		slog.ErrorContext(ctx, "executor: test case cleanup failed", "container_id", s.container.ID(), "error", err)
-	}
 }

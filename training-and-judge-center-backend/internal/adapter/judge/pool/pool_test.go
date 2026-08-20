@@ -19,9 +19,9 @@ const smallMemBytes = 64 * 1024 * 1024
 // non-reaper tests.
 func testCfg(capacity int) PoolConfig {
 	return PoolConfig{
-		MemLimitBytes: int64(capacity) * smallMemBytes,
-		IdleTimeout:   time.Hour,
-		ReapInterval:  time.Hour,
+		BudgetBytes:  int64(capacity) * smallMemBytes,
+		IdleTimeout:  time.Hour,
+		ReapInterval: time.Hour,
 		Languages: map[string]LanguageConfig{
 			"cpp20":  {Image: "judge:cpp20", MemoryBytes: smallMemBytes},
 			"java17": {Image: "judge:java17", MemoryBytes: smallMemBytes},
@@ -201,7 +201,7 @@ func TestClaim_MemoryFull_EvictsLRUIdleContainer(t *testing.T) {
 	}
 	p := newTestPool(t, testCfg(2), mock)
 	c1 := putIdleContainer(t, p, "cpp20", 2*time.Minute) // older — should be evicted
-	putIdleContainer(t, p, "cpp20", 1*time.Minute)        // newer
+	putIdleContainer(t, p, "cpp20", 1*time.Minute)       // newer
 
 	got, err := p.Claim(context.Background(), "java17")
 	if err != nil {
@@ -318,10 +318,10 @@ func TestRelease_MarksIdleAndUpdatesTimestamp(t *testing.T) {
 func TestReaper_ExpiredIdleContainer_IsDestroyed(t *testing.T) {
 	mock := &mockDockerClient{}
 	cfg := PoolConfig{
-		MemLimitBytes: 10 * smallMemBytes,
-		IdleTimeout:   50 * time.Millisecond,
-		ReapInterval:  20 * time.Millisecond,
-		Languages:     map[string]LanguageConfig{"cpp20": {Image: "judge:cpp20", MemoryBytes: smallMemBytes}},
+		BudgetBytes:  10 * smallMemBytes,
+		IdleTimeout:  50 * time.Millisecond,
+		ReapInterval: 20 * time.Millisecond,
+		Languages:    map[string]LanguageConfig{"cpp20": {Image: "judge:cpp20", MemoryBytes: smallMemBytes}},
 	}
 	p := newTestPool(t, cfg, mock)
 	putIdleContainer(t, p, "cpp20", 200*time.Millisecond) // already past IdleTimeout
@@ -338,10 +338,10 @@ func TestReaper_ExpiredIdleContainer_IsDestroyed(t *testing.T) {
 func TestReaper_BusyContainer_NotDestroyed(t *testing.T) {
 	mock := &mockDockerClient{}
 	cfg := PoolConfig{
-		MemLimitBytes: 10 * smallMemBytes,
-		IdleTimeout:   50 * time.Millisecond,
-		ReapInterval:  20 * time.Millisecond,
-		Languages:     map[string]LanguageConfig{"cpp20": {Image: "judge:cpp20", MemoryBytes: smallMemBytes}},
+		BudgetBytes:  10 * smallMemBytes,
+		IdleTimeout:  50 * time.Millisecond,
+		ReapInterval: 20 * time.Millisecond,
+		Languages:    map[string]LanguageConfig{"cpp20": {Image: "judge:cpp20", MemoryBytes: smallMemBytes}},
 	}
 	p := newTestPool(t, cfg, mock)
 	c := putIdleContainer(t, p, "cpp20", 200*time.Millisecond)
@@ -366,10 +366,10 @@ func TestReaper_DockerFails_ContainerRestoredToIdle(t *testing.T) {
 		},
 	}
 	cfg := PoolConfig{
-		MemLimitBytes: 10 * smallMemBytes,
-		IdleTimeout:   50 * time.Millisecond,
-		ReapInterval:  20 * time.Millisecond,
-		Languages:     map[string]LanguageConfig{"cpp20": {Image: "judge:cpp20", MemoryBytes: smallMemBytes}},
+		BudgetBytes:  10 * smallMemBytes,
+		IdleTimeout:  50 * time.Millisecond,
+		ReapInterval: 20 * time.Millisecond,
+		Languages:    map[string]LanguageConfig{"cpp20": {Image: "judge:cpp20", MemoryBytes: smallMemBytes}},
 	}
 	p := newTestPool(t, cfg, mock)
 	c := putIdleContainer(t, p, "cpp20", 200*time.Millisecond)

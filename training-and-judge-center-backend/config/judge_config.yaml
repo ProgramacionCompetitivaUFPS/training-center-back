@@ -46,9 +46,18 @@ judge:
 
   # Sizing belongs to the POOL, not to the language: the same language can need
   # different limits depending on what the container is used for.
+  # Budgets are carved out of the dind container's memory, minus the daemon reserve.
   pools:
-    solutions:
+    heavy:  # compiles every language, and runs contestant solutions
+      budgetBytes: 6979321856  # 6.5 GiB
       languages:
         cpp20:     { cpu: "1", memoryBytes: 2147483648 }  # 2 GiB
         java17:    { cpu: "1", memoryBytes: 2147483648 }  # 2 GiB (the JVM sees 75%, see runCmd)
         python310: { cpu: "1", memoryBytes: 1073741824 }  # 1 GiB
+
+    light:  # runs already-compiled checkers and validators, never compiles
+      budgetBytes: 3221225472  # 3 GiB
+      languages:
+        cpp20:     { cpu: "1", memoryBytes: 536870912 }   # 512 MiB
+        java17:    { cpu: "1", memoryBytes: 1073741824 }  # 1 GiB, for the JVM
+        python310: { cpu: "1", memoryBytes: 536870912 }   # 512 MiB
