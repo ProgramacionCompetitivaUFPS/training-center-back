@@ -207,7 +207,7 @@ func main() {
 	unlinkGoogleIdentityUseCase := appuser.NewUnlinkGoogleIdentityUseCase(userRepo, oauthIdentityRepo, emailSender)
 	refreshUseCase := appuser.NewRefreshUseCase(refreshTokenRepo, userRepo, jwtService, refreshTokenCodec, redisRateLimiter, rotationCache)
 	logoutUseCase := appuser.NewLogoutUseCase(refreshTokenRepo, sessionInvalidator, refreshTokenCodec)
-	getMyProfileUseCase := appuser.NewGetMyProfileUseCase(userRepo)
+	getMyProfileUseCase := appuser.NewGetMyProfileUseCase(userRepo, oauthIdentityRepo)
 	getUserByNicknameUseCase := appuser.NewGetUserByNicknameUseCase(userRepo)
 	updateUserUseCase := appuser.NewUpdateUserUseCase(userRepo)
 	updatePasswordUseCase := appuser.NewUpdatePasswordUseCase(userRepo, emailSender, sessionInvalidator, redisRateLimiter, refreshTokenRepo)

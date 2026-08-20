@@ -12,15 +12,16 @@ import (
 )
 
 type fullUserResponse struct {
-	Email       string `json:"email"`
-	Name        string `json:"name"`
-	Nickname    string `json:"nickname"`
-	Country     string `json:"country"`
-	City        string `json:"city"`
-	Institution string `json:"institution"`
-	Role        string `json:"role"`
-	CreatedAt   string `json:"createdAt"`
-	UpdatedAt   string `json:"updatedAt,omitempty"`
+	Email        string `json:"email"`
+	Name         string `json:"name"`
+	Nickname     string `json:"nickname"`
+	Country      string `json:"country"`
+	City         string `json:"city"`
+	Institution  string `json:"institution"`
+	Role         string `json:"role"`
+	CreatedAt    string `json:"createdAt"`
+	UpdatedAt    string `json:"updatedAt,omitempty"`
+	GoogleLinked bool   `json:"googleLinked"`
 }
 
 type publicUserResponse struct {
@@ -51,7 +52,24 @@ func (h *Handler) GetMyProfile(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	handler.WriteJSON(r.Context(), w, http.StatusOK, buildFullResponse(out.User))
+	resp := fullUserResponse{
+		Name:         out.User.Name,
+		Nickname:     out.User.Nickname,
+		Country:      out.User.Country,
+		City:         out.User.City,
+		Institution:  out.User.Institution,
+		Role:         out.User.Role,
+		CreatedAt:    out.User.CreatedAt.UTC().Format(time.RFC3339),
+		GoogleLinked: out.GoogleLinked,
+	}
+	if out.User.Email != nil {
+		resp.Email = *out.User.Email
+	}
+	if out.User.UpdatedAt != nil {
+		resp.UpdatedAt = out.User.UpdatedAt.UTC().Format(time.RFC3339)
+	}
+
+	handler.WriteJSON(r.Context(), w, http.StatusOK, resp)
 }
 
 // @Summary      Get user by nickname
@@ -59,7 +77,7 @@ func (h *Handler) GetMyProfile(w http.ResponseWriter, r *http.Request) {
 // @Produce      json
 // @Security     BearerAuth
 // @Param        nickname path string true "User nickname"
-// @Success      200 {object} fullUserResponse
+// @Success      200 {object} updatedUserResponse
 // @Failure      401 {object} apperror.AppError
 // @Failure      404 {object} apperror.AppError
 // @Router       /users/{nickname} [get]
@@ -83,7 +101,7 @@ func (h *Handler) GetByNickname(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if out.IsFullProfile {
-		handler.WriteJSON(r.Context(), w, http.StatusOK, buildFullResponse(out.User))
+		handler.WriteJSON(r.Context(), w, http.StatusOK, buildUpdatedResponse(out.User))
 	} else {
 		handler.WriteJSON(r.Context(), w, http.StatusOK, publicUserResponse{
 			Name:        out.User.Name,
@@ -93,23 +111,4 @@ func (h *Handler) GetByNickname(w http.ResponseWriter, r *http.Request) {
 			CreatedAt:   out.User.CreatedAt.UTC().Format(time.RFC3339),
 		})
 	}
-}
-
-func buildFullResponse(u appuser.UserDTO) fullUserResponse {
-	resp := fullUserResponse{
-		Name:        u.Name,
-		Nickname:    u.Nickname,
-		Country:     u.Country,
-		City:        u.City,
-		Institution: u.Institution,
-		Role:        u.Role,
-		CreatedAt:   u.CreatedAt.UTC().Format(time.RFC3339),
-	}
-	if u.Email != nil {
-		resp.Email = *u.Email
-	}
-	if u.UpdatedAt != nil {
-		resp.UpdatedAt = u.UpdatedAt.UTC().Format(time.RFC3339)
-	}
-	return resp
 }
