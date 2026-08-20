@@ -27,10 +27,10 @@ const (
 type ArtifactCompiler struct {
 	pool   *pool.Pool
 	docker dockerExecClient
-	cfg    ArtifactCompilerConfig
+	cfg    ArtifactConfig
 }
 
-func NewArtifactCompiler(p *pool.Pool, docker dockerExecClient, cfg ArtifactCompilerConfig) *ArtifactCompiler {
+func NewArtifactCompiler(p *pool.Pool, docker dockerExecClient, cfg ArtifactConfig) *ArtifactCompiler {
 	return &ArtifactCompiler{pool: p, docker: docker, cfg: cfg}
 }
 
@@ -63,7 +63,7 @@ func (c *ArtifactCompiler) Compile(ctx context.Context, req appjudge.CompileArti
 	sourcePath := withArtifactName(langCfg.SourcePath, name)
 	if _, err := c.docker.CopyToContainer(compileCtx, container.ID(), client.CopyToContainerOptions{
 		DestinationPath: path.Dir(sourcePath),
-		Content:         buildTar(path.Base(sourcePath), req.SourceCode),
+		Content:         buildTar(path.Base(sourcePath), req.SourceCode, modeSource),
 	}); err != nil {
 		slog.ErrorContext(ctx, "artifact_compiler: copy source failed", "container_id", container.ID(), "error", err)
 		return appjudge.CompileArtifactResult{}, apperror.NewInternal()

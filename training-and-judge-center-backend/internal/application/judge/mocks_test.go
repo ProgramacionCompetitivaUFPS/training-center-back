@@ -183,14 +183,37 @@ func (m *mockArtifactUploader) Upload(ctx context.Context, path string, content 
 // ── ValidatorRunner mock ─────────────────────────────────────────────────────
 
 type mockValidatorRunner struct {
-	runFn func(ctx context.Context, req ValidatorRunRequest) (ValidatorRunResult, error)
+	beginValidatingFn func(ctx context.Context, validatorPath string, language submission.Language) (ValidatorSession, error)
+	session           *mockValidatorSession
 }
 
-func (m *mockValidatorRunner) Run(ctx context.Context, req ValidatorRunRequest) (ValidatorRunResult, error) {
-	if m.runFn != nil {
-		return m.runFn(ctx, req)
+func (m *mockValidatorRunner) BeginValidating(ctx context.Context, validatorPath string, language submission.Language) (ValidatorSession, error) {
+	if m.beginValidatingFn != nil {
+		return m.beginValidatingFn(ctx, validatorPath, language)
+	}
+	if m.session == nil {
+		m.session = &mockValidatorSession{}
+	}
+	return m.session, nil
+}
+
+// ── ValidatorSession mock ────────────────────────────────────────────────────
+
+type mockValidatorSession struct {
+	validateFn func(ctx context.Context, input []byte) (ValidatorRunResult, error)
+	closeCalls int
+}
+
+func (m *mockValidatorSession) Validate(ctx context.Context, input []byte) (ValidatorRunResult, error) {
+	if m.validateFn != nil {
+		return m.validateFn(ctx, input)
 	}
 	return ValidatorRunResult{Accepted: true}, nil
+}
+
+func (m *mockValidatorSession) Close(ctx context.Context) error {
+	m.closeCalls++
+	return nil
 }
 
 // ── SolutionProvider mock ────────────────────────────────────────────────────

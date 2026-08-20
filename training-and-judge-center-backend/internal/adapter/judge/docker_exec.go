@@ -9,10 +9,17 @@ import (
 	"github.com/moby/moby/client"
 )
 
-func buildTar(filename string, content []byte) io.Reader {
+// File modes for what gets copied into a container. An artifact has to be
+// executable: a C++ artifact is an ELF binary the sandbox runs directly.
+const (
+	modeSource     int64 = 0644
+	modeExecutable int64 = 0755
+)
+
+func buildTar(filename string, content []byte, mode int64) io.Reader {
 	var buf bytes.Buffer
 	tw := tar.NewWriter(&buf)
-	_ = tw.WriteHeader(&tar.Header{Name: filename, Mode: 0644, Size: int64(len(content))})
+	_ = tw.WriteHeader(&tar.Header{Name: filename, Mode: mode, Size: int64(len(content))})
 	_, _ = tw.Write(content)
 	_ = tw.Close()
 	return &buf

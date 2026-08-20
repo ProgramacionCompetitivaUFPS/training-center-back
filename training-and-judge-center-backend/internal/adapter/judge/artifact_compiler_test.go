@@ -17,8 +17,8 @@ import (
 	"github.com/training-judge-center/backend/pkg/apperror"
 )
 
-func testArtifactCfg() ArtifactCompilerConfig {
-	return ArtifactCompilerConfig{
+func testArtifactCfg() ArtifactConfig {
+	return ArtifactConfig{
 		Languages: map[string]ArtifactLanguageConfig{
 			testLang: {
 				SourcePath:   "/sandbox/{name}.cpp",

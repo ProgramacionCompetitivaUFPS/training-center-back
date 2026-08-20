@@ -38,13 +38,11 @@ type PrepareJudgingOutput struct {
 	Failure              *PrepareJudgingFailure // nil when everything compiled and every input was accepted
 }
 
-// compiledValidator carries a just-compiled validator's artifact forward to
-// the input-checking step — the artifact is used in memory, straight from
-// ArtifactCompiler's output, never re-downloaded from storage.
+// compiledValidator points at where the just-compiled validator was stored.
+// The input-checking step runs it from there rather than from the bytes still
+// in memory, so a botched upload surfaces here instead of much later.
 type compiledValidator struct {
 	compiledKey string
-	artifact    []byte
-	filename    string
 	language    submission.Language
 }
 
@@ -107,13 +105,14 @@ func (uc *PrepareJudgingUseCase) Execute(ctx context.Context, in PrepareJudgingI
 		return nil, err
 	}
 
+	session, err := uc.runner.BeginValidating(ctx, validator.compiledKey, validator.language)
+	if err != nil {
+		return nil, err
+	}
+	defer session.Close(ctx)
+
 	for _, tc := range testCases {
-		result, err := uc.runner.Run(ctx, ValidatorRunRequest{
-			Filename: validator.filename,
-			Language: validator.language,
-			Artifact: validator.artifact,
-			Input:    tc.Input,
-		})
+		result, err := session.Validate(ctx, tc.Input)
 		if err != nil {
 			return nil, err
 		}
@@ -203,8 +202,6 @@ func (uc *PrepareJudgingUseCase) prepareValidator(ctx context.Context, problemID
 
 	return &compiledValidator{
 		compiledKey: compiledKey,
-		artifact:    result.Artifact,
-		filename:    source.Filename,
 		language:    source.Language,
 	}, nil, nil
 }

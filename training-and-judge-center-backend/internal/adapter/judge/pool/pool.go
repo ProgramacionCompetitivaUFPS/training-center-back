@@ -15,7 +15,6 @@ import (
 type Pool struct {
 	mu             sync.Mutex
 	cfg            PoolConfig
-	budget         int64
 	docker         dockerLifecycle
 	containers     []*Container
 	allocatedBytes int64
@@ -40,7 +39,6 @@ func NewPool(cfg PoolConfig, docker dockerLifecycle) *Pool {
 	ctx, cancel := context.WithCancel(context.Background())
 	return &Pool{
 		cfg:      cfg,
-		budget:   cfg.MemLimitBytes - cfg.OverheadBytes,
 		docker:   docker,
 		released: make(chan struct{}, 1),
 		stop:     make(chan struct{}),
@@ -162,7 +160,7 @@ func (p *Pool) Release(c *Container) {
 
 // Caller must hold p.mu.
 func (p *Pool) canCreate(langCfg LanguageConfig) bool {
-	return p.allocatedBytes+langCfg.MemoryBytes <= p.budget
+	return p.allocatedBytes+langCfg.MemoryBytes <= p.cfg.BudgetBytes
 }
 
 // Caller must hold p.mu.

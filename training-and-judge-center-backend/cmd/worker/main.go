@@ -6,8 +6,10 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"maps"
 	"os"
 	"os/signal"
+	"slices"
 	"strconv"
 	"strings"
 	"syscall"
@@ -29,9 +31,16 @@ import (
 	appsubmission "github.com/training-judge-center/backend/internal/application/submission"
 )
 
-// poolSolutions keys the pool that compiles and runs contestant code. It is a
-// map key, so a typo would silently read a zero-valued pool instead of failing.
-const poolSolutions = "solutions"
+// Pool names, which are also the keys of judge.pools. They are map keys, so a
+// typo would silently read a zero-valued pool instead of failing.
+const (
+	poolHeavy = "heavy" // compiles every language, and runs contestant solutions
+	poolLight = "light" // runs already-compiled checkers and validators
+)
+
+// reapInterval is how often the pool looks for containers idle past their
+// timeout; unlike the timeout itself it is not worth configuring.
+const reapInterval = time.Minute
 
 // Floors applied when the matching judge config key is missing or non-positive.
 // KnownFields rejects unknown keys but says nothing about absent ones, so every
@@ -107,17 +116,9 @@ func main() {
 		"docker_daemon_reserve_cores", judgeCfg.Judge.DockerDaemonReserveCores,
 		"max_concurrent", maxConcurrent)
 
-	// Sizing and image now come from different sections, so they are joined
-	// here: the pool decides how big a container is, the language which image
-	// it runs.
-	solutionSizing := judgeCfg.Judge.Pools[poolSolutions].Languages
-	poolLanguages := make(map[string]judgepool.LanguageConfig, len(solutionSizing))
-	for lang, sizing := range solutionSizing {
-		poolLanguages[lang] = judgepool.LanguageConfig{
-			Image:       judgeCfg.Judge.Languages[lang].Image,
-			CPU:         sizing.CPU,
-			MemoryBytes: sizing.MemoryBytes,
-		}
+	if err := validatePoolBudgets(judgeCfg, poolMemLimit, maxConcurrent); err != nil {
+		slog.Error("worker: judge config does not fit this machine", "error", err)
+		os.Exit(1)
 	}
 
 	execLanguages := make(map[string]adapterjudge.LanguageExecConfig, len(judgeCfg.Judge.Languages))
@@ -132,30 +133,31 @@ func main() {
 			SourcePath:   lc.ArtifactSource,
 			CompileCmd:   lc.ArtifactCompile,
 			ArtifactPath: lc.ArtifactPath,
+			RunCmd:       lc.ArtifactRun,
 		}
-	}
-
-	poolCfg := judgepool.PoolConfig{
-		MemLimitBytes: poolMemLimit,
-		OverheadBytes: judgeCfg.Judge.DockerDaemonReserveBytes,
-		IdleTimeout:   time.Duration(judgeCfg.Judge.IdleTimeoutMinutes) * time.Minute,
-		ReapInterval:  time.Minute,
-		Languages:     poolLanguages,
 	}
 
 	executorCfg := adapterjudge.ExecutorConfig{Languages: execLanguages}
 
-	pool := judgepool.NewPool(poolCfg, dockerClient)
-	pool.Start()
-	defer pool.Stop()
+	idleTimeout := time.Duration(judgeCfg.Judge.IdleTimeoutMinutes) * time.Minute
 
-	executor := adapterjudge.NewExecutor(pool, dockerClient, executorCfg)
-	artifactCompiler := adapterjudge.NewArtifactCompiler(pool, dockerClient, adapterjudge.ArtifactCompilerConfig{Languages: artifactLanguages})
+	heavyPool := judgepool.NewPool(poolConfigFor(judgeCfg, poolHeavy, idleTimeout), dockerClient)
+	heavyPool.Start()
+	defer heavyPool.Stop()
+
+	lightPool := judgepool.NewPool(poolConfigFor(judgeCfg, poolLight, idleTimeout), dockerClient)
+	lightPool.Start()
+	defer lightPool.Stop()
+
+	executor := adapterjudge.NewExecutor(heavyPool, dockerClient, executorCfg)
+	artifactCfg := adapterjudge.ArtifactConfig{Languages: artifactLanguages}
+	artifactCompiler := adapterjudge.NewArtifactCompiler(heavyPool, dockerClient, artifactCfg)
 
 	var sourceCodeDownloader appjudge.SourceCodeDownloader
 	var testCaseProvider appjudge.TestCaseProvider
 	var outputChecker appjudge.OutputChecker
 	var artifactUploader appjudge.ArtifactUploader
+	var validatorRunner appjudge.ValidatorRunner
 
 	switch storageBackend {
 	case "gcs":
@@ -173,19 +175,20 @@ func main() {
 		testCaseProvider = adapterjudge.NewTestCaseProvider(gcsClient, gcsBucket, dbPool)
 		outputChecker = adapterjudge.NewOutputComparator(gcsClient, gcsBucket)
 		artifactUploader = adapterjudge.NewArtifactUploader(gcsClient, gcsBucket)
+		validatorRunner = adapterjudge.NewValidatorRunner(lightPool, dockerClient, artifactCfg, gcsClient, gcsBucket)
 		slog.Info("worker: using GCS storage backend", "bucket", gcsBucket)
 	default:
 		sourceCodeDownloader = adapterjudge.NewSourceCodeDownloaderLocal(storageLocalDir)
 		testCaseProvider = adapterjudge.NewTestCaseProviderLocal(storageLocalDir, dbPool)
 		outputChecker = adapterjudge.NewOutputComparatorLocal(storageLocalDir)
 		artifactUploader = adapterjudge.NewArtifactUploaderLocal(storageLocalDir)
+		validatorRunner = adapterjudge.NewValidatorRunnerLocal(lightPool, dockerClient, artifactCfg, storageLocalDir)
 		slog.Info("worker: using local storage backend", "dir", storageLocalDir)
 	}
 
 	problemProvider := adapterjudge.NewProblemProvider(dbPool)
 	solutionProvider := adapterjudge.NewSolutionProvider(dbPool)
 	judgingSourceProvider := adapterjudge.NewJudgingSourceProvider(dbPool)
-	validatorRunner := adapterjudge.NewValidatorRunner()
 	submissionRepo := adaptersubmission.NewRepository(dbPool)
 	submissionUpdater := adapterjudge.NewSubmissionUpdater(submissionRepo)
 	staleSubmissionRecoverer := adapterjudge.NewStaleSubmissionRecoverer(dbPool)
@@ -264,7 +267,8 @@ func main() {
 				return
 			case <-ticker.C:
 				pingCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
-				healthy := pool.IsHealthy(pingCtx)
+				// Both pools talk to the same daemon, so one ping answers for both.
+				healthy := heavyPool.IsHealthy(pingCtx)
 				cancel()
 				if !healthy {
 					slog.Error("worker: container pool is unhealthy, exiting so the pod restarts")
@@ -358,7 +362,8 @@ type judgePoolLanguageConfig struct {
 }
 
 type judgePoolConfig struct {
-	Languages map[string]judgePoolLanguageConfig `yaml:"languages"`
+	BudgetBytes int64                              `yaml:"budgetBytes"`
+	Languages   map[string]judgePoolLanguageConfig `yaml:"languages"`
 }
 
 type judgeSection struct {
@@ -409,12 +414,17 @@ func validateJudgeConfig(cfg judgeConfigFile) error {
 	if len(cfg.Judge.Languages) == 0 {
 		return errors.New("no languages defined")
 	}
-	if _, ok := cfg.Judge.Pools[poolSolutions]; !ok {
-		return fmt.Errorf("no %q pool defined", poolSolutions)
+	for _, name := range []string{poolHeavy, poolLight} {
+		if _, ok := cfg.Judge.Pools[name]; !ok {
+			return fmt.Errorf("no %q pool defined", name)
+		}
 	}
 	// A pool sizing a language with no image would only fail when that language
 	// is first claimed, mid-judging.
 	for poolName, pool := range cfg.Judge.Pools {
+		if pool.BudgetBytes <= 0 {
+			return fmt.Errorf("pool %q: budgetBytes is not positive", poolName)
+		}
 		if len(pool.Languages) == 0 {
 			return fmt.Errorf("pool %q sizes no languages", poolName)
 		}
@@ -437,16 +447,21 @@ func validateJudgeConfig(cfg judgeConfigFile) error {
 			return fmt.Errorf("language %q has no image", lang)
 		}
 		// A language with a runCmd is one solutions are written in, so it must
-		// be sized by the solutions pool and able to build a checker or
-		// validator. Entries without one are not languages code is sent in.
+		// be sized by the heavy pool and able to build a checker or validator.
+		// Entries without one are not languages code is sent in.
 		if lc.RunCmd == "" {
 			continue
 		}
 		if lc.Extension == "" {
 			return fmt.Errorf("language %q runs solutions but has no extension", lang)
 		}
-		if _, ok := cfg.Judge.Pools[poolSolutions].Languages[lang]; !ok {
-			return fmt.Errorf("language %q runs solutions but pool %q does not size it", lang, poolSolutions)
+		if _, ok := cfg.Judge.Pools[poolHeavy].Languages[lang]; !ok {
+			return fmt.Errorf("language %q runs solutions but pool %q does not size it", lang, poolHeavy)
+		}
+		// The artifact fields below mean a checker or validator can be written
+		// in this language, and those run in the light pool.
+		if _, ok := cfg.Judge.Pools[poolLight].Languages[lang]; !ok {
+			return fmt.Errorf("language %q can carry a checker but pool %q does not size it", lang, poolLight)
 		}
 		for _, f := range []struct{ name, value string }{
 			{"artifactSource", lc.ArtifactSource},
@@ -460,6 +475,56 @@ func validateJudgeConfig(cfg judgeConfigFile) error {
 			if !strings.Contains(f.value, adapterjudge.ArtifactNamePlaceholder) {
 				return fmt.Errorf("language %q: %s has no %s", lang, f.name, adapterjudge.ArtifactNamePlaceholder)
 			}
+		}
+	}
+	return nil
+}
+
+// validatePoolBudgets checks the config against the machine it runs on. Its
+// numbers come from the environment rather than the file, which is why it is
+// separate from validateJudgeConfig.
+// poolConfigFor joins the two config sections a pool needs: the pool says how
+// big a container is, the language which image it runs.
+func poolConfigFor(cfg judgeConfigFile, poolName string, idleTimeout time.Duration) judgepool.PoolConfig {
+	pool := cfg.Judge.Pools[poolName]
+	languages := make(map[string]judgepool.LanguageConfig, len(pool.Languages))
+	for lang, sizing := range pool.Languages {
+		languages[lang] = judgepool.LanguageConfig{
+			Image:       cfg.Judge.Languages[lang].Image,
+			CPU:         sizing.CPU,
+			MemoryBytes: sizing.MemoryBytes,
+		}
+	}
+	return judgepool.PoolConfig{
+		BudgetBytes:  pool.BudgetBytes,
+		IdleTimeout:  idleTimeout,
+		ReapInterval: reapInterval,
+		Languages:    languages,
+	}
+}
+
+func validatePoolBudgets(cfg judgeConfigFile, dindMemBytes int64, maxConcurrent int) error {
+	var total int64
+	for _, pool := range cfg.Judge.Pools {
+		total += pool.BudgetBytes
+	}
+	total += cfg.Judge.DockerDaemonReserveBytes
+	if total > dindMemBytes {
+		return fmt.Errorf("pool budgets plus the daemon reserve add up to %d bytes, over the %d the dind container has",
+			total, dindMemBytes)
+	}
+	// D13: every judging holds one container in each pool, so a pool that
+	// cannot fit maxConcurrent of its largest language blocks forever once they
+	// are all busy — a silent hang instead of a loud failure.
+	for _, name := range slices.Sorted(maps.Keys(cfg.Judge.Pools)) {
+		pool := cfg.Judge.Pools[name]
+		var largest int64
+		for _, sizing := range pool.Languages {
+			largest = max(largest, sizing.MemoryBytes)
+		}
+		if need := int64(maxConcurrent) * largest; pool.BudgetBytes < need {
+			return fmt.Errorf("pool %q: budget %d is under the %d needed for %d concurrent containers of its largest language (%d bytes)",
+				name, pool.BudgetBytes, need, maxConcurrent, largest)
 		}
 	}
 	return nil
