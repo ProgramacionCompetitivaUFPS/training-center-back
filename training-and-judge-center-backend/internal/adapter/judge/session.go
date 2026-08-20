@@ -22,8 +22,10 @@ import (
 
 const (
 	maxCompileLogBytes = 10 * 1024
-	maxOutputBytes     = 64 << 20
-	compileTimeout     = 30 * time.Second
+	// maxOutputBytes also bounds what a checker has to hold in a light pool
+	// container; 64 MiB made every language run out of memory there.
+	maxOutputBytes = 8 << 20
+	compileTimeout = 30 * time.Second
 )
 
 type Session struct {
@@ -182,5 +184,15 @@ func (s *Session) copyOutput(ctx context.Context) []byte {
 		return nil
 	}
 	defer res.Content.Close()
-	return extractFirstFile(res.Content, maxOutputBytes)
+
+	// Reading one byte past the limit tells a truncated output apart from one
+	// that just fits. Truncation is silent to the contestant until step 7 turns
+	// it into a verdict, so at least leave a trace here.
+	output := extractFirstFile(res.Content, maxOutputBytes+1)
+	if len(output) > maxOutputBytes {
+		slog.WarnContext(ctx, "executor: contestant output truncated at the limit",
+			"container_id", s.container.ID(), "limit_bytes", maxOutputBytes)
+		return output[:maxOutputBytes]
+	}
+	return output
 }

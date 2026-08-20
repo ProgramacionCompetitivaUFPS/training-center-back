@@ -582,8 +582,19 @@ Ninguno bloquea el diseño; son elecciones que conviene hacer con el código del
 
 - **Si la entrada del caso de prueba viaja por el volumen compartido** (más barato que `CopyToContainer`) o sigue por la API. La salida sí va por el volumen (D7); la entrada podría ir por cualquiera de los dos.
 - **Limpieza del directorio del judging**: hoy `Session.Close` hace `rm -rf /sandbox/*`; hay que sumar el borrado de `<raíz>/<uuid>` por parte del worker.
-- **`maxOutputBytes`**: hoy 64 MiB. Con D7 deja de presionar al worker, pero sigue acotando cuánto disco del `emptyDir` puede consumir un judging. Bajarlo a ~8 MiB sigue siendo generosísimo para programación competitiva.
+- ~~**`maxOutputBytes`**: hoy 64 MiB.~~ **Resuelto en el Paso 5**: bajó a 8 MiB. Con D7 además deja de presionar al worker, pero sigue acotando cuánto disco del `emptyDir` puede consumir un judging.
+- **Los otros dos archivos que lee el checker no están acotados por `maxOutputBytes`** (encontrado en el Paso 5, sin resolver). Bajar ese límite acota la salida **del concursante**, pero el checker recibe tres archivos, y el input y la salida esperada salen de `parseTestCasesZip` (`internal/adapter/judge/test_case_provider.go`), que tiene **su propio tope, independiente y quemado como literal**: `io.ReadAll(io.LimitReader(rc, 64*1024*1024))`. O sea que un problem setter que sube un `.ans` de 60 MiB hace OOM al container del pool liviano igual, y el dimensionamiento de D13 no lo cubre. Es un camino mucho más raro que el del concursante —lo controla el setter, y el publish lo agarraría antes que una competencia— pero el número está donde nadie lo va a ver. Al encararlo hay que decidir **dos cosas distintas**: cuál es el tope por archivo de caso de prueba, y si vive junto a `maxOutputBytes` en vez de suelto en el parser del ZIP. Ojo con la asimetría al elegirlo: el pico de memoria del checker escala con la **suma** de los tres archivos, no con el mayor.
+
+  **Y toca también al worker, no solo al container.** El Paso 5 cambia dónde viven esos bytes: hoy `customCheckerCompare` escribe los tres archivos a un directorio temporal **en disco**, y el adapter nuevo los empaqueta en un **tar en memoria** (`buildTar` arma un `bytes.Buffer`) para copiarlos por la API de Docker. Sumado a que `GetTestCases` ya trae **todos** los casos de prueba a memoria de una vez, el worker —que tiene `limits.memory: 512Mi`— queda expuesto a datos que solo el problem setter acota. El Paso 7 se lleva la salida del concursante al volumen compartido, pero **no** el input ni la salida esperada, así que este ítem le sobrevive.
 - **Qué reportar como KB consumidos** (ver D11): el veredicto de MLE queda correcto porque lo hace cumplir el kernel, pero el número que se muestra vendría de `MaxUsage`, contaminado por corridas anteriores en el mismo container.
+- **Un checker roto se reporta como wrong answer del concursante** (encontrado en el Paso 5, decidido dejarlo así). El adapter trata **cualquier** exit distinto de cero como rechazo, con el stderr como mensaje — igual que `ValidatorSession.Validate` desde el Paso 4. Eso mete dos casos ajenos en la misma bolsa:
+
+  - **`exit 3` es `_fail` en testlib**: el checker declarando que *él* o los datos del jurado están rotos, no que la salida del concursante esté mal. La tabla completa es `0=_ok`, `1=_wa`, `2=_pe`, `3=_fail`, `7=_points`.
+  - **El checker agotando la memoria del container del pool liviano**: sale con 137 en C++/Python y con **1** en Java (medido en el Paso 4, ver D13), indistinguible de un rechazo legítimo.
+
+  Se decidió no introducir la tabla de testlib en el Paso 5 por tres razones: dejaría al checker con un criterio distinto del validator, que se acaba de cerrar en el Paso 4; **acoplaría el sistema a testlib de verdad**, cuando hoy solo lo permite —un checker que es un `main` común y corriente es válido, y un `return 3` suyo pasaría a significar algo que su autor no quiso decir—; y sobre todo **no arregla el segundo caso**, porque en Java el OOM da exit 1 y ninguna tabla de exit codes lo distingue.
+
+  **Dónde encararlo: en el Paso 6**, que es donde se toca memoria, y con el mecanismo que ese paso ya necesita. La pista que este documento deja para el MLE de las soluciones sirve igual acá: si la señal de "se quedó sin memoria" sale del cgroup (`memory.events` / `memory.max` leídos después de la corrida) en vez del código de salida, cubre los tres lenguajes de forma uniforme y separa el OOM del rechazo **sin** tocar la interpretación del exit code. Recién con eso resuelto tiene sentido discutir si además se distingue el `3` de testlib, que es la parte chica del problema.
 - ~~**Verificar que `jar` venga en `openjdk-17-jdk-headless`** y acotar el `-C /sandbox .` a los `.class`.~~ **Resuelto en el Paso 3**, verificado corriéndolo en la imagen real: `jar` viene incluido, y el `-C /sandbox .` efectivamente metía el `.java` en el JAR. Se compila con `-d /sandbox/classes` y se empaqueta desde ahí.
 - **Un checker Java con la clase no pública falla tarde y disfrazado.** Verificado en `judge-runner:java17`: si la clase no es `public`, javac acepta cualquier nombre de archivo y `jar` no verifica que la main-class exista, así que la compilación pasa y revienta al ejecutar con `Could not find or load main class Checker`. Se decidió (Paso 3) no validar nada al subir, porque el mensaje nombra la clase esperada y una regex sobre fuente Java es código que se pudre. Si el caso aparece en la práctica, el lugar para atajarlo es el Paso 5, con el checker corriendo de verdad.
 
@@ -657,7 +668,7 @@ De la Fase 5 sobreviven dos cosas, ninguna relacionada con esto: el `BackendConf
 
 | Archivo | Motivo |
 |---|---|
-| `adapter/judge/output_comparator.go` | pasa al pool con forma de sesión; la comparación por tokens también (D6) |
+| `adapter/judge/output_comparator.go` | pasa al pool con forma de sesión; la comparación por tokens también (D6). **Hecho en el Paso 5**: quedó partido en `output_checker.go` (la factory, renombrada por Ad1), `checker_session.go` (la sesión de sandbox) y `token_comparison.go` (lo que sigue en el worker hasta el Paso 7) |
 | `adapter/judge/pool/` | segunda instancia con presupuesto propio; bind mount del volumen compartido (D7) |
 | `adapter/judge/session.go` | salida al volumen en vez de `copyOutput`; `docker update --memory` al reclamar (D11) |
 | `adapter/judge/config.go` + `judge_config.yaml` | separar `languages` de `pools`, campos de artefacto (D9/D10) |
@@ -736,6 +747,70 @@ La asimetría con el tiempo lo deja claro: para tiempo hay verificación posteri
 
 Encontrado al buscar cómo arreglar el bug anterior — y es lo que hace **peligroso** el arreglo obvio. El detalle completo está en **D11**; en resumen: `MemoryKb` sale de `stats.MemoryStats.MaxUsage`, que es el pico del container **desde que arrancó**. Como los containers se reusan y `Close` no resetea el contador del cgroup, ese número refleja el pico de cualquier corrida anterior, incluidas las de otras submissions. Por eso no se puede replicar el patrón del tiempo (`if runResult.MemoryKb > limits.MemoryKb`): daría MLE por culpa de una submission ajena.
 
+### Los argumentos del checker van cruzados respecto de testlib — arreglado en el Paso 5
+
+Encontrado al decidir si `CheckRequest` conserva `Input`. El adapter invoca al checker con `(input, salida esperada, salida del concursante)`, siguiendo al pie de la letra el spec del proyecto (`specs/Judge System/README.md:319`, `./checker input.txt expected.txt actual.txt`). **testlib liga los dos últimos al revés**:
+
+| argv | testlib | qué es |
+|---|---|---|
+| `argv[1]` | `inf` | input del caso |
+| `argv[2]` | `ouf` | salida del **concursante** |
+| `argv[3]` | `ans` | respuesta del **jurado** |
+
+No es cosmético, porque testlib trata los dos archivos con semánticas distintas a propósito: un `readInt()` mal formado en `ouf` es un *wrong answer* limpio (culpa del concursante), y el mismo `readInt()` mal formado en `ans` es un `_fail` — testlib asume por definición que los datos del jurado son correctos, así que si no lo son el problema está roto. Cruzados, un concursante que imprime basura hace que el checker declare que el jurado está mal. Y para el caso que justifica tener checker personalizado —problemas con múltiples respuestas válidas— el checker termina validando la respuesta del jurado como si fuera la del concursante.
+
+**Se corrigió en el Paso 5**, que reescribe esa misma línea de invocación, y **se actualizó el spec** en el mismo commit para que no quede documentación contradiciendo al código — la misma deriva que el Paso 3 tuvo que cerrar con `Solution.java`. Sin riesgo sobre datos productivos: por D12 todo el pipeline es de esta rama y nunca se mergeó.
+
+### El pool pesado le da a Python la mitad de la memoria que la plataforma promete — pendiente, va al Paso 6
+
+Encontrado en el Paso 5, al revisar de dónde salían los tamaños del YAML. **No se arregló acá**: es territorio del Paso 6 (memoria), y nada de esto está desplegado todavía.
+
+`config/judge_config.yaml` dimensiona el pool pesado así: `cpp20` 2 GiB, `java17` 2 GiB, **`python310` 1 GiB**. Los números vienen de la config ilustrativa de D10 —que el propio documento marcaba como ilustrativa— y pasaron al YAML en el Paso 2 sin que nadie volviera sobre el de Python.
+
+**Por qué está mal.** D5 dice qué significa `memoryBytes` en el pool pesado: *"el número es el techo donde una solución recibe MLE, así que tiene que ser al menos tan grande como el mayor `memoryLimit` que un problema pueda declarar — no es un número libre"*. Y `config/virtual_object.json` declara `maxMemoryLimitGlobal: 2048` (MB) y, explícitamente, `{ "language": "python310", "maxMemoryLimit": 2048 }`.
+
+O sea: un problema con `memoryLimit = 2048 MB`, una solución en Python que usa 1.5 GB → el cgroup la mata en 1 GiB → exit 137 → **MEMORY_LIMIT_EXCEEDED**, mientras la equivalente en C++ pasa. Es la misma clase de bug que el de `MaxRAMPercentage=25` que ya está en esta sección, con la config en el lugar de la JVM.
+
+**Y el Paso 6 no lo rescata: lo empeora si no se corrige primero.** D11 aplica el límite real con `docker update --memory=<límite del problema>` al reclamar, y justifica su seguridad con *"la contabilidad del pool queda conservadora: se reservaron 2 GiB y se usa menos"*. Ese razonamiento **solo vale si el techo del pool es ≥ cualquier límite de problema**. Con Python en 1 GiB, `docker update` tendría que **subirlo**: el pool contabilizaría 1 GiB para un container que puede usar 2, y con `maxConcurrent` judgings simultáneos el dind se queda sin memoria. Sobreventa invisible.
+
+**El arreglo del número es una línea y entra sin tocar nada más**: `python310` a 2 GiB deja el pool pesado caliente en `2+2+2 = 6 GiB ≤ 6.5` de presupuesto, y el invariante de D13 en `2 × 2 = 4 GiB ≤ 6.5`. Los presupuestos totales no se mueven.
+
+**Lo que no es de una línea es la guarda.** Nada lo detecta al arrancar: `validatePoolBudgets` chequea que los presupuestos entren en el dind y el invariante anti-deadlock de D13, no esto. La guarda correcta —que todo lenguaje del pool pesado declare `memoryBytes ≥ maxMemoryLimitGlobal`— es exactamente el **chequeo cruzado contra `config/virtual_object.json` que el Paso 3 descartó a propósito** (*"acopla el arranque del worker a un archivo de configuración de la API y eso merece su propia decisión"*). Este hallazgo es el argumento más fuerte a favor que apareció hasta ahora: sin él, el acoplamiento existe igual, solo que implícito y sin nadie que lo verifique.
+
+**El cuadro completo**, para un problema que declara los 2048 MB que la plataforma permite:
+
+| | techo efectivo hoy | ¿llega a 2048 MB? |
+|---|---|---|
+| cpp20 | 2 GiB | sí |
+| java17 | 1.5 GiB (`MaxRAMPercentage=75` sobre 2 GiB) | **no** |
+| python310 | **1 GiB** | **no, la mitad** |
+
+El de Java es deliberado y está documentado más arriba; el de Python no está justificado en ningún lado.
+
+#### Y la pregunta que abre: ¿el tope de 2048 MB por problema es el correcto?
+
+Surgió al discutir lo anterior, y **se decidió resolverla en el Paso 6** junto con los tamaños, porque las dos cosas son el mismo número visto desde dos archivos. La propuesta sobre la mesa es **bajar `maxMemoryLimitGlobal` a 1024 MB**. El análisis, para no rehacerlo:
+
+**Qué controla ese número.** Es el máximo que un problem setter puede *declarar*, aplicado por **rechazo, no por recorte** (`internal/domain/problem/language_override.go:49`). Un problema normal declara 256, así que bajarlo no toca los problemas típicos: angosta el extremo que un setter podría pedir.
+
+**Lo que le cuesta a la infraestructura, que no está escrito en ningún lado.** Por D5 el techo del container del pool pesado debe ser ≥ el mayor `memoryLimit` declarable, y ese techo entra directo en el invariante de D13:
+
+```
+budget del pool pesado  ≥  maxConcurrent × max(memoryBytes)  ≥  maxConcurrent × maxMemoryLimitGlobal
+```
+
+Con `maxConcurrent = 2` y 2048 MB, **el pool pesado no puede medir menos de 4 GiB** sobre los 9.5 GiB que hay para los dos pools. O sea: **un número del archivo de configuración de la API le fija el piso al presupuesto de memoria del judge**, y ni el código ni este documento lo decían.
+
+**Para Java el multiplicador es peor.** Con `MaxRAMPercentage=75`, para que Java alcance de verdad un límite L el container necesita `L / 0.75 = 1.33 × L`. Para llegar a 2048 MB hacen falta **2.7 GiB de container**, y el piso de D13 salta a **5.4 GiB** — más de la mitad del presupuesto total, para servir un límite que casi ningún problema usa.
+
+**Referencias externas**: Codeforces usa 256 MB típico con 1024 MB de máximo de plataforma; AtCoder y Kattis, 1024 MB. DOMjudge usa 2 GiB por default — es el único punto a favor del 2048 actual.
+
+**Con 1024 MB**: containers de ~1.25 GiB para C++/Python y ~1.4 GiB para Java, piso de D13 en `2 × 1.4 = 2.8 GiB` en vez de 4 (o 5.4 con Java arreglado). Libera 1.5–2.5 GiB, que valen más como **`maxConcurrent`** —submissions en paralelo durante una competencia— que como un techo que nadie toca. Y sobre todo, hace **asequible** que los tres lenguajes lleguen de verdad al límite declarado, en vez de que la equidad entre lenguajes se pague con presupuesto.
+
+**El argumento en contra, a verificar antes de decidir**: el import de paquetes ICPC. Un paquete real puede declarar 2048 MB, y como el exceso **rechaza** en vez de recortar, ese import fallaría. Antes de bajar el número conviene mirar qué declaran los paquetes que efectivamente se piensan importar.
+
+**Una inconsistencia aparte, del mismo archivo**: `maxTimeLimit` es **por lenguaje** (300s C++ / 400s Java / 600s Python) — el diseño ya acepta que Python necesita más margen. `maxMemoryLimit` es **plano en los tres** (2048). La presión de memoria por lenguaje es como mínimo tan despareja como la de tiempo: una solución Python a un problema pensado para 256 MB en C++ usa fácil 3-5× eso. El mecanismo para acomodar por lenguaje ya existe en el archivo, se usa para tiempo y no para memoria.
+
 ### `CheckerLanguage`/`CheckerFilename` no llegan al judging real
 
 **Decisión explícita del usuario**: no arreglarlo aparte, porque el rediseño reescribe ese call site igual. Y con D8/D9 termina **desapareciendo por construcción**: al normalizar el artefacto, `CheckerFilename` deja de existir en los puertos de ejecución y no hay nada que se pueda olvidar de pasar.
@@ -788,6 +863,8 @@ Un checker o validator escrito con testlib —que es el caso normal en programac
 **Regla de cada paso**: el proyecto compila y la suite queda en verde al terminarlo. Nada de estados intermedios rotos — en Go no se puede migrar media interfaz, así que cada cambio de puerto arrastra a sus llamadores y mocks en el mismo paso.
 
 **Dos hitos que valen la pena tener presentes**: al terminar el **paso 5** queda cerrado el **problema 2** (ningún código del problem setter corre ya con privilegios del worker). Al terminar el **paso 7** queda cerrado el **problema 1** (el worker vuelve a solo coordinar). El arreglo de seguridad aterriza antes que el de rendimiento, y cada uno vale por separado.
+
+> **Problema 2 cerrado** al completarse el Paso 5. Comprobación concreta: `os/exec` ya no aparece en ningún archivo de `internal/adapter/judge/`. Todo el código que sube un problem setter —checker y validator, al compilar y al ejecutar— corre ahora en containers del pool, con `NetworkMode: "none"`, sin las variables de entorno del worker y sin acceso al socket de Docker.
 
 ### Paso 1 — El binario de comparación, aislado (D6) ✅ COMPLETO
 
@@ -911,21 +988,82 @@ Cada test se verificó **rompiendo lo que prueba**: 7 mutaciones sobre las regla
 **Y la verificación encontró un test que no probaba lo que decía**: el invariante de D13 toma el lenguaje **más grande** del pool, pero todos los pools del `validConfig` dimensionaban un solo lenguaje, así que "el más grande" y "el más chico" eran indistinguibles — una mutación que tomaba el menor pasaba en verde. Se agregó un caso donde el pool dimensiona dos lenguajes y el presupuesto alcanza para el chico pero no para el grande.
 
 Hay además un test que corre la config despachada contra **los números reales del cluster** (10 GiB y 3 cores, copiados de `deploy/k8s/judge/worker.yaml` con un comentario que lo dice). Agarra el caso de escribir presupuestos que no entran en la máquina real; **no** agarra el inverso, que alguien agrande el dind y el YAML no lo siga.
+### Paso 5 — El checker al sandbox (D3) ✅ COMPLETO
 
-
-### Paso 5 — El checker al sandbox (D3)
-
-Puertos `OutputChecker`/`CheckerSession`, se reescribe `output_comparator.go` sobre pool liviano, y `ValidateSolutionsUseCase` y `JudgeSubmissionUseCase` abren la sesión antes de sus loops. Se borran `artifact_invocation.go` y `judging_timeouts.go`.
+Puertos `OutputChecker`/`CheckerSession`, se reescribe `output_comparator.go` sobre pool liviano, y `ValidateSolutionsUseCase` y `JudgeSubmissionUseCase` abren la sesión antes de sus loops. Se borran `artifact_invocation.go` y `judging_timeouts.go` — verificado al cerrar el Paso 4: `artifactInvocation`, `isTimeoutErr` y `trustedSubprocessTimeout` no tienen más consumidores que `output_comparator.go`, así que los dos archivos se van enteros.
 
 **La comparación por tokens se queda en el worker por ahora**: moverla sin el volumen del paso 7 empeoraría la CPU del worker en vez de mejorarla, porque habría que empujar los bytes hacia adentro del container.
 
 Acá **desaparece por construcción** el bug de `CheckerLanguage`/`CheckerFilename`. Y hay que escribir el test que hoy no existe: uno que cruce la frontera caso de uso → adapter, porque los actuales mockean justo el punto donde se perdían los campos.
 
-**Y hay que decidir `maxOutputBytes` antes de fijar los tamaños del pool liviano.** La medición del Paso 4 (ver D13) muestra que con los 64 MiB de hoy ningún tamaño razonable alcanza: un checker que lee las dos salidas y compara por tokens muere por OOM en los tres lenguajes. Con 8 o 16 MiB, los tamaños actuales sobran.
+**Y con esto queda cerrado el problema 2**: ningún código del problem setter corre ya con los privilegios del worker.
 
-### Paso 6 — Límites de memoria reales (D11)
+#### `maxOutputBytes` se adelanta a este paso (decidido al cerrar el Paso 4)
+
+El plan le asignaba esta decisión al Paso 7, pero el problema aparece acá. Antes del volumen compartido, el checker recibe input, salida esperada y salida del concursante **como bytes**, y el adapter los copia adentro del container del pool liviano. Con los 64 MiB de hoy, la medición del Paso 4 (ver D13) dice que un checker que lee las dos salidas y compara por tokens **muere por OOM en los tres lenguajes**, con cualquier tamaño razonable de pool. O sea: el Paso 5 tal como estaba planeado entregaba un checker que se cae con salidas grandes.
+
+**Se decidió bajar `maxOutputBytes`** (una constante en `session.go`, un solo lugar). Con 8 o 16 MiB los tamaños actuales del pool liviano sobran, y el propio documento ya calificaba los 64 MiB de patológicos para programación competitiva.
+
+Se descartó **subir los tamaños del pool liviano** para sostener los 64 MiB: obligaría a ~1 GiB para C++ y Python y más para Java, o sea a duplicar el presupuesto del pool liviano para sostener un límite que igual queremos bajar. Y se descartó **dejarlo para el Paso 7**, que es shippear un checker que se sabe que muere.
+
+**Resuelto al ejecutar el Paso 5**: baja a **8 MiB**, y el veredicto de output limit **no entra acá** — la receta para introducirlo quedó escrita en el Paso 7, que es donde el límite pasa a aplicarse de verdad. El razonamiento completo y las alternativas descartadas están en "Lo que se decidió en el camino" de este mismo paso.
+
+#### Advertencia para verificar este paso
+
+Aunque el Paso 5 salga perfecto, **un checker real de testlib sigue sin poder probarse de punta a punta**: `testlib.h` no está en la imagen de C++ (ver la sección de bugs). Un checker escrito con testlib falla con `No such file or directory`, y eso **no** es una falla de este paso.
+
+#### Lo que se decidió en el camino
+
+**1. `maxOutputBytes` baja a 8 MiB, y el veredicto de output limit se difiere al Paso 7.** El número sale de la medición de D13 —los picos del checker a 8 MiB son 119 MiB (C++), 162 MiB (Python) y 88 MiB (Java) contra techos de 512/512/1024 MiB— y coincide con el default de `output_limit` de **DOMjudge** (8192 kB), que es el juez de referencia de ICPC. Se descartó **16 MiB** porque el pico de Python sube a 320 MiB contra un techo de 512, y esa medición usó un checker *naive*: uno de testlib que además parsea a estructuras propias se come el margen restante.
+
+Sobre el veredicto, el argumento que decidió: **hoy `maxOutputBytes` no es un límite de salida sino un tope de lectura del worker** — el comando de `RunTestCase` redirige a `/sandbox/output.txt` sin ningún tope, así que la constante solo evita que el worker se traiga todo a memoria. Un veredicto construido sobre ella le diría al concursante que excedió un límite que el sistema nunca le impuso. Se evaluó aplicarlo de verdad ya acá con `| head -c 8M` dentro del `sh -c` y **se descartó**: el exit code del pipeline pasa a ser el de `head` y eso rompe la detección de TLE (124) y MLE (137). La receta completa quedó escrita en el **Paso 7**, con los siete lugares a tocar. Como paliativo explícito, `copyOutput` **loguea** la truncación (lee un byte más que el límite para distinguirla de una salida que justo entra).
+
+**2. La rama del caso sin checker personalizado se queda en el adapter.** `BeginChecking` con ruta vacía devuelve una sesión sin container que compara por tokens en el worker; con ruta no vacía, la sesión de sandbox. Se descartó que **los casos de uso ramificaran** (`if limits.CheckerPath == ""`): subiría la política de comparación a la capa de aplicación, duplicada en los dos casos de uso, y el Paso 7 tendría que deshacerla en los dos lugares.
+
+El sentinela es la **ruta vacía**, no el `HasCustomChecker` de `ProblemLimits`, que sería el intuitivo pero es incorrecto: hay un caso deliberado donde `HasCustomChecker` es `true` y `CheckerPath` queda vacío —un checker que nunca se compiló, que loguea un warning y cae a comparación por tokens en vez de romper todo judging de ese problema— y el booleano rompería ese fallback.
+
+**Esta forma es la que sobrevive al Paso 7**: cuando la comparación por tokens se mude al pool liviano con la imagen `compare` (D6), la rama deja de devolver una sesión distinta y pasa a elegir qué lenguaje reclamar. Los casos de uso no se enteran. El comentario en el código nombra el Paso 7 explícitamente, y `token_comparison.go` se aisló en un archivo propio para que ese paso lo borre con un `git rm` en vez de desenredarlo.
+
+**3. El orden de los argumentos del checker estaba invertido respecto de testlib; se corrigió acá.** Detalle completo en la sección de bugs. Los tres archivos entran al sandbox con nombres que dicen qué son (`input.txt`, `output.txt` del concursante, `answer.txt` del jurado) y se pasan en ese orden. **Se actualizó `specs/Judge System/README.md`** en el mismo commit, y de paso se corrigió otra cosa que ese spec decía y el código no hace: prometía `exit 1 = WRONG_ANSWER` y `exit 2 = PRESENTATION_ERROR`, cuando `PRESENTATION_ERROR` **no existe** como estado en `domain/submission/status.go` y el adapter trata cualquier no-cero como rechazo.
+
+**4. Cualquier exit distinto de cero sigue siendo rechazo.** Se evaluó traer la tabla de testlib (`3 = _fail`, el checker declarando que el problema está roto) y se descartó; el razonamiento y la receta para encararlo en el Paso 6 están en "Detalles a resolver al implementar".
+
+**5. Los tamaños del pool liviano no se tocaron.** Con 8 MiB los tres picos quedan holgados, y bajarlos no compra nada: el presupuesto ya cierra exacto (6.5 + 3 = 9.5 GiB disponibles) y los tres lenguajes ya entran calientes en ambos pools. En **Java** específicamente bajarlo sería peligroso: un checker que toca el techo del container **sale con exit 1** (medido en el Paso 4), indistinguible de un rechazo legítimo, así que apretarlo no produce un error visible sino *wrong answers silenciosos al concursante*. El invariante de D13 se verificó sin cambios.
+
+**6. `OutputComparator` → `OutputChecker`, por Ad1.** Era el único adapter de `adapter/judge` cuyo nombre no coincidía con el del puerto que implementa (`Executor`→`Executor`, `ValidatorRunner`→`ValidatorRunner`).
+
+**7. Se extrajo `artifactSession`, que es la otra mitad de D3.** Al escribir `CheckerSession` aparecieron **~54 líneas idénticas** a `ValidatorSession` —el bloque de `ExecCreate`/`ExecAttach`/`StdCopy`, la red de seguridad con su `Discard`, y `Close` entero—, no las ~20 que se habían estimado. Lo que se duplicaba no era código trivial sino **el ciclo de vida del container**: cuándo se descarta, cuándo se anula el puntero, cuándo se limpia; una tercera copia divergible de eso es donde aparecen los bugs que los tests no ven. Y D3 lo dice literal: *"La reutilización ocurre en el adapter, no en el puerto"* — los puertos separados ya estaban, el adapter compartido faltaba.
+
+Quedó un struct privado que las dos sesiones **embeben**, con `writeFile`/`run`/`Close`. `run` se quedó además con la construcción del `timeout --kill-after=1s Ns`, que antes armaba cada llamador: así el límite adentro del container y la red de seguridad de Go —que tiene que ser más larga— no pueden separarse. Con eso `Validate` quedó en ~12 líneas y `Check` en ~20, cada una mostrando solo lo suyo.
+
+**8. Se extrajo `downloadArtifact` a un archivo propio**, con el precedente de Ad8 que el Paso 3 usó para `buildTar`/`extractFirstFile`. Los logs pasaron de `validator_runner: compiled validator not found` a `artifact_download: compiled artifact not found` **con el path**, que identifica mejor de qué artefacto se trata (`problems/abc/checker/compiled` vs `.../validator/compiled`) que el nombre del adapter.
+
+**9. `CheckerFilename` desapareció de los puertos, y con él `dbCheckerJSON.Filename`.** Su comentario decía que hacía falta *"to invoke a compiled Java checker — its class name must match the original uploaded filename"*, que dejó de ser cierto en el Paso 3. El nombre original **se sigue guardando en la base para mostrarlo**; lo que se fue es traerlo al judging. Borrar el campo del struct no toca la base: el JSON sigue teniendo la clave y `json.Unmarshal` la ignora.
+
+**10. Los mocks y helpers compartidos se movieron a `mocks_test.go`.** `mockDockerExecClient`, `mockPoolDockerClient`, `fakeAttach`, `blockingAttach`, `stdcopyFrame`, `outputTar`, `statsBody`, `testPoolCfg`, `newTestPool` (renombrado desde `newTestPoolForExecutor`, que ya mentía porque también sirve al pool liviano) y `recordExecs` vivían dentro de `executor_test.go` y `artifact_compiler_test.go`. Es preexistente, pero los tres archivos de test nuevos llevaban los consumidores de 3 a 6, o sea que `executor_test.go` pasaba a ser el `mocks_test.go` del paquete con otro nombre. **A9** y **Ad11** son explícitos al respecto. De paso se unificaron `testArtifactCfg` y `testValidatorCfg`, que eran la misma fixture con un campo de diferencia.
+
+#### Tests
+
+Los tests siguen a lo que prueban, no al archivo donde nació el código (**M5**): los dos de `Close` que vivían en `validator_runner_test.go` se mudaron a **`artifact_session_test.go`**, porque desde la extracción prueban `artifactSession` y no el validator. Ahí se sumaron dos que faltaban: que `run` envuelve el comando en el timeout, y que la red de seguridad **descarta** el container. Y `artifact_download_test.go` cubre el guard del artefacto vacío, que hasta ahora no probaba nadie.
+
+`checker_boundary_test.go` es el test que este documento pedía: construye el **`JudgeSubmissionUseCase` real** sobre el **`OutputChecker` real**, con solo sus vecinos mockeados. Vive en `adapter/judge` porque es el único lado posible —`adapter` importa `application`, al revés sería ciclo— y tiene precedente en **Ad11**, que hace exactamente esto para los handlers.
+
+**Verificación por mutación: 11 mutaciones, todas en rojo en el test que les corresponde y en ninguno más.** Cuatro sobre `artifactSession` (sin timeout, red de seguridad que devuelve en vez de descartar, `Close` que no limpia, container sucio devuelto), cinco sobre el checker (orden de argv invertido, contenidos de los archivos cruzados, rama de ruta vacía desactivada, artefacto sin bit de ejecución, claim antes de la descarga) y dos sobre los casos de uso.
+
+**La mutación que justifica el test de frontera**: reproducir el bug original —pasar `""` en vez de `limits.CheckerPath`, que compila igual que el struct incompleto de antes— pone en rojo `checker_boundary_test.go` y **deja `internal/application/judge` en verde**. Es la demostración concreta de que los tests que existían son ciegos a esta clase de bug.
+
+**Y la verificación encontró un hueco que no habíamos previsto**: abrir la sesión y no cerrarla nunca no lo agarraba nada, y eso filtra un container del pool liviano por solución hasta agotarlo. Se agregaron dos tests —uno por caso de uso— que verifican que la sesión se abre **una vez** para N casos de prueba y se cierra **una vez**; el mismo test agarra también la mutación de abrirla adentro del loop, que es la que desharía el beneficio de D3.
+
+### Paso 6 — Límites de memoria reales (D11) ← SIGUIENTE
 
 `docker update --memory` al reclamar el container, y decidir qué reportar como KB consumidos. Independiente del resto, se puede mover de lugar sin romper nada.
+
+**Antes de escribir nada acá, resolver los dos hallazgos del Paso 5 que están en la sección de bugs**, porque los dos cambian los números sobre los que este paso opera:
+
+1. **`python310` tiene 1 GiB en el pool pesado** contra los 2048 MB que la plataforma promete. Hay que corregirlo **antes** del `docker update`: la seguridad que D11 argumenta depende de que el techo del pool sea ≥ cualquier límite de problema, y con Python por debajo el `docker update` tendría que *subirlo*, sobrevendiendo el presupuesto sin que nada avise.
+2. **Si `maxMemoryLimitGlobal` baja de 2048 a 1024 MB**, que es la propuesta anotada ahí con su análisis completo. Ese número le fija el piso al pool pesado, así que decidirlo primero evita dimensionar dos veces.
+
+Y conviene resolver de paso la **guarda de arranque** que ninguna de las dos cosas tiene: que todo lenguaje del pool pesado declare `memoryBytes ≥ maxMemoryLimitGlobal`. Es el chequeo cruzado contra `virtual_object.json` que el Paso 3 difirió; el hallazgo de Python es el argumento más fuerte a favor que apareció.
 
 **Y acá hay que resolver el MLE de Java**, que está en la sección de bugs: la JVM nunca deja que el cgroup la mate por heap, así que el `exitCodeMLE = 137` es inalcanzable y todo MLE de Java se reporta hoy como runtime error. La vía del exit code por lenguaje se evaluó y **se descartó**; hace falta pensar otra o refinarla. Una pista: si acá el límite pasa a aplicarse con `docker update --memory`, quizás la señal deba salir del propio cgroup (`memory.events`) en vez del código de salida, lo que además sería uniforme para los tres lenguajes.
 
@@ -934,6 +1072,26 @@ Acá **desaparece por construcción** el bug de `CheckerLanguage`/`CheckerFilena
 El `emptyDir` en `worker.yaml` montado en `dind` y en `worker`, el UUID por judging con la raíz no listable, `RunTestCase` escribiendo al volumen, y `copyOutput` eliminado. `CheckRequest` pasa de recibir bytes a recibir una ruta, y la comparación por tokens se muda a pool liviano con la imagen del paso 1.
 
 **Es el paso más difícil de verificar localmente** — los tests del pool mockean Docker, así que la prueba real cae en la Fase 8 contra el cluster. Por eso va último: si algo queda mal, no contamina los pasos anteriores.
+
+#### Acá entra el veredicto `OUTPUT_LIMIT_EXCEEDED` (diferido desde el Paso 5)
+
+**Por qué acá y no en el Paso 5.** Hasta este paso, `maxOutputBytes` **no es un límite de salida sino un tope de lectura del worker**: el comando de `RunTestCase` redirige a `/sandbox/output.txt` sin ningún tope, así que un programa que imprime sin parar llena el archivo igual y la constante solo evita que el worker se traiga todo a memoria. Un veredicto construido sobre ese número le diría al concursante "excediste el límite de salida" cuando el sistema en realidad nunca se lo impuso. En el Paso 7 la salida pasa al volumen compartido y el límite **hay que aplicarlo de verdad** —el `emptyDir` es finito y lo comparten todos los judgings—, así que recién ahí el veredicto significa lo que dice.
+
+**Se evaluó y se descartó aplicarlo ya en el Paso 5** con `| head -c 8M` dentro del `sh -c`: el exit code del pipeline pasa a ser el de `head`, y eso rompe la detección de TLE (124) y MLE (137), que es de lo que dependen los dos casos de uso para dar veredicto. Cualquier solución que no rompa eso es del tamaño del Paso 7.
+
+**Mientras tanto (desde el Paso 5) la truncación se loguea** con `slog.WarnContext` en `copyOutput`, para que el caso deje evidencia en vez de aparecer como un wrong answer inexplicable. Es un paliativo explícito, no la solución.
+
+**Receta concreta, para no re-investigar.** El veredicto **no necesita migración**: `submissions.status` es `TEXT NOT NULL` sin CHECK ni tipo enum (`cmd/migrate/migrations/012_create_submissions_table.sql:9`). Lugares a tocar:
+
+1. `internal/domain/submission/status.go` — la constante `statusOutputLimitExceeded`, la factoría privada `newStatusOutputLimitExceeded`, y **los dos `switch`**: el de `NewStatus` y el de `IsFinal`. Olvidar el de `IsFinal` deja el veredicto fuera de "terminado" y lo agarraría el barrido de stale.
+2. `internal/domain/submission/submission.go` — `MarkOutputLimitExceeded`, siguiendo la forma de `MarkWrongAnswer`.
+3. `internal/application/judge/judge_submission.go` — detectar el exceso en el resultado de la corrida y marcar.
+4. `internal/application/judge/validate_solutions.go` — un `FailureKind` nuevo; si no, la solución del propio setter que imprime de más se reporta como wrong answer.
+5. `internal/application/problem/solution_validator.go` — el `SolutionFailureKind` espejo del anterior.
+6. **`internal/application/contest/get_standings.go`** — la lista literal de veredictos que cuentan como intento penalizado (`case "WRONG_ANSWER", "TIME_LIMIT_EXCEEDED", ...`). Es el que se olvida: si no se agrega, un OLE no penaliza y nada avisa. **Buscar por el literal, no por el tipo**, porque son strings sueltos.
+7. La detección misma: en el Paso 7 sale de acotar la escritura en el container, no de mirar cuánto leyó el worker.
+
+Fuera de este repo queda el frontend, que muestra los veredictos.
 
 ### Paso 8 — Barrido y cierre
 
@@ -972,18 +1130,19 @@ Conviene correr una pasada de `staticcheck ./...` o `golangci-lint run --enable 
 **Candidatos concretos que hay que verificar uno por uno:**
 
 *Borrados: confirmar que nada más los referencia*
-- `artifactInvocation` y sus tests
-- `isTimeoutErr` y `trustedSubprocessTimeout` (`judging_timeouts.go` entero)
-- `native_compiler.go` + `_cpp/_java/_python` y sus tests
-- `validator_runner.go` (versión nativa) y sus tests
+- ~~`artifactInvocation` y sus tests~~ **borrado en el Paso 5**
+- ~~`isTimeoutErr` y `trustedSubprocessTimeout` (`judging_timeouts.go` entero)~~ **borrado en el Paso 5**. Con eso `os/exec` **no aparece más en `adapter/judge`**, que es la prueba concreta de que ningún código del problem setter corre ya en el filesystem del worker.
+- ~~`native_compiler.go` + `_cpp/_java/_python` y sus tests~~ **borrado en el Paso 3**
+- ~~`validator_runner.go` (versión nativa) y sus tests~~ **reemplazado en el Paso 4**
 
 *Probablemente huérfanos tras los cambios*
-- `tokenCompare` en `output_comparator.go` — la lógica se muda a `cmd/compare`, así que la copia en Go del adapter queda sin uso
+- `tokenCompare` — **NO queda huérfano en el Paso 5**: la comparación por tokens sigue en el worker hasta el Paso 7. Vive aislada en `token_comparison.go` junto a `tokenCheckerSession`, para que el Paso 7 borre el archivo entero.
 - `copyOutput`, y `maxOutputBytes` si deja de tener llamadores (la salida pasa por el volumen)
-- `CheckerFilename` en `ProblemLimits` y en `CheckRequest` — lo elimina D9
-- `dbCheckerJSON.Filename` en `problem_provider.go`, si el filename ya no hace falta en tiempo de ejecución
-- `ValidatorRunRequest.Artifact`, que pasa a ser una ruta
+- ~~`CheckerFilename` en `ProblemLimits` y en `CheckRequest`~~ **eliminado en el Paso 5**
+- ~~`dbCheckerJSON.Filename` en `problem_provider.go`~~ **eliminado en el Paso 5**: el filename ya no hace falta en tiempo de ejecución, y sigue guardado en la base para mostrarlo
+- ~~`ValidatorRunRequest.Artifact`, que pasa a ser una ruta~~ **el struct entero desapareció en el Paso 4**
 - Mocks y helpers de test de los puertos borrados (`mockNativeCompiler`, `mockValidatorRunner` y compañía en los `mocks_test.go`)
+- **La apertura de sesión de pool liviano sigue duplicada** entre `OutputChecker.BeginChecking` y `ValidatorRunner.BeginValidating` (buscar config → descargar → reclamar → inyectar): son iguales salvo el rol y el tipo de sesión. El Paso 5 extrajo la mitad de abajo (`artifactSession`) y la descarga (`downloadArtifact`), pero no ésta, porque el Paso 7 vuelve a tocar los dos archivos. Vale mirarla después de ese paso, no antes.
 
 *Config*
 - Restos de la forma vieja de `languages` tras la reestructuración de D10

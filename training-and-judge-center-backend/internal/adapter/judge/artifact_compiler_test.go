@@ -5,7 +5,6 @@ import (
 	"bytes"
 	"context"
 	"errors"
-	"fmt"
 	"io"
 	"strings"
 	"testing"
@@ -17,21 +16,9 @@ import (
 	"github.com/training-judge-center/backend/pkg/apperror"
 )
 
-func testArtifactCfg() ArtifactConfig {
-	return ArtifactConfig{
-		Languages: map[string]ArtifactLanguageConfig{
-			testLang: {
-				SourcePath:   "/sandbox/{name}.cpp",
-				CompileCmd:   "g++ -o /sandbox/{name} /sandbox/{name}.cpp",
-				ArtifactPath: "/sandbox/{name}",
-			},
-		},
-	}
-}
-
 func newTestArtifactCompiler(t *testing.T, docker *mockDockerExecClient) *ArtifactCompiler {
 	t.Helper()
-	p, _ := newTestPoolForExecutor(t)
+	p, _ := newTestPool(t)
 	return NewArtifactCompiler(p, docker, testArtifactCfg())
 }
 
@@ -43,26 +30,6 @@ func artifactTar(content []byte) io.ReadCloser {
 	_, _ = tw.Write(content)
 	_ = tw.Close()
 	return io.NopCloser(&buf)
-}
-
-func firstTarEntry(t *testing.T, r io.Reader) (string, []byte) {
-	t.Helper()
-	tr := tar.NewReader(r)
-	hdr, err := tr.Next()
-	if err != nil {
-		t.Fatalf("could not read the tar sent to the container: %v", err)
-	}
-	data, _ := io.ReadAll(tr)
-	return hdr.Name, data
-}
-
-// recordExecs numbers the exec calls so the attach mock can tell the compile
-// (the first) from the cleanup (the second), and keeps every command issued.
-func recordExecs(docker *mockDockerExecClient, cmds *[][]string) {
-	docker.execCreateFn = func(_ context.Context, _ string, opts client.ExecCreateOptions) (client.ExecCreateResult, error) {
-		*cmds = append(*cmds, opts.Cmd)
-		return client.ExecCreateResult{ID: fmt.Sprintf("exec-%d", len(*cmds))}, nil
-	}
 }
 
 func TestArtifactCompiler_Compile_SubstitutesTheRoleEverywhere(t *testing.T) {
@@ -204,7 +171,7 @@ func TestArtifactCompiler_Compile_WipesTheSandboxAndReturnsTheContainer(t *testi
 	}
 	var cmds [][]string
 	recordExecs(docker, &cmds)
-	p, poolDocker := newTestPoolForExecutor(t)
+	p, poolDocker := newTestPool(t)
 	c := NewArtifactCompiler(p, docker, testArtifactCfg())
 
 	if _, err := c.Compile(context.Background(), appjudge.CompileArtifactRequest{
@@ -251,7 +218,7 @@ func TestArtifactCompiler_Compile_DiscardsTheContainerWhenCleanupFails(t *testin
 		}
 		return client.ExecCreateResult{ID: "exec-1"}, nil
 	}
-	p, poolDocker := newTestPoolForExecutor(t)
+	p, poolDocker := newTestPool(t)
 	c := NewArtifactCompiler(p, docker, testArtifactCfg())
 
 	if _, err := c.Compile(context.Background(), appjudge.CompileArtifactRequest{

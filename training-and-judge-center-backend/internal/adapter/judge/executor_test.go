@@ -1,195 +1,16 @@
 package judge
 
 import (
-	"archive/tar"
-	"bufio"
 	"bytes"
 	"context"
-	"encoding/binary"
-	"encoding/json"
-	"fmt"
-	"io"
-	"net"
-	"sync/atomic"
 	"testing"
 	"time"
 
-	"github.com/moby/moby/api/types/container"
 	"github.com/moby/moby/client"
 	judgepool "github.com/training-judge-center/backend/internal/adapter/judge/pool"
 	appjudge "github.com/training-judge-center/backend/internal/application/judge"
 	"github.com/training-judge-center/backend/internal/domain/submission"
 )
-
-// --- pipeConn: net.Conn backed by io.PipeReader for test attach results ---
-
-type pipeConn struct{ *io.PipeReader }
-
-func (pipeConn) Write(b []byte) (int, error)        { return len(b), nil }
-func (pipeConn) LocalAddr() net.Addr                { return nil }
-func (pipeConn) RemoteAddr() net.Addr               { return nil }
-func (pipeConn) SetDeadline(_ time.Time) error      { return nil }
-func (pipeConn) SetReadDeadline(_ time.Time) error  { return nil }
-func (pipeConn) SetWriteDeadline(_ time.Time) error { return nil }
-
-// --- attach helpers ---
-
-// fakeAttach returns an ExecAttachResult whose reader yields content then EOF.
-func fakeAttach(content []byte) client.ExecAttachResult {
-	pr, pw := io.Pipe()
-	go func() {
-		_, _ = pw.Write(content)
-		pw.Close()
-	}()
-	conn := pipeConn{pr}
-	return client.ExecAttachResult{
-		HijackedResponse: client.HijackedResponse{
-			Conn:   conn,
-			Reader: bufio.NewReader(conn),
-		},
-	}
-}
-
-// blockingAttach returns an ExecAttachResult that blocks until ctx is done.
-func blockingAttach(ctx context.Context) client.ExecAttachResult {
-	pr, pw := io.Pipe()
-	go func() {
-		<-ctx.Done()
-		pw.CloseWithError(ctx.Err())
-	}()
-	conn := pipeConn{pr}
-	return client.ExecAttachResult{
-		HijackedResponse: client.HijackedResponse{
-			Conn:   conn,
-			Reader: bufio.NewReader(conn),
-		},
-	}
-}
-
-// stdcopyFrame encodes data in Docker's multiplexed stream format.
-// streamType: 1 = stdout, 2 = stderr.
-func stdcopyFrame(streamType byte, data []byte) []byte {
-	frame := make([]byte, 8+len(data))
-	frame[0] = streamType
-	binary.BigEndian.PutUint32(frame[4:], uint32(len(data)))
-	copy(frame[8:], data)
-	return frame
-}
-
-// outputTar wraps content in a tar archive, mimicking CopyFromContainer's response.
-func outputTar(content []byte) io.ReadCloser {
-	var buf bytes.Buffer
-	tw := tar.NewWriter(&buf)
-	_ = tw.WriteHeader(&tar.Header{Name: "output.txt", Mode: 0644, Size: int64(len(content))})
-	_, _ = tw.Write(content)
-	_ = tw.Close()
-	return io.NopCloser(&buf)
-}
-
-// statsBody returns JSON-encoded StatsResponse with the given peak memory usage.
-func statsBody(maxUsageBytes uint64) io.ReadCloser {
-	stats := container.StatsResponse{
-		MemoryStats: container.MemoryStats{MaxUsage: maxUsageBytes},
-	}
-	data, _ := json.Marshal(stats)
-	return io.NopCloser(bytes.NewReader(data))
-}
-
-// --- mockDockerExecClient ---
-
-type mockDockerExecClient struct {
-	copyToContainerFn   func(context.Context, string, client.CopyToContainerOptions) (client.CopyToContainerResult, error)
-	execCreateFn        func(context.Context, string, client.ExecCreateOptions) (client.ExecCreateResult, error)
-	execAttachFn        func(context.Context, string, client.ExecAttachOptions) (client.ExecAttachResult, error)
-	execInspectFn       func(context.Context, string, client.ExecInspectOptions) (client.ExecInspectResult, error)
-	copyFromContainerFn func(context.Context, string, client.CopyFromContainerOptions) (client.CopyFromContainerResult, error)
-	containerStatsFn    func(context.Context, string, client.ContainerStatsOptions) (client.ContainerStatsResult, error)
-
-	execCreateCnt atomic.Int64
-}
-
-func (m *mockDockerExecClient) CopyToContainer(ctx context.Context, id string, opts client.CopyToContainerOptions) (client.CopyToContainerResult, error) {
-	if m.copyToContainerFn != nil {
-		return m.copyToContainerFn(ctx, id, opts)
-	}
-	return client.CopyToContainerResult{}, nil
-}
-
-func (m *mockDockerExecClient) ExecCreate(ctx context.Context, id string, opts client.ExecCreateOptions) (client.ExecCreateResult, error) {
-	m.execCreateCnt.Add(1)
-	if m.execCreateFn != nil {
-		return m.execCreateFn(ctx, id, opts)
-	}
-	return client.ExecCreateResult{ID: "exec-1"}, nil
-}
-
-func (m *mockDockerExecClient) ExecAttach(ctx context.Context, id string, opts client.ExecAttachOptions) (client.ExecAttachResult, error) {
-	if m.execAttachFn != nil {
-		return m.execAttachFn(ctx, id, opts)
-	}
-	return fakeAttach(nil), nil
-}
-
-func (m *mockDockerExecClient) ExecInspect(ctx context.Context, id string, opts client.ExecInspectOptions) (client.ExecInspectResult, error) {
-	if m.execInspectFn != nil {
-		return m.execInspectFn(ctx, id, opts)
-	}
-	return client.ExecInspectResult{ExitCode: 0}, nil
-}
-
-func (m *mockDockerExecClient) CopyFromContainer(ctx context.Context, id string, opts client.CopyFromContainerOptions) (client.CopyFromContainerResult, error) {
-	if m.copyFromContainerFn != nil {
-		return m.copyFromContainerFn(ctx, id, opts)
-	}
-	return client.CopyFromContainerResult{Content: outputTar(nil)}, nil
-}
-
-func (m *mockDockerExecClient) ContainerStats(ctx context.Context, id string, opts client.ContainerStatsOptions) (client.ContainerStatsResult, error) {
-	if m.containerStatsFn != nil {
-		return m.containerStatsFn(ctx, id, opts)
-	}
-	return client.ContainerStatsResult{Body: statsBody(0)}, nil
-}
-
-// --- mockPoolDockerClient: satisfies pool's unexported dockerLifecycle ---
-
-type mockPoolDockerClient struct {
-	idCounter atomic.Int64
-}
-
-func (m *mockPoolDockerClient) ContainerCreate(_ context.Context, _ client.ContainerCreateOptions) (client.ContainerCreateResult, error) {
-	return client.ContainerCreateResult{ID: fmt.Sprintf("pool-ctr-%d", m.idCounter.Add(1))}, nil
-}
-
-func (m *mockPoolDockerClient) ContainerStart(_ context.Context, _ string, _ client.ContainerStartOptions) (client.ContainerStartResult, error) {
-	return client.ContainerStartResult{}, nil
-}
-
-func (m *mockPoolDockerClient) ContainerRemove(_ context.Context, _ string, _ client.ContainerRemoveOptions) (client.ContainerRemoveResult, error) {
-	return client.ContainerRemoveResult{}, nil
-}
-
-func (m *mockPoolDockerClient) Ping(_ context.Context, _ client.PingOptions) (client.PingResult, error) {
-	return client.PingResult{}, nil
-}
-
-// --- test setup ---
-
-const (
-	testLang     = "cpp20"
-	testMemBytes = 512 * 1024 * 1024 // 512 MB
-)
-
-func testPoolCfg() judgepool.PoolConfig {
-	return judgepool.PoolConfig{
-		BudgetBytes:  4 * testMemBytes,
-		IdleTimeout:  time.Hour,
-		ReapInterval: time.Hour,
-		Languages: map[string]judgepool.LanguageConfig{
-			testLang: {Image: "judge:cpp20", MemoryBytes: testMemBytes},
-		},
-	}
-}
 
 func testExecCfg() ExecutorConfig {
 	return ExecutorConfig{
@@ -203,18 +24,9 @@ func testExecCfg() ExecutorConfig {
 	}
 }
 
-func newTestPoolForExecutor(t *testing.T) (*judgepool.Pool, *mockPoolDockerClient) {
-	t.Helper()
-	poolMock := &mockPoolDockerClient{}
-	p := judgepool.NewPool(testPoolCfg(), poolMock)
-	p.Start()
-	t.Cleanup(p.Stop)
-	return p, poolMock
-}
-
 func newTestSession(t *testing.T, docker *mockDockerExecClient) (*Session, *judgepool.Pool) {
 	t.Helper()
-	p, _ := newTestPoolForExecutor(t)
+	p, _ := newTestPool(t)
 	c, err := p.Claim(context.Background(), testLang)
 	if err != nil {
 		t.Fatalf("pool.Claim: %v", err)
@@ -232,7 +44,7 @@ func newTestSession(t *testing.T, docker *mockDockerExecClient) (*Session, *judg
 
 // 1. BeginSession with a language absent from ExecutorConfig returns error without claiming.
 func TestExecutor_BeginSession_UnknownLanguage(t *testing.T) {
-	p, poolMock := newTestPoolForExecutor(t)
+	p, poolMock := newTestPool(t)
 	e := NewExecutor(p, &mockDockerExecClient{}, ExecutorConfig{Languages: map[string]LanguageExecConfig{}})
 
 	_, err := e.BeginSession(context.Background(), submission.RestoreLanguage("rust"))
@@ -246,7 +58,7 @@ func TestExecutor_BeginSession_UnknownLanguage(t *testing.T) {
 
 // 2. BeginSession for a known language claims a container and returns a *Session.
 func TestExecutor_BeginSession_Success(t *testing.T) {
-	p, _ := newTestPoolForExecutor(t)
+	p, _ := newTestPool(t)
 	e := NewExecutor(p, &mockDockerExecClient{}, testExecCfg())
 
 	sess, err := e.BeginSession(context.Background(), submission.RestoreLanguage(testLang))

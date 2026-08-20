@@ -315,17 +315,22 @@ def compare(expected, actual):
 
 When problem has a checker:
 
+The argument order is testlib's, so a checker written for Codeforces runs here
+unchanged. Note that the contestant's output comes **before** the jury's answer.
+
 ```bash
-./checker input.txt expected.txt actual.txt
+./checker input.txt output.txt answer.txt
 # Exit code 0 = ACCEPTED
-# Exit code 1 = WRONG_ANSWER
-# Exit code 2 = PRESENTATION_ERROR (optional)
+# Any other exit code = rejected, with the checker's stderr as the reason
 ```
 
 Checker receives:
-- `input.txt`: Test case input
-- `expected.txt`: Expected output (may be ignored)
-- `actual.txt`: User's output
+- `input.txt`: Test case input — testlib's `inf`
+- `output.txt`: The contestant's output — testlib's `ouf`
+- `answer.txt`: The jury's answer (may be ignored) — testlib's `ans`
+
+The distinction matters: testlib reports a malformed read on `ouf` as a wrong
+answer, and the same malformed read on `ans` as a fatal jury error.
 
 ---
 

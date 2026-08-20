@@ -1,9 +1,7 @@
 package judge
 
 import (
-	"archive/tar"
 	"context"
-	"errors"
 	"io"
 	"strings"
 	"testing"
@@ -18,33 +16,12 @@ import (
 
 const testValidatorKey = "problems/abc/validator/compiled"
 
-func testValidatorCfg() ArtifactConfig {
-	return ArtifactConfig{
-		Languages: map[string]ArtifactLanguageConfig{
-			testLang: {
-				SourcePath:   "/sandbox/{name}.cpp",
-				CompileCmd:   "g++ -o /sandbox/{name} /sandbox/{name}.cpp",
-				ArtifactPath: "/sandbox/{name}",
-				RunCmd:       "/sandbox/{name}",
-			},
-		},
-	}
-}
-
-func storedArtifact(content string) *mockGCSReader {
-	return &mockGCSReader{
-		readObjectFn: func(_ context.Context, _ string) (io.ReadCloser, error) {
-			return io.NopCloser(strings.NewReader(content)), nil
-		},
-	}
-}
-
 // newTestValidatorRunner builds the adapter over its own pool, returned so a
 // test can tell a released container from a discarded one.
 func newTestValidatorRunner(t *testing.T, docker *mockDockerExecClient, reader gcsReader) (*ValidatorRunner, *mockPoolDockerClient) {
 	t.Helper()
-	p, poolDocker := newTestPoolForExecutor(t)
-	return &ValidatorRunner{pool: p, docker: docker, reader: reader, cfg: testValidatorCfg()}, poolDocker
+	p, poolDocker := newTestPool(t)
+	return &ValidatorRunner{pool: p, docker: docker, reader: reader, cfg: testArtifactCfg()}, poolDocker
 }
 
 func beginTestValidating(t *testing.T, r *ValidatorRunner) appjudge.ValidatorSession {
@@ -54,19 +31,6 @@ func beginTestValidating(t *testing.T, r *ValidatorRunner) appjudge.ValidatorSes
 		t.Fatalf("BeginValidating: %v", err)
 	}
 	return s
-}
-
-// firstTarEntryMode is firstTarEntry plus the mode, which is what decides
-// whether the sandbox can execute the artifact at all.
-func firstTarEntryMode(t *testing.T, r io.Reader) (string, int64, []byte) {
-	t.Helper()
-	tr := tar.NewReader(r)
-	hdr, err := tr.Next()
-	if err != nil {
-		t.Fatalf("could not read the tar sent to the container: %v", err)
-	}
-	data, _ := io.ReadAll(tr)
-	return hdr.Name, hdr.Mode, data
 }
 
 // A C++ artifact is an ELF binary the sandbox runs directly, so injecting it
@@ -190,64 +154,6 @@ func TestValidatorSession_Validate_ReusesOneContainerForEveryInput(t *testing.T)
 	}
 }
 
-// The next claimer runs another problem's checker, which must not find this
-// validator lying in /sandbox.
-func TestValidatorSession_Close_WipesTheSandboxAndReturnsTheContainer(t *testing.T) {
-	var cmds [][]string
-	docker := &mockDockerExecClient{}
-	recordExecs(docker, &cmds)
-	r, poolDocker := newTestValidatorRunner(t, docker, storedArtifact("ELF binary"))
-	s := beginTestValidating(t, r)
-
-	if err := s.Close(context.Background()); err != nil {
-		t.Fatalf("Close: %v", err)
-	}
-
-	var wiped bool
-	for _, cmd := range cmds {
-		if len(cmd) == 3 && strings.Contains(cmd[2], "rm -rf /sandbox/*") {
-			wiped = true
-		}
-	}
-	if !wiped {
-		t.Errorf("expected the sandbox to be wiped, commands were: %v", cmds)
-	}
-	if _, err := r.pool.Claim(context.Background(), testLang); err != nil {
-		t.Fatalf("claim after close: %v", err)
-	}
-	if got := poolDocker.idCounter.Load(); got != 1 {
-		t.Errorf("expected the container to be reused, but the pool created %d", got)
-	}
-}
-
-func TestValidatorSession_Close_DiscardsTheContainerWhenCleanupFails(t *testing.T) {
-	execs := 0
-	docker := &mockDockerExecClient{}
-	docker.execCreateFn = func(_ context.Context, _ string, _ client.ExecCreateOptions) (client.ExecCreateResult, error) {
-		execs++
-		if execs > 1 {
-			return client.ExecCreateResult{}, errors.New("daemon unreachable")
-		}
-		return client.ExecCreateResult{ID: "exec-1"}, nil
-	}
-	r, poolDocker := newTestValidatorRunner(t, docker, storedArtifact("ELF binary"))
-	s := beginTestValidating(t, r)
-
-	if _, err := s.Validate(context.Background(), []byte("1")); err != nil {
-		t.Fatalf("Validate: %v", err)
-	}
-	if err := s.Close(context.Background()); err != nil {
-		t.Fatalf("Close: %v", err)
-	}
-
-	if _, err := r.pool.Claim(context.Background(), testLang); err != nil {
-		t.Fatalf("claim after close: %v", err)
-	}
-	if got := poolDocker.idCounter.Load(); got != 2 {
-		t.Errorf("expected the dirty container to be discarded and a fresh one created, the pool created %d", got)
-	}
-}
-
 // Downloading before claiming is what keeps the failure path free of a
 // container that would have to be handed back.
 func TestValidatorRunner_BeginValidating_MissingArtifactClaimsNoContainer(t *testing.T) {
@@ -277,7 +183,7 @@ func TestValidatorRunner_BeginValidating_RejectsALanguageWithNoArtifactConfig(t 
 	p.Start()
 	t.Cleanup(p.Stop)
 
-	r := &ValidatorRunner{pool: p, docker: &mockDockerExecClient{}, reader: storedArtifact("jar"), cfg: testValidatorCfg()}
+	r := &ValidatorRunner{pool: p, docker: &mockDockerExecClient{}, reader: storedArtifact("jar"), cfg: testArtifactCfg()}
 
 	_, err := r.BeginValidating(context.Background(), testValidatorKey, submission.RestoreLanguage("java17"))
 

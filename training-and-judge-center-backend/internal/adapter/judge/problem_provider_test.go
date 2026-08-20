@@ -46,9 +46,6 @@ func TestGetLimits_CheckerCompiled_ReturnsCompiledPathAndLanguage(t *testing.T) 
 	if limits.CheckerLanguage.String() != "cpp20" {
 		t.Errorf("CheckerLanguage: got %q, want cpp20", limits.CheckerLanguage.String())
 	}
-	if limits.CheckerFilename != "checker.cpp" {
-		t.Errorf("CheckerFilename: got %q, want checker.cpp", limits.CheckerFilename)
-	}
 }
 
 // TestGetLimits_CheckerNotYetCompiled_FallsBackToTokenComparison covers an

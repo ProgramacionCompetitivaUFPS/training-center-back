@@ -118,9 +118,8 @@ func (uc *JudgeSubmissionUseCase) Execute(ctx context.Context, in JudgeSubmissio
 	return uc.persistVerdict(ctx, sub)
 }
 
-// judgeAttempt ejecuta un intento completo de evaluación.
-// Retorna (shouldRetry=true, err) cuando la infra falló y sub no tiene veredicto.
-// Retorna (shouldRetry=false, nil) cuando sub ya tiene un veredicto definitivo.
+// judgeAttempt runs one whole judging attempt. It returns (true, err) when infra
+// failed and sub carries no verdict, and (false, nil) once sub has a final one.
 func (uc *JudgeSubmissionUseCase) judgeAttempt(
 	ctx context.Context,
 	sub *submission.Submission,
@@ -147,6 +146,14 @@ func (uc *JudgeSubmissionUseCase) judgeAttempt(
 		return false, nil
 	}
 
+	// Opened after compiling: a submission that does not build produces no output
+	// to check, so no checker container is held during the compile.
+	checkerSession, err := uc.outputChecker.BeginChecking(ctx, limits.CheckerPath, limits.CheckerLanguage)
+	if err != nil {
+		return true, err
+	}
+	defer checkerSession.Close(ctx)
+
 	maxTimeMs, maxMemoryKb := 0, 0
 	for _, tc := range testCases {
 		runResult, err := session.RunTestCase(ctx, RunRequest{
@@ -170,11 +177,10 @@ func (uc *JudgeSubmissionUseCase) judgeAttempt(
 				_ = sub.MarkTimeLimitExceeded(runResult.TimeMs, now)
 				return false, nil
 			}
-			checkResult, err := uc.outputChecker.Check(ctx, CheckRequest{
+			checkResult, err := checkerSession.Check(ctx, CheckRequest{
 				Input:            tc.Input,
 				ExpectedOutput:   tc.ExpectedOutput,
 				ContestantOutput: runResult.Output,
-				CheckerPath:      limits.CheckerPath,
 			})
 			if err != nil {
 				return true, err

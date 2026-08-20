@@ -554,3 +554,45 @@ func TestJudgeSubmission_WrongAnswer_DoesNotRetry(t *testing.T) {
 		t.Errorf("expected checker called 1 time, got %d", checkerCalls)
 	}
 }
+
+// Same contract as the publish path: one session per attempt, always closed.
+func TestJudgeSubmission_OpensAndClosesOneCheckerSession(t *testing.T) {
+	begins := 0
+	checker := &mockOutputChecker{}
+	checker.beginCheckingFn = func(context.Context, string, submission.Language) (CheckerSession, error) {
+		begins++
+		checker.session = &mockCheckerSession{}
+		return checker.session, nil
+	}
+	testCases := &mockTestCaseProvider{
+		getTestCasesFn: func(context.Context, string) ([]TestCase, error) {
+			return []TestCase{
+				{Input: []byte("1 2"), ExpectedOutput: []byte("3")},
+				{Input: []byte("2 3"), ExpectedOutput: []byte("5")},
+			}, nil
+		},
+	}
+	sub := pendingSubmission()
+	uc := newJudgeSubmissionUseCase(
+		&mockSubmissionUpdater{
+			getByIDFn: func(context.Context, submission.SubmissionID) (*submission.Submission, error) {
+				return sub, nil
+			},
+		},
+		&mockSourceCodeDownloader{}, &mockProblemProvider{}, testCases, &mockExecutor{}, checker,
+	)
+
+	if err := uc.Execute(context.Background(), JudgeSubmissionInput{SubmissionID: submissionID}); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if begins != 1 {
+		t.Errorf("BeginChecking calls: got %d, want 1 for two test cases", begins)
+	}
+	if checker.session.checkCalls != 2 {
+		t.Errorf("Check calls: got %d, want one per test case", checker.session.checkCalls)
+	}
+	if checker.session.closeCalls != 1 {
+		t.Errorf("Close calls: got %d, want 1 — an unclosed session leaks its container", checker.session.closeCalls)
+	}
+}

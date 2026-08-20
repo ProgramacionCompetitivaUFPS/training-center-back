@@ -385,3 +385,40 @@ func TestValidateSolutions_WrongAnswer_LargeOutput_IsTruncated(t *testing.T) {
 		t.Errorf("Actual length: got %d, want the truncated length", len(out.Failure.Actual))
 	}
 }
+
+// The session exists so one container and one artifact download serve every test
+// case. Opening it per case would undo that; leaving it open would leak a light
+// pool container per solution until the pool ran dry.
+func TestValidateSolutions_OpensAndClosesOneCheckerSessionPerSolution(t *testing.T) {
+	begins := 0
+	checker := &mockOutputChecker{}
+	checker.beginCheckingFn = func(context.Context, string, submission.Language) (CheckerSession, error) {
+		begins++
+		checker.session = &mockCheckerSession{}
+		return checker.session, nil
+	}
+	testCases := &mockTestCaseProvider{
+		getTestCasesFn: func(context.Context, string) ([]TestCase, error) {
+			return []TestCase{
+				{Name: "secret/001", Input: []byte("1 2"), ExpectedOutput: []byte("3")},
+				{Name: "secret/002", Input: []byte("2 3"), ExpectedOutput: []byte("5")},
+				{Name: "secret/003", Input: []byte("4 5"), ExpectedOutput: []byte("9")},
+			}, nil
+		},
+	}
+	uc := newValidateSolutionsUseCase(&mockSolutionProvider{}, &mockSourceCodeDownloader{}, &mockProblemProvider{}, testCases, &mockExecutor{}, checker)
+
+	if _, err := uc.Execute(context.Background(), ValidateSolutionsInput{ProblemID: problemID}); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if begins != 1 {
+		t.Errorf("BeginChecking calls: got %d, want 1 for three test cases", begins)
+	}
+	if checker.session.checkCalls != 3 {
+		t.Errorf("Check calls: got %d, want one per test case", checker.session.checkCalls)
+	}
+	if checker.session.closeCalls != 1 {
+		t.Errorf("Close calls: got %d, want 1 — an unclosed session leaks its container", checker.session.closeCalls)
+	}
+}

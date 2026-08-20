@@ -2,8 +2,6 @@ package judge
 
 import (
 	"context"
-	"errors"
-	"io"
 	"log/slog"
 	"path"
 
@@ -41,7 +39,7 @@ func (r *ValidatorRunner) BeginValidating(ctx context.Context, validatorPath str
 
 	// Downloading first keeps the failure path simple: no container is held
 	// while storage is being read.
-	artifact, err := r.download(ctx, validatorPath)
+	artifact, err := downloadArtifact(ctx, r.reader, validatorPath)
 	if err != nil {
 		return nil, err
 	}
@@ -53,12 +51,13 @@ func (r *ValidatorRunner) BeginValidating(ctx context.Context, validatorPath str
 	}
 
 	name := appjudge.NewArtifactRoleValidator().String()
-	s := &ValidatorSession{
+	s := &ValidatorSession{artifactSession{
 		container: container,
 		pool:      r.pool,
 		docker:    r.docker,
+		role:      name,
 		runCmd:    withArtifactName(langCfg.RunCmd, name),
-	}
+	}}
 
 	artifactPath := withArtifactName(langCfg.ArtifactPath, name)
 	if _, err := r.docker.CopyToContainer(ctx, container.ID(), client.CopyToContainerOptions{
@@ -72,28 +71,4 @@ func (r *ValidatorRunner) BeginValidating(ctx context.Context, validatorPath str
 		return nil, apperror.NewInternal()
 	}
 	return s, nil
-}
-
-func (r *ValidatorRunner) download(ctx context.Context, validatorPath string) ([]byte, error) {
-	rc, err := r.reader.readObject(ctx, validatorPath)
-	if err != nil {
-		if errors.Is(err, storage.ErrObjectNotExist) {
-			slog.ErrorContext(ctx, "validator_runner: compiled validator not found", "path", validatorPath)
-		} else {
-			slog.ErrorContext(ctx, "validator_runner: failed to open the compiled validator", "path", validatorPath, "error", err)
-		}
-		return nil, apperror.NewInternal()
-	}
-	defer rc.Close()
-
-	artifact, err := io.ReadAll(&io.LimitedReader{R: rc, N: maxArtifactBytes})
-	if err != nil {
-		slog.ErrorContext(ctx, "validator_runner: failed to read the compiled validator", "path", validatorPath, "error", err)
-		return nil, apperror.NewInternal()
-	}
-	if len(artifact) == 0 {
-		slog.ErrorContext(ctx, "validator_runner: the compiled validator is empty", "path", validatorPath)
-		return nil, apperror.NewInternal()
-	}
-	return artifact, nil
 }

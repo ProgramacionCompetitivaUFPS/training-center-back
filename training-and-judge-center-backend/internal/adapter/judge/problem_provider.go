@@ -21,8 +21,9 @@ func NewProblemProvider(db infraPostgres.Querier) *ProblemProvider {
 	return &ProblemProvider{db: db}
 }
 
+// The stored JSON also carries the uploaded filename, which the judge no longer
+// needs: the artifact has a fixed name inside the sandbox.
 type dbCheckerJSON struct {
-	Filename    string  `json:"filename"`
 	FileKey     string  `json:"fileKey"`
 	Language    string  `json:"language"`
 	CompiledKey *string `json:"compiledKey,omitempty"`
@@ -78,7 +79,6 @@ func (p *ProblemProvider) GetLimits(ctx context.Context, problemID string) (appJ
 			}
 			limits.CheckerPath = *checker.CompiledKey
 			limits.CheckerLanguage = lang
-			limits.CheckerFilename = checker.Filename
 		}
 	}
 
