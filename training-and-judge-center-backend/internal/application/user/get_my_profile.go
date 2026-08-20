@@ -15,6 +15,7 @@ type GetMyProfileOutput struct {
 	User          UserDTO
 	IsFullProfile bool
 	GoogleLinked  bool
+	HasPassword   bool
 }
 
 type GetMyProfileUseCase struct {
@@ -44,5 +45,6 @@ func (uc *GetMyProfileUseCase) Execute(ctx context.Context, in GetMyProfileInput
 		User:          userToDTO(foundUser),
 		IsFullProfile: true,
 		GoogleLinked:  identity != nil,
+		HasPassword:   foundUser.Password().HasPassword(),
 	}, nil
 }

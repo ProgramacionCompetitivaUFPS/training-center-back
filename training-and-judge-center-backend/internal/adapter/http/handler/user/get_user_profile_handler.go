@@ -22,6 +22,7 @@ type fullUserResponse struct {
 	CreatedAt    string `json:"createdAt"`
 	UpdatedAt    string `json:"updatedAt,omitempty"`
 	GoogleLinked bool   `json:"googleLinked"`
+	HasPassword  bool   `json:"hasPassword"`
 }
 
 type publicUserResponse struct {
@@ -61,6 +62,7 @@ func (h *Handler) GetMyProfile(w http.ResponseWriter, r *http.Request) {
 		Role:         out.User.Role,
 		CreatedAt:    out.User.CreatedAt.UTC().Format(time.RFC3339),
 		GoogleLinked: out.GoogleLinked,
+		HasPassword:  out.HasPassword,
 	}
 	if out.User.Email != nil {
 		resp.Email = *out.User.Email

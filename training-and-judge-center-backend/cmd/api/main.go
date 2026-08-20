@@ -211,6 +211,7 @@ func main() {
 	getUserByNicknameUseCase := appuser.NewGetUserByNicknameUseCase(userRepo)
 	updateUserUseCase := appuser.NewUpdateUserUseCase(userRepo)
 	updatePasswordUseCase := appuser.NewUpdatePasswordUseCase(userRepo, emailSender, sessionInvalidator, redisRateLimiter, refreshTokenRepo)
+	setPasswordUseCase := appuser.NewSetPasswordUseCase(userRepo, emailSender)
 	adminUpdateUserUseCase := appuser.NewAdminUpdateUserUseCase(userRepo)
 	adminDeactivateUserUseCase := appuser.NewAdminDeactivateUserUseCase(userRepo, sessionInvalidator, refreshTokenRepo)
 	listUsersUseCase := appuser.NewListUsersUseCase(userRepo)
@@ -240,7 +241,7 @@ func main() {
 	getProfileStatsUseCase := appuser.NewGetProfileStatsUseCase(rankingProvider, submissionStatsProvider, contestParticipationProvider, topicStatsProvider)
 
 	// Handlers
-	userHandler := handlerUser.NewHandler(createUserUseCase, getMyProfileUseCase, getUserByNicknameUseCase, updateUserUseCase, updatePasswordUseCase, adminUpdateUserUseCase, adminDeactivateUserUseCase, listUsersUseCase, requestEmailChangeUseCase, confirmEmailChangeUseCase, requestPasswordRecoveryUseCase, resetPasswordUseCase, requestDeactivationUseCase, confirmDeactivationUseCase, getDashboardUseCase, getProfileStatsUseCase, linkGoogleIdentityUseCase, unlinkGoogleIdentityUseCase)
+	userHandler := handlerUser.NewHandler(createUserUseCase, getMyProfileUseCase, getUserByNicknameUseCase, updateUserUseCase, updatePasswordUseCase, adminUpdateUserUseCase, adminDeactivateUserUseCase, listUsersUseCase, requestEmailChangeUseCase, confirmEmailChangeUseCase, requestPasswordRecoveryUseCase, resetPasswordUseCase, requestDeactivationUseCase, confirmDeactivationUseCase, getDashboardUseCase, getProfileStatsUseCase, linkGoogleIdentityUseCase, unlinkGoogleIdentityUseCase, setPasswordUseCase)
 	authHandler := handler.NewAuthHandler(loginUseCase, loginWithGoogleUseCase, refreshUseCase, logoutUseCase)
 
 	// Group repositories & platform adapters

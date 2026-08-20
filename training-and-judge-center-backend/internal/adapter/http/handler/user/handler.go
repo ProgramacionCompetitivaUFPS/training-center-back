@@ -23,6 +23,7 @@ type Handler struct {
 	getProfileStats         *appuser.GetProfileStatsUseCase
 	linkGoogle              *appuser.LinkGoogleIdentityUseCase
 	unlinkGoogle            *appuser.UnlinkGoogleIdentityUseCase
+	setPassword             *appuser.SetPasswordUseCase
 }
 
 func NewHandler(
@@ -44,6 +45,7 @@ func NewHandler(
 	getProfileStats *appuser.GetProfileStatsUseCase,
 	linkGoogle *appuser.LinkGoogleIdentityUseCase,
 	unlinkGoogle *appuser.UnlinkGoogleIdentityUseCase,
+	setPassword *appuser.SetPasswordUseCase,
 ) *Handler {
 	return &Handler{
 		createUser:              createUser,
@@ -64,5 +66,6 @@ func NewHandler(
 		getProfileStats:         getProfileStats,
 		linkGoogle:              linkGoogle,
 		unlinkGoogle:            unlinkGoogle,
+		setPassword:             setPassword,
 	}
 }

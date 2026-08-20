@@ -85,6 +85,60 @@ func TestGetMyProfile_GoogleLinked_False(t *testing.T) {
 	}
 }
 
+func TestGetMyProfile_HasPassword_True(t *testing.T) {
+	repo := newNoConflictRepo()
+	activeUser := newUserWithRole("user-1", shared.RoleContestant, domain.StatusActive)
+	repo.findByIDFn = func(_ context.Context, id string) (*domain.User, error) {
+		if id == "user-1" {
+			return activeUser, nil
+		}
+		return nil, nil
+	}
+	uc := NewGetMyProfileUseCase(repo, &mockOAuthIdentityRepository{})
+
+	result, err := uc.Execute(context.Background(), GetMyProfileInput{UserID: "user-1"})
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+	if !result.HasPassword {
+		t.Error("expected HasPassword to be true for a user with a password set")
+	}
+}
+
+func TestGetMyProfile_HasPassword_False(t *testing.T) {
+	repo := newNoConflictRepo()
+	googleOnlyUser := domain.RestoreUser(
+		"user-1",
+		nil,
+		"",
+		"Google User",
+		"user-1",
+		"",
+		"",
+		"",
+		shared.RoleContestant.String(),
+		domain.StatusActive.String(),
+		time.Now(),
+		nil,
+		nil,
+	)
+	repo.findByIDFn = func(_ context.Context, id string) (*domain.User, error) {
+		if id == "user-1" {
+			return googleOnlyUser, nil
+		}
+		return nil, nil
+	}
+	uc := NewGetMyProfileUseCase(repo, &mockOAuthIdentityRepository{})
+
+	result, err := uc.Execute(context.Background(), GetMyProfileInput{UserID: "user-1"})
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+	if result.HasPassword {
+		t.Error("expected HasPassword to be false for a user with no password (e.g. Google-only signup)")
+	}
+}
+
 func TestGetMyProfile_UserNotFound(t *testing.T) {
 	repo := newNoConflictRepo()
 	uc := NewGetMyProfileUseCase(repo, &mockOAuthIdentityRepository{})

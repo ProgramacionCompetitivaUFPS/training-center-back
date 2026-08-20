@@ -200,6 +200,7 @@ func NewRouter(h *Handlers, s *Services, allowedOrigins []string) *chi.Mux {
 		r.Get("/users/{nickname}", h.User.GetByNickname)
 		r.Put("/users", h.User.UpdateProfile)
 		r.Put("/users/password", h.User.UpdatePassword)
+		r.Post("/users/password", h.User.SetPassword)
 		r.Post("/users/email-change/request", h.User.RequestEmailChange)
 		r.Post("/users/email-change/confirm", h.User.ConfirmEmailChange)
 		r.Post("/users/deactivation", h.User.RequestDeactivation)
