@@ -19,13 +19,25 @@ type updateUserRequest struct {
 	Country     *string `json:"country"`
 }
 
+type updatedUserResponse struct {
+	Email       string `json:"email"`
+	Name        string `json:"name"`
+	Nickname    string `json:"nickname"`
+	Country     string `json:"country"`
+	City        string `json:"city"`
+	Institution string `json:"institution"`
+	Role        string `json:"role"`
+	CreatedAt   string `json:"createdAt"`
+	UpdatedAt   string `json:"updatedAt,omitempty"`
+}
+
 // @Summary      Update my profile
 // @Tags         users
 // @Accept       json
 // @Produce      json
 // @Security     BearerAuth
 // @Param        body body updateUserRequest true "Fields to update"
-// @Success      200 {object} fullUserResponse
+// @Success      200 {object} updatedUserResponse
 // @Failure      400 {object} apperror.AppError
 // @Failure      401 {object} apperror.AppError
 // @Router       /users [put]
@@ -55,21 +67,24 @@ func (h *Handler) UpdateProfile(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	resp := fullUserResponse{
-		Name:        out.User.Name,
-		Nickname:    out.User.Nickname,
-		Country:     out.User.Country,
-		City:        out.User.City,
-		Institution: out.User.Institution,
-		Role:        out.User.Role,
-		CreatedAt:   out.User.CreatedAt.UTC().Format(time.RFC3339),
-	}
-	if out.User.Email != nil {
-		resp.Email = *out.User.Email
-	}
-	if out.User.UpdatedAt != nil {
-		resp.UpdatedAt = out.User.UpdatedAt.UTC().Format(time.RFC3339)
-	}
+	handler.WriteJSON(r.Context(), w, http.StatusOK, buildUpdatedResponse(out.User))
+}
 
-	handler.WriteJSON(r.Context(), w, http.StatusOK, resp)
+func buildUpdatedResponse(u appuser.UserDTO) updatedUserResponse {
+	resp := updatedUserResponse{
+		Name:        u.Name,
+		Nickname:    u.Nickname,
+		Country:     u.Country,
+		City:        u.City,
+		Institution: u.Institution,
+		Role:        u.Role,
+		CreatedAt:   u.CreatedAt.UTC().Format(time.RFC3339),
+	}
+	if u.Email != nil {
+		resp.Email = *u.Email
+	}
+	if u.UpdatedAt != nil {
+		resp.UpdatedAt = u.UpdatedAt.UTC().Format(time.RFC3339)
+	}
+	return resp
 }

@@ -21,6 +21,9 @@ type Handler struct {
 	confirmDeactivation     *appuser.ConfirmDeactivationUseCase
 	getDashboard            *appuser.GetDashboardUseCase
 	getProfileStats         *appuser.GetProfileStatsUseCase
+	linkGoogle              *appuser.LinkGoogleIdentityUseCase
+	unlinkGoogle            *appuser.UnlinkGoogleIdentityUseCase
+	setPassword             *appuser.SetPasswordUseCase
 }
 
 func NewHandler(
@@ -40,6 +43,9 @@ func NewHandler(
 	confirmDeactivation *appuser.ConfirmDeactivationUseCase,
 	getDashboard *appuser.GetDashboardUseCase,
 	getProfileStats *appuser.GetProfileStatsUseCase,
+	linkGoogle *appuser.LinkGoogleIdentityUseCase,
+	unlinkGoogle *appuser.UnlinkGoogleIdentityUseCase,
+	setPassword *appuser.SetPasswordUseCase,
 ) *Handler {
 	return &Handler{
 		createUser:              createUser,
@@ -58,5 +64,8 @@ func NewHandler(
 		confirmDeactivation:     confirmDeactivation,
 		getDashboard:            getDashboard,
 		getProfileStats:         getProfileStats,
+		linkGoogle:              linkGoogle,
+		unlinkGoogle:            unlinkGoogle,
+		setPassword:             setPassword,
 	}
 }

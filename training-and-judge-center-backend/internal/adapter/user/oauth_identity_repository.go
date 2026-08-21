@@ -74,3 +74,37 @@ func (r *OAuthIdentityRepository) FindByProvider(ctx context.Context, provider d
 
 	return domainUser.RestoreOAuthIdentity(id, userID, provider, providerUserID, createdAt), nil
 }
+
+func (r *OAuthIdentityRepository) FindByUserID(ctx context.Context, userID string, provider domainUser.OAuthProvider) (*domainUser.OAuthIdentity, error) {
+	query := `
+		SELECT id, provider_user_id, created_at
+		FROM oauth_identities
+		WHERE user_id = $1 AND provider = $2`
+
+	var id, providerUserID string
+	var createdAt time.Time
+
+	q := infraPostgres.GetQuerier(ctx, r.db)
+	err := q.QueryRow(ctx, query, userID, provider.String()).Scan(&id, &providerUserID, &createdAt)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, nil
+		}
+		slog.ErrorContext(ctx, "database error in FindByUserID", "user_id", userID, "error", err)
+		return nil, apperror.NewInternal()
+	}
+
+	return domainUser.RestoreOAuthIdentity(id, userID, provider, providerUserID, createdAt), nil
+}
+
+func (r *OAuthIdentityRepository) DeleteByUserID(ctx context.Context, userID string, provider domainUser.OAuthProvider) (bool, error) {
+	query := `DELETE FROM oauth_identities WHERE user_id = $1 AND provider = $2`
+
+	q := infraPostgres.GetQuerier(ctx, r.db)
+	tag, err := q.Exec(ctx, query, userID, provider.String())
+	if err != nil {
+		slog.ErrorContext(ctx, "database error deleting oauth identity", "user_id", userID, "error", err)
+		return false, apperror.NewInternal()
+	}
+	return tag.RowsAffected() > 0, nil
+}

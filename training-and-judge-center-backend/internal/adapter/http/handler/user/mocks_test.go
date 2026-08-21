@@ -329,3 +329,48 @@ func (m *mockTopicStatsProvider) GetTopicBreakdown(ctx context.Context, userID s
 	}
 	return nil, nil
 }
+
+// mockHandlerOAuthIdentityRepo implements domainuser.OAuthIdentityRepository for handler tests.
+type mockHandlerOAuthIdentityRepo struct {
+	saveFn           func(ctx context.Context, identity *domainuser.OAuthIdentity) error
+	findByProviderFn func(ctx context.Context, provider domainuser.OAuthProvider, providerUserID string) (*domainuser.OAuthIdentity, error)
+	findByUserIDFn   func(ctx context.Context, userID string, provider domainuser.OAuthProvider) (*domainuser.OAuthIdentity, error)
+	deleteByUserIDFn func(ctx context.Context, userID string, provider domainuser.OAuthProvider) (bool, error)
+}
+
+func (m *mockHandlerOAuthIdentityRepo) Save(ctx context.Context, identity *domainuser.OAuthIdentity) error {
+	if m.saveFn != nil {
+		return m.saveFn(ctx, identity)
+	}
+	return nil
+}
+func (m *mockHandlerOAuthIdentityRepo) FindByProvider(ctx context.Context, provider domainuser.OAuthProvider, providerUserID string) (*domainuser.OAuthIdentity, error) {
+	if m.findByProviderFn != nil {
+		return m.findByProviderFn(ctx, provider, providerUserID)
+	}
+	return nil, nil
+}
+func (m *mockHandlerOAuthIdentityRepo) FindByUserID(ctx context.Context, userID string, provider domainuser.OAuthProvider) (*domainuser.OAuthIdentity, error) {
+	if m.findByUserIDFn != nil {
+		return m.findByUserIDFn(ctx, userID, provider)
+	}
+	return nil, nil
+}
+func (m *mockHandlerOAuthIdentityRepo) DeleteByUserID(ctx context.Context, userID string, provider domainuser.OAuthProvider) (bool, error) {
+	if m.deleteByUserIDFn != nil {
+		return m.deleteByUserIDFn(ctx, userID, provider)
+	}
+	return true, nil
+}
+
+// mockHandlerGoogleVerifier implements appuser.GoogleIDTokenVerifier for handler tests.
+type mockHandlerGoogleVerifier struct {
+	verifyFn func(ctx context.Context, idToken string) (*appuser.GoogleClaims, error)
+}
+
+func (m *mockHandlerGoogleVerifier) Verify(ctx context.Context, idToken string) (*appuser.GoogleClaims, error) {
+	if m.verifyFn != nil {
+		return m.verifyFn(ctx, idToken)
+	}
+	return &appuser.GoogleClaims{Sub: "google-sub-123", Email: "test@example.com", EmailVerified: true, Name: "Test User"}, nil
+}

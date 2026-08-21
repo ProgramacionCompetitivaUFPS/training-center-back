@@ -3,7 +3,6 @@ package user
 import (
 	"context"
 
-
 	domain "github.com/training-judge-center/backend/internal/domain/user"
 	"github.com/training-judge-center/backend/pkg/apperror"
 )
@@ -15,14 +14,17 @@ type GetMyProfileInput struct {
 type GetMyProfileOutput struct {
 	User          UserDTO
 	IsFullProfile bool
+	GoogleLinked  bool
+	HasPassword   bool
 }
 
 type GetMyProfileUseCase struct {
-	repo domain.Repository
+	repo              domain.Repository
+	oauthIdentityRepo domain.OAuthIdentityRepository
 }
 
-func NewGetMyProfileUseCase(repo domain.Repository) *GetMyProfileUseCase {
-	return &GetMyProfileUseCase{repo: repo}
+func NewGetMyProfileUseCase(repo domain.Repository, oauthIdentityRepo domain.OAuthIdentityRepository) *GetMyProfileUseCase {
+	return &GetMyProfileUseCase{repo: repo, oauthIdentityRepo: oauthIdentityRepo}
 }
 
 func (uc *GetMyProfileUseCase) Execute(ctx context.Context, in GetMyProfileInput) (*GetMyProfileOutput, error) {
@@ -33,5 +35,16 @@ func (uc *GetMyProfileUseCase) Execute(ctx context.Context, in GetMyProfileInput
 	if foundUser == nil {
 		return nil, apperror.NewNotFound(domain.ErrCodeUserNotFound, "User not found")
 	}
-	return &GetMyProfileOutput{User: userToDTO(foundUser), IsFullProfile: true}, nil
+
+	identity, err := uc.oauthIdentityRepo.FindByUserID(ctx, foundUser.ID(), domain.OAuthProviderGoogle)
+	if err != nil {
+		return nil, err
+	}
+
+	return &GetMyProfileOutput{
+		User:          userToDTO(foundUser),
+		IsFullProfile: true,
+		GoogleLinked:  identity != nil,
+		HasPassword:   foundUser.Password().HasPassword(),
+	}, nil
 }

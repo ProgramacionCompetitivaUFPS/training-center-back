@@ -60,6 +60,7 @@ func NewRouter(h *Handlers, s *Services, allowedOrigins []string) *chi.Mux {
 	r.Post("/password/reset", h.User.ResetPassword)
 	r.Route("/auth", func(r chi.Router) {
 		r.Post("/login", h.Auth.Login)
+		r.Post("/google", h.Auth.LoginWithGoogle)
 		r.Post("/refresh", h.Auth.Refresh)
 		r.Post("/logout", h.Auth.Logout)
 	})
@@ -199,10 +200,13 @@ func NewRouter(h *Handlers, s *Services, allowedOrigins []string) *chi.Mux {
 		r.Get("/users/{nickname}", h.User.GetByNickname)
 		r.Put("/users", h.User.UpdateProfile)
 		r.Put("/users/password", h.User.UpdatePassword)
+		r.Post("/users/password", h.User.SetPassword)
 		r.Post("/users/email-change/request", h.User.RequestEmailChange)
 		r.Post("/users/email-change/confirm", h.User.ConfirmEmailChange)
 		r.Post("/users/deactivation", h.User.RequestDeactivation)
 		r.Post("/users/deactivation/confirm", h.User.ConfirmDeactivation)
+		r.Post("/users/google", h.User.LinkGoogle)
+		r.Delete("/users/google", h.User.UnlinkGoogle)
 	})
 
 	// Protected routes — admin only
