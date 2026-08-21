@@ -5,7 +5,6 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
-	"time"
 
 	appuser "github.com/training-judge-center/backend/internal/application/user"
 	"github.com/training-judge-center/backend/internal/domain/shared"
@@ -18,12 +17,8 @@ func newHandlerWithUnlinkGoogle(uc *appuser.UnlinkGoogleIdentityUseCase) *Handle
 
 func TestUnlinkGoogle_LinkedAccount_Returns204(t *testing.T) {
 	oauthRepo := &mockHandlerOAuthIdentityRepo{
-		findByUserIDFn: func(_ context.Context, _ string, _ domainuser.OAuthProvider) (*domainuser.OAuthIdentity, error) {
-			identity, err := domainuser.NewOAuthIdentity("identity-1", "user-abc", domainuser.OAuthProviderGoogle, "google-sub-1", time.Now())
-			if err != nil {
-				t.Fatalf("unexpected error building test identity: %v", err)
-			}
-			return identity, nil
+		deleteByUserIDFn: func(_ context.Context, _ string, _ domainuser.OAuthProvider) (bool, error) {
+			return true, nil
 		},
 	}
 	userRepo := &mockHandlerUserRepo{
@@ -51,8 +46,8 @@ func TestUnlinkGoogle_LinkedAccount_Returns204(t *testing.T) {
 
 func TestUnlinkGoogle_NoLinkedAccount_Returns404(t *testing.T) {
 	oauthRepo := &mockHandlerOAuthIdentityRepo{
-		findByUserIDFn: func(_ context.Context, _ string, _ domainuser.OAuthProvider) (*domainuser.OAuthIdentity, error) {
-			return nil, nil
+		deleteByUserIDFn: func(_ context.Context, _ string, _ domainuser.OAuthProvider) (bool, error) {
+			return false, nil
 		},
 	}
 	userRepo := &mockHandlerUserRepo{

@@ -35,16 +35,12 @@ func (uc *UnlinkGoogleIdentityUseCase) Execute(ctx context.Context, in UnlinkGoo
 		return apperror.NewConflict(ErrCodeCannotUnlinkLastCredential, "cannot unlink Google account without a password set; set a password first")
 	}
 
-	identity, err := uc.oauthIdentityRepo.FindByUserID(ctx, in.UserID, user.OAuthProviderGoogle)
+	deleted, err := uc.oauthIdentityRepo.DeleteByUserID(ctx, in.UserID, user.OAuthProviderGoogle)
 	if err != nil {
 		return err
 	}
-	if identity == nil {
+	if !deleted {
 		return apperror.NewNotFound(user.ErrCodeOAuthIdentityNotFound, "no linked Google account found for this user")
-	}
-
-	if err := uc.oauthIdentityRepo.DeleteByUserID(ctx, in.UserID, user.OAuthProviderGoogle); err != nil {
-		return err
 	}
 
 	_ = uc.emailSender.Send(ctx, appshared.EmailMessage{

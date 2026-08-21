@@ -335,7 +335,7 @@ type mockHandlerOAuthIdentityRepo struct {
 	saveFn           func(ctx context.Context, identity *domainuser.OAuthIdentity) error
 	findByProviderFn func(ctx context.Context, provider domainuser.OAuthProvider, providerUserID string) (*domainuser.OAuthIdentity, error)
 	findByUserIDFn   func(ctx context.Context, userID string, provider domainuser.OAuthProvider) (*domainuser.OAuthIdentity, error)
-	deleteByUserIDFn func(ctx context.Context, userID string, provider domainuser.OAuthProvider) error
+	deleteByUserIDFn func(ctx context.Context, userID string, provider domainuser.OAuthProvider) (bool, error)
 }
 
 func (m *mockHandlerOAuthIdentityRepo) Save(ctx context.Context, identity *domainuser.OAuthIdentity) error {
@@ -356,11 +356,11 @@ func (m *mockHandlerOAuthIdentityRepo) FindByUserID(ctx context.Context, userID 
 	}
 	return nil, nil
 }
-func (m *mockHandlerOAuthIdentityRepo) DeleteByUserID(ctx context.Context, userID string, provider domainuser.OAuthProvider) error {
+func (m *mockHandlerOAuthIdentityRepo) DeleteByUserID(ctx context.Context, userID string, provider domainuser.OAuthProvider) (bool, error) {
 	if m.deleteByUserIDFn != nil {
 		return m.deleteByUserIDFn(ctx, userID, provider)
 	}
-	return nil
+	return true, nil
 }
 
 // mockHandlerGoogleVerifier implements appuser.GoogleIDTokenVerifier for handler tests.

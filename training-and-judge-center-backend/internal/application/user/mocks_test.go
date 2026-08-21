@@ -398,7 +398,7 @@ type mockOAuthIdentityRepository struct {
 	saveFn           func(ctx context.Context, identity *domain.OAuthIdentity) error
 	findByProviderFn func(ctx context.Context, provider domain.OAuthProvider, providerUserID string) (*domain.OAuthIdentity, error)
 	findByUserIDFn   func(ctx context.Context, userID string, provider domain.OAuthProvider) (*domain.OAuthIdentity, error)
-	deleteByUserIDFn func(ctx context.Context, userID string, provider domain.OAuthProvider) error
+	deleteByUserIDFn func(ctx context.Context, userID string, provider domain.OAuthProvider) (bool, error)
 }
 
 func (m *mockOAuthIdentityRepository) Save(ctx context.Context, identity *domain.OAuthIdentity) error {
@@ -422,11 +422,11 @@ func (m *mockOAuthIdentityRepository) FindByUserID(ctx context.Context, userID s
 	return nil, nil
 }
 
-func (m *mockOAuthIdentityRepository) DeleteByUserID(ctx context.Context, userID string, provider domain.OAuthProvider) error {
+func (m *mockOAuthIdentityRepository) DeleteByUserID(ctx context.Context, userID string, provider domain.OAuthProvider) (bool, error) {
 	if m.deleteByUserIDFn != nil {
 		return m.deleteByUserIDFn(ctx, userID, provider)
 	}
-	return nil
+	return true, nil
 }
 
 // ── mockGoogleIDTokenVerifier ────────────────────────────────────────────────

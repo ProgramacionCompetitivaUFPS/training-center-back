@@ -97,13 +97,14 @@ func (r *OAuthIdentityRepository) FindByUserID(ctx context.Context, userID strin
 	return domainUser.RestoreOAuthIdentity(id, userID, provider, providerUserID, createdAt), nil
 }
 
-func (r *OAuthIdentityRepository) DeleteByUserID(ctx context.Context, userID string, provider domainUser.OAuthProvider) error {
+func (r *OAuthIdentityRepository) DeleteByUserID(ctx context.Context, userID string, provider domainUser.OAuthProvider) (bool, error) {
 	query := `DELETE FROM oauth_identities WHERE user_id = $1 AND provider = $2`
 
 	q := infraPostgres.GetQuerier(ctx, r.db)
-	if _, err := q.Exec(ctx, query, userID, provider.String()); err != nil {
+	tag, err := q.Exec(ctx, query, userID, provider.String())
+	if err != nil {
 		slog.ErrorContext(ctx, "database error deleting oauth identity", "user_id", userID, "error", err)
-		return apperror.NewInternal()
+		return false, apperror.NewInternal()
 	}
-	return nil
+	return tag.RowsAffected() > 0, nil
 }

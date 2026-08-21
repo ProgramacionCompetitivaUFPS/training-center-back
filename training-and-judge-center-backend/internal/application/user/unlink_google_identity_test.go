@@ -3,7 +3,6 @@ package user
 import (
 	"context"
 	"testing"
-	"time"
 
 	appshared "github.com/training-judge-center/backend/internal/application/shared"
 	domain "github.com/training-judge-center/backend/internal/domain/user"
@@ -13,16 +12,9 @@ import (
 func TestUnlinkGoogleIdentity_LinkedAccount_DeletesIdentity(t *testing.T) {
 	deleteCalledFor := ""
 	oauthRepo := &mockOAuthIdentityRepository{
-		findByUserIDFn: func(_ context.Context, _ string, _ domain.OAuthProvider) (*domain.OAuthIdentity, error) {
-			identity, err := domain.NewOAuthIdentity("identity-1", "user-abc", domain.OAuthProviderGoogle, "google-sub-1", time.Now())
-			if err != nil {
-				t.Fatalf("unexpected error building test identity: %v", err)
-			}
-			return identity, nil
-		},
-		deleteByUserIDFn: func(_ context.Context, userID string, _ domain.OAuthProvider) error {
+		deleteByUserIDFn: func(_ context.Context, userID string, _ domain.OAuthProvider) (bool, error) {
 			deleteCalledFor = userID
-			return nil
+			return true, nil
 		},
 	}
 	userRepo := &mockUserRepository{
@@ -44,9 +36,9 @@ func TestUnlinkGoogleIdentity_LinkedAccount_DeletesIdentity(t *testing.T) {
 func TestUnlinkGoogleIdentity_NoPasswordSet_ReturnsConflict(t *testing.T) {
 	deleteCalled := false
 	oauthRepo := &mockOAuthIdentityRepository{
-		deleteByUserIDFn: func(_ context.Context, _ string, _ domain.OAuthProvider) error {
+		deleteByUserIDFn: func(_ context.Context, _ string, _ domain.OAuthProvider) (bool, error) {
 			deleteCalled = true
-			return nil
+			return true, nil
 		},
 	}
 	userRepo := &mockUserRepository{
@@ -77,15 +69,8 @@ func TestUnlinkGoogleIdentity_NoPasswordSet_ReturnsConflict(t *testing.T) {
 
 func TestUnlinkGoogleIdentity_LinkedAccount_SendsSecurityAlertEmail(t *testing.T) {
 	oauthRepo := &mockOAuthIdentityRepository{
-		findByUserIDFn: func(_ context.Context, _ string, _ domain.OAuthProvider) (*domain.OAuthIdentity, error) {
-			identity, err := domain.NewOAuthIdentity("identity-1", "user-uuid-123", domain.OAuthProviderGoogle, "google-sub-1", time.Now())
-			if err != nil {
-				t.Fatalf("unexpected error building test identity: %v", err)
-			}
-			return identity, nil
-		},
-		deleteByUserIDFn: func(_ context.Context, _ string, _ domain.OAuthProvider) error {
-			return nil
+		deleteByUserIDFn: func(_ context.Context, _ string, _ domain.OAuthProvider) (bool, error) {
+			return true, nil
 		},
 	}
 	userRepo := &mockUserRepository{
@@ -116,14 +101,9 @@ func TestUnlinkGoogleIdentity_LinkedAccount_SendsSecurityAlertEmail(t *testing.T
 }
 
 func TestUnlinkGoogleIdentity_NoLinkedAccount_ReturnsNotFound(t *testing.T) {
-	deleteCalled := false
 	oauthRepo := &mockOAuthIdentityRepository{
-		findByUserIDFn: func(_ context.Context, _ string, _ domain.OAuthProvider) (*domain.OAuthIdentity, error) {
-			return nil, nil
-		},
-		deleteByUserIDFn: func(_ context.Context, _ string, _ domain.OAuthProvider) error {
-			deleteCalled = true
-			return nil
+		deleteByUserIDFn: func(_ context.Context, _ string, _ domain.OAuthProvider) (bool, error) {
+			return false, nil
 		},
 	}
 	userRepo := &mockUserRepository{
@@ -147,15 +127,48 @@ func TestUnlinkGoogleIdentity_NoLinkedAccount_ReturnsNotFound(t *testing.T) {
 	if appErr.Kind != apperror.KindNotFound {
 		t.Errorf("expected kind NOT_FOUND, got %s", appErr.Kind)
 	}
-	if deleteCalled {
-		t.Error("expected DeleteByUserID NOT to be called when nothing is linked")
+}
+
+// A concurrent unlink request can delete the row first: the DELETE this
+// request runs affects zero rows, and DeleteByUserID reports that atomically
+// instead of racing a separate FindByUserID check against it.
+func TestUnlinkGoogleIdentity_ConcurrentUnlink_ReturnsNotFoundWithoutEmail(t *testing.T) {
+	oauthRepo := &mockOAuthIdentityRepository{
+		deleteByUserIDFn: func(_ context.Context, _ string, _ domain.OAuthProvider) (bool, error) {
+			return false, nil
+		},
+	}
+	userRepo := &mockUserRepository{
+		findByIDFn: func(_ context.Context, _ string) (*domain.User, error) {
+			return newActiveUser(), nil
+		},
+	}
+	emailSent := false
+	emailSender := &mockEmailSender{
+		sendFn: func(_ context.Context, _ appshared.EmailMessage) error {
+			emailSent = true
+			return nil
+		},
+	}
+	uc := NewUnlinkGoogleIdentityUseCase(userRepo, oauthRepo, emailSender)
+
+	err := uc.Execute(context.Background(), UnlinkGoogleIdentityInput{UserID: "user-abc"})
+	appErr, ok := err.(*apperror.AppError)
+	if !ok {
+		t.Fatalf("expected *apperror.AppError, got %T", err)
+	}
+	if appErr.Code != domain.ErrCodeOAuthIdentityNotFound {
+		t.Errorf("expected code %q, got %q", domain.ErrCodeOAuthIdentityNotFound, appErr.Code)
+	}
+	if emailSent {
+		t.Error("expected no security-alert email when this request did not actually delete anything")
 	}
 }
 
-func TestUnlinkGoogleIdentity_FindError_PropagatesError(t *testing.T) {
+func TestUnlinkGoogleIdentity_DeleteError_PropagatesError(t *testing.T) {
 	oauthRepo := &mockOAuthIdentityRepository{
-		findByUserIDFn: func(_ context.Context, _ string, _ domain.OAuthProvider) (*domain.OAuthIdentity, error) {
-			return nil, apperror.NewInternal()
+		deleteByUserIDFn: func(_ context.Context, _ string, _ domain.OAuthProvider) (bool, error) {
+			return false, apperror.NewInternal()
 		},
 	}
 	userRepo := &mockUserRepository{

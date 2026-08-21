@@ -226,11 +226,31 @@ func TestOAuthIdentityRepository_DeleteByUserID_Success(t *testing.T) {
 		},
 	})
 
-	if err := repo.DeleteByUserID(context.Background(), testIdentityUserID, domainUser.OAuthProviderGoogle); err != nil {
+	deleted, err := repo.DeleteByUserID(context.Background(), testIdentityUserID, domainUser.OAuthProviderGoogle)
+	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
+	}
+	if !deleted {
+		t.Error("expected deleted == true when a row was affected")
 	}
 	if capturedArgs[0] != testIdentityUserID {
 		t.Errorf("expected user_id arg %q, got %v", testIdentityUserID, capturedArgs[0])
+	}
+}
+
+func TestOAuthIdentityRepository_DeleteByUserID_NoRowsAffected_ReturnsFalse(t *testing.T) {
+	repo := NewOAuthIdentityRepository(&mockQuerier{
+		execFn: func(_ context.Context, _ string, _ ...interface{}) (pgconn.CommandTag, error) {
+			return pgconn.NewCommandTag("DELETE 0"), nil
+		},
+	})
+
+	deleted, err := repo.DeleteByUserID(context.Background(), testIdentityUserID, domainUser.OAuthProviderGoogle)
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+	if deleted {
+		t.Error("expected deleted == false when nothing was affected (e.g. already unlinked by a concurrent request)")
 	}
 }
 
@@ -241,7 +261,7 @@ func TestOAuthIdentityRepository_DeleteByUserID_DBError_ReturnsInternal(t *testi
 		},
 	})
 
-	err := repo.DeleteByUserID(context.Background(), testIdentityUserID, domainUser.OAuthProviderGoogle)
+	_, err := repo.DeleteByUserID(context.Background(), testIdentityUserID, domainUser.OAuthProviderGoogle)
 	assertAppErrorKind(t, err, apperror.KindInternal)
 }
 
