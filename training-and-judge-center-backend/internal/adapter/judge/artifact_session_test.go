@@ -125,3 +125,44 @@ func TestArtifactSession_Close_DiscardsTheContainerWhenCleanupFails(t *testing.T
 		t.Errorf("expected the dirty container to be discarded and a fresh one created, the pool created %d", got)
 	}
 }
+
+// A killed artifact is our memory limit, not a verdict: reporting it as a
+// non-zero exit would make the checker blame the contestant's output, and the
+// validator blame the setter's test case. Caught in run so both sessions get it.
+func TestArtifactSession_Run_KilledArtifactIsAnErrorNotAnExitCode(t *testing.T) {
+	docker := &mockDockerExecClient{
+		execInspectFn: func(_ context.Context, _ string, _ client.ExecInspectOptions) (client.ExecInspectResult, error) {
+			return client.ExecInspectResult{ExitCode: 137}, nil
+		},
+	}
+	s, _ := newTestArtifactSession(t, docker)
+
+	exitCode, _, err := s.run(context.Background(), "/sandbox/Checker")
+	if err == nil {
+		t.Fatal("expected an error for a killed artifact, got nil")
+	}
+	if exitCode != 0 {
+		t.Errorf("exit code = %d, want 0 — a killed artifact must not reach the caller as a verdict", exitCode)
+	}
+}
+
+// Any other non-zero exit is the artifact doing its job, and has to keep
+// travelling back as a result.
+func TestArtifactSession_Run_OtherNonZeroExitsStayResults(t *testing.T) {
+	for _, code := range []int{1, 2, 3, 42} {
+		docker := &mockDockerExecClient{
+			execInspectFn: func(_ context.Context, _ string, _ client.ExecInspectOptions) (client.ExecInspectResult, error) {
+				return client.ExecInspectResult{ExitCode: code}, nil
+			},
+		}
+		s, _ := newTestArtifactSession(t, docker)
+
+		got, _, err := s.run(context.Background(), "/sandbox/Checker")
+		if err != nil {
+			t.Fatalf("exit %d: unexpected error: %v", code, err)
+		}
+		if got != code {
+			t.Errorf("exit code = %d, want %d", got, code)
+		}
+	}
+}

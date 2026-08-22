@@ -327,3 +327,66 @@ func TestExecutor_BeginSession_ProblemLimitReachesThePoolInBytes(t *testing.T) {
 		t.Errorf("container created with Memory = %d bytes, want %d (%d KB)", got, want, testProblemMemoryKb)
 	}
 }
+
+// timeout(1) SIGKILLs a second after its own deadline, so the worker's deadline
+// has to sit past that. Under it, a run that dies late — a Java OOM takes
+// seconds, not microseconds — would be discarded as broken infrastructure and
+// end in SYSTEM_ERROR instead of producing a verdict.
+func TestSession_RunTestCase_SafetyNetOutlivesTheInContainerKill(t *testing.T) {
+	const timeLimitMs = 1000
+	// wallBackstop = max(2, ceil(2*timeLimit)) = 2s, and timeout --kill-after=1s
+	// makes the process certainly dead one second later.
+	const certainlyDead = 3 * time.Second
+
+	var deadline time.Time
+	var haveDeadline bool
+	mock := &mockDockerExecClient{
+		execCreateFn: func(ctx context.Context, _ string, _ client.ExecCreateOptions) (client.ExecCreateResult, error) {
+			deadline, haveDeadline = ctx.Deadline()
+			return client.ExecCreateResult{ID: "exec-1"}, nil
+		},
+	}
+	s, _ := newTestSession(t, mock)
+
+	start := time.Now()
+	if _, err := s.RunTestCase(context.Background(), appjudge.RunRequest{
+		Input: []byte("1\n"), TimeLimitMs: timeLimitMs,
+	}); err != nil {
+		t.Fatalf("RunTestCase: %v", err)
+	}
+
+	if !haveDeadline {
+		t.Fatal("the exec call must carry a deadline")
+	}
+	if got := deadline.Sub(start); got <= certainlyDead {
+		t.Errorf("worker deadline is %v after the start, want more than %v — it would give up before the in-container SIGKILL",
+			got, certainlyDead)
+	}
+}
+
+// The checker and validator paths assert their command; the solution path did
+// not, so dropping --kill-after went unnoticed. That flag is what guarantees
+// the process is dead before the worker's own deadline, and without it a slow
+// run turns into a discarded container and SYSTEM_ERROR instead of a verdict.
+func TestSession_RunTestCase_WrapsTheCommandInTheInContainerTimeout(t *testing.T) {
+	var cmds [][]string
+	mock := &mockDockerExecClient{}
+	recordExecs(mock, &cmds)
+	s, _ := newTestSession(t, mock)
+
+	if _, err := s.RunTestCase(context.Background(), appjudge.RunRequest{
+		Input: []byte("1\n"), TimeLimitMs: 1000,
+	}); err != nil {
+		t.Fatalf("RunTestCase: %v", err)
+	}
+
+	if len(cmds) != 1 || len(cmds[0]) != 3 || cmds[0][0] != "sh" || cmds[0][1] != "-c" {
+		t.Fatalf("expected one command through sh -c, got: %v", cmds)
+	}
+	// wallBackstop = max(2, ceil(2*1000/1000)) = 2s
+	want := "timeout --kill-after=1s 2s " + testExecCfg().Languages[testLang].RunCmd +
+		" < /sandbox/input.txt > /sandbox/output.txt 2>/dev/null"
+	if cmds[0][2] != want {
+		t.Errorf("command:\n got %q\nwant %q", cmds[0][2], want)
+	}
+}

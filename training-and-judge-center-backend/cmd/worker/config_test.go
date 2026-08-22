@@ -381,3 +381,32 @@ func TestValidatePoolBudgets_RejectsConfigsThatDoNotFit(t *testing.T) {
 		})
 	}
 }
+
+// The judge reads one exit code as "out of memory" for every language, and for
+// Java that is only true because of this flag: without it the JVM enforces its
+// own heap cap and exits 1, which the use cases report as a runtime error. The
+// quotes are load-bearing too — runCmd is interpolated into an sh -c string, so
+// unquoted the shell splits the flag into three arguments and it is ignored.
+func TestJudgeConfig_JavaSignalsOutOfMemoryWithTheExitCodeEveryoneElseUses(t *testing.T) {
+	cfg := decodeRealConfig(t)
+
+	const want = `'-XX:OnOutOfMemoryError=kill -9 %p'`
+	runCmd := cfg.Judge.Languages["java17"].RunCmd
+	if !strings.Contains(runCmd, want) {
+		t.Errorf("java17 runCmd is %q,\nit must carry %s or a Java MLE reports RUNTIME_ERROR", runCmd, want)
+	}
+}
+
+// The light pool runs checkers and validators, and a Java one that exceeds its
+// container has to exit 137 like every other language. Without this flag it
+// exits 1, which the adapter reads as the checker rejecting the contestant's
+// output — a silent wrong answer for a correct solution.
+func TestJudgeConfig_JavaArtifactsSignalOutOfMemoryTheSameWay(t *testing.T) {
+	cfg := decodeRealConfig(t)
+
+	const want = `'-XX:OnOutOfMemoryError=kill -9 %p'`
+	artifactRun := cfg.Judge.Languages["java17"].ArtifactRun
+	if !strings.Contains(artifactRun, want) {
+		t.Errorf("java17 artifactRun is %q,\nit must carry %s or a killed checker looks like a rejection", artifactRun, want)
+	}
+}

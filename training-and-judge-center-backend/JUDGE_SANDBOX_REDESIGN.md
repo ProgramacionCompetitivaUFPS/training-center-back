@@ -877,7 +877,7 @@ De la Fase 5 sobreviven dos cosas, ninguna relacionada con esto: el `BackendConf
 Todos son preexistentes y ninguno lo introdujo este rediseño, pero no todos se arreglan dentro de él: los dos de memoria sí (D11), y el de `CheckerFilename` desaparece por construcción (D8/D9). El MLE de Java y la colisión de soluciones Java quedan **sin arreglar**, cada uno con su nota.
 
 
-### El MLE de Java no se puede detectar — solución pendiente de rediseño
+### El MLE de Java no se puede detectar — ✅ RESUELTO en el Paso 6 (A4)
 
 Encontrado al revisar por qué C++ y Java tenían el mismo `memoryBytes`. Son **dos** bugs; el primero ya está arreglado, el segundo **no tiene todavía una solución aceptada**.
 
@@ -889,7 +889,7 @@ Encontrado al revisar por qué C++ y Java tenían el mismo `memoryBytes`. Son **
 Eso conecta directo con D11: `{memoryLimit}` implica que el `runCmd` de Java **no puede ser un string estático**, necesita sustitución por problema. Al resolver el Paso 6 conviene mirar esa especificación original antes de inventar otra.
 
 **Otras discrepancias del mismo bloque, preexistentes y sin corregir** (se dejaron para una revisión propia de `RUNNER_ARCHITECTURE.md`, no son de este rediseño): `syntaxCheckCmd: "pypy3 -m py_compile ..."` es un campo que **no existe en el código** y además nombra `pypy3` en vez de `python3`; y `compileCmd: "javac ... /sandbox/Solution.java"` usa mayúscula contra el `solution.java` real.
-**Bug sin resolver — el veredicto de MLE en Java es imposible con el mecanismo actual.**
+**Bug resuelto en el Paso 6 — el veredicto de MLE en Java era imposible con el mecanismo de entonces.**
 
 ```go
 exitCodeMLE = 137 // OOM killer sent SIGKILL (128 + 9) when cgroup memory limit was exceeded
@@ -908,8 +908,25 @@ La JVM **nunca deja que el cgroup la mate por agotamiento de heap**: refuerza su
 Ningún valor produce 137. Así que **hoy todo MLE de Java se reporta como runtime error**, y sin rastro: el comando de ejecución manda stderr a `/dev/null`, así que ni el mensaje de `OutOfMemoryError` sobrevive.
 
 **Se consideró y NO se aceptó**: usar `-XX:+ExitOnOutOfMemoryError` (exit 3 determinista) y volver la interpretación del código de salida dependiente del lenguaje. Funcionaría, pero un programa que haga `System.exit(3)` a propósito se reportaría como MLE, y sobre todo convierte una constante única (`exitCodeMLE`) en una tabla por lenguaje, esparciendo conocimiento del runtime de Java dentro de la capa de aplicación.
+**Resuelto en el Paso 6 (A4), y ninguna de las dos vías que este bloque anticipaba resultó ser la buena.** La tabla de arriba, además, resultó **incompleta**: `MaxRAMPercentage=100` da 137 —no 1— cuando el programa asigna en trozos en vez de pedir un único array gigante, así que el exit code de la JVM depende del **patrón de asignación del concursante** y ninguna regla derivada del kernel puede unificarlo. La pista que este documento dejaba (`memory.events`) tampoco: con el flag adoptado la JVM se mata desde el espacio de usuario y el contador del kernel queda en cero.
 
-**Queda para el Paso 6** (D11, límites de memoria reales), donde hay que **pensar otra solución o refinar ésta**. Un punto de partida: si ahí se va a aplicar el límite del problema con `docker update --memory`, quizás la señal de MLE deba salir del propio cgroup (leyendo `memory.events`/`memory.max` después de la corrida) en vez de inferirse del código de salida — lo que además sería uniforme para los tres lenguajes en lugar de una regla por lenguaje.
+Lo que se adoptó es `-XX:OnOutOfMemoryError=kill -9 %p`, que hace que la JVM produzca **el mismo 137** que el cgroup produce para los otros dos lenguajes, sin tabla de exit codes por lenguaje y sin tocar Go. El detalle completo, las mediciones y los caveats están en el Paso 6, punto 7.
+
+### El exit 137 es ambiguo: OOM o SIGKILL tras un SIGTERM ignorado — preexistente, sin arreglar
+
+Encontrado al cerrar A7, verificando que `timeout` no produjera 137 por su cuenta. Sí lo produce:
+
+| Situación | exit |
+|---|---|
+| El OOM killer del cgroup mata al proceso | **137** |
+| El proceso **ignora SIGTERM** y `timeout --kill-after=1s` recurre a SIGKILL | **137** |
+| El proceso simplemente tarda de más y muere con SIGTERM | 124 |
+
+O sea que una solución que instale un manejador de SIGTERM y no muera recibe **`MEMORY_LIMIT_EXCEEDED` en vez de `TIME_LIMIT_EXCEEDED`**. Es preexistente: la constante `exitCodeMLE = 137` siempre tuvo esta ambigüedad, y A4 no la introduce ni la agrava.
+
+**Cuán real es**: medido que la JVM sale con SIGTERM dentro del segundo de gracia en todos los casos, incluso con el GC bajo presión al 90% del container, igual que un binario de C++. Así que solo lo dispara código que instale un manejador **a propósito** — algo que no pasa en programación competitiva, y que además no le sirve a nadie: los dos veredictos son fallos.
+
+**Por qué no se arregló acá**: distinguirlos requeriría una señal extra, y la única disponible —el `oom_kill` del cgroup— **no sirve para Java**, porque con el flag de A4 la JVM se mata desde el espacio de usuario y el contador no se mueve (ver el Paso 6, punto 9). O sea que el arreglo cubriría C++ y Python y dejaría a Java exactamente igual de ambiguo. Si alguna vez se encara, la vía sería `-XX:+ExitOnOutOfMemoryError` (exit 3) para Java, aceptando la tabla de exit codes por lenguaje que A4 evitó.
 ### El `memoryLimit` del problema no se está aplicando
 
 Encontrado al revisar para qué sirve `LanguageConfig.MemoryBytes`. **Arreglo decidido en D11**: `docker update --memory` al reclamar el container.
@@ -1335,17 +1352,43 @@ De paso, D14 fijó todo lo demás sobre lo que este paso opera: `maxConcurrent =
 
 **A2 — Cómo llega el límite del problema a la sesión. ✅ RESUELTO, ver abajo.** Hoy viaja **por caso de prueba** (`RunRequest.MemoryKb`), pero es constante para todo el judging. Para hacer el `docker update` una sola vez hay que moverlo a la apertura de la sesión — exactamente lo que el Paso 5 hizo con los datos del checker en `BeginChecking`.
 
-**A3 — Qué número exacto se le pasa al `docker update`, y el aviso que va con él. ⚠️ ABIERTO, pero el código ya toma una rama: hoy pasa el límite exacto.** El cgroup **no cuenta solo la memoria de la solución**: también el page cache de los archivos que el programa lee y escribe (`input.txt`, `output.txt`), más el `sh -c`, el `timeout` y el binario o intérprete mapeado. La medición del Paso 4 ya lo dice: *"los picos incluyen las dos salidas en el page cache del cgroup (~2× su tamaño)"*. Entonces `--memory = el límite exacto` produce MLE falsos —un problema de 256 MB con input de 20 MB mata a una solución que reservó 240—, y `--memory = límite + margen` los evita pero deja al container usar más que el límite declarado.
+**A3 — Qué número exacto se le pasa al `docker update`. ✅ RESUELTO: el límite exacto, sin margen.** La premisa que este documento traía **era falsa, y se midió**.
 
-> **Si se elige la segunda, hay que redimensionar los pools.** El pool contabiliza 2 GiB para C++ y Python, que es exactamente el tope de problema; si el `docker update` pudiera poner 2 GiB + margen, el pool reservaría menos de lo que el container puede usar — la sobreventa invisible que D11 advierte. Con `maxConcurrent = 5` y N3 en 17.75 de 17.75 GiB no hay de dónde sacarlos sin rehacer el reparto (bajar a N1 libera 5.1 GiB).
+Decía que el page cache de los archivos que el programa lee y escribe cuenta contra el cgroup y produce MLE falsos —*"un problema de 256 MB con input de 20 MB mata a una solución que reservó 240"*—. Medido en `judge-runner:cpp20`, con el comando exacto de `RunTestCase`, el umbral de OOM es **idéntico** con entradas de 0, 64 y 200 MiB:
 
-**A4 — Cómo se detecta el MLE de forma uniforme en los tres lenguajes.** Es el bug de la sección de bugs: la JVM nunca deja que el cgroup la mate por agotamiento de heap —refuerza su propio tope y lanza `OutOfMemoryError`—, así que `exitCodeMLE = 137` es inalcanzable y **todo MLE de Java se reporta hoy como runtime error**, sin rastro (el comando manda stderr a `/dev/null`). La vía del exit code por lenguaje se evaluó y se descartó. La pista que este documento deja: si la señal sale del propio cgroup (`memory.events`, campo `oom_kill`) en vez del código de salida, cubre los tres lenguajes de forma uniforme.
+| Reserva de la solución | input 0 MiB | input 64 MiB | input 200 MiB |
+|---|---|---|---|
+| 250 MiB | pasa | pasa | — |
+| 255 MiB | OOM | OOM | — |
+| 200 MiB | pasa | — | pasa |
+
+El page cache **es reclamable**: al llegar al techo el kernel desaloja páginas de archivo en vez de matar el proceso. El pico del cgroup toca el límite exacto y el proceso sigue vivo.
+
+**El overhead real, medido por búsqueda binaria del máximo reservable** (20 MiB de entrada, imágenes reales):
+
+| Container | cpp20 | python310 | java17 |
+|---|---|---|---|
+| 256 MiB | **254** (99%) | **251** (98%) | 184 (72%) |
+| 512 MiB | **509** (99%) | **507** (99%) | 369 (72%) |
+| 1024 MiB | **1021** (99%) | **1018** (99%) | — |
+
+C++ y Python tienen **3-6 MiB de overhead fijo**, no proporcional. Java tiene un 28% proporcional, que es territorio de **A9** y no de esta decisión.
+
+**Se decide pasar el límite exacto, sin margen.** Esos 3-6 MiB son ~2% de un límite típico de 256 MB, y están dentro de lo que el problem setter ya asume: es el mismo modelo de Codeforces y DOMjudge, donde el límite se aplica al proceso **incluyendo su runtime**. Un problema que declara 256 MB está diciendo "tu solución entra en 256 MB, con su runtime adentro".
+
+**Alternativas descartadas**: un **margen proporcional** —no hay nada proporcional que compensar, el overhead es fijo—; y un **margen fijo de 16 MiB**, que evitaría cualquier MLE por overhead del runtime pero compensa un problema que no existe.
+
+**Corrección a una conclusión intermedia de esta misma sesión**: se midió primero un "50% de overhead en Java" y se dio por inválido el `java17: 2.75 GiB` de D14. **Era artefacto del test**, que reservaba un único `byte[]` gigante — el peor caso para la JVM, que necesita una región contigua. Con reservas en trozos de 1 MiB, como asigna una solución real, sube a 72%. Con eso `2816 × 0.72 = 2028 MiB` contra los 2048 declarables: D14 queda **corto por ~20 MiB, no por la mitad**.
+
+**Nota de método, porque casi produce la conclusión opuesta**: el primer experimento no reservaba nada. `g++ -O2` eliminó el `malloc` + `memset` porque la memoria nunca se leía después — optimización legal. Lo delató **el pico del cgroup**: 8 MiB tras "reservar" 300. Sin esa lectura de control, un barrido entero en verde habría "demostrado" que no hay overhead. Se corrigió con `volatile` y leyendo la memoria de vuelta.
+
+**A4 — Cómo se detecta el MLE de forma uniforme en los tres lenguajes. ✅ RESUELTO, ver abajo.** Es el bug de la sección de bugs: la JVM nunca deja que el cgroup la mate por agotamiento de heap —refuerza su propio tope y lanza `OutOfMemoryError`—, así que `exitCodeMLE = 137` es inalcanzable y **todo MLE de Java se reporta hoy como runtime error**, sin rastro (el comando manda stderr a `/dev/null`). La vía del exit code por lenguaje se evaluó y se descartó. La pista que este documento deja: si la señal sale del propio cgroup (`memory.events`, campo `oom_kill`) en vez del código de salida, cubre los tres lenguajes de forma uniforme.
 
 **A5 — Qué reportar como KB consumidos.** Ver D11: no es elegir entre un número aproximado y el límite, es **construir una medición que hoy no existe**, porque en cgroup v2 `MaxUsage` viene en cero. Y `memory.peak` no se puede resetear entre corridas (dos motivos independientes, ver D11), así que hereda la contaminación. Aislar una corrida necesita medir el pico del **proceso** y no el del cgroup.
 
 **A6 — Si el `docker update` aplica también al pool liviano.** El Paso 5 dejó `artifactSession` compartido por las sesiones de checker y validator. Hay que decidir si el límite del problema tiene sentido ahí o si el pool liviano se queda con el techo fijo de su config.
 
-**A7 — El OOM del checker en el pool liviano** (abierto desde el Paso 5, mismo mecanismo). Un checker que se queda sin memoria sale con **137 en C++/Python y con 1 en Java**, indistinguible de un rechazo legítimo — o sea, *wrong answers silenciosos al concursante*. Si la solución de A4 sale del cgroup, cubre este caso también y hay que cerrarlo acá.
+**A7 — El OOM del checker en el pool liviano. ✅ RESUELTO, ver abajo.** (abierto desde el Paso 5, mismo mecanismo). Un checker que se queda sin memoria sale con **137 en C++/Python y con 1 en Java**, indistinguible de un rechazo legítimo — o sea, *wrong answers silenciosos al concursante*. Si la solución de A4 sale del cgroup, cubre este caso también y hay que cerrarlo acá.
 
 **A8 — La guarda de arranque que falta**: que todo lenguaje del pool pesado declare `memoryBytes >= maxMemoryLimitGlobal`. Es el **chequeo cruzado contra `config/virtual_object.json`** que el Paso 3 difirió a propósito por acoplar el arranque del worker a un archivo de configuración de la API. El bug de Python es el argumento más fuerte a favor que apareció: sin la guarda, el acoplamiento existe igual, solo que implícito y sin nadie que lo verifique.
 
@@ -1395,7 +1438,72 @@ El campo no se "movió" tanto como se **borró**: `RunRequest.MemoryKb` solo se 
 
 **5. `LanguageCeiling` en vez de un `0` pelado** en los tres call sites que corren código confiable. Precedente directo: el Paso 4 introdujo `modeSource`/`modeExecutable` justamente *"para que no queden números sueltos en los call sites"*, después de que un `0644` quemado hiciera invisible el bug del artefacto sin permiso de ejecución.
 
-**6. A3 sigue abierto, pero el código ya toma una rama.** `BeginSession` pasa `memoryKb * 1024` — el límite **exacto**, sin margen. Es una de las dos opciones que A3 plantea, elegida por omisión al implementar y no por decisión. Con ella, el page cache del input cuenta contra el cgroup y un problema de 256 MB con un input de 20 MB puede dar **MLE falso**. Queda por confirmar o cambiar; si se elige agregar margen, **hay que redimensionar los pools** (ver el aviso en A3).
+**6. A3 quedó confirmado: el límite exacto, sin margen.** `BeginSession` pasa `memoryKb * 1024`. Salió así por omisión al implementar, y después se midió que es lo correcto — el detalle y las mediciones están en A3, incluida la corrección de la premisa que este documento traía sobre el page cache.
+
+**7. A4 — el MLE de Java se detecta con el mismo 137 que los otros dos, y la pista de este documento era la equivocada.**
+
+La pista decía sacar la señal del cgroup (`memory.events`, campo `oom_kill`). **Medido: no sirve**, y por la razón que hace difícil el problema — cuando una solución Java agota el heap **no hay ningún OOM del cgroup**: la JVM se autolimita antes y lanza `OutOfMemoryError`. El contador queda en `+0`. El cgroup habría cubierto C++ y Python, que es donde ya funcionaba, y perdido Java entero.
+
+**También se midió, y se descartó, subir el techo del heap** para que el cgroup pase a ser el límite que ata. El exit code queda dependiendo del **patrón de asignación del concursante**:
+
+| Patrón de asignación | `MaxRAMPercentage=75` | `MaxRAMPercentage=100` |
+|---|---|---|
+| un `byte[]` gigante | 1 | **1** |
+| trozos de 1 MiB | 1 | 137 |
+| muchos objetos chicos | 1 | 137 |
+
+La JVM tiene dos modos de falla: si una **sola** petición no entra en el heap máximo la rechaza sin tocar memoria; si va **creciendo**, el cgroup la mata. Ninguna señal derivada del kernel puede unificarlos.
+
+**Lo que se adoptó** es un flag en el `runCmd` de Java:
+
+```yaml
+runCmd: "java -XX:MaxRAMPercentage=75 '-XX:OnOutOfMemoryError=kill -9 %p' -cp /sandbox Solution"
+```
+
+La JVM se manda `SIGKILL` a sí misma al primer `OutOfMemoryError` → **exit 137, el mismo código que produce el cgroup**. Verificado sobre 3 patrones de asignación × 3 tamaños de container × 2 configuraciones de heap: 137 en todos. Y verificado de punta a punta tomando el string **literal del YAML despachado** y corriéndolo en `judge-runner:java17` con la forma exacta del comando de `RunTestCase`.
+
+**Por qué gana sobre `+ExitOnOutOfMemoryError`**, que este documento había descartado: ése también da un código uniforme (el 3), pero **convierte `exitCodeMLE` en una tabla por lenguaje**, que era la objeción de fondo. Con el `kill -9` la constante sigue siendo una sola y pasa de ser una mentira a ser cierta. **Cero cambios en Go**: es una línea de configuración.
+
+**Las comillas simples son estructurales**: `runCmd` se interpola dentro de un `sh -c`, así que sin ellas el shell parte el flag en tres argumentos y lo ignora en silencio. Medido: sin comillas, exit 1.
+
+**Los caveats, medidos:**
+
+- `OnOutOfMemoryError` hace `fork` para lanzar el comando, y la JVM lo documenta como *best-effort*: bajo presión extrema podría no ejecutarse. **Su modo de falla es benigno**: la JVM sigue propagando el `OutOfMemoryError` y sale con 1, o sea que en el peor caso se vuelve al comportamiento de hoy. No introduce ninguna falla nueva. No falló en ninguna de las corridas, ayudado por que con `MaxRAMPercentage=75` todavía queda un 25% del container libre cuando el heap se llena.
+- Dispara aunque el programa **capture** el `OutOfMemoryError`. En programación competitiva no es un patrón, pero es un cambio de semántica.
+- La detección **tarda entre 0.5 y 2.3 s** y crece con el tamaño del container, así que compite con la red de reloj de `RunTestCase`. Ver el punto 8.
+
+**Y lo que conviene saber para calibrar la urgencia de este bug**: `get_standings.go:241` trata `RUNTIME_ERROR` y `MEMORY_LIMIT_EXCEEDED` **idénticamente** como intento fallido penalizado, así que el puntaje de la competencia nunca fue distinto por esto. Lo que se gana es **diagnóstico**: al concursante, que dejaba de buscar un crash inexistente; y sobre todo al problem setter, que en el publish recibía "runtime error" por su propia solución de referencia y podía concluir que su código tiene un bug en vez de que el límite de memoria es muy ajustado para Java — y publicar un problema que ninguna solución Java puede cumplir.
+
+**8. La red de seguridad del worker pasa de `+2s` a `+5s`, extraída como `runGrace`.**
+
+```
+SIGTERM    en  wallBackstop
+SIGKILL    en  wallBackstop + 1     ← muerte garantizada
+red de Go  en  wallBackstop + 5     ← antes +2
+```
+
+Antes eran 2 segundos, y **ese margen no era margen puro**: el mismo deadline envuelve también `ExecCreate` y `ExecAttach`, dos round trips al demonio de Docker que con 5 judgings concurrentes se estiran. Y este paso lo vuelve estructural: hoy un MLE de Java sale al instante (exit 1) y nunca se acerca a la red; con el flag tarda 1-2.3 s y sí llega.
+
+Medido, replicando las dos redes: **la red de Go no dispara en ningún caso**, ni siquiera con el margen viejo. Lo único que se degrada es la combinación de 2 GB de memoria con 1 s de tiempo, donde el backstop gana por 0.26 s y el veredicto sale **TLE en vez de MLE** — un veredicto equivocado pero inofensivo, y no `SYSTEM_ERROR`. En el caso real de los 12 paquetes (1024 MB de memoria, límites de 1 a 26 s) la detección tarda ~1 s contra un backstop de 2 s: **MLE correcto**.
+
+Subirlo es barato: cuando esa red dispara, el container **se destruye** (`pool.Discard`, 221 ms de recreación), así que hacerlo menos sensible reduce destrucciones espurias. Y de paso **cierra una inconsistencia**: el camino del checker ya usaba `artifactRunGrace = 5 * time.Second`, con el comentario que describe exactamente para qué sirve. El de las soluciones usaba 2.
+
+**9. A7 — el artefacto matado deja de ser un veredicto, y se detecta en `artifactSession.run`.**
+
+`Check` y `Validate` leen cualquier exit no-cero como "el artefacto rechazó su entrada". Para un artefacto **matado** eso culpa a la salida del concursante, o al caso de prueba del setter, por nuestro propio dimensionamiento del pool liviano.
+
+La detección va en **`run`**, la mitad compartida que el Paso 5 extrajo, y no en cada sesión: *"el artefacto murió"* es una propiedad de ejecutarlo, no de lo que significa. `Check` y `Validate` no cambian una línea.
+
+El `artifactRun` de Java lleva el mismo flag que su `runCmd`, por la misma razón. Verificado de punta a punta con el string literal del YAML: un checker Java que se queda sin memoria sale con **137**, y uno que corre bien con **0**.
+
+**Y acá la pista del documento se invierte del todo**: con el flag, la JVM se mata **desde el espacio de usuario**, así que el contador `oom_kill` del kernel **queda en 0**.
+
+| | exit | `oom_kill` |
+|---|---|---|
+| checker Java sin el flag | 1 | +0 |
+| checker Java con el flag | **137** | **+0** |
+
+Un esquema basado en `memory.events` habría detectado C++ y Python —donde no hacía falta— y perdido exactamente el caso que motivaba A7.
 
 #### Tests
 
@@ -1419,6 +1527,37 @@ Y el test del pool que cubre el hallazgo del punto 1 (`ContainerLeftAtLowerLimit
 
 **Nota de método**: el primer intento de la mutación "el camino rápido no aplica el límite" rompió la compilación en vez de mutar limpio. Un build roto no prueba nada — se rehizo reemplazando solo la llamada por un `error(nil)`, y ahí sí falló en los tests correctos.
 
+Y ocho más para A4 y A7, con sus mutaciones:
+
+| Mutación | Tests que se ponen en rojo |
+|---|---|
+| `runGrace` por debajo del `--kill-after` | `SafetyNetOutlivesTheInContainerKill` |
+| se quita `--kill-after` del comando | `WrapsTheCommandInTheInContainerTimeout` |
+| se quita el flag de OOM del `runCmd` de Java | la guarda de config del `runCmd` |
+| se quitan las comillas del flag | la misma guarda |
+| se quita la detección del artefacto matado | los 3 del artefacto matado |
+| `exitCodeKilled` apunta al `1` | **6**: los del artefacto matado *y* los del rechazo legítimo |
+| se quita el flag del `artifactRun` de Java | la guarda de config del `artifactRun` |
+
+La del `exitCodeKilled = 1` es la que más dice: rompe las dos familias a la vez, o sea que los tests fijan **en tensión** las dos conductas que este paso tiene que separar — un artefacto matado no es un veredicto, y un rechazo legítimo sí lo es.
+
+**Dos mutaciones que hay que mirar aparte:**
+
+- **`runGrace` de vuelta a 2 segundos: pasa, y está bien que pase.** El invariante testeable es *"el worker no se rinde antes del SIGKILL del container"*, y con 2 segundos se sigue cumpliendo. El 5 es una elección de calibración respaldada por medición, no una propiedad verificable. Un test que fingiera cubrirla sería un test tautológico sobre una constante.
+- **Quitar `--kill-after` no rompía nada antes de este paso.** El camino del checker y el del validator aseveran su comando exacto desde el Paso 5; el de las soluciones no lo hacía. Ese flag es lo que garantiza que el proceso muera antes del deadline del worker, así que sacarlo convertía runs lentos en containers destruidos y `SYSTEM_ERROR`. El test nuevo cierra ese hueco preexistente.
+
+**Y dos guardas sobre la configuración despachada**, con el precedente del test que ya corre `judge_config.yaml` contra los números reales del cluster. Son literales, y su valor no es lo que aseveran sino **el comentario que explica por qué**: el arreglo de A4 y A7 vive entero en un string de YAML, y quitarlo no rompe nada visible — simplemente devuelve el bug, en silencio.
+
+#### Notas de método
+
+Tres experimentos de esta tanda dieron un resultado equivocado antes de dar el correcto, y los tres habrían llevado a la conclusión opuesta:
+
+1. **El primer experimento de overhead no reservaba memoria.** `g++ -O2` eliminó el `malloc` + `memset` porque nada leía el buffer después — optimización legal. Un barrido entero en verde habría "demostrado" que no hay overhead. **Lo delató el pico del cgroup**: 8 MiB tras "reservar" 300. Corregido con `volatile` y leyendo la memoria de vuelta.
+2. **El "50% de overhead de Java" era artefacto del patrón de asignación.** Un único `byte[]` gigante es el peor caso para la JVM, que necesita una región contigua. Con trozos de 1 MiB —como asigna una solución real— el número real es 72%. Sobre el dato equivocado se llegó a dar por inválido el dimensionamiento de `java17` de D14, que en realidad está bien.
+3. **Dos corridas dieron exit 1 "de la JVM" que en realidad era mi test desbordando `int`.** Un array de Java está indexado por `int`, así que `3072 << 20` da negativo y lanza `NegativeArraySizeException`. Parecía que el flag fallaba a tamaños grandes.
+
+El patrón común: **un experimento que "pasa" no prueba que el mecanismo funcione**; hace falta un control que demuestre que el experimento sabe fallar.
+
 ### Paso 6.5 — `buildTar` deja de duplicar
 
 Cambiar `buildTar` de `bytes.Buffer` a `io.Pipe` + goroutine, para que el tar se transmita en vez de materializarse. Medido: pico de heap de 55.0 → 27.6 MB para un archivo de 27.4 MB, con **cero** asignación durante la operación.
@@ -1441,6 +1580,17 @@ D7 dejaba explícitamente abierto *"si la entrada del caso de prueba también vi
 
 - **No hay problema de seguridad.** El argumento de D7 para excluir la salida esperada es que es secreta: si el código del concursante pudiera leerla, le bastaría imprimirla. **La entrada no lo es** — el programa del concursante la recibe por stdin por definición, así que ponerla en el directorio del judging no le filtra nada que no vaya a leer igual. La salida esperada sigue viajando por la API, como D7 punto 5 exige.
 - **Es el 82% del pico de memoria del worker** en el peor problema real. Hoy el input se copia **dos veces** por caso: una al container pesado (`RunTestCase`) y otra al liviano (`Check`), y cada copia paga además la duplicación de `buildTar`. Sobre el problema B de los paquetes reales (input de 28.75 MB), el pico por judging baja de ~70 MB a ~33 MB solo con esto.
+
+**El volumen tiene que estar respaldado por disco, nunca `medium: Memory`.** Un `emptyDir` normal vive en el almacenamiento efímero del nodo, y leerlo pone sus páginas en el page cache — que **sí** se le cargan al cgroup, pero son **reclamables**, y por eso no le quitan memoria a la solución (ver A3). Un `emptyDir: {medium: Memory}` es un **tmpfs**: sus páginas también se cargan al cgroup y **no son reclamables** (solo podrían irse a swap, que está desactivado a propósito para que el MLE sea determinista).
+
+Medido, con un input de 64 MiB en un container de 256 MiB:
+
+| Dónde vive el input | La solución llega a reservar |
+|---|---|
+| disco / overlayfs (`emptyDir` normal) | **254 MiB** |
+| tmpfs (`emptyDir: {medium: Memory}`) | **190 MiB** |
+
+Pierde exactamente el tamaño del archivo. Si alguien declarara el volumen como tmpfs buscando velocidad, **cada byte de entrada y de salida pasaría a descontarse del límite de memoria del concursante**, y el veredicto quedaría atado al tamaño de los casos de prueba. El `dind-storage` que ya existe es `emptyDir: {}`, así que el precedente está bien; falta que quede escrito antes de agregar el volumen nuevo.
 
 **Lo que el volumen NO elimina**: los casos de prueba se siguen descomprimiendo enteros en memoria del worker, porque el worker es quien lee el ZIP de GCS y escribe los archivos al volumen. Después de este paso ese pasa a ser el **único** término dominante de su consumo, y lo acota el tope de 100 MB de D14.
 

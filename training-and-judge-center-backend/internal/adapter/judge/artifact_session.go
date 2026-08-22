@@ -25,6 +25,12 @@ const (
 
 	// sandboxInputPath is where both sessions put the test case's input.
 	sandboxInputPath = "/sandbox/input.txt"
+
+	// exitCodeKilled is SIGKILL (128 + 9). An artifact reaches it by exceeding
+	// the light pool container's memory — from the kernel for C++ and Python,
+	// from the JVM's own OnOutOfMemoryError for Java. Either way the artifact
+	// died on us, so it is our failure and not a verdict.
+	exitCodeKilled = 137
 )
 
 // artifactSession is the half a checker session and a validator session share:
@@ -90,6 +96,14 @@ func (s *artifactSession) run(ctx context.Context, cmd string) (int, string, err
 	inspectRes, err := s.docker.ExecInspect(ctx, execRes.ID, client.ExecInspectOptions{})
 	if err != nil {
 		slog.ErrorContext(ctx, "artifact_session: exec inspect failed", "role", s.role, "container_id", s.container.ID(), "error", err)
+		return 0, "", apperror.NewInternal()
+	}
+	// Caught here rather than in each session: both read a non-zero exit as the
+	// artifact rejecting its input, which for a killed artifact would blame the
+	// contestant, or the test case, for our own memory limit.
+	if inspectRes.ExitCode == exitCodeKilled {
+		slog.ErrorContext(ctx, "artifact_session: artifact was killed, most likely out of memory",
+			"role", s.role, "container_id", s.container.ID())
 		return 0, "", apperror.NewInternal()
 	}
 	return inspectRes.ExitCode, strings.TrimSpace(errBuf.String()), nil

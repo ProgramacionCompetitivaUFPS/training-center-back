@@ -13,7 +13,11 @@ import (
 // Exit codes produced by the Linux timeout(1) command and the kernel OOM killer.
 const (
 	exitCodeTLE = 124 // timeout(1) killed the process after the time limit
-	exitCodeMLE = 137 // OOM killer sent SIGKILL (128 + 9) when cgroup memory limit was exceeded
+	// exitCodeMLE is the cgroup OOM killer's SIGKILL (128 + 9). Java never gets
+	// there on its own — the JVM enforces its own heap cap and exits 1 — so its
+	// runCmd in judge_config.yaml carries OnOutOfMemoryError to SIGKILL itself.
+	// Removing that flag silently turns every Java MLE back into a runtime error.
+	exitCodeMLE = 137
 )
 
 type JudgeSubmissionInput struct {

@@ -231,3 +231,24 @@ func TestOutputChecker_BeginChecking_RejectsALanguageWithNoArtifactConfig(t *tes
 		t.Error("expected no container to be claimed")
 	}
 }
+
+// The bug this closes: a checker that ran out of memory exited non-zero, which
+// Check read as "the contestant's output is wrong" — a silent wrong answer for
+// a correct solution, caused by our own light pool sizing.
+func TestCheckerSession_Check_KilledCheckerIsNotAWrongAnswer(t *testing.T) {
+	docker := &mockDockerExecClient{
+		execInspectFn: func(_ context.Context, _ string, _ client.ExecInspectOptions) (client.ExecInspectResult, error) {
+			return client.ExecInspectResult{ExitCode: 137}, nil
+		},
+	}
+	c, _ := newTestOutputChecker(t, docker, storedArtifact("ELF binary"))
+	s := beginTestChecking(t, c)
+
+	result, err := s.Check(context.Background(), appjudge.CheckRequest{ContestantOutput: []byte("4")})
+	if err == nil {
+		t.Fatal("expected an error for a killed checker, got a verdict")
+	}
+	if result.Accepted {
+		t.Error("a killed checker must not accept either")
+	}
+}
