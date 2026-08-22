@@ -26,6 +26,11 @@ const (
 	// container; 64 MiB made every language run out of memory there.
 	maxOutputBytes = 8 << 20
 	compileTimeout = 30 * time.Second
+	// runGrace is what the worker waits past the in-container timeout before
+	// assuming the daemon is stuck and the container has to go. It has to
+	// outlast the SIGKILL that timeout(1) sends a second after its deadline,
+	// and also cover the two Docker round trips the same deadline wraps.
+	runGrace = 5 * time.Second
 )
 
 type Session struct {
@@ -98,7 +103,7 @@ func (s *Session) RunTestCase(ctx context.Context, req appjudge.RunRequest) (app
 		wallBackstopSecs, s.langCfg.RunCmd,
 	)
 
-	safetyCtx, cancel := context.WithTimeout(ctx, time.Duration(wallBackstopSecs+2)*time.Second)
+	safetyCtx, cancel := context.WithTimeout(ctx, time.Duration(wallBackstopSecs)*time.Second+runGrace)
 	defer cancel()
 
 	cpuBeforeNs, _ := s.readStats(ctx)

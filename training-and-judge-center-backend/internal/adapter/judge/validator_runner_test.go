@@ -192,3 +192,23 @@ func TestValidatorRunner_BeginValidating_RejectsALanguageWithNoArtifactConfig(t 
 		t.Error("expected no container to be claimed")
 	}
 }
+
+// Same as the checker: a validator killed for memory would otherwise be read as
+// the setter's test case being invalid.
+func TestValidatorSession_Validate_KilledValidatorIsNotARejection(t *testing.T) {
+	docker := &mockDockerExecClient{
+		execInspectFn: func(_ context.Context, _ string, _ client.ExecInspectOptions) (client.ExecInspectResult, error) {
+			return client.ExecInspectResult{ExitCode: 137}, nil
+		},
+	}
+	r, _ := newTestValidatorRunner(t, docker, storedArtifact("ELF binary"))
+	s := beginTestValidating(t, r)
+
+	result, err := s.Validate(context.Background(), []byte("999999"))
+	if err == nil {
+		t.Fatal("expected an error for a killed validator, got a result")
+	}
+	if result.Accepted {
+		t.Error("a killed validator must not accept either")
+	}
+}

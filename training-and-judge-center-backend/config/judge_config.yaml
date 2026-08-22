@@ -27,12 +27,18 @@ judge:
       extension: "java"
       compileCmd: "javac -encoding UTF-8 /sandbox/Solution.java"
       # Without MaxRAMPercentage the JVM caps its heap at 25% of the container.
-      runCmd: "java -XX:MaxRAMPercentage=75 -cp /sandbox Solution"
+      # OnOutOfMemoryError makes the JVM SIGKILL itself, so a Java MLE reports
+      # exit 137 like every other language instead of a bare exit 1. The single
+      # quotes are load-bearing: runCmd is interpolated into an sh -c string.
+      runCmd: "java -XX:MaxRAMPercentage=75 '-XX:OnOutOfMemoryError=kill -9 %p' -cp /sandbox Solution"
       artifactSource:  "/sandbox/{name}.java"
       # -d keeps the .class files out of /sandbox, so the JAR cannot pick up the source.
       artifactCompile: "javac -encoding UTF-8 -d /sandbox/classes /sandbox/{name}.java && jar --create --file /sandbox/{name}.jar --main-class {name} -C /sandbox/classes ."
       artifactPath:    "/sandbox/{name}.jar"
-      artifactRun:     "java -jar /sandbox/{name}.jar"
+      # Same OnOutOfMemoryError as runCmd, and for the same reason: a checker
+      # that exceeds the light pool's memory must exit 137 and not 1, which is
+      # indistinguishable from it rejecting the contestant's output.
+      artifactRun:     "java '-XX:OnOutOfMemoryError=kill -9 %p' -jar /sandbox/{name}.jar"
 
     python310:
       image: "judge-runner:python310"
