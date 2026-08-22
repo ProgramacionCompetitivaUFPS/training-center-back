@@ -16,9 +16,10 @@ func testExecCfg() ExecutorConfig {
 	return ExecutorConfig{
 		Languages: map[string]LanguageExecConfig{
 			testLang: {
-				CompileCmd: "g++ -std=c++20 -o /sandbox/solution /sandbox/solution.cpp",
-				RunCmd:     "/sandbox/solution",
-				Extension:  "cpp",
+				CompileCmd:   "g++ -std=c++20 -o /sandbox/solution /sandbox/solution.cpp",
+				RunCmd:       "/sandbox/solution",
+				Extension:    "cpp",
+				MemoryFactor: 1.0,
 			},
 		},
 	}
@@ -388,5 +389,27 @@ func TestSession_RunTestCase_WrapsTheCommandInTheInContainerTimeout(t *testing.T
 		" < /sandbox/input.txt > /sandbox/output.txt 2>/dev/null"
 	if cmds[0][2] != want {
 		t.Errorf("command:\n got %q\nwant %q", cmds[0][2], want)
+	}
+}
+
+// A runtime that reserves memory of its own would otherwise charge that reserve
+// to the contestant: without the factor a Java solution gets 86% of the limit
+// the problem declared, against 99% for a native binary.
+func TestExecutor_BeginSession_MemoryFactorBuysBackTheRuntimeReserve(t *testing.T) {
+	p, poolMock := newTestPool(t)
+	cfg := testExecCfg()
+	lc := cfg.Languages[testLang]
+	lc.MemoryFactor = 1.5
+	cfg.Languages[testLang] = lc
+	e := NewExecutor(p, &mockDockerExecClient{}, cfg)
+
+	if _, err := e.BeginSession(context.Background(), submission.RestoreLanguage(testLang), testProblemMemoryKb); err != nil {
+		t.Fatalf("BeginSession: %v", err)
+	}
+
+	const want = int64(float64(testProblemMemoryKb) * 1024 * 1.5)
+	if got := poolMock.lastCreateMemory.Load(); got != want {
+		t.Errorf("container created with Memory = %d, want %d (the problem's %d KB times 1.5)",
+			got, want, testProblemMemoryKb)
 	}
 }

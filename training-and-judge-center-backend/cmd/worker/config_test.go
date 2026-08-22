@@ -2,10 +2,12 @@ package main
 
 import (
 	"bytes"
+	"encoding/json"
 	"os"
 	"strings"
 	"testing"
 
+	"github.com/training-judge-center/backend/internal/config"
 	"gopkg.in/yaml.v3"
 )
 
@@ -19,7 +21,7 @@ const (
 // The dind container limits, mirrored from deploy/k8s/judge/worker.yaml. They
 // are the numbers the shipped budgets were chosen against.
 const (
-	clusterDindMemBytes = 25 << 30 // limits.memory: 25Gi
+	clusterDindMemBytes = 24 << 30 // limits.memory: 24Gi
 	clusterDindCores    = 6        // limits.cpu: "6"
 )
 
@@ -49,6 +51,7 @@ func validConfig() judgeConfigFile {
 			testLang: {
 				Image:           "judge-runner:cpp20",
 				Extension:       "cpp",
+				MemoryFactor:    1.0,
 				CompileCmd:      "g++ -o /sandbox/Solution /sandbox/Solution.cpp",
 				RunCmd:          "/sandbox/Solution",
 				ArtifactSource:  "/sandbox/{name}.cpp",
@@ -165,6 +168,7 @@ func TestValidateJudgeConfig_RejectsBrokenConfigs(t *testing.T) {
 				c.Judge.Languages["python310"] = judgeLanguageConfig{
 					Image:           "judge-runner:python310",
 					Extension:       "py",
+					MemoryFactor:    1.0,
 					RunCmd:          "python3 /sandbox/Solution.py",
 					ArtifactSource:  "/sandbox/{name}.py",
 					ArtifactCompile: "python3 -m py_compile /sandbox/{name}.py",
@@ -184,6 +188,11 @@ func TestValidateJudgeConfig_RejectsBrokenConfigs(t *testing.T) {
 				c.Judge.Languages["python310"] = judgeLanguageConfig{Image: "judge-runner:python310"}
 			},
 			wantErr: `language "cpp20" can carry a checker but pool "light" does not size it`,
+		},
+		{
+			name:    "a language that runs solutions has no memoryFactor",
+			breaks:  func(c *judgeConfigFile) { withLang(c, func(l *judgeLanguageConfig) { l.MemoryFactor = 0 }) },
+			wantErr: "memoryFactor is under 1",
 		},
 		{
 			name:    "an artifact field is empty",
@@ -408,5 +417,71 @@ func TestJudgeConfig_JavaArtifactsSignalOutOfMemoryTheSameWay(t *testing.T) {
 	artifactRun := cfg.Judge.Languages["java17"].ArtifactRun
 	if !strings.Contains(artifactRun, want) {
 		t.Errorf("java17 artifactRun is %q,\nit must carry %s or a killed checker looks like a rejection", artifactRun, want)
+	}
+}
+
+// The JVM applies MinRAMPercentage instead of MaxRAMPercentage when the
+// container is under ~250 MB, so setting only the max leaves a Java solution
+// with 47% of a small container against the 99% C++ gets. Both together hold
+// 85-87% across the whole range. Dropping either one degrades silently: the
+// solution just gets less memory than the problem promised.
+func TestJudgeConfig_JavaGetsItsShareOfEveryContainerSize(t *testing.T) {
+	cfg := decodeRealConfig(t)
+
+	runCmd := cfg.Judge.Languages["java17"].RunCmd
+	for _, want := range []string{"-XX:MaxRAMPercentage=90", "-XX:MinRAMPercentage=90"} {
+		if !strings.Contains(runCmd, want) {
+			t.Errorf("java17 runCmd is %q,\nit must carry %s", runCmd, want)
+		}
+	}
+
+	// Those percentages hand at least 10% of the container to non-heap, so the
+	// container has to exceed the problem's limit by at least as much or the
+	// contestant pays for the JVM's reserve out of their own budget.
+	if f := cfg.Judge.Languages["java17"].MemoryFactor; f < 1.1 {
+		t.Errorf("java17 memoryFactor is %v, too low to buy back what the JVM reserves", f)
+	}
+}
+
+// virtualObjectPath is the API's own config, and the worker never reads it at
+// runtime: both files ship baked into the same image, so they can only drift in
+// the repository, and a test catches that in CI before the image exists.
+const virtualObjectPath = "../../config/virtual_object.json"
+
+func decodeVirtualObject(t *testing.T) config.VirtualObject {
+	t.Helper()
+	data, err := os.ReadFile(virtualObjectPath)
+	if err != nil {
+		t.Fatalf("could not read %s: %v", virtualObjectPath, err)
+	}
+	var vo config.VirtualObject
+	if err := json.Unmarshal(data, &vo); err != nil {
+		t.Fatalf("could not decode %s: %v", virtualObjectPath, err)
+	}
+	return vo
+}
+
+// The invariant nobody was checking: a pool's ceiling has to cover the largest
+// limit a problem may declare in that language, times whatever its runtime
+// reserves for itself. Without it a problem declares 2048 MB, Claim caps the
+// request, and the solution silently gets less than it was promised — which is
+// exactly the python310 bug D14 had to fix by hand.
+func TestJudgeConfig_EveryHeavyLanguageCanHonourTheLimitsThePlatformAllows(t *testing.T) {
+	cfg := decodeRealConfig(t)
+	vo := decodeVirtualObject(t)
+
+	// The global is what bounds every language, not the per-language limits: a
+	// problem's own memoryLimit is validated against the global and applies to
+	// whatever language is submitted, and languageOverrides can only cap what an
+	// override declares, never raise it past the global.
+	maxMB := vo.MaxMemoryLimitGlobal
+
+	for lang, sizing := range cfg.Judge.Pools[poolHeavy].Languages {
+		factor := cfg.Judge.Languages[lang].MemoryFactor
+		need := int64(float64(maxMB) * 1024 * 1024 * factor)
+		if sizing.MemoryBytes < need {
+			t.Errorf("pool %q, language %q: memoryBytes is %d, but a problem may declare %d MB, which needs %d with memoryFactor %v",
+				poolHeavy, lang, sizing.MemoryBytes, maxMB, need, factor)
+		}
 	}
 }

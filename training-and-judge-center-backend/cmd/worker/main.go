@@ -125,9 +125,10 @@ func main() {
 	artifactLanguages := make(map[string]adapterjudge.ArtifactLanguageConfig, len(judgeCfg.Judge.Languages))
 	for lang, lc := range judgeCfg.Judge.Languages {
 		execLanguages[lang] = adapterjudge.LanguageExecConfig{
-			CompileCmd: lc.CompileCmd,
-			RunCmd:     lc.RunCmd,
-			Extension:  lc.Extension,
+			CompileCmd:   lc.CompileCmd,
+			RunCmd:       lc.RunCmd,
+			Extension:    lc.Extension,
+			MemoryFactor: lc.MemoryFactor,
 		}
 		artifactLanguages[lang] = adapterjudge.ArtifactLanguageConfig{
 			SourcePath:   lc.ArtifactSource,
@@ -343,14 +344,15 @@ func main() {
 // judgeLanguageConfig holds what is true of a language regardless of which pool
 // runs it: its image and how its code is compiled and executed.
 type judgeLanguageConfig struct {
-	Image           string `yaml:"image"`
-	Extension       string `yaml:"extension"`
-	CompileCmd      string `yaml:"compileCmd"`
-	RunCmd          string `yaml:"runCmd"`
-	ArtifactSource  string `yaml:"artifactSource"`
-	ArtifactCompile string `yaml:"artifactCompile"`
-	ArtifactPath    string `yaml:"artifactPath"`
-	ArtifactRun     string `yaml:"artifactRun"`
+	Image           string  `yaml:"image"`
+	Extension       string  `yaml:"extension"`
+	MemoryFactor    float64 `yaml:"memoryFactor"`
+	CompileCmd      string  `yaml:"compileCmd"`
+	RunCmd          string  `yaml:"runCmd"`
+	ArtifactSource  string  `yaml:"artifactSource"`
+	ArtifactCompile string  `yaml:"artifactCompile"`
+	ArtifactPath    string  `yaml:"artifactPath"`
+	ArtifactRun     string  `yaml:"artifactRun"`
 }
 
 // judgePoolLanguageConfig is the sizing of one language's containers inside one
@@ -454,6 +456,11 @@ func validateJudgeConfig(cfg judgeConfigFile) error {
 		}
 		if lc.Extension == "" {
 			return fmt.Errorf("language %q runs solutions but has no extension", lang)
+		}
+		// The container is sized as the problem's limit times this, so a language
+		// that omits it silently hands its runtime's overhead to the contestant.
+		if lc.MemoryFactor < 1 {
+			return fmt.Errorf("language %q runs solutions but its memoryFactor is under 1 (%v)", lang, lc.MemoryFactor)
 		}
 		if _, ok := cfg.Judge.Pools[poolHeavy].Languages[lang]; !ok {
 			return fmt.Errorf("language %q runs solutions but pool %q does not size it", lang, poolHeavy)

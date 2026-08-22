@@ -15,6 +15,7 @@ judge:
     cpp20:
       image: "judge-runner:cpp20"
       extension: "cpp"
+      memoryFactor: 1.0        # a native binary reserves nothing of its own
       compileCmd: "g++ -std=c++20 -O2 -o /sandbox/Solution /sandbox/Solution.cpp"
       runCmd: "/sandbox/Solution"
       artifactSource:  "/sandbox/{name}.cpp"
@@ -25,12 +26,18 @@ judge:
     java17:
       image: "judge-runner:java17"
       extension: "java"
+      # Container needed per usable MB: MaxRAMPercentage=90 hands 10% to non-heap
+      # and the GC keeps a little more. Without the factor a Java solution gets
+      # 86% of what the problem declares against C++ and Python getting 99%.
+      memoryFactor: 1.15
       compileCmd: "javac -encoding UTF-8 /sandbox/Solution.java"
-      # Without MaxRAMPercentage the JVM caps its heap at 25% of the container.
+      # Both percentages, because the JVM applies MinRAMPercentage instead of
+      # MaxRAMPercentage below ~250 MB of container: with only the max set, a
+      # solution gets 47% of a small container and 72% of a large one.
       # OnOutOfMemoryError makes the JVM SIGKILL itself, so a Java MLE reports
       # exit 137 like every other language instead of a bare exit 1. The single
       # quotes are load-bearing: runCmd is interpolated into an sh -c string.
-      runCmd: "java -XX:MaxRAMPercentage=75 '-XX:OnOutOfMemoryError=kill -9 %p' -cp /sandbox Solution"
+      runCmd: "java -XX:MaxRAMPercentage=90 -XX:MinRAMPercentage=90 '-XX:OnOutOfMemoryError=kill -9 %p' -cp /sandbox Solution"
       artifactSource:  "/sandbox/{name}.java"
       # -d keeps the .class files out of /sandbox, so the JAR cannot pick up the source.
       artifactCompile: "javac -encoding UTF-8 -d /sandbox/classes /sandbox/{name}.java && jar --create --file /sandbox/{name}.jar --main-class {name} -C /sandbox/classes ."
@@ -43,6 +50,7 @@ judge:
     python310:
       image: "judge-runner:python310"
       extension: "py"
+      memoryFactor: 1.0        # the interpreter costs ~5 MiB, fixed rather than proportional
       compileCmd: ""           # empty = interpreted language, compilation is skipped
       runCmd: "python3 /sandbox/Solution.py"
       artifactSource:  "/sandbox/{name}.py"
@@ -58,12 +66,14 @@ judge:
   # They must add up with dockerDaemonReserveBytes to the dind memory limit.
   pools:
     heavy:  # compiles every language, and runs contestant solutions
-      budgetBytes: 19058917376  # 17.75 GiB
+      budgetBytes: 17985175552  # 16.75 GiB
       languages:
-        # A container's limit is the ceiling where a solution gets MLE, so it
-        # cannot be under maxMemoryLimitGlobal (2048 MB in virtual_object.json).
+        # This is the ceiling a claim can ask for, so it cannot be under
+        # maxMemoryLimitGlobal (2048 MB in virtual_object.json). It only applies
+        # in full when a problem declares no memory limit, or when compiling:
+        # a judging resizes the container down to the problem's own limit.
         cpp20:     { cpu: "1", memoryBytes: 2147483648 }  # 2 GiB
-        java17:    { cpu: "1", memoryBytes: 2952790016 }  # 2.75 GiB: the JVM only sees 75%, see runCmd
+        java17:    { cpu: "1", memoryBytes: 2550136832 }  # 2.375 GiB: 2048 MB x 1.19, room for the memoryFactor
         python310: { cpu: "1", memoryBytes: 2147483648 }  # 2 GiB
 
     light:  # runs already-compiled checkers and validators, never compiles

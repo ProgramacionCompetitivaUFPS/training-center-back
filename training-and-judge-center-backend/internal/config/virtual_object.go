@@ -21,9 +21,14 @@ type VirtualObject struct {
 	MaxFileCountTestCase  int               `json:"maxFileCountTestCase"`
 	MaxFileSizeDefaultMB  int               `json:"maxFileSizeDefaultMB"`
 	MaxTimeLimitGlobal    int               `json:"maxTimeLimitGlobal"`
-	MaxMemoryLimitGlobal  int               `json:"maxMemoryLimitGlobal"`
-	LanguageOverrides     []LanguageLimit   `json:"languageOverrides"`
-	Tags                  []string          `json:"tags"`
+	// MaxMemoryLimitGlobal is the largest memory limit a problem may declare, and
+	// it reaches past the API: the judge sizes its heavy pool containers to cover
+	// it, times each language's memoryFactor. Raising it without resizing them
+	// makes the pool cap the request and hand the solution less memory than the
+	// problem promised, silently. A test in cmd/worker guards the relationship.
+	MaxMemoryLimitGlobal int             `json:"maxMemoryLimitGlobal"`
+	LanguageOverrides    []LanguageLimit `json:"languageOverrides"`
+	Tags                 []string        `json:"tags"`
 }
 
 func loadVirtualObject() *VirtualObject {
