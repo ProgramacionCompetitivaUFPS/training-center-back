@@ -478,7 +478,11 @@ MemoryKb: memoryKb,                                        // valor absoluto
 
 y de dónde sale: `int(stats.MemoryStats.MaxUsage / 1024)` — el **pico del container desde que arrancó**. Como los containers se reusan entre casos y entre judgings (`Close` limpia `/sandbox` pero no resetea el contador del cgroup), ese número nunca baja y refleja el pico de **cualquier** corrida que haya pasado por ahí, incluidas las de otras submissions.
 
-**Por eso el arreglo obvio del bug 1 es peligroso**: copiar lo que se hace con el tiempo (`if runResult.MemoryKb > limits.MemoryKb`) le daría MLE a una submission porque *otra anterior* consumió mucha memoria en ese mismo container.
+> **Corregido al preparar el Paso 6: en cgroup v2 el número no está contaminado, no existe.** Verificado corriendo el mismo decode del código (`container.StatsResponse`, mismo cliente moby) contra un container real en un Docker con `CgroupVersion: 2`: `MaxUsage = 0`, y el JSON crudo de la API **no trae la clave `max_usage`** — es v1-only. La vía de cgroup v2 es `/sys/fs/cgroup/memory.peak`, que sí funciona y no está expuesta por la API de Docker.
+>
+> Como el cluster es cgroup v2 (`docker:27-dind` sobre nodos COS de GKE), **hoy todo veredicto reporta 0 KB de memoria consumida**. La asimetría con el tiempo es peor de lo que este documento decía: la CPU se mide bien (`total_usage` viene poblado) y la memoria directamente no se mide.
+
+**Por eso el arreglo obvio del bug 1 es peligroso**: copiar lo que se hace con el tiempo (`if runResult.MemoryKb > limits.MemoryKb`) compararía contra un número que no describe esta corrida — contaminado en cgroup v1, y cero en v2.
 
 **El arreglo**: `docker update --memory=<límite del problema>` al reclamar el container para un judging. El MLE lo hace cumplir el kernel al valor correcto y se detecta con el mecanismo que ya existe (SIGKILL → exit 137 → `exitCodeMLE`).
 
@@ -488,7 +492,14 @@ y de dónde sale: `int(stats.MemoryStats.MaxUsage / 1024)` — el **pico del con
 
 **Se descartó `ulimit -v`**, que es lo primero que uno prueba: limita el espacio de direcciones **virtual**, no el residente, y una JVM reserva muchísimo virtual sin usarlo — mataría todo Java.
 
-**Pendiente de definir**: qué reportar como KB consumidos. Aunque el veredicto sea correcto, el número seguiría viniendo de `MaxUsage` contaminado. Resetear el pico del cgroup entre corridas depende de la versión de cgroup y no está expuesto por la API de Docker, así que hay que elegir entre reportar algo aproximado o directamente el límite.
+**Pendiente de definir**: qué reportar como KB consumidos. Con la corrección de arriba la pregunta cambia de forma: no es *"elegir entre un número aproximado y el límite"*, es **construir una medición que hoy no existe**.
+
+La fuente natural en cgroup v2 es `/sys/fs/cgroup/memory.peak`, leído **dentro** del container con un `docker exec` (verificado: se lee bien). Pero **no se puede resetear entre corridas**, por dos motivos independientes que hay que tener presentes al diseñarlo:
+
+- El reset de `memory.peak` (escribirle cualquier valor) llegó en **Linux 6.11**; los nodos COS de GKE están por debajo.
+- Docker monta `/sys/fs/cgroup` **de solo lectura** dentro del container, así que aunque el kernel lo soportara, el `docker exec` no podría escribirlo.
+
+O sea que `memory.peak` sigue siendo monotónico desde que arrancó el container, y como los containers se reusan, hereda el mismo problema de contaminación que `MaxUsage` tenía en v1. Aislar una corrida necesita otra vía —medir el pico del **proceso** en lugar del cgroup (`getrusage`/`ru_maxrss` del hijo, que es lo que hacen los jueces clásicos)— y eso implica algo en la imagen o en el comando de ejecución. Queda para el Paso 6.
 
 **Alcance**: el rediseño ya modifica `RunTestCase` (por D7, la salida deja de ir a `/sandbox/output.txt`), así que el costo marginal es bajo.
 
@@ -539,6 +550,8 @@ El objetivo razonable es que quepan los **lenguajes principales** con holgura. S
 
 **Corregido al ejecutar el Paso 4**: la versión anterior de esta tabla sumaba la reserva del demonio (0.5 GiB) *además* de los 9.5 GiB, que ya la tenían descontada, y daba 7.6. La conclusión no cambia.
 
+> **Los números de esta tabla quedaron obsoletos con D14.** El nodo pasó a `e2-standard-8`, el dind a 25 GiB, `maxConcurrent` a 5 y el dimensionamiento a N3 (esta tabla usa N2). Se dejan porque el razonamiento —el invariante es lo obligatorio, los containers calientes son comodidad— sigue valiendo tal cual; **los valores vigentes están en D14**.
+
 El `e2-standard-4` actual cumple el invariante con margen y además mantiene calientes los tres lenguajes en ambos pools. Crecer la máquina sirve solo para subir `maxConcurrent` y procesar más submissions en paralelo: es una decisión de throughput para la competencia, separada de este rediseño.
 
 #### Medición del pool liviano (hecha en el Paso 4)
@@ -576,17 +589,162 @@ Los números del YAML **no se tocaron en el Paso 4**: lo único que el pool livi
 
 ---
 
+
+---
+
+### D14 — Dimensionamiento del nodo, el pod y los pools ✅
+
+Cierra las dos precondiciones que el Paso 6 exigía resolver antes de escribir código, y de paso el reparto entero de la infraestructura. Todo lo de abajo está medido o derivado del código, salvo donde se dice explícitamente.
+
+#### La máquina: `e2-standard-8`
+
+Sube de `e2-standard-4`. **El motivo es la concurrencia, no la memoria**: `maxConcurrent` sale de `limits.cpu` del dind menos la reserva del demonio, y en la máquina chica eran 2. Con la nueva son **5**.
+
+**El costo no fue el criterio, y conviene dejar escrito por qué**: el `judge-pool` tiene `--num-nodes 0 --min-nodes 0` y KEDA `minReplicaCount: 0`, así que el nodo del judge **solo existe mientras hay cola**. La cadena es: cola vacía → KEDA baja el worker a 0 (`cooldownPeriod: 300`) → nodo sin pods → el cluster autoscaler lo elimina (~10 min de gracia). El delta sobre `e2-standard-4` es de **~US$0.67 por competencia de 5 horas**.
+
+El único escenario donde eso se rompe es que la cola nunca se vacíe —`activationValue: "0"` mantiene el worker en ≥1 con cualquier mensaje—, y ahí un mensaje envenenado que se reencola para siempre deja el nodo prendido 24/7 (~US$196/mes). Vale un chequeo en la Fase 8.
+
+**Se descartó quedarse en `e2-standard-4`**: es viable —con N1 hasta sobra memoria— pero deja `maxConcurrent` en 2 y la CPU del pod al filo (3.5 de ~3.5 utilizables). Con 40 personas enviando a la vez, la cola es lo que se nota, y no se compra con memoria.
+
+**Migración**: GKE no permite cambiar el machine type de un node pool existente. Hay que crear uno nuevo con el mismo taint, cambiar el `nodeSelector` del worker y borrar el viejo. Con 0 nodos y sin datos es reversible en minutos.
+
+#### `requests == limits`: QoS Guaranteed, en los tres containers
+
+Antes: dind `requests 2/8Gi` contra `limits 3/10Gi`, worker `250m/256Mi` contra `500m/512Mi`. Tres razones para igualarlos:
+
+1. **El judge se dimensiona contra `limits`, pero el nodo reserva `requests`.** `POD_MEMORY_LIMIT` y `POD_CPU_LIMIT` leen `limits.*` del dind vía Downward API, así que `validatePoolBudgets` y `maxConcurrent` operaban sobre memoria y cores que el scheduler nunca garantizó. Funcionaba por una razón accidental: el node pool está taintado y corre un solo pod, así que no había con quién competir.
+2. **QoS.** Con la brecha el pod es *Burstable*, de los primeros en ser desalojado bajo presión de memoria del nodo — con judgings en vuelo adentro.
+3. **En un node pool dedicado la brecha no le sirve a nadie**: el argumento normal a favor de `requests < limits` es prestarle el sobrante a otros pods, y el taint garantiza que no hay otros.
+
+**El `prepull-language-images` también necesita `resources`.** Kubernetes clasifica la QoS mirando **todos** los containers, init containers incluidos: sin bloque `resources` el pod queda Burstable por más que dind y worker estén igualados. Se le ponen `200m / 256Mi`, generosos para lo que hace — el `docker pull` lo ejecuta el **demonio** dentro del dind, y el container del CLI solo transporta órdenes y progreso.
+
+**Y no le cuesta nada al pod.** El pedido efectivo de un pod con sidecars es `máx(para cada init normal: su pedido + Σ sidecars ya arrancados, Σ sidecars + Σ containers normales)`. Como `dind` es sidecar nativo (`restartPolicy: Always`) y el prepull corre antes de que el worker arranque, la franja del prepull es 6.2 CPU / 25.25 GiB, por debajo del estado estable de 7 CPU / 27 GiB. El prepull usa la franja del worker, prestada.
+
+#### El reparto completo
+
+Del nodo crudo a lo que queda para los pools:
+
+```
+e2-standard-8                                     8.00 CPU   32.00 GiB
+  reserva del kubelet (fórmula de GKE)           −0.09      −3.66
+─────────────────────────────────────────────────────────────────────
+ASIGNABLE                                         7.91      28.34
+  DaemonSets (kube-proxy, fluentbit, métricas,
+  pdcsi, netd) — ESTIMADO, ver pendientes        −~0.40     −~0.45
+─────────────────────────────────────────────────────────────────────
+DISPONIBLE PARA EL POD                           ~7.50     ~27.90 GiB
+
+  dind        6.00 CPU / 25.00 GiB
+  worker      1.00 CPU /  2.00 GiB
+  prepull     (franja prestada del worker)
+─────────────────────────────────────────────────────────────────────
+POD                                               7.00      27.00 GiB
+MARGEN                                           ~0.50      ~0.90 GiB
+```
+
+Adentro de los 25 GiB del dind:
+
+| | GiB | bytes |
+|---|---|---|
+| `pools.heavy.budgetBytes` | 17.75 | 19058917376 |
+| `pools.light.budgetBytes` | 6.25 | 6710886400 |
+| `dockerDaemonReserveBytes` | 1.00 | 1073741824 |
+| **suma = `dind.limits.memory`** | **25.00** | **26843545600** |
+
+`dockerDaemonReserveBytes` sube de 512 MiB a 1 GiB: los 512 se dimensionaron para 2 judgings concurrentes y ahora son 5, con más churn de containers y más metadata en el demonio.
+
+#### `maxMemoryLimitGlobal` se queda en 2048 MB
+
+Se evaluó bajarlo a 1024 (la propuesta que este documento traía anotada) y **se descartó**.
+
+**El argumento en contra que el documento pedía verificar, verificado**: los 12 paquetes BOCA de `packages_contest` —los que la Fase 9 va a convertir e importar— declaran **1024 MB los doce**, y además el mismo valor para los tres lenguajes (`limits/cpp`, `limits/java`, `limits/c` son idénticos). O sea que 1024 alcanzaría exacto para la competencia real. Pero también significa que **el tope no es lo que aprieta**: ningún problema real se acerca a 2048.
+
+Lo que decidió: con el dimensionamiento de arriba, **2048 no le cuesta nada** — el pool pesado entra en N3 dentro de los 17.75 GiB. Bajar a 1024 liberaría ~9 GiB que **no se pueden convertir en nada**: `maxConcurrent` lo limita la CPU, no la memoria, así que sería presupuesto muerto. Y deja el techo de la plataforma donde DOMjudge lo tiene por default.
+
+**Se descartó también hacer `maxMemoryLimit` por lenguaje**, que era la inconsistencia anotada (`maxTimeLimit` sí lo es: 300s/400s/600s). Dos razones: `platform_settings.go` exige `maxMemoryLimit <= maxMemoryLimitGlobal`, así que un valor por lenguaje solo puede **apretar**, nunca aflojar — no sirve para "darle más a Python", que era el caso que lo motivaba, y para eso ya están los `languageOverrides` por problema. Y el dato real: los 12 paquetes no diferencian por lenguaje.
+
+**Bajarlo después no rompe nada**: los tres call sites que validan (`create_problem`, `update_problem`, `import_problem`) lo hacen al escribir; la lectura usa `RestoreMemoryLimit`, sin validar. No hay migración.
+
+#### Tamaños por lenguaje, y de dónde sale el 2.75 de Java
+
+| Pool pesado | GiB | Por qué |
+|---|---|---|
+| `cpp20` | 2.00 | = el tope de problema |
+| `java17` | **2.75** | `2048 / 0.75 = 2730 MiB` — con `MaxRAMPercentage=75` el heap es el 75% del container, así que para entregar 2048 hay que darle 2.67; redondeado a 2.75 |
+| `python310` | **2.00** | **corrige el bug**: tenía 1 GiB contra los 2048 que la plataforma promete |
+
+El pool liviano no se toca (`cpp20` 0.5 / `java17` 1 / `python310` 0.5): corre checkers y validators, a los que el `memoryLimit` del problema nunca se les aplica, así que `maxMemoryLimitGlobal` no lo mueve.
+
+#### El nivel al que se dimensiona: N3
+
+El documento tenía un solo nivel escrito (el invariante de D13). Al dimensionar aparecieron cuatro, y conviene nombrarlos porque la diferencia entre ellos son varios GiB:
+
+| | Fórmula | Qué garantiza |
+|---|---|---|
+| **N1** | `maxConcurrent × mayor` | el invariante de D13: nadie se cuelga. **Lo único obligatorio** |
+| **N2** | `Σ(todos los lenguajes)` | un container ocioso de cada lenguaje |
+| **N3** | `(maxConcurrent − 1) × mayor + Σ(todos)` | un caliente de cada lenguaje **y** los judgings concurrentes en el más pesado |
+| **N4** | `maxConcurrent × Σ(todos)` | nunca evicta; por encima, ninguna memoria extra es alcanzable |
+
+Con `maxConcurrent = 5`, **N2 queda por debajo de N1** (6.75 contra 13.75 en el pool pesado): a concurrencia alta el invariante ya cubre "un caliente por lenguaje" de sobra. La elección real es entre N1 y N3.
+
+```
+Pesado  N3 = (5−1) × 2.75 + (2 + 2.75 + 2) = 11 + 6.75 = 17.75 GiB
+Liviano N3 = (5−1) × 1    + (0.5 + 1 + 0.5) =  4 + 2.00 =  6.00 GiB
+                                     (6.125 cuando `compare` llegue en el Paso 7)
+```
+
+**Se eligió N3 sabiendo que N1 alcanzaría.** Lo que se compra son los 200-500 ms de crear un container, sobre un judging que dura segundos — el propio D13 dice que evictar *"es el comportamiento normal y esperado, no una falla"*. Se eligió igual porque el margen deja ver el comportamiento bajo estrés en vez de descubrirlo en competencia, y porque con la máquina nueva sale gratis. **Si hiciera falta memoria para otra cosa, bajar a N1 libera 5.1 GiB sin romper ningún invariante.**
+
+#### El worker: 1 core / 2 GiB
+
+Sube de `500m / 512Mi`. Los dos números se eligieron cuando el worker solo coordinaba, y desde la Fase 6 descomprime, empaqueta y compara.
+
+**La memoria** — medido con 5 judgings concurrentes en Go 1.25, simulando el mundo post-Paso 7 (entrada por el volumen, sin duplicación de tar), reportando `runtime.MemStats.Sys`:
+
+| Datos de prueba por problema | `Sys` |
+|---|---|
+| 50 MB | 525 MB |
+| **100 MB** | **1006 MB** |
+| 200 MB (el tope viejo) | 1614 MB |
+
+Con 2 GiB y el tope nuevo de 100 MB queda al **52%**. La medición no incluye la línea de base real (pgx, cliente de GCS, AMQP), así que son cotas inferiores.
+
+**La CPU** — el término dominante es descomprimir el ZIP de casos de prueba, medido a ~120 MB/s con un core:
+
+| | 5 judgings de 100 MB a la vez |
+|---|---|
+| `500m` | **10.2 s** |
+| `1 core` | **5.1 s** |
+| 2 cores | 2.6 s |
+
+Son segundos de latencia muerta antes de que el judging empiece. **Se descartó 2 cores**: consumiría todo el margen del nodo, y los DaemonSets corren con `system-node-critical` — no se quedarían afuera, **preemptarían al pod del judge**.
+
+Dato que explica por qué `500m` frena tanto: **Go 1.25 nunca baja `GOMAXPROCS` de 2** aunque el cgroup diga 0.5. Con dos hilos contra medio core, el runtime quema su cuota en ~25 ms de cada período de 100 y queda frenado el resto.
+
+**La CPU del worker no le cuesta nada a `maxConcurrent`**: son containers separados con cgroups separados, y la fórmula se deriva de `limits.cpu` **del dind**.
+
+#### El tope de datos de prueba baja de 200 a 100 MB
+
+`maxFileSizeTestCaseMB` en `config/virtual_object.json`, que acota el total descomprimido del ZIP. **Con 200 MB el worker no aguantaba ni un solo judging** (ver la sección de bugs). Los 100 MB dejan 3.5× de aire sobre el problema real más pesado, que son 28.8 MB.
+
+#### Alternativas descartadas, todas medidas
+
+- **`GOMEMLIMIT`** (decisión explícita del usuario: no por ahora). Go no lee el límite del cgroup por su cuenta, así que hoy el GC deja crecer el heap al doble de los datos vivos y **se hace matar en vez de recolectar**. Medido: con 100 MB × 5, `GOMEMLIMIT=800MiB` baja el consumo de 1005 a 797 MB. Con 200 MB × 5 **no puede honrarlo** (1614 → 1082): los datos vivos son 1000 MB y el GC no recolecta lo que sigue referenciado. Sirve donde el problema es el colchón del GC, no donde son los datos vivos.
+- **Streaming de casos de prueba** (`GetTestCases` devolviendo un iterador en vez de un slice). Convierte `O(suma de casos)` en `O(caso mayor)`, pero **con estos datos no compra casi nada**: los paquetes BOCA tienen 2-3 casos y en los pesados **un solo archivo es el 99% del peso** (28.75 de 28.8 MB en el problema B). Sirve para problemas con muchos casos chicos; la palanca real acá es un tope **por archivo**, que no existe.
+- **N1 en vez de N3** — ver arriba.
+- **`e2-standard-4`** — ver arriba.
 ## Detalles a resolver al implementar
 
 Ninguno bloquea el diseño; son elecciones que conviene hacer con el código delante.
 
-- **Si la entrada del caso de prueba viaja por el volumen compartido** (más barato que `CopyToContainer`) o sigue por la API. La salida sí va por el volumen (D7); la entrada podría ir por cualquiera de los dos.
+- ~~**Si la entrada del caso de prueba viaja por el volumen compartido** o sigue por la API.~~ **Resuelto: va por el volumen.** El razonamiento (no es secreta, y es el 82% del pico de memoria del worker) está en el Paso 7.
 - **Limpieza del directorio del judging**: hoy `Session.Close` hace `rm -rf /sandbox/*`; hay que sumar el borrado de `<raíz>/<uuid>` por parte del worker.
 - ~~**`maxOutputBytes`**: hoy 64 MiB.~~ **Resuelto en el Paso 5**: bajó a 8 MiB. Con D7 además deja de presionar al worker, pero sigue acotando cuánto disco del `emptyDir` puede consumir un judging.
 - **Los otros dos archivos que lee el checker no están acotados por `maxOutputBytes`** (encontrado en el Paso 5, sin resolver). Bajar ese límite acota la salida **del concursante**, pero el checker recibe tres archivos, y el input y la salida esperada salen de `parseTestCasesZip` (`internal/adapter/judge/test_case_provider.go`), que tiene **su propio tope, independiente y quemado como literal**: `io.ReadAll(io.LimitReader(rc, 64*1024*1024))`. O sea que un problem setter que sube un `.ans` de 60 MiB hace OOM al container del pool liviano igual, y el dimensionamiento de D13 no lo cubre. Es un camino mucho más raro que el del concursante —lo controla el setter, y el publish lo agarraría antes que una competencia— pero el número está donde nadie lo va a ver. Al encararlo hay que decidir **dos cosas distintas**: cuál es el tope por archivo de caso de prueba, y si vive junto a `maxOutputBytes` en vez de suelto en el parser del ZIP. Ojo con la asimetría al elegirlo: el pico de memoria del checker escala con la **suma** de los tres archivos, no con el mayor.
 
   **Y toca también al worker, no solo al container.** El Paso 5 cambia dónde viven esos bytes: hoy `customCheckerCompare` escribe los tres archivos a un directorio temporal **en disco**, y el adapter nuevo los empaqueta en un **tar en memoria** (`buildTar` arma un `bytes.Buffer`) para copiarlos por la API de Docker. Sumado a que `GetTestCases` ya trae **todos** los casos de prueba a memoria de una vez, el worker —que tiene `limits.memory: 512Mi`— queda expuesto a datos que solo el problem setter acota. El Paso 7 se lleva la salida del concursante al volumen compartido, pero **no** el input ni la salida esperada, así que este ítem le sobrevive.
-- **Qué reportar como KB consumidos** (ver D11): el veredicto de MLE queda correcto porque lo hace cumplir el kernel, pero el número que se muestra vendría de `MaxUsage`, contaminado por corridas anteriores en el mismo container.
+- **Qué reportar como KB consumidos** (ver D11 y el Paso 6, A5): el veredicto de MLE queda correcto porque lo hace cumplir el kernel, pero el número que se muestra sale de `MaxUsage`, que **en cgroup v2 viene en cero**. No es elegir entre un valor aproximado y el límite: es construir una medición que hoy no existe.
 - **Un checker roto se reporta como wrong answer del concursante** (encontrado en el Paso 5, decidido dejarlo así). El adapter trata **cualquier** exit distinto de cero como rechazo, con el stderr como mensaje — igual que `ValidatorSession.Validate` desde el Paso 4. Eso mete dos casos ajenos en la misma bolsa:
 
   - **`exit 3` es `_fail` en testlib**: el checker declarando que *él* o los datos del jurado están rotos, no que la salida del concursante esté mal. La tabla completa es `0=_ok`, `1=_wa`, `2=_pe`, `3=_fail`, `7=_points`.
@@ -623,6 +781,34 @@ Ninguno bloquea el diseño; son elecciones que conviene hacer con el código del
 
 ---
 
+
+#### Pendientes que abrió el dimensionamiento de D14, sin paso asignado
+
+- **Medir los DaemonSets antes de aplicar los números de D14.** Es la única fila del desglose que quedó estimada (~0.40 CPU / ~0.45 GiB), y de ella dependen los 0.5 CPU y 0.9 GiB de margen del pod. El orden correcto es: crear el node pool nuevo → dejar que levante un nodo → `kubectl describe node <nodo>` → leer la sección **`Allocated resources`** (que muestra lo ya pedido, con los DaemonSets arriba y el pod del judge todavía no) → ajustar `dind.limits.memory` contra el número real. Si sale más alto que lo estimado, se recorta del dind; si sale más bajo, el excedente natural es también el dind (el worker queda al 52% con el tope de 100 MB).
+
+  **Y el margen no es capacidad ociosa**: los DaemonSets del sistema corren con `priorityClassName: system-node-critical`, así que si no entran no se quedan afuera — **preemptan al pod del judge**. El modo de falla de pedir de más no es "no arranca", es "arranca y lo matan en medio de una competencia".
+
+  **Se decidió medirlo al desplegar, no antes.** Medir en la máquina destino **es** la migración: GKE no deja cambiar el machine type, así que tener un nodo `e2-standard-8` exige crear el node pool nuevo. Y el margen que D14 deja son 0.9 GiB contra ~0.45 estimados, o sea 2×: para que falle, los DaemonSets tendrían que pedir el doble de lo típico. El modo de falla además es benigno y ruidoso — el pod queda `Pending` y `kubectl describe pod` lo dice con todas las letras; el arreglo es bajar el `25Gi` del dind.
+
+- **`github.com/rabbitmq/amqp091-go` está marcado `// indirect` en `go.mod` y no lo es** — `internal/adapter/queue/rabbitmq_queue.go` lo importa directamente. Apareció al correr los tests con `-mod=mod`, que lo movió solo; se revirtió por no ser de esta tarea. Un `go mod tidy` lo corrige. Sin efecto funcional: es exactitud del manifiesto de dependencias.
+
+- **Un tope por archivo individual de caso de prueba**, separado del total. Hoy solo existe el total (`maxFileSizeTestCaseMB`, 100 MB tras D14), aplicado además como tope por archivo, así que **un solo archivo puede ocupar los 100 MB completos**. Eso importa por dos motivos distintos que conviene no mezclar:
+
+  - **Para el worker**, es lo que hace que el streaming de casos de prueba no sirva: convertir `O(suma)` en `O(caso mayor)` no ayuda si un archivo es el 99% del peso, que es exactamente la forma de los paquetes BOCA (28.75 de 28.8 MB en el problema B).
+  - **Para el container del pool liviano**, es el ítem que ya estaba anotado más arriba: el pico de memoria del checker escala con la **suma** de los tres archivos que recibe, y `maxOutputBytes` solo acota uno de ellos.
+
+  Un valor razonable con los datos reales sería ~32 MB (cubre los 28.75 con margen), pero hay que decidirlo mirando los dos consumidores a la vez, y decidir también **dónde vive** — hoy el tope del parser está quemado como literal (`io.ReadAll(io.LimitReader(rc, 64*1024*1024))` en `test_case_provider.go`), desincronizado de la config.
+
+- **Cache de casos de prueba por problema.** Con `maxConcurrent = 5`, cinco submissions al mismo problema **descargan y descomprimen el mismo ZIP cinco veces**, cada una con su copia en memoria. En una competencia las submissions se agolpan sobre unos pocos problemas, así que es trabajo repetido casi en su totalidad, y ataca los dos costos a la vez:
+
+  - **CPU**: medido, descomprimir 100 MB cuesta ~825 ms con un core; cinco a la vez tardan 5.1 s en llegar al primer caso de prueba.
+  - **Memoria**: cinco copias de los mismos datos es exactamente el término que domina el consumo del worker.
+
+  Lo que hay que resolver al encararlo: **la invalidación**. Un problem setter puede cambiar los casos de prueba, y el dominio ya tiene el campo para detectarlo (`judgingUpdatedAt`, que `SetTestCases` toca y que los tres casos de uso de rejudge ya usan). Y el canje: un cache sostiene memoria entre judgings a cambio de bajar los picos, así que su tamaño hay que dimensionarlo igual que todo lo demás — un LRU de 2-3 problemas alcanzaría para una competencia.
+
+- **El comentario de doc de `validatePoolBudgets` quedó huérfano sobre `poolConfigFor`** (`cmd/worker/main.go`). `poolConfigFor` tiene su propio comentario justo debajo, y `validatePoolBudgets` quedó sin ninguno unas líneas más abajo. Cosmético; arreglarlo cuando se toque el archivo.
+
+- **`CLAUDE.md` describe el consumidor del worker como serial** (*"consumidor concurrente con semáforo (hoy es serial)"*) y **ya es concurrente** desde antes de este rediseño: `Consume` usa `sem := make(chan struct{}, maxConcurrent)` con goroutines y `Qos(maxConcurrent)` (`internal/adapter/queue/rabbitmq_queue.go`). Es el mismo tipo de deriva documentación-código que el Paso 3 cerró con `Solution.java`. Va junto con los otros dos ítems de `CLAUDE.md` que el roadmap ya anota.
 
 - **Revisar la configuración de la plataforma entera — fuera de este rediseño, pero pedido explícitamente.** Hoy hay **tres superficies de configuración** que nadie coordina:
 
@@ -761,9 +947,9 @@ No es cosmético, porque testlib trata los dos archivos con semánticas distinta
 
 **Se corrigió en el Paso 5**, que reescribe esa misma línea de invocación, y **se actualizó el spec** en el mismo commit para que no quede documentación contradiciendo al código — la misma deriva que el Paso 3 tuvo que cerrar con `Solution.java`. Sin riesgo sobre datos productivos: por D12 todo el pipeline es de esta rama y nunca se mergeó.
 
-### El pool pesado le da a Python la mitad de la memoria que la plataforma promete — pendiente, va al Paso 6
+### El pool pesado le da a Python la mitad de la memoria que la plataforma promete — ✅ RESUELTO en D14
 
-Encontrado en el Paso 5, al revisar de dónde salían los tamaños del YAML. **No se arregló acá**: es territorio del Paso 6 (memoria), y nada de esto está desplegado todavía.
+Encontrado en el Paso 5, al revisar de dónde salían los tamaños del YAML. **Arreglado en D14**: `python310` pasa a 2 GiB en `pools.heavy`. Se deja el diagnóstico completo abajo porque explica por qué el techo del pool y `maxMemoryLimitGlobal` son el mismo número visto desde dos archivos.
 
 `config/judge_config.yaml` dimensiona el pool pesado así: `cpp20` 2 GiB, `java17` 2 GiB, **`python310` 1 GiB**. Los números vienen de la config ilustrativa de D10 —que el propio documento marcaba como ilustrativa— y pasaron al YAML en el Paso 2 sin que nadie volviera sobre el de Python.
 
@@ -787,9 +973,9 @@ O sea: un problema con `memoryLimit = 2048 MB`, una solución en Python que usa 
 
 El de Java es deliberado y está documentado más arriba; el de Python no está justificado en ningún lado.
 
-#### Y la pregunta que abre: ¿el tope de 2048 MB por problema es el correcto?
+#### Y la pregunta que abre: ¿el tope de 2048 MB por problema es el correcto? — ✅ RESUELTA en D14
 
-Surgió al discutir lo anterior, y **se decidió resolverla en el Paso 6** junto con los tamaños, porque las dos cosas son el mismo número visto desde dos archivos. La propuesta sobre la mesa es **bajar `maxMemoryLimitGlobal` a 1024 MB**. El análisis, para no rehacerlo:
+Surgió al discutir lo anterior, y **se resolvió en D14: se queda en 2048**. La propuesta que este documento traía era bajarlo a 1024; se descartó porque con el dimensionamiento de D14 los 2048 no cuestan nada y lo que se liberaría no se puede convertir en concurrencia. El análisis que sigue se conserva porque **el argumento en contra que pedía verificar ya se verificó** (los 12 paquetes BOCA declaran 1024, ver D14) y porque describe bien el acoplamiento entre los dos archivos:
 
 **Qué controla ese número.** Es el máximo que un problem setter puede *declarar*, aplicado por **rechazo, no por recorte** (`internal/domain/problem/language_override.go:49`). Un problema normal declara 256, así que bajarlo no toca los problemas típicos: angosta el extremo que un setter podría pedir.
 
@@ -856,6 +1042,82 @@ Un checker o validator escrito con testlib —que es el caso normal en programac
 
 **Decisión pendiente al hacerlo**: si el header se vendorea en el repo (reproducible, versión congelada) o se baja en el build (más simple, dependencia de red en el build).
 
+
+### El worker no aguantaba su propio tope de datos de prueba — ✅ RESUELTO en D14
+
+Encontrado al dimensionar el worker para el Paso 6. **Estaba activo hoy**, con `maxConcurrent = 2`, sin necesidad de ningún cambio de este rediseño.
+
+`config/virtual_object.json` declaraba `maxFileSizeTestCaseMB: 200`, que `icpc_parser.go` aplica como **total descomprimido** del ZIP de casos de prueba, y también como tope por archivo individual. O sea que un problema legal podía traer 200 MB de datos.
+
+El worker, por judging, sostiene:
+
+| Componente | Tamaño | Vive |
+|---|---|---|
+| ZIP comprimido (`io.ReadAll` en `GetTestCases`) | el ZIP entero | solo durante `GetTestCases` |
+| Todos los casos descomprimidos (`parseTestCasesZip`) | Σ inputs + answers | **todo el judging** |
+| Copia tar de cada archivo que entra al container (`buildTar`) | = ese archivo | por escritura |
+| Salida del concursante | ≤ 8 MiB | por caso |
+
+Para un problema en el tope: `200 (casos) + 200 (copia tar del input) + 8 (salida) = 408 MB de datos vivos`, más la línea de base del proceso. Contra los **512Mi** que tenía el container del worker, **un solo judging ya se pasaba**. Y cuando el kernel mata al proceso worker se caen todos los judgings en vuelo y la conexión con RabbitMQ — el modo de falla que el "Problema 1" de este documento describe.
+
+Con los datos reales no explotaba: el peor de los 12 paquetes BOCA son 28.8 MB, así que 2 judgings concurrentes daban ~130 MB. El agujero estaba entre lo que los datos reales usan y lo que la plataforma permitía declarar.
+
+**Arreglado en D14 por los dos lados**: el tope baja a 100 MB y el worker sube a 2 GiB.
+
+### `buildTar` duplica en memoria cada archivo que entra al container — pendiente, va al Paso 6.5
+
+Encontrado al desglosar la memoria del worker. La API de Docker tiene una sola forma de meter un archivo en un container: `CopyToContainer` recibe un `io.Reader` que debe entregar un **stream tar**. El tar es inevitable; **materializarlo entero en memoria no**.
+
+```go
+func buildTar(filename string, content []byte, mode int64) io.Reader {
+	var buf bytes.Buffer      // materializa el tar COMPLETO
+	tw := tar.NewWriter(&buf)
+	tw.WriteHeader(...)
+	tw.Write(content)         // el archivo entero entra al buffer
+	tw.Close()
+	return &buf               // recién acá empieza a leerse
+}
+```
+
+Devuelve un `io.Reader`, o sea que *aparenta* ser un stream, pero para cuando devuelve ya construyó todo: el archivo existe dos veces al mismo tiempo.
+
+**Medido** contra un archivo de 27.4 MB (el tamaño del input más grande de los paquetes reales), consumiendo el reader como lo hace el cliente de Docker:
+
+| | Asignado durante la operación | Pico de heap |
+|---|---|---|
+| `buildTar` actual | 27.4 MB | **55.0 MB** |
+| con `io.Pipe` + goroutine | **0.0 MB** | 27.6 MB |
+
+Por qué está escrito así: es la forma obvia, y hasta el Paso 5 todo lo que se copiaba era chico (el fuente ≤ 1 MB, el artefacto compilado unos MB). Los inputs de decenas de MB entraron al cuadro cuando el checker pasó a recibir sus tres archivos por la API.
+
+**La parte delicada del arreglo**: con `io.Pipe`, si `CopyToContainer` falla temprano y nadie cierra el lado lector, la goroutine escritora **queda bloqueada para siempre** — un goroutine leak que además retiene el archivo. Antes de implementarlo hay que verificar que el cliente de moby cierre el reader que recibe en **todos** los caminos de error, o cerrarlo explícitamente desde el llamador.
+
+**Sigue valiendo después del Paso 7**: aunque el input y la salida del concursante pasen al volumen compartido, por la API siguen viajando el fuente de la solución, el artefacto del checker y la **salida esperada** (que D7 punto 5 prohíbe poner en el volumen).
+
+### `GOMEMLIMIT` no está configurado — decidido no hacerlo por ahora
+
+Go **no lee el límite de memoria del cgroup por su cuenta**. Con `GOGC=100` por defecto, el pacer del GC deja crecer el heap hasta ~2× los datos vivos antes de recolectar, sin saber que hay un techo: en un container de 512Mi con 300 MB vivos, apunta a 600 MB y **el cgroup mata el proceso antes de que el GC llegue a correr**.
+
+`grep` sobre manifests, Dockerfiles y código: cero apariciones de `GOMEMLIMIT`, `GOGC` y `GOMAXPROCS`.
+
+Medido (5 judgings concurrentes, Go 1.25, `runtime.MemStats.Sys`):
+
+| Datos por problema | Por defecto | Con `GOMEMLIMIT=800MiB` |
+|---|---|---|
+| 100 MB | 1005 MB | **797 MB** — lo honra |
+| 200 MB | 1614 MB | 1082 MB — **no puede** |
+
+La segunda fila muestra la propiedad importante: es un límite **blando** y **no puede recolectar lo que sigue referenciado**. Con 5 × 200 MB los datos vivos son 1000 MB y ninguna configuración los baja. Sirve donde el problema es el colchón del GC, no donde son los datos vivos.
+
+**Decisión explícita del usuario: no agregarlo por ahora.** Con el dimensionamiento de D14 (tope 100 MB, worker 2 GiB) el worker queda al 52% sin necesitarlo. Queda anotado como la palanca a usar si el margen se achica.
+
+Al medirlo apareció además un dato que explica otra cosa: **Go 1.25 nunca baja `GOMAXPROCS` de 2** aunque el cgroup declare 0.5 CPU (verificado: `cpu.max = 50000 100000` y `GOMAXPROCS = 2`). Con dos hilos contra medio core el runtime quema su cuota en ~25 ms de cada período de 100 y queda frenado el resto — es la explicación de por qué los `500m` del worker frenaban tanto la descompresión.
+
+### El pod del judge es Burstable aunque dind y worker estén igualados — ✅ RESUELTO en D14
+
+Kubernetes clasifica la QoS de un pod mirando **todos** sus containers, **init containers incluidos**. El `prepull-language-images` de `worker.yaml` no tiene bloque `resources` en absoluto, así que el pod queda **Burstable** —de los primeros en ser desalojado bajo presión de memoria del nodo— por más que dind y worker declaren `requests == limits`.
+
+Es el renglón que decide si el resto del cambio de D14 sirve. Arreglado ahí, con `200m / 256Mi`.
 ---
 
 ## Plan de ejecución
@@ -1058,20 +1320,68 @@ Los tests siguen a lo que prueban, no al archivo donde nació el código (**M5**
 
 `docker update --memory` al reclamar el container, y decidir qué reportar como KB consumidos. Independiente del resto, se puede mover de lugar sin romper nada.
 
-**Antes de escribir nada acá, resolver los dos hallazgos del Paso 5 que están en la sección de bugs**, porque los dos cambian los números sobre los que este paso opera:
+#### Precondiciones: ✅ resueltas en D14
 
-1. **`python310` tiene 1 GiB en el pool pesado** contra los 2048 MB que la plataforma promete. Hay que corregirlo **antes** del `docker update`: la seguridad que D11 argumenta depende de que el techo del pool sea ≥ cualquier límite de problema, y con Python por debajo el `docker update` tendría que *subirlo*, sobrevendiendo el presupuesto sin que nada avise.
-2. **Si `maxMemoryLimitGlobal` baja de 2048 a 1024 MB**, que es la propuesta anotada ahí con su análisis completo. Ese número le fija el piso al pool pesado, así que decidirlo primero evita dimensionar dos veces.
+Este paso arrancaba con dos hallazgos del Paso 5 que había que cerrar antes de escribir código, porque cambiaban los números sobre los que opera. **Los dos se resolvieron en D14**, junto con el dimensionamiento entero de la infraestructura:
 
-Y conviene resolver de paso la **guarda de arranque** que ninguna de las dos cosas tiene: que todo lenguaje del pool pesado declare `memoryBytes ≥ maxMemoryLimitGlobal`. Es el chequeo cruzado contra `virtual_object.json` que el Paso 3 difirió; el hallazgo de Python es el argumento más fuerte a favor que apareció.
+1. **`python310` tenía 1 GiB en el pool pesado** contra los 2048 MB que la plataforma promete → pasa a 2 GiB.
+2. **`maxMemoryLimitGlobal`** → se queda en 2048 (se evaluó bajarlo a 1024 y se descartó; ver D14).
 
-**Y acá hay que resolver el MLE de Java**, que está en la sección de bugs: la JVM nunca deja que el cgroup la mate por heap, así que el `exitCodeMLE = 137` es inalcanzable y todo MLE de Java se reporta hoy como runtime error. La vía del exit code por lenguaje se evaluó y **se descartó**; hace falta pensar otra o refinarla. Una pista: si acá el límite pasa a aplicarse con `docker update --memory`, quizás la señal deba salir del propio cgroup (`memory.events`) en vez del código de salida, lo que además sería uniforme para los tres lenguajes.
+De paso, D14 fijó todo lo demás sobre lo que este paso opera: `maxConcurrent = 5`, los presupuestos de los dos pools, y `java17` en 2.75 GiB para que la JVM pueda entregar los 2048 declarados.
+
+#### Lo que hay que decidir acá
+
+**A1 — Dónde vive el `docker update`.** `Pool.Claim(ctx, language)` solo conoce lenguajes y el diseño quiere mantenerlo ignorante de qué clase de código corre. Las dos opciones son `Executor.BeginSession` después del `Claim`, o cambiar la firma de `Claim`.
+
+**A2 — Cómo llega el límite del problema a la sesión.** Hoy viaja **por caso de prueba** (`RunRequest.MemoryKb`), pero es constante para todo el judging. Para hacer el `docker update` una sola vez hay que moverlo a la apertura de la sesión — exactamente lo que el Paso 5 hizo con los datos del checker en `BeginChecking`.
+
+**A3 — Qué número exacto se le pasa al `docker update`, y el aviso que va con él.** El cgroup **no cuenta solo la memoria de la solución**: también el page cache de los archivos que el programa lee y escribe (`input.txt`, `output.txt`), más el `sh -c`, el `timeout` y el binario o intérprete mapeado. La medición del Paso 4 ya lo dice: *"los picos incluyen las dos salidas en el page cache del cgroup (~2× su tamaño)"*. Entonces `--memory = el límite exacto` produce MLE falsos —un problema de 256 MB con input de 20 MB mata a una solución que reservó 240—, y `--memory = límite + margen` los evita pero deja al container usar más que el límite declarado.
+
+> **Si se elige la segunda, hay que redimensionar los pools.** El pool contabiliza 2 GiB para C++ y Python, que es exactamente el tope de problema; si el `docker update` pudiera poner 2 GiB + margen, el pool reservaría menos de lo que el container puede usar — la sobreventa invisible que D11 advierte. Con `maxConcurrent = 5` y N3 en 17.75 de 17.75 GiB no hay de dónde sacarlos sin rehacer el reparto (bajar a N1 libera 5.1 GiB).
+
+**A4 — Cómo se detecta el MLE de forma uniforme en los tres lenguajes.** Es el bug de la sección de bugs: la JVM nunca deja que el cgroup la mate por agotamiento de heap —refuerza su propio tope y lanza `OutOfMemoryError`—, así que `exitCodeMLE = 137` es inalcanzable y **todo MLE de Java se reporta hoy como runtime error**, sin rastro (el comando manda stderr a `/dev/null`). La vía del exit code por lenguaje se evaluó y se descartó. La pista que este documento deja: si la señal sale del propio cgroup (`memory.events`, campo `oom_kill`) en vez del código de salida, cubre los tres lenguajes de forma uniforme.
+
+**A5 — Qué reportar como KB consumidos.** Ver D11: no es elegir entre un número aproximado y el límite, es **construir una medición que hoy no existe**, porque en cgroup v2 `MaxUsage` viene en cero. Y `memory.peak` no se puede resetear entre corridas (dos motivos independientes, ver D11), así que hereda la contaminación. Aislar una corrida necesita medir el pico del **proceso** y no el del cgroup.
+
+**A6 — Si el `docker update` aplica también al pool liviano.** El Paso 5 dejó `artifactSession` compartido por las sesiones de checker y validator. Hay que decidir si el límite del problema tiene sentido ahí o si el pool liviano se queda con el techo fijo de su config.
+
+**A7 — El OOM del checker en el pool liviano** (abierto desde el Paso 5, mismo mecanismo). Un checker que se queda sin memoria sale con **137 en C++/Python y con 1 en Java**, indistinguible de un rechazo legítimo — o sea, *wrong answers silenciosos al concursante*. Si la solución de A4 sale del cgroup, cubre este caso también y hay que cerrarlo acá.
+
+**A8 — La guarda de arranque que falta**: que todo lenguaje del pool pesado declare `memoryBytes >= maxMemoryLimitGlobal`. Es el **chequeo cruzado contra `config/virtual_object.json`** que el Paso 3 difirió a propósito por acoplar el arranque del worker a un archivo de configuración de la API. El bug de Python es el argumento más fuerte a favor que apareció: sin la guarda, el acoplamiento existe igual, solo que implícito y sin nadie que lo verifique.
+
+> **Verificado por mutación al aplicar D14**: revertir `python310` a 1 GiB en `judge_config.yaml` deja **toda la suite en verde**. Ninguna regla de arranque ni ningún test relaciona el techo del pool con `maxMemoryLimitGlobal`, así que el bug podría volver a entrar sin que nada avise. En cambio, las guardas que **sí** existen se comprobaron efectivas: bajar el dind a 10 GiB o subirlo a 10 cores sin tocar los presupuestos ponen en rojo `TestValidatePoolBudgets_TheShippedConfigFitsTheCluster`.
+
+**A9 — El `runCmd` de Java deja de poder ser estático.** `RUNNER_ARCHITECTURE.md` especificaba `runCmd: "java -Xmx{memoryLimit}m Solution"` — el diseño original **sí** contemplaba pasarle a la JVM el límite del problema con una plantilla. Hoy es `java -XX:MaxRAMPercentage=75 -cp /sandbox Solution`, estático, y por eso `java17` necesita 2.75 GiB de container para entregar 2048. Si el límite pasa a ser por problema, ese string choca con D9 ("la config queda 100% estática") — que el Paso 3 ya tuvo que matizar con el token `{name}`. Conviene mirar la especificación original antes de inventar otra.
+
+### Paso 6.5 — `buildTar` deja de duplicar
+
+Cambiar `buildTar` de `bytes.Buffer` a `io.Pipe` + goroutine, para que el tar se transmita en vez de materializarse. Medido: pico de heap de 55.0 → 27.6 MB para un archivo de 27.4 MB, con **cero** asignación durante la operación.
+
+Es un paso propio porque no pertenece a ninguno de los dos vecinos: no es memoria de containers (Paso 6) ni depende del volumen compartido (Paso 7), y **sigue valiendo después del Paso 7** — el fuente de la solución, el artefacto del checker y la salida esperada siguen viajando por la API de Docker.
+
+Está aislado en un archivo (`internal/adapter/judge/docker_exec.go`), no toca ningún puerto ni caso de uso, y sus llamadores no cambian de firma.
+
+**Lo que hay que resolver al hacerlo**: con `io.Pipe`, si `CopyToContainer` falla temprano y nadie cierra el lado lector, la goroutine escritora queda bloqueada para siempre — goroutine leak que además retiene el archivo. Hay que verificar que el cliente de moby cierre el reader en **todos** los caminos de error, o cerrarlo explícitamente desde el llamador. El detalle completo está en la sección de bugs.
 
 ### Paso 7 — Volumen compartido y comparación por tokens a pool liviano (D7, D6)
 
 El `emptyDir` en `worker.yaml` montado en `dind` y en `worker`, el UUID por judging con la raíz no listable, `RunTestCase` escribiendo al volumen, y `copyOutput` eliminado. `CheckRequest` pasa de recibir bytes a recibir una ruta, y la comparación por tokens se muda a pool liviano con la imagen del paso 1.
 
 **Es el paso más difícil de verificar localmente** — los tests del pool mockean Docker, así que la prueba real cae en la Fase 8 contra el cluster. Por eso va último: si algo queda mal, no contamina los pasos anteriores.
+
+#### La entrada del caso de prueba SÍ viaja por el volumen — sub-decisión de D7, resuelta
+
+D7 dejaba explícitamente abierto *"si la entrada del caso de prueba también viaja por el volumen o sigue por la API"*. **Va por el volumen**, por dos razones que aparecieron al desglosar la memoria del worker:
+
+- **No hay problema de seguridad.** El argumento de D7 para excluir la salida esperada es que es secreta: si el código del concursante pudiera leerla, le bastaría imprimirla. **La entrada no lo es** — el programa del concursante la recibe por stdin por definición, así que ponerla en el directorio del judging no le filtra nada que no vaya a leer igual. La salida esperada sigue viajando por la API, como D7 punto 5 exige.
+- **Es el 82% del pico de memoria del worker** en el peor problema real. Hoy el input se copia **dos veces** por caso: una al container pesado (`RunTestCase`) y otra al liviano (`Check`), y cada copia paga además la duplicación de `buildTar`. Sobre el problema B de los paquetes reales (input de 28.75 MB), el pico por judging baja de ~70 MB a ~33 MB solo con esto.
+
+**Lo que el volumen NO elimina**: los casos de prueba se siguen descomprimiendo enteros en memoria del worker, porque el worker es quien lee el ZIP de GCS y escribe los archivos al volumen. Después de este paso ese pasa a ser el **único** término dominante de su consumo, y lo acota el tope de 100 MB de D14.
+
+#### Lo demás que este paso arrastra
+
+- **`compare` hay que agregarlo a `languages` Y a `pools.light.languages`** (pendiente desde el Paso 4). Si falta el segundo, `BeginChecking` sin checker personalizado falla con `unknown language` en la primera submission. El presupuesto del pool liviano que fijó D14 ya lo contempla: 6.25 GiB contra los 6.125 que N3 pide con `compare` adentro.
+- **La apertura de sesión de pool liviano sigue duplicada** entre `OutputChecker.BeginChecking` y `ValidatorRunner.BeginValidating`. El Paso 5 extrajo la mitad de abajo (`artifactSession`) y la descarga (`downloadArtifact`) pero no ésta, porque este paso vuelve a tocar los dos archivos. Mirarla al terminar.
 
 #### Acá entra el veredicto `OUTPUT_LIMIT_EXCEEDED` (diferido desde el Paso 5)
 
