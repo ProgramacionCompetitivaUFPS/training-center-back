@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/moby/moby/client"
+	judgepool "github.com/training-judge-center/backend/internal/adapter/judge/pool"
 )
 
 // newTestArtifactSession builds the shared session half over its own pool, which
@@ -15,7 +16,7 @@ import (
 func newTestArtifactSession(t *testing.T, docker *mockDockerExecClient) (*artifactSession, *mockPoolDockerClient) {
 	t.Helper()
 	p, poolDocker := newTestPool(t)
-	c, err := p.Claim(context.Background(), testLang)
+	c, err := p.Claim(context.Background(), testLang, judgepool.LanguageCeiling)
 	if err != nil {
 		t.Fatalf("pool.Claim: %v", err)
 	}
@@ -68,7 +69,7 @@ func TestArtifactSession_Run_SafetyNetDiscardsTheContainer(t *testing.T) {
 	if s.container != nil {
 		t.Error("the container must be nil after being discarded")
 	}
-	if _, err := s.pool.Claim(context.Background(), testLang); err != nil {
+	if _, err := s.pool.Claim(context.Background(), testLang, judgepool.LanguageCeiling); err != nil {
 		t.Fatalf("claim after discard: %v", err)
 	}
 	if got := poolDocker.idCounter.Load(); got != 2 {
@@ -97,7 +98,7 @@ func TestArtifactSession_Close_WipesTheSandboxAndReturnsTheContainer(t *testing.
 	if !wiped {
 		t.Errorf("expected the sandbox to be wiped, commands were: %v", cmds)
 	}
-	if _, err := s.pool.Claim(context.Background(), testLang); err != nil {
+	if _, err := s.pool.Claim(context.Background(), testLang, judgepool.LanguageCeiling); err != nil {
 		t.Fatalf("claim after close: %v", err)
 	}
 	if got := poolDocker.idCounter.Load(); got != 1 {
@@ -117,7 +118,7 @@ func TestArtifactSession_Close_DiscardsTheContainerWhenCleanupFails(t *testing.T
 		t.Fatalf("Close: %v", err)
 	}
 
-	if _, err := s.pool.Claim(context.Background(), testLang); err != nil {
+	if _, err := s.pool.Claim(context.Background(), testLang, judgepool.LanguageCeiling); err != nil {
 		t.Fatalf("claim after close: %v", err)
 	}
 	if got := poolDocker.idCounter.Load(); got != 2 {

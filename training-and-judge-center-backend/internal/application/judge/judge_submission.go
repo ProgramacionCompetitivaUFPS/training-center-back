@@ -128,7 +128,7 @@ func (uc *JudgeSubmissionUseCase) judgeAttempt(
 	testCases []TestCase,
 	now time.Time,
 ) (bool, error) {
-	session, err := uc.executor.BeginSession(ctx, sub.Language())
+	session, err := uc.executor.BeginSession(ctx, sub.Language(), limits.MemoryKb)
 	if err != nil {
 		return true, err
 	}
@@ -159,7 +159,6 @@ func (uc *JudgeSubmissionUseCase) judgeAttempt(
 		runResult, err := session.RunTestCase(ctx, RunRequest{
 			Input:       tc.Input,
 			TimeLimitMs: limits.TimeLimitMs,
-			MemoryKb:    limits.MemoryKb,
 		})
 		if err != nil {
 			return true, err

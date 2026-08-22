@@ -50,7 +50,7 @@ func (c *OutputChecker) BeginChecking(ctx context.Context, checkerPath string, l
 		return nil, err
 	}
 
-	container, err := c.pool.Claim(ctx, lang)
+	container, err := c.pool.Claim(ctx, lang, pool.LanguageCeiling)
 	if err != nil {
 		slog.ErrorContext(ctx, "output_checker: claim container failed", "language", lang, "error", err)
 		return nil, apperror.NewInternal()

@@ -61,7 +61,7 @@ type mockJudgeExecutor struct {
 	session *mockJudgeExecutionSession
 }
 
-func (m *mockJudgeExecutor) BeginSession(_ context.Context, _ submission.Language) (appJudge.ExecutionSession, error) {
+func (m *mockJudgeExecutor) BeginSession(_ context.Context, _ submission.Language, _ int) (appJudge.ExecutionSession, error) {
 	if m.session != nil {
 		return m.session, nil
 	}

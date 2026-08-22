@@ -27,7 +27,7 @@ func testExecCfg() ExecutorConfig {
 func newTestSession(t *testing.T, docker *mockDockerExecClient) (*Session, *judgepool.Pool) {
 	t.Helper()
 	p, _ := newTestPool(t)
-	c, err := p.Claim(context.Background(), testLang)
+	c, err := p.Claim(context.Background(), testLang, judgepool.LanguageCeiling)
 	if err != nil {
 		t.Fatalf("pool.Claim: %v", err)
 	}
@@ -47,7 +47,7 @@ func TestExecutor_BeginSession_UnknownLanguage(t *testing.T) {
 	p, poolMock := newTestPool(t)
 	e := NewExecutor(p, &mockDockerExecClient{}, ExecutorConfig{Languages: map[string]LanguageExecConfig{}})
 
-	_, err := e.BeginSession(context.Background(), submission.RestoreLanguage("rust"))
+	_, err := e.BeginSession(context.Background(), submission.RestoreLanguage("rust"), testProblemMemoryKb)
 	if err == nil {
 		t.Fatal("expected error for unknown language, got nil")
 	}
@@ -61,7 +61,7 @@ func TestExecutor_BeginSession_Success(t *testing.T) {
 	p, _ := newTestPool(t)
 	e := NewExecutor(p, &mockDockerExecClient{}, testExecCfg())
 
-	sess, err := e.BeginSession(context.Background(), submission.RestoreLanguage(testLang))
+	sess, err := e.BeginSession(context.Background(), submission.RestoreLanguage(testLang), testProblemMemoryKb)
 	if err != nil {
 		t.Fatalf("BeginSession: %v", err)
 	}
@@ -175,7 +175,7 @@ func TestSession_RunTestCase_Accepted(t *testing.T) {
 	defer s.Close(context.Background())
 
 	result, err := s.RunTestCase(context.Background(), appjudge.RunRequest{
-		Input: []byte("1\n"), TimeLimitMs: 1000, MemoryKb: 262144,
+		Input: []byte("1\n"), TimeLimitMs: 1000,
 	})
 	if err != nil {
 		t.Fatalf("RunTestCase: %v", err)
@@ -199,7 +199,7 @@ func TestSession_RunTestCase_TLE(t *testing.T) {
 	defer s.Close(context.Background())
 
 	result, err := s.RunTestCase(context.Background(), appjudge.RunRequest{
-		Input: []byte("1\n"), TimeLimitMs: 1000, MemoryKb: 262144,
+		Input: []byte("1\n"), TimeLimitMs: 1000,
 	})
 	if err != nil {
 		t.Fatalf("RunTestCase: %v", err)
@@ -220,7 +220,7 @@ func TestSession_RunTestCase_MLE(t *testing.T) {
 	defer s.Close(context.Background())
 
 	result, err := s.RunTestCase(context.Background(), appjudge.RunRequest{
-		Input: []byte("1\n"), TimeLimitMs: 1000, MemoryKb: 262144,
+		Input: []byte("1\n"), TimeLimitMs: 1000,
 	})
 	if err != nil {
 		t.Fatalf("RunTestCase: %v", err)
@@ -242,7 +242,7 @@ func TestSession_RunTestCase_MemoryKb(t *testing.T) {
 	defer s.Close(context.Background())
 
 	result, err := s.RunTestCase(context.Background(), appjudge.RunRequest{
-		Input: []byte("1\n"), TimeLimitMs: 1000, MemoryKb: 262144,
+		Input: []byte("1\n"), TimeLimitMs: 1000,
 	})
 	if err != nil {
 		t.Fatalf("RunTestCase: %v", err)
@@ -264,7 +264,7 @@ func TestSession_RunTestCase_SafetyNet_Discards(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
 	defer cancel()
 	_, err := s.RunTestCase(ctx, appjudge.RunRequest{
-		Input: []byte("1\n"), TimeLimitMs: 1000, MemoryKb: 262144,
+		Input: []byte("1\n"), TimeLimitMs: 1000,
 	})
 	if err == nil {
 		t.Fatal("expected error from safety net, got nil")
@@ -281,12 +281,12 @@ func TestSession_Close_ReleasesContainer(t *testing.T) {
 	p.Start()
 	t.Cleanup(p.Stop)
 
-	c, _ := p.Claim(context.Background(), testLang)
+	c, _ := p.Claim(context.Background(), testLang, judgepool.LanguageCeiling)
 	s := &Session{container: c, pool: p, docker: &mockDockerExecClient{}, langCfg: testExecCfg().Languages[testLang]}
 
 	_ = s.Close(context.Background())
 
-	c2, err := p.Claim(context.Background(), testLang)
+	c2, err := p.Claim(context.Background(), testLang, judgepool.LanguageCeiling)
 	if err != nil {
 		t.Fatalf("Claim after Close: %v", err)
 	}
@@ -308,5 +308,22 @@ func TestSession_Close_AfterDiscard_Noop(t *testing.T) {
 	}
 	if mock.execCreateCnt.Load() != cntBefore {
 		t.Error("Close must not make Docker calls when container is nil")
+	}
+}
+
+// The port speaks kilobytes because that is what the problem declares; the pool
+// speaks bytes. The conversion is one multiplication, and getting it wrong gives
+// a container a thousandth of its limit without anything failing visibly.
+func TestExecutor_BeginSession_ProblemLimitReachesThePoolInBytes(t *testing.T) {
+	p, poolMock := newTestPool(t)
+	e := NewExecutor(p, &mockDockerExecClient{}, testExecCfg())
+
+	if _, err := e.BeginSession(context.Background(), submission.RestoreLanguage(testLang), testProblemMemoryKb); err != nil {
+		t.Fatalf("BeginSession: %v", err)
+	}
+
+	const want = int64(testProblemMemoryKb) * 1024
+	if got := poolMock.lastCreateMemory.Load(); got != want {
+		t.Errorf("container created with Memory = %d bytes, want %d (%d KB)", got, want, testProblemMemoryKb)
 	}
 }

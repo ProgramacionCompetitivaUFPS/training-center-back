@@ -19,7 +19,6 @@ type CompileResult struct {
 type RunRequest struct {
 	Input       []byte
 	TimeLimitMs int
-	MemoryKb    int
 }
 
 type RunResult struct {
@@ -36,5 +35,8 @@ type ExecutionSession interface {
 }
 
 type Executor interface {
-	BeginSession(ctx context.Context, language submission.Language) (ExecutionSession, error)
+	// memoryKb is the problem's limit. It belongs here and not in RunRequest
+	// because it is constant for the whole judging and applying it costs a
+	// container reconfiguration.
+	BeginSession(ctx context.Context, language submission.Language, memoryKb int) (ExecutionSession, error)
 }

@@ -250,10 +250,20 @@ func (m *mockDockerExecClient) ContainerStats(ctx context.Context, id string, op
 
 type mockPoolDockerClient struct {
 	idCounter atomic.Int64
+	// lastCreateMemory is how a test sees the ceiling a claim asked for: the
+	// pool creates the container straight at it.
+	lastCreateMemory atomic.Int64
 }
 
-func (m *mockPoolDockerClient) ContainerCreate(_ context.Context, _ client.ContainerCreateOptions) (client.ContainerCreateResult, error) {
+func (m *mockPoolDockerClient) ContainerCreate(_ context.Context, opts client.ContainerCreateOptions) (client.ContainerCreateResult, error) {
+	if opts.HostConfig != nil {
+		m.lastCreateMemory.Store(opts.HostConfig.Resources.Memory)
+	}
 	return client.ContainerCreateResult{ID: fmt.Sprintf("pool-ctr-%d", m.idCounter.Add(1))}, nil
+}
+
+func (m *mockPoolDockerClient) ContainerUpdate(_ context.Context, _ string, _ client.ContainerUpdateOptions) (client.ContainerUpdateResult, error) {
+	return client.ContainerUpdateResult{}, nil
 }
 
 func (m *mockPoolDockerClient) ContainerStart(_ context.Context, _ string, _ client.ContainerStartOptions) (client.ContainerStartResult, error) {
@@ -273,6 +283,9 @@ func (m *mockPoolDockerClient) Ping(_ context.Context, _ client.PingOptions) (cl
 const (
 	testLang     = "cpp20"
 	testMemBytes = 512 * 1024 * 1024 // 512 MB
+	// testProblemMemoryKb is a problem limit well under testMemBytes, so tests
+	// can tell the problem's ceiling from the pool's.
+	testProblemMemoryKb = 128 * 1024 // 128 MB
 )
 
 func testPoolCfg() judgepool.PoolConfig {

@@ -36,10 +36,20 @@ type mockDockerClient struct {
 	createFn  func(context.Context, client.ContainerCreateOptions) (client.ContainerCreateResult, error)
 	startFn   func(context.Context, string, client.ContainerStartOptions) (client.ContainerStartResult, error)
 	removeFn  func(context.Context, string, client.ContainerRemoveOptions) (client.ContainerRemoveResult, error)
+	updateFn  func(context.Context, string, client.ContainerUpdateOptions) (client.ContainerUpdateResult, error)
 	pingFn    func(context.Context, client.PingOptions) (client.PingResult, error)
 	createCnt atomic.Int64
 	removeCnt atomic.Int64
+	updateCnt atomic.Int64
 	idCounter atomic.Int64
+}
+
+func (m *mockDockerClient) ContainerUpdate(ctx context.Context, id string, opts client.ContainerUpdateOptions) (client.ContainerUpdateResult, error) {
+	m.updateCnt.Add(1)
+	if m.updateFn != nil {
+		return m.updateFn(ctx, id, opts)
+	}
+	return client.ContainerUpdateResult{}, nil
 }
 
 func (m *mockDockerClient) ContainerCreate(ctx context.Context, opts client.ContainerCreateOptions) (client.ContainerCreateResult, error) {
@@ -112,6 +122,7 @@ func putIdleContainer(t *testing.T, p *Pool, lang string, age time.Duration) *Co
 		id:          fmt.Sprintf("ctr-injected-%d", injectedIDCounter.Add(1)),
 		language:    lang,
 		memoryBytes: smallMemBytes,
+		limitBytes:  smallMemBytes, // as created: enforcing its language ceiling
 		state:       stateIdle,
 		lastUsedAt:  time.Now().Add(-age),
 	}
@@ -151,7 +162,7 @@ func TestClaim_IdleContainerExists_ReturnedWithoutCreating(t *testing.T) {
 	p := newTestPool(t, testCfg(2), mock)
 	c := putIdleContainer(t, p, "cpp20", 0)
 
-	got, err := p.Claim(context.Background(), "cpp20")
+	got, err := p.Claim(context.Background(), "cpp20", LanguageCeiling)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -170,7 +181,7 @@ func TestClaim_NoPreviousContainers_CreatesNew(t *testing.T) {
 	mock := &mockDockerClient{}
 	p := newTestPool(t, testCfg(1), mock)
 
-	got, err := p.Claim(context.Background(), "cpp20")
+	got, err := p.Claim(context.Background(), "cpp20", LanguageCeiling)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -203,7 +214,7 @@ func TestClaim_MemoryFull_EvictsLRUIdleContainer(t *testing.T) {
 	c1 := putIdleContainer(t, p, "cpp20", 2*time.Minute) // older — should be evicted
 	putIdleContainer(t, p, "cpp20", 1*time.Minute)       // newer
 
-	got, err := p.Claim(context.Background(), "java17")
+	got, err := p.Claim(context.Background(), "java17", LanguageCeiling)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -235,7 +246,7 @@ func TestClaim_LRUEviction_DockerFails_ReturnsError(t *testing.T) {
 	c1 := putIdleContainer(t, p, "cpp20", 2*time.Minute)
 	putIdleContainer(t, p, "cpp20", 1*time.Minute)
 
-	_, err := p.Claim(context.Background(), "java17")
+	_, err := p.Claim(context.Background(), "java17", LanguageCeiling)
 	if err == nil {
 		t.Fatal("expected error, got nil")
 	}
@@ -247,11 +258,11 @@ func TestClaim_LRUEviction_DockerFails_ReturnsError(t *testing.T) {
 func TestClaim_AllBusy_BlocksUntilRelease(t *testing.T) {
 	mock := &mockDockerClient{}
 	p := newTestPool(t, testCfg(1), mock)
-	busy, _ := p.Claim(context.Background(), "cpp20")
+	busy, _ := p.Claim(context.Background(), "cpp20", LanguageCeiling)
 
 	resultCh := make(chan *Container, 1)
 	go func() {
-		c, _ := p.Claim(context.Background(), "cpp20")
+		c, _ := p.Claim(context.Background(), "cpp20", LanguageCeiling)
 		resultCh <- c
 	}()
 	time.Sleep(20 * time.Millisecond) // let the goroutine reach the blocked select
@@ -272,12 +283,12 @@ func TestClaim_AllBusy_BlocksUntilRelease(t *testing.T) {
 func TestClaim_ContextCancelled_ReturnsError(t *testing.T) {
 	mock := &mockDockerClient{}
 	p := newTestPool(t, testCfg(1), mock)
-	_, _ = p.Claim(context.Background(), "cpp20") // fill the budget; never released
+	_, _ = p.Claim(context.Background(), "cpp20", LanguageCeiling) // fill the budget; never released
 
 	ctx, cancel := context.WithCancel(context.Background())
 	errCh := make(chan error, 1)
 	go func() {
-		_, err := p.Claim(ctx, "cpp20")
+		_, err := p.Claim(ctx, "cpp20", LanguageCeiling)
 		errCh <- err
 	}()
 	time.Sleep(20 * time.Millisecond)
@@ -297,7 +308,7 @@ func TestClaim_ContextCancelled_ReturnsError(t *testing.T) {
 func TestRelease_MarksIdleAndUpdatesTimestamp(t *testing.T) {
 	mock := &mockDockerClient{}
 	p := newTestPool(t, testCfg(1), mock)
-	c, _ := p.Claim(context.Background(), "cpp20")
+	c, _ := p.Claim(context.Background(), "cpp20", LanguageCeiling)
 
 	// Sleep 1ms to ensure the timestamp set by Claim is strictly older than
 	// `before`. On Windows, time.Now() has ~15ms resolution so without this
@@ -401,7 +412,7 @@ func TestReaper_DrainingContainer_SkippedByClaim(t *testing.T) {
 
 	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
 	defer cancel()
-	_, err := p.Claim(ctx, "cpp20")
+	_, err := p.Claim(ctx, "cpp20", LanguageCeiling)
 	if !errors.Is(err, context.DeadlineExceeded) {
 		t.Errorf("expected DeadlineExceeded, got %v", err)
 	}
@@ -428,7 +439,7 @@ func TestClaim_DrainingContainerWithBudgetAvailable_CreatesNew(t *testing.T) {
 	p.mu.Unlock()
 
 	// Budget still has room — Claim must not block.
-	got, err := p.Claim(context.Background(), "cpp20")
+	got, err := p.Claim(context.Background(), "cpp20", LanguageCeiling)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -440,4 +451,162 @@ func TestClaim_DrainingContainerWithBudgetAvailable_CreatesNew(t *testing.T) {
 	}
 	assertAllocatedBytes(t, p, 2*smallMemBytes)
 	assertState(t, p, draining, stateDraining) // must not have been touched by Claim
+}
+
+// --- Memory limit per claim ---
+
+// captureUpdates returns a mock that records the memory each ContainerUpdate asks for.
+func captureUpdates(seen *[]int64) *mockDockerClient {
+	m := &mockDockerClient{}
+	m.updateFn = func(_ context.Context, _ string, opts client.ContainerUpdateOptions) (client.ContainerUpdateResult, error) {
+		*seen = append(*seen, opts.Resources.Memory)
+		return client.ContainerUpdateResult{}, nil
+	}
+	return m
+}
+
+// 1. A limit under the language ceiling reaches the container as asked.
+func TestClaim_MemoryLimitUnderCeiling_AppliedToContainer(t *testing.T) {
+	var updates []int64
+	mock := captureUpdates(&updates)
+	p := newTestPool(t, testCfg(2), mock)
+	putIdleContainer(t, p, "cpp20", 0)
+
+	const want = smallMemBytes / 4
+	c, err := p.Claim(context.Background(), "cpp20", want)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(updates) != 1 || updates[0] != want {
+		t.Fatalf("ContainerUpdate memory = %v, want exactly [%d]", updates, want)
+	}
+	if c.limitBytes != want {
+		t.Errorf("limitBytes = %d, want %d", c.limitBytes, want)
+	}
+	// The pool still charges the ceiling: budgeting less would oversell the daemon.
+	if c.memoryBytes != smallMemBytes {
+		t.Errorf("memoryBytes = %d, want the ceiling %d", c.memoryBytes, smallMemBytes)
+	}
+	assertAllocatedBytes(t, p, smallMemBytes)
+}
+
+// 2. A limit over the ceiling is capped: the pool budgeted for the ceiling and
+// honouring more would let the daemon run out of memory unnoticed.
+func TestClaim_MemoryLimitOverCeiling_CappedToCeiling(t *testing.T) {
+	var updates []int64
+	mock := captureUpdates(&updates)
+	p := newTestPool(t, testCfg(2), mock)
+	putIdleContainer(t, p, "cpp20", 0)
+
+	c, err := p.Claim(context.Background(), "cpp20", 4*smallMemBytes)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, u := range updates {
+		if u > smallMemBytes {
+			t.Fatalf("ContainerUpdate asked for %d, over the ceiling %d", u, smallMemBytes)
+		}
+	}
+	if c.limitBytes != smallMemBytes {
+		t.Errorf("limitBytes = %d, want the ceiling %d", c.limitBytes, smallMemBytes)
+	}
+}
+
+// 3. A container created for this claim is born at the right limit, so no
+// separate update round trip is needed.
+func TestClaim_NewContainer_CreatedAtRequestedLimit(t *testing.T) {
+	var created int64
+	mock := &mockDockerClient{
+		createFn: func(_ context.Context, opts client.ContainerCreateOptions) (client.ContainerCreateResult, error) {
+			created = opts.HostConfig.Resources.Memory
+			return client.ContainerCreateResult{ID: "ctr-new"}, nil
+		},
+	}
+	p := newTestPool(t, testCfg(1), mock)
+
+	const want = smallMemBytes / 2
+	if _, err := p.Claim(context.Background(), "cpp20", want); err != nil {
+		t.Fatal(err)
+	}
+	if created != want {
+		t.Errorf("created with Memory = %d, want %d", created, want)
+	}
+	if mock.updateCnt.Load() != 0 {
+		t.Errorf("updateCnt = %d, want 0 — a fresh container needs no update", mock.updateCnt.Load())
+	}
+}
+
+// 4. Reusing a container that already enforces the requested limit skips the
+// Docker round trip, which is the common case during a contest.
+func TestClaim_LimitAlreadyMatches_SkipsUpdate(t *testing.T) {
+	mock := &mockDockerClient{}
+	p := newTestPool(t, testCfg(2), mock)
+
+	const limit = smallMemBytes / 4
+	c, err := p.Claim(context.Background(), "cpp20", limit)
+	if err != nil {
+		t.Fatal(err)
+	}
+	p.Release(c)
+	before := mock.updateCnt.Load()
+
+	if _, err := p.Claim(context.Background(), "cpp20", limit); err != nil {
+		t.Fatal(err)
+	}
+	if got := mock.updateCnt.Load(); got != before {
+		t.Errorf("updateCnt = %d, want %d — the limit already matched", got, before)
+	}
+}
+
+// 5. The case that put the limit inside Claim: the heavy pool is shared between
+// judging and compiling, so a container left at a problem's small limit must not
+// hand that limit to the next claimer.
+func TestClaim_ContainerLeftAtLowerLimit_RestoredForNextClaimer(t *testing.T) {
+	var updates []int64
+	mock := captureUpdates(&updates)
+	p := newTestPool(t, testCfg(2), mock)
+
+	c, err := p.Claim(context.Background(), "cpp20", smallMemBytes/8)
+	if err != nil {
+		t.Fatal(err)
+	}
+	p.Release(c)
+
+	reused, err := p.Claim(context.Background(), "cpp20", LanguageCeiling)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if reused != c {
+		t.Fatal("expected the same container to be reused")
+	}
+	if reused.limitBytes != smallMemBytes {
+		t.Errorf("limitBytes = %d, want the ceiling %d back", reused.limitBytes, smallMemBytes)
+	}
+	if len(updates) == 0 || updates[len(updates)-1] != smallMemBytes {
+		t.Errorf("last ContainerUpdate = %v, want it to end at %d", updates, smallMemBytes)
+	}
+}
+
+// 6. A container whose ceiling could not be set is in an unknown state, and an
+// unknown ceiling means a wrong verdict, so it is destroyed instead of handed out.
+func TestClaim_UpdateFails_DiscardsContainerAndErrors(t *testing.T) {
+	mock := &mockDockerClient{
+		updateFn: func(context.Context, string, client.ContainerUpdateOptions) (client.ContainerUpdateResult, error) {
+			return client.ContainerUpdateResult{}, errors.New("daemon refused")
+		},
+	}
+	p := newTestPool(t, testCfg(2), mock)
+	putIdleContainer(t, p, "cpp20", 0)
+
+	got, err := p.Claim(context.Background(), "cpp20", smallMemBytes/4)
+	if err == nil {
+		t.Fatal("expected an error when the memory limit cannot be applied")
+	}
+	if got != nil {
+		t.Error("expected no container when the limit could not be applied")
+	}
+	if mock.removeCnt.Load() != 1 {
+		t.Errorf("removeCnt = %d, want 1 — the container must be discarded", mock.removeCnt.Load())
+	}
+	assertAllocatedBytes(t, p, 0)
 }

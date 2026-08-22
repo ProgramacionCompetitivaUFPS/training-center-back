@@ -41,7 +41,7 @@ func TestJudgeSubmission_NotPending_IsIgnored(t *testing.T) {
 		&mockProblemProvider{},
 		&mockTestCaseProvider{},
 		&mockExecutor{
-			beginSessionFn: func(_ context.Context, _ submission.Language) (ExecutionSession, error) {
+			beginSessionFn: func(_ context.Context, _ submission.Language, _ int) (ExecutionSession, error) {
 				executorCalled = true
 				return &mockExecutionSession{}, nil
 			},
@@ -98,7 +98,7 @@ func TestJudgeSubmission_CompilationError_MarksSubAndACKs(t *testing.T) {
 		&mockProblemProvider{},
 		&mockTestCaseProvider{},
 		&mockExecutor{
-			beginSessionFn: func(_ context.Context, _ submission.Language) (ExecutionSession, error) {
+			beginSessionFn: func(_ context.Context, _ submission.Language, _ int) (ExecutionSession, error) {
 				return &mockExecutionSession{
 					compileFn: func(_ context.Context, _ CompileRequest) (CompileResult, error) {
 						return CompileResult{Success: false, Log: "error: undeclared"}, nil
@@ -182,7 +182,7 @@ func TestJudgeSubmission_TimeLimitExceeded(t *testing.T) {
 		&mockProblemProvider{},
 		&mockTestCaseProvider{},
 		&mockExecutor{
-			beginSessionFn: func(_ context.Context, _ submission.Language) (ExecutionSession, error) {
+			beginSessionFn: func(_ context.Context, _ submission.Language, _ int) (ExecutionSession, error) {
 				return &mockExecutionSession{
 					runTestCaseFn: func(_ context.Context, _ RunRequest) (RunResult, error) {
 						return RunResult{ExitCode: 124, TimeMs: 1000}, nil
@@ -214,7 +214,7 @@ func TestJudgeSubmission_TimeLimitExceededByCPUTime(t *testing.T) {
 		&mockProblemProvider{},
 		&mockTestCaseProvider{},
 		&mockExecutor{
-			beginSessionFn: func(_ context.Context, _ submission.Language) (ExecutionSession, error) {
+			beginSessionFn: func(_ context.Context, _ submission.Language, _ int) (ExecutionSession, error) {
 				return &mockExecutionSession{
 					runTestCaseFn: func(_ context.Context, _ RunRequest) (RunResult, error) {
 						return RunResult{ExitCode: 0, TimeMs: 1500, MemoryKb: 1024, Output: []byte("3")}, nil
@@ -246,7 +246,7 @@ func TestJudgeSubmission_MemoryLimitExceeded(t *testing.T) {
 		&mockProblemProvider{},
 		&mockTestCaseProvider{},
 		&mockExecutor{
-			beginSessionFn: func(_ context.Context, _ submission.Language) (ExecutionSession, error) {
+			beginSessionFn: func(_ context.Context, _ submission.Language, _ int) (ExecutionSession, error) {
 				return &mockExecutionSession{
 					runTestCaseFn: func(_ context.Context, _ RunRequest) (RunResult, error) {
 						return RunResult{ExitCode: 137, MemoryKb: 262144}, nil
@@ -278,7 +278,7 @@ func TestJudgeSubmission_RuntimeError(t *testing.T) {
 		&mockProblemProvider{},
 		&mockTestCaseProvider{},
 		&mockExecutor{
-			beginSessionFn: func(_ context.Context, _ submission.Language) (ExecutionSession, error) {
+			beginSessionFn: func(_ context.Context, _ submission.Language, _ int) (ExecutionSession, error) {
 				return &mockExecutionSession{
 					runTestCaseFn: func(_ context.Context, _ RunRequest) (RunResult, error) {
 						return RunResult{ExitCode: 1, TimeMs: 20, MemoryKb: 512}, nil
@@ -310,7 +310,7 @@ func TestJudgeSubmission_SessionInfraError_MarksSystemError(t *testing.T) {
 		&mockProblemProvider{},
 		&mockTestCaseProvider{},
 		&mockExecutor{
-			beginSessionFn: func(_ context.Context, _ submission.Language) (ExecutionSession, error) {
+			beginSessionFn: func(_ context.Context, _ submission.Language, _ int) (ExecutionSession, error) {
 				return &mockExecutionSession{
 					runTestCaseFn: func(_ context.Context, _ RunRequest) (RunResult, error) {
 						return RunResult{}, errTransient
@@ -369,7 +369,7 @@ func TestJudgeSubmission_TransientError_Retries_ThenSucceeds(t *testing.T) {
 	var updatedStatus string
 	executor := &mockExecutor{}
 	attempt := 0
-	executor.beginSessionFn = func(_ context.Context, _ submission.Language) (ExecutionSession, error) {
+	executor.beginSessionFn = func(_ context.Context, _ submission.Language, _ int) (ExecutionSession, error) {
 		attempt++
 		if attempt < 3 {
 			return nil, errors.New("docker unavailable")
@@ -406,7 +406,7 @@ func TestJudgeSubmission_TransientError_Retries_ThenSucceeds(t *testing.T) {
 func TestJudgeSubmission_TransientError_ExhaustsRetries_MarksSystemError(t *testing.T) {
 	var updatedStatus string
 	executor := &mockExecutor{
-		beginSessionFn: func(_ context.Context, _ submission.Language) (ExecutionSession, error) {
+		beginSessionFn: func(_ context.Context, _ submission.Language, _ int) (ExecutionSession, error) {
 			return nil, errors.New("docker unavailable")
 		},
 	}
@@ -441,7 +441,7 @@ func TestJudgeSubmission_RunTestCaseInfraError_Retries(t *testing.T) {
 	var updatedStatus string
 	executor := &mockExecutor{}
 	sessionCall := 0
-	executor.beginSessionFn = func(_ context.Context, _ submission.Language) (ExecutionSession, error) {
+	executor.beginSessionFn = func(_ context.Context, _ submission.Language, _ int) (ExecutionSession, error) {
 		sessionCall++
 		runCall := 0
 		return &mockExecutionSession{
@@ -484,7 +484,7 @@ func TestJudgeSubmission_RunTestCaseInfraError_Retries(t *testing.T) {
 func TestJudgeSubmission_CompilationError_DoesNotRetry(t *testing.T) {
 	var updatedStatus string
 	executor := &mockExecutor{
-		beginSessionFn: func(_ context.Context, _ submission.Language) (ExecutionSession, error) {
+		beginSessionFn: func(_ context.Context, _ submission.Language, _ int) (ExecutionSession, error) {
 			return &mockExecutionSession{
 				compileFn: func(_ context.Context, _ CompileRequest) (CompileResult, error) {
 					return CompileResult{Success: false, Log: "error: undeclared"}, nil
@@ -594,5 +594,40 @@ func TestJudgeSubmission_OpensAndClosesOneCheckerSession(t *testing.T) {
 	}
 	if checker.session.closeCalls != 1 {
 		t.Errorf("Close calls: got %d, want 1 — an unclosed session leaks its container", checker.session.closeCalls)
+	}
+}
+
+// The problem's memory limit moved from RunRequest (per test case, where nobody
+// read it) to BeginSession (per judging, where the container is configured).
+// That is the shape of the CheckerLanguage bug: a field set at one call site and
+// forgotten at the other. Every other test here mocks the executor without
+// looking at its arguments, so only this one would notice it stop arriving.
+func TestJudgeSubmission_ProblemMemoryLimitReachesTheSession(t *testing.T) {
+	const wantMemoryKb = 131072 // 128 MB, different from the mock's default
+
+	gotMemoryKb := -1
+	uc := newJudgeSubmissionUseCase(
+		&mockSubmissionUpdater{},
+		&mockSourceCodeDownloader{},
+		&mockProblemProvider{
+			getLimitsFn: func(_ context.Context, _ string) (ProblemLimits, error) {
+				return ProblemLimits{TimeLimitMs: 1000, MemoryKb: wantMemoryKb}, nil
+			},
+		},
+		&mockTestCaseProvider{},
+		&mockExecutor{
+			beginSessionFn: func(_ context.Context, _ submission.Language, memoryKb int) (ExecutionSession, error) {
+				gotMemoryKb = memoryKb
+				return &mockExecutionSession{}, nil
+			},
+		},
+		&mockOutputChecker{},
+	)
+
+	if err := uc.Execute(context.Background(), JudgeSubmissionInput{SubmissionID: submissionID}); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if gotMemoryKb != wantMemoryKb {
+		t.Errorf("BeginSession got memoryKb = %d, want the problem's %d", gotMemoryKb, wantMemoryKb)
 	}
 }
