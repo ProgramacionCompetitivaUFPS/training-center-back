@@ -19,8 +19,8 @@ const (
 // The dind container limits, mirrored from deploy/k8s/judge/worker.yaml. They
 // are the numbers the shipped budgets were chosen against.
 const (
-	clusterDindMemBytes = 10 << 30 // limits.memory: 10Gi
-	clusterDindCores    = 3        // limits.cpu: "3"
+	clusterDindMemBytes = 25 << 30 // limits.memory: 25Gi
+	clusterDindCores    = 6        // limits.cpu: "6"
 )
 
 // decodeRealConfig parses the config the worker actually ships with, the same

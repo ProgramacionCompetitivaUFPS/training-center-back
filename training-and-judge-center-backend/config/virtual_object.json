@@ -11,7 +11,7 @@
     ".java": "java17"
   },
   "maxFileCountSample": 10,
-  "maxFileSizeTestCaseMB": 200,
+  "maxFileSizeTestCaseMB": 100,
   "maxFileCountTestCase": 10000,
   "maxFileSizeDefaultMB": 2,
   "maxTimeLimitGlobal": 600000,

@@ -37,13 +37,17 @@ spec:
           args:
             - --host=tcp://0.0.0.0:2375
             - --host=unix:///var/run/docker.sock
+          # requests == limits on every container puts the pod in Guaranteed QoS.
+          # The worker reads limits.cpu/limits.memory below through the Downward
+          # API, so they must be what the node actually reserved.
+          # cpu 6 -> maxConcurrent 5 (minus the daemon reserve core).
           resources:
             requests:
-              cpu: "2"
-              memory: 8Gi
+              cpu: "6"
+              memory: 25Gi
             limits:
-              cpu: "3"
-              memory: 10Gi
+              cpu: "6"
+              memory: 25Gi
           volumeMounts:
             - name: dind-storage
               mountPath: /var/lib/docker
@@ -84,9 +88,19 @@ spec:
                 docker tag  "$REG/judge-runner-$lang:$version" "judge-runner:$lang"
               done
               echo "prepull: all language images ready"
+          # Small, but required: QoS looks at init containers too, and one
+          # without resources would drop the whole pod to Burstable. Free —
+          # this runs before the worker starts, inside its share.
+          resources:
+            requests:
+              cpu: 200m
+              memory: 256Mi
+            limits:
+              cpu: 200m
+              memory: 256Mi
       containers:
         - name: worker
-          image: __IMAGE__   # placeholder: se sustituye por la versión al aplicar (bootstrap) / lo actualiza el CD con set image. NO aplicar directo sin sustituir.
+          image: __IMAGE__   # placeholder, substituted at apply time by bootstrap and updated by CD's set image. Never apply this file unsubstituted.
           command: ["/bin/worker"]
           envFrom:
             - configMapRef:
@@ -119,10 +133,13 @@ spec:
                   containerName: dind
                   resource: limits.cpu
                   divisor: 1m
+          # 1 core: decompressing a 100 MB test case ZIP is the worker's
+          # dominant CPU cost, and 500m halved its throughput. 2Gi holds
+          # maxConcurrent judgings worth of test data.
           resources:
             requests:
-              cpu: 250m
-              memory: 256Mi
+              cpu: "1"
+              memory: 2Gi
             limits:
-              cpu: 500m
-              memory: 512Mi
+              cpu: "1"
+              memory: 2Gi
