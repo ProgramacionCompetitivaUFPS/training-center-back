@@ -4,6 +4,10 @@ type LanguageExecConfig struct {
 	CompileCmd string // space-separated args; empty = interpreted language, skip compile
 	RunCmd     string // space-separated run command
 	Extension  string // without leading dot: "cpp", "java", "py"
+	// MemoryFactor is how much container this language needs per usable byte.
+	// A runtime that reserves memory of its own — the JVM does, a native binary
+	// does not — would otherwise charge that reserve to the contestant.
+	MemoryFactor float64
 }
 
 type ExecutorConfig struct {

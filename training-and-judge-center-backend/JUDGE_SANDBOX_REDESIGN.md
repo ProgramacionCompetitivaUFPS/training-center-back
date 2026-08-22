@@ -550,7 +550,7 @@ El objetivo razonable es que quepan los **lenguajes principales** con holgura. S
 
 **Corregido al ejecutar el Paso 4**: la versión anterior de esta tabla sumaba la reserva del demonio (0.5 GiB) *además* de los 9.5 GiB, que ya la tenían descontada, y daba 7.6. La conclusión no cambia.
 
-> **Los números de esta tabla quedaron obsoletos con D14.** El nodo pasó a `e2-standard-8`, el dind a 25 GiB, `maxConcurrent` a 5 y el dimensionamiento a N3 (esta tabla usa N2). Se dejan porque el razonamiento —el invariante es lo obligatorio, los containers calientes son comodidad— sigue valiendo tal cual; **los valores vigentes están en D14**.
+> **Los números de esta tabla quedaron obsoletos con D14.** El nodo pasó a `e2-standard-8`, el dind a 24 GiB, `maxConcurrent` a 5 y el dimensionamiento a N3 (esta tabla usa N2). Se dejan porque el razonamiento —el invariante es lo obligatorio, los containers calientes son comodidad— sigue valiendo tal cual; **los valores vigentes están en D14**.
 
 El `e2-standard-4` actual cumple el invariante con margen y además mantiene calientes los tres lenguajes en ambos pools. Crecer la máquina sirve solo para subir `maxConcurrent` y procesar más submissions en paralelo: es una decisión de throughput para la competencia, separada de este rediseño.
 
@@ -634,22 +634,24 @@ ASIGNABLE                                         7.91      28.34
 ─────────────────────────────────────────────────────────────────────
 DISPONIBLE PARA EL POD                           ~7.50     ~27.90 GiB
 
-  dind        6.00 CPU / 25.00 GiB
+  dind        6.00 CPU / 24.00 GiB
   worker      1.00 CPU /  2.00 GiB
   prepull     (franja prestada del worker)
 ─────────────────────────────────────────────────────────────────────
-POD                                               7.00      27.00 GiB
-MARGEN                                           ~0.50      ~0.90 GiB
+POD                                               7.00      26.00 GiB
+MARGEN                                           ~0.50      ~1.90 GiB
 ```
 
-Adentro de los 25 GiB del dind:
+Adentro de los 24 GiB del dind:
 
 | | GiB | bytes |
 |---|---|---|
-| `pools.heavy.budgetBytes` | 17.75 | 19058917376 |
+| `pools.heavy.budgetBytes` | 16.75 | 17985175552 |
 | `pools.light.budgetBytes` | 6.25 | 6710886400 |
 | `dockerDaemonReserveBytes` | 1.00 | 1073741824 |
-| **suma = `dind.limits.memory`** | **25.00** | **26843545600** |
+| **suma = `dind.limits.memory`** | **24.00** | **25769803776** |
+
+> **Estos números los recalculó A9 del Paso 6**, dos veces: el dind bajó de 25 a 22 GiB al descubrir que los 2.75 GiB de `java17` no servían para nada, y volvió a 24 al introducir el `memoryFactor`, que sí necesita que el container supere el límite del problema. El margen del pod quedó en **1.9 GiB**, y es lo único que protege contra la única fila del desglose que sigue estimada — los DaemonSets.
 
 `dockerDaemonReserveBytes` sube de 512 MiB a 1 GiB: los 512 se dimensionaron para 2 judgings concurrentes y ahora son 5, con más churn de containers y más metadata en el demonio.
 
@@ -659,19 +661,23 @@ Se evaluó bajarlo a 1024 (la propuesta que este documento traía anotada) y **s
 
 **El argumento en contra que el documento pedía verificar, verificado**: los 12 paquetes BOCA de `packages_contest` —los que la Fase 9 va a convertir e importar— declaran **1024 MB los doce**, y además el mismo valor para los tres lenguajes (`limits/cpp`, `limits/java`, `limits/c` son idénticos). O sea que 1024 alcanzaría exacto para la competencia real. Pero también significa que **el tope no es lo que aprieta**: ningún problema real se acerca a 2048.
 
-Lo que decidió: con el dimensionamiento de arriba, **2048 no le cuesta nada** — el pool pesado entra en N3 dentro de los 17.75 GiB. Bajar a 1024 liberaría ~9 GiB que **no se pueden convertir en nada**: `maxConcurrent` lo limita la CPU, no la memoria, así que sería presupuesto muerto. Y deja el techo de la plataforma donde DOMjudge lo tiene por default.
+Lo que decidió: con el dimensionamiento de arriba, **2048 no le cuesta nada** — el pool pesado entra en N3 dentro de su presupuesto. Bajar a 1024 liberaría ~9 GiB que **no se pueden convertir en nada**: `maxConcurrent` lo limita la CPU, no la memoria, así que sería presupuesto muerto. Y deja el techo de la plataforma donde DOMjudge lo tiene por default.
 
 **Se descartó también hacer `maxMemoryLimit` por lenguaje**, que era la inconsistencia anotada (`maxTimeLimit` sí lo es: 300s/400s/600s). Dos razones: `platform_settings.go` exige `maxMemoryLimit <= maxMemoryLimitGlobal`, así que un valor por lenguaje solo puede **apretar**, nunca aflojar — no sirve para "darle más a Python", que era el caso que lo motivaba, y para eso ya están los `languageOverrides` por problema. Y el dato real: los 12 paquetes no diferencian por lenguaje.
 
 **Bajarlo después no rompe nada**: los tres call sites que validan (`create_problem`, `update_problem`, `import_problem`) lo hacen al escribir; la lectura usa `RestoreMemoryLimit`, sin validar. No hay migración.
 
-#### Tamaños por lenguaje, y de dónde sale el 2.75 de Java
+#### Tamaños por lenguaje, y el `memoryFactor`
 
 | Pool pesado | GiB | Por qué |
 |---|---|---|
-| `cpp20` | 2.00 | = el tope de problema |
-| `java17` | **2.75** | `2048 / 0.75 = 2730 MiB` — con `MaxRAMPercentage=75` el heap es el 75% del container, así que para entregar 2048 hay que darle 2.67; redondeado a 2.75 |
+| `cpp20` | 2.00 | = el tope de problema, con `memoryFactor: 1.0` |
+| `java17` | **2.375** | 2048 × 1.19: cubre el `memoryFactor: 1.15` con aire |
 | `python310` | **2.00** | **corrige el bug**: tenía 1 GiB contra los 2048 que la plataforma promete |
+
+**El techo del pool es lo máximo que un `Claim` puede pedir**, y con el `memoryFactor` de A9 un `Claim` pide `límite del problema × factor`. Para C++ y Python el factor es 1.0, así que su techo es exactamente el tope de problema. Para Java es 1.15, así que su techo tiene que ser mayor: `2048 × 1.15 = 2355 MiB`, redondeado a 2.375 GiB.
+
+Ese techo se alcanza **en pleno** solo en dos casos: un problema que **no declara** límite de memoria (`memory_limit` es nullable, y entonces `Claim` usa `LanguageCeiling`) y la **compilación** de artefactos. Para lo segundo hay medición: `javac` sobre un checker multi-clase de 200 líneas con generics usa **60-111 MiB**, o sea que sobra por un factor de 20.
 
 El pool liviano no se toca (`cpp20` 0.5 / `java17` 1 / `python310` 0.5): corre checkers y validators, a los que el `memoryLimit` del problema nunca se les aplica, así que `maxMemoryLimitGlobal` no lo mueve.
 
@@ -689,12 +695,12 @@ El documento tenía un solo nivel escrito (el invariante de D13). Al dimensionar
 Con `maxConcurrent = 5`, **N2 queda por debajo de N1** (6.75 contra 13.75 en el pool pesado): a concurrencia alta el invariante ya cubre "un caliente por lenguaje" de sobra. La elección real es entre N1 y N3.
 
 ```
-Pesado  N3 = (5−1) × 2.75 + (2 + 2.75 + 2) = 11 + 6.75 = 17.75 GiB
+Pesado  N3 = (5−1) × 2.375 + (2 + 2.375 + 2)  = 9.50 + 6.375 = 15.875 GiB
 Liviano N3 = (5−1) × 1    + (0.5 + 1 + 0.5) =  4 + 2.00 =  6.00 GiB
                                      (6.125 cuando `compare` llegue en el Paso 7)
 ```
 
-**Se eligió N3 sabiendo que N1 alcanzaría.** Lo que se compra son los 200-500 ms de crear un container, sobre un judging que dura segundos — el propio D13 dice que evictar *"es el comportamiento normal y esperado, no una falla"*. Se eligió igual porque el margen deja ver el comportamiento bajo estrés en vez de descubrirlo en competencia, y porque con la máquina nueva sale gratis. **Si hiciera falta memoria para otra cosa, bajar a N1 libera 5.1 GiB sin romper ningún invariante.**
+**Se eligió N3 sabiendo que N1 alcanzaría.** Lo que se compra son los 200-500 ms de crear un container, sobre un judging que dura segundos — el propio D13 dice que evictar *"es el comportamiento normal y esperado, no una falla"*. Se eligió igual porque el margen deja ver el comportamiento bajo estrés en vez de descubrirlo en competencia, y porque con la máquina nueva sale gratis. **Si hiciera falta memoria para otra cosa, bajar a N1 libera 6 GiB sin romper ningún invariante (N1 pesado = 5 × 2.375 = 11.875 GiB, liviano = 5 × 1 = 5).**
 
 #### El worker: 1 core / 2 GiB
 
@@ -744,7 +750,7 @@ Ninguno bloquea el diseño; son elecciones que conviene hacer con el código del
 - **Los otros dos archivos que lee el checker no están acotados por `maxOutputBytes`** (encontrado en el Paso 5, sin resolver). Bajar ese límite acota la salida **del concursante**, pero el checker recibe tres archivos, y el input y la salida esperada salen de `parseTestCasesZip` (`internal/adapter/judge/test_case_provider.go`), que tiene **su propio tope, independiente y quemado como literal**: `io.ReadAll(io.LimitReader(rc, 64*1024*1024))`. O sea que un problem setter que sube un `.ans` de 60 MiB hace OOM al container del pool liviano igual, y el dimensionamiento de D13 no lo cubre. Es un camino mucho más raro que el del concursante —lo controla el setter, y el publish lo agarraría antes que una competencia— pero el número está donde nadie lo va a ver. Al encararlo hay que decidir **dos cosas distintas**: cuál es el tope por archivo de caso de prueba, y si vive junto a `maxOutputBytes` en vez de suelto en el parser del ZIP. Ojo con la asimetría al elegirlo: el pico de memoria del checker escala con la **suma** de los tres archivos, no con el mayor.
 
   **Y toca también al worker, no solo al container.** El Paso 5 cambia dónde viven esos bytes: hoy `customCheckerCompare` escribe los tres archivos a un directorio temporal **en disco**, y el adapter nuevo los empaqueta en un **tar en memoria** (`buildTar` arma un `bytes.Buffer`) para copiarlos por la API de Docker. Sumado a que `GetTestCases` ya trae **todos** los casos de prueba a memoria de una vez, el worker —que tiene `limits.memory: 512Mi`— queda expuesto a datos que solo el problem setter acota. El Paso 7 se lleva la salida del concursante al volumen compartido, pero **no** el input ni la salida esperada, así que este ítem le sobrevive.
-- **Qué reportar como KB consumidos** (ver D11 y el Paso 6, A5): el veredicto de MLE queda correcto porque lo hace cumplir el kernel, pero el número que se muestra sale de `MaxUsage`, que **en cgroup v2 viene en cero**. No es elegir entre un valor aproximado y el límite: es construir una medición que hoy no existe.
+- ~~**Qué reportar como KB consumidos**~~ **Diseñado y verificado; ejecuta en el Paso 7** (ver ahí la sección de A5). El veredicto de MLE queda correcto porque lo hace cumplir el kernel, pero el número que se muestra sale de `MaxUsage`, que **en cgroup v2 viene en cero**. La medición correcta es el `ru_maxrss` del proceso, con `/usr/bin/time` por fuera del `timeout`.
 - **Un checker roto se reporta como wrong answer del concursante** (encontrado en el Paso 5, decidido dejarlo así). El adapter trata **cualquier** exit distinto de cero como rechazo, con el stderr como mensaje — igual que `ValidatorSession.Validate` desde el Paso 4. Eso mete dos casos ajenos en la misma bolsa:
 
   - **`exit 3` es `_fail` en testlib**: el checker declarando que *él* o los datos del jurado están rotos, no que la salida del concursante esté mal. La tabla completa es `0=_ok`, `1=_wa`, `2=_pe`, `3=_fail`, `7=_points`.
@@ -1333,7 +1339,7 @@ Los tests siguen a lo que prueban, no al archivo donde nació el código (**M5**
 
 **Y la verificación encontró un hueco que no habíamos previsto**: abrir la sesión y no cerrarla nunca no lo agarraba nada, y eso filtra un container del pool liviano por solución hasta agotarlo. Se agregaron dos tests —uno por caso de uso— que verifican que la sesión se abre **una vez** para N casos de prueba y se cierra **una vez**; el mismo test agarra también la mutación de abrirla adentro del loop, que es la que desharía el beneficio de D3.
 
-### Paso 6 — Límites de memoria reales (D11) ← SIGUIENTE
+### Paso 6 — Límites de memoria reales (D11) ✅ COMPLETO
 
 `docker update --memory` al reclamar el container, y decidir qué reportar como KB consumidos. Independiente del resto, se puede mover de lugar sin romper nada.
 
@@ -1378,23 +1384,25 @@ C++ y Python tienen **3-6 MiB de overhead fijo**, no proporcional. Java tiene un
 
 **Alternativas descartadas**: un **margen proporcional** —no hay nada proporcional que compensar, el overhead es fijo—; y un **margen fijo de 16 MiB**, que evitaría cualquier MLE por overhead del runtime pero compensa un problema que no existe.
 
-**Corrección a una conclusión intermedia de esta misma sesión**: se midió primero un "50% de overhead en Java" y se dio por inválido el `java17: 2.75 GiB` de D14. **Era artefacto del test**, que reservaba un único `byte[]` gigante — el peor caso para la JVM, que necesita una región contigua. Con reservas en trozos de 1 MiB, como asigna una solución real, sube a 72%. Con eso `2816 × 0.72 = 2028 MiB` contra los 2048 declarables: D14 queda **corto por ~20 MiB, no por la mitad**.
+**Corrección a una conclusión intermedia de esta misma sesión**: se midió primero un "50% de overhead en Java" y se dio por inválido el `java17: 2.75 GiB` de D14. **Era artefacto del test**, que reservaba un único `byte[]` gigante — el peor caso para la JVM, que necesita una región contigua. Con reservas en trozos de 1 MiB, como asigna una solución real, sube a 72%. Con eso `2816 × 0.72 = 2028 MiB` contra los 2048 declarables: D14 queda **corto por ~20 MiB, no por la mitad**. (Y A9 volvió sobre ese número por otra vía: los 2.75 GiB no servían porque el container se achica al límite del problema, y terminó en 2.375 GiB por el `memoryFactor`. Ver el punto 11.)
 
 **Nota de método, porque casi produce la conclusión opuesta**: el primer experimento no reservaba nada. `g++ -O2` eliminó el `malloc` + `memset` porque la memoria nunca se leía después — optimización legal. Lo delató **el pico del cgroup**: 8 MiB tras "reservar" 300. Sin esa lectura de control, un barrido entero en verde habría "demostrado" que no hay overhead. Se corrigió con `volatile` y leyendo la memoria de vuelta.
 
 **A4 — Cómo se detecta el MLE de forma uniforme en los tres lenguajes. ✅ RESUELTO, ver abajo.** Es el bug de la sección de bugs: la JVM nunca deja que el cgroup la mate por agotamiento de heap —refuerza su propio tope y lanza `OutOfMemoryError`—, así que `exitCodeMLE = 137` es inalcanzable y **todo MLE de Java se reporta hoy como runtime error**, sin rastro (el comando manda stderr a `/dev/null`). La vía del exit code por lenguaje se evaluó y se descartó. La pista que este documento deja: si la señal sale del propio cgroup (`memory.events`, campo `oom_kill`) en vez del código de salida, cubre los tres lenguajes de forma uniforme.
 
-**A5 — Qué reportar como KB consumidos.** Ver D11: no es elegir entre un número aproximado y el límite, es **construir una medición que hoy no existe**, porque en cgroup v2 `MaxUsage` viene en cero. Y `memory.peak` no se puede resetear entre corridas (dos motivos independientes, ver D11), así que hereda la contaminación. Aislar una corrida necesita medir el pico del **proceso** y no el del cgroup.
+**A5 — Qué reportar como KB consumidos. ⏭️ DIFERIDO AL PASO 7, con el diseño hecho y verificado.** No es elegir entre un número aproximado y el límite: en cgroup v2 `MaxUsage` viene en **cero**, así que hoy todo veredicto reporta 0 KB — y peor, lo persiste como `0` y no como `NULL`, con lo que la API afirma que la solución usó 0 KB. La medición correcta es el `ru_maxrss` del proceso, y quedó diseñada, medida por lenguaje y con sus dos decisiones abiertas analizadas **en el Paso 7**. Se difirió porque lo difícil no es medir sino sacar el número del container, que es exactamente el código que ese paso reescribe: hacerlo acá era escribir esa plomería dos veces, y con la variante peor.
 
-**A6 — Si el `docker update` aplica también al pool liviano.** El Paso 5 dejó `artifactSession` compartido por las sesiones de checker y validator. Hay que decidir si el límite del problema tiene sentido ahí o si el pool liviano se queda con el techo fijo de su config.
+**A6 — Si el `docker update` aplica también al pool liviano. ✅ RESUELTO: no, y el código ya lo hace bien.** El `memoryLimit` de un problema restringe **el código del concursante**; el checker es código del jurado, y sus necesidades escalan con el tamaño de las salidas que compara, no con lo que el problema le promete al concursante. Aplicárselo sería como imponerle al compilador el límite de tiempo del problema. Y las mediciones del Paso 4 lo vuelven inviable, no solo incoherente: un checker necesita 88-162 MiB para una salida de 8 MiB, así que un problema con límite de 64 MB dejaría al checker en 64 MiB y **haría OOM en todos los casos de prueba** — que desde A7 se detecta y termina en `SYSTEM_ERROR` en vez de en wrong answers silenciosos. Los dos reclamantes del pool liviano ya piden `pool.LanguageCeiling`, así que no hay cambio de código: es una decisión a registrar para que nadie la reabra creyendo que es una inconsistencia.
+
+**Consecuencia**: el dimensionamiento del pool liviano depende únicamente de cuántos bytes tiene que sostener el artefacto — la salida del concursante (`maxOutputBytes`) más el input y la salida esperada. Eso lo deja correcto hoy y deja el **tope por archivo de caso de prueba**, que no existe, como el único pendiente que puede volver a romperlo.
 
 **A7 — El OOM del checker en el pool liviano. ✅ RESUELTO, ver abajo.** (abierto desde el Paso 5, mismo mecanismo). Un checker que se queda sin memoria sale con **137 en C++/Python y con 1 en Java**, indistinguible de un rechazo legítimo — o sea, *wrong answers silenciosos al concursante*. Si la solución de A4 sale del cgroup, cubre este caso también y hay que cerrarlo acá.
 
-**A8 — La guarda de arranque que falta**: que todo lenguaje del pool pesado declare `memoryBytes >= maxMemoryLimitGlobal`. Es el **chequeo cruzado contra `config/virtual_object.json`** que el Paso 3 difirió a propósito por acoplar el arranque del worker a un archivo de configuración de la API. El bug de Python es el argumento más fuerte a favor que apareció: sin la guarda, el acoplamiento existe igual, solo que implícito y sin nadie que lo verifique.
+**A8 — La guarda de arranque que falta. ✅ RESUELTO: va en un test, no en el arranque.** que todo lenguaje del pool pesado declare `memoryBytes >= maxMemoryLimitGlobal`. Es el **chequeo cruzado contra `config/virtual_object.json`** que el Paso 3 difirió a propósito por acoplar el arranque del worker a un archivo de configuración de la API. El bug de Python es el argumento más fuerte a favor que apareció: sin la guarda, el acoplamiento existe igual, solo que implícito y sin nadie que lo verifique.
 
 > **Verificado por mutación al aplicar D14**: revertir `python310` a 1 GiB en `judge_config.yaml` deja **toda la suite en verde**. Ninguna regla de arranque ni ningún test relaciona el techo del pool con `maxMemoryLimitGlobal`, así que el bug podría volver a entrar sin que nada avise. En cambio, las guardas que **sí** existen se comprobaron efectivas: bajar el dind a 10 GiB o subirlo a 10 cores sin tocar los presupuestos ponen en rojo `TestValidatePoolBudgets_TheShippedConfigFitsTheCluster`.
 
-**A9 — El `runCmd` de Java deja de poder ser estático.** `RUNNER_ARCHITECTURE.md` especificaba `runCmd: "java -Xmx{memoryLimit}m Solution"` — el diseño original **sí** contemplaba pasarle a la JVM el límite del problema con una plantilla. Hoy es `java -XX:MaxRAMPercentage=75 -cp /sandbox Solution`, estático, y por eso `java17` necesita 2.75 GiB de container para entregar 2048. Si el límite pasa a ser por problema, ese string choca con D9 ("la config queda 100% estática") — que el Paso 3 ya tuvo que matizar con el token `{name}`. Conviene mirar la especificación original antes de inventar otra.
+**A9 — El `runCmd` de Java deja de poder ser estático. ✅ RESUELTO: no, sigue estático — y la premisa se cayó sola.** `RUNNER_ARCHITECTURE.md` especificaba `runCmd: "java -Xmx{memoryLimit}m Solution"` — el diseño original **sí** contemplaba pasarle a la JVM el límite del problema con una plantilla. Hoy es `java -XX:MaxRAMPercentage=75 -cp /sandbox Solution`, estático, y por eso `java17` necesita 2.75 GiB de container para entregar 2048. Si el límite pasa a ser por problema, ese string choca con D9 ("la config queda 100% estática") — que el Paso 3 ya tuvo que matizar con el token `{name}`. Conviene mirar la especificación original antes de inventar otra.
 
 
 #### Lo que se decidió en el camino
@@ -1505,6 +1513,92 @@ El `artifactRun` de Java lleva el mismo flag que su `runCmd`, por la misma razó
 
 Un esquema basado en `memory.events` habría detectado C++ y Python —donde no hacía falta— y perdido exactamente el caso que motivaba A7.
 
+**10. A9 — el `runCmd` de Java sigue siendo estático, y lo que faltaba era una segunda percentage.**
+
+La premisa de A9 era que el `runCmd` tenía que volverse dinámico para llevar `-Xmx{memoryLimit}`, como especificaba `RUNNER_ARCHITECTURE.md`. **A1 la disolvió**: antes el container era siempre 2 GiB sin importar el problema, así que `MaxRAMPercentage=75` daba 1.5 GiB sin importar el problema. Ahora el `docker update` deja el container **en el límite del problema**, y el porcentaje escala solo. Eso era todo lo que la plantilla buscaba.
+
+Lo que quedaba era la brecha: Java recibía el 72% de su container y C++ el 99%. Al medirla apareció que **debajo de ~250 MB de container `MaxRAMPercentage` no se aplica en absoluto** — la JVM usa `MinRAMPercentage`, cuyo default es 50%:
+
+| Container | `MaxRAM=75` | `MaxRAM=90` | `MaxRAM=90` + **`MinRAM=90`** |
+|---|---|---|---|
+| 128 MiB | 47% | 47% *(lo ignora)* | **85%** |
+| 256 MiB | 71% | 87% | 87% |
+| 512 MiB | 72% | 86% | 86% |
+
+Con las dos, Java queda en **85-87% uniforme en todo el rango**, con config estática y sin tocar Go. Verificado de punta a punta con el `runCmd` literal del YAML, incluyendo que un MLE siga dando 137.
+
+**Y la plantilla del spec original resultó medidamente peor**, no solo innecesaria:
+
+| | 128 MiB | 256 MiB | 512 MiB |
+|---|---|---|---|
+| `-Xmx(container−48)` | 59% | 78% | 87% |
+| `MaxRAM=90` + `MinRAM=90` | **85%** | **87%** | 86% |
+
+`RUNNER_ARCHITECTURE.md` apuntaba al problema correcto con la herramienta equivocada. **D9 queda intacto**: no hace falta ninguna sustitución nueva.
+
+**Lo que sigue abierto y no se cierra acá**: la brecha entre el 86% de Java y el 99% de C++ es **estructural**. Los ~50 MiB no-heap de la JVM son memoria real que el proceso usa, y como el container se capa al límite del problema, no hay porcentaje que los recupere. Cerrarla exigiría que el `docker update` de Java usara `límite / 0.86`, o sea **una regla por lenguaje dentro de Go** — justo lo que A3 decidió no hacer, y que además obligaría a redimensionar los pools (el techo pasaría a ser 2048/0.86 = 2.33 GiB). Queda anotado como una asimetría conocida, no como un bug: un problema que declara 256 MB le da 254 a C++, 251 a Python y 223 a Java.
+
+**11. La brecha del 86% se cierra con un `memoryFactor` por lenguaje, y el dimensionamiento se recalcula.**
+
+Con el porcentaje arreglado Java seguía recibiendo el 86% de lo que el problema declara, contra el 99% de C++ y el 98% de Python. Eso no se puede cerrar con más porcentaje: los ~10% que `MaxRAMPercentage=90` le deja a lo no-heap son memoria real que el proceso usa, y como el container se capa **al límite del problema**, esa reserva sale del presupuesto del concursante.
+
+**Lo que se adoptó** es un campo por lenguaje en `judge_config.yaml`:
+
+```yaml
+cpp20:      memoryFactor: 1.0     # un binario nativo no reserva nada propio
+python310:  memoryFactor: 1.0     # el intérprete cuesta ~5 MiB, fijo y no proporcional
+java17:     memoryFactor: 1.15
+```
+
+`Executor.BeginSession` pide `límite del problema × factor`. **Es dato, no lógica** — la misma forma que `runCmd`, `extension` o los cuatro campos de artefacto —, así que Go lee un número de un mapa y multiplica, sin ninguna rama por lenguaje. **D9 sigue intacto.**
+
+Medido con el `runCmd` literal del YAML, en la imagen real:
+
+| Límite declarado | Container = límite × 1.15 | La solución recibe |
+|---|---|---|
+| 128 MB | 147 MiB | **100%** |
+| 256 MB | 294 MiB | **100%** |
+| 512 MB | 588 MiB | **99%** |
+| 1024 MB | 1177 MiB | **99%** |
+
+**Es obligatorio para todo lenguaje con `runCmd`**, con una regla de arranque nueva, igual que los cuatro campos de artefacto. Si tuviera un default de 1.0, alguien que agregue Kotlin o Scala heredaría el bug en silencio.
+
+**Se descartó la variante barata** de dejar el techo de `java17` en 2 GiB y aceptar que el factor quede capado por encima de problemas de ~1780 MB: los 12 paquetes reales declaran 1024, así que no se notaría, pero dejaría una asimetría silenciosa en el extremo — la plataforma diría que se puede declarar 2048 y Java recibiría 1780. Es exactamente la clase de bug que este documento viene encontrando; el de Python en D14 era eso mismo.
+
+**El dimensionamiento pasó por dos revisiones en este mismo paso**, y conviene dejar el rastro para que los números no parezcan arbitrarios:
+
+| | Antes de A9 | Tras quitar el 2.75 inútil | **Con el `memoryFactor`** |
+|---|---|---|---|
+| `java17` en `pools.heavy` | 2.75 GiB | 2 GiB | **2.375 GiB** |
+| N3 del pool pesado | 17.75 | 14.00 | **15.875 GiB** |
+| Presupuesto pesado | 17.75 | 14.75 | **16.75 GiB** |
+| `dind.limits.memory` | 25 GiB | 22 GiB | **24 GiB** |
+| Margen del pod | 0.9 GiB | 3.9 GiB | **1.9 GiB** |
+
+Los 2.75 GiB originales salían de `2048 / 0.75` y **A1 los había dejado sin efecto** — el container se achica al límite del problema, así que ese techo solo se alcanzaba con un problema sin límite declarado o al compilar, y `javac` sobre un checker multi-clase de 200 líneas usa **60-111 MiB, medido**. Con el factor el techo vuelve a tener función, pero ahora por una razón que se puede explicar: es `2048 × 1.19`, el máximo que un `Claim` puede llegar a pedir.
+
+**Lo que queda sin cubrir, y es de A8**: si alguien bajara el techo de `java17` por debajo de `2048 × 1.15`, el pool caparía el pedido y el factor dejaría de aplicarse para los problemas grandes. `Claim` loguea un warning al capar, pero ningún test lo detecta. La guarda que lo atraparía es *"todo lenguaje del pool pesado debe declarar `memoryBytes ≥ maxMemoryLimitGlobal × su memoryFactor"*, que es el chequeo cruzado contra `virtual_object.json` que A8 tiene pendiente. El factor le da a esa guarda una forma más precisa de la que tenía.
+
+**12. A8 — el chequeo cruzado vive en un test, no en el arranque del worker.**
+
+A8 pedía una guarda que ningún archivo tenía: que todo lenguaje del pool pesado declarara `memoryBytes` suficiente para el mayor límite que un problema puede declarar. El Paso 3 la había diferido porque *"acopla el arranque del worker a un archivo de configuración de la API"*.
+
+**El dato que decidió dónde va**: el `Dockerfile` hace `COPY --from=builder /app/config /config`, y el worker **no monta ningún ConfigMap de configuración** — su único volumen es `dind-storage`. O sea que `judge_config.yaml` y `virtual_object.json` viajan **horneados en la misma imagen** y no pueden divergir en el cluster: solo pueden divergir **en el repositorio**. Y eso lo agarra un test en CI, antes de que la imagen exista.
+
+Una validación en arranque comprobaría dos archivos que ya no pueden estar en desacuerdo, y a cambio **agregaría un modo de falla nuevo**: el worker dejaría de arrancar si ese archivo falta o no parsea, cuando hoy no lo necesita para nada más. Y si algún día `virtual_object.json` se mueve a un ConfigMap —que es justo lo que contempla el pendiente de revisar la configuración de la plataforma— el worker se rompería.
+
+El test asevera, para cada lenguaje del pool pesado:
+
+```
+memoryBytes(lenguaje)  ≥  maxMemoryLimitGlobal × memoryFactor(lenguaje)
+```
+
+y reusa el struct `config.VirtualObject` en vez de redeclarar el esquema, así que un renombre de campo lo rompe fuerte. Con eso quedan cubiertos los tres agujeros que nadie veía: el bug original de `python310` que D14 arregló a mano, un techo de `java17` por debajo de lo que el `memoryFactor` necesita, y cualquiera que suba `maxMemoryLimitGlobal` sin redimensionar el pool.
+
+**El aviso quedó en `internal/config/virtual_object.go`**, sobre el campo `MaxMemoryLimitGlobal`. El JSON no admite comentarios, y ese struct es donde aterriza alguien que vaya a cambiar el número.
+
+**Y una mutación encontró un bug en el test recién escrito.** La primera versión usaba el `languageOverrides[L].maxMemoryLimit` como máximo efectivo del lenguaje, y **es incorrecto**: el `memoryLimit` **base** de un problema se valida contra el global (`memory_limit.go`) y aplica a cualquier lenguaje que se envíe; los límites por lenguaje solo capan lo que un *override* puede declarar, y `platform_settings.go` ya garantiza que sean ≤ el global. O sea que el máximo efectivo de cualquier lenguaje **es siempre el global**. Sin la mutación de subir `maxMemoryLimitGlobal`, el test habría quedado en verde sin cubrir justamente el caso que más importa.
+
 #### Tests
 
 Nueve tests nuevos, **los nueve verificados rompiendo lo que prueban**:
@@ -1548,6 +1642,25 @@ La del `exitCodeKilled = 1` es la que más dice: rompe las dos familias a la vez
 
 **Y dos guardas sobre la configuración despachada**, con el precedente del test que ya corre `judge_config.yaml` contra los números reales del cluster. Son literales, y su valor no es lo que aseveran sino **el comentario que explica por qué**: el arreglo de A4 y A7 vive entero en un string de YAML, y quitarlo no rompe nada visible — simplemente devuelve el bug, en silencio.
 
+**Y cuatro más para A9 y A8**, con sus mutaciones:
+
+| Mutación | Tests que se ponen en rojo |
+|---|---|
+| se quita `MinRAMPercentage` del `runCmd` de Java | la guarda del reparto de Java |
+| `MaxRAMPercentage` vuelve a 75 | la misma |
+| `java17` vuelve a `memoryFactor: 1.0` | la misma |
+| el executor ignora el `memoryFactor` | `MemoryFactorBuysBackTheRuntimeReserve` |
+| se quita la regla de arranque del `memoryFactor` | `RejectsBrokenConfigs` |
+| el techo de `java17` baja a 2 GiB | **el chequeo cruzado de A8** |
+| se reintroduce el bug de `python310` (1 GiB) | el mismo |
+| se sube `maxMemoryLimitGlobal` sin redimensionar | el mismo |
+| *(control)* tocar `virtual_object.json` sin romper el invariante | ninguno — sin falsos positivos |
+
+**Dos mutaciones más que pasan a propósito**, además de la de `runGrace`:
+
+- **Bajar el presupuesto del pool pesado por debajo de N3 pero sobre N1 pasa.** Es correcto: la validación de arranque hace cumplir **el invariante de D13 (N1)**, no el objetivo de comodidad (N3). Bajarlo por debajo de N1 sí falla.
+- **El control de A8**: editar `virtual_object.json` sin romper el invariante no rompe nada, que es lo que demuestra que el test no tiene falsos positivos.
+
 #### Notas de método
 
 Tres experimentos de esta tanda dieron un resultado equivocado antes de dar el correcto, y los tres habrían llevado a la conclusión opuesta:
@@ -1558,7 +1671,7 @@ Tres experimentos de esta tanda dieron un resultado equivocado antes de dar el c
 
 El patrón común: **un experimento que "pasa" no prueba que el mecanismo funcione**; hace falta un control que demuestre que el experimento sabe fallar.
 
-### Paso 6.5 — `buildTar` deja de duplicar
+### Paso 6.5 — `buildTar` deja de duplicar ← SIGUIENTE
 
 Cambiar `buildTar` de `bytes.Buffer` a `io.Pipe` + goroutine, para que el tar se transmita en vez de materializarse. Medido: pico de heap de 55.0 → 27.6 MB para un archivo de 27.4 MB, con **cero** asignación durante la operación.
 
@@ -1599,6 +1712,77 @@ Pierde exactamente el tamaño del archivo. Si alguien declarara el volumen como 
 - **`compare` hay que agregarlo a `languages` Y a `pools.light.languages`** (pendiente desde el Paso 4). Si falta el segundo, `BeginChecking` sin checker personalizado falla con `unknown language` en la primera submission. El presupuesto del pool liviano que fijó D14 ya lo contempla: 6.25 GiB contra los 6.125 que N3 pide con `compare` adentro.
 - **La apertura de sesión de pool liviano sigue duplicada** entre `OutputChecker.BeginChecking` y `ValidatorRunner.BeginValidating`. El Paso 5 extrajo la mitad de abajo (`artifactSession`) y la descarga (`downloadArtifact`) pero no ésta, porque este paso vuelve a tocar los dos archivos. Mirarla al terminar.
 
+
+#### Acá entra la medición de memoria consumida (A5, diferido desde el Paso 6)
+
+**Qué está roto hoy.** `Session.readStats` devuelve `int(stats.MemoryStats.MaxUsage / 1024)`, y **`MaxUsage` viene en cero en cgroup v2** — la clave `max_usage` directamente no aparece en el JSON de la API de Docker, es de v1. El cluster es cgroup v2 (`docker:27-dind` sobre nodos COS), así que **todo veredicto reporta 0 KB**.
+
+Y se guarda peor de lo que parece: `s.memoryKb = &memoryKb` toma la dirección del parámetro, así que un `0` se persiste como **0, no como NULL**. La API devuelve `"memoryKb": 0`, que el concursante lee como *"tu solución usó 0 KB"*, no como *"no lo medimos"*. Las únicas transiciones que dejan NULL son `MarkTimeLimitExceeded` y `MarkCompilationError`, que no tocan el campo.
+
+**Por qué aterriza en este paso y no en el 6.** Medir no es el problema: el mecanismo está diseñado y verificado abajo. El problema es **sacar el número del container**, que es exactamente el código que este paso reescribe — hacerlo en el Paso 6 significaba escribir esa plomería dos veces, y con la variante peor.
+
+##### El mecanismo, ya verificado
+
+**`/usr/bin/time -f %M`**, que reporta el `ru_maxrss` del proceso: el pico de RSS, aislado por corrida. Es lo que hacen los jueces clásicos.
+
+**Los exit codes se preservan** — el obstáculo que mató la idea del `| head -c` del Paso 5. Medido con y sin el envoltorio: `0`, `124` (TLE) y `137` (MLE) llegan intactos en las dos formas de anidarlo.
+
+**`time` va POR FUERA del `timeout`**, no adentro:
+
+```
+/usr/bin/time -f %M -o <archivo>  timeout --kill-after=1s Ns  CMD < in > out 2>/dev/null
+```
+
+Con `time` adentro, un TLE mata también a `time` y **no se escribe ninguna medición**. Con `time` afuera sobrevive y mide en los tres casos (éxito, TLE, MLE). Medido.
+
+**La exactitud, por lenguaje** (container de 512 MiB, reservas de 20/50/100 MiB):
+
+| Lenguaje | `ru_maxrss` − reserva real |
+|---|---|
+| cpp20 | **1 MiB**, constante |
+| python310 | **7 MiB**, constante (el intérprete) |
+| java17 | 38-62 MiB, creciente (la JVM) |
+
+**Y por qué no sirve el pico del cgroup**, medido en la misma corrida: marcó 176-269 MiB sin importar lo que la corrida reservara, porque venía contaminado por el `g++`/`javac` que había compilado en ese mismo container. Es la contaminación que D11 describe, vista en vivo. Sumado a que `memory.peak` **no se puede resetear** (reset desde Linux 6.11, y Docker monta `/sys/fs/cgroup` de solo lectura), la vía del cgroup está cerrada.
+
+##### Las dos decisiones que quedan, con su análisis hecho
+
+**1. Cómo llega la herramienta al container.** `/usr/bin/time` **no está en ninguna de las tres imágenes** (son Ubuntu; el paquete es `time`).
+
+| | `apt install time` | binario propio, copiado al sandbox |
+|---|---|---|
+| Imágenes | 3 Dockerfiles + `RUNNER_VERSION` + push | ninguna |
+| Despliegue | coordinado: las imágenes antes que el código | normal |
+| Código | solo el comando | un `cmd/` nuevo, embeberlo y copiarlo por sesión |
+| Precedente | `testlib.h`, pendiente por exactamente esto | `cmd/compare`, que ya existe |
+
+El binario propio sería un programa mínimo que hace `fork` + `wait4` y reporta `ru_maxrss`; estático (`CGO_ENABLED=0`) corre igual en las imágenes Ubuntu del judge y en la Alpine del backend.
+
+**2. Cómo vuelve el número al worker.** Acá es donde este paso lo abarata:
+
+- Un `CopyFromContainer` extra **por caso de prueba** (~17 ms × N; con 25 casos, ~425 ms por judging).
+- Rutearlo por el stream de stderr del exec, guardando el exit code a mano (`C=$?; cat ...; exit $C`). Sin round trip extra, pero es gimnasia de shell dentro del template del comando.
+- **Escribirlo al directorio del judging en el volumen compartido y leerlo de ahí: gratis**, cero llamadas a Docker. Es la opción que este paso habilita, y la razón por la que A5 se difirió hasta acá.
+
+##### La superficie que cambia
+
+`memoryKb` **no alimenta ninguna lógica**: fuera del judging solo se transporta al JSON. Las standings y el ranking ICPC miran el **status**, nunca el consumo; la única comparación en todo el backend es el máximo entre casos de `judge_submission.go`. O sea que es puramente informativo, y el cambio no puede alterar ningún resultado.
+
+Se muestra en 4 tipos y 5 endpoints:
+
+| Endpoint | Tipo |
+|---|---|
+| `GET /submissions/{id}` | `handler/submission/get_submission_handler.go` |
+| `GET /users/me/submissions` | `handler/submission/types.go` |
+| `GET /problems/p/{slug}/submissions` | idem |
+| `GET /groups/{id}/contests/{id}/submissions` | `handler/contest/types.go` |
+| `GET /users/me/dashboard` | `handler/user/dashboard_handler.go` |
+
+Los cinco declaran el campo como `*int`, así que **aceptan `null` sin cambio de contrato**.
+
+##### Por qué no se puso `NULL` mientras tanto
+
+Se evaluó dejar el campo en `NULL` en vez de en `0` hasta que la medición exista, para quitar de la API la afirmación falsa. **Se descartó**: los cuatro `Mark*` que tocan memoria reciben `memoryKb int`, no `*int`, así que dejar NULL exige cambiar la firma del dominio, sus call sites y sus tests — un cambio de la API del dominio, más un paso intermedio que este paso deshace, para un campo que acá pasa a tener un valor real. El `0` queda como está hasta entonces.
 #### Acá entra el veredicto `OUTPUT_LIMIT_EXCEEDED` (diferido desde el Paso 5)
 
 **Por qué acá y no en el Paso 5.** Hasta este paso, `maxOutputBytes` **no es un límite de salida sino un tope de lectura del worker**: el comando de `RunTestCase` redirige a `/sandbox/output.txt` sin ningún tope, así que un programa que imprime sin parar llena el archivo igual y la constante solo evita que el worker se traiga todo a memoria. Un veredicto construido sobre ese número le diría al concursante "excediste el límite de salida" cuando el sistema en realidad nunca se lo impuso. En el Paso 7 la salida pasa al volumen compartido y el límite **hay que aplicarlo de verdad** —el `emptyDir` es finito y lo comparten todos los judgings—, así que recién ahí el veredicto significa lo que dice.
@@ -1618,6 +1802,12 @@ Pierde exactamente el tamaño del archivo. Si alguien declarara el volumen como 
 7. La detección misma: en el Paso 7 sale de acotar la escritura en el container, no de mirar cuánto leyó el worker.
 
 Fuera de este repo queda el frontend, que muestra los veredictos.
+
+**Dos cosas que hay que decidir acá y que este documento todavía no plantea:**
+
+**1. Con qué mecanismo se acota la escritura.** El punto 7 de arriba dice "sale de acotar la escritura en el container" sin decir cómo, y la vía obvia ya está descartada: `| head -c 8M` convierte el exit code del pipeline en el de `head` y rompe la detección de TLE (124) y MLE (137). Un candidato que no tiene ese problema es **`ulimit -f`** dentro del `sh -c`: el kernel manda `SIGXFSZ` al proceso que se pasa del tamaño, lo que da un exit code propio (128+25 = 153) en vez de pisar el del comando, y no introduce ningún pipeline. Hay que verificarlo corriéndolo —incluido qué hace la JVM con esa señal, que es donde esta clase de cosas se rompe— antes de darlo por bueno.
+
+**2. Si 8 MiB sigue siendo el número correcto.** Se eligió en el Paso 5 bajo la restricción de que **el checker tiene que sostener la salida en el pool liviano**, con los picos medidos en D13 (119/162/88 MiB para 8 MiB de salida) y coincidiendo con el default de DOMjudge. Esa restricción **sobrevive a este paso** —el checker sigue leyendo la salida, ahora desde el volumen— pero el número no se volvió a mirar desde entonces, y acá cambia de significado: pasa de ser un tope de lectura interno del worker a ser **un límite real que se le impone al concursante**. Vale re-examinarlo con ese cambio encima.
 
 ### Paso 8 — Barrido y cierre
 

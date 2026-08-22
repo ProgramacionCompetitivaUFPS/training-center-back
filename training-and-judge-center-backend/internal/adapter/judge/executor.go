@@ -28,8 +28,10 @@ func (e *Executor) BeginSession(ctx context.Context, lang submission.Language, m
 	}
 
 	// The container enforces the problem's limit, so MLE fires where the problem
-	// says and not at the pool's ceiling.
-	c, err := e.pool.Claim(ctx, lang.String(), int64(memoryKb)*1024)
+	// says and not at the pool's ceiling. The factor buys back what the runtime
+	// reserves for itself, so the same limit means the same usable memory in
+	// every language.
+	c, err := e.pool.Claim(ctx, lang.String(), int64(float64(memoryKb)*1024*lc.MemoryFactor))
 	if err != nil {
 		slog.ErrorContext(ctx, "executor: claim container failed", "language", lang.String(), "error", err)
 		return nil, apperror.NewInternal()
