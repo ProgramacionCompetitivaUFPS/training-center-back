@@ -44,7 +44,7 @@ func (r *ValidatorRunner) BeginValidating(ctx context.Context, validatorPath str
 		return nil, err
 	}
 
-	container, err := r.pool.Claim(ctx, lang)
+	container, err := r.pool.Claim(ctx, lang, pool.LanguageCeiling)
 	if err != nil {
 		slog.ErrorContext(ctx, "validator_runner: claim container failed", "language", lang, "error", err)
 		return nil, apperror.NewInternal()

@@ -60,7 +60,7 @@ func TestValidateSolutions_NoSolutions_ReturnsInternalError(t *testing.T) {
 
 func TestValidateSolutions_CompileFails_ReturnsCompileErrorFailure(t *testing.T) {
 	executor := &mockExecutor{
-		beginSessionFn: func(_ context.Context, _ submission.Language) (ExecutionSession, error) {
+		beginSessionFn: func(_ context.Context, _ submission.Language, _ int) (ExecutionSession, error) {
 			return &mockExecutionSession{
 				compileFn: func(_ context.Context, _ CompileRequest) (CompileResult, error) {
 					return CompileResult{Success: false, Log: "syntax error"}, nil
@@ -114,7 +114,7 @@ func TestValidateSolutions_TimeLimitExceeded_ExitCode124(t *testing.T) {
 		},
 	}
 	executor := &mockExecutor{
-		beginSessionFn: func(_ context.Context, _ submission.Language) (ExecutionSession, error) {
+		beginSessionFn: func(_ context.Context, _ submission.Language, _ int) (ExecutionSession, error) {
 			return &mockExecutionSession{
 				runTestCaseFn: func(_ context.Context, _ RunRequest) (RunResult, error) {
 					return RunResult{ExitCode: exitCodeTLE, TimeMs: 1000}, nil
@@ -148,7 +148,7 @@ func TestValidateSolutions_TimeLimitExceeded_OverLimitDespiteExitZero(t *testing
 		},
 	}
 	executor := &mockExecutor{
-		beginSessionFn: func(_ context.Context, _ submission.Language) (ExecutionSession, error) {
+		beginSessionFn: func(_ context.Context, _ submission.Language, _ int) (ExecutionSession, error) {
 			return &mockExecutionSession{
 				runTestCaseFn: func(_ context.Context, _ RunRequest) (RunResult, error) {
 					return RunResult{ExitCode: 0, TimeMs: 600}, nil
@@ -174,7 +174,7 @@ func TestValidateSolutions_MemoryLimitExceeded_ExitCode137(t *testing.T) {
 		},
 	}
 	executor := &mockExecutor{
-		beginSessionFn: func(_ context.Context, _ submission.Language) (ExecutionSession, error) {
+		beginSessionFn: func(_ context.Context, _ submission.Language, _ int) (ExecutionSession, error) {
 			return &mockExecutionSession{
 				runTestCaseFn: func(_ context.Context, _ RunRequest) (RunResult, error) {
 					return RunResult{ExitCode: exitCodeMLE}, nil
@@ -200,7 +200,7 @@ func TestValidateSolutions_RuntimeError_UnknownExitCode(t *testing.T) {
 		},
 	}
 	executor := &mockExecutor{
-		beginSessionFn: func(_ context.Context, _ submission.Language) (ExecutionSession, error) {
+		beginSessionFn: func(_ context.Context, _ submission.Language, _ int) (ExecutionSession, error) {
 			return &mockExecutionSession{
 				runTestCaseFn: func(_ context.Context, _ RunRequest) (RunResult, error) {
 					return RunResult{ExitCode: 1}, nil
@@ -229,7 +229,7 @@ func TestValidateSolutions_StopsAtFirstFailingSolution(t *testing.T) {
 		},
 	}
 	executor := &mockExecutor{
-		beginSessionFn: func(_ context.Context, _ submission.Language) (ExecutionSession, error) {
+		beginSessionFn: func(_ context.Context, _ submission.Language, _ int) (ExecutionSession, error) {
 			return &mockExecutionSession{
 				compileFn: func(_ context.Context, _ CompileRequest) (CompileResult, error) {
 					return CompileResult{Success: false, Log: "syntax error"}, nil
@@ -277,7 +277,7 @@ func TestValidateSolutions_CountsSampleAndSecretCases(t *testing.T) {
 
 func TestValidateSolutions_TransientError_RetriesAndSucceeds(t *testing.T) {
 	executor := &mockExecutor{
-		beginSessionFn: func(_ context.Context, _ submission.Language) (ExecutionSession, error) {
+		beginSessionFn: func(_ context.Context, _ submission.Language, _ int) (ExecutionSession, error) {
 			return nil, errTransient
 		},
 	}
@@ -286,7 +286,7 @@ func TestValidateSolutions_TransientError_RetriesAndSucceeds(t *testing.T) {
 
 	// Succeed on the 3rd BeginSession call.
 	attempt := 0
-	executor.beginSessionFn = func(_ context.Context, _ submission.Language) (ExecutionSession, error) {
+	executor.beginSessionFn = func(_ context.Context, _ submission.Language, _ int) (ExecutionSession, error) {
 		attempt++
 		if attempt < 3 {
 			return nil, errTransient
@@ -308,7 +308,7 @@ func TestValidateSolutions_TransientError_RetriesAndSucceeds(t *testing.T) {
 
 func TestValidateSolutions_TransientError_ExhaustsRetries_ReturnsError(t *testing.T) {
 	executor := &mockExecutor{
-		beginSessionFn: func(_ context.Context, _ submission.Language) (ExecutionSession, error) {
+		beginSessionFn: func(_ context.Context, _ submission.Language, _ int) (ExecutionSession, error) {
 			return nil, errors.New("docker unavailable")
 		},
 	}
@@ -359,7 +359,7 @@ func TestValidateSolutions_WrongAnswer_LargeOutput_IsTruncated(t *testing.T) {
 		},
 	}
 	executor := &mockExecutor{
-		beginSessionFn: func(_ context.Context, _ submission.Language) (ExecutionSession, error) {
+		beginSessionFn: func(_ context.Context, _ submission.Language, _ int) (ExecutionSession, error) {
 			return &mockExecutionSession{
 				runTestCaseFn: func(_ context.Context, _ RunRequest) (RunResult, error) {
 					return RunResult{ExitCode: 0, Output: largeOutput}, nil
@@ -420,5 +420,38 @@ func TestValidateSolutions_OpensAndClosesOneCheckerSessionPerSolution(t *testing
 	}
 	if checker.session.closeCalls != 1 {
 		t.Errorf("Close calls: got %d, want 1 — an unclosed session leaks its container", checker.session.closeCalls)
+	}
+}
+
+// Same crossing as in judge_submission_test.go, on the publish path: the
+// problem's own solutions must be judged under the limit the problem declares,
+// or the publish would validate them against the pool's ceiling instead.
+func TestValidateSolutions_ProblemMemoryLimitReachesTheSession(t *testing.T) {
+	const wantMemoryKb = 131072 // 128 MB, different from the mock's default
+
+	gotMemoryKb := -1
+	uc := newValidateSolutionsUseCase(
+		&mockSolutionProvider{},
+		&mockSourceCodeDownloader{},
+		&mockProblemProvider{
+			getLimitsFn: func(_ context.Context, _ string) (ProblemLimits, error) {
+				return ProblemLimits{TimeLimitMs: 1000, MemoryKb: wantMemoryKb}, nil
+			},
+		},
+		&mockTestCaseProvider{},
+		&mockExecutor{
+			beginSessionFn: func(_ context.Context, _ submission.Language, memoryKb int) (ExecutionSession, error) {
+				gotMemoryKb = memoryKb
+				return &mockExecutionSession{}, nil
+			},
+		},
+		&mockOutputChecker{},
+	)
+
+	if _, err := uc.Execute(context.Background(), ValidateSolutionsInput{ProblemID: problemID}); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if gotMemoryKb != wantMemoryKb {
+		t.Errorf("BeginSession got memoryKb = %d, want the problem's %d", gotMemoryKb, wantMemoryKb)
 	}
 }

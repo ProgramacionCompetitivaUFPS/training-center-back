@@ -175,7 +175,7 @@ func (uc *ValidateSolutionsUseCase) checkSolution(ctx context.Context, sol Solut
 		return nil, err
 	}
 
-	session, err := uc.executor.BeginSession(ctx, sol.Language)
+	session, err := uc.executor.BeginSession(ctx, sol.Language, limits.MemoryKb)
 	if err != nil {
 		return nil, err
 	}
@@ -201,7 +201,6 @@ func (uc *ValidateSolutionsUseCase) checkSolution(ctx context.Context, sol Solut
 		runResult, err := session.RunTestCase(ctx, RunRequest{
 			Input:       tc.Input,
 			TimeLimitMs: limits.TimeLimitMs,
-			MemoryKb:    limits.MemoryKb,
 		})
 		if err != nil {
 			return nil, err

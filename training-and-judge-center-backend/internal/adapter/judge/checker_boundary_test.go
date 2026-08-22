@@ -76,7 +76,7 @@ func (boundaryTestCaseProvider) GetTestCases(context.Context, string) ([]appjudg
 // contestant's output, which is what the checker under test then receives.
 type boundaryExecutor struct{}
 
-func (boundaryExecutor) BeginSession(context.Context, submission.Language) (appjudge.ExecutionSession, error) {
+func (boundaryExecutor) BeginSession(context.Context, submission.Language, int) (appjudge.ExecutionSession, error) {
 	return boundaryExecutionSession{}, nil
 }
 

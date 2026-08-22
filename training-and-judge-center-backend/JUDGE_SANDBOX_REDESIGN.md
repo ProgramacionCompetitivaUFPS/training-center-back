@@ -1331,11 +1331,11 @@ De paso, D14 fijó todo lo demás sobre lo que este paso opera: `maxConcurrent =
 
 #### Lo que hay que decidir acá
 
-**A1 — Dónde vive el `docker update`.** `Pool.Claim(ctx, language)` solo conoce lenguajes y el diseño quiere mantenerlo ignorante de qué clase de código corre. Las dos opciones son `Executor.BeginSession` después del `Claim`, o cambiar la firma de `Claim`.
+**A1 — Dónde vive el `docker update`. ✅ RESUELTO, ver abajo.** `Pool.Claim(ctx, language)` solo conoce lenguajes y el diseño quiere mantenerlo ignorante de qué clase de código corre. Las dos opciones son `Executor.BeginSession` después del `Claim`, o cambiar la firma de `Claim`.
 
-**A2 — Cómo llega el límite del problema a la sesión.** Hoy viaja **por caso de prueba** (`RunRequest.MemoryKb`), pero es constante para todo el judging. Para hacer el `docker update` una sola vez hay que moverlo a la apertura de la sesión — exactamente lo que el Paso 5 hizo con los datos del checker en `BeginChecking`.
+**A2 — Cómo llega el límite del problema a la sesión. ✅ RESUELTO, ver abajo.** Hoy viaja **por caso de prueba** (`RunRequest.MemoryKb`), pero es constante para todo el judging. Para hacer el `docker update` una sola vez hay que moverlo a la apertura de la sesión — exactamente lo que el Paso 5 hizo con los datos del checker en `BeginChecking`.
 
-**A3 — Qué número exacto se le pasa al `docker update`, y el aviso que va con él.** El cgroup **no cuenta solo la memoria de la solución**: también el page cache de los archivos que el programa lee y escribe (`input.txt`, `output.txt`), más el `sh -c`, el `timeout` y el binario o intérprete mapeado. La medición del Paso 4 ya lo dice: *"los picos incluyen las dos salidas en el page cache del cgroup (~2× su tamaño)"*. Entonces `--memory = el límite exacto` produce MLE falsos —un problema de 256 MB con input de 20 MB mata a una solución que reservó 240—, y `--memory = límite + margen` los evita pero deja al container usar más que el límite declarado.
+**A3 — Qué número exacto se le pasa al `docker update`, y el aviso que va con él. ⚠️ ABIERTO, pero el código ya toma una rama: hoy pasa el límite exacto.** El cgroup **no cuenta solo la memoria de la solución**: también el page cache de los archivos que el programa lee y escribe (`input.txt`, `output.txt`), más el `sh -c`, el `timeout` y el binario o intérprete mapeado. La medición del Paso 4 ya lo dice: *"los picos incluyen las dos salidas en el page cache del cgroup (~2× su tamaño)"*. Entonces `--memory = el límite exacto` produce MLE falsos —un problema de 256 MB con input de 20 MB mata a una solución que reservó 240—, y `--memory = límite + margen` los evita pero deja al container usar más que el límite declarado.
 
 > **Si se elige la segunda, hay que redimensionar los pools.** El pool contabiliza 2 GiB para C++ y Python, que es exactamente el tope de problema; si el `docker update` pudiera poner 2 GiB + margen, el pool reservaría menos de lo que el container puede usar — la sobreventa invisible que D11 advierte. Con `maxConcurrent = 5` y N3 en 17.75 de 17.75 GiB no hay de dónde sacarlos sin rehacer el reparto (bajar a N1 libera 5.1 GiB).
 
@@ -1352,6 +1352,72 @@ De paso, D14 fijó todo lo demás sobre lo que este paso opera: `maxConcurrent =
 > **Verificado por mutación al aplicar D14**: revertir `python310` a 1 GiB en `judge_config.yaml` deja **toda la suite en verde**. Ninguna regla de arranque ni ningún test relaciona el techo del pool con `maxMemoryLimitGlobal`, así que el bug podría volver a entrar sin que nada avise. En cambio, las guardas que **sí** existen se comprobaron efectivas: bajar el dind a 10 GiB o subirlo a 10 cores sin tocar los presupuestos ponen en rojo `TestValidatePoolBudgets_TheShippedConfigFitsTheCluster`.
 
 **A9 — El `runCmd` de Java deja de poder ser estático.** `RUNNER_ARCHITECTURE.md` especificaba `runCmd: "java -Xmx{memoryLimit}m Solution"` — el diseño original **sí** contemplaba pasarle a la JVM el límite del problema con una plantilla. Hoy es `java -XX:MaxRAMPercentage=75 -cp /sandbox Solution`, estático, y por eso `java17` necesita 2.75 GiB de container para entregar 2048. Si el límite pasa a ser por problema, ese string choca con D9 ("la config queda 100% estática") — que el Paso 3 ya tuvo que matizar con el token `{name}`. Conviene mirar la especificación original antes de inventar otra.
+
+
+#### Lo que se decidió en el camino
+
+**1. A1 — el límite entra en la firma de `Claim`, no en un método aparte.**
+
+```go
+func (p *Pool) Claim(ctx context.Context, language string, memoryBytes int64) (*Container, error)
+```
+
+Se evaluaron tres formas y **decidió un hallazgo, no la estética**: el pool pesado lo comparten **dos** consumidores —`Executor` (juzgar) y `ArtifactCompiler` (compilar checkers y validators)— sobre los **mismos** containers, porque el pool reusa por lenguaje y no por consumidor. Entonces un container que un judging dejó en el límite de su problema le entregaría ese techo a la siguiente compilación:
+
+```
+submission a un problema de 256 MB → container en 256 MiB → Release
+publish de otro problema           → ArtifactCompiler reclama ESE container
+                                   → g++ -O2 con testlib en 256 MiB → OOM
+```
+
+Un checker que no compila, con un error que no se parece a la causa. Con el límite en la firma, **cada reclamante declara lo que necesita y lo que había antes deja de importar** — el estado sucio no se puede dar, no porque alguien lo limpie sino porque nadie lo lee.
+
+**Alternativas descartadas**: *(a)* que el executor aplicara y `Session.Close` restaurara — el executor necesitaría el techo del lenguaje, que vive en `pool.LanguageConfig`, así que habría que **duplicarlo** en `ExecutorConfig` con dos números que deben coincidir y nada que lo verifique; *(b)* un `pool.SetMemoryLimit` público más restauración en `Close` — menos invasivo, pero el invariante pasa a depender de que `Close` corra y de que cada consumidor se acuerde, y hoy **tres de los cuatro** reclamantes no fijan nada.
+
+**Y la propiedad que solo el pool puede dar**: capa cualquier valor por encima de `langCfg.MemoryBytes`. D11 justifica que bajar el límite es seguro diciendo *"la contabilidad del pool queda conservadora"*, y eso vale **solo mientras nadie suba** por encima de lo contabilizado. El pool es el único que tiene los dos números en la mano —lo que carga contra su presupuesto y lo que el kernel aplica—, así que ahí la sobreventa pasa a ser **imposible por construcción** en vez de una convención. Es el bug de Python de D14 visto desde el otro lado.
+
+**2. Lo verificado corriéndolo, para que nadie lo re-investigue.**
+
+- **`ContainerUpdate` con solo los campos de memoria deja intacto el `NanoCPUs`.** Era el riesgo real: el API recibe el struct `Resources` entero, y perder el techo de 1 CPU rompería la equidad del veredicto que D5 sostiene. Medido por la vía exacta del código (`Resources{Memory, MemorySwap}`): `memory.max` cambia, `cpu.max` y `memory.swap.max` quedan igual. El demonio trata los campos en cero como "no tocar".
+- **Bajar y subir funcionan los dos**, sobre un container en marcha, sin recrearlo.
+- **Cuesta 16.7 ms** (peor caso de 100: 19.1), contra los **221 ms** que el pool ya paga por crear un container. Y ocurre **una vez por judging**, no por caso de prueba. Además muchas veces no se paga: un container nuevo se crea directamente con el límite pedido, y uno reusado con el mismo límite se saltea el viaje.
+
+**3. Una desviación del plan de este documento**: decía agregar `ContainerUpdate` a `dockerExecClient`. Va en **`dockerLifecycle`** (`pool/docker_client.go`), porque el dueño de la operación resultó ser el pool. `dockerExecClient` no se tocó.
+
+**4. A2 — el límite viaja en `BeginSession`, y `RunRequest.MemoryKb` desaparece.**
+
+```
+problems.memory_limit → ProblemLimits.MemoryKb → BeginSession(ctx, lang, memoryKb)
+                                               → Claim(ctx, lang, memoryKb*1024)
+```
+
+El campo no se "movió" tanto como se **borró**: `RunRequest.MemoryKb` solo se asignaba (en `judge_submission.go` y `validate_solutions.go`) y **nadie lo leía**, que es la forma en que el bug original sobrevivió sin que nada avisara.
+
+**5. `LanguageCeiling` en vez de un `0` pelado** en los tres call sites que corren código confiable. Precedente directo: el Paso 4 introdujo `modeSource`/`modeExecutable` justamente *"para que no queden números sueltos en los call sites"*, después de que un `0644` quemado hiciera invisible el bug del artefacto sin permiso de ejecución.
+
+**6. A3 sigue abierto, pero el código ya toma una rama.** `BeginSession` pasa `memoryKb * 1024` — el límite **exacto**, sin margen. Es una de las dos opciones que A3 plantea, elegida por omisión al implementar y no por decisión. Con ella, el page cache del input cuenta contra el cgroup y un problema de 256 MB con un input de 20 MB puede dar **MLE falso**. Queda por confirmar o cambiar; si se elige agregar margen, **hay que redimensionar los pools** (ver el aviso en A3).
+
+#### Tests
+
+Nueve tests nuevos, **los nueve verificados rompiendo lo que prueban**:
+
+| Mutación | Tests que se ponen en rojo |
+|---|---|
+| `Claim` ignora el límite pedido | 1, 3, 5, 6 |
+| sin el capado al techo | **solo 2** |
+| crear el container con el techo en vez del límite | **solo 3** |
+| sin el *skip* cuando el límite ya coincide | **solo 4** |
+| el camino rápido no aplica el límite | 1, 5, 6 |
+| update fallido no descarta el container | **solo 6** |
+| sin la conversión KB → bytes | **solo** el del executor |
+| `judge_submission` pasa `0` en vez del límite | **solo** el suyo |
+| `validate_solutions` pasa `0` en vez del límite | **solo** el suyo |
+
+Las dos últimas son las que valen: reproducen la forma exacta del bug de `CheckerLanguage` —un cero que compila perfecto— justo en el momento en que ese bug entra, porque el valor **acaba de mudarse** de un call site a otro. Los tests que ya existían mockean el executor sin mirar sus argumentos, así que son ciegos a eso.
+
+Y el test del pool que cubre el hallazgo del punto 1 (`ContainerLeftAtLowerLimit_RestoredForNextClaimer`) es el que documenta, en código, por qué el límite está en la firma.
+
+**Nota de método**: el primer intento de la mutación "el camino rápido no aplica el límite" rompió la compilación en vez de mutar limpio. Un build roto no prueba nada — se rehizo reemplazando solo la llamada por un `error(nil)`, y ahí sí falló en los tests correctos.
 
 ### Paso 6.5 — `buildTar` deja de duplicar
 

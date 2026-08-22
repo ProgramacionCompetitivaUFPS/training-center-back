@@ -194,7 +194,7 @@ func TestArtifactCompiler_Compile_WipesTheSandboxAndReturnsTheContainer(t *testi
 
 	// A container that was released is reused; a discarded one would force the
 	// pool to create a second.
-	if _, err := p.Claim(context.Background(), testLang); err != nil {
+	if _, err := p.Claim(context.Background(), testLang, judgepool.LanguageCeiling); err != nil {
 		t.Fatalf("claim after compile: %v", err)
 	}
 	if got := poolDocker.idCounter.Load(); got != 1 {
@@ -229,7 +229,7 @@ func TestArtifactCompiler_Compile_DiscardsTheContainerWhenCleanupFails(t *testin
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	if _, err := p.Claim(context.Background(), testLang); err != nil {
+	if _, err := p.Claim(context.Background(), testLang, judgepool.LanguageCeiling); err != nil {
 		t.Fatalf("claim after compile: %v", err)
 	}
 	if got := poolDocker.idCounter.Load(); got != 2 {

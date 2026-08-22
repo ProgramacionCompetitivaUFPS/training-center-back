@@ -53,7 +53,7 @@ func (c *ArtifactCompiler) Compile(ctx context.Context, req appjudge.CompileArti
 	compileCtx, cancel := context.WithTimeout(ctx, compileTimeout)
 	defer cancel()
 
-	container, err := c.pool.Claim(compileCtx, language)
+	container, err := c.pool.Claim(compileCtx, language, pool.LanguageCeiling)
 	if err != nil {
 		slog.ErrorContext(ctx, "artifact_compiler: claim container failed", "language", language, "error", err)
 		return appjudge.CompileArtifactResult{}, apperror.NewInternal()
