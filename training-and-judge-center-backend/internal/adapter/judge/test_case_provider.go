@@ -16,6 +16,7 @@ import (
 	"github.com/jackc/pgx/v5"
 	infraPostgres "github.com/training-judge-center/backend/internal/adapter/postgres"
 	appJudge "github.com/training-judge-center/backend/internal/application/judge"
+	appProblem "github.com/training-judge-center/backend/internal/application/problem"
 	"github.com/training-judge-center/backend/pkg/apperror"
 )
 
@@ -48,26 +49,27 @@ func (p *TestCaseProvider) GetTestCases(ctx context.Context, problemID string) (
 		return []appJudge.TestCase{}, nil
 	}
 
-	rc, err := p.reader.readObject(ctx, *testCasesKey)
+	zipKey := appProblem.TestCasesZipKey(*testCasesKey)
+	rc, err := p.reader.readObject(ctx, zipKey)
 	if err != nil {
 		if errors.Is(err, storage.ErrObjectNotExist) {
-			slog.ErrorContext(ctx, "test_case_provider: ZIP not found in GCS", "key", *testCasesKey)
+			slog.ErrorContext(ctx, "test_case_provider: ZIP not found in GCS", "key", zipKey)
 			return nil, apperror.NewNotFound(apperror.ErrCodeNotFound, "test cases not found")
 		}
-		slog.ErrorContext(ctx, "test_case_provider: failed to open ZIP from GCS", "key", *testCasesKey, "error", err)
+		slog.ErrorContext(ctx, "test_case_provider: failed to open ZIP from GCS", "key", zipKey, "error", err)
 		return nil, apperror.NewInternal()
 	}
 	defer rc.Close()
 
 	zipData, err := io.ReadAll(rc)
 	if err != nil {
-		slog.ErrorContext(ctx, "test_case_provider: failed to read ZIP", "key", *testCasesKey, "error", err)
+		slog.ErrorContext(ctx, "test_case_provider: failed to read ZIP", "key", zipKey, "error", err)
 		return nil, apperror.NewInternal()
 	}
 
 	testCases, err := parseTestCasesZip(zipData, maxTestCaseFileBytes)
 	if err != nil {
-		slog.ErrorContext(ctx, "test_case_provider: failed to parse ZIP", "key", *testCasesKey, "error", err)
+		slog.ErrorContext(ctx, "test_case_provider: failed to parse ZIP", "key", zipKey, "error", err)
 		return nil, apperror.NewInternal()
 	}
 	return testCases, nil

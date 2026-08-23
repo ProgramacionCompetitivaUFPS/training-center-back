@@ -102,3 +102,45 @@ func TestUploadProblemFiles_VerifierIsStoredUnderItsFixedName(t *testing.T) {
 		})
 	}
 }
+
+// The judge rebuilds the ZIP path from the prefix the problem stores, so the two
+// have to agree: if they drift, no judging of that problem finds its test cases.
+func TestUploadProblemFiles_TestCasesZipSitsInsideTheStoredPrefix(t *testing.T) {
+	var uploaded []string
+	storage := &mockFileStorage{
+		uploadFileFn: func(_ context.Context, path string, _ []byte) error {
+			uploaded = append(uploaded, path)
+			return nil
+		},
+	}
+	parser := &mockZipParser{
+		parseTestCasesZipFn: func(_ context.Context, _ []byte) ([]ParsedFile, error) {
+			return []ParsedFile{{Path: "data/sample/01.in", Content: []byte("1 2")}}, nil
+		},
+	}
+	p := newDraftProblem()
+	uc := NewUploadProblemFilesUseCase(repoWith(p), &mockValidationRepository{}, storage, parser, newDefaultSettings())
+
+	_, err := uc.Execute(context.Background(), UploadProblemFilesInput{
+		Slug:        testSlug,
+		FileType:    FileTypeTestCases,
+		FileName:    "tc.zip",
+		FileData:    []byte("PK"),
+		CurrentUser: asCoach(authorID),
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	prefix := p.TestCasesKey()
+	if prefix == nil {
+		t.Fatal("no test cases key was recorded on the problem")
+	}
+	want := *prefix + "/testcases.zip"
+	for _, k := range uploaded {
+		if k == want {
+			return
+		}
+	}
+	t.Errorf("ZIP key %q not among the uploaded keys %v", want, uploaded)
+}

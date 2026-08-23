@@ -125,6 +125,19 @@ func (m *mockFileStorage) DeleteFilesWithPrefix(ctx context.Context, prefix stri
 	return nil
 }
 
+// ── ZipParser mock ───────────────────────────────────────────────────────────
+
+type mockZipParser struct {
+	parseTestCasesZipFn func(ctx context.Context, zipData []byte) ([]ParsedFile, error)
+}
+
+func (m *mockZipParser) ParseTestCasesZip(ctx context.Context, zipData []byte) ([]ParsedFile, error) {
+	if m.parseTestCasesZipFn != nil {
+		return m.parseTestCasesZipFn(ctx, zipData)
+	}
+	return nil, nil
+}
+
 // ── ProblemValidationRepository mock ─────────────────────────────────────────
 
 type mockValidationRepository struct {

@@ -202,7 +202,8 @@ func TestGetTestCases_DBError_ReturnsInternal(t *testing.T) {
 }
 
 func TestGetTestCases_GCSNotFound_ReturnsNotFound(t *testing.T) {
-	key := "problems/abc/tests.zip"
+	// The problem stores the upload prefix; the ZIP lives inside it.
+	const key = "problems/abc/testcases/2b0f"
 	provider := &TestCaseProvider{
 		db: &mockQuerier{
 			queryRowFn: func(_ context.Context, _ string, _ ...interface{}) pgx.Row {
@@ -225,7 +226,8 @@ func TestGetTestCases_GCSNotFound_ReturnsNotFound(t *testing.T) {
 }
 
 func TestGetTestCases_GCSError_ReturnsInternal(t *testing.T) {
-	key := "problems/abc/tests.zip"
+	// The problem stores the upload prefix; the ZIP lives inside it.
+	const key = "problems/abc/testcases/2b0f"
 	provider := &TestCaseProvider{
 		db: &mockQuerier{
 			queryRowFn: func(_ context.Context, _ string, _ ...interface{}) pgx.Row {
@@ -248,7 +250,9 @@ func TestGetTestCases_GCSError_ReturnsInternal(t *testing.T) {
 }
 
 func TestGetTestCases_WithZIP(t *testing.T) {
-	key := "problems/abc/tests.zip"
+	// The problem stores the upload prefix; the ZIP lives inside it.
+	const key = "problems/abc/testcases/2b0f"
+	const wantObject = "problems/abc/testcases/2b0f/testcases.zip"
 	zipData := buildZip(t, map[string]string{
 		"data/secret/001.in":  "5",
 		"data/secret/001.ans": "25",
@@ -266,8 +270,8 @@ func TestGetTestCases_WithZIP(t *testing.T) {
 		},
 		reader: &mockGCSReader{
 			readObjectFn: func(_ context.Context, object string) (io.ReadCloser, error) {
-				if object != key {
-					t.Errorf("readObject: got %q, want %q", object, key)
+				if object != wantObject {
+					t.Errorf("readObject: got %q, want %q", object, wantObject)
 				}
 				return io.NopCloser(bytes.NewReader(zipData)), nil
 			},
