@@ -11,15 +11,15 @@ import (
 )
 
 type latestValidationResponse struct {
-	Found             bool                          `json:"found"`
-	Terminal          bool                          `json:"terminal"`
-	Passed            bool                          `json:"passed"`
-	Status            string                        `json:"status,omitempty"`
-	ValidationLogs    []string                      `json:"validationLogs,omitempty"`
-	ValidationSummary *appProblem.ValidationSummary `json:"validationSummary,omitempty"`
-	FailedTestCases   []appProblem.FailedTestCase   `json:"failedTestCases,omitempty"`
-	CompilationErrors *appProblem.CompilationErrors `json:"compilationErrors,omitempty"`
-	FailedInputs      []appProblem.FailedInput      `json:"failedInputs,omitempty"`
+	Found             bool                   `json:"found"`
+	Terminal          bool                   `json:"terminal"`
+	Passed            bool                   `json:"passed"`
+	Status            string                 `json:"status,omitempty"`
+	ValidationLogs    []string               `json:"validationLogs,omitempty"`
+	ValidationSummary *validationSummaryResp `json:"validationSummary,omitempty"`
+	FailedTestCases   []failedTestCaseResp   `json:"failedTestCases,omitempty"`
+	CompilationErrors *compilationErrorsResp `json:"compilationErrors,omitempty"`
+	FailedInputs      []failedInputResp      `json:"failedInputs,omitempty"`
 }
 
 // @Summary      Get the latest validation attempt for a problem
@@ -57,9 +57,9 @@ func (h *Handler) GetLatestValidation(w http.ResponseWriter, r *http.Request) {
 		Passed:            out.Passed,
 		Status:            out.Status,
 		ValidationLogs:    out.Report.ValidationLogs,
-		ValidationSummary: out.Report.ValidationSummary,
-		FailedTestCases:   out.Report.FailedTestCases,
-		CompilationErrors: out.Report.CompilationErrors,
-		FailedInputs:      out.Report.FailedInputs,
+		ValidationSummary: toValidationSummaryResp(out.Report.ValidationSummary),
+		FailedTestCases:   toFailedTestCaseResps(out.Report.FailedTestCases),
+		CompilationErrors: toCompilationErrorsResp(out.Report.CompilationErrors),
+		FailedInputs:      toFailedInputResps(out.Report.FailedInputs),
 	})
 }

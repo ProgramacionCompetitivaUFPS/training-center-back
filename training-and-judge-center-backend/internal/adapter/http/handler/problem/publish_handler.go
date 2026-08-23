@@ -11,21 +11,21 @@ import (
 )
 
 type publishResponse struct {
-	Slug              string                        `json:"slug"`
-	Status            string                        `json:"status"`
-	Message           string                        `json:"message"`
-	ValidationLogs    []string                      `json:"validationLogs"`
-	ValidationSummary *appProblem.ValidationSummary `json:"validationSummary,omitempty"`
+	Slug              string                 `json:"slug"`
+	Status            string                 `json:"status"`
+	Message           string                 `json:"message"`
+	ValidationLogs    []string               `json:"validationLogs"`
+	ValidationSummary *validationSummaryResp `json:"validationSummary,omitempty"`
 }
 
 type publishFailureResponse struct {
-	Error             string                        `json:"error"`
-	Message           string                        `json:"message"`
-	ValidationLogs    []string                      `json:"validationLogs"`
-	MissingFields     []string                      `json:"missingFields,omitempty"`
-	FailedTestCases   []appProblem.FailedTestCase   `json:"failedTestCases,omitempty"`
-	CompilationErrors *appProblem.CompilationErrors `json:"compilationErrors,omitempty"`
-	FailedInputs      []appProblem.FailedInput      `json:"failedInputs,omitempty"`
+	Error             string                 `json:"error"`
+	Message           string                 `json:"message"`
+	ValidationLogs    []string               `json:"validationLogs"`
+	MissingFields     []string               `json:"missingFields,omitempty"`
+	FailedTestCases   []failedTestCaseResp   `json:"failedTestCases,omitempty"`
+	CompilationErrors *compilationErrorsResp `json:"compilationErrors,omitempty"`
+	FailedInputs      []failedInputResp      `json:"failedInputs,omitempty"`
 }
 
 // @Summary      Publish problem
@@ -86,7 +86,7 @@ func writePublishOutcome(w http.ResponseWriter, r *http.Request, slug string, ou
 			Status:            out.Status,
 			Message:           "Problem published successfully",
 			ValidationLogs:    out.Report.ValidationLogs,
-			ValidationSummary: out.Report.ValidationSummary,
+			ValidationSummary: toValidationSummaryResp(out.Report.ValidationSummary),
 		})
 		return
 	}
@@ -94,9 +94,9 @@ func writePublishOutcome(w http.ResponseWriter, r *http.Request, slug string, ou
 		Error:             "VALIDATION_FAILED",
 		Message:           validationFailureMessage(out.Report),
 		ValidationLogs:    out.Report.ValidationLogs,
-		FailedTestCases:   out.Report.FailedTestCases,
-		CompilationErrors: out.Report.CompilationErrors,
-		FailedInputs:      out.Report.FailedInputs,
+		FailedTestCases:   toFailedTestCaseResps(out.Report.FailedTestCases),
+		CompilationErrors: toCompilationErrorsResp(out.Report.CompilationErrors),
+		FailedInputs:      toFailedInputResps(out.Report.FailedInputs),
 	})
 }
 
