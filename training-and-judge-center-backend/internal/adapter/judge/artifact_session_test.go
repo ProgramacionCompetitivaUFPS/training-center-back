@@ -45,7 +45,7 @@ func TestArtifactSession_Run_WrapsTheCommandInTheInContainerTimeout(t *testing.T
 	if len(cmds) != 1 || len(cmds[0]) != 3 || cmds[0][0] != "sh" || cmds[0][1] != "-c" {
 		t.Fatalf("expected one command through sh -c, got: %v", cmds)
 	}
-	want := "timeout --kill-after=1s 30s /sandbox/Checker a b c"
+	want := "timeout -k 1 30 /sandbox/Checker a b c"
 	if cmds[0][2] != want {
 		t.Errorf("command: got %q, want %q", cmds[0][2], want)
 	}
