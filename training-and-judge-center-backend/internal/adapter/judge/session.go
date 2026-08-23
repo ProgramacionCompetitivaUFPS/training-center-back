@@ -52,13 +52,16 @@ type Session struct {
 	judgingDir string
 }
 
+// SolutionBaseName is a solution's source filename inside the sandbox; judge_config.yaml must spell it the same.
+const SolutionBaseName = "Solution"
+
 func (s *Session) Compile(ctx context.Context, req appjudge.CompileRequest) (appjudge.CompileResult, error) {
 	ctx30, cancel := context.WithTimeout(ctx, compileTimeout)
 	defer cancel()
 
 	if _, err := s.docker.CopyToContainer(ctx30, s.container.ID(), client.CopyToContainerOptions{
 		DestinationPath: "/sandbox",
-		Content:         buildTar("solution."+s.langCfg.Extension, req.SourceCode, modeSource),
+		Content:         buildTar(SolutionBaseName+"."+s.langCfg.Extension, req.SourceCode, modeSource),
 	}); err != nil {
 		slog.ErrorContext(ctx, "executor: copy source failed", "container_id", s.container.ID(), "error", err)
 		return appjudge.CompileResult{}, apperror.NewInternal()

@@ -543,3 +543,21 @@ func TestValidateJudgeConfig_RequiresTheDefaultChecker(t *testing.T) {
 		})
 	}
 }
+
+// The executor writes a solution's source under adapterjudge.SolutionBaseName,
+// and the shipped commands have to spell it the same or nothing compiles.
+// Changing the YAML without the Go side broke all three languages once.
+func TestShippedConfig_SolutionCommandsUseTheNameTheExecutorWrites(t *testing.T) {
+	cfg := decodeRealConfig(t)
+	for name, lang := range cfg.Judge.Languages {
+		if lang.RunCmd == "" {
+			continue // not a language solutions are written in
+		}
+		if !strings.Contains(lang.RunCmd, adapterjudge.SolutionBaseName) {
+			t.Errorf("%s runCmd %q does not name %q", name, lang.RunCmd, adapterjudge.SolutionBaseName)
+		}
+		if lang.CompileCmd != "" && !strings.Contains(lang.CompileCmd, "/sandbox/"+adapterjudge.SolutionBaseName) {
+			t.Errorf("%s compileCmd %q does not read /sandbox/%s", name, lang.CompileCmd, adapterjudge.SolutionBaseName)
+		}
+	}
+}
