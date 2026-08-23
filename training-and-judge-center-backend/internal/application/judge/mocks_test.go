@@ -75,13 +75,13 @@ func (m *mockTestCaseProvider) GetTestCases(ctx context.Context, problemID strin
 
 type mockExecutor struct {
 	calls          int
-	beginSessionFn func(ctx context.Context, language submission.Language, memoryKb int) (ExecutionSession, error)
+	beginSessionFn func(ctx context.Context, language submission.Language, memoryKb int, judgingID string) (ExecutionSession, error)
 }
 
-func (m *mockExecutor) BeginSession(ctx context.Context, language submission.Language, memoryKb int) (ExecutionSession, error) {
+func (m *mockExecutor) BeginSession(ctx context.Context, language submission.Language, memoryKb int, judgingID string) (ExecutionSession, error) {
 	m.calls++
 	if m.beginSessionFn != nil {
-		return m.beginSessionFn(ctx, language, memoryKb)
+		return m.beginSessionFn(ctx, language, memoryKb, judgingID)
 	}
 	return &mockExecutionSession{}, nil
 }
@@ -105,7 +105,7 @@ func (m *mockExecutionSession) RunTestCase(ctx context.Context, req RunRequest) 
 	if m.runTestCaseFn != nil {
 		return m.runTestCaseFn(ctx, req)
 	}
-	return RunResult{ExitCode: 0, TimeMs: 50, MemoryKb: 1024, Output: []byte("3")}, nil
+	return RunResult{ExitCode: 0, TimeMs: 50, MemoryKb: 1024, OutputPreview: []byte("3")}, nil
 }
 
 func (m *mockExecutionSession) Close(ctx context.Context) error {
@@ -118,16 +118,16 @@ func (m *mockExecutionSession) Close(ctx context.Context) error {
 // ── OutputChecker mock ───────────────────────────────────────────────────────
 
 type mockOutputChecker struct {
-	beginCheckingFn func(ctx context.Context, checkerPath string, language submission.Language) (CheckerSession, error)
+	beginCheckingFn func(ctx context.Context, checkerPath string, language submission.Language, judgingID string) (CheckerSession, error)
 	// checkFn is a shortcut for the common case: a session that always answers
 	// the same way, without having to build one.
-	checkFn func(ctx context.Context, req CheckRequest) (CheckResult, error)
+	checkFn func(ctx context.Context, expectedOutput []byte) (CheckResult, error)
 	session *mockCheckerSession
 }
 
-func (m *mockOutputChecker) BeginChecking(ctx context.Context, checkerPath string, language submission.Language) (CheckerSession, error) {
+func (m *mockOutputChecker) BeginChecking(ctx context.Context, checkerPath string, language submission.Language, judgingID string) (CheckerSession, error) {
 	if m.beginCheckingFn != nil {
-		return m.beginCheckingFn(ctx, checkerPath, language)
+		return m.beginCheckingFn(ctx, checkerPath, language, judgingID)
 	}
 	if m.session == nil {
 		m.session = &mockCheckerSession{checkFn: m.checkFn}
@@ -138,15 +138,15 @@ func (m *mockOutputChecker) BeginChecking(ctx context.Context, checkerPath strin
 // ── CheckerSession mock ──────────────────────────────────────────────────────
 
 type mockCheckerSession struct {
-	checkFn    func(ctx context.Context, req CheckRequest) (CheckResult, error)
+	checkFn    func(ctx context.Context, expectedOutput []byte) (CheckResult, error)
 	checkCalls int
 	closeCalls int
 }
 
-func (m *mockCheckerSession) Check(ctx context.Context, req CheckRequest) (CheckResult, error) {
+func (m *mockCheckerSession) Check(ctx context.Context, expectedOutput []byte) (CheckResult, error) {
 	m.checkCalls++
 	if m.checkFn != nil {
-		return m.checkFn(ctx, req)
+		return m.checkFn(ctx, expectedOutput)
 	}
 	return CheckResult{Accepted: true}, nil
 }

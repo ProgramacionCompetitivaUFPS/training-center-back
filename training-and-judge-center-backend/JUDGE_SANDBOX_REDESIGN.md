@@ -1784,6 +1784,51 @@ Sube además la apuesta sobre la regla que D7 ya trae: **los UUID no pueden apar
 
 **Pendiente que abre este paso, para el commit 2**: la verificación **de punta a punta** al arrancar —escribir un marcador, crear un container y comprobar que lo ve— es lo único que atraparía un `JUDGE_VOLUME_SOURCE` con un valor *equivocado*, contra ausente, que sí se atrapa. No entró en el commit 1 porque necesita una imagen y un container y porque hasta el commit 2 el volumen no lo usa nadie. En el commit 2 el modo de falla se vuelve real.
 
+**5. Lo que cruza la capa de aplicación es un token opaco, no rutas (commit 2).** Las dos sesiones —la del pool pesado y la del checker— salen de adapters distintos y tienen que apuntar al mismo directorio, y el único que conoce a las dos es el caso de uso. Se le pasa un UUID que **nunca interpreta**; el layout (`input.txt`, `output.txt`) es saber del adapter, compartido entre dos archivos del mismo paquete, que es lo que D3 pide: *"la reutilización ocurre en el adapter, no en el puerto"*. Se descartó pasar rutas explícitas: meten filesystem en la capa de aplicación y las acercan a los logs, que es justo lo que D7 prohíbe. Y se descartó un puerto propio con el patrón de `TransactionManager`: su ventaja real —la limpieza garantizada— se consigue igual desde `Session.Close`, que los dos casos de uso ya difieren.
+
+Con eso **`CheckRequest` desapareció entero**, con el precedente exacto del Paso 4: de sus tres campos, dos se mudaron al volumen y `Check` quedó recibiendo sólo la respuesta del jurado. `RunResult.Output` pasó a `OutputPreview`.
+
+**El emparejamiento pasa a ser implícito** —`Check` mira lo que la última `RunTestCase` dejó— y eso lo hace **más** seguro, no menos: antes el caso de uso tenía que pasar los bytes del mismo caso que acababa de correr, y `testCases[j]` por error era un bug silencioso. Ahora no hay nada que pasar. Es el argumento de D8: el bug deja de existir por construcción.
+
+**6. La respuesta del jurado se queda en la API, y la alternativa quedó medida (commit 2).** Se propuso meterla también en el volumen, bajo un segundo nombre no adivinable (`<uuid>/<secreto>/answer.txt`). **El esquema funciona** —verificado: con la raíz del judging en `0111` un sandbox no puede listar, así que el secreto anidado es el mismo modelo de capacidad que el UUID de afuera—, pero el tipo de cambio no cierra: sobre los paquetes reales **un solo archivo son 28.75 de 28.8 MB**, y ése es el input, así que todas las respuestas juntas son unos 50 KB. Mover la respuesta compra ~50 KB de transferencia a cambio de degradar la garantía de D7 de *"no existe ninguna ruta que el container del concursante pueda alcanzar"* a *"existe, y la protege un nombre"*.
+
+**Si algún día el número cambia, la vía correcta no es un secreto anidado sino un montaje que el pool pesado no tenga**: la respuesta en un volumen que sólo monta el liviano. El ahorro sería el mismo y no habría secreto que guardar. Cuesta un segundo volumen y un segundo valor de configuración en las dos topologías.
+
+**7. La cuenta de "~70 a ~33 MB" de este documento ya no vale, y el desglose real es otro (commit 2).** Esa medición atribuía el ahorro a mandar el input por el volumen, pero contaba la duplicación de `buildTar`, que el **Paso 6.5 ya eliminó**. Con el código de hoy, sobre el problema real más pesado:
+
+| Qué se mueve al volumen | Memoria del worker | CPU / API |
+|---|---|---|
+| la salida del concursante | **hasta 8 MiB por judging** | dos cruces por caso |
+| el input | ninguna — `GetTestCases` lo sostiene igual | **2 × 28.75 MB por caso** |
+| la respuesta del jurado | ninguna — mismo motivo | ~50 KB por judging |
+
+O sea que del commit 2 el ahorro de **memoria** lo trae la salida, y el de **CPU** lo trae el input.
+
+**8. El layout del directorio quedó más apretado de lo planeado, y salió de la misma discusión (commit 2).** El plan era que el directorio fuera del uid 1000 para que el `>` del shell pudiera crear `output.txt`. Medido, eso le da al concursante más de lo necesario: podía listar el directorio, crear archivos y **borrar su propio input**. Con el directorio de `root` en `0111` y `output.txt` **pre-creado** a nombre del uid 1000, la redirección sigue funcionando y el sandbox pierde las tres capacidades:
+
+| | uuid del concursante (`0755`) | uuid de root (`0111`), `output.txt` pre-creado |
+|---|---|---|
+| `ls` del directorio | input.txt | Permission denied |
+| redirigir a `output.txt` | OK | **OK** |
+| crear un archivo nuevo | OK | Permission denied |
+| borrar el input | OK | Permission denied |
+
+**Y el worker sigue pudiendo escribir adentro porque es root**, verificado corriendo las mismas llamadas de Go que hace el adapter (`os.Mkdir` con el modo intacto tras el umask, `os.WriteFile`, `os.Chown`, `os.RemoveAll`). El control, como uid 1000, falla en todas — incluida la de crear un directorio propio bajo la raíz, así que un concursante tampoco puede plantar señuelos.
+
+**9. La raíz del volumen pasó a ser un argumento del constructor (commit 2).** `judgingDir` empezó usando la constante absoluta `/judging` y eso deja **sin poder testear** todo el commit: ningún test puede escribir ahí, y en la máquina de un desarrollador sin root tampoco. `NewExecutor` y `NewOutputChecker` la reciben, el composition root les pasa `pool.SharedVolumePath`, y los tests usan `t.TempDir()`.
+
+**10. `Session.Close` borra el directorio ANTES del guard del container (commit 2).** `Close` sale temprano cuando `s.container == nil`, que es lo que deja la red de seguridad al descartar un container. Con la limpieza detrás de ese guard, **cada judging que toca la red de seguridad dejaba un directorio para siempre** en el `emptyDir`. Tiene test propio.
+
+**11. Dos huecos más que encontró el barrido de mutaciones (commit 2).**
+
+- El test del layout aseveraba el modo contra **`judgingDirMode`, la constante que la mutación cambia**, así que ponerla en `0755` pasaba en verde. Es el mismo error que ya había aparecido en el paso 0 con `exitRejected`. Ahora compara contra el literal `0o111`.
+- **Nada cubría que el nombre del directorio fuera aleatorio**, que es donde se apoya toda la seguridad de D7: una mutación a un nombre fijo pasaba. El test nuevo fija las dos mitades —que dos judgings no compartan directorio, y que el nombre **no sea el id de la submission**, que la API entrega—, y las dos mutaciones correspondientes quedan en rojo.
+
+**12. El volumen habilita un streaming más fuerte que el que este documento descartó (commit 2, pendiente de evaluar).** El documento descartó el streaming de casos de prueba razonando que *"convierte O(suma) en O(caso mayor)"*, que no ayuda cuando un solo archivo **es** la suma. Eso vale para un iterador que materializa un caso a la vez; **escribiendo del ZIP directo a un archivo no se materializa ninguno**, y pasa a ser `O(buffer)`. Es la palanca que subiría el tope de datos de prueba, que hoy lo fija el worker sosteniendo todo en memoria.
+
+**No hace falta el volumen para conseguirlo**: el ZIP trae el tamaño descomprimido en su header y `buildTar` sólo necesita el tamaño por adelantado, así que una variante que reciba un `io.Reader` más el tamaño deja pasar la respuesta del jurado por la API igual de sin-materializar. El streaming y el destino son decisiones independientes. **Queda para evaluar al terminar el paso.**
+
+
 #### La entrada del caso de prueba SÍ viaja por el volumen — sub-decisión de D7, resuelta
 
 D7 dejaba explícitamente abierto *"si la entrada del caso de prueba también viaja por el volumen o sigue por la API"*. **Va por el volumen**, por dos razones que aparecieron al desglosar la memoria del worker:

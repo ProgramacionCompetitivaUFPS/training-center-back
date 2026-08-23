@@ -156,7 +156,7 @@ func main() {
 	lightPool.Start()
 	defer lightPool.Stop()
 
-	executor := adapterjudge.NewExecutor(heavyPool, dockerClient, executorCfg)
+	executor := adapterjudge.NewExecutor(heavyPool, dockerClient, executorCfg, judgepool.SharedVolumePath)
 	artifactCfg := adapterjudge.ArtifactConfig{Languages: artifactLanguages}
 	artifactCompiler := adapterjudge.NewArtifactCompiler(heavyPool, dockerClient, artifactCfg)
 
@@ -180,14 +180,14 @@ func main() {
 		defer gcsClient.Close()
 		sourceCodeDownloader = adapterjudge.NewSourceCodeDownloader(gcsClient, gcsBucket)
 		testCaseProvider = adapterjudge.NewTestCaseProvider(gcsClient, gcsBucket, dbPool)
-		outputChecker = adapterjudge.NewOutputChecker(lightPool, dockerClient, artifactCfg, gcsClient, gcsBucket)
+		outputChecker = adapterjudge.NewOutputChecker(lightPool, dockerClient, artifactCfg, gcsClient, gcsBucket, judgepool.SharedVolumePath)
 		artifactUploader = adapterjudge.NewArtifactUploader(gcsClient, gcsBucket)
 		validatorRunner = adapterjudge.NewValidatorRunner(lightPool, dockerClient, artifactCfg, gcsClient, gcsBucket)
 		slog.Info("worker: using GCS storage backend", "bucket", gcsBucket)
 	default:
 		sourceCodeDownloader = adapterjudge.NewSourceCodeDownloaderLocal(storageLocalDir)
 		testCaseProvider = adapterjudge.NewTestCaseProviderLocal(storageLocalDir, dbPool)
-		outputChecker = adapterjudge.NewOutputCheckerLocal(lightPool, dockerClient, artifactCfg, storageLocalDir)
+		outputChecker = adapterjudge.NewOutputCheckerLocal(lightPool, dockerClient, artifactCfg, storageLocalDir, judgepool.SharedVolumePath)
 		artifactUploader = adapterjudge.NewArtifactUploaderLocal(storageLocalDir)
 		validatorRunner = adapterjudge.NewValidatorRunnerLocal(lightPool, dockerClient, artifactCfg, storageLocalDir)
 		slog.Info("worker: using local storage backend", "dir", storageLocalDir)

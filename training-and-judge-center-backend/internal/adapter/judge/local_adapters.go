@@ -13,8 +13,8 @@ func NewTestCaseProviderLocal(dir string, db infraPostgres.Querier) *TestCasePro
 	return &TestCaseProvider{reader: newLocalReader(dir), db: db}
 }
 
-func NewOutputCheckerLocal(p *pool.Pool, docker dockerExecClient, cfg ArtifactConfig, dir string) *OutputChecker {
-	return &OutputChecker{pool: p, docker: docker, reader: newLocalReader(dir), cfg: cfg}
+func NewOutputCheckerLocal(p *pool.Pool, docker dockerExecClient, cfg ArtifactConfig, dir string, judgingRoot string) *OutputChecker {
+	return &OutputChecker{pool: p, docker: docker, reader: newLocalReader(dir), cfg: cfg, judgingRoot: judgingRoot}
 }
 
 func NewArtifactUploaderLocal(dir string) *ArtifactUploader {

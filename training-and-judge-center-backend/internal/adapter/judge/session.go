@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"os"
 	"strings"
 	"time"
 
@@ -22,10 +23,14 @@ import (
 
 const (
 	maxCompileLogBytes = 10 * 1024
-	// maxOutputBytes also bounds what a checker has to hold in a light pool
-	// container; 64 MiB made every language run out of memory there.
+	// maxOutputBytes is what a checker has to hold in a light pool container;
+	// 64 MiB made every language run out of memory there. Nothing enforces it
+	// yet: step 5 of the shared volume work turns it into a verdict.
 	maxOutputBytes = 8 << 20
-	compileTimeout = 30 * time.Second
+	// outputPreviewBytes is read back for the wrong-answer report. It is above
+	// the application layer's own preview so its truncation marker stays honest.
+	outputPreviewBytes = 4 << 10
+	compileTimeout     = 30 * time.Second
 	// runGrace is what the worker waits past the in-container timeout before
 	// assuming the daemon is stuck and the container has to go. It has to
 	// outlast the SIGKILL that timeout(1) sends a second after its deadline,
@@ -34,10 +39,11 @@ const (
 )
 
 type Session struct {
-	container *pool.Container // nil after Discard by safety net
-	pool      *pool.Pool
-	docker    dockerExecClient
-	langCfg   LanguageExecConfig
+	container  *pool.Container // nil after Discard by safety net
+	pool       *pool.Pool
+	docker     dockerExecClient
+	langCfg    LanguageExecConfig
+	judgingDir string
 }
 
 func (s *Session) Compile(ctx context.Context, req appjudge.CompileRequest) (appjudge.CompileResult, error) {
@@ -89,18 +95,18 @@ func (s *Session) Compile(ctx context.Context, req appjudge.CompileRequest) (app
 }
 
 func (s *Session) RunTestCase(ctx context.Context, req appjudge.RunRequest) (appjudge.RunResult, error) {
-	if _, err := s.docker.CopyToContainer(ctx, s.container.ID(), client.CopyToContainerOptions{
-		DestinationPath: "/sandbox",
-		Content:         buildTar("input.txt", req.Input, modeSource),
-	}); err != nil {
-		slog.ErrorContext(ctx, "executor: copy input failed", "container_id", s.container.ID(), "error", err)
+	// Straight to the shared volume: the sandbox reads it from there, and so
+	// does the checker, instead of each getting its own copy through the API.
+	if err := os.WriteFile(judgingInputPath(s.judgingDir), req.Input, judgingFileMode); err != nil {
+		slog.ErrorContext(ctx, "executor: write input failed", "error", err)
 		return appjudge.RunResult{}, apperror.NewInternal()
 	}
 
 	wallBackstopSecs := max(2, (req.TimeLimitMs*2+999)/1000)
 	cmd := fmt.Sprintf(
-		"timeout --kill-after=1s %ds %s < /sandbox/input.txt > /sandbox/output.txt 2>/dev/null",
+		"timeout --kill-after=1s %ds %s < %s > %s 2>/dev/null",
 		wallBackstopSecs, s.langCfg.RunCmd,
+		judgingInputPath(s.judgingDir), judgingOutputPath(s.judgingDir),
 	)
 
 	safetyCtx, cancel := context.WithTimeout(ctx, time.Duration(wallBackstopSecs)*time.Second+runGrace)
@@ -147,17 +153,22 @@ func (s *Session) RunTestCase(ctx context.Context, req appjudge.RunRequest) (app
 	}
 
 	result := appjudge.RunResult{
-		ExitCode: inspectRes.ExitCode,
-		TimeMs:   cpuTimeMs,
-		MemoryKb: memoryKb,
-		Output:   s.copyOutput(ctx),
+		ExitCode:      inspectRes.ExitCode,
+		TimeMs:        cpuTimeMs,
+		MemoryKb:      memoryKb,
+		OutputPreview: s.readOutputPreview(ctx),
 	}
 	// No per-case cleanup: the shell redirection truncates output.txt before the
-	// program starts, CopyToContainer overwrites input.txt, and Close wipes both.
+	// program starts, the worker overwrites input.txt, and Close removes both.
 	return result, nil
 }
 
 func (s *Session) Close(ctx context.Context) error {
+	// Ahead of the container guard on purpose: the safety net nils the container
+	// out, and the judging directory would then stay in the volume forever.
+	if err := os.RemoveAll(s.judgingDir); err != nil {
+		slog.ErrorContext(ctx, "executor: judging directory cleanup failed", "error", err)
+	}
 	if s.container == nil {
 		return nil
 	}
@@ -181,23 +192,34 @@ func (s *Session) readStats(ctx context.Context) (uint64, int) {
 	return stats.CPUStats.CPUUsage.TotalUsage, int(stats.MemoryStats.MaxUsage / 1024)
 }
 
-func (s *Session) copyOutput(ctx context.Context) []byte {
-	res, err := s.docker.CopyFromContainer(ctx, s.container.ID(), client.CopyFromContainerOptions{
-		SourcePath: "/sandbox/output.txt",
-	})
+// readOutputPreview brings back only what the wrong-answer report needs. The
+// output itself stays in the volume for the checker to read.
+func (s *Session) readOutputPreview(ctx context.Context) []byte {
+	outputPath := judgingOutputPath(s.judgingDir)
+	info, err := os.Stat(outputPath)
 	if err != nil {
+		slog.ErrorContext(ctx, "executor: output file missing after the run", "error", err)
 		return nil
 	}
-	defer res.Content.Close()
-
-	// Reading one byte past the limit tells a truncated output apart from one
-	// that just fits. Truncation is silent to the contestant until step 7 turns
-	// it into a verdict, so at least leave a trace here.
-	output := extractFirstFile(res.Content, maxOutputBytes+1)
-	if len(output) > maxOutputBytes {
-		slog.WarnContext(ctx, "executor: contestant output truncated at the limit",
-			"container_id", s.container.ID(), "limit_bytes", maxOutputBytes)
-		return output[:maxOutputBytes]
+	// Nothing stops a program from printing past the limit until step 5 makes it
+	// a verdict, so until then it at least leaves a trace.
+	if info.Size() > maxOutputBytes {
+		slog.WarnContext(ctx, "executor: contestant output ran past the limit",
+			"limit_bytes", maxOutputBytes, "size_bytes", info.Size())
 	}
-	return output
+
+	f, err := os.Open(outputPath)
+	if err != nil {
+		slog.ErrorContext(ctx, "executor: opening the output failed", "error", err)
+		return nil
+	}
+	defer f.Close()
+
+	preview := make([]byte, outputPreviewBytes)
+	n, err := io.ReadFull(f, preview)
+	if err != nil && err != io.EOF && err != io.ErrUnexpectedEOF {
+		slog.ErrorContext(ctx, "executor: reading the output failed", "error", err)
+		return nil
+	}
+	return preview[:n]
 }

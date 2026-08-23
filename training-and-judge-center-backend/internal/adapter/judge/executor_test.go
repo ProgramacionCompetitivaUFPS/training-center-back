@@ -3,6 +3,7 @@ package judge
 import (
 	"bytes"
 	"context"
+	"os"
 	"testing"
 	"time"
 
@@ -33,10 +34,11 @@ func newTestSession(t *testing.T, docker *mockDockerExecClient) (*Session, *judg
 		t.Fatalf("pool.Claim: %v", err)
 	}
 	s := &Session{
-		container: c,
-		pool:      p,
-		docker:    docker,
-		langCfg:   testExecCfg().Languages[testLang],
+		container:  c,
+		pool:       p,
+		docker:     docker,
+		langCfg:    testExecCfg().Languages[testLang],
+		judgingDir: newTestJudgingDir(t),
 	}
 	return s, p
 }
@@ -46,9 +48,9 @@ func newTestSession(t *testing.T, docker *mockDockerExecClient) (*Session, *judg
 // 1. BeginSession with a language absent from ExecutorConfig returns error without claiming.
 func TestExecutor_BeginSession_UnknownLanguage(t *testing.T) {
 	p, poolMock := newTestPool(t)
-	e := NewExecutor(p, &mockDockerExecClient{}, ExecutorConfig{Languages: map[string]LanguageExecConfig{}})
+	e := NewExecutor(p, &mockDockerExecClient{}, ExecutorConfig{Languages: map[string]LanguageExecConfig{}}, t.TempDir())
 
-	_, err := e.BeginSession(context.Background(), submission.RestoreLanguage("rust"), testProblemMemoryKb)
+	_, err := e.BeginSession(context.Background(), submission.RestoreLanguage("rust"), testProblemMemoryKb, "judging-1")
 	if err == nil {
 		t.Fatal("expected error for unknown language, got nil")
 	}
@@ -60,9 +62,9 @@ func TestExecutor_BeginSession_UnknownLanguage(t *testing.T) {
 // 2. BeginSession for a known language claims a container and returns a *Session.
 func TestExecutor_BeginSession_Success(t *testing.T) {
 	p, _ := newTestPool(t)
-	e := NewExecutor(p, &mockDockerExecClient{}, testExecCfg())
+	e := NewExecutor(p, &mockDockerExecClient{}, testExecCfg(), t.TempDir())
 
-	sess, err := e.BeginSession(context.Background(), submission.RestoreLanguage(testLang), testProblemMemoryKb)
+	sess, err := e.BeginSession(context.Background(), submission.RestoreLanguage(testLang), testProblemMemoryKb, "judging-1")
 	if err != nil {
 		t.Fatalf("BeginSession: %v", err)
 	}
@@ -164,16 +166,13 @@ func TestSession_Compile_LogTruncated(t *testing.T) {
 	}
 }
 
-// 7. RunTestCase with exit code 0 returns the program output.
+// 7. RunTestCase with exit code 0 previews what the program left in the volume.
 func TestSession_RunTestCase_Accepted(t *testing.T) {
 	expected := []byte("42\n")
-	mock := &mockDockerExecClient{
-		copyFromContainerFn: func(_ context.Context, _ string, _ client.CopyFromContainerOptions) (client.CopyFromContainerResult, error) {
-			return client.CopyFromContainerResult{Content: outputTar(expected)}, nil
-		},
-	}
+	mock := &mockDockerExecClient{}
 	s, _ := newTestSession(t, mock)
 	defer s.Close(context.Background())
+	writeContestantOutput(t, s.judgingDir, expected)
 
 	result, err := s.RunTestCase(context.Background(), appjudge.RunRequest{
 		Input: []byte("1\n"), TimeLimitMs: 1000,
@@ -184,8 +183,8 @@ func TestSession_RunTestCase_Accepted(t *testing.T) {
 	if result.ExitCode != 0 {
 		t.Errorf("ExitCode = %d, want 0", result.ExitCode)
 	}
-	if !bytes.Equal(result.Output, expected) {
-		t.Errorf("Output = %q, want %q", result.Output, expected)
+	if !bytes.Equal(result.OutputPreview, expected) {
+		t.Errorf("OutputPreview = %q, want %q", result.OutputPreview, expected)
 	}
 }
 
@@ -317,9 +316,9 @@ func TestSession_Close_AfterDiscard_Noop(t *testing.T) {
 // a container a thousandth of its limit without anything failing visibly.
 func TestExecutor_BeginSession_ProblemLimitReachesThePoolInBytes(t *testing.T) {
 	p, poolMock := newTestPool(t)
-	e := NewExecutor(p, &mockDockerExecClient{}, testExecCfg())
+	e := NewExecutor(p, &mockDockerExecClient{}, testExecCfg(), t.TempDir())
 
-	if _, err := e.BeginSession(context.Background(), submission.RestoreLanguage(testLang), testProblemMemoryKb); err != nil {
+	if _, err := e.BeginSession(context.Background(), submission.RestoreLanguage(testLang), testProblemMemoryKb, "judging-1"); err != nil {
 		t.Fatalf("BeginSession: %v", err)
 	}
 
@@ -386,7 +385,7 @@ func TestSession_RunTestCase_WrapsTheCommandInTheInContainerTimeout(t *testing.T
 	}
 	// wallBackstop = max(2, ceil(2*1000/1000)) = 2s
 	want := "timeout --kill-after=1s 2s " + testExecCfg().Languages[testLang].RunCmd +
-		" < /sandbox/input.txt > /sandbox/output.txt 2>/dev/null"
+		" < " + judgingInputPath(s.judgingDir) + " > " + judgingOutputPath(s.judgingDir) + " 2>/dev/null"
 	if cmds[0][2] != want {
 		t.Errorf("command:\n got %q\nwant %q", cmds[0][2], want)
 	}
@@ -401,9 +400,9 @@ func TestExecutor_BeginSession_MemoryFactorBuysBackTheRuntimeReserve(t *testing.
 	lc := cfg.Languages[testLang]
 	lc.MemoryFactor = 1.5
 	cfg.Languages[testLang] = lc
-	e := NewExecutor(p, &mockDockerExecClient{}, cfg)
+	e := NewExecutor(p, &mockDockerExecClient{}, cfg, t.TempDir())
 
-	if _, err := e.BeginSession(context.Background(), submission.RestoreLanguage(testLang), testProblemMemoryKb); err != nil {
+	if _, err := e.BeginSession(context.Background(), submission.RestoreLanguage(testLang), testProblemMemoryKb, "judging-1"); err != nil {
 		t.Fatalf("BeginSession: %v", err)
 	}
 
@@ -411,5 +410,49 @@ func TestExecutor_BeginSession_MemoryFactorBuysBackTheRuntimeReserve(t *testing.
 	if got := poolMock.lastCreateMemory.Load(); got != want {
 		t.Errorf("container created with Memory = %d, want %d (the problem's %d KB times 1.5)",
 			got, want, testProblemMemoryKb)
+	}
+}
+
+// The input reaching the sandbox through the filesystem instead of the Docker
+// API is the whole point: it used to be copied twice per test case, once into
+// each container.
+func TestSession_RunTestCase_WritesTheInputToTheVolume(t *testing.T) {
+	docker := &mockDockerExecClient{
+		copyToContainerFn: func(context.Context, string, client.CopyToContainerOptions) (client.CopyToContainerResult, error) {
+			t.Error("the input went through the Docker API; it belongs in the volume")
+			return client.CopyToContainerResult{}, nil
+		},
+	}
+	s, _ := newTestSession(t, docker)
+	defer s.Close(context.Background())
+
+	if _, err := s.RunTestCase(context.Background(), appjudge.RunRequest{
+		Input: []byte("1 2\n"), TimeLimitMs: 1000,
+	}); err != nil {
+		t.Fatalf("RunTestCase: %v", err)
+	}
+
+	got, err := os.ReadFile(judgingInputPath(s.judgingDir))
+	if err != nil {
+		t.Fatalf("reading the input back: %v", err)
+	}
+	if string(got) != "1 2\n" {
+		t.Errorf("input.txt: got %q, want the test case input", got)
+	}
+}
+
+// The safety net nils the container out, so cleanup placed after that guard
+// would leave one directory per rescued judging in the shared volume forever.
+func TestSession_Close_RemovesTheJudgingDirectoryEvenWithoutAContainer(t *testing.T) {
+	s, _ := newTestSession(t, &mockDockerExecClient{})
+	dir := s.judgingDir
+	s.container = nil // what the safety net leaves behind
+
+	if err := s.Close(context.Background()); err != nil {
+		t.Fatalf("Close: %v", err)
+	}
+
+	if _, err := os.Stat(dir); !os.IsNotExist(err) {
+		t.Errorf("the judging directory survived Close: %v", err)
 	}
 }

@@ -5,6 +5,8 @@ import (
 	"log/slog"
 	"time"
 
+	"github.com/google/uuid"
+
 	appshared "github.com/training-judge-center/backend/internal/application/shared"
 	"github.com/training-judge-center/backend/internal/domain/submission"
 	"github.com/training-judge-center/backend/pkg/apperror"
@@ -132,7 +134,11 @@ func (uc *JudgeSubmissionUseCase) judgeAttempt(
 	testCases []TestCase,
 	now time.Time,
 ) (bool, error) {
-	session, err := uc.executor.BeginSession(ctx, sub.Language(), limits.MemoryKb)
+	// A fresh unguessable name per attempt. Never the submission id: that one is
+	// public over the API, and the name is what isolates one judging from another.
+	judgingID := uuid.NewString()
+
+	session, err := uc.executor.BeginSession(ctx, sub.Language(), limits.MemoryKb, judgingID)
 	if err != nil {
 		return true, err
 	}
@@ -152,7 +158,7 @@ func (uc *JudgeSubmissionUseCase) judgeAttempt(
 
 	// Opened after compiling: a submission that does not build produces no output
 	// to check, so no checker container is held during the compile.
-	checkerSession, err := uc.outputChecker.BeginChecking(ctx, limits.CheckerPath, limits.CheckerLanguage)
+	checkerSession, err := uc.outputChecker.BeginChecking(ctx, limits.CheckerPath, limits.CheckerLanguage, judgingID)
 	if err != nil {
 		return true, err
 	}
@@ -180,11 +186,7 @@ func (uc *JudgeSubmissionUseCase) judgeAttempt(
 				_ = sub.MarkTimeLimitExceeded(runResult.TimeMs, now)
 				return false, nil
 			}
-			checkResult, err := checkerSession.Check(ctx, CheckRequest{
-				Input:            tc.Input,
-				ExpectedOutput:   tc.ExpectedOutput,
-				ContestantOutput: runResult.Output,
-			})
+			checkResult, err := checkerSession.Check(ctx, tc.ExpectedOutput)
 			if err != nil {
 				return true, err
 			}
