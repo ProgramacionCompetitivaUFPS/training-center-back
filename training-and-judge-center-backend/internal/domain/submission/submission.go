@@ -157,23 +157,25 @@ func (s *Submission) markFinal(now time.Time) error {
 	return nil
 }
 
-func (s *Submission) MarkAccepted(timeMs, memoryKb int, now time.Time) error {
+// memoryKb is a pointer because it may not have been measured: a zero would
+// tell the contestant their solution used no memory at all.
+func (s *Submission) MarkAccepted(timeMs int, memoryKb *int, now time.Time) error {
 	if err := s.markFinal(now); err != nil {
 		return err
 	}
 	s.status = newStatusAccepted()
 	s.timeMs = &timeMs
-	s.memoryKb = &memoryKb
+	s.memoryKb = memoryKb
 	return nil
 }
 
-func (s *Submission) MarkWrongAnswer(timeMs, memoryKb int, now time.Time) error {
+func (s *Submission) MarkWrongAnswer(timeMs int, memoryKb *int, now time.Time) error {
 	if err := s.markFinal(now); err != nil {
 		return err
 	}
 	s.status = newStatusWrongAnswer()
 	s.timeMs = &timeMs
-	s.memoryKb = &memoryKb
+	s.memoryKb = memoryKb
 	return nil
 }
 
@@ -186,22 +188,22 @@ func (s *Submission) MarkTimeLimitExceeded(timeMs int, now time.Time) error {
 	return nil
 }
 
-func (s *Submission) MarkMemoryLimitExceeded(memoryKb int, now time.Time) error {
+func (s *Submission) MarkMemoryLimitExceeded(memoryKb *int, now time.Time) error {
 	if err := s.markFinal(now); err != nil {
 		return err
 	}
 	s.status = newStatusMemoryLimitExceeded()
-	s.memoryKb = &memoryKb
+	s.memoryKb = memoryKb
 	return nil
 }
 
-func (s *Submission) MarkRuntimeError(timeMs, memoryKb int, now time.Time) error {
+func (s *Submission) MarkRuntimeError(timeMs int, memoryKb *int, now time.Time) error {
 	if err := s.markFinal(now); err != nil {
 		return err
 	}
 	s.status = newStatusRuntimeError()
 	s.timeMs = &timeMs
-	s.memoryKb = &memoryKb
+	s.memoryKb = memoryKb
 	return nil
 }
 

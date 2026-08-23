@@ -105,7 +105,7 @@ func (m *mockExecutionSession) RunTestCase(ctx context.Context, req RunRequest) 
 	if m.runTestCaseFn != nil {
 		return m.runTestCaseFn(ctx, req)
 	}
-	return RunResult{ExitCode: 0, TimeMs: 50, MemoryKb: 1024, OutputPreview: []byte("3")}, nil
+	return RunResult{ExitCode: 0, TimeMs: 50, MemoryKb: kb(1024), OutputPreview: []byte("3")}, nil
 }
 
 func (m *mockExecutionSession) Close(ctx context.Context) error {
@@ -309,3 +309,7 @@ func pendingSubmission() *submission.Submission {
 }
 
 var errTransient = errors.New("transient error")
+
+// kb reads better than taking the address of a local at every call site.
+// RunResult carries a pointer because a run may produce no measurement.
+func kb(v int) *int { return &v }

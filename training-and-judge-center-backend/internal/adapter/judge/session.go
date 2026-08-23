@@ -8,6 +8,7 @@ import (
 	"io"
 	"log/slog"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 
@@ -103,16 +104,20 @@ func (s *Session) RunTestCase(ctx context.Context, req appjudge.RunRequest) (app
 	}
 
 	wallBackstopSecs := max(2, (req.TimeLimitMs*2+999)/1000)
+	// time wraps timeout and not the other way round: inside, a TLE would kill
+	// it too and no measurement would be written. -q keeps the diagnostic line
+	// GNU time prints on a non-zero exit out of the file, which is every TLE and
+	// every MLE.
 	cmd := fmt.Sprintf(
-		"timeout --kill-after=1s %ds %s < %s > %s 2>/dev/null",
-		wallBackstopSecs, s.langCfg.RunCmd,
+		"/usr/bin/time -q -f %%M -o %s timeout --kill-after=1s %ds %s < %s > %s 2>/dev/null",
+		judgingMemPath(s.judgingDir), wallBackstopSecs, s.langCfg.RunCmd,
 		judgingInputPath(s.judgingDir), judgingOutputPath(s.judgingDir),
 	)
 
 	safetyCtx, cancel := context.WithTimeout(ctx, time.Duration(wallBackstopSecs)*time.Second+runGrace)
 	defer cancel()
 
-	cpuBeforeNs, _ := s.readStats(ctx)
+	cpuBeforeNs := s.readCPUNanos(ctx)
 	execRes, err := s.docker.ExecCreate(safetyCtx, s.container.ID(), client.ExecCreateOptions{
 		Cmd: []string{"sh", "-c", cmd},
 	})
@@ -146,7 +151,7 @@ func (s *Session) RunTestCase(ctx context.Context, req appjudge.RunRequest) (app
 		return appjudge.RunResult{}, apperror.NewInternal()
 	}
 
-	cpuAfterNs, memoryKb := s.readStats(ctx)
+	cpuAfterNs := s.readCPUNanos(ctx)
 	cpuTimeMs := 0
 	if cpuAfterNs > cpuBeforeNs {
 		cpuTimeMs = int((cpuAfterNs - cpuBeforeNs) / 1_000_000)
@@ -155,7 +160,7 @@ func (s *Session) RunTestCase(ctx context.Context, req appjudge.RunRequest) (app
 	result := appjudge.RunResult{
 		ExitCode:      inspectRes.ExitCode,
 		TimeMs:        cpuTimeMs,
-		MemoryKb:      memoryKb,
+		MemoryKb:      s.readMemoryKb(ctx),
 		OutputPreview: s.readOutputPreview(ctx),
 	}
 	// No per-case cleanup: the shell redirection truncates output.txt before the
@@ -179,17 +184,38 @@ func (s *Session) Close(ctx context.Context) error {
 	return nil
 }
 
-func (s *Session) readStats(ctx context.Context) (uint64, int) {
+// readCPUNanos returns the container's cumulative CPU time. Memory does not
+// come from here: MemoryStats.MaxUsage is a cgroup v1 field, absent on v2, and
+// the container is reused across test cases anyway.
+func (s *Session) readCPUNanos(ctx context.Context) uint64 {
 	statsRes, err := s.docker.ContainerStats(ctx, s.container.ID(), client.ContainerStatsOptions{Stream: false})
 	if err != nil {
-		return 0, 0
+		return 0
 	}
 	defer statsRes.Body.Close()
 	var stats container.StatsResponse
 	if err := json.NewDecoder(statsRes.Body).Decode(&stats); err != nil {
-		return 0, 0
+		return 0
 	}
-	return stats.CPUStats.CPUUsage.TotalUsage, int(stats.MemoryStats.MaxUsage / 1024)
+	return stats.CPUStats.CPUUsage.TotalUsage
+}
+
+// readMemoryKb picks up the peak RSS /usr/bin/time left behind: the run's own,
+// isolated from whatever else passed through this container. nil rather than
+// zero when there is nothing to read, so no verdict claims a solution used no
+// memory at all.
+func (s *Session) readMemoryKb(ctx context.Context) *int {
+	raw, err := os.ReadFile(judgingMemPath(s.judgingDir))
+	if err != nil {
+		slog.ErrorContext(ctx, "executor: reading the memory measurement failed", "error", err)
+		return nil
+	}
+	kb, err := strconv.Atoi(strings.TrimSpace(string(raw)))
+	if err != nil {
+		slog.ErrorContext(ctx, "executor: the memory measurement is not a number", "content", strutil.Truncate(string(raw), 200))
+		return nil
+	}
+	return &kb
 }
 
 // readOutputPreview brings back only what the wrong-answer report needs. The

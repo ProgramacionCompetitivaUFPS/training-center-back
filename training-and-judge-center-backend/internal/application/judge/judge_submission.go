@@ -164,7 +164,9 @@ func (uc *JudgeSubmissionUseCase) judgeAttempt(
 	}
 	defer checkerSession.Close(ctx)
 
-	maxTimeMs, maxMemoryKb := 0, 0
+	maxTimeMs := 0
+	// nil until some test case reports one: the maximum of nothing is not zero.
+	var maxMemoryKb *int
 	for _, tc := range testCases {
 		runResult, err := session.RunTestCase(ctx, RunRequest{
 			Input:       tc.Input,
@@ -197,7 +199,7 @@ func (uc *JudgeSubmissionUseCase) judgeAttempt(
 			if runResult.TimeMs > maxTimeMs {
 				maxTimeMs = runResult.TimeMs
 			}
-			if runResult.MemoryKb > maxMemoryKb {
+			if runResult.MemoryKb != nil && (maxMemoryKb == nil || *runResult.MemoryKb > *maxMemoryKb) {
 				maxMemoryKb = runResult.MemoryKb
 			}
 		default:

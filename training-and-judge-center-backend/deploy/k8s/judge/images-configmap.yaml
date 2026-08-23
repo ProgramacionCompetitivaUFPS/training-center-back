@@ -1,19 +1,21 @@
-# Versiones de las imagenes del sandbox del judge. Fijas a proposito (nunca
-# "latest"): el toolchain no puede cambiar solo bajo una competencia en curso, o
-# los veredictos podrian moverse.
+# Versions of the judge sandbox images. Pinned on purpose, never "latest": the
+# toolchain must not change under a contest in progress, or verdicts could move.
 #
-# RUNNER_VERSION cubre las tres imagenes de lenguaje. Son toolchains: cambian
-# casi nunca y se construyen y suben a mano (ver GKE_DEPLOY_ROADMAP.md).
+# RUNNER_VERSION covers the three language images. They are toolchains: they
+# change almost never, and are built and pushed by hand (see GKE_DEPLOY_ROADMAP.md).
+# Because the worker's run command relies on what these images carry, a version
+# declared here has to be pushed BEFORE the code that depends on it is deployed.
 #
-# COMPARE_VERSION es independiente porque el comparador por defecto es codigo
-# nuestro (cmd/compare), no un toolchain. Lo construye el CI: al declarar aca una
-# version nueva en el mismo PR que cambia el comparador, el pipeline de deploy la
-# construye y la sube. Si el comparador cambia y esta version no, el CI falla.
+# COMPARE_VERSION is independent because the default comparator is our own code
+# (cmd/compare), not a toolchain. CI builds it: declaring a new version here in
+# the same PR that changes the comparator makes the deploy pipeline build and
+# push it. If the comparator changes and this version does not, CI fails.
 apiVersion: v1
 kind: ConfigMap
 metadata:
   name: judge-images
   namespace: training-center
 data:
-  RUNNER_VERSION: "v0.1.0"
+  # v0.2.0 adds GNU time to the base image, which the run command now invokes.
+  RUNNER_VERSION: "v0.2.0"
   COMPARE_VERSION: "v0.1.0"

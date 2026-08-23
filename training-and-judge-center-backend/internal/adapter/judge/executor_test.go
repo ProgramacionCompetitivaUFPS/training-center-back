@@ -230,16 +230,13 @@ func TestSession_RunTestCase_MLE(t *testing.T) {
 	}
 }
 
-// 10. ContainerStats MaxUsage is reported in KB.
-func TestSession_RunTestCase_MemoryKb(t *testing.T) {
-	const maxUsage = 256 * 1024 * 1024 // 256 MB → 262144 KB
-	mock := &mockDockerExecClient{
-		containerStatsFn: func(_ context.Context, _ string, _ client.ContainerStatsOptions) (client.ContainerStatsResult, error) {
-			return client.ContainerStatsResult{Body: statsBody(maxUsage)}, nil
-		},
-	}
-	s, _ := newTestSession(t, mock)
+// 10. The memory a run used comes from what /usr/bin/time left behind, not from
+// the container's cgroup: MemoryStats.MaxUsage is a cgroup v1 field that reports
+// nothing on v2, and the container is reused across test cases anyway.
+func TestSession_RunTestCase_MemoryComesFromTheRunsOwnMeasurement(t *testing.T) {
+	s, _ := newTestSession(t, &mockDockerExecClient{})
 	defer s.Close(context.Background())
+	writeMemoryMeasurement(t, s.judgingDir, "262144\n")
 
 	result, err := s.RunTestCase(context.Background(), appjudge.RunRequest{
 		Input: []byte("1\n"), TimeLimitMs: 1000,
@@ -247,8 +244,42 @@ func TestSession_RunTestCase_MemoryKb(t *testing.T) {
 	if err != nil {
 		t.Fatalf("RunTestCase: %v", err)
 	}
-	if result.MemoryKb != 262144 {
-		t.Errorf("MemoryKb = %d, want 262144", result.MemoryKb)
+	if result.MemoryKb == nil {
+		t.Fatal("MemoryKb is nil, want the measurement the run left")
+	}
+	if *result.MemoryKb != 262144 {
+		t.Errorf("MemoryKb = %d, want 262144", *result.MemoryKb)
+	}
+}
+
+// Nothing measurable is reported as nothing: a zero would tell the contestant
+// their solution used no memory at all, which is what the old cgroup field did
+// on every single verdict.
+func TestSession_RunTestCase_UnreadableMeasurementIsNilNotZero(t *testing.T) {
+	tests := []struct {
+		name    string
+		content string
+	}{
+		{"the file is empty", ""},
+		{"the file holds something that is not a number", "Command exited with non-zero status 124\n103424"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			s, _ := newTestSession(t, &mockDockerExecClient{})
+			defer s.Close(context.Background())
+			writeMemoryMeasurement(t, s.judgingDir, tt.content)
+
+			result, err := s.RunTestCase(context.Background(), appjudge.RunRequest{
+				Input: []byte("1\n"), TimeLimitMs: 1000,
+			})
+			if err != nil {
+				t.Fatalf("RunTestCase: %v", err)
+			}
+			if result.MemoryKb != nil {
+				t.Errorf("MemoryKb = %d, want nil", *result.MemoryKb)
+			}
+		})
 	}
 }
 
@@ -383,8 +414,10 @@ func TestSession_RunTestCase_WrapsTheCommandInTheInContainerTimeout(t *testing.T
 	if len(cmds) != 1 || len(cmds[0]) != 3 || cmds[0][0] != "sh" || cmds[0][1] != "-c" {
 		t.Fatalf("expected one command through sh -c, got: %v", cmds)
 	}
-	// wallBackstop = max(2, ceil(2*1000/1000)) = 2s
-	want := "timeout --kill-after=1s 2s " + testExecCfg().Languages[testLang].RunCmd +
+	// time wraps timeout, not the other way round, and -q keeps the diagnostic
+	// line GNU time prints on a non-zero exit out of the measurement file.
+	want := "/usr/bin/time -q -f %M -o " + judgingMemPath(s.judgingDir) +
+		" timeout --kill-after=1s 2s " + testExecCfg().Languages[testLang].RunCmd +
 		" < " + judgingInputPath(s.judgingDir) + " > " + judgingOutputPath(s.judgingDir) + " 2>/dev/null"
 	if cmds[0][2] != want {
 		t.Errorf("command:\n got %q\nwant %q", cmds[0][2], want)

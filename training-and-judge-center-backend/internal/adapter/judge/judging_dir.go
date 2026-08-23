@@ -26,16 +26,26 @@ func judgingOutputPath(judgingDir string) string {
 	return path.Join(judgingDir, "output.txt")
 }
 
+// judgingMemPath is where /usr/bin/time leaves the run's peak RSS.
+func judgingMemPath(judgingDir string) string {
+	return path.Join(judgingDir, "mem.txt")
+}
+
 // createJudgingDir lays out the slot. The worker is root, so it keeps writing
 // inside a directory it just made unwritable for everyone else.
 func createJudgingDir(judgingDir string) error {
 	if err := os.Mkdir(judgingDir, judgingDirMode); err != nil {
 		return err
 	}
-	out := judgingOutputPath(judgingDir)
-	if err := os.WriteFile(out, nil, judgingFileMode); err != nil {
-		return err
+	// Both are rewritten by the sandbox on every test case, so it has to own
+	// them: the directory above forbids creating anything.
+	for _, p := range []string{judgingOutputPath(judgingDir), judgingMemPath(judgingDir)} {
+		if err := os.WriteFile(p, nil, judgingFileMode); err != nil {
+			return err
+		}
+		if err := os.Chown(p, sandboxUID, sandboxUID); err != nil {
+			return err
+		}
 	}
-	// The sandbox rewrites this file on every test case, so it has to own it.
-	return os.Chown(out, sandboxUID, sandboxUID)
+	return nil
 }

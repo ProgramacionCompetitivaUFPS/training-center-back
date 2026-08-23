@@ -30,14 +30,17 @@ func TestCreateJudgingDir_LeavesTheSlotUnlistableAndUnwritable(t *testing.T) {
 		t.Errorf("directory mode: got %#o, want %#o — the sandbox must not list or write it", got, 0o111)
 	}
 
-	// Pre-created so the shell redirection never needs to create it, which the
-	// mode above forbids.
-	out, err := os.Stat(judgingOutputPath(dir))
-	if err != nil {
-		t.Fatalf("output.txt was not pre-created: %v", err)
-	}
-	if uid := sandboxOwner(t, out); uid != sandboxUID {
-		t.Errorf("output.txt owner: got uid %d, want the sandbox user %d", uid, sandboxUID)
+	// Both are pre-created because the mode above forbids the sandbox creating
+	// anything: the shell redirection and time -o would fail otherwise.
+	for _, p := range []string{judgingOutputPath(dir), judgingMemPath(dir)} {
+		info, err := os.Stat(p)
+		if err != nil {
+			t.Errorf("%s was not pre-created: %v", filepath.Base(p), err)
+			continue
+		}
+		if uid := sandboxOwner(t, info); uid != sandboxUID {
+			t.Errorf("%s owner: got uid %d, want the sandbox user %d", filepath.Base(p), uid, sandboxUID)
+		}
 	}
 }
 
