@@ -1259,6 +1259,27 @@ BusyBox v1.37.0 ... Usage: timeout [-s SIG] [-k KILL_SECS] SECS PROG ARGS
 
 **Por qué ningún test lo vio, que es el patrón de los tres bugs de esta fase.** Los tests del adapter **aseveran el string del comando** con el cliente de Docker mockeado, así que fijaban `--kill-after=1s` como lo correcto sin que nada ejecutara ese `timeout` en ninguna imagen. La imagen `compare` es la única Alpine del sistema y llegó dos pasos después de que se escribiera el wrapper. **Ninguna cantidad de tests de esa forma podía atraparlo**; hacía falta correrlo contra la imagen real, que es exactamente lo que la Fase 8 es.
 
+### La suite sólo pasaba como root, y eso ocultó un bug entero — ✅ RESUELTO en el Paso 8
+
+**Lo introdujo esta rama, y lo encontró el CI del PR, no nosotros.** Todo lo que corrimos en esta sesión daba verde.
+
+`createJudgingDir` creaba el directorio del judging en modo `0111` y **después** escribía `output.txt` y `mem.txt` adentro; la limpieza borraba entradas de ese mismo directorio; y en el medio hay un `chown` al uid del sandbox. Las tres cosas exigen root — un directorio en `0111` no tiene `w`, así que ni su propio dueño puede crear ni borrar nada adentro. En producción funciona porque el container del worker **es** root, y por eso el problema nunca apareció en el cluster.
+
+**Por qué ninguna corrida local lo vio**: la receta de tests que documenta `CLAUDE.md` es `docker run ... golang:1.25 go test ./...`, y un container corre como **root** salvo que se le pida lo contrario. O sea que la forma canónica de correr los tests en este proyecto es también la que oculta esta clase de bug. El runner de GitHub Actions no es privilegiado, y ahí saltó: cinco tests en rojo, dos por el layout y tres por la limpieza de `t.TempDir`.
+
+**El arreglo mantiene el estado final idéntico** —directorio `0111`, los dos archivos del uid 1000— pero llega distinto: el directorio se crea escribible y se cierra con un `chmod` al final, y `removeJudgingDir` lo afloja antes de borrar. Sólo el `chown` sigue necesitando root, y se saltea cuando no lo hay: si algún día el worker dejara de ser root, el sandbox no podría escribir su salida y **fallaría ruidosamente**, no en silencio.
+
+Dos tests del executor descartaban la sesión que abrían (`if _, err := e.BeginSession(...)`), así que el directorio quedaba cerrado y la limpieza automática de `t.TempDir` no podía borrarlo. Ahora la cierran.
+
+**La regla que sale de esto, y que vale más que el arreglo**: correr la suite como root es un entorno privilegiado, y un entorno privilegiado no prueba que el código funcione en uno que no lo es. Cuando el código toca permisos, dueños o modos de archivo, hay que correrla **también** como usuario común:
+
+```
+docker run --rm --user 1000:1000 -e HOME=/tmp -e GOCACHE=/tmp/gc -e GOMODCACHE=/tmp/gm \
+  -e GOFLAGS=-buildvcs=false -v "...:/app" -w /app/... golang:1.25 go test ./...
+```
+
+Las tres variables de entorno y el `-buildvcs=false` no son decorativos: sin ellas el uid 1000 no tiene dónde escribir la cache de Go, y `go build` falla por el stamping de VCS al no confiar en el repositorio. El arreglo se verificó en las dos direcciones — verde como `uid=0` y como `uid=1000` —, que es lo único que demuestra que ninguna de las dos ramas quedó rota.
+
 ## Plan de ejecución
 
 **Regla de cada paso**: el proyecto compila y la suite queda en verde al terminarlo. Nada de estados intermedios rotos — en Go no se puede migrar media interfaz, así que cada cambio de puerto arrastra a sus llamadores y mocks en el mismo paso.

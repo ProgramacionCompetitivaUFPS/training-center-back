@@ -14,7 +14,6 @@ bash tests/test_e2e.sh                  # requires running http
 ```
 
 **Dev env vars:**
-- `MOCK_AUTH=1` — reads user from `X-Mock-User` header
 - `STORAGE_BACKEND=local` — local filesystem instead of GCS
 
 ## Architecture
@@ -107,8 +106,8 @@ adapter/ratelimit/ ← driven adapter: rate limiting (transversal)
 
 **Adapter double-logging:** the adapter logs the raw error before returning `apperror.NewInternal()`. The application layer must NOT log errors that come from adapters — they were already logged at the boundary.
 
-**Estado de los dominios:** todos los dominios del backend (`user`, `problem`, `group`, `material`, `contest`, `team`, `submission`) tienen capa de dominio, `application/` y handlers HTTP implementados. El **Judge System** está mayormente implementado: pool de containers (`adapter/judge/pool/`), executor/session (`adapter/judge/`), use case con retries (`application/judge/`) y el binario `cmd/worker/` (RUNNER_ARCHITECTURE.md lo llama `cmd/judge` — es el mismo componente). Pendientes: consumidor concurrente con semáforo (hoy es serial), `Pool.IsHealthy()` + `os.Exit` si el pool se degrada, goroutine de recuperación (§874), y despliegue DinD en GKE.
+**Estado de los dominios:** todos los dominios del backend (`user`, `problem`, `group`, `material`, `contest`, `team`, `submission`) tienen capa de dominio, `application/` y handlers HTTP implementados. El **Judge System** está implementado y probado de punta a punta contra GKE: dos pools de containers (`adapter/judge/pool/`, `heavy` y `light`), executor/session, compilación y ejecución de checkers y validators **dentro del sandbox**, consumidor concurrente con semáforo, `Pool.IsHealthy()` con `os.Exit`, recuperación de trabajos stale, y el binario `cmd/worker/`.
 
-**Endpoints pendientes principales:**
-- `POST /problems/p/{slug}/publish` — requiere Judge System; bloquea DRAFT→PUBLISHED por API.
-- `GET /users/me/dashboard` — dashboard de actividad cross-domain (misc-4).
+> `RUNNER_ARCHITECTURE.md` lo llama `cmd/judge` — es el mismo componente — y describe el diseño **anterior** al rediseño del sandbox. La fuente de verdad de cómo funciona hoy el judge es `training-and-judge-center-backend/JUDGE_SANDBOX_REDESIGN.md`.
+
+**Pendientes del judge:** ya no quedan endpoints principales sin implementar (`publish` y `GET /users/me/dashboard` existen). Lo que queda son ítems acotados —el `BackendConfig` del Ingress, deriva de documentación, y refactors chicos— listados al final de `JUDGE_SANDBOX_REDESIGN.md`.
