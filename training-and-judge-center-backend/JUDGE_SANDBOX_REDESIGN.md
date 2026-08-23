@@ -792,7 +792,24 @@ Ninguno bloquea el diseño; son elecciones que conviene hacer con el código del
 
 #### Pendientes que abrió el dimensionamiento de D14, sin paso asignado
 
-- **Medir los DaemonSets antes de aplicar los números de D14.** Es la única fila del desglose que quedó estimada (~0.40 CPU / ~0.45 GiB), y de ella dependen los 0.5 CPU y 0.9 GiB de margen del pod. El orden correcto es: crear el node pool nuevo → dejar que levante un nodo → `kubectl describe node <nodo>` → leer la sección **`Allocated resources`** (que muestra lo ya pedido, con los DaemonSets arriba y el pod del judge todavía no) → ajustar `dind.limits.memory` contra el número real. Si sale más alto que lo estimado, se recorta del dind; si sale más bajo, el excedente natural es también el dind (el worker queda al 52% con el tope de 100 MB).
+- **Medir los DaemonSets antes de aplicar los números de D14. — ✅ MEDIDO en A1 del Paso 8, y la estimación se quedaba corta al doble.**
+
+  | | D14 estimaba | Medido en el nodo real |
+  |---|---|---|
+  | Asignable CPU | 7.91 | **7.910** — exacto |
+  | Asignable memoria | 28.34 GiB | **27.73 GiB** |
+  | DaemonSets CPU | ~0.40 | **0.489** |
+  | DaemonSets memoria | ~0.45 GiB | **0.883 GiB** |
+
+  Ocho DaemonSets: `anetd` 205m, `fluentbit-gke` 105m, `gke-metadata-server` 100m, `node-local-dns` 30m, `gke-metrics-agent` 21m, `pdcsi-node` 15m, `netd` 8m, `collector` 5m.
+
+  **El pod entra, pero con menos de la mitad del margen de memoria que D14 suponía**: contra sus 7 CPU / 26 GiB de requests quedan `7.910 − 0.489 = 7.421` de CPU (margen 0.42, se esperaba ~0.5) y `27.73 − 0.883 = 26.85` GiB de memoria (**margen 0.85 GiB, se esperaba 1.9**). Este mismo documento decía que *"para que falle, los DaemonSets tendrían que pedir el doble de lo típico"* — piden casi exactamente el doble de lo estimado. El dimensionamiento sobrevive; la holgura que se creía tener, no. **Si hiciera falta recuperar margen, la palanca sigue siendo bajar el `24Gi` del dind**, y N1 en vez de N3 libera 6 GiB sin romper ningún invariante.
+
+  **Y la medición destapó un error propio en los `sizeLimit` de A1**: se eligieron contra un cálculo de *"50 GB de disco → ~42 GB utilizables"*, y el `ephemeral-storage` asignable real del nodo es **17.53 GiB**. Los dos topes sumaban 22 GiB, o sea que `dind-storage: 20Gi` era **inalcanzable** y no acotaba nada: el nodo se queda sin disco antes. Corregido a `10Gi` (~10× las imágenes, que pesan 920 MB), que con los `2Gi` de `judging` da 12 GiB contra 17.53 asignables. **La regla que faltaba escribir: un `sizeLimit` tiene que estar por debajo del `ephemeral-storage` asignable, no sólo por encima de lo que se usa.**
+
+  El detalle original de por qué se difirió la medición:
+
+- **(original)** Es la única fila del desglose que quedó estimada (~0.40 CPU / ~0.45 GiB), y de ella dependen los 0.5 CPU y 0.9 GiB de margen del pod. El orden correcto es: crear el node pool nuevo → dejar que levante un nodo → `kubectl describe node <nodo>` → leer la sección **`Allocated resources`** (que muestra lo ya pedido, con los DaemonSets arriba y el pod del judge todavía no) → ajustar `dind.limits.memory` contra el número real. Si sale más alto que lo estimado, se recorta del dind; si sale más bajo, el excedente natural es también el dind (el worker queda al 52% con el tope de 100 MB).
 
   **Y el margen no es capacidad ociosa**: los DaemonSets del sistema corren con `priorityClassName: system-node-critical`, así que si no entran no se quedan afuera — **preemptan al pod del judge**. El modo de falla de pedir de más no es "no arranca", es "arranca y lo matan en medio de una competencia".
 
@@ -2133,8 +2150,8 @@ Lo pendiente está repartido en todo este documento y en el roadmap. Acá está 
 | `testlib.h` en la imagen de C++ | ✅ **hecho** | Sin él un checker real de testlib **no compila**. Vendorizado en `third_party/testlib/` — ver el bug, que quedó cerrado |
 | `sizeLimit` en los dos `emptyDir` de `worker.yaml` | ✅ **hecho** | Eran `emptyDir: {}` pelados, y este trabajo empezó a escribir ahí datos del concursante y del setter. `judging: 2Gi`, `dind-storage: 20Gi` |
 | Construir las imágenes con `time` | ✅ **construidas y verificadas local** | El comando de ejecución ya invoca `/usr/bin/time`: sin la imagen **todo falla con exit 127** |
-| **Subirlas** a Artifact Registry (`RUNNER_VERSION: v0.2.0`, ya declarado) | ⏸ pendiente | Tres tags: `judge-runner-{cpp20,java17,python310}:v0.2.0`. El comparador lo construye el CI al taguear, no a mano |
-| Migrar el node pool a `e2-standard-8` y medir los DaemonSets con `kubectl describe node` | ⏸ pendiente | D14 está escrito y **no ejecutado**; los números ya commiteados en `worker.yaml` y `judge_config.yaml` asumen la máquina nueva |
+| **Subidas** a Artifact Registry | ✅ **hecho** | `judge-runner-{cpp20,java17,python310}:v0.2.0`, y además `judge-runner-compare:v0.1.0`, que **no existía en el registro en ninguna versión** — el prepull la recorre con `set -e`, así que sin ella el pod del worker no arrancaba nunca. Bloqueo de la Fase 8 que nadie había visto |
+| Migrar el node pool a `e2-standard-8` y medir los DaemonSets | ✅ **hecho** | La migración resultó un `update in-place` de Terraform, no la recreación que D14 prescribía. La medición está arriba, en el pendiente que cierra |
 
 **La receta de migración de D14 era falsa, verificado ejecutándola.** Dice *"GKE no permite cambiar el machine type de un node pool existente. Hay que crear uno nuevo con el mismo taint, cambiar el `nodeSelector` del worker y borrar el viejo"*. Con el provider de Google 7.43 el plan sale **`update in-place`**: `0 to add, 1 to change, 0 to destroy`. Nada de node pool nuevo, nada de tocar el `nodeSelector`, nada de borrar el viejo — el node pool vive en Terraform (`deploy/gcp/cluster.tf`) y la migración es **editar una línea y aplicar**. Tardó 1m10s.
 
