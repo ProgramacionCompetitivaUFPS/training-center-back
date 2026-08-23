@@ -1076,7 +1076,7 @@ Un problem setter que hace lo obvio —clase pública— termina con todas sus s
 
 **Qué costaría arreglarlo de verdad**: que las soluciones dejen de identificarse por filename. Toca `AddSolution`, `RemoveSolution`, el endpoint de borrado y el contrato de la API. Es una decisión propia, no un detalle de este rediseño.
 
-### `testlib.h` no está en la imagen de C++ — pendiente, fuera de este rediseño
+### `testlib.h` no está en la imagen de C++ — ✅ RESUELTO en A1 del Paso 8
 
 Encontrado al preparar el Paso 3 y verificado adentro de `judge-runner:cpp20`: no existe `/usr/include/testlib.h`, ni ninguna copia en el repositorio. `cpp20.Dockerfile` instala únicamente `g++`.
 
@@ -1084,7 +1084,11 @@ Un checker o validator escrito con testlib —que es el caso normal en programac
 
 **Por qué no se arregla acá**: implica agregar el header a la imagen de C++, reconstruirla y subir `RUNNER_VERSION` en `deploy/k8s/judge/images-configmap.yaml`. Es trabajo de imágenes, no de código, y el rediseño no lo empeora — la compilación nativa tampoco lo tenía.
 
-**Decisión pendiente al hacerlo**: si el header se vendorea en el repo (reproducible, versión congelada) o se baja en el build (más simple, dependencia de red en el build).
+**Resuelto: se vendorea**, en `third_party/testlib/` (tag `0.9.41`, commit `68f9f30`), copiado a `/usr/local/include/testlib.h` sólo en `cpp20.Dockerfile`. El argumento lo da el propio `images-configmap.yaml`, que fija las versiones porque *"the toolchain must not change under a contest in progress, or verdicts could move"*: bajarlo en el build haría que dos builds de la misma `RUNNER_VERSION` produjeran imágenes distintas, y hacerlo desde un tag fijo con checksum lo arregla a medias — sigue metiendo una dependencia de red en el build. `/usr/local/include` y no `/usr/include` porque el FHS reserva el segundo para lo que instala el gestor de paquetes.
+
+**Verificado corriéndolo en la imagen reconstruida, con control**: el header queda en modo 644 y legible por el uid 1000; `#include "testlib.h"` resuelve desde `/sandbox` (y el control demuestra que g++ se queja si el header no está); y un checker real de testlib compila y devuelve `0` para una respuesta correcta, `1` para una incorrecta y `2` para un archivo ausente — la tabla de testlib, y lo que el adapter ya lee como rechazo.
+
+**Nota de método**: la primera medición de `/usr/bin/time` en las imágenes reportó que faltaba en las tres, y era falso — el test mandaba stderr a `/dev/null`, o sea que tapaba justo el diagnóstico. `time` está y funciona. Es el mismo patrón que este documento viene repitiendo: un experimento que "falla" tampoco prueba nada si no se mira por qué.
 
 
 ### El worker no aguantaba su propio tope de datos de prueba — ✅ RESUELTO en D14
@@ -2124,12 +2128,19 @@ Lo pendiente está repartido en todo este documento y en el roadmap. Acá está 
 
 **A1 — Infraestructura, sin esto no se puede probar.**
 
-| | Por qué |
-|---|---|
-| Construir y subir las imágenes con `time` (`RUNNER_VERSION: v0.2.0`, ya declarado) | El comando de ejecución ya invoca `/usr/bin/time`: sin la imagen **todo falla con exit 127** |
-| `testlib.h` en la imagen de C++ | Sin él un checker real de testlib **no compila**, así que la Fase 8 no puede probar lo que el rediseño vino a hacer seguro. Falta decidir vendorearlo o bajarlo en el build |
-| `sizeLimit` en los dos `emptyDir` de `worker.yaml` | Hoy son `emptyDir: {}` pelados, y este trabajo empezó a escribir ahí datos del concursante y del setter |
-| Migrar el node pool a `e2-standard-8` y medir los DaemonSets con `kubectl describe node` | D14 está escrito y **no ejecutado**; los números ya commiteados en `worker.yaml` y `judge_config.yaml` asumen la máquina nueva |
+| | Estado | Por qué |
+|---|---|---|
+| `testlib.h` en la imagen de C++ | ✅ **hecho** | Sin él un checker real de testlib **no compila**. Vendorizado en `third_party/testlib/` — ver el bug, que quedó cerrado |
+| `sizeLimit` en los dos `emptyDir` de `worker.yaml` | ✅ **hecho** | Eran `emptyDir: {}` pelados, y este trabajo empezó a escribir ahí datos del concursante y del setter. `judging: 2Gi`, `dind-storage: 20Gi` |
+| Construir las imágenes con `time` | ✅ **construidas y verificadas local** | El comando de ejecución ya invoca `/usr/bin/time`: sin la imagen **todo falla con exit 127** |
+| **Subirlas** a Artifact Registry (`RUNNER_VERSION: v0.2.0`, ya declarado) | ⏸ pendiente | Tres tags: `judge-runner-{cpp20,java17,python310}:v0.2.0`. El comparador lo construye el CI al taguear, no a mano |
+| Migrar el node pool a `e2-standard-8` y medir los DaemonSets con `kubectl describe node` | ⏸ pendiente | D14 está escrito y **no ejecutado**; los números ya commiteados en `worker.yaml` y `judge_config.yaml` asumen la máquina nueva |
+
+**Corrección a la receta de migración de D14**: dice *"GKE no permite cambiar el machine type de un node pool existente. Hay que crear uno nuevo con el mismo taint, cambiar el `nodeSelector` del worker y borrar el viejo"*. El node pool **está en Terraform** (`deploy/gcp/cluster.tf`), así que cambiar `machine_type` hace que Terraform reemplace el recurso solo, y como el nombre `judge-pool` no cambia y el worker selecciona por `cloud.google.com/gke-nodepool: judge-pool`, **el `nodeSelector` no se toca**. La migración es editar una línea y `terraform apply`.
+
+**Reclasificación decidida con el usuario**: A3 (barrido de código muerto) pasa **después del PR**, ya probado y mergeado, por presupuesto de la sesión. El costo aceptado: el PR lleva código muerto que los revisores van a leer, que es lo que D12 argumentaba en contra. El alcance de A3 sigue escrito abajo, así que no se pierde.
+
+**Y el rebase con `develop` se adelantó** a antes de A1, no después de pulir. Salió mejor así: rebasear antes de construir imágenes evita pushear un tag versionado y tener que rehacerlo si `develop` tocó `docker/judge/`. Resultado: 18 commits, **cero conflictos**, con solapamiento en sólo tres archivos (`cmd/api/main.go`, `router.go`, `docker-compose.yml`) porque los 31 commits nuevos de `develop` son todos de Google OAuth. Build, `vet` y suite completa en verde después.
 
 **A2 — Corrección: el tope por archivo de caso de prueba. ✅ COMPLETO.** Era **una** decisión con tres constantes (ver el punto 28 del Paso 7): el tope por archivo, `maxTokenBytes` de `cmd/compare` y `compare.memoryBytes` del pool liviano, más que el parser **falle en vez de truncar en silencio**.
 
