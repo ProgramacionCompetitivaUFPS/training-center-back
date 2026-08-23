@@ -204,6 +204,16 @@ func (p *Pool) oldestIdleContainer() *Container {
 	return oldest
 }
 
+// sharedVolumeBind is the judging volume as the daemon expects it: the source
+// it resolves, the path every container sees, and read-only where it applies.
+func (p *Pool) sharedVolumeBind() string {
+	bind := p.cfg.SharedVolumeSource + ":" + SharedVolumePath
+	if p.cfg.SharedVolumeReadOnly {
+		bind += ":ro"
+	}
+	return bind
+}
+
 // Removes the dangling container if ContainerStart fails after ContainerCreate succeeds.
 // Caller must NOT hold p.mu.
 func (p *Pool) createContainer(ctx context.Context, langCfg LanguageConfig, memoryBytes int64) (string, error) {
@@ -215,6 +225,8 @@ func (p *Pool) createContainer(ctx context.Context, langCfg LanguageConfig, memo
 			Cmd: []string{"sleep", "infinity"},
 		},
 		HostConfig: &container.HostConfig{
+			// Every container of a pool mounts the judging volume the same way.
+			Binds: []string{p.sharedVolumeBind()},
 			Resources: container.Resources{
 				Memory: memoryBytes,
 				// MemorySwap == Memory disables swap entirely, making MLE

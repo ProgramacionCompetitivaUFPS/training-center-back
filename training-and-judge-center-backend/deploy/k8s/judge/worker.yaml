@@ -25,6 +25,12 @@ spec:
       volumes:
         - name: dind-storage
           emptyDir: {}
+        # Where the contestant's output and the test case input live, so they
+        # never travel through the worker. Disk-backed on purpose: never add
+        # medium: Memory, whose pages are charged to the sandbox's cgroup and
+        # cannot be reclaimed, silently shrinking the contestant's memory limit.
+        - name: judging
+          emptyDir: {}
       initContainers:
         - name: dind
           image: docker:27-dind
@@ -51,6 +57,10 @@ spec:
           volumeMounts:
             - name: dind-storage
               mountPath: /var/lib/docker
+            # The daemon runs in here, so it resolves the bind source in this
+            # filesystem. Without this mount the sandboxes get an empty dir.
+            - name: judging
+              mountPath: /judging
           startupProbe:
             exec:
               command: ["docker", "info"]
@@ -110,6 +120,10 @@ spec:
               value: tcp://localhost:2375
             - name: JUDGE_CONFIG
               value: /config/judge_config.yaml
+            # What the daemon resolves the judging mount against. A path here,
+            # because the daemon lives in the dind sidecar and sees this one.
+            - name: JUDGE_VOLUME_SOURCE
+              value: /judging
             - name: DB_PASSWORD
               valueFrom:
                 secretKeyRef:
@@ -143,3 +157,6 @@ spec:
             limits:
               cpu: "1"
               memory: 2Gi
+          volumeMounts:
+            - name: judging
+              mountPath: /judging
