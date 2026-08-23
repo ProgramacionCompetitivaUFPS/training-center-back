@@ -55,7 +55,7 @@
 - `problem_validation_repository.go` (port con 3 métodos: `Save`, `FindByID`, `FindLatestByProblemID` — se simplificó de un diseño inicial de 4 métodos al notar que el índice único ya garantiza que "la más reciente" y "la activa" son siempre la misma fila).
 - `judging_file.go` extendido con `compiledKey`/`compiledAt` de solo lectura (sin setter — se escribe por SQL directo desde el worker, Fase 6).
 - `internal/adapter/problem/repository.go` actualizado para persistir/leer los campos nuevos.
-- Migración `033_create_problem_validations_table.sql`, probada localmente contra el Postgres de `docker-compose` (ciclo up→down→up verificado) — **no aplicada contra el cluster de GKE**, a propósito: nada en el código todavía usa la tabla (el port no tiene implementación real hasta la Fase 4), así que no había motivo para tocar el entorno real todavía.
+- Migración `034_create_problem_validations_table.sql` (renumerada desde `033` al rebasear: `develop` había usado ese número para `033_create_oauth_identities_table.sql`), probada localmente contra el Postgres de `docker-compose` (ciclo up→down→up verificado) — **no aplicada contra el cluster de GKE**, a propósito: nada en el código todavía usa la tabla (el port no tiene implementación real hasta la Fase 4), así que no había motivo para tocar el entorno real todavía.
 - Todo el proyecto compila (`go build ./...`) y los tests de dominio y del adaptador pasan.
 
 **Estado**: ✅ completa.
