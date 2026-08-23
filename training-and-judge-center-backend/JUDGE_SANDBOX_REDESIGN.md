@@ -1232,6 +1232,33 @@ El Paso 3, decisión #2, cambió el nombre convenido de `solution` a `Solution` 
 
 **Lo que NO se hizo, candidato para A3.** La causa raíz es una asimetría: los artefactos tienen el token `{name}` en sus cuatro campos —el mecanismo que el Paso 3 construyó justamente para que no exista una tabla desincronizable—, y las soluciones no. Extenderlo (`compileCmd: "g++ ... /sandbox/{name}.cpp"` con `{name}` = `Solution`) elimina la duplicación en vez de custodiarla, a costa de una regla de arranque nueva y de tocar el wiring de `LanguageExecConfig`. Se eligió la guarda por presupuesto de sesión, con el bug ya en el camino crítico.
 
+### El reporte descartaba el motivo por el que el checker rechazó — ✅ RESUELTO en el Paso 8
+
+Encontrado al diagnosticar el bug siguiente, y es lo que lo hacía indiagnosticable. `CheckResult.Message` lleva la explicación del checker, pero `validate_solutions.go` armaba el `SolutionFailure` sólo con `Expected`/`Actual` **tomados de las copias del worker**. Resultado: un publish fallido decía `Expected: 5\n / Got: 5\n` —los dos lados idénticos— y nada más, porque el container había leído algo distinto de lo que el worker tenía en memoria.
+
+El campo `Details` ya existía en `FailedTestCase` y ya se mapeaba al JSON, así que el último tramo era gratis: sólo faltaba llenarlo. Ahora el mensaje viaja `CheckResult` → `SolutionFailure` → `SolutionValidationFailure` → `FailedTestCase.Details`, y además se agrega a `validationLogs` como línea `Checker: ...`.
+
+**Por qué importa más allá del diagnóstico**: en competencia, un problem setter recibía "wrong answer" sobre su propia solución de referencia sin ninguna pista. Es la misma clase de pérdida de información que el Paso 6 corrigió con el MLE de Java, donde el argumento era el mismo: el veredicto ya era correcto, lo que faltaba era decir por qué.
+
+**Lo que sigue sin cubrirse**: `judge_submission.go` —el camino de las submissions reales— no se tocó, así que ahí el mensaje del checker sigue sin llegar a ningún lado. No es simétrico con el publish y conviene decidirlo aparte, porque a un concursante no se le muestra lo mismo que a un setter.
+
+### El `timeout` del pool liviano no existe en la imagen `compare` — ✅ RESUELTO en el Paso 8
+
+**Lo introdujo esta rama, en el Paso 7.** Con el mensaje del checker ya visible, el reporte lo dijo de frente:
+
+```
+timeout: unrecognized option: kill-after=1s
+BusyBox v1.37.0 ... Usage: timeout [-s SIG] [-k KILL_SECS] SECS PROG ARGS
+```
+
+`artifactSession.run` envolvía todo en `timeout --kill-after=1s Ns`, la forma larga de GNU coreutils. Las tres imágenes de lenguaje son Ubuntu y la aceptan; la imagen `compare` que introdujo D6 es **`alpine:3.21`**, o sea BusyBox, y la rechaza. El wrapper fallaba **antes de ejecutar el checker**, salía distinto de cero, y `Check` lee cualquier no-cero como rechazo: **toda submission sin checker personalizado daba `WRONG_ANSWER`** — que es, por D6, la mayoría del tráfico.
+
+**El arreglo es `timeout -k 1 <segundos>`**, sin sufijo, que las dos implementaciones aceptan. Verificado corriéndolo en las dos bases reales, con control: en `alpine:3.21` la forma corta sale 0 y la larga reproduce el error exacto del cluster; en `ubuntu:24.04` la corta sale 0 y **un comando que se pasa del límite sigue saliendo 124**, que era la propiedad que no se podía perder.
+
+`RunTestCase` conserva la forma larga a propósito: sólo corre sobre las imágenes de lenguaje, y además invoca `/usr/bin/time`, que BusyBox tampoco trae — hacerlo portable a medias sería peor que no hacerlo.
+
+**Por qué ningún test lo vio, que es el patrón de los tres bugs de esta fase.** Los tests del adapter **aseveran el string del comando** con el cliente de Docker mockeado, así que fijaban `--kill-after=1s` como lo correcto sin que nada ejecutara ese `timeout` en ninguna imagen. La imagen `compare` es la única Alpine del sistema y llegó dos pasos después de que se escribiera el wrapper. **Ninguna cantidad de tests de esa forma podía atraparlo**; hacía falta correrlo contra la imagen real, que es exactamente lo que la Fase 8 es.
+
 ## Plan de ejecución
 
 **Regla de cada paso**: el proyecto compila y la suite queda en verde al terminarlo. Nada de estados intermedios rotos — en Go no se puede migrar media interfaz, así que cada cambio de puerto arrastra a sus llamadores y mocks en el mismo paso.
@@ -2309,6 +2336,36 @@ O sea que **el worker publica el problema, no el handler HTTP**: el handler sól
 **Los 600 s son el número correcto, y no por casualidad**: el handler se rinde solo a los **540 s** y devuelve un `503` con `ErrCodeValidationTimedOut` y un mensaje que le dice al setter que vuelva más tarde. El timeout del balanceador tiene que **sobrevivir** al de la aplicación, o el usuario nunca llega a recibir ese 503 y el modo de falla vuelve a ser un corte mudo. Los 600 dejan 60 s de margen. Un valor por debajo de 540 sería peor que inútil.
 
 **Lo que NO está verificado**: que el backend esté efectivamente en los 30 s. Es el default documentado de GCP y lo que anotó la Fase 1 del roadmap, pero **nadie lo leyó de este cluster**. Se confirma con `gcloud compute backend-services list` y `describe <nombre> --global`, mirando `timeoutSec`. Ese mismo comando es después la verificación de que el cambio surtió efecto: el Ingress de GKE reconcilia los `BackendConfig` de forma asíncrona, así que **aplicar el manifiesto no prueba que el balanceador ya cambió**.
+
+
+**A6 — La Fase 8 se ejecutó: un problema publicado de punta a punta. ✅ COMPLETO**
+
+El objetivo era acotado —publicar un problema mínimo contra el cluster real— y se cumplió. `a-mas-b` (A+B, 1 sample + 3 secret, solución C++) quedó `PUBLISHED`, verificado por dos endpoints independientes.
+
+**Cuatro bugs, tres de ellos de esta rama, todos arreglados.** Están documentados uno por uno en "Bugs encontrados en el camino". El patrón que comparten importa más que cada uno: **los tres de esta rama pasaban la suite en verde**, porque los tests del adapter aseveran *el string del comando* con el cliente de Docker mockeado. Ninguno ejecuta nada contra una imagen real. Es exactamente el hueco que esta fase existe para cubrir, y conviene tenerlo presente antes de confiar en que la suite verde significa que el judge funciona.
+
+**Lo que quedó verificado en el cluster**, y que hasta ahora sólo estaba diseñado:
+
+| | Evidencia |
+|---|---|
+| El `emptyDir` compartido entre `dind` y `worker` | `judging volume verified end to end` — la sonda del Paso 7, punto 16 |
+| El dimensionamiento de D14 | `pod_cpu_millicores=6000 → max_concurrent=5` |
+| La medición de memoria de A5 | veredictos con `memoryKb` 3560 y 3532, **no cero** |
+| KEDA → autoscaler → prepull | worker listo en ~2 min desde cero nodos |
+| El timeout del backend del LB | **30.3 s medidos**, dos veces — lo que A5 daba por no verificado |
+
+**El control que le da valor al publish verde.** Un publish que pasa no prueba que los casos se ejecuten. Se mandaron dos submissions al problema ya publicado, idénticas salvo el tipo:
+
+| Solución | Veredicto | Tiempo | Memoria |
+|---|---|---|---|
+| `long long` | **ACCEPTED** | 62 ms | 3560 KB |
+| `int` | **WRONG_ANSWER** | 53 ms | 3532 KB |
+
+La diferencia sólo se manifiesta en `secret/03` (`1000000000 + 2000000000` desborda int32), así que el par demuestra que ese caso se ejecuta y que la comparación discrimina. De paso ejercita el camino de `judge_submission.go`, que es código distinto del publish y que nunca había corrido — es donde vivía el bug de `CheckerLanguage` que D8/D9 eliminó por construcción.
+
+**Un quinto arreglo, encontrado al probar los endpoints de submission.** Un problema nace `PRIVATE`, y `submit_solution.go` sólo dejaba enviar a los *modifiers*: **el autor no podía enviar a su propio problema**. El dominio ya tenía la regla correcta —`Problem.CanBeEditedBy`: autor, admin o modifier— y el chequeo de submission tenía una copia degradada. Ahora la espeja, con `AuthorID` agregado a `ProblemInfo` y a su query. Verificado por mutación: desactivar la rama del autor pone en rojo los dos tests nuevos y ninguno más. El camino de contest no tenía la copia (gatea por membresía), así que es un solo lugar.
+
+**Lo que la Fase 8 NO cubrió**, y conviene no confundir con probado: checkers y validators personalizados (todo lo anterior usó el camino por defecto, `compare`), Java y Python como lenguajes de solución, los veredictos de TLE/MLE/OLE, y la concurrencia real — nunca hubo más de dos judgings a la vez.
 
 #### B · Después de probado y mergeado
 
