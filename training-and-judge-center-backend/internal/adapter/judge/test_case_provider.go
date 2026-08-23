@@ -19,6 +19,9 @@ import (
 	"github.com/training-judge-center/backend/pkg/apperror"
 )
 
+// Defensive read limit per file, mirroring the maxFileSizeTestCaseInputMB that upload enforces.
+const maxTestCaseFileBytes = 64 << 20
+
 type TestCaseProvider struct {
 	reader gcsReader
 	db     infraPostgres.Querier
@@ -62,7 +65,7 @@ func (p *TestCaseProvider) GetTestCases(ctx context.Context, problemID string) (
 		return nil, apperror.NewInternal()
 	}
 
-	testCases, err := parseTestCasesZip(zipData)
+	testCases, err := parseTestCasesZip(zipData, maxTestCaseFileBytes)
 	if err != nil {
 		slog.ErrorContext(ctx, "test_case_provider: failed to parse ZIP", "key", *testCasesKey, "error", err)
 		return nil, apperror.NewInternal()
@@ -71,7 +74,7 @@ func (p *TestCaseProvider) GetTestCases(ctx context.Context, problemID string) (
 }
 
 // parseTestCasesZip follows the ICPC Problem Package Format (data/sample/ and data/secret/).
-func parseTestCasesZip(data []byte) ([]appJudge.TestCase, error) {
+func parseTestCasesZip(data []byte, maxFileBytes int) ([]appJudge.TestCase, error) {
 	r, err := zip.NewReader(bytes.NewReader(data), int64(len(data)))
 	if err != nil {
 		return nil, fmt.Errorf("invalid zip: %w", err)
@@ -106,10 +109,14 @@ func parseTestCasesZip(data []byte) ([]appJudge.TestCase, error) {
 		if err != nil {
 			return nil, fmt.Errorf("open %s in zip: %w", cleanPath, err)
 		}
-		content, readErr := io.ReadAll(io.LimitReader(rc, 64*1024*1024))
+		// One byte past the cap: LimitReader on its own would truncate in silence.
+		content, readErr := io.ReadAll(io.LimitReader(rc, int64(maxFileBytes)+1))
 		rc.Close()
 		if readErr != nil {
 			return nil, fmt.Errorf("read %s in zip: %w", cleanPath, readErr)
+		}
+		if len(content) > maxFileBytes {
+			return nil, fmt.Errorf("%s in zip exceeds the %d byte limit", cleanPath, maxFileBytes)
 		}
 
 		switch ext {

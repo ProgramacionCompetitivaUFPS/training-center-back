@@ -146,13 +146,15 @@ func main() {
 		}
 	}
 
-	icpcParser := problem.NewICPCParser(
-		settingsProvider.MaxFileSizeTestCaseMB(),
-		settingsProvider.MaxFileSizeDefaultMB(),
-		settingsProvider.MaxFileCountTestCase(),
-		settingsProvider.MaxFileCountSample(),
-		cfg.VirtualObject.LanguageExtensions,
-	)
+	icpcParser := problem.NewICPCParser(problem.ICPCParserConfig{
+		MaxUncompressedSizeMB: settingsProvider.MaxFileSizeTestCaseMB(),
+		MaxTestCaseInputMB:    cfg.VirtualObject.MaxFileSizeTestCaseInputMB,
+		MaxTestCaseAnswerMB:   cfg.VirtualObject.MaxFileSizeTestCaseAnswerMB,
+		MaxMetadataFileSizeMB: settingsProvider.MaxFileSizeDefaultMB(),
+		MaxFiles:              settingsProvider.MaxFileCountTestCase(),
+		MaxSampleFiles:        settingsProvider.MaxFileCountSample(),
+		LanguageExtensions:    cfg.VirtualObject.LanguageExtensions,
+	})
 	zipParser := problem.NewZipParser(icpcParser)
 	packageParser := problem.NewICPCPackageParser(icpcParser)
 
