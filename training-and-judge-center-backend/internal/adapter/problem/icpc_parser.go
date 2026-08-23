@@ -17,24 +17,40 @@ import (
 )
 
 type ICPCParser struct {
-	maxUncompressedSizeMB int
-	maxMetadataFileBytes  int
-	maxFiles              int
-	maxSampleFiles        int
-	languageExtensions    map[string]bool
+	maxUncompressedSizeMB  int
+	maxTestCaseInputBytes  int
+	maxTestCaseAnswerBytes int
+	maxMetadataFileBytes   int
+	maxFiles               int
+	maxSampleFiles         int
+	languageExtensions     map[string]bool
 }
 
-func NewICPCParser(maxUncompressedSizeMB int, maxMetadataFileSizeMB int, maxFiles int, maxSampleFiles int, languageExtensions map[string]string) *ICPCParser {
-	exts := make(map[string]bool, len(languageExtensions))
-	for ext := range languageExtensions {
+// ICPCParserConfig holds the package limits the parser enforces. Named fields
+// rather than a run of ints: transposing two of them would compile clean.
+type ICPCParserConfig struct {
+	MaxUncompressedSizeMB int // whole package, uncompressed
+	MaxTestCaseInputMB    int // a single .in file
+	MaxTestCaseAnswerMB   int // a single .ans file
+	MaxMetadataFileSizeMB int
+	MaxFiles              int
+	MaxSampleFiles        int
+	LanguageExtensions    map[string]string
+}
+
+func NewICPCParser(cfg ICPCParserConfig) *ICPCParser {
+	exts := make(map[string]bool, len(cfg.LanguageExtensions))
+	for ext := range cfg.LanguageExtensions {
 		exts[ext] = true
 	}
 	return &ICPCParser{
-		maxUncompressedSizeMB: maxUncompressedSizeMB,
-		maxMetadataFileBytes:  maxMetadataFileSizeMB * 1024 * 1024,
-		maxFiles:              maxFiles,
-		maxSampleFiles:        maxSampleFiles,
-		languageExtensions:    exts,
+		maxUncompressedSizeMB:  cfg.MaxUncompressedSizeMB,
+		maxTestCaseInputBytes:  cfg.MaxTestCaseInputMB * 1024 * 1024,
+		maxTestCaseAnswerBytes: cfg.MaxTestCaseAnswerMB * 1024 * 1024,
+		maxMetadataFileBytes:   cfg.MaxMetadataFileSizeMB * 1024 * 1024,
+		maxFiles:               cfg.MaxFiles,
+		maxSampleFiles:         cfg.MaxSampleFiles,
+		languageExtensions:     exts,
 	}
 }
 
@@ -85,7 +101,7 @@ func (p *ICPCParser) ParseTestCasesZip(ctx context.Context, zipData []byte) ([]E
 		return nil, err
 	}
 
-	if err := p.validateMetadataFileSizes(pz, prefix); err != nil {
+	if err := p.validateFileSizes(pz, prefix); err != nil {
 		return nil, err
 	}
 
@@ -119,7 +135,7 @@ func (p *ICPCParser) ParsePackageZip(ctx context.Context, zipData []byte) (*Pars
 		return nil, err
 	}
 
-	if err := p.validateMetadataFileSizes(pz, prefix); err != nil {
+	if err := p.validateFileSizes(pz, prefix); err != nil {
 		return nil, err
 	}
 
@@ -375,7 +391,10 @@ func (p *ICPCParser) detectRootPrefix(pz *ParsedZip, anchor AnchorType) (string,
 	return candidates[0], yamlFile, nil
 }
 
-func (p *ICPCParser) validateMetadataFileSizes(pz *ParsedZip, prefix string) error {
+// validateFileSizes caps a single file. Test data gets its own limits per kind:
+// an .in is only ever read whole by a custom checker, while an .ans also bounds
+// the largest token cmd/compare can meet, so it is held to the output limit.
+func (p *ICPCParser) validateFileSizes(pz *ParsedZip, prefix string) error {
 	for _, czf := range pz.Files {
 		if czf.IsDir {
 			continue
@@ -383,9 +402,22 @@ func (p *ICPCParser) validateMetadataFileSizes(pz *ParsedZip, prefix string) err
 		stripped := strings.TrimPrefix(czf.CleanPath, prefix)
 		isTestData := strings.HasPrefix("/"+stripped, "/data/sample/") ||
 			strings.HasPrefix("/"+stripped, "/data/secret/")
-		if !isTestData && czf.File.UncompressedSize64 > uint64(p.maxMetadataFileBytes) {
+
+		kind, limit := "Auxiliary file", p.maxMetadataFileBytes
+		if isTestData {
+			switch czf.Ext {
+			case ".in":
+				kind, limit = "Test case input", p.maxTestCaseInputBytes
+			case ".ans":
+				kind, limit = "Test case answer", p.maxTestCaseAnswerBytes
+			default:
+				continue
+			}
+		}
+
+		if czf.File.UncompressedSize64 > uint64(limit) {
 			return apperror.NewValidation([]apperror.FieldError{
-				{Field: "file", Message: fmt.Sprintf("Auxiliary file '%s' exceeds the allowed limit of %d bytes.", czf.CleanPath, p.maxMetadataFileBytes)},
+				{Field: "file", Message: fmt.Sprintf("%s '%s' exceeds the allowed limit of %d bytes.", kind, czf.CleanPath, limit)},
 			})
 		}
 	}

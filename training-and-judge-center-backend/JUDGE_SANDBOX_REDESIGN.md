@@ -836,6 +836,12 @@ Ninguno bloquea el diseño; son elecciones que conviene hacer con el código del
   - **Tres formatos y tres estilos de carga** (env, JSON, YAML), con tres niveles de rigor distintos: el YAML rechaza claves desconocidas, el JSON no valida nada.
   - **`virtual_object` no dice qué contiene.** El nombre no describe ni límites de problema ni lenguajes ni tags.
 
+  - **El default de `maxFileSizeTestCaseMB` quedó en el número que D14 quitó** (encontrado al ejecutar A2). `internal/adapter/config/config_service.go` hace `defaultIfZero(cfg.MaxFileSizeTestCaseMB, 200)`, y D14 bajó ese tope de 200 a 100 MB justamente porque *"el worker no aguantaba su propio tope"* (ver la sección de bugs). Si alguien borra la clave del JSON, la plataforma vuelve sola al valor que se quitó y nada avisa, porque el JSON no valida nada. El arreglo del número es una línea; lo que no es de una línea es revisar los otros cuatro `defaultIfZero` del mismo bloque, que nadie volvió a mirar desde que se escribieron.
+
+  - **`config_service.go` no está donde ARCHITECTURE.md dice que va** (encontrado al ejecutar A2). Ese documento tiene una entrada propia al respecto —*"Where does `platform/config/config_service.go` go?"*— y responde: *"It belongs in `adapter/problem/platform_settings.go`"*, porque construye un tipo de dominio (`problem.PlatformSettings`) a partir de config cruda. Hoy vive en `internal/adapter/config/config_service.go`. Es deriva puramente de ubicación: el archivo hace exactamente lo que ARCHITECTURE.md describe, sólo que en otro lado.
+
+  - **`PlatformSettings` transporta cinco campos que el dominio nunca lee** (encontrado al ejecutar A2). Verificado con grep: `MaxFileSizeTestCaseMB`, `MaxFileSizeDefaultMB`, `MaxFileCountTestCase`, `MaxFileCountSample` y `UploadMaxConcurrency` sólo los consumen `adapter/http/handler/problem/` y `cmd/api`; ningún archivo de `internal/domain/` los usa. El efecto concreto es que `NewPlatformSettings` toma **11 parámetros posicionales con 5 `int` seguidos**, donde transponer dos compila perfecto — la misma forma de bug que `RunRequest.MemoryKb` y `CheckerLanguage`. Fue el motivo por el que A2 decidió que los dos topes nuevos por archivo **no** viajaran por ahí (ver el Paso 8, A2). Si esos cinco campos salieran del dominio, el constructor bajaría a seis parámetros y el chequeo cross-field de tamaños de archivo (`platform_settings.go:60`) se mudaría con ellos.
+
 ## Consecuencias
 
 ### Sobre la Fase 5 del roadmap: se cae casi entera
@@ -1954,7 +1960,9 @@ Extrapolado al tope de 100 MB de la config son ~536 MB con 5 judgings, que concu
 
 **Queda registrado como opción**, con estos números, para cuando alguien quiera subir el tope de datos de prueba: es la palanca correcta para eso y ésta es su factura.
 
-**28. El tope por archivo, `maxTokenBytes` y el tamaño de `compare` son UNA decisión, no tres (al cerrar el paso).** Hoy viven en tres archivos sin ninguna relación escrita, y el resultado es incoherente:
+**28. El tope por archivo, `maxTokenBytes` y el tamaño de `compare` son UNA decisión, no tres (al cerrar el paso). — ✅ RESUELTO en A2 del Paso 8**, donde además la relación que este punto escribe resultó **sobre-restringida** y su fórmula nombraba la variable equivocada. El diagnóstico de abajo se conserva porque es correcto; lo que cambia es la salida.
+
+Hoy viven en tres archivos sin ninguna relación escrita, y el resultado es incoherente:
 
 | | tope real hoy | ¿los 16 MiB de `maxTokenBytes` sirven? |
 |---|---|---|
@@ -2123,7 +2131,68 @@ Lo pendiente está repartido en todo este documento y en el roadmap. Acá está 
 | `sizeLimit` en los dos `emptyDir` de `worker.yaml` | Hoy son `emptyDir: {}` pelados, y este trabajo empezó a escribir ahí datos del concursante y del setter |
 | Migrar el node pool a `e2-standard-8` y medir los DaemonSets con `kubectl describe node` | D14 está escrito y **no ejecutado**; los números ya commiteados en `worker.yaml` y `judge_config.yaml` asumen la máquina nueva |
 
-**A2 — Corrección: el tope por archivo de caso de prueba.** Es **una** decisión con tres constantes (ver el punto 28 del Paso 7): el tope por archivo, `maxTokenBytes` de `cmd/compare` y `compare.memoryBytes` del pool liviano. Incluye que el parser **falle en vez de truncar en silencio**. Es lo único que puede volver a romper el dimensionamiento del pool liviano en competencia.
+**A2 — Corrección: el tope por archivo de caso de prueba. ✅ COMPLETO.** Era **una** decisión con tres constantes (ver el punto 28 del Paso 7): el tope por archivo, `maxTokenBytes` de `cmd/compare` y `compare.memoryBytes` del pool liviano, más que el parser **falle en vez de truncar en silencio**.
+
+| | Antes | Después |
+|---|---|---|
+| tope por archivo `.in` | 100 MB, el mismo número que el total | **64 MiB** |
+| tope por archivo `.ans` | 100 MB, el mismo número que el total | **8 MiB**, atado a `maxOutputBytes` |
+| parser del judge | trunca en silencio en un literal de 64 MiB | **falla**, con el tope como parámetro |
+| `maxTokenBytes` | 16 MiB justificado por corazonada | 16 MiB en `pkg/judgelimits`, con el invariante escrito y guardado |
+| `compare.memoryBytes` | 128 MiB | **sin cambio** |
+
+#### Lo que se decidió en el camino
+
+**1. Dos topes por archivo y no uno, y el del `.ans` atado a `maxOutputBytes`.** El punto 28 trata "tope por archivo" como **un solo número que acota los tres archivos** y después obliga a `maxTokenBytes` a cubrirlo. Está sobre-restringido: **`compare` nunca abre el input** (verificado — `run` abre `args[1]` y `args[2]`, nunca `args[0]`), y los datos reales dicen que los dos archivos no se parecen en nada. Aplicar la cadena tal cual habría obligado a `compare.memoryBytes: 256 MiB`, el doble de hoy, comprado para un token que no puede ver.
+
+El tope del `.ans` **no es un número libre**: una respuesta correcta es, por definición, algo que una solución correcta puede imprimir, y una solución no puede imprimir más de `maxOutputBytes` sin recibir `OUTPUT_LIMIT_EXCEEDED`. Un `.ans` mayor describe un problema que ninguna solución puede resolver. Eso quedó como aserción, no como comentario.
+
+**2. El `.in` va en 64 MiB, y el ~32 MB que este documento sugería estaba mal.** Los 12 paquetes reales tienen **tres** problemas en la banda de 20-30 MB (B 28.75, K 28.40, H 20.57 MiB) y después caen a 2.16: no es un outlier, es un cuarto del set agrupado justo debajo de 32, o sea **1.06× de margen**. Y el tope del `.in` **no le cuesta nada al worker** (su exposición la fija el total, que no cambia) **ni a `compare`** (no lo lee): su único consumidor es el container de un checker **personalizado**. Los 64 MiB coinciden exactamente con el literal donde el parser truncaba, así que **nada que hoy funcione deja de funcionar**, y lo que hoy se corrompe en silencio pasa a rechazarse al subir.
+
+**3. `maxTokenBytes` se queda en 16 MiB, y el off-by-one de `bufio` es el hallazgo que lo decide.** Medido replicando `openTokens`, con control: **un token de exactamente `maxTokenBytes` es rechazado, incluso en EOF sin delimitador** — `bufio` chequea "buffer lleno" antes de mirar si hay EOF. Igualar el tope a los 8 MiB, que es lo obvio, habría hecho que un `.ans` de exactamente 8 MiB en un solo token diera exit 3 → rechazo → **todas las submissions de ese problema en wrong answer**.
+
+Con el tope del `.ans` en 8 MiB el token legítimo más grande pasa a ser 8 MiB, así que los 16 quedan **inalcanzables** — que el punto 28 llamaba un defecto y es el estado correcto de una **válvula de seguridad**: una que puede saltar en operación normal no es una válvula, es una política, y la política ahora vive en el upload con mensaje claro. Los modos de falla son groseramente asimétricos: muy ajustado rompe una competencia en silencio, muy holgado no cuesta nada medible.
+
+**4. La fórmula del punto 28 nombra la variable equivocada.** Dice `compare.memoryBytes ≈ 2 × maxTokenBytes + overhead`, y la medición del propio Paso 7 lo desmiente: el piso de 64 MiB lo produce un token de **8 MiB**, y uno de 16 MiB **no consume más** — sale con exit 3 antes de crecer. La memoria de `compare` sigue al **token más grande que puede llegar de verdad**, acotado por los topes de archivo, no a `maxTokenBytes`. Con la válvula por encima los dos números quedan **desacoplados**, y por eso los 128 MiB no se movieron.
+
+**5. Los topes viven en `virtual_object.json`, y no viajan por `PlatformSettings`.** Lo primero porque hay **dos puntos de aplicación** —el upload (`cmd/api` → `icpc_parser`, donde el setter recibe el mensaje) y el judging (`cmd/worker` → `test_case_provider`, la defensa contra una entrada que descomprime más de lo que declara)— y el primero es el que decide dónde vive la política. Lo segundo porque `NewPlatformSettings` habría pasado a **13 parámetros posicionales con 7 `int` seguidos**, donde transponer dos compila perfecto; el detalle está en la revisión de configuración de la plataforma, junto con el dato de que el dominio no lee ninguno de esos cinco campos.
+
+**Sin default: un tope ausente hace que la API no arranque.** `defaultIfZero(cfg.MaxFileSizeTestCaseMB, 200)` es exactamente cómo un default silencioso restauró el número que D14 había quitado. La validación quedó en `validateVirtualObject`, una función propia que devuelve `error` —precedente del Paso 3 con `validateJudgeConfig`—, con el invariante **`answer ≤ input ≤ total`**.
+
+**6. `NewICPCParser` pasa a recibir un `ICPCParserConfig`**, con el precedente de `adapter/judge/config.go`. Tenía cuatro `int` seguidos en orden `size, size, count, count`; los dos topes nuevos lo habrían llevado a seis. La verificación por mutación lo confirmó de la peor manera: **intercambiar los dos campos no rompe el test del tope del `.in`**, porque el mensaje lo elige la extensión y no el número. Sólo lo mata el test que fija que los dos topes **no son intercambiables**.
+
+**7. `pkg/judgelimits`, porque dos de los tres números estaban separados por un accidente y no por una decisión.** El tope del `.ans` está en el JSON por la decisión 5 de arriba; pero `maxTokenBytes` estaba en `cmd/compare`, un `package main` que **Go no deja importar**, y eso no es diseño: es dónde se tipeó la constante. Moviendo `MaxOutputBytes` y `MaxTokenBytes` a un paquete importable, un solo test lee los tres números de verdad y **no queda ningún literal**. Y el invariante gana una casa: quien edite una constante ve la otra al lado, en vez de un comentario que apunta al otro extremo del repo. El `compare.Dockerfile` ya hace `COPY . .`, así que no cambia ni el binario ni el aislamiento que importa.
+
+Se descartó mover el comparador entero a `internal/compare/` dejando `cmd/compare/main.go` como un `main` de tres líneas: es la centralización más completa y lo haría testeable desde afuera, pero es un refactor bastante mayor que no compra nada para este invariante.
+
+#### Las dos mediciones que lo sostienen
+
+**El token más grande en los 12 paquetes reales**, con control (un archivo sintético con un token de 5000 caracteres, reportado como 5000):
+
+| | Archivo más grande | Token más grande |
+|---|---|---|
+| `input/` (`.in`) | 30 147 796 B = 28.75 MiB (problema B) | **1 000 000 B** (problema B) |
+| `output/` (`.ans`) | 2 068 944 B = 1.97 MiB (problema H) | **15 B** (problema H) |
+
+Los dos tamaños confirman lo que este documento ya tenía por otra vía. Los tokens no los había medido nadie, y son los que dicen que 16 MiB es una válvula y no un tope operativo: la respuesta real más "tokenizada" del set entero cabe en 15 bytes.
+
+**El off-by-one de `bufio`**, con `maxTokenBytes = 8 MiB`:
+
+| Archivo | Resultado |
+|---|---|
+| token de `max−1`, con `\n` o en EOF | ok |
+| token de **`max` exacto**, con `\n` o en EOF | **`token too long`** |
+| *CONTROL* token de `max+1` | `token too long` ✓ |
+
+#### Tests
+
+**Diecisiete mutaciones, todas verificadas** —y dos de ellas no se aplicaron en el primer intento, lo que el arnés detectó en vez de darlas por buenas: el `sed` fallaba por la indentación de las ramas del `switch`.
+
+Sobre el parser (5): campos intercambiados en el constructor; se cae la rama del `.in`; se cae la del `.ans`; `isTestData` siempre falso; y `>` a `>=`. Sobre el parser del judge (4): vuelve a truncar en silencio; `>` a `>=`; sin el byte extra; y un renombre de parámetro como control. Sobre la guarda cruzada (4): el tope del `.ans` sube a 16 MiB; `MaxTokenBytes` baja a 8; `MaxOutputBytes` sube a 32; y el tope del `.in` a 90 como control. Sobre `validateVirtualObject` (5): cada una de las cuatro reglas por separado, más romper el JSON despachado.
+
+**Y un control encontró un hueco que no habíamos previsto.** La primera tanda dejó pasar `>` → `>=` en el parser: **ningún test tocaba el borde**, y ese borde es justamente el que la decisión 3 usa para fijar `maxTokenBytes` — si el parser rechazara el archivo de exactamente el tope, el razonamiento del off-by-one cambiaría. Se cubrió en los dos parsers, y ahora esa mutación se pone en rojo.
+
+**Lo que este ítem NO cierra**, y sigue anotado: el pico de un checker **personalizado** escala con la suma de los tres archivos que recibe, y con el `.in` en 64 MiB eso son ~80 MB contra techos de 512 MiB (C++/Python) y 1 GiB (Java). La medición de D13 llega hasta 16 MiB por archivo y no más, así que extrapolar dice que **Python es el que queda al filo** y nadie lo midió. El modo de falla es ruidoso —`artifact_session.go` detecta el exit 137 y devuelve `apperror.NewInternal()`, explícitamente *"our failure and not a verdict"*— y lo agarra el problem setter en el publish, no un concursante en competencia. Es lo que hay que medir si aparece un problema con checker personalizado y datos grandes.
 
 **A3 — Barrido de código muerto y prolijidad.** La lista de candidatos está en la sección siguiente. Súmenle: la **apertura duplicada de sesión de pool liviano** entre `OutputChecker` y `ValidatorRunner` (diferida explícitamente "para después del Paso 7"), el `ok` que `poolConfigFor` ignora al leer el mapa, el comentario huérfano de `validatePoolBudgets`, `go mod tidy` (amqp091-go marcado `// indirect` sin serlo), y las tres cosas menores de `judge_config.yaml`.
 

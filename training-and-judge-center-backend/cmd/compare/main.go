@@ -14,14 +14,9 @@ import (
 	"fmt"
 	"io"
 	"os"
-)
 
-// maxTokenBytes bounds a single token. strings.Fields, the tokenizer this
-// replaces, had no such limit, so this is set well beyond anything a realistic
-// output reaches. Exceeding it exits with exitFailure, which the judge treats
-// like any other non-zero exit — a rejection. Distinguishing it would let a
-// contestant force a retried system error by printing one huge token.
-const maxTokenBytes = 16 << 20
+	"github.com/training-judge-center/backend/pkg/judgelimits"
+)
 
 const (
 	exitAccepted = 0
@@ -95,7 +90,8 @@ func openTokens(path string) (*bufio.Scanner, func(), error) {
 		return nil, nil, err
 	}
 	scanner := bufio.NewScanner(f)
-	scanner.Buffer(make([]byte, 0, 64*1024), maxTokenBytes)
+	// Going over the cap exits with exitFailure, which the judge reads as a rejection.
+	scanner.Buffer(make([]byte, 0, 64*1024), judgelimits.MaxTokenBytes)
 	scanner.Split(bufio.ScanWords)
 	return scanner, func() { _ = f.Close() }, nil
 }

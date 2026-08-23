@@ -11,6 +11,19 @@ import (
 	"github.com/training-judge-center/backend/pkg/apperror"
 )
 
+// testParserConfig uses deliberately small caps: these tests pin behaviour, and
+// asserting against the shipped 64/8 would compare a mutation to itself.
+func testParserConfig() problem.ICPCParserConfig {
+	return problem.ICPCParserConfig{
+		MaxUncompressedSizeMB: 200,
+		MaxTestCaseInputMB:    2,
+		MaxTestCaseAnswerMB:   1,
+		MaxMetadataFileSizeMB: 2,
+		MaxFiles:              10000,
+		MaxSampleFiles:        10,
+	}
+}
+
 func createZipBuffer(t *testing.T, files map[string][]byte) []byte {
 	t.Helper()
 	buf := new(bytes.Buffer)
@@ -31,7 +44,7 @@ func createZipBuffer(t *testing.T, files map[string][]byte) []byte {
 }
 
 func TestICPCParser_ValidArchive(t *testing.T) {
-	p := problem.NewICPCParser(200, 2, 10000, 10, nil)
+	p := problem.NewICPCParser(testParserConfig())
 
 	zipData := createZipBuffer(t, map[string][]byte{
 		"data/sample/1.in":  []byte("1 2"),
@@ -54,7 +67,7 @@ func TestICPCParser_ValidArchive(t *testing.T) {
 }
 
 func TestICPCParser_InvalidExtension(t *testing.T) {
-	p := problem.NewICPCParser(200, 2, 10000, 10, nil)
+	p := problem.NewICPCParser(testParserConfig())
 
 	zipData := createZipBuffer(t, map[string][]byte{
 		"data/sample/1.in":  []byte("1 2"),
@@ -77,7 +90,7 @@ func TestICPCParser_InvalidExtension(t *testing.T) {
 }
 
 func TestICPCParser_PathTraversal(t *testing.T) {
-	p := problem.NewICPCParser(200, 2, 10000, 10, nil)
+	p := problem.NewICPCParser(testParserConfig())
 
 	zipData := createZipBuffer(t, map[string][]byte{
 		"data/sample/1.in":            []byte("1 2"),
@@ -91,7 +104,7 @@ func TestICPCParser_PathTraversal(t *testing.T) {
 }
 
 func TestICPCParser_MissingContentDir(t *testing.T) {
-	p := problem.NewICPCParser(200, 2, 10000, 10, nil)
+	p := problem.NewICPCParser(testParserConfig())
 
 	zipData := createZipBuffer(t, map[string][]byte{
 		"some_other_dir/1.in": []byte("1 2"),
@@ -104,7 +117,9 @@ func TestICPCParser_MissingContentDir(t *testing.T) {
 }
 
 func TestICPCParser_TooManySamples(t *testing.T) {
-	p := problem.NewICPCParser(200, 2, 10000, 1, nil)
+	cfg := testParserConfig()
+	cfg.MaxSampleFiles = 1
+	p := problem.NewICPCParser(cfg)
 
 	zipData := createZipBuffer(t, map[string][]byte{
 		"data/sample/1.in": []byte("1 2"),
@@ -115,4 +130,126 @@ func TestICPCParser_TooManySamples(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected error for too many samples, got nil")
 	}
+}
+
+// rejectionMessage fails unless the parse was rejected, and returns the reason.
+func rejectionMessage(t *testing.T, err error) string {
+	t.Helper()
+	if err == nil {
+		t.Fatal("expected the package to be rejected, got nil")
+	}
+	appErr, ok := err.(*apperror.AppError)
+	if !ok || len(appErr.Details) == 0 {
+		t.Fatalf("expected apperror.AppError with Details, got: %v", err)
+	}
+	return appErr.Details[0].Message
+}
+
+func mb(n float64) []byte { return bytes.Repeat([]byte("x"), int(n*1024*1024)) }
+
+func TestICPCParser_InputOverItsOwnCapIsRejected(t *testing.T) {
+	p := problem.NewICPCParser(testParserConfig()) // input cap 2 MB
+
+	zipData := createZipBuffer(t, map[string][]byte{
+		"data/sample/1.in":  mb(3),
+		"data/sample/1.ans": []byte("3"),
+	})
+
+	msg := rejectionMessage(t, mustFailParse(t, p, zipData))
+	// HasPrefix and not Contains: the file path travels inside the message.
+	if !strings.HasPrefix(msg, "Test case input") {
+		t.Errorf("expected the input cap to be the one that fired, got: %s", msg)
+	}
+}
+
+func TestICPCParser_AnswerOverItsOwnCapIsRejected(t *testing.T) {
+	p := problem.NewICPCParser(testParserConfig()) // answer cap 1 MB
+
+	zipData := createZipBuffer(t, map[string][]byte{
+		"data/sample/1.in":  []byte("1 2"),
+		"data/sample/1.ans": mb(1.5),
+	})
+
+	msg := rejectionMessage(t, mustFailParse(t, p, zipData))
+	if !strings.HasPrefix(msg, "Test case answer") {
+		t.Errorf("expected the answer cap to be the one that fired, got: %s", msg)
+	}
+}
+
+// The two caps are not interchangeable: 1.5 MB sits under the input cap and
+// over the answer cap, so every wrong limit (input, metadata, total) lets it
+// through and only the right one rejects it.
+func TestICPCParser_TheTwoTestCaseCapsAreNotInterchangeable(t *testing.T) {
+	t.Run("an answer of that size is rejected", func(t *testing.T) {
+		p := problem.NewICPCParser(testParserConfig())
+		zipData := createZipBuffer(t, map[string][]byte{
+			"data/sample/1.in":  []byte("1 2"),
+			"data/sample/1.ans": mb(1.5),
+		})
+		msg := rejectionMessage(t, mustFailParse(t, p, zipData))
+		if !strings.HasPrefix(msg, "Test case answer") {
+			t.Errorf("expected the answer cap to be the one that fired, got: %s", msg)
+		}
+	})
+
+	t.Run("an input of that size is accepted", func(t *testing.T) {
+		p := problem.NewICPCParser(testParserConfig())
+		zipData := createZipBuffer(t, map[string][]byte{
+			"data/sample/1.in":  mb(1.5),
+			"data/sample/1.ans": []byte("3"),
+		})
+		if _, err := p.ParseTestCasesZip(context.Background(), zipData); err != nil {
+			t.Fatalf("expected the input to fit under its own cap, got: %v", err)
+		}
+	})
+}
+
+func TestICPCParser_AuxiliaryFilesKeepTheirOwnCap(t *testing.T) {
+	p := problem.NewICPCParser(testParserConfig()) // metadata cap 2 MB
+
+	zipData := createZipBuffer(t, map[string][]byte{
+		"data/sample/1.in":  []byte("1 2"),
+		"data/sample/1.ans": []byte("3"),
+		"README.md":         mb(3),
+	})
+
+	msg := rejectionMessage(t, mustFailParse(t, p, zipData))
+	if !strings.HasPrefix(msg, "Auxiliary file") {
+		t.Errorf("expected the metadata cap to be the one that fired, got: %s", msg)
+	}
+}
+
+// A cap of N MB means N MB is legal. cmd/compare's maxTokenBytes is sized one
+// notch above this, so a token filling a whole answer file still scans.
+func TestICPCParser_AFileExactlyAtItsCapIsAccepted(t *testing.T) {
+	oneMB := 1 * 1024 * 1024 // testParserConfig caps an answer at 1 MB
+
+	t.Run("exactly at the cap", func(t *testing.T) {
+		p := problem.NewICPCParser(testParserConfig())
+		zipData := createZipBuffer(t, map[string][]byte{
+			"data/sample/1.in":  []byte("1 2"),
+			"data/sample/1.ans": bytes.Repeat([]byte("x"), oneMB),
+		})
+		if _, err := p.ParseTestCasesZip(context.Background(), zipData); err != nil {
+			t.Fatalf("expected a file exactly at its cap to be accepted, got: %v", err)
+		}
+	})
+
+	t.Run("one byte over the cap", func(t *testing.T) {
+		p := problem.NewICPCParser(testParserConfig())
+		zipData := createZipBuffer(t, map[string][]byte{
+			"data/sample/1.in":  []byte("1 2"),
+			"data/sample/1.ans": bytes.Repeat([]byte("x"), oneMB+1),
+		})
+		msg := rejectionMessage(t, mustFailParse(t, p, zipData))
+		if !strings.HasPrefix(msg, "Test case answer") {
+			t.Errorf("expected the answer cap to be the one that fired, got: %s", msg)
+		}
+	})
+}
+
+func mustFailParse(t *testing.T, p *problem.ICPCParser, zipData []byte) error {
+	t.Helper()
+	_, err := p.ParseTestCasesZip(context.Background(), zipData)
+	return err
 }

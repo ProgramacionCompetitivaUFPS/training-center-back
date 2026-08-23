@@ -19,6 +19,7 @@ import (
 	"github.com/training-judge-center/backend/internal/adapter/judge/pool"
 	appjudge "github.com/training-judge-center/backend/internal/application/judge"
 	"github.com/training-judge-center/backend/pkg/apperror"
+	"github.com/training-judge-center/backend/pkg/judgelimits"
 	"github.com/training-judge-center/backend/pkg/strutil"
 )
 
@@ -26,8 +27,9 @@ const (
 	maxCompileLogBytes = 10 * 1024
 	// maxOutputBytes is the output limit a run is held to, enforced below and
 	// reported as a verdict. It is also what a checker has to hold in a light
-	// pool container: 64 MiB made every language run out of memory there.
-	maxOutputBytes = 8 << 20
+	// pool container: 64 MiB made every language run out of memory there. It
+	// lives in judgelimits because cmd/compare has to agree with it.
+	maxOutputBytes = judgelimits.MaxOutputBytes
 	// outputPreviewBytes is read back for the wrong-answer report. It is above
 	// the application layer's own preview so its truncation marker stays honest.
 	outputPreviewBytes = 4 << 10

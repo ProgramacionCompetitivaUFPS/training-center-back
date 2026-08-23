@@ -6,6 +6,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/training-judge-center/backend/pkg/judgelimits"
 )
 
 // writeFiles lays out the three files a checker receives, in the order it
@@ -118,7 +120,7 @@ func TestRun_MissingFile_ReportsFailure(t *testing.T) {
 // A token beyond the buffer limit is a checker failure too — reporting it as a
 // wrong answer would blame the contestant for our own limit.
 func TestRun_TokenTooLong_ReportsFailure(t *testing.T) {
-	huge := strings.Repeat("x", maxTokenBytes+1)
+	huge := strings.Repeat("x", judgelimits.MaxTokenBytes+1)
 
 	var stderr bytes.Buffer
 	if got := run(writeFiles(t, huge, huge), &stderr); got != exitFailure {

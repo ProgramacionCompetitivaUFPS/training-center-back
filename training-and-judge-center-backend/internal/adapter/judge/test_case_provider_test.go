@@ -6,6 +6,7 @@ import (
 	"context"
 	"errors"
 	"io"
+	"strings"
 	"testing"
 
 	"cloud.google.com/go/storage"
@@ -40,7 +41,7 @@ func TestParseTestCasesZip_SampleAndSecret(t *testing.T) {
 		"data/secret/002.ans": "9",
 	})
 
-	testCases, err := parseTestCasesZip(zipData)
+	testCases, err := parseTestCasesZip(zipData, maxTestCaseFileBytes)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -68,7 +69,7 @@ func TestParseTestCasesZip_RootPrefix(t *testing.T) {
 		"problem-abc/data/secret/001.ans": "world",
 	})
 
-	testCases, err := parseTestCasesZip(zipData)
+	testCases, err := parseTestCasesZip(zipData, maxTestCaseFileBytes)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -91,7 +92,7 @@ func TestParseTestCasesZip_MissingAnswer_PairOmitted(t *testing.T) {
 		"data/sample/002.in":  "2",
 	})
 
-	testCases, err := parseTestCasesZip(zipData)
+	testCases, err := parseTestCasesZip(zipData, maxTestCaseFileBytes)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -105,7 +106,7 @@ func TestParseTestCasesZip_NoTestFiles_ReturnsEmpty(t *testing.T) {
 		"problem.yaml": "name: example\n",
 	})
 
-	testCases, err := parseTestCasesZip(zipData)
+	testCases, err := parseTestCasesZip(zipData, maxTestCaseFileBytes)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -115,7 +116,7 @@ func TestParseTestCasesZip_NoTestFiles_ReturnsEmpty(t *testing.T) {
 }
 
 func TestParseTestCasesZip_InvalidBytes_ReturnsError(t *testing.T) {
-	_, err := parseTestCasesZip([]byte("not a zip"))
+	_, err := parseTestCasesZip([]byte("not a zip"), maxTestCaseFileBytes)
 	if err == nil {
 		t.Fatal("expected error for invalid zip, got nil")
 	}
@@ -132,7 +133,7 @@ func TestParseTestCasesZip_Ordered(t *testing.T) {
 		"data/secret/002.ans": "B",
 	})
 
-	testCases, err := parseTestCasesZip(zipData)
+	testCases, err := parseTestCasesZip(zipData, maxTestCaseFileBytes)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -282,5 +283,48 @@ func TestGetTestCases_WithZIP(t *testing.T) {
 	}
 	if string(cases[0].Input) != "5" || string(cases[0].ExpectedOutput) != "25" {
 		t.Errorf("case 0: input=%q expected=%q", cases[0].Input, cases[0].ExpectedOutput)
+	}
+}
+
+// A file past the cap must fail. io.LimitReader on its own returns no error, so
+// the answer would come back cut and every submission would be judged against it.
+func TestParseTestCasesZip_AFileOverTheLimitFails(t *testing.T) {
+	const limit = 10
+
+	zipData := buildZip(t, map[string]string{
+		"data/secret/001.in":  "1 2",
+		"data/secret/001.ans": strings.Repeat("x", limit+1),
+	})
+
+	testCases, err := parseTestCasesZip(zipData, limit)
+	if err == nil {
+		t.Fatalf("expected the oversized file to fail, got %d test cases", len(testCases))
+	}
+	if !strings.Contains(err.Error(), "001.ans") {
+		t.Errorf("expected the error to name the file, got: %v", err)
+	}
+}
+
+// The boundary is load-bearing: a file of exactly the cap is legal, and it has
+// to arrive whole — reading maxFileBytes+1 must not leak into what is kept.
+func TestParseTestCasesZip_AFileExactlyAtTheLimitIsReadWhole(t *testing.T) {
+	const limit = 10
+	answer := strings.Repeat("x", limit)
+
+	zipData := buildZip(t, map[string]string{
+		"data/secret/001.in":  "1 2",
+		"data/secret/001.ans": answer,
+	})
+
+	testCases, err := parseTestCasesZip(zipData, limit)
+	if err != nil {
+		t.Fatalf("expected a file exactly at the cap to be accepted, got: %v", err)
+	}
+	if len(testCases) != 1 {
+		t.Fatalf("expected 1 test case, got %d", len(testCases))
+	}
+	if string(testCases[0].ExpectedOutput) != answer {
+		t.Errorf("expected the answer to arrive whole (%d bytes), got %d",
+			len(answer), len(testCases[0].ExpectedOutput))
 	}
 }
