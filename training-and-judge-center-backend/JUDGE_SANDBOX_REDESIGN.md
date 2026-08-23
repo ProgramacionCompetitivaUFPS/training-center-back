@@ -1734,7 +1734,7 @@ Cinco mutaciones, cada una en rojo exactamente donde corresponde:
 
 Tres cosas se leen de ahí. La segunda mutación deja dos casos en verde y **está bien**: son justo aquellos donde el relleno vale cero, así que no hay nada que romper. La tercera pone en rojo sólo esos mismos dos, que es la demostración de que las filas de 0 y 512 bytes se ganan el lugar en la tabla. Y la cuarta es la que más dice: volver al `bytes.Buffer` deja el test de igualdad **en verde**, porque la implementación vieja produce un tar perfectamente válido — sólo que copiando. El test del formato, solo, nunca habría notado una regresión al comportamiento que este paso elimina.
 
-### Paso 7 — Volumen compartido y comparación por tokens a pool liviano (D7, D6) ← SIGUIENTE
+### Paso 7 — Volumen compartido y comparación por tokens a pool liviano (D7, D6) ✅ COMPLETO
 
 El `emptyDir` en `worker.yaml` montado en `dind` y en `worker`, el UUID por judging con la raíz no listable, `RunTestCase` escribiendo al volumen, y `copyOutput` eliminado. `CheckRequest` pasa de recibir bytes a recibir una ruta, y la comparación por tokens se muda a pool liviano con la imagen del paso 1.
 
@@ -1934,6 +1934,47 @@ Pero `specs/Judge System/README.md` **documentaba dos veredictos que no existen*
 
 Se corrigió entero: las dos tablas de veredictos, el diagrama de transiciones, la prioridad —que además no era una prioridad entre problemas sino *el primer caso que falla decide*—, y la sección de la comparación por defecto, que ahora dice lo que `cmd/compare` hace, incluidos sus exit codes y que su memoria sigue al token más grande.
 
+**27. El streaming de casos de prueba: evaluado y descartado por ahora, con los números (al cerrar el paso).** Medido con el código real, con la forma del problema real más pesado (un input de 28 MB que es casi todo el peso):
+
+| | 1 judging | 5 judgings |
+|---|---|---|
+| hoy, los casos vivos todo el judging | 30.1 MB | **154.3 MB** |
+| escribiendo del ZIP directo a un archivo | 0.1 MB | **0.3 MB** |
+
+Extrapolado al tope de 100 MB de la config son ~536 MB con 5 judgings, que concuerda con los 1006 MB de `Sys` que D14 midió. **El streaming lo elimina prácticamente entero.**
+
+**No se hace, por cuatro razones:**
+
+- **No hace falta**: el worker está al **52%** en el peor caso permitido, y los datos reales (28.8 MB) están **3.5× por debajo** de ese tope.
+- **Reforma un puerto**: el input tendría que escribirlo el `TestCaseProvider` directo al directorio del judging, con lo que un segundo adapter pasa a conocer el layout del volumen y a recibir el `judgingID`, y `RunRequest.Input` desaparece.
+- **Degrada el publish**: `GetTestCases` se llama **una vez** y sus casos se reusan para todas las soluciones; con los casos escritos en el directorio de cada judging habría que re-extraer el ZIP por solución.
+- **Cambia memoria por disco en el caso típico**: hoy el volumen sostiene **un** input por vez porque se sobrescribe; escribiendo todos por adelantado sostiene la suma.
+
+**Y tira en contra del otro pendiente**: el cache de casos de prueba sostiene datos en memoria a propósito, y ataca CPU *y* memoria en competencia, donde cinco submissions caen sobre el mismo problema. Son direcciones opuestas y el cache cubre más.
+
+**Queda registrado como opción**, con estos números, para cuando alguien quiera subir el tope de datos de prueba: es la palanca correcta para eso y ésta es su factura.
+
+**28. El tope por archivo, `maxTokenBytes` y el tamaño de `compare` son UNA decisión, no tres (al cerrar el paso).** Hoy viven en tres archivos sin ninguna relación escrita, y el resultado es incoherente:
+
+| | tope real hoy | ¿los 16 MiB de `maxTokenBytes` sirven? |
+|---|---|---|
+| salida del concursante | **8 MiB** (`maxOutputBytes`, impuesto desde el commit 5) | **no: inalcanzable** — un token no puede pasar del archivo |
+| respuesta del jurado | **64 MiB** (el literal del parser) | **no: demasiado chico** |
+
+O sea que el número es de más para un archivo y de menos para el otro. Y la mitad de abajo muerde: una respuesta del jurado con un token de más de 16 MiB hace que `compare` salga con 3, que el adapter lee como rechazo, y **todas las submissions de ese problema terminan en wrong answer**.
+
+**Y el parser trunca en silencio.** `content, readErr := io.ReadAll(io.LimitReader(rc, 64*1024*1024))` en `test_case_provider.go`: `io.LimitReader` **no devuelve error**, corta y ya. Un `.ans` de 70 MB es legal contra el tope total de 100 MB y se truncaría sin que nada avise — mismo modo de falla, distinta causa.
+
+**La relación que hay que escribir cuando se encare:**
+
+```
+tope por archivo de caso de prueba   ← fija el token legítimo más grande posible
+      ≤ maxTokenBytes (cmd/compare)  ← por debajo, rechaza respuestas legítimas
+compare.memoryBytes ≈ 2 × maxTokenBytes + overhead   ← medido: piso de 64 MiB para un token de 8 MiB
+```
+
+Los tres números se mueven juntos. Y el tope por archivo tiene que **fallar**, no truncar.
+
 
 #### La entrada del caso de prueba SÍ viaja por el volumen — sub-decisión de D7, resuelta
 
@@ -2063,11 +2104,58 @@ Se sostiene por tres razones a la vez: ese 4×, la coincidencia con el default d
 
 *(Como control de la medición: el input más grande dio 28.75 MiB en el problema B, exactamente lo que este documento ya tenía anotado por otra vía.)*
 
-### Paso 8 — Barrido y cierre
+### Paso 8 — Pulido para el PR ← SIGUIENTE
 
-El barrido de código muerto de la sección siguiente, actualizar el `JUDGE_VALIDATION_ROADMAP.md` (la Fase 5 se cae casi entera y la Fase 6 se reescribe), y decidir si los dos sobrevivientes de la Fase 5 —el `BackendConfig` del Ingress y el runbook para recrear la cola— entran en este PR o van aparte.
+**El Paso 7 terminó, y con él los dos problemas que motivaron el rediseño.** Lo que queda es dejar una versión pulida, probarla contra el cluster (Fase 8 del roadmap) y recién ahí abrir el PR.
+
+**El orden importa**: pulir → **rebase con `develop`** → probar en Kubernetes → PR. Probar sobre una rama desactualizada no prueba lo que se va a mergear.
+
+Lo pendiente está repartido en todo este documento y en el roadmap. Acá está clasificado en dos grupos, decidido con el usuario.
+
+#### A · Antes del PR
+
+**A1 — Infraestructura, sin esto no se puede probar.**
+
+| | Por qué |
+|---|---|
+| Construir y subir las imágenes con `time` (`RUNNER_VERSION: v0.2.0`, ya declarado) | El comando de ejecución ya invoca `/usr/bin/time`: sin la imagen **todo falla con exit 127** |
+| `testlib.h` en la imagen de C++ | Sin él un checker real de testlib **no compila**, así que la Fase 8 no puede probar lo que el rediseño vino a hacer seguro. Falta decidir vendorearlo o bajarlo en el build |
+| `sizeLimit` en los dos `emptyDir` de `worker.yaml` | Hoy son `emptyDir: {}` pelados, y este trabajo empezó a escribir ahí datos del concursante y del setter |
+| Migrar el node pool a `e2-standard-8` y medir los DaemonSets con `kubectl describe node` | D14 está escrito y **no ejecutado**; los números ya commiteados en `worker.yaml` y `judge_config.yaml` asumen la máquina nueva |
+
+**A2 — Corrección: el tope por archivo de caso de prueba.** Es **una** decisión con tres constantes (ver el punto 28 del Paso 7): el tope por archivo, `maxTokenBytes` de `cmd/compare` y `compare.memoryBytes` del pool liviano. Incluye que el parser **falle en vez de truncar en silencio**. Es lo único que puede volver a romper el dimensionamiento del pool liviano en competencia.
+
+**A3 — Barrido de código muerto y prolijidad.** La lista de candidatos está en la sección siguiente. Súmenle: la **apertura duplicada de sesión de pool liviano** entre `OutputChecker` y `ValidatorRunner` (diferida explícitamente "para después del Paso 7"), el `ok` que `poolConfigFor` ignora al leer el mapa, el comentario huérfano de `validatePoolBudgets`, `go mod tidy` (amqp091-go marcado `// indirect` sin serlo), y las tres cosas menores de `judge_config.yaml`.
+
+**A4 — Documentación: la deriva que este trabajo creó o debe cerrar.**
+
+| | |
+|---|---|
+| `JUDGE_VALIDATION_ROADMAP.md` | La Fase 5 se cae casi entera y la Fase 6 se reescribe |
+| Releerlo entero (lo que era el Paso 9) | Recuperar lo que quedó en el camino cuando el bug desvió el trabajo a mitad de la Fase 5 |
+| `CLAUDE.md` | Tres puntos: el consumidor descrito como "serial" cuando ya es concurrente, los endpoints pendientes, y `MOCK_AUTH` |
+| `RUNNER_ARCHITECTURE.md` | `syntaxCheckCmd` no existe en el código, dice `pypy3` por `python3`, y `Solution.java` con otra caja |
+| La convención de nombres de clase Java (`Solution`/`Checker`/`Validator`) | No está escrita en ningún lado |
+| La mención muerta a `tokenCompare` en el test de `cmd/compare` | Una línea |
+
+#### B · Después de probado y mergeado
+
+| | Por qué queda afuera |
+|---|---|
+| **Streaming de casos de prueba** | Evaluado con números (punto 27): resuelve un problema que no tenemos |
+| **Cache de casos de prueba por problema** | La palanca que sí ataca CPU y memoria en competencia, pero es diseño propio |
+| **`GOMEMLIMIT`** | Decidido explícitamente que no, por ahora |
+| **Revisión de la configuración de la plataforma** | Tres superficies que nadie coordina; grande y preexistente |
+| **Soluciones Java que colisionan por filename** | Toca la identidad en el dominio y el contrato de la API |
+| **El exit 137 ambiguo** (OOM contra SIGTERM ignorado) | Medido: sólo lo dispara código que instale un manejador a propósito |
+| **La tabla de exit codes de testlib** (`3 = _fail`) | Acoplaría el sistema a testlib de verdad |
+| **Validar la clase Java no pública al subir** | El mensaje de `javac` ya nombra el arreglo |
+| **La "Pieza 0"** del roadmap: `prepareChecker` escribe la key en vivo antes de saber si las soluciones pasan | Hoy es inofensivo porque el publish corre en `DRAFT`; es prerequisito de un PR ya planeado aparte |
+| **Más realimentación al concursante** | **Decidido que no**, no diferido: alejaría el sistema de las condiciones reales de competencia |
 
 ### Paso 9 — Releer el roadmap y recuperar lo que quedó en el camino
+
+> **Es el ítem A4 del Paso 8**, no un paso aparte. El detalle vive acá.
 
 El descubrimiento del bug nos desvió a mitad de la Fase 5, así que quedaron cosas pendientes de las fases finales que nunca se retomaron. **Releer `JUDGE_VALIDATION_ROADMAP.md` entero** buscándolas, porque están dispersas entre el cuerpo de las fases y los apéndices, no juntas en una lista.
 
