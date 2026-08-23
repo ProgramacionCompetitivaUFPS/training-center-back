@@ -31,8 +31,8 @@ func writeFiles(t *testing.T, contestant, answer string) []string {
 	return paths
 }
 
-// The cases mirror the ones that covered tokenCompare in the worker, so a
-// divergence in verdict between the two implementations shows up here.
+// The cases mirror the token comparison this binary replaced in the worker, so
+// a divergence in verdict from the behaviour that shipped shows up here.
 func TestRun_Verdicts(t *testing.T) {
 	tests := []struct {
 		name       string

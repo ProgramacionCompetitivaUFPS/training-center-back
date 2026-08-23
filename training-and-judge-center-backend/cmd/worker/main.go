@@ -539,6 +539,9 @@ func poolConfigFor(cfg judgeConfigFile, poolName string, idleTimeout time.Durati
 	}
 }
 
+// validatePoolBudgets checks the two things the config file cannot know on its
+// own: that the pools fit inside the dind container, and D13's invariant that a
+// pool can serve maxConcurrent claims of its largest language without blocking.
 func validatePoolBudgets(cfg judgeConfigFile, dindMemBytes int64, maxConcurrent int) error {
 	var total int64
 	for _, pool := range cfg.Judge.Pools {
