@@ -19,13 +19,13 @@ const probeMarker = "shared-volume-probe"
 // compare against nothing.
 func VerifySharedVolume(ctx context.Context, lightPool *pool.Pool, docker dockerExecClient, judgingRoot string) error {
 	dir := path.Join(judgingRoot, "probe")
-	if err := os.RemoveAll(dir); err != nil {
+	if err := removeJudgingDir(dir); err != nil {
 		return fmt.Errorf("clearing the probe directory: %w", err)
 	}
 	if err := createJudgingDir(dir); err != nil {
 		return fmt.Errorf("laying out the probe directory: %w", err)
 	}
-	defer os.RemoveAll(dir)
+	defer removeJudgingDir(dir)
 
 	if err := os.WriteFile(judgingOutputPath(dir), []byte(probeMarker), judgingFileMode); err != nil {
 		return fmt.Errorf("writing the probe marker: %w", err)

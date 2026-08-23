@@ -3,7 +3,6 @@ package judge
 import (
 	"context"
 	"log/slog"
-	"os"
 	"path"
 
 	"github.com/training-judge-center/backend/internal/adapter/judge/pool"
@@ -45,7 +44,7 @@ func (e *Executor) BeginSession(ctx context.Context, lang submission.Language, m
 	// every language.
 	c, err := e.pool.Claim(ctx, lang.String(), int64(float64(memoryKb)*1024*lc.MemoryFactor))
 	if err != nil {
-		_ = os.RemoveAll(judgingDir)
+		_ = removeJudgingDir(judgingDir)
 		slog.ErrorContext(ctx, "executor: claim container failed", "language", lang.String(), "error", err)
 		return nil, apperror.NewInternal()
 	}
