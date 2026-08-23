@@ -24,7 +24,9 @@ type RunRequest struct {
 type RunResult struct {
 	ExitCode int
 	TimeMs   int
-	MemoryKb int
+	// MemoryKb is nil when the run produced no measurement. Reporting a zero
+	// instead would say the solution used no memory at all.
+	MemoryKb *int
 	// OutputPreview is the first few KB of what the contestant printed, enough
 	// for the wrong-answer report. The output itself never leaves the sandbox.
 	OutputPreview []byte

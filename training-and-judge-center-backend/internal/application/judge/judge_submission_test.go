@@ -217,7 +217,7 @@ func TestJudgeSubmission_TimeLimitExceededByCPUTime(t *testing.T) {
 			beginSessionFn: func(_ context.Context, _ submission.Language, _ int, _ string) (ExecutionSession, error) {
 				return &mockExecutionSession{
 					runTestCaseFn: func(_ context.Context, _ RunRequest) (RunResult, error) {
-						return RunResult{ExitCode: 0, TimeMs: 1500, MemoryKb: 1024, OutputPreview: []byte("3")}, nil
+						return RunResult{ExitCode: 0, TimeMs: 1500, MemoryKb: kb(1024), OutputPreview: []byte("3")}, nil
 					},
 				}, nil
 			},
@@ -249,7 +249,7 @@ func TestJudgeSubmission_MemoryLimitExceeded(t *testing.T) {
 			beginSessionFn: func(_ context.Context, _ submission.Language, _ int, _ string) (ExecutionSession, error) {
 				return &mockExecutionSession{
 					runTestCaseFn: func(_ context.Context, _ RunRequest) (RunResult, error) {
-						return RunResult{ExitCode: 137, MemoryKb: 262144}, nil
+						return RunResult{ExitCode: 137, MemoryKb: kb(262144)}, nil
 					},
 				}, nil
 			},
@@ -281,7 +281,7 @@ func TestJudgeSubmission_RuntimeError(t *testing.T) {
 			beginSessionFn: func(_ context.Context, _ submission.Language, _ int, _ string) (ExecutionSession, error) {
 				return &mockExecutionSession{
 					runTestCaseFn: func(_ context.Context, _ RunRequest) (RunResult, error) {
-						return RunResult{ExitCode: 1, TimeMs: 20, MemoryKb: 512}, nil
+						return RunResult{ExitCode: 1, TimeMs: 20, MemoryKb: kb(512)}, nil
 					},
 				}, nil
 			},
@@ -450,7 +450,7 @@ func TestJudgeSubmission_RunTestCaseInfraError_Retries(t *testing.T) {
 				if sessionCall == 1 && runCall == 1 {
 					return RunResult{}, errors.New("container died")
 				}
-				return RunResult{ExitCode: 0, TimeMs: 50, MemoryKb: 1024, OutputPreview: []byte("3")}, nil
+				return RunResult{ExitCode: 0, TimeMs: 50, MemoryKb: kb(1024), OutputPreview: []byte("3")}, nil
 			},
 		}, nil
 	}
@@ -700,5 +700,70 @@ func TestJudgeSubmission_TheJudgingDirectoryIsUnguessable(t *testing.T) {
 		if id == submissionID {
 			t.Errorf("the judging directory is the submission id, which the API hands out")
 		}
+	}
+}
+
+// The verdict reports the largest measurement across the test cases, and
+// reports nothing at all when there is none — a zero would say the solution
+// used no memory, which is exactly what the old cgroup field did every time.
+func TestJudgeSubmission_ReportsTheLargestMeasurementOrNone(t *testing.T) {
+	tests := []struct {
+		name    string
+		perCase []*int
+		wantKb  *int
+	}{
+		{"the largest of what was measured", []*int{kb(512), kb(4096), kb(1024)}, kb(4096)},
+		{"some cases measured, some not", []*int{nil, kb(2048), nil}, kb(2048)},
+		{"nothing measured at all", []*int{nil, nil, nil}, nil},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			sub := pendingSubmission()
+			i := 0
+			executor := &mockExecutor{
+				beginSessionFn: func(_ context.Context, _ submission.Language, _ int, _ string) (ExecutionSession, error) {
+					return &mockExecutionSession{
+						runTestCaseFn: func(context.Context, RunRequest) (RunResult, error) {
+							r := RunResult{ExitCode: 0, TimeMs: 10, MemoryKb: tt.perCase[i], OutputPreview: []byte("3")}
+							i++
+							return r, nil
+						},
+					}, nil
+				},
+			}
+			testCases := &mockTestCaseProvider{
+				getTestCasesFn: func(context.Context, string) ([]TestCase, error) {
+					return []TestCase{
+						{Input: []byte("1"), ExpectedOutput: []byte("3")},
+						{Input: []byte("2"), ExpectedOutput: []byte("3")},
+						{Input: []byte("3"), ExpectedOutput: []byte("3")},
+					}, nil
+				},
+			}
+			uc := newJudgeSubmissionUseCase(
+				&mockSubmissionUpdater{
+					getByIDFn: func(context.Context, submission.SubmissionID) (*submission.Submission, error) {
+						return sub, nil
+					},
+				},
+				&mockSourceCodeDownloader{}, &mockProblemProvider{},
+				testCases, executor, &mockOutputChecker{},
+			)
+
+			if err := uc.Execute(context.Background(), JudgeSubmissionInput{SubmissionID: submissionID}); err != nil {
+				t.Fatalf("Execute: %v", err)
+			}
+
+			got := sub.MemoryKb()
+			switch {
+			case tt.wantKb == nil && got != nil:
+				t.Errorf("MemoryKb = %d, want nil", *got)
+			case tt.wantKb != nil && got == nil:
+				t.Errorf("MemoryKb is nil, want %d", *tt.wantKb)
+			case tt.wantKb != nil && *got != *tt.wantKb:
+				t.Errorf("MemoryKb = %d, want %d", *got, *tt.wantKb)
+			}
+		})
 	}
 }

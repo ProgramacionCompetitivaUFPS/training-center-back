@@ -395,3 +395,15 @@ func writeContestantOutput(t *testing.T, judgingDir string, output []byte) {
 		t.Fatalf("writing the contestant's output: %v", err)
 	}
 }
+
+// kb reads better than taking the address of a local at every call site.
+// RunResult carries a pointer because a run may produce no measurement.
+func kb(v int) *int { return &v }
+
+// writeMemoryMeasurement stands in for /usr/bin/time inside the sandbox.
+func writeMemoryMeasurement(t *testing.T, judgingDir, content string) {
+	t.Helper()
+	if err := os.WriteFile(judgingMemPath(judgingDir), []byte(content), judgingFileMode); err != nil {
+		t.Fatalf("writing the memory measurement: %v", err)
+	}
+}

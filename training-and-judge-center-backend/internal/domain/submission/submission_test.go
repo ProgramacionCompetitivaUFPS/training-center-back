@@ -85,7 +85,7 @@ func TestSubmission_Start_FromRunning_Fails(t *testing.T) {
 
 func TestSubmission_MarkAccepted_FromRunning_Succeeds(t *testing.T) {
 	s := newRunningSubmission(t)
-	if err := s.MarkAccepted(150, 4096, testNow); err != nil {
+	if err := s.MarkAccepted(150, kb(4096), testNow); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	if !s.Status().IsFinal() {
@@ -108,14 +108,14 @@ func TestSubmission_MarkAccepted_FromRunning_Succeeds(t *testing.T) {
 func TestSubmission_MarkAccepted_FromPending_Fails(t *testing.T) {
 	lang := submission.RestoreLanguage("cpp20")
 	s, _ := submission.NewSubmission(testSubmissionID, testProblemID, shared.RestoreUserID(testUserID), nil, nil, lang, "g++", "path", "abc123", 512, "", "", testNow)
-	if err := s.MarkAccepted(150, 4096, testNow); err == nil {
+	if err := s.MarkAccepted(150, kb(4096), testNow); err == nil {
 		t.Error("expected error when marking ACCEPTED from PENDING, got nil")
 	}
 }
 
 func TestSubmission_MarkWrongAnswer(t *testing.T) {
 	s := newRunningSubmission(t)
-	if err := s.MarkWrongAnswer(200, 2048, testNow); err != nil {
+	if err := s.MarkWrongAnswer(200, kb(2048), testNow); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	if s.Status().String() != "WRONG_ANSWER" {
@@ -138,7 +138,7 @@ func TestSubmission_MarkTimeLimitExceeded(t *testing.T) {
 
 func TestSubmission_MarkMemoryLimitExceeded(t *testing.T) {
 	s := newRunningSubmission(t)
-	if err := s.MarkMemoryLimitExceeded(262144, testNow); err != nil {
+	if err := s.MarkMemoryLimitExceeded(kb(262144), testNow); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	if s.Status().String() != "MEMORY_LIMIT_EXCEEDED" {
@@ -151,7 +151,7 @@ func TestSubmission_MarkMemoryLimitExceeded(t *testing.T) {
 
 func TestSubmission_MarkRuntimeError(t *testing.T) {
 	s := newRunningSubmission(t)
-	if err := s.MarkRuntimeError(300, 1024, testNow); err != nil {
+	if err := s.MarkRuntimeError(300, kb(1024), testNow); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	if s.Status().String() != "RUNTIME_ERROR" {
@@ -184,8 +184,12 @@ func TestSubmission_MarkSystemError(t *testing.T) {
 
 func TestSubmission_MarkFinal_FromFinal_Fails(t *testing.T) {
 	s := newRunningSubmission(t)
-	_ = s.MarkAccepted(100, 512, testNow)
-	if err := s.MarkWrongAnswer(100, 512, testNow); err == nil {
+	_ = s.MarkAccepted(100, kb(512), testNow)
+	if err := s.MarkWrongAnswer(100, kb(512), testNow); err == nil {
 		t.Error("expected error when re-marking final submission, got nil")
 	}
 }
+
+// kb reads better than taking the address of a local at every call site. The
+// verdicts take a pointer because a run may produce no measurement at all.
+func kb(v int) *int { return &v }

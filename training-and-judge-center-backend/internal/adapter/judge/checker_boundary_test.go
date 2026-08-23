@@ -99,7 +99,7 @@ func (s boundaryExecutionSession) RunTestCase(context.Context, appjudge.RunReque
 	if err := os.WriteFile(judgingOutputPath(s.dir), []byte("3"), judgingFileMode); err != nil {
 		return appjudge.RunResult{}, err
 	}
-	return appjudge.RunResult{ExitCode: 0, TimeMs: 10, MemoryKb: 1024, OutputPreview: []byte("3")}, nil
+	return appjudge.RunResult{ExitCode: 0, TimeMs: 10, MemoryKb: kb(1024), OutputPreview: []byte("3")}, nil
 }
 
 func (boundaryExecutionSession) Close(context.Context) error { return nil }

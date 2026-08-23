@@ -752,7 +752,7 @@ Ninguno bloquea el diseño; son elecciones que conviene hacer con el código del
   > **Corregido al medirlo en el commit 3**: eso vale para un checker **personalizado**, que lee los archivos enteros. Para `compare` —el camino por defecto, o sea la mayoría del tráfico— es falso: streamea, nunca abre el input, y su memoria sigue al **token más grande** y no al tamaño de los archivos. Ver el punto 14 del Paso 7.
 
   **Y toca también al worker, no solo al container.** El Paso 5 cambia dónde viven esos bytes: hoy `customCheckerCompare` escribe los tres archivos a un directorio temporal **en disco**, y el adapter nuevo los empaqueta en un **tar en memoria** (`buildTar` arma un `bytes.Buffer`) para copiarlos por la API de Docker. Sumado a que `GetTestCases` ya trae **todos** los casos de prueba a memoria de una vez, el worker —que tiene `limits.memory: 512Mi`— queda expuesto a datos que solo el problem setter acota. El Paso 7 se lleva la salida del concursante al volumen compartido, pero **no** el input ni la salida esperada, así que este ítem le sobrevive.
-- ~~**Qué reportar como KB consumidos**~~ **Diseñado y verificado; ejecuta en el Paso 7** (ver ahí la sección de A5). El veredicto de MLE queda correcto porque lo hace cumplir el kernel, pero el número que se muestra sale de `MaxUsage`, que **en cgroup v2 viene en cero**. La medición correcta es el `ru_maxrss` del proceso, con `/usr/bin/time` por fuera del `timeout`.
+- ~~**Qué reportar como KB consumidos**~~ **Resuelto en el commit 4 del Paso 7.** Salía de `MaxUsage`, que **en cgroup v2 viene en cero**, así que todo veredicto reportaba 0 KB. Ahora es el `ru_maxrss` del proceso, medido con `/usr/bin/time -q` por fuera del `timeout` y devuelto por el volumen compartido; sin medición el campo queda en `NULL` y no en `0`.
 - **Un checker roto se reporta como wrong answer del concursante** (encontrado en el Paso 5, decidido dejarlo así). El adapter trata **cualquier** exit distinto de cero como rechazo, con el stderr como mensaje — igual que `ValidatorSession.Validate` desde el Paso 4. Eso mete dos casos ajenos en la misma bolsa:
 
   - **`exit 3` es `_fail` en testlib**: el checker declarando que *él* o los datos del jurado están rotos, no que la salida del concursante esté mal. La tabla completa es `0=_ok`, `1=_wa`, `2=_pe`, `3=_fail`, `7=_points`.
@@ -1406,7 +1406,7 @@ C++ y Python tienen **3-6 MiB de overhead fijo**, no proporcional. Java tiene un
 
 **A4 — Cómo se detecta el MLE de forma uniforme en los tres lenguajes. ✅ RESUELTO, ver abajo.** Es el bug de la sección de bugs: la JVM nunca deja que el cgroup la mate por agotamiento de heap —refuerza su propio tope y lanza `OutOfMemoryError`—, así que `exitCodeMLE = 137` es inalcanzable y **todo MLE de Java se reporta hoy como runtime error**, sin rastro (el comando manda stderr a `/dev/null`). La vía del exit code por lenguaje se evaluó y se descartó. La pista que este documento deja: si la señal sale del propio cgroup (`memory.events`, campo `oom_kill`) en vez del código de salida, cubre los tres lenguajes de forma uniforme.
 
-**A5 — Qué reportar como KB consumidos. ⏭️ DIFERIDO AL PASO 7, con el diseño hecho y verificado.** No es elegir entre un número aproximado y el límite: en cgroup v2 `MaxUsage` viene en **cero**, así que hoy todo veredicto reporta 0 KB — y peor, lo persiste como `0` y no como `NULL`, con lo que la API afirma que la solución usó 0 KB. La medición correcta es el `ru_maxrss` del proceso, y quedó diseñada, medida por lenguaje y con sus dos decisiones abiertas analizadas **en el Paso 7**. Se difirió porque lo difícil no es medir sino sacar el número del container, que es exactamente el código que ese paso reescribe: hacerlo acá era escribir esa plomería dos veces, y con la variante peor.
+**A5 — Qué reportar como KB consumidos. ✅ RESUELTO en el commit 4 del Paso 7** (diferido desde acá con el diseño hecho). No es elegir entre un número aproximado y el límite: en cgroup v2 `MaxUsage` viene en **cero**, así que hoy todo veredicto reporta 0 KB — y peor, lo persiste como `0` y no como `NULL`, con lo que la API afirma que la solución usó 0 KB. La medición correcta es el `ru_maxrss` del proceso, y quedó diseñada, medida por lenguaje y con sus dos decisiones abiertas analizadas **en el Paso 7**. Se difirió porque lo difícil no es medir sino sacar el número del container, que es exactamente el código que ese paso reescribe: hacerlo acá era escribir esa plomería dos veces, y con la variante peor.
 
 **A6 — Si el `docker update` aplica también al pool liviano. ✅ RESUELTO: no, y el código ya lo hace bien.** El `memoryLimit` de un problema restringe **el código del concursante**; el checker es código del jurado, y sus necesidades escalan con el tamaño de las salidas que compara, no con lo que el problema le promete al concursante. Aplicárselo sería como imponerle al compilador el límite de tiempo del problema. Y las mediciones del Paso 4 lo vuelven inviable, no solo incoherente: un checker necesita 88-162 MiB para una salida de 8 MiB, así que un problema con límite de 64 MB dejaría al checker en 64 MiB y **haría OOM en todos los casos de prueba** — que desde A7 se detecta y termina en `SYSTEM_ERROR` en vez de en wrong answers silenciosos. Los dos reclamantes del pool liviano ya piden `pool.LanguageCeiling`, así que no hay cambio de código: es una decisión a registrar para que nadie la reabra creyendo que es una inconsistencia.
 
@@ -1750,7 +1750,7 @@ Salió de cargar el contexto con el código delante, y cada uno deja el proyecto
 | 1 | la plomería del volumen | ✅ |
 | 2 | el corazón: la salida deja de pasar por el worker | ✅ |
 | 3 | la comparación por tokens al pool liviano | ✅ |
-| 4 | A5: la memoria consumida se mide de verdad | |
+| 4 | A5: la memoria consumida se mide de verdad | ✅ |
 | 5 | el veredicto `OUTPUT_LIMIT_EXCEEDED` | |
 
 **Y el encuadre de "difícil de verificar localmente" quedó corregido**: es cierto para la suite —los tests del pool mockean Docker— pero **no para los mecanismos**. Todo lo riesgoso de este paso se puede medir con Docker real, incluido levantar un `dind` de verdad y ver qué alcanza un container creado por el demonio de adentro. Lo que sí queda para la Fase 8 es la parte de Kubernetes propiamente dicha: que el `emptyDir` se comparta entre los dos containers del pod.
@@ -1860,6 +1860,43 @@ Se evaluó distinguirlo y **se descartó por un argumento que apareció al mirar
 
 - **`compare` no puede faltar en la config.** Las reglas existentes no lo cubrían: alguien lo borra de `pools.light.languages` y la config sigue siendo válida, hasta que la primera submission sin checker personalizado falla con `unknown language` — en competencia, en el peor momento. Ahora `validateJudgeConfig` exige que esté declarado con `artifactRun` y dimensionado por el pool liviano.
 - **La sonda de punta a punta del volumen**, que el commit 2 quedó debiendo. Al arrancar, el worker escribe un marcador en el volumen, reclama un container `compare`, lo lee desde adentro y compara. Es lo único que puede ver un `JUDGE_VOLUME_SOURCE` con un valor equivocado. Vive en el paquete del adapter y `main.go` la llama con una línea. Costo: ~220 ms una vez. **Canje aceptado**: el worker pasa a depender de Docker al arrancar, cosa que antes no hacía — en Kubernetes el `startupProbe` del dind ya lo garantiza, en local exige tener las imágenes construidas.
+
+**17. `/usr/bin/time` entra por el paquete del distro, en un solo Dockerfile (commit 4).** No está en ninguna de las tres imágenes — verificado corriéndolas —, pero las tres derivan de `judge-runner:base`, así que es **una línea en un archivo**, no tres. Se descartó el binario propio que este documento proponía como alternativa: reimplementa en ~40 líneas de Go algo que el distro mantiene, y su precedente supuesto —`cmd/compare`— en realidad vive **dentro de una imagen**, no embebido y copiado por sesión, así que no es tal precedente.
+
+**El costo es el orden de despliegue**: si el código sale antes que las imágenes, el comando invoca un binario inexistente y **todo falla con exit 127**. Queda escrito en `images-configmap.yaml` junto a `RUNNER_VERSION`, que sube a `v0.2.0`. Decisión explícita del usuario: no se prueba nada hasta terminar el paso, así que imágenes y código salen juntos. El bump además ya estaba en la cola por `testlib.h`, que sigue pendiente.
+
+**18. El comando lleva `-q`, y esto el documento lo daba por verificado sin estarlo (commit 4).** GNU `time` **antepone una línea de diagnóstico** cuando el comando no sale con cero:
+
+| | exit | contenido del archivo |
+|---|---|---|
+| termina bien | 0 | `103936` |
+| se cuelga | 124 | `Command exited with non-zero status 124` + `103424` |
+| pasa el techo | 137 | `Command terminated by signal 9` + `260736` |
+
+O sea que parsear con un `Atoi` directo andaba en el camino feliz y **fallaba justo en TLE y en MLE**. Este documento decía que los exit codes estaban verificados —y lo están— pero nadie había mirado *qué queda en el archivo*. Con `-q` queda una sola línea con el número en los cuatro casos.
+
+El control de la medición: reservando ~1 MiB da 2432 KB y reservando 100 MiB da 103936 KB, así que discrimina de verdad y no reporta una constante.
+
+**19. Verificado con el `runCmd` literal de Java, que era el riesgo real (commit 4).** El formato de `time` usa `%M` y el flag de la JVM usa `%p`, en el mismo string de `sh -c`. Medido con el string sacado del YAML despachado:
+
+| | exit | `%M` |
+|---|---|---|
+| CONTROL: reserva ~0 MiB | 0 | 35 916 KB — la JVM de base |
+| reserva 100 MiB | 0 | 166 108 KB |
+| se cuelga | 124 | 166 528 KB |
+| pasa el techo | **137** | 295 904 KB |
+
+Los cuatro exit codes intactos, **incluido el 137 que produce el `-XX:OnOutOfMemoryError=kill -9 %p` de A4**: envolver con `time` no interfiere con que la JVM se mate sola.
+
+**El número de Java incluye la JVM entera** —35 MiB de base, 162 reportados para 100 reservados— y se reporta tal cual. No es un error de medición: es el RSS real del proceso, que es lo que reporta un juez clásico. Descontar una línea de base por lenguaje sería lógica por lenguaje en Go, justo lo que D9 sacó del código.
+
+**20. `mem.txt` se pre-crea, y eso sale del layout del commit 2 (commit 4).** El directorio del judging es de `root` en `0111`, así que el sandbox **no puede crear archivos ahí**: sin pre-crearlo a nombre del uid 1000, `time -o` falla y no hay medición. Va en `createJudgingDir`, junto a `output.txt` y por la misma razón.
+
+**21. `MemoryKb` pasa a `*int` en el dominio, y la decisión se dio vuelta al contar el costo (commit 4).** Este documento había descartado el `NULL` diciendo que era *"un cambio de la API del dominio, sus call sites y sus tests"*. Contado contra el código: **4 métodos, 4 call sites de producción en un solo archivo, 10 en un solo archivo de tests** — tres archivos y ~35 líneas. `validate_solutions.go` no llama a ningún `Mark*`. Y el campo del struct **ya era `*int`**, igual que el getter: el puntero se fabricaba artificialmente a partir de un valor que podía ser un cero mentiroso.
+
+Con el costo real sobre la mesa gana el argumento de fondo: **el cero centinela es la forma de bug que este rediseño viene encontrando una y otra vez** — `RunRequest.MemoryKb` que se asignaba y nadie leía, `CheckerLanguage` en su valor cero llegando al adapter, `MaxUsage` devolviendo 0 y la API afirmando "usaste 0 KB". Un `*int` hace que *"no lo medimos"* no se pueda representar como *"0 KB"*. Y no introduce nada nuevo para los clientes: `MarkTimeLimitExceeded` y `MarkCompilationError` ya dejaban el campo en `NULL`, y los cinco endpoints ya lo declaran `*int`.
+
+**Anotado y no hecho**: el TLE **ahora sí tiene medición** (`exit=124` escribe `%M`), pero `MarkTimeLimitExceeded` no recibe memoria y se descarta. Sumarla es otro cambio de firma del dominio, y la memoria de una solución que se colgó no le sirve a nadie. Si alguna vez se quiere, el dato está ahí.
 
 
 #### La entrada del caso de prueba SÍ viaja por el volumen — sub-decisión de D7, resuelta
