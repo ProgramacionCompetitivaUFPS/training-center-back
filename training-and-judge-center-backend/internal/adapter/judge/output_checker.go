@@ -21,19 +21,21 @@ type OutputChecker struct {
 	docker dockerExecClient
 	reader gcsReader
 	cfg    ArtifactConfig
+	// judgingRoot is the shared volume the heavy pool wrote into.
+	judgingRoot string
 }
 
-func NewOutputChecker(p *pool.Pool, docker dockerExecClient, cfg ArtifactConfig, client *storage.Client, bucket string) *OutputChecker {
-	return &OutputChecker{pool: p, docker: docker, reader: newGCSReader(client, bucket), cfg: cfg}
+func NewOutputChecker(p *pool.Pool, docker dockerExecClient, cfg ArtifactConfig, client *storage.Client, bucket string, judgingRoot string) *OutputChecker {
+	return &OutputChecker{pool: p, docker: docker, reader: newGCSReader(client, bucket), cfg: cfg, judgingRoot: judgingRoot}
 }
 
 // BeginChecking downloads the compiled checker and injects it into a light pool
 // container, which then checks every output of the judging.
-func (c *OutputChecker) BeginChecking(ctx context.Context, checkerPath string, language submission.Language) (appjudge.CheckerSession, error) {
+func (c *OutputChecker) BeginChecking(ctx context.Context, checkerPath string, language submission.Language, judgingID string) (appjudge.CheckerSession, error) {
 	// Token comparison still runs in the worker, so no container is claimed for a
 	// problem without a custom checker. Step 7 moves it to the light pool.
 	if checkerPath == "" {
-		return &tokenCheckerSession{}, nil
+		return &tokenCheckerSession{judgingDir: path.Join(c.judgingRoot, judgingID)}, nil
 	}
 
 	lang := language.String()
@@ -57,13 +59,16 @@ func (c *OutputChecker) BeginChecking(ctx context.Context, checkerPath string, l
 	}
 
 	name := appjudge.NewArtifactRoleChecker().String()
-	s := &CheckerSession{artifactSession{
-		container: container,
-		pool:      c.pool,
-		docker:    c.docker,
-		role:      name,
-		runCmd:    withArtifactName(langCfg.RunCmd, name),
-	}}
+	s := &CheckerSession{
+		artifactSession: artifactSession{
+			container: container,
+			pool:      c.pool,
+			docker:    c.docker,
+			role:      name,
+			runCmd:    withArtifactName(langCfg.RunCmd, name),
+		},
+		judgingDir: path.Join(c.judgingRoot, judgingID),
+	}
 
 	artifactPath := withArtifactName(langCfg.ArtifactPath, name)
 	if _, err := c.docker.CopyToContainer(ctx, container.ID(), client.CopyToContainerOptions{

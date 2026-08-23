@@ -60,7 +60,7 @@ func TestValidateSolutions_NoSolutions_ReturnsInternalError(t *testing.T) {
 
 func TestValidateSolutions_CompileFails_ReturnsCompileErrorFailure(t *testing.T) {
 	executor := &mockExecutor{
-		beginSessionFn: func(_ context.Context, _ submission.Language, _ int) (ExecutionSession, error) {
+		beginSessionFn: func(_ context.Context, _ submission.Language, _ int, _ string) (ExecutionSession, error) {
 			return &mockExecutionSession{
 				compileFn: func(_ context.Context, _ CompileRequest) (CompileResult, error) {
 					return CompileResult{Success: false, Log: "syntax error"}, nil
@@ -89,7 +89,7 @@ func TestValidateSolutions_WrongAnswer_ReturnsFailure(t *testing.T) {
 		},
 	}
 	checker := &mockOutputChecker{
-		checkFn: func(_ context.Context, _ CheckRequest) (CheckResult, error) {
+		checkFn: func(_ context.Context, _ []byte) (CheckResult, error) {
 			return CheckResult{Accepted: false}, nil
 		},
 	}
@@ -114,7 +114,7 @@ func TestValidateSolutions_TimeLimitExceeded_ExitCode124(t *testing.T) {
 		},
 	}
 	executor := &mockExecutor{
-		beginSessionFn: func(_ context.Context, _ submission.Language, _ int) (ExecutionSession, error) {
+		beginSessionFn: func(_ context.Context, _ submission.Language, _ int, _ string) (ExecutionSession, error) {
 			return &mockExecutionSession{
 				runTestCaseFn: func(_ context.Context, _ RunRequest) (RunResult, error) {
 					return RunResult{ExitCode: exitCodeTLE, TimeMs: 1000}, nil
@@ -148,7 +148,7 @@ func TestValidateSolutions_TimeLimitExceeded_OverLimitDespiteExitZero(t *testing
 		},
 	}
 	executor := &mockExecutor{
-		beginSessionFn: func(_ context.Context, _ submission.Language, _ int) (ExecutionSession, error) {
+		beginSessionFn: func(_ context.Context, _ submission.Language, _ int, _ string) (ExecutionSession, error) {
 			return &mockExecutionSession{
 				runTestCaseFn: func(_ context.Context, _ RunRequest) (RunResult, error) {
 					return RunResult{ExitCode: 0, TimeMs: 600}, nil
@@ -174,7 +174,7 @@ func TestValidateSolutions_MemoryLimitExceeded_ExitCode137(t *testing.T) {
 		},
 	}
 	executor := &mockExecutor{
-		beginSessionFn: func(_ context.Context, _ submission.Language, _ int) (ExecutionSession, error) {
+		beginSessionFn: func(_ context.Context, _ submission.Language, _ int, _ string) (ExecutionSession, error) {
 			return &mockExecutionSession{
 				runTestCaseFn: func(_ context.Context, _ RunRequest) (RunResult, error) {
 					return RunResult{ExitCode: exitCodeMLE}, nil
@@ -200,7 +200,7 @@ func TestValidateSolutions_RuntimeError_UnknownExitCode(t *testing.T) {
 		},
 	}
 	executor := &mockExecutor{
-		beginSessionFn: func(_ context.Context, _ submission.Language, _ int) (ExecutionSession, error) {
+		beginSessionFn: func(_ context.Context, _ submission.Language, _ int, _ string) (ExecutionSession, error) {
 			return &mockExecutionSession{
 				runTestCaseFn: func(_ context.Context, _ RunRequest) (RunResult, error) {
 					return RunResult{ExitCode: 1}, nil
@@ -229,7 +229,7 @@ func TestValidateSolutions_StopsAtFirstFailingSolution(t *testing.T) {
 		},
 	}
 	executor := &mockExecutor{
-		beginSessionFn: func(_ context.Context, _ submission.Language, _ int) (ExecutionSession, error) {
+		beginSessionFn: func(_ context.Context, _ submission.Language, _ int, _ string) (ExecutionSession, error) {
 			return &mockExecutionSession{
 				compileFn: func(_ context.Context, _ CompileRequest) (CompileResult, error) {
 					return CompileResult{Success: false, Log: "syntax error"}, nil
@@ -277,7 +277,7 @@ func TestValidateSolutions_CountsSampleAndSecretCases(t *testing.T) {
 
 func TestValidateSolutions_TransientError_RetriesAndSucceeds(t *testing.T) {
 	executor := &mockExecutor{
-		beginSessionFn: func(_ context.Context, _ submission.Language, _ int) (ExecutionSession, error) {
+		beginSessionFn: func(_ context.Context, _ submission.Language, _ int, _ string) (ExecutionSession, error) {
 			return nil, errTransient
 		},
 	}
@@ -286,7 +286,7 @@ func TestValidateSolutions_TransientError_RetriesAndSucceeds(t *testing.T) {
 
 	// Succeed on the 3rd BeginSession call.
 	attempt := 0
-	executor.beginSessionFn = func(_ context.Context, _ submission.Language, _ int) (ExecutionSession, error) {
+	executor.beginSessionFn = func(_ context.Context, _ submission.Language, _ int, _ string) (ExecutionSession, error) {
 		attempt++
 		if attempt < 3 {
 			return nil, errTransient
@@ -308,7 +308,7 @@ func TestValidateSolutions_TransientError_RetriesAndSucceeds(t *testing.T) {
 
 func TestValidateSolutions_TransientError_ExhaustsRetries_ReturnsError(t *testing.T) {
 	executor := &mockExecutor{
-		beginSessionFn: func(_ context.Context, _ submission.Language, _ int) (ExecutionSession, error) {
+		beginSessionFn: func(_ context.Context, _ submission.Language, _ int, _ string) (ExecutionSession, error) {
 			return nil, errors.New("docker unavailable")
 		},
 	}
@@ -359,16 +359,16 @@ func TestValidateSolutions_WrongAnswer_LargeOutput_IsTruncated(t *testing.T) {
 		},
 	}
 	executor := &mockExecutor{
-		beginSessionFn: func(_ context.Context, _ submission.Language, _ int) (ExecutionSession, error) {
+		beginSessionFn: func(_ context.Context, _ submission.Language, _ int, _ string) (ExecutionSession, error) {
 			return &mockExecutionSession{
 				runTestCaseFn: func(_ context.Context, _ RunRequest) (RunResult, error) {
-					return RunResult{ExitCode: 0, Output: largeOutput}, nil
+					return RunResult{ExitCode: 0, OutputPreview: largeOutput}, nil
 				},
 			}, nil
 		},
 	}
 	checker := &mockOutputChecker{
-		checkFn: func(_ context.Context, _ CheckRequest) (CheckResult, error) {
+		checkFn: func(_ context.Context, _ []byte) (CheckResult, error) {
 			return CheckResult{Accepted: false}, nil
 		},
 	}
@@ -392,7 +392,7 @@ func TestValidateSolutions_WrongAnswer_LargeOutput_IsTruncated(t *testing.T) {
 func TestValidateSolutions_OpensAndClosesOneCheckerSessionPerSolution(t *testing.T) {
 	begins := 0
 	checker := &mockOutputChecker{}
-	checker.beginCheckingFn = func(context.Context, string, submission.Language) (CheckerSession, error) {
+	checker.beginCheckingFn = func(context.Context, string, submission.Language, string) (CheckerSession, error) {
 		begins++
 		checker.session = &mockCheckerSession{}
 		return checker.session, nil
@@ -440,7 +440,7 @@ func TestValidateSolutions_ProblemMemoryLimitReachesTheSession(t *testing.T) {
 		},
 		&mockTestCaseProvider{},
 		&mockExecutor{
-			beginSessionFn: func(_ context.Context, _ submission.Language, memoryKb int) (ExecutionSession, error) {
+			beginSessionFn: func(_ context.Context, _ submission.Language, memoryKb int, _ string) (ExecutionSession, error) {
 				gotMemoryKb = memoryKb
 				return &mockExecutionSession{}, nil
 			},
@@ -453,5 +453,39 @@ func TestValidateSolutions_ProblemMemoryLimitReachesTheSession(t *testing.T) {
 	}
 	if gotMemoryKb != wantMemoryKb {
 		t.Errorf("BeginSession got memoryKb = %d, want the problem's %d", gotMemoryKb, wantMemoryKb)
+	}
+}
+
+// Same contract as the judging path: the heavy pool writes the solution's output
+// into the judging directory and the checker reads it from there, so both
+// sessions have to be opened on the same one.
+func TestValidateSolutions_BothSessionsShareOneJudgingDirectory(t *testing.T) {
+	var executorID, checkerID string
+	executor := &mockExecutor{
+		beginSessionFn: func(_ context.Context, _ submission.Language, _ int, judgingID string) (ExecutionSession, error) {
+			executorID = judgingID
+			return &mockExecutionSession{}, nil
+		},
+	}
+	checker := &mockOutputChecker{
+		beginCheckingFn: func(_ context.Context, _ string, _ submission.Language, judgingID string) (CheckerSession, error) {
+			checkerID = judgingID
+			return &mockCheckerSession{}, nil
+		},
+	}
+	uc := newValidateSolutionsUseCase(
+		&mockSolutionProvider{}, &mockSourceCodeDownloader{}, &mockProblemProvider{},
+		&mockTestCaseProvider{}, executor, checker,
+	)
+
+	if _, err := uc.Execute(context.Background(), ValidateSolutionsInput{ProblemID: problemID}); err != nil {
+		t.Fatalf("Execute: %v", err)
+	}
+
+	if executorID == "" {
+		t.Fatal("the execution session was opened without a judging directory")
+	}
+	if checkerID != executorID {
+		t.Errorf("checker got %q, the executor got %q — they must share one directory", checkerID, executorID)
 	}
 }

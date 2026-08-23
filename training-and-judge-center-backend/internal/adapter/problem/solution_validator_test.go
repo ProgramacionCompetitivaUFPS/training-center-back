@@ -52,7 +52,7 @@ func (m *mockJudgeExecutionSession) Compile(ctx context.Context, req appJudge.Co
 }
 
 func (m *mockJudgeExecutionSession) RunTestCase(_ context.Context, _ appJudge.RunRequest) (appJudge.RunResult, error) {
-	return appJudge.RunResult{ExitCode: 0, TimeMs: 10, Output: []byte("1")}, nil
+	return appJudge.RunResult{ExitCode: 0, TimeMs: 10, OutputPreview: []byte("1")}, nil
 }
 
 func (m *mockJudgeExecutionSession) Close(_ context.Context) error { return nil }
@@ -61,7 +61,7 @@ type mockJudgeExecutor struct {
 	session *mockJudgeExecutionSession
 }
 
-func (m *mockJudgeExecutor) BeginSession(_ context.Context, _ submission.Language, _ int) (appJudge.ExecutionSession, error) {
+func (m *mockJudgeExecutor) BeginSession(_ context.Context, _ submission.Language, _ int, _ string) (appJudge.ExecutionSession, error) {
 	if m.session != nil {
 		return m.session, nil
 	}
@@ -70,13 +70,13 @@ func (m *mockJudgeExecutor) BeginSession(_ context.Context, _ submission.Languag
 
 type mockJudgeOutputChecker struct{}
 
-func (m *mockJudgeOutputChecker) BeginChecking(_ context.Context, _ string, _ submission.Language) (appJudge.CheckerSession, error) {
+func (m *mockJudgeOutputChecker) BeginChecking(_ context.Context, _ string, _ submission.Language, _ string) (appJudge.CheckerSession, error) {
 	return &mockJudgeCheckerSession{}, nil
 }
 
 type mockJudgeCheckerSession struct{}
 
-func (m *mockJudgeCheckerSession) Check(_ context.Context, _ appJudge.CheckRequest) (appJudge.CheckResult, error) {
+func (m *mockJudgeCheckerSession) Check(_ context.Context, _ []byte) (appJudge.CheckResult, error) {
 	return appJudge.CheckResult{Accepted: true}, nil
 }
 

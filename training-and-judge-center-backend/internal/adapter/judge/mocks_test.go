@@ -11,6 +11,8 @@ import (
 	"fmt"
 	"io"
 	"net"
+	"os"
+	"path/filepath"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -360,4 +362,28 @@ func firstTarEntryMode(t *testing.T, r io.Reader) (string, int64, []byte) {
 	}
 	data, _ := io.ReadAll(tr)
 	return hdr.Name, hdr.Mode, data
+}
+
+// newTestJudgingDir lays out one judging's slot under a temp root. It does not
+// call createJudgingDir: that one hands output.txt to the sandbox user and
+// leaves the directory unwritable, and both of those need root.
+func newTestJudgingDir(t *testing.T) string {
+	t.Helper()
+	dir := filepath.Join(t.TempDir(), "judging")
+	if err := os.Mkdir(dir, 0o755); err != nil {
+		t.Fatalf("creating the judging directory: %v", err)
+	}
+	if err := os.WriteFile(judgingOutputPath(dir), nil, judgingFileMode); err != nil {
+		t.Fatalf("creating output.txt: %v", err)
+	}
+	return dir
+}
+
+// writeContestantOutput stands in for the sandbox: it leaves in the judging
+// directory what the contestant's program would have printed.
+func writeContestantOutput(t *testing.T, judgingDir string, output []byte) {
+	t.Helper()
+	if err := os.WriteFile(judgingOutputPath(judgingDir), output, judgingFileMode); err != nil {
+		t.Fatalf("writing the contestant's output: %v", err)
+	}
 }

@@ -23,7 +23,7 @@ const (
 	artifactRunSecs  = 30
 	artifactRunGrace = 5 * time.Second
 
-	// sandboxInputPath is where both sessions put the test case's input.
+	// sandboxInputPath is where the validator session puts the input it checks.
 	sandboxInputPath = "/sandbox/input.txt"
 
 	// exitCodeKilled is SIGKILL (128 + 9). An artifact reaches it by exceeding

@@ -6,6 +6,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/google/uuid"
+
 	"github.com/training-judge-center/backend/pkg/apperror"
 )
 
@@ -175,7 +177,11 @@ func (uc *ValidateSolutionsUseCase) checkSolution(ctx context.Context, sol Solut
 		return nil, err
 	}
 
-	session, err := uc.executor.BeginSession(ctx, sol.Language, limits.MemoryKb)
+	// A fresh unguessable name per solution: the name is what isolates one
+	// judging directory from another.
+	judgingID := uuid.NewString()
+
+	session, err := uc.executor.BeginSession(ctx, sol.Language, limits.MemoryKb, judgingID)
 	if err != nil {
 		return nil, err
 	}
@@ -191,7 +197,7 @@ func (uc *ValidateSolutionsUseCase) checkSolution(ctx context.Context, sol Solut
 
 	// Opened after compiling: a solution that does not build produces no output
 	// to check, so no checker container is held during the compile.
-	checkerSession, err := uc.outputChecker.BeginChecking(ctx, limits.CheckerPath, limits.CheckerLanguage)
+	checkerSession, err := uc.outputChecker.BeginChecking(ctx, limits.CheckerPath, limits.CheckerLanguage, judgingID)
 	if err != nil {
 		return nil, err
 	}
@@ -215,11 +221,7 @@ func (uc *ValidateSolutionsUseCase) checkSolution(ctx context.Context, sol Solut
 			if runResult.TimeMs > limits.TimeLimitMs {
 				return &SolutionFailure{FileKey: sol.FileKey, Kind: FailureTimeLimitExceeded, TestCase: tc.Name, TimeMs: runResult.TimeMs, TimeLimitMs: limits.TimeLimitMs}, nil
 			}
-			checkResult, err := checkerSession.Check(ctx, CheckRequest{
-				Input:            tc.Input,
-				ExpectedOutput:   tc.ExpectedOutput,
-				ContestantOutput: runResult.Output,
-			})
+			checkResult, err := checkerSession.Check(ctx, tc.ExpectedOutput)
 			if err != nil {
 				return nil, err
 			}
@@ -229,7 +231,7 @@ func (uc *ValidateSolutionsUseCase) checkSolution(ctx context.Context, sol Solut
 					Kind:     FailureWrongAnswer,
 					TestCase: tc.Name,
 					Expected: truncatePreview(tc.ExpectedOutput),
-					Actual:   truncatePreview(runResult.Output),
+					Actual:   truncatePreview(runResult.OutputPreview),
 				}, nil
 			}
 		default:

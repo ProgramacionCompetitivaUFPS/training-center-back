@@ -3,8 +3,6 @@ package judge
 import (
 	"context"
 	"testing"
-
-	appjudge "github.com/training-judge-center/backend/internal/application/judge"
 )
 
 func TestTokenCompare(t *testing.T) {
@@ -37,14 +35,13 @@ func TestTokenCompare(t *testing.T) {
 	}
 }
 
+// The contestant output now comes off the volume, so this path reads the file
+// the heavy pool left behind instead of receiving its bytes.
 func TestTokenCheckerSession_Check_ComparesTheTwoOutputs(t *testing.T) {
-	s := &tokenCheckerSession{}
+	dir := layOutJudgingDir(t, t.TempDir(), "42")
+	s := &tokenCheckerSession{judgingDir: dir}
 
-	result, err := s.Check(context.Background(), appjudge.CheckRequest{
-		ExpectedOutput:   []byte("42\n"),
-		ContestantOutput: []byte("42"),
-	})
-
+	result, err := s.Check(context.Background(), []byte("42\n"))
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
