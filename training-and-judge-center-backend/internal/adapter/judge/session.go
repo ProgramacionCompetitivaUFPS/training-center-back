@@ -188,7 +188,7 @@ func (s *Session) RunTestCase(ctx context.Context, req appjudge.RunRequest) (app
 func (s *Session) Close(ctx context.Context) error {
 	// Ahead of the container guard on purpose: the safety net nils the container
 	// out, and the judging directory would then stay in the volume forever.
-	if err := os.RemoveAll(s.judgingDir); err != nil {
+	if err := removeJudgingDir(s.judgingDir); err != nil {
 		slog.ErrorContext(ctx, "executor: judging directory cleanup failed", "error", err)
 	}
 	if s.container == nil {

@@ -31,21 +31,32 @@ func judgingMemPath(judgingDir string) string {
 	return path.Join(judgingDir, "mem.txt")
 }
 
-// createJudgingDir lays out the slot. The worker is root, so it keeps writing
-// inside a directory it just made unwritable for everyone else.
+// createJudgingDir lays out the slot, then locks the directory: the sandbox must
+// reach the two files it is given and be unable to add, list or remove anything.
 func createJudgingDir(judgingDir string) error {
-	if err := os.Mkdir(judgingDir, judgingDirMode); err != nil {
+	// Created writable and tightened at the end: the final mode forbids
+	// creating anything, the two files below included.
+	if err := os.Mkdir(judgingDir, 0o700); err != nil {
 		return err
 	}
-	// Both are rewritten by the sandbox on every test case, so it has to own
-	// them: the directory above forbids creating anything.
+	// Both are rewritten by the sandbox on every test case, so it has to own them.
 	for _, p := range []string{judgingOutputPath(judgingDir), judgingMemPath(judgingDir)} {
 		if err := os.WriteFile(p, nil, judgingFileMode); err != nil {
 			return err
 		}
-		if err := os.Chown(p, sandboxUID, sandboxUID); err != nil {
-			return err
+		// Handing a file to another user needs root, which the worker container is.
+		if os.Geteuid() == 0 {
+			if err := os.Chown(p, sandboxUID, sandboxUID); err != nil {
+				return err
+			}
 		}
 	}
-	return nil
+	return os.Chmod(judgingDir, judgingDirMode)
+}
+
+// removeJudgingDir undoes the lock before deleting: a directory in
+// judgingDirMode cannot have its entries removed, not even by its owner.
+func removeJudgingDir(judgingDir string) error {
+	_ = os.Chmod(judgingDir, 0o700)
+	return os.RemoveAll(judgingDir)
 }

@@ -350,9 +350,13 @@ func TestExecutor_BeginSession_ProblemLimitReachesThePoolInBytes(t *testing.T) {
 	p, poolMock := newTestPool(t)
 	e := NewExecutor(p, &mockDockerExecClient{}, testExecCfg(), t.TempDir())
 
-	if _, err := e.BeginSession(context.Background(), submission.RestoreLanguage(testLang), testProblemMemoryKb, "judging-1"); err != nil {
+	sess, err := e.BeginSession(context.Background(), submission.RestoreLanguage(testLang), testProblemMemoryKb, "judging-1")
+	if err != nil {
 		t.Fatalf("BeginSession: %v", err)
 	}
+	// The judging directory is unwritable until Close unlocks it, so leaving the
+	// session open makes t.TempDir cleanup fail for anyone who is not root.
+	defer sess.Close(context.Background())
 
 	const want = int64(testProblemMemoryKb) * 1024
 	if got := poolMock.lastCreateMemory.Load(); got != want {
@@ -438,9 +442,13 @@ func TestExecutor_BeginSession_MemoryFactorBuysBackTheRuntimeReserve(t *testing.
 	cfg.Languages[testLang] = lc
 	e := NewExecutor(p, &mockDockerExecClient{}, cfg, t.TempDir())
 
-	if _, err := e.BeginSession(context.Background(), submission.RestoreLanguage(testLang), testProblemMemoryKb, "judging-1"); err != nil {
+	sess, err := e.BeginSession(context.Background(), submission.RestoreLanguage(testLang), testProblemMemoryKb, "judging-1")
+	if err != nil {
 		t.Fatalf("BeginSession: %v", err)
 	}
+	// The judging directory is unwritable until Close unlocks it, so leaving the
+	// session open makes t.TempDir cleanup fail for anyone who is not root.
+	defer sess.Close(context.Background())
 
 	const want = int64(float64(testProblemMemoryKb) * 1024 * 1.5)
 	if got := poolMock.lastCreateMemory.Load(); got != want {
