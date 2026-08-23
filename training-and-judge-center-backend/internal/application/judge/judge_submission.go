@@ -176,6 +176,15 @@ func (uc *JudgeSubmissionUseCase) judgeAttempt(
 			return true, err
 		}
 
+		// Ahead of the exit code, which cannot carry this: the three runtimes
+		// answer the signal that stops an oversized write with 153, 1 and 0, so
+		// reading it would report a runtime error, a wrong answer and a pass for
+		// the same behaviour.
+		if runResult.OutputLimitExceeded {
+			_ = sub.MarkOutputLimitExceeded(runResult.TimeMs, runResult.MemoryKb, now)
+			return false, nil
+		}
+
 		switch runResult.ExitCode {
 		case exitCodeTLE:
 			_ = sub.MarkTimeLimitExceeded(runResult.TimeMs, now)

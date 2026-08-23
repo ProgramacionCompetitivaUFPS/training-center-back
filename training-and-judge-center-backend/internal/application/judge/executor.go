@@ -30,6 +30,9 @@ type RunResult struct {
 	// OutputPreview is the first few KB of what the contestant printed, enough
 	// for the wrong-answer report. The output itself never leaves the sandbox.
 	OutputPreview []byte
+	// OutputLimitExceeded means the run wrote more than the sandbox allows, so
+	// what is on disk was cut short and says nothing about the solution.
+	OutputLimitExceeded bool
 }
 
 type ExecutionSession interface {

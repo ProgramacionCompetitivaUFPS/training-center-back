@@ -767,3 +767,52 @@ func TestJudgeSubmission_ReportsTheLargestMeasurementOrNone(t *testing.T) {
 		})
 	}
 }
+
+// An oversized output has to win over the exit code, because the exit code says
+// something different in every language: 153 in C++, 1 in Python, 0 in Java for
+// the very same behaviour. Reading it would give a runtime error, a wrong
+// answer and a pass for one thing.
+func TestJudgeSubmission_OutputLimitWinsOverTheExitCode(t *testing.T) {
+	tests := []struct {
+		name     string
+		exitCode int
+	}{
+		{"C++ dies from the signal", 153},
+		{"Python exits with an error", 1},
+		{"Java finishes as if nothing happened", 0},
+		{"the run also timed out", exitCodeTLE},
+		{"the run also ran out of memory", exitCodeMLE},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			sub := pendingSubmission()
+			executor := &mockExecutor{
+				beginSessionFn: func(_ context.Context, _ submission.Language, _ int, _ string) (ExecutionSession, error) {
+					return &mockExecutionSession{
+						runTestCaseFn: func(context.Context, RunRequest) (RunResult, error) {
+							return RunResult{ExitCode: tt.exitCode, TimeMs: 10, OutputLimitExceeded: true}, nil
+						},
+					}, nil
+				},
+			}
+			uc := newJudgeSubmissionUseCase(
+				&mockSubmissionUpdater{
+					getByIDFn: func(context.Context, submission.SubmissionID) (*submission.Submission, error) {
+						return sub, nil
+					},
+				},
+				&mockSourceCodeDownloader{}, &mockProblemProvider{},
+				&mockTestCaseProvider{}, executor, &mockOutputChecker{},
+			)
+
+			if err := uc.Execute(context.Background(), JudgeSubmissionInput{SubmissionID: submissionID}); err != nil {
+				t.Fatalf("Execute: %v", err)
+			}
+
+			if got := sub.Status().String(); got != "OUTPUT_LIMIT_EXCEEDED" {
+				t.Errorf("verdict: got %q, want OUTPUT_LIMIT_EXCEEDED", got)
+			}
+		})
+	}
+}

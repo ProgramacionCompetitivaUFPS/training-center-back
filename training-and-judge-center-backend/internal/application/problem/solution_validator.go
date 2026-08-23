@@ -9,6 +9,7 @@ const (
 	SolutionFailureWrongAnswer         SolutionFailureKind = "WRONG_ANSWER"
 	SolutionFailureTimeLimitExceeded   SolutionFailureKind = "TIME_LIMIT_EXCEEDED"
 	SolutionFailureMemoryLimitExceeded SolutionFailureKind = "MEMORY_LIMIT_EXCEEDED"
+	SolutionFailureOutputLimitExceeded SolutionFailureKind = "OUTPUT_LIMIT_EXCEEDED"
 	SolutionFailureRuntimeError        SolutionFailureKind = "RUNTIME_ERROR"
 )
 

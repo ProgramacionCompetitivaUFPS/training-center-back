@@ -197,6 +197,19 @@ func (s *Submission) MarkMemoryLimitExceeded(memoryKb *int, now time.Time) error
 	return nil
 }
 
+// MarkOutputLimitExceeded is what a run that wrote past the output limit gets.
+// It is not a wrong answer: the output was cut short, so comparing it says
+// nothing about whether the solution was right.
+func (s *Submission) MarkOutputLimitExceeded(timeMs int, memoryKb *int, now time.Time) error {
+	if err := s.markFinal(now); err != nil {
+		return err
+	}
+	s.status = newStatusOutputLimitExceeded()
+	s.timeMs = &timeMs
+	s.memoryKb = memoryKb
+	return nil
+}
+
 func (s *Submission) MarkRuntimeError(timeMs int, memoryKb *int, now time.Time) error {
 	if err := s.markFinal(now); err != nil {
 		return err

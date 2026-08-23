@@ -3,6 +3,7 @@ package judge
 import (
 	"bytes"
 	"context"
+	"fmt"
 	"os"
 	"testing"
 	"time"
@@ -414,9 +415,11 @@ func TestSession_RunTestCase_WrapsTheCommandInTheInContainerTimeout(t *testing.T
 	if len(cmds) != 1 || len(cmds[0]) != 3 || cmds[0][0] != "sh" || cmds[0][1] != "-c" {
 		t.Fatalf("expected one command through sh -c, got: %v", cmds)
 	}
-	// time wraps timeout, not the other way round, and -q keeps the diagnostic
-	// line GNU time prints on a non-zero exit out of the measurement file.
-	want := "/usr/bin/time -q -f %M -o " + judgingMemPath(s.judgingDir) +
+	// The write limit comes first so it reaches everything below it; time wraps
+	// timeout and not the other way round; and -q keeps the diagnostic line GNU
+	// time prints on a non-zero exit out of the measurement file.
+	want := fmt.Sprintf("ulimit -c 0; ulimit -f %d; ", outputLimitBlocks) +
+		"/usr/bin/time -q -f %M -o " + judgingMemPath(s.judgingDir) +
 		" timeout --kill-after=1s 2s " + testExecCfg().Languages[testLang].RunCmd +
 		" < " + judgingInputPath(s.judgingDir) + " > " + judgingOutputPath(s.judgingDir) + " 2>/dev/null"
 	if cmds[0][2] != want {
@@ -487,5 +490,49 @@ func TestSession_Close_RemovesTheJudgingDirectoryEvenWithoutAContainer(t *testin
 
 	if _, err := os.Stat(dir); !os.IsNotExist(err) {
 		t.Errorf("the judging directory survived Close: %v", err)
+	}
+}
+
+// The exit code cannot carry this: the three runtimes answer the signal that
+// stops an oversized write with 153, 1 and 0. What decides is the file size,
+// which works because the write limit sits one block above the reported one.
+func TestSession_RunTestCase_OutputLimitIsDecidedByTheFileSize(t *testing.T) {
+	tests := []struct {
+		name        string
+		outputBytes int
+		want        bool
+	}{
+		{"well under the limit", 1024, false},
+		{"one byte under the limit", maxOutputBytes - 1, false},
+		{"exactly the limit is still legal", maxOutputBytes, false},
+		{"one byte over", maxOutputBytes + 1, true},
+		{"cut off by the kernel at the write limit", outputLimitBlocks * 512, true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			s, _ := newTestSession(t, &mockDockerExecClient{})
+			defer s.Close(context.Background())
+			writeContestantOutput(t, s.judgingDir, make([]byte, tt.outputBytes))
+
+			result, err := s.RunTestCase(context.Background(), appjudge.RunRequest{
+				Input: []byte("1\n"), TimeLimitMs: 1000,
+			})
+			if err != nil {
+				t.Fatalf("RunTestCase: %v", err)
+			}
+			if result.OutputLimitExceeded != tt.want {
+				t.Errorf("OutputLimitExceeded = %v for %d bytes, want %v",
+					result.OutputLimitExceeded, tt.outputBytes, tt.want)
+			}
+		})
+	}
+}
+
+// The write limit has to land above the reported one, or an output of exactly
+// the limit would be cut and then read as having gone over it.
+func TestOutputLimitBlocks_LeaveRoomAboveTheReportedLimit(t *testing.T) {
+	if got := outputLimitBlocks * 512; got <= maxOutputBytes {
+		t.Errorf("the kernel would cut at %d, at or below the %d we report", got, maxOutputBytes)
 	}
 }
