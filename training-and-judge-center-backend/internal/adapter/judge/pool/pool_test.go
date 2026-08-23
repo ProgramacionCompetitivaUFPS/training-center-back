@@ -26,6 +26,7 @@ func testCfg(capacity int) PoolConfig {
 			"cpp20":  {Image: "judge:cpp20", MemoryBytes: smallMemBytes},
 			"java17": {Image: "judge:java17", MemoryBytes: smallMemBytes},
 		},
+		SharedVolumeSource: "/judging",
 	}
 }
 
@@ -609,4 +610,44 @@ func TestClaim_UpdateFails_DiscardsContainerAndErrors(t *testing.T) {
 		t.Errorf("removeCnt = %d, want 1 — the container must be discarded", mock.removeCnt.Load())
 	}
 	assertAllocatedBytes(t, p, 0)
+}
+
+// The daemon resolves the mount source in its own filesystem, and Docker turns a
+// source it cannot find into an empty directory instead of an error — so what
+// goes in this field is the difference between a working judging and every
+// submission failing its checker.
+func TestClaim_MountsTheJudgingVolume(t *testing.T) {
+	tests := []struct {
+		name     string
+		source   string
+		readOnly bool
+		want     string
+	}{
+		{"a path, which is what the dind sidecar sees", "/judging", false, "/judging:/judging"},
+		{"a volume name, which is what the host's daemon needs", "judging", false, "judging:/judging"},
+		{"a pool that only ever reads", "/judging", true, "/judging:/judging:ro"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var binds []string
+			mock := &mockDockerClient{
+				createFn: func(_ context.Context, opts client.ContainerCreateOptions) (client.ContainerCreateResult, error) {
+					binds = opts.HostConfig.Binds
+					return client.ContainerCreateResult{ID: "ctr-1"}, nil
+				},
+			}
+			cfg := testCfg(2)
+			cfg.SharedVolumeSource = tt.source
+			cfg.SharedVolumeReadOnly = tt.readOnly
+			p := newTestPool(t, cfg, mock)
+
+			if _, err := p.Claim(context.Background(), "cpp20", LanguageCeiling); err != nil {
+				t.Fatal(err)
+			}
+			if len(binds) != 1 || binds[0] != tt.want {
+				t.Errorf("binds: got %v, want [%q]", binds, tt.want)
+			}
+		})
+	}
 }

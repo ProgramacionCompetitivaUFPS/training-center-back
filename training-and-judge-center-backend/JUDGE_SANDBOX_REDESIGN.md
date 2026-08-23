@@ -1738,6 +1738,52 @@ El `emptyDir` en `worker.yaml` montado en `dind` y en `worker`, el UUID por judg
 
 **Es el paso más difícil de verificar localmente** — los tests del pool mockean Docker, así que la prueba real cae en la Fase 8 contra el cluster. Por eso va último: si algo queda mal, no contamina los pasos anteriores.
 
+#### El paso se ejecuta en seis commits
+
+Salió de cargar el contexto con el código delante, y cada uno deja el proyecto compilando y la suite en verde.
+
+| | | |
+|---|---|---|
+| 0 | el orden de los argumentos de `compare` | ✅ |
+| 1 | la plomería del volumen | ✅ |
+| 2 | el corazón: la salida deja de pasar por el worker | |
+| 3 | la comparación por tokens al pool liviano | |
+| 4 | A5: la memoria consumida se mide de verdad | |
+| 5 | el veredicto `OUTPUT_LIMIT_EXCEEDED` | |
+
+**Y el encuadre de "difícil de verificar localmente" quedó corregido**: es cierto para la suite —los tests del pool mockean Docker— pero **no para los mecanismos**. Todo lo riesgoso de este paso se puede medir con Docker real, incluido levantar un `dind` de verdad y ver qué alcanza un container creado por el demonio de adentro. Lo que sí queda para la Fase 8 es la parte de Kubernetes propiamente dicha: que el `emptyDir` se comparta entre los dos containers del pod.
+
+#### Lo que se decidió en el camino
+
+**1. La topología de `docker-compose` no es la de Kubernetes, y el volumen tiene que servir a las dos.**
+
+D7 razona sobre el pod de Kubernetes y nunca menciona el entorno local, donde `docker-compose.yml` **no tiene sidecar `dind`**: el worker monta el socket del demonio del host, así que los containers del sandbox son sus **hermanos** y el demonio resuelve el origen del montaje en el filesystem **del host**. Una ruta `/judging` que existe adentro del worker no existe ahí.
+
+Medido con Docker real, levantando un `dind` y comparando las dos topologías:
+
+| | origen = ruta `/judging` | origen = nombre de volumen |
+|---|---|---|
+| demonio adentro de `dind` (Kubernetes) | **funciona** | — |
+| demonio del host (compose) | **0 archivos** | **funciona** |
+
+**El modo de falla es el peor posible y es lo que fija todo lo demás**: Docker **crea el origen que no encuentra como un directorio vacío**, sin error y con exit 0. Medido. O sea que un montaje mal armado no rompe: hace que el checker lea archivos vacíos y que **todas las submissions den wrong answer**.
+
+De ahí las tres decisiones:
+
+- **El origen es configuración** (`JUDGE_VOLUME_SOURCE`), **requerida y sin default**: `/judging` en `worker.yaml`, el nombre del volumen en el compose. Un default habría hecho que un compose sin configurar cayera justo en el modo silencioso. Es la misma clase de valor que `DOCKER_HOST`, que ya vale distinto en cada topología y por esta misma razón.
+- **La ruta es una constante en Go** (`pool.SharedVolumePath`), porque no cambia entre topologías ni adentro del worker ni adentro del sandbox. Se descartó ponerla en `judge_config.yaml`: ese archivo va **horneado en la imagen**, así que tendría el mismo valor en las dos topologías, que es justo lo que no puede ser.
+- **El worker verifica el directorio al arrancar y no lo crea si falta.** Que falte significa que el volumen no está montado, que *es* el bug; crearlo lo taparía, exactamente el error que comete Docker. De paso le aplica el `0711` de D7.
+
+**2. El montaje va en la config del pool, no en `Claim`.** Los montajes son **inmutables después de crear el container** y el pool reusa containers entre judgings. Es el espejo exacto de A1 del Paso 6: el límite de memoria *sí* se puede cambiar en caliente y por eso viaja en `Claim`; el montaje no, y por eso es del pool. Coincide con lo que D7 ya pedía — montaje uniforme, igual en todos los containers de un pool.
+
+**3. El pool liviano monta en sólo lectura.** El experimento verificó los permisos de D7 y de paso marcó su límite: con la raíz en `0711` un sandbox **no puede enumerar** (`ls` da *Permission denied*), pero si conoce una ruta puede leerla **y escribirla**. Leer es el contrato que D7 acepta —la ruta es la credencial—, pero escribir significa poder **alterar el veredicto de otra submission**. El liviano nunca escribe en el volumen (lee el input y la salida del concursante; la respuesta del jurado le llega por la API), así que un `:ro` cierra esa mitad gratis. No rompe la uniformidad: cada pool tiene su config y adentro de cada uno el montaje sigue siendo idéntico.
+
+Sube además la apuesta sobre la regla que D7 ya trae: **los UUID no pueden aparecer nunca en un log visible ni en un mensaje de error de la API**.
+
+**4. Un hueco de tests que el barrido de mutaciones encontró.** La primera tanda dejó pasar en verde la mutación *"`poolConfigFor` no marca el liviano como sólo lectura"*: el test del pool probaba que el bind **respeta** la bandera, pero nada probaba que el composition root la **pone**. Es la forma exacta del bug de `CheckerLanguage` y del `RunRequest.MemoryKb` — un valor que no se pasa y que compila perfecto. Cubierto ahora en `cmd/worker/shared_volume_test.go`.
+
+**Pendiente que abre este paso, para el commit 2**: la verificación **de punta a punta** al arrancar —escribir un marcador, crear un container y comprobar que lo ve— es lo único que atraparía un `JUDGE_VOLUME_SOURCE` con un valor *equivocado*, contra ausente, que sí se atrapa. No entró en el commit 1 porque necesita una imagen y un container y porque hasta el commit 2 el volumen no lo usa nadie. En el commit 2 el modo de falla se vuelve real.
+
 #### La entrada del caso de prueba SÍ viaja por el volumen — sub-decisión de D7, resuelta
 
 D7 dejaba explícitamente abierto *"si la entrada del caso de prueba también viaja por el volumen o sigue por la API"*. **Va por el volumen**, por dos razones que aparecieron al desglosar la memoria del worker:
@@ -1906,16 +1952,3 @@ Conviene correr una pasada de `staticcheck ./...` o `golangci-lint run --enable 
 - `tokenCompare` — **NO queda huérfano en el Paso 5**: la comparación por tokens sigue en el worker hasta el Paso 7. Vive aislada en `token_comparison.go` junto a `tokenCheckerSession`, para que el Paso 7 borre el archivo entero.
 - `copyOutput`, y `maxOutputBytes` si deja de tener llamadores (la salida pasa por el volumen)
 - ~~`CheckerFilename` en `ProblemLimits` y en `CheckRequest`~~ **eliminado en el Paso 5**
-- ~~`dbCheckerJSON.Filename` en `problem_provider.go`~~ **eliminado en el Paso 5**: el filename ya no hace falta en tiempo de ejecución, y sigue guardado en la base para mostrarlo
-- ~~`ValidatorRunRequest.Artifact`, que pasa a ser una ruta~~ **el struct entero desapareció en el Paso 4**
-- Mocks y helpers de test de los puertos borrados (`mockNativeCompiler`, `mockValidatorRunner` y compañía en los `mocks_test.go`)
-- **La apertura de sesión de pool liviano sigue duplicada** entre `OutputChecker.BeginChecking` y `ValidatorRunner.BeginValidating` (buscar config → descargar → reclamar → inyectar): son iguales salvo el rol y el tipo de sesión. El Paso 5 extrajo la mitad de abajo (`artifactSession`) y la descarga (`downloadArtifact`), pero no ésta, porque el Paso 7 vuelve a tocar los dos archivos. Vale mirarla después de ese paso, no antes.
-
-*Config*
-- Restos de la forma vieja de `languages` tras la reestructuración de D10
-- Referencias a `cpuOverheadCores` después del renombre a `dockerDaemonReserveCores`
-
-*Y el barrido general*
-- Campos de structs de request/result que quedaron sin escribir o sin leer
-- Constructores y variables de `cmd/worker/main.go` que ya no se enchufan a nada
-- Entradas de `judge_config.yaml` que ningún código lee

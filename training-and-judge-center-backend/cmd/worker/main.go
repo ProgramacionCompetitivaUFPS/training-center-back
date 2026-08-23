@@ -140,13 +140,19 @@ func main() {
 
 	executorCfg := adapterjudge.ExecutorConfig{Languages: execLanguages}
 
+	volumeSource := getRequiredEnv("JUDGE_VOLUME_SOURCE")
+	if err := ensureSharedVolume(judgepool.SharedVolumePath); err != nil {
+		slog.Error("worker: the judging volume is not usable", "error", err)
+		os.Exit(1)
+	}
+
 	idleTimeout := time.Duration(judgeCfg.Judge.IdleTimeoutMinutes) * time.Minute
 
-	heavyPool := judgepool.NewPool(poolConfigFor(judgeCfg, poolHeavy, idleTimeout), dockerClient)
+	heavyPool := judgepool.NewPool(poolConfigFor(judgeCfg, poolHeavy, idleTimeout, volumeSource), dockerClient)
 	heavyPool.Start()
 	defer heavyPool.Stop()
 
-	lightPool := judgepool.NewPool(poolConfigFor(judgeCfg, poolLight, idleTimeout), dockerClient)
+	lightPool := judgepool.NewPool(poolConfigFor(judgeCfg, poolLight, idleTimeout, volumeSource), dockerClient)
 	lightPool.Start()
 	defer lightPool.Stop()
 
@@ -492,7 +498,7 @@ func validateJudgeConfig(cfg judgeConfigFile) error {
 // separate from validateJudgeConfig.
 // poolConfigFor joins the two config sections a pool needs: the pool says how
 // big a container is, the language which image it runs.
-func poolConfigFor(cfg judgeConfigFile, poolName string, idleTimeout time.Duration) judgepool.PoolConfig {
+func poolConfigFor(cfg judgeConfigFile, poolName string, idleTimeout time.Duration, volumeSource string) judgepool.PoolConfig {
 	pool := cfg.Judge.Pools[poolName]
 	languages := make(map[string]judgepool.LanguageConfig, len(pool.Languages))
 	for lang, sizing := range pool.Languages {
@@ -503,10 +509,13 @@ func poolConfigFor(cfg judgeConfigFile, poolName string, idleTimeout time.Durati
 		}
 	}
 	return judgepool.PoolConfig{
-		BudgetBytes:  pool.BudgetBytes,
-		IdleTimeout:  idleTimeout,
-		ReapInterval: reapInterval,
-		Languages:    languages,
+		BudgetBytes:        pool.BudgetBytes,
+		IdleTimeout:        idleTimeout,
+		ReapInterval:       reapInterval,
+		Languages:          languages,
+		SharedVolumeSource: volumeSource,
+		// The light pool only ever reads the judging directory.
+		SharedVolumeReadOnly: poolName == poolLight,
 	}
 }
 
@@ -581,4 +590,23 @@ func getRequiredEnvInt64(key string) int64 {
 		os.Exit(1)
 	}
 	return n
+}
+
+// ensureSharedVolume fails fast when the judging volume is not mounted where it
+// is expected. Docker creates a missing bind source as an empty directory, so a
+// broken mount would otherwise surface as every submission failing its checker.
+func ensureSharedVolume(path string) error {
+	info, err := os.Stat(path)
+	if err != nil {
+		return fmt.Errorf("%s: %w", path, err)
+	}
+	if !info.IsDir() {
+		return fmt.Errorf("%s is not a directory", path)
+	}
+	// 0711 lets a sandbox enter a judging directory whose path it was handed,
+	// while leaving it unable to list the root and discover anyone else's.
+	if err := os.Chmod(path, 0o711); err != nil {
+		return fmt.Errorf("%s: %w", path, err)
+	}
+	return nil
 }
