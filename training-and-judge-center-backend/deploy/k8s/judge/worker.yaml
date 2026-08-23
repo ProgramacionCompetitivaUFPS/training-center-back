@@ -23,14 +23,25 @@ spec:
           value: "true"
           effect: NoSchedule
       volumes:
+        # Both sizeLimits bound the blast radius rather than any single judging:
+        # going over one EVICTS THE POD, judgings in flight and all, so they are
+        # deliberately far above what is needed. Together they stay well under
+        # the node's ~42Gi of usable ephemeral storage.
         - name: dind-storage
-          emptyDir: {}
+          # The four judge images are ~920MB on disk; the rest is the writable
+          # layer of up to ten live containers, plus room for the images to grow.
+          emptyDir:
+            sizeLimit: 20Gi
         # Where the contestant's output and the test case input live, so they
         # never travel through the worker. Disk-backed on purpose: never add
         # medium: Memory, whose pages are charged to the sandbox's cgroup and
         # cannot be reclaimed, silently shrinking the contestant's memory limit.
         - name: judging
-          emptyDir: {}
+          # 5 concurrent judgings hold ~360MiB: an input under its 64MiB cap, an
+          # output under its 8MiB one, and the memory reading. The rest absorbs
+          # directories a failed Close would leave behind.
+          emptyDir:
+            sizeLimit: 2Gi
       initContainers:
         - name: dind
           image: docker:27-dind
