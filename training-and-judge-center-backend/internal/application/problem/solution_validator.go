@@ -16,14 +16,15 @@ const (
 // SolutionValidationFailure mirrors judge.SolutionFailure — kept as a
 // separate local type so this package never imports application/judge.
 type SolutionValidationFailure struct {
-	FileKey     string
-	Kind        SolutionFailureKind
-	CompileLog  string
-	TestCase    string
-	TimeMs      int
-	TimeLimitMs int
-	Expected    []byte
-	Actual      []byte
+	FileKey        string
+	Kind           SolutionFailureKind
+	CompileLog     string
+	TestCase       string
+	TimeMs         int
+	TimeLimitMs    int
+	Expected       []byte
+	Actual         []byte
+	CheckerMessage string
 }
 
 type SolutionValidationResult struct {

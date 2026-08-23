@@ -32,14 +32,15 @@ func (v *SolutionValidator) Validate(ctx context.Context, problemID string) (*ap
 	}
 	if out.Failure != nil {
 		result.Failure = &appProblem.SolutionValidationFailure{
-			FileKey:     out.Failure.FileKey,
-			Kind:        appProblem.SolutionFailureKind(out.Failure.Kind),
-			CompileLog:  out.Failure.CompileLog,
-			TestCase:    out.Failure.TestCase,
-			TimeMs:      out.Failure.TimeMs,
-			TimeLimitMs: out.Failure.TimeLimitMs,
-			Expected:    out.Failure.Expected,
-			Actual:      out.Failure.Actual,
+			FileKey:        out.Failure.FileKey,
+			Kind:           appProblem.SolutionFailureKind(out.Failure.Kind),
+			CompileLog:     out.Failure.CompileLog,
+			TestCase:       out.Failure.TestCase,
+			TimeMs:         out.Failure.TimeMs,
+			TimeLimitMs:    out.Failure.TimeLimitMs,
+			Expected:       out.Failure.Expected,
+			Actual:         out.Failure.Actual,
+			CheckerMessage: out.Failure.CheckerMessage,
 		}
 	}
 	return result, nil

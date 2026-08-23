@@ -181,7 +181,11 @@ func buildValidationReport(result *SolutionValidationResult) ValidationReport {
 	case SolutionFailureWrongAnswer:
 		tc.Expected = string(f.Expected)
 		tc.Actual = string(f.Actual)
+		tc.Details = f.CheckerMessage
 		logs = append(logs, fmt.Sprintf("  Expected: %s", f.Expected), fmt.Sprintf("  Got: %s", f.Actual))
+		if f.CheckerMessage != "" {
+			logs = append(logs, "  Checker: "+f.CheckerMessage)
+		}
 	case SolutionFailureTimeLimitExceeded:
 		timeLimit := f.TimeLimitMs
 		tc.TimeLimit = &timeLimit

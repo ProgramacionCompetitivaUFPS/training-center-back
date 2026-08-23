@@ -44,14 +44,15 @@ func truncatePreview(data []byte) []byte {
 // SolutionFailure describes the first problem ValidateSolutionsUseCase found,
 // across every solution it tried. Only the fields relevant to Kind are set.
 type SolutionFailure struct {
-	FileKey     string
-	Kind        FailureKind
-	CompileLog  string // set only when Kind == FailureCompileError
-	TestCase    string // set for every kind except FailureCompileError
-	TimeMs      int    // set only when Kind == FailureTimeLimitExceeded
-	TimeLimitMs int    // set only when Kind == FailureTimeLimitExceeded
-	Expected    []byte // set only when Kind == FailureWrongAnswer
-	Actual      []byte // set only when Kind == FailureWrongAnswer
+	FileKey        string
+	Kind           FailureKind
+	CompileLog     string // set only when Kind == FailureCompileError
+	TestCase       string // set for every kind except FailureCompileError
+	TimeMs         int    // set only when Kind == FailureTimeLimitExceeded
+	TimeLimitMs    int    // set only when Kind == FailureTimeLimitExceeded
+	Expected       []byte // set only when Kind == FailureWrongAnswer
+	Actual         []byte // set only when Kind == FailureWrongAnswer
+	CheckerMessage string // why the checker rejected; set only when Kind == FailureWrongAnswer
 }
 
 type ValidateSolutionsOutput struct {
@@ -233,11 +234,12 @@ func (uc *ValidateSolutionsUseCase) checkSolution(ctx context.Context, sol Solut
 			}
 			if !checkResult.Accepted {
 				return &SolutionFailure{
-					FileKey:  sol.FileKey,
-					Kind:     FailureWrongAnswer,
-					TestCase: tc.Name,
-					Expected: truncatePreview(tc.ExpectedOutput),
-					Actual:   truncatePreview(runResult.OutputPreview),
+					FileKey:        sol.FileKey,
+					Kind:           FailureWrongAnswer,
+					TestCase:       tc.Name,
+					Expected:       truncatePreview(tc.ExpectedOutput),
+					Actual:         truncatePreview(runResult.OutputPreview),
+					CheckerMessage: checkResult.Message,
 				}, nil
 			}
 		default:
