@@ -3,9 +3,10 @@
 // delimited tokens. It runs inside a sandbox container, so the outputs never
 // have to travel through the worker just to be compared.
 //
-// It takes the same three file arguments as a custom checker (input, expected,
-// contestant) even though the input is unused, so every checker — custom or
-// default — is invoked exactly the same way.
+// It takes the same three file arguments as a custom checker, in testlib's
+// order — the input, the contestant's output, the jury's answer — so every
+// checker, custom or default, is invoked exactly the same way. The input is
+// never read.
 package main
 
 import (
@@ -33,50 +34,50 @@ func main() {
 
 func run(args []string, stderr io.Writer) int {
 	if len(args) != 3 {
-		fmt.Fprintln(stderr, "usage: compare <input> <expected> <contestant>")
+		fmt.Fprintln(stderr, "usage: compare <input> <output> <answer>")
 		return exitFailure
 	}
 
-	expected, closeExpected, err := openTokens(args[1])
+	contestant, closeContestant, err := openTokens(args[1])
 	if err != nil {
-		fmt.Fprintf(stderr, "reading expected output: %v\n", err)
-		return exitFailure
-	}
-	defer closeExpected()
-
-	contestant, closeContestant, err := openTokens(args[2])
-	if err != nil {
-		fmt.Fprintf(stderr, "reading contestant output: %v\n", err)
+		fmt.Fprintf(stderr, "reading the contestant's output: %v\n", err)
 		return exitFailure
 	}
 	defer closeContestant()
+
+	answer, closeAnswer, err := openTokens(args[2])
+	if err != nil {
+		fmt.Fprintf(stderr, "reading the jury's answer: %v\n", err)
+		return exitFailure
+	}
+	defer closeAnswer()
 
 	for position := 1; ; position++ {
 		// Both are advanced every iteration, deliberately without short-circuiting:
 		// knowing whether the contestant still has tokens is what detects a count
 		// mismatch, so this must not become a && .
-		expOK, conOK := expected.Scan(), contestant.Scan()
+		conOK, ansOK := contestant.Scan(), answer.Scan()
 
-		if err := expected.Err(); err != nil {
-			fmt.Fprintf(stderr, "reading expected output: %v\n", err)
+		if err := contestant.Err(); err != nil {
+			fmt.Fprintf(stderr, "reading the contestant's output: %v\n", err)
 			return exitFailure
 		}
-		if err := contestant.Err(); err != nil {
-			fmt.Fprintf(stderr, "reading contestant output: %v\n", err)
+		if err := answer.Err(); err != nil {
+			fmt.Fprintf(stderr, "reading the jury's answer: %v\n", err)
 			return exitFailure
 		}
 
 		switch {
-		case !expOK && !conOK:
+		case !conOK && !ansOK:
 			return exitAccepted
-		case expOK != conOK:
+		case conOK != ansOK:
 			// Reports the position but never the token itself. CheckResult.Message
 			// is discarded today, but surfacing a checker's message is the natural
 			// thing to add later, and keeping values out means that can be done
-			// without leaking the expected output.
+			// without leaking the jury's answer.
 			fmt.Fprintf(stderr, "token count mismatch at position %d\n", position)
 			return exitRejected
-		case expected.Text() != contestant.Text():
+		case contestant.Text() != answer.Text():
 			fmt.Fprintf(stderr, "token mismatch at position %d\n", position)
 			return exitRejected
 		}

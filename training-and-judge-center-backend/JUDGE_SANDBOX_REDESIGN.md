@@ -970,6 +970,19 @@ No es cosmético, porque testlib trata los dos archivos con semánticas distinta
 
 **Se corrigió en el Paso 5**, que reescribe esa misma línea de invocación, y **se actualizó el spec** en el mismo commit para que no quede documentación contradiciendo al código — la misma deriva que el Paso 3 tuvo que cerrar con `Solution.java`. Sin riesgo sobre datos productivos: por D12 todo el pipeline es de esta rama y nunca se mergeó.
 
+### `compare` quedó con el orden que el Paso 5 invirtió — ✅ RESUELTO en el Paso 0 del Paso 7
+
+Encontrado al cargar el contexto del Paso 7, y es el mismo bug de arriba visto desde el otro archivo. `cmd/compare/main.go` se escribió en el **Paso 1**, cuando la invocación todavía era `(input, salida esperada, salida del concursante)`, y leía `args[1]` como la respuesta del jurado y `args[2]` como la del concursante. El **Paso 5** invirtió los dos últimos para seguir a testlib, pero `compare` no se tocó porque **nadie lo invoca todavía** — su primer llamador llega recién con la mudanza de la comparación por tokens al pool liviano.
+
+Su comentario de cabecera afirmaba que tomaba *"the same three file arguments as a custom checker (input, expected, contestant)"*: cierto cuando se escribió, falso dos pasos después.
+
+**Inofensivo hoy, y por eso peligroso.** La comparación por tokens es simétrica, así que intercambiar los dos archivos no cambia el veredicto ni el mensaje: cableado tal cual habría funcionado, con los tests en verde y el nombre equivocado adentro. Se rompe el día que `compare` se vuelva asimétrico, que es justo la mejora que su propio código anticipa (*"surfacing a checker's message is the natural thing to add later"*) y que su test de filtración ya custodia — sobre el archivo equivocado.
+
+**Se arregló antes de empezar el Paso 7 y no dentro de él**, para que no desapareciera dentro de un diff de una docena de archivos. Se arregla `compare` y no la invocación: la invocación sigue a testlib, que es el estándar y que el Paso 5 fijó a propósito.
+
+**Lo que lo hace verificable no es el veredicto sino el mensaje de error**, que nombra *qué* archivo no se pudo leer. Sobre esa asimetría se escribió el test que fija el orden; el veredicto, por simétrico, no puede fijarlo. Tres controles corrigieron el camino hasta ahí, y el tercero es el que vale: la primera versión del test usaba `strings.Contains(msg, "contestant")` y **pasaba con el bug puesto**, porque `t.TempDir()` nombra el directorio temporal con el nombre del subtest y la palabra buscada aparecía en la ruta del archivo faltante. Un test que pasa por el motivo equivocado. Se cerró con `HasPrefix`.
+
+
 ### El pool pesado le da a Python la mitad de la memoria que la plataforma promete — ✅ RESUELTO en D14
 
 Encontrado en el Paso 5, al revisar de dónde salían los tamaños del YAML. **Arreglado en D14**: `python310` pasa a 2 GiB en `pools.heavy`. Se deja el diagnóstico completo abajo porque explica por qué el techo del pool y `maxMemoryLimitGlobal` son el mismo número visto desde dos archivos.
