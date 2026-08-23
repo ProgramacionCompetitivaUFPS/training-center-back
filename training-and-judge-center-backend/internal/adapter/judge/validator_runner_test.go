@@ -94,7 +94,7 @@ func TestValidatorSession_Validate_RunsTheArtifactOnTheInput(t *testing.T) {
 	if len(cmds) != 1 || len(cmds[0]) != 3 || cmds[0][0] != "sh" || cmds[0][1] != "-c" {
 		t.Fatalf("expected one command through sh -c, got: %v", cmds)
 	}
-	want := "timeout --kill-after=1s 30s /sandbox/Validator < /sandbox/input.txt"
+	want := "timeout -k 1 30 /sandbox/Validator < /sandbox/input.txt"
 	if cmds[0][2] != want {
 		t.Errorf("run command: got %q, want %q", cmds[0][2], want)
 	}

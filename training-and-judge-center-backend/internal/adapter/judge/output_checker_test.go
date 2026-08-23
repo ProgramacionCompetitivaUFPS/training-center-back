@@ -130,7 +130,7 @@ func TestOutputChecker_BeginChecking_NoCheckerPathClaimsTheCompareLanguage(t *te
 	if len(copied) != 1 || copied[0] != "answer.txt" {
 		t.Errorf("files copied into the container: got %v, want only answer.txt", copied)
 	}
-	want := "timeout --kill-after=1s 30s /usr/local/bin/compare " +
+	want := "timeout -k 1 30 /usr/local/bin/compare " +
 		judgingInputPath(dir) + " " + judgingOutputPath(dir) + " /sandbox/answer.txt"
 	if len(cmds) != 1 || cmds[0][2] != want {
 		t.Errorf("run command: got %v, want %q", cmds, want)
@@ -178,7 +178,7 @@ func TestCheckerSession_Check_ReadsTheVolumeAndPassesTestlibOrder(t *testing.T) 
 	if len(cmds) != 1 || len(cmds[0]) != 3 || cmds[0][0] != "sh" || cmds[0][1] != "-c" {
 		t.Fatalf("expected one command through sh -c, got: %v", cmds)
 	}
-	want := "timeout --kill-after=1s 30s /sandbox/Checker " +
+	want := "timeout -k 1 30 /sandbox/Checker " +
 		judgingInputPath(dir) + " " + judgingOutputPath(dir) + " /sandbox/answer.txt"
 	if cmds[0][2] != want {
 		t.Errorf("run command: got %q, want %q", cmds[0][2], want)

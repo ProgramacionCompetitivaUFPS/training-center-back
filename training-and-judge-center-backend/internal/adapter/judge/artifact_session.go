@@ -63,7 +63,7 @@ func (s *artifactSession) run(ctx context.Context, cmd string) (int, string, err
 	defer cancel()
 
 	execRes, err := s.docker.ExecCreate(safetyCtx, s.container.ID(), client.ExecCreateOptions{
-		Cmd:          []string{"sh", "-c", fmt.Sprintf("timeout --kill-after=1s %ds %s", artifactRunSecs, cmd)},
+		Cmd:          []string{"sh", "-c", fmt.Sprintf("timeout -k 1 %d %s", artifactRunSecs, cmd)},
 		AttachStdout: true,
 		AttachStderr: true,
 	})
