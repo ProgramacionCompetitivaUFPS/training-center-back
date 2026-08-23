@@ -1184,7 +1184,53 @@ Al medirlo apareció además un dato que explica otra cosa: **Go 1.25 nunca baja
 Kubernetes clasifica la QoS de un pod mirando **todos** sus containers, **init containers incluidos**. El `prepull-language-images` de `worker.yaml` no tiene bloque `resources` en absoluto, así que el pod queda **Burstable** —de los primeros en ser desalojado bajo presión de memoria del nodo— por más que dind y worker declaren `requests == limits`.
 
 Es el renglón que decide si el resto del cambio de D14 sirve. Arreglado ahí, con `200m / 256Mi`.
+
+### El judge leía la clave de casos de prueba como si fuera el ZIP — ✅ RESUELTO en el Paso 8
+
+Encontrado al ejecutar la Fase 8, en el primer publish real: terminó en `SYSTEM_ERROR` con `test_case_provider: ZIP not found in GCS key=problems/a-mas-b/testcases/<uuid>`, aunque la subida había respondido `200` y `testCases: true`.
+
+**`test_cases_key` significaba dos cosas distintas.** La subida deja el ZIP en `{prefijo}/testcases.zip` y, al lado, cada archivo de sample extraído; lo que persiste en el problema es **el prefijo**. El lector del judge lo pasaba tal cual a `readObject`, o sea que buscaba un objeto con el nombre del directorio.
+
+| Quién | Qué asumía |
+|---|---|
+| `upload_files.go` (subida) | prefijo |
+| `import_problem.go` (import ICPC) | prefijo |
+| `upload_files.go` — `cleanupPrefix` al reemplazar | prefijo |
+| `delete_file.go` — `deleteByPrefix = true` | prefijo |
+| `delete_problem.go` — `DeleteFilesWithPrefix` | prefijo |
+| `submission/problem_provider.go` | sólo chequea `nil`; indiferente |
+| **`test_case_provider.go`** | **el objeto ZIP** ← el único |
+
+**Alcance**: los tres caminos del judge pasan por ese lector — `judge_submission.go` (submissions reales), `prepare_judging.go` y `validate_solutions.go`. O sea que **ningún problema subido por la API fue nunca juzgable**, ni al publicar ni al enviar una submission. No lo introdujo este rediseño: el lector viene de `88c7562`, que ya está en `develop`.
+
+**Por qué ningún test lo agarraba, que es la parte que más enseña.** `TestGetTestCases_WithZIP` existía y aseveraba exactamente la clave que se le pasa a `readObject` — pero fabricaba `key := "problems/abc/tests.zip"`, una clave **con forma de objeto ZIP que ningún escritor produce**, y después verificaba que el lector la usara literal. El test no era ciego al bug: lo fijaba. Es la misma trampa que este documento viene registrando —un test que compara contra una constante inventada por él mismo—, acá con el agravante de que la constante inventada tiene una forma que la producción nunca genera.
+
+**El arreglo**: `TestCasesZipKey(prefix)` en `internal/application/problem/test_cases_storage.go` nombra la relación una sola vez, y la usan los dos escritores y el lector. El literal `testcases.zip` queda en un único lugar del código. `adapter/judge` pasa a importar `application/problem`, que la tabla de dependencias de `ARCHITECTURE.md` (§3) permite explícitamente y que ya hacen `adapter/submission`, `adapter/contest` y `adapter/queue`.
+
+**Se descartó un fallback en el lector** (probar el ZIP y, si no está, la clave pelada): taparía exactamente esta clase de desacuerdo la próxima vez.
+
+**Verificado por mutación**, tres, cada una con build limpio:
+
+| Mutación | Tests en rojo |
+|---|---|
+| el helper devuelve el prefijo pelado — el bug original, exacto | el del lector **y** el del escritor |
+| cambia el nombre del ZIP | los mismos dos |
+| sólo el lector deja de usar el helper | **sólo** el del lector |
+
+La tercera es la que vale: demuestra que las dos mitades del invariante se cubren por separado, y que el test del escritor no puede tapar una regresión del lector.
 ---
+
+### El fuente de la solución se escribía en minúscula contra un YAML en PascalCase — ✅ RESUELTO en el Paso 8
+
+**Lo introdujo esta rama**, a diferencia del bug anterior. Encontrado en el segundo publish real: `cc1plus: fatal error: /sandbox/Solution.cpp: No such file or directory`.
+
+El Paso 3, decisión #2, cambió el nombre convenido de `solution` a `Solution` y actualizó `judge_config.yaml` — pero no el único lugar de Go que escribe ese archivo, `Session.Compile`, que seguía armando `buildTar("solution."+Extension, ...)`. En `develop` los dos lados coinciden en minúscula; en esta rama el YAML quedó en PascalCase y Go en minúscula.
+
+**Rompía los tres lenguajes, o sea el judge entero**: `cpp20` y `java17` en el `compileCmd`, y `python310` —que no compila— en el `runCmd: python3 /sandbox/Solution.py`. Ninguna solución podía compilarse ni ejecutarse, y habría entrado al PR: la suite pasaba en verde porque los tests del adapter mockean Docker y aseveran **el comando**, nunca que el archivo exista.
+
+**El arreglo**: `SolutionBaseName` en `internal/adapter/judge/session.go`, usado en el call site, más una guarda en `cmd/worker/config_test.go` que exige que el `compileCmd`/`runCmd` de todo lenguaje con `runCmd` nombre ese mismo identificador. Es la frontera Go↔YAML que ningún test cruzaba, con el precedente de las dos guardas sobre la config despachada del Paso 6.
+
+**Lo que NO se hizo, candidato para A3.** La causa raíz es una asimetría: los artefactos tienen el token `{name}` en sus cuatro campos —el mecanismo que el Paso 3 construyó justamente para que no exista una tabla desincronizable—, y las soluciones no. Extenderlo (`compileCmd: "g++ ... /sandbox/{name}.cpp"` con `{name}` = `Solution`) elimina la duplicación en vez de custodiarla, a costa de una regla de arranque nueva y de tocar el wiring de `LanguageExecConfig`. Se eligió la guarda por presupuesto de sesión, con el bug ya en el camino crítico.
 
 ## Plan de ejecución
 
@@ -2236,6 +2282,33 @@ Sobre el parser (5): campos intercambiados en el constructor; se cae la rama del
 | `RUNNER_ARCHITECTURE.md` | `syntaxCheckCmd` no existe en el código, dice `pypy3` por `python3`, y `Solution.java` con otra caja |
 | La convención de nombres de clase Java (`Solution`/`Checker`/`Validator`) | No está escrita en ningún lado |
 | La mención muerta a `tokenCompare` en el test de `cmd/compare` | Una línea |
+
+**A5 — El `BackendConfig` del Ingress: la respuesta del publish se corta a los 30 s. — PENDIENTE**
+
+Es la otra cosa que sobrevivía de la Fase 5 —junto con el runbook de la cola `submissions`— y **no se implementó**. `grep` sobre `deploy/` y `.github/`: no existe ningún `BackendConfig` en el repositorio, así que el balanceador de GCP le aplica al Service `api` su timeout por defecto de **30 s**.
+
+**No bloquea la Fase 8, y conviene dejar escrito por qué**, porque el encuadre natural —*"el publish bloquea la conexión mientras el judge valida, así que sin esto no se puede probar"*— es falso. Verificado siguiendo la cadena entera:
+
+| Dónde | Qué hace |
+|---|---|
+| `PublishProblemUseCase.Execute` | **No bloquea**: chequea permisos y los cinco campos, crea el ticket de validación, lo encola y devuelve el `ValidationID` |
+| `publish_handler.go` | Acá está el bloqueo, y es sólo del handler: `awaitProblemValidation.Execute` |
+| `AwaitProblemValidationUseCase` | Poll cada **750 ms**, timeout de **9 min** (`defaultAwaitPollInterval` / `defaultAwaitPollTimeout`) |
+| `ValidateProblemUseCase` | **`MarkPublished` corre en el worker**, en la misma transacción que marca el ticket `PASSED` |
+
+O sea que **el worker publica el problema, no el handler HTTP**: el handler sólo mira desde afuera, y su propio comentario lo dice (*"The worker keeps working regardless of whether anyone is still waiting"*). Si el balanceador corta a los 30 s, lo único que se pierde es **ver el reporte por esa conexión** — la validación sigue, el problema se publica igual, y `GET /problems/p/{slug}/validation` lo cuenta sin bloquear. Y volver a llamar al publish es seguro: `FindLatestByProblemID` reusa la validación en vuelo en vez de encolar otra.
+
+**Lo que sí cuesta, y por eso hay que arreglarlo antes del PR**: un problem setter recibe un 504 del balanceador y **no puede saber si su problema se publicó o no** sin consultar otro endpoint. El reporte de validación —los logs, los casos que fallaron, los errores de compilación— es exactamente lo que el publish existe para devolver, y hoy sólo llega si la validación entera termina en menos de 30 s.
+
+**Qué hacer, con los valores concretos:**
+
+1. Crear `deploy/k8s/ingress/backendconfig.yaml` — un `BackendConfig` (`cloud.google.com/v1`) llamado `api-timeout`, en el namespace `training-center`, con `spec.timeoutSec: 600`. La ruta y el número los fija la Fase 5 del roadmap.
+2. Referenciarlo desde el Service `api` (`deploy/k8s/app/api.yaml`), que ya tiene bloque de anotaciones junto al `cloud.google.com/neg`: `cloud.google.com/backend-config: '{"default": "api-timeout"}'`.
+3. **Aplicarlo a mano**: el workflow de deploy no aplica manifests, sólo corre migraciones, aplica el ConfigMap `judge-images` y hace `set image`.
+
+**Los 600 s son el número correcto, y no por casualidad**: el handler se rinde solo a los **540 s** y devuelve un `503` con `ErrCodeValidationTimedOut` y un mensaje que le dice al setter que vuelva más tarde. El timeout del balanceador tiene que **sobrevivir** al de la aplicación, o el usuario nunca llega a recibir ese 503 y el modo de falla vuelve a ser un corte mudo. Los 600 dejan 60 s de margen. Un valor por debajo de 540 sería peor que inútil.
+
+**Lo que NO está verificado**: que el backend esté efectivamente en los 30 s. Es el default documentado de GCP y lo que anotó la Fase 1 del roadmap, pero **nadie lo leyó de este cluster**. Se confirma con `gcloud compute backend-services list` y `describe <nombre> --global`, mirando `timeoutSec`. Ese mismo comando es después la verificación de que el cambio surtió efecto: el Ingress de GKE reconcilia los `BackendConfig` de forma asíncrona, así que **aplicar el manifiesto no prueba que el balanceador ya cambió**.
 
 #### B · Después de probado y mergeado
 
