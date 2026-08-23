@@ -142,7 +142,7 @@ func (uc *ImportProblemUseCase) Execute(ctx context.Context, input ImportProblem
 	if pkg.ZipData != nil {
 		uploadInstanceID := uuid.New().String()
 		basePath := fmt.Sprintf("problems/%s/%s/%s", slug.String(), FileTypeTestCases, uploadInstanceID)
-		zipKey := fmt.Sprintf("%s/testcases.zip", basePath)
+		zipKey := TestCasesZipKey(basePath)
 
 		if err := uc.storage.UploadFile(ctx, zipKey, pkg.ZipData); err != nil {
 			cleanup()

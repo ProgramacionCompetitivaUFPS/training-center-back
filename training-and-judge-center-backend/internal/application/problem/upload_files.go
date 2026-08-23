@@ -158,7 +158,7 @@ func (uc *UploadProblemFilesUseCase) handleTestCases(ctx context.Context, p *pro
 
 	uploadInstanceID := uuid.New().String()
 	basePath := fmt.Sprintf("problems/%s/%s/%s", p.Slug().String(), FileTypeTestCases, uploadInstanceID)
-	zipKey := fmt.Sprintf("%s/testcases.zip", basePath)
+	zipKey := TestCasesZipKey(basePath)
 
 	allNewKeys := make([]string, 0, len(sampleFiles)+1)
 	allNewKeys = append(allNewKeys, zipKey)
