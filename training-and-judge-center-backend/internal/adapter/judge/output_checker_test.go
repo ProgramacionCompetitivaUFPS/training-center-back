@@ -83,14 +83,28 @@ func TestOutputChecker_BeginChecking_InjectsTheArtifactExecutable(t *testing.T) 
 	}
 }
 
-// A problem without a custom checker is most of the traffic, and token
-// comparison still runs in the worker, so claiming a light pool container for it
-// would tie one up per judging for nothing. Step 3 turns this branch into a
-// claim of the compare language.
-func TestOutputChecker_BeginChecking_NoCheckerPathClaimsNoContainer(t *testing.T) {
+// A problem without a custom checker is most of the traffic. It runs our own
+// comparison binary in a light pool container of its own language, with no
+// artifact to download or inject: the binary already ships inside the image.
+func TestOutputChecker_BeginChecking_NoCheckerPathClaimsTheCompareLanguage(t *testing.T) {
+	var cmds [][]string
+	downloads := 0
+	var copied []string
+	docker := &mockDockerExecClient{
+		copyToContainerFn: func(_ context.Context, _ string, opts client.CopyToContainerOptions) (client.CopyToContainerResult, error) {
+			name, _, _ := firstTarEntryMode(t, opts.Content)
+			copied = append(copied, name)
+			return client.CopyToContainerResult{}, nil
+		},
+	}
+	recordExecs(docker, &cmds)
+	reader := &mockGCSReader{readObjectFn: func(context.Context, string) (io.ReadCloser, error) {
+		downloads++
+		return io.NopCloser(strings.NewReader("ELF binary")), nil
+	}}
 	root := t.TempDir()
-	c, poolDocker := newTestOutputChecker(t, &mockDockerExecClient{}, storedArtifact("ELF binary"), root)
-	layOutJudgingDir(t, root, "42")
+	c, poolDocker := newTestOutputChecker(t, docker, reader, root)
+	dir := layOutJudgingDir(t, root, "42")
 
 	session, err := c.BeginChecking(context.Background(), "", submission.Language{}, testJudgingID)
 	if err != nil {
@@ -98,15 +112,28 @@ func TestOutputChecker_BeginChecking_NoCheckerPathClaimsNoContainer(t *testing.T
 	}
 	defer session.Close(context.Background())
 
-	result, err := session.Check(context.Background(), []byte("42\n"))
-	if err != nil {
+	if _, err := session.Check(context.Background(), []byte("42\n")); err != nil {
 		t.Fatalf("Check: %v", err)
 	}
-	if !result.Accepted {
-		t.Error("expected matching tokens to be accepted")
+
+	if got := poolDocker.idCounter.Load(); got != 1 {
+		t.Errorf("expected one compare container, the pool created %d", got)
 	}
-	if got := poolDocker.idCounter.Load(); got != 0 {
-		t.Errorf("expected no container to be claimed, the pool created %d", got)
+	if got := poolDocker.lastCreateImage.Load(); got != "judge-runner:compare" {
+		t.Errorf("image: got %v, want the compare image", got)
+	}
+	if downloads != 0 {
+		t.Errorf("storage was read %d times; the compare binary is not an artifact", downloads)
+	}
+	// Only the jury answer travels through the API: the comparison binary is
+	// already in the image, so nothing is injected for it.
+	if len(copied) != 1 || copied[0] != "answer.txt" {
+		t.Errorf("files copied into the container: got %v, want only answer.txt", copied)
+	}
+	want := "timeout --kill-after=1s 30s /usr/local/bin/compare " +
+		judgingInputPath(dir) + " " + judgingOutputPath(dir) + " /sandbox/answer.txt"
+	if len(cmds) != 1 || cmds[0][2] != want {
+		t.Errorf("run command: got %v, want %q", cmds, want)
 	}
 }
 

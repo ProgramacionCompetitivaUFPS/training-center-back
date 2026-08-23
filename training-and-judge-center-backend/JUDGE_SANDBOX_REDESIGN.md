@@ -749,6 +749,8 @@ Ninguno bloquea el diseño; son elecciones que conviene hacer con el código del
 - ~~**`maxOutputBytes`**: hoy 64 MiB.~~ **Resuelto en el Paso 5**: bajó a 8 MiB. Con D7 además deja de presionar al worker, pero sigue acotando cuánto disco del `emptyDir` puede consumir un judging.
 - **Los otros dos archivos que lee el checker no están acotados por `maxOutputBytes`** (encontrado en el Paso 5, sin resolver). Bajar ese límite acota la salida **del concursante**, pero el checker recibe tres archivos, y el input y la salida esperada salen de `parseTestCasesZip` (`internal/adapter/judge/test_case_provider.go`), que tiene **su propio tope, independiente y quemado como literal**: `io.ReadAll(io.LimitReader(rc, 64*1024*1024))`. O sea que un problem setter que sube un `.ans` de 60 MiB hace OOM al container del pool liviano igual, y el dimensionamiento de D13 no lo cubre. Es un camino mucho más raro que el del concursante —lo controla el setter, y el publish lo agarraría antes que una competencia— pero el número está donde nadie lo va a ver. Al encararlo hay que decidir **dos cosas distintas**: cuál es el tope por archivo de caso de prueba, y si vive junto a `maxOutputBytes` en vez de suelto en el parser del ZIP. Ojo con la asimetría al elegirlo: el pico de memoria del checker escala con la **suma** de los tres archivos, no con el mayor.
 
+  > **Corregido al medirlo en el commit 3**: eso vale para un checker **personalizado**, que lee los archivos enteros. Para `compare` —el camino por defecto, o sea la mayoría del tráfico— es falso: streamea, nunca abre el input, y su memoria sigue al **token más grande** y no al tamaño de los archivos. Ver el punto 14 del Paso 7.
+
   **Y toca también al worker, no solo al container.** El Paso 5 cambia dónde viven esos bytes: hoy `customCheckerCompare` escribe los tres archivos a un directorio temporal **en disco**, y el adapter nuevo los empaqueta en un **tar en memoria** (`buildTar` arma un `bytes.Buffer`) para copiarlos por la API de Docker. Sumado a que `GetTestCases` ya trae **todos** los casos de prueba a memoria de una vez, el worker —que tiene `limits.memory: 512Mi`— queda expuesto a datos que solo el problem setter acota. El Paso 7 se lleva la salida del concursante al volumen compartido, pero **no** el input ni la salida esperada, así que este ítem le sobrevive.
 - ~~**Qué reportar como KB consumidos**~~ **Diseñado y verificado; ejecuta en el Paso 7** (ver ahí la sección de A5). El veredicto de MLE queda correcto porque lo hace cumplir el kernel, pero el número que se muestra sale de `MaxUsage`, que **en cgroup v2 viene en cero**. La medición correcta es el `ru_maxrss` del proceso, con `/usr/bin/time` por fuera del `timeout`.
 - **Un checker roto se reporta como wrong answer del concursante** (encontrado en el Paso 5, decidido dejarlo así). El adapter trata **cualquier** exit distinto de cero como rechazo, con el stderr como mensaje — igual que `ValidatorSession.Validate` desde el Paso 4. Eso mete dos casos ajenos en la misma bolsa:
@@ -801,7 +803,7 @@ Ninguno bloquea el diseño; son elecciones que conviene hacer con el código del
 - **Un tope por archivo individual de caso de prueba**, separado del total. Hoy solo existe el total (`maxFileSizeTestCaseMB`, 100 MB tras D14), aplicado además como tope por archivo, así que **un solo archivo puede ocupar los 100 MB completos**. Eso importa por dos motivos distintos que conviene no mezclar:
 
   - **Para el worker**, es lo que hace que el streaming de casos de prueba no sirva: convertir `O(suma)` en `O(caso mayor)` no ayuda si un archivo es el 99% del peso, que es exactamente la forma de los paquetes BOCA (28.75 de 28.8 MB en el problema B).
-  - **Para el container del pool liviano**, es el ítem que ya estaba anotado más arriba: el pico de memoria del checker escala con la **suma** de los tres archivos que recibe, y `maxOutputBytes` solo acota uno de ellos.
+  - **Para el container del pool liviano**, es el ítem que ya estaba anotado más arriba: el pico de un checker **personalizado** escala con la **suma** de los tres archivos que recibe, y `maxOutputBytes` solo acota uno de ellos. Para `compare` no aplica (ver el punto 14 del Paso 7).
 
   Un valor razonable con los datos reales sería ~32 MB (cubre los 28.75 con margen), pero hay que decidirlo mirando los dos consumidores a la vez, y decidir también **dónde vive** — hoy el tope del parser está quemado como literal (`io.ReadAll(io.LimitReader(rc, 64*1024*1024))` en `test_case_provider.go`), desincronizado de la config.
 
@@ -1746,8 +1748,8 @@ Salió de cargar el contexto con el código delante, y cada uno deja el proyecto
 |---|---|---|
 | 0 | el orden de los argumentos de `compare` | ✅ |
 | 1 | la plomería del volumen | ✅ |
-| 2 | el corazón: la salida deja de pasar por el worker | |
-| 3 | la comparación por tokens al pool liviano | |
+| 2 | el corazón: la salida deja de pasar por el worker | ✅ |
+| 3 | la comparación por tokens al pool liviano | ✅ |
 | 4 | A5: la memoria consumida se mide de verdad | |
 | 5 | el veredicto `OUTPUT_LIMIT_EXCEEDED` | |
 
@@ -1828,6 +1830,37 @@ O sea que del commit 2 el ahorro de **memoria** lo trae la salida, y el de **CPU
 
 **No hace falta el volumen para conseguirlo**: el ZIP trae el tamaño descomprimido en su header y `buildTar` sólo necesita el tamaño por adelantado, así que una variante que reciba un `io.Reader` más el tamaño deja pasar la respuesta del jurado por la API igual de sin-materializar. El streaming y el destino son decisiones independientes. **Queda para evaluar al terminar el paso.**
 
+**13. `compare` declara su comando en el YAML, contra lo que D10 decía (commit 3).** D10 fija que *"`compare` aparece en `languages` con solo una imagen y ningún comando"*, y esa línea quedó desactualizada: se escribió antes de que existiera el mecanismo de invocación. Poner `/usr/local/bin/compare` en Go reintroduce exactamente lo que D9 sacó del código — lógica por lenguaje. Con `artifactRun: "/usr/local/bin/compare"` la maquinaria existente lo corre sin ninguna rama nueva: `withArtifactName` sobre un string sin `{name}` no hace nada, y las reglas de arranque que exigen los cuatro campos lo eximen **por construcción**, porque sólo aplican a lenguajes con `runCmd`.
+
+La entrada queda deliberadamente parcial —imagen y `artifactRun`, nada más— y el YAML lo explica en el lugar, que es lo que D10 pedía documentar.
+
+**14. `compare` en el pool liviano son 128 MiB, y el número dejó de ser ilustrativo (commit 3).** Medido contra la imagen real, con el container capado como lo capa el pool:
+
+| | |
+|---|---|
+| salidas de 8 MiB, tokens normales | funciona en **16 MiB** de container |
+| salidas de **64 MiB**, tokens normales | funciona en **16 MiB** |
+| input de 64 MiB | irrelevante: **`compare` nunca abre el input** |
+| un solo token de 8 MiB | 64 MiB sí, 48 MiB **OOM** |
+| un token de 16 MiB o más | **exit 3** en 64 MiB, nunca OOM |
+
+**Lo que esto corrige del documento**: el pendiente del tope por archivo dice que *"el pico de memoria del checker escala con la suma de los tres archivos"*. **Es falso para el camino por defecto**, que es la mayoría del tráfico. `compare` streamea con un buffer de 64 KB, así que su memoria sigue al **token más grande**, no a los archivos — y ese token está acotado por `maxTokenBytes` (16 MiB), una constante nuestra. Sigue siendo cierto para checkers personalizados, que leen los archivos enteros: la medición de D13 era de uno escrito así.
+
+**Consecuencia para el futuro**: si alguna vez sube el tope de la respuesta, hay que redimensionar `cpp20`/`java17`/`python310` del pool liviano y el worker, pero **no `compare`**. Su techo está atado a `maxTokenBytes`, no a la configuración de la plataforma.
+
+Los 128 MiB son 2× el piso medido del peor caso. Bajarlo a 64 no compra nada: el presupuesto liberado no se convierte en concurrencia, que la limita la CPU.
+
+**15. El `exit 3` de `compare` se sigue leyendo como rechazo, y su comentario era el que estaba mal (commit 3).** `cmd/compare` distingue `0/1/3` a propósito y su comentario prometía que pasarse de `maxTokenBytes` *"is reported as a checker failure rather than silently as a wrong answer"*. `CheckerSession.Check` trata cualquier no-cero como rechazo, así que esa promesa era falsa en cuanto se cableara.
+
+Se evaluó distinguirlo y **se descartó por un argumento que apareció al mirarlo**: el tamaño del token lo controla el concursante, y `Check` devolviendo error dispara el **reintento** — o sea que sería un amplificador, tres judgings completos por submission a pedido. Se corrigió el comentario en vez del comportamiento.
+
+**Y de paso se cayó una hipótesis mía**: creí que distinguir el 3 atraparía el montaje roto del volumen. No lo hace — con el montaje roto el archivo existe pero **vacío**, así que `compare` sale con 1, no con 3. Eso sólo lo atrapa la sonda del punto 16.
+
+**16. Dos guardas nuevas (commit 3).**
+
+- **`compare` no puede faltar en la config.** Las reglas existentes no lo cubrían: alguien lo borra de `pools.light.languages` y la config sigue siendo válida, hasta que la primera submission sin checker personalizado falla con `unknown language` — en competencia, en el peor momento. Ahora `validateJudgeConfig` exige que esté declarado con `artifactRun` y dimensionado por el pool liviano.
+- **La sonda de punta a punta del volumen**, que el commit 2 quedó debiendo. Al arrancar, el worker escribe un marcador en el volumen, reclama un container `compare`, lo lee desde adentro y compara. Es lo único que puede ver un `JUDGE_VOLUME_SOURCE` con un valor equivocado. Vive en el paquete del adapter y `main.go` la llama con una línea. Costo: ~220 ms una vez. **Canje aceptado**: el worker pasa a depender de Docker al arrancar, cosa que antes no hacía — en Kubernetes el `startupProbe` del dind ya lo garantiza, en local exige tener las imágenes construidas.
+
 
 #### La entrada del caso de prueba SÍ viaja por el volumen — sub-decisión de D7, resuelta
 
@@ -1851,7 +1884,7 @@ Pierde exactamente el tamaño del archivo. Si alguien declarara el volumen como 
 
 #### Lo demás que este paso arrastra
 
-- **`compare` hay que agregarlo a `languages` Y a `pools.light.languages`** (pendiente desde el Paso 4). Si falta el segundo, `BeginChecking` sin checker personalizado falla con `unknown language` en la primera submission. El presupuesto del pool liviano que fijó D14 ya lo contempla: 6.25 GiB contra los 6.125 que N3 pide con `compare` adentro.
+- ~~**`compare` hay que agregarlo a `languages` Y a `pools.light.languages`**~~ **Hecho en el commit 3**, y el modo de falla que preocupaba —`unknown language` en la primera submission— pasó a ser una regla de arranque (ver el punto 16). El presupuesto del pool liviano que fijó D14 lo contemplaba: 6.25 GiB contra los 6.125 que N3 pide con `compare` adentro.
 - **La apertura de sesión de pool liviano sigue duplicada** entre `OutputChecker.BeginChecking` y `ValidatorRunner.BeginValidating`. El Paso 5 extrajo la mitad de abajo (`artifactSession`) y la descarga (`downloadArtifact`) pero no ésta, porque este paso vuelve a tocar los dos archivos. Mirarla al terminar.
 
 
@@ -1949,7 +1982,13 @@ Fuera de este repo queda el frontend, que muestra los veredictos.
 
 **1. Con qué mecanismo se acota la escritura.** El punto 7 de arriba dice "sale de acotar la escritura en el container" sin decir cómo, y la vía obvia ya está descartada: `| head -c 8M` convierte el exit code del pipeline en el de `head` y rompe la detección de TLE (124) y MLE (137). Un candidato que no tiene ese problema es **`ulimit -f`** dentro del `sh -c`: el kernel manda `SIGXFSZ` al proceso que se pasa del tamaño, lo que da un exit code propio (128+25 = 153) en vez de pisar el del comando, y no introduce ningún pipeline. Hay que verificarlo corriéndolo —incluido qué hace la JVM con esa señal, que es donde esta clase de cosas se rompe— antes de darlo por bueno.
 
-**2. Si 8 MiB sigue siendo el número correcto.** Se eligió en el Paso 5 bajo la restricción de que **el checker tiene que sostener la salida en el pool liviano**, con los picos medidos en D13 (119/162/88 MiB para 8 MiB de salida) y coincidiendo con el default de DOMjudge. Esa restricción **sobrevive a este paso** —el checker sigue leyendo la salida, ahora desde el volumen— pero el número no se volvió a mirar desde entonces, y acá cambia de significado: pasa de ser un tope de lectura interno del worker a ser **un límite real que se le impone al concursante**. Vale re-examinarlo con ese cambio encima.
+**2. ~~Si 8 MiB sigue siendo el número correcto.~~ ✅ RESUELTA en el commit 3: se queda en 8 MiB.** Se volvió a mirar con el cambio de significado encima —pasa de tope de lectura interno del worker a límite real impuesto al concursante— y ahora hay el dato que faltaba: **medido sobre los 12 paquetes reales de la competencia**, la respuesta esperada más grande es la del problema H con **2 068 944 B ≈ 1.97 MiB**; el resto están por debajo de 120 KB. O sea que 8 MiB dan **4× de margen sobre la peor salida correcta real**, y hay un problema que de verdad usa el 25% del límite: no es un número teórico.
+
+Se sostiene por tres razones a la vez: ese 4×, la coincidencia con el default de DOMjudge (`output_limit` 8192 kB), y que es el valor más alto que mantiene cómodos a los checkers **personalizados** con el dimensionamiento actual del pool liviano — a 16 MiB el pico de Python sube a 320 MiB contra un techo de 512 (D13), que es lo que hizo descartar 16 en el Paso 5.
+
+**El caveat**: el margen es 4×, no 100×. Si aparece un problema cuya salida correcta pase de ~2 MiB de forma significativa, éste es el número a revisar, y no se revisa solo — subirlo obliga a redimensionar `cpp20`/`java17`/`python310` en el pool liviano, que sí escalan con el archivo. `compare` no (punto 14).
+
+*(Como control de la medición: el input más grande dio 28.75 MiB en el problema B, exactamente lo que este documento ya tenía anotado por otra vía.)*
 
 ### Paso 8 — Barrido y cierre
 

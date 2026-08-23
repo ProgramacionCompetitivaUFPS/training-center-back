@@ -18,8 +18,9 @@ import (
 
 // maxTokenBytes bounds a single token. strings.Fields, the tokenizer this
 // replaces, had no such limit, so this is set well beyond anything a realistic
-// output reaches; exceeding it is reported as a checker failure rather than
-// silently as a wrong answer.
+// output reaches. Exceeding it exits with exitFailure, which the judge treats
+// like any other non-zero exit — a rejection. Distinguishing it would let a
+// contestant force a retried system error by printing one huge token.
 const maxTokenBytes = 16 << 20
 
 const (

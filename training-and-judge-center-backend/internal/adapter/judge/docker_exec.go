@@ -5,7 +5,9 @@ import (
 	"bytes"
 	"context"
 	"io"
+	"strings"
 
+	"github.com/moby/moby/api/pkg/stdcopy"
 	"github.com/moby/moby/client"
 )
 
@@ -53,4 +55,27 @@ func runAndWait(ctx context.Context, docker dockerExecClient, containerID string
 	_, _ = io.Copy(io.Discard, att.Reader)
 	att.Conn.Close()
 	return nil
+}
+
+// readFileInContainer returns what the sandbox sees at a path, trimmed. Only the
+// shared volume probe needs this: everything else reads files on the worker's
+// own side of the mount.
+func readFileInContainer(ctx context.Context, docker dockerExecClient, containerID, filePath string) (string, error) {
+	execRes, err := docker.ExecCreate(ctx, containerID, client.ExecCreateOptions{
+		Cmd:          []string{"cat", filePath},
+		AttachStdout: true,
+		AttachStderr: true,
+	})
+	if err != nil {
+		return "", err
+	}
+	att, err := docker.ExecAttach(ctx, execRes.ID, client.ExecAttachOptions{})
+	if err != nil {
+		return "", err
+	}
+	defer att.Conn.Close()
+
+	var out, errBuf bytes.Buffer
+	_, _ = stdcopy.StdCopy(&out, &errBuf, att.Reader)
+	return strings.TrimSpace(out.String()), nil
 }

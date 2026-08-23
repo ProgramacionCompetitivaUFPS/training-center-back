@@ -18,6 +18,10 @@ type ExecutorConfig struct {
 // artifact's role name.
 const ArtifactNamePlaceholder = "{name}"
 
+// CompareLanguage is the default checker: not a language anyone writes code in,
+// but a pool entry like any other, whose artifact ships inside its image.
+const CompareLanguage = "compare"
+
 // ArtifactLanguageConfig is how one language's checker or validator is built
 // and run. The two halves belong to different pools: building happens in the
 // heavy one, running in the light one.
