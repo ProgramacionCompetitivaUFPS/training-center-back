@@ -24,14 +24,17 @@ import (
 
 const (
 	maxCompileLogBytes = 10 * 1024
-	// maxOutputBytes is what a checker has to hold in a light pool container;
-	// 64 MiB made every language run out of memory there. Nothing enforces it
-	// yet: step 5 of the shared volume work turns it into a verdict.
+	// maxOutputBytes is the output limit a run is held to, enforced below and
+	// reported as a verdict. It is also what a checker has to hold in a light
+	// pool container: 64 MiB made every language run out of memory there.
 	maxOutputBytes = 8 << 20
 	// outputPreviewBytes is read back for the wrong-answer report. It is above
 	// the application layer's own preview so its truncation marker stays honest.
 	outputPreviewBytes = 4 << 10
-	compileTimeout     = 30 * time.Second
+	// outputLimitBlocks is what ulimit -f takes: 512-byte blocks, and one more
+	// than maxOutputBytes needs so that going over is visible in the file size.
+	outputLimitBlocks = maxOutputBytes/512 + 1
+	compileTimeout    = 30 * time.Second
 	// runGrace is what the worker waits past the in-container timeout before
 	// assuming the daemon is stuck and the container has to go. It has to
 	// outlast the SIGKILL that timeout(1) sends a second after its deadline,
@@ -104,13 +107,20 @@ func (s *Session) RunTestCase(ctx context.Context, req appjudge.RunRequest) (app
 	}
 
 	wallBackstopSecs := max(2, (req.TimeLimitMs*2+999)/1000)
+	// The write limit sits one block ABOVE maxOutputBytes on purpose: an output
+	// of exactly the limit stays legal, and anything longer lands above it, which
+	// is what makes the excess visible in the file size. The exit code cannot be
+	// used for it — the three runtimes answer SIGXFSZ with 153, 1 and 0.
+	// ulimit -c 0 keeps a core dump of a half-gigabyte process off the disk
+	// instead of trusting the daemon's default.
+	//
 	// time wraps timeout and not the other way round: inside, a TLE would kill
 	// it too and no measurement would be written. -q keeps the diagnostic line
 	// GNU time prints on a non-zero exit out of the file, which is every TLE and
 	// every MLE.
 	cmd := fmt.Sprintf(
-		"/usr/bin/time -q -f %%M -o %s timeout --kill-after=1s %ds %s < %s > %s 2>/dev/null",
-		judgingMemPath(s.judgingDir), wallBackstopSecs, s.langCfg.RunCmd,
+		"ulimit -c 0; ulimit -f %d; /usr/bin/time -q -f %%M -o %s timeout --kill-after=1s %ds %s < %s > %s 2>/dev/null",
+		outputLimitBlocks, judgingMemPath(s.judgingDir), wallBackstopSecs, s.langCfg.RunCmd,
 		judgingInputPath(s.judgingDir), judgingOutputPath(s.judgingDir),
 	)
 
@@ -157,11 +167,13 @@ func (s *Session) RunTestCase(ctx context.Context, req appjudge.RunRequest) (app
 		cpuTimeMs = int((cpuAfterNs - cpuBeforeNs) / 1_000_000)
 	}
 
+	preview, exceeded := s.readOutput(ctx)
 	result := appjudge.RunResult{
-		ExitCode:      inspectRes.ExitCode,
-		TimeMs:        cpuTimeMs,
-		MemoryKb:      s.readMemoryKb(ctx),
-		OutputPreview: s.readOutputPreview(ctx),
+		ExitCode:            inspectRes.ExitCode,
+		TimeMs:              cpuTimeMs,
+		MemoryKb:            s.readMemoryKb(ctx),
+		OutputPreview:       preview,
+		OutputLimitExceeded: exceeded,
 	}
 	// No per-case cleanup: the shell redirection truncates output.txt before the
 	// program starts, the worker overwrites input.txt, and Close removes both.
@@ -218,26 +230,26 @@ func (s *Session) readMemoryKb(ctx context.Context) *int {
 	return &kb
 }
 
-// readOutputPreview brings back only what the wrong-answer report needs. The
-// output itself stays in the volume for the checker to read.
-func (s *Session) readOutputPreview(ctx context.Context) []byte {
+// readOutput brings back only what the wrong-answer report needs, and whether
+// the run wrote past the limit. The output itself stays in the volume for the
+// checker to read.
+//
+// The size is what decides: the write limit sits one block above
+// maxOutputBytes, so an output that went over lands above it, whatever the
+// runtime did with the signal that stopped it.
+func (s *Session) readOutput(ctx context.Context) ([]byte, bool) {
 	outputPath := judgingOutputPath(s.judgingDir)
 	info, err := os.Stat(outputPath)
 	if err != nil {
 		slog.ErrorContext(ctx, "executor: output file missing after the run", "error", err)
-		return nil
+		return nil, false
 	}
-	// Nothing stops a program from printing past the limit until step 5 makes it
-	// a verdict, so until then it at least leaves a trace.
-	if info.Size() > maxOutputBytes {
-		slog.WarnContext(ctx, "executor: contestant output ran past the limit",
-			"limit_bytes", maxOutputBytes, "size_bytes", info.Size())
-	}
+	exceeded := info.Size() > maxOutputBytes
 
 	f, err := os.Open(outputPath)
 	if err != nil {
 		slog.ErrorContext(ctx, "executor: opening the output failed", "error", err)
-		return nil
+		return nil, exceeded
 	}
 	defer f.Close()
 
@@ -245,7 +257,7 @@ func (s *Session) readOutputPreview(ctx context.Context) []byte {
 	n, err := io.ReadFull(f, preview)
 	if err != nil && err != io.EOF && err != io.ErrUnexpectedEOF {
 		slog.ErrorContext(ctx, "executor: reading the output failed", "error", err)
-		return nil
+		return nil, exceeded
 	}
-	return preview[:n]
+	return preview[:n], exceeded
 }

@@ -9,6 +9,7 @@ const (
 	statusWrongAnswer         = "WRONG_ANSWER"
 	statusTimeLimitExceeded   = "TIME_LIMIT_EXCEEDED"
 	statusMemoryLimitExceeded = "MEMORY_LIMIT_EXCEEDED"
+	statusOutputLimitExceeded = "OUTPUT_LIMIT_EXCEEDED"
 	statusRuntimeError        = "RUNTIME_ERROR"
 	statusCompilationError    = "COMPILATION_ERROR"
 	statusSystemError         = "SYSTEM_ERROR"
@@ -21,7 +22,7 @@ type SubmissionStatus struct {
 func NewStatus(raw string) (SubmissionStatus, error) {
 	switch raw {
 	case statusPending, statusRunning, statusAccepted, statusWrongAnswer,
-		statusTimeLimitExceeded, statusMemoryLimitExceeded,
+		statusTimeLimitExceeded, statusMemoryLimitExceeded, statusOutputLimitExceeded,
 		statusRuntimeError, statusCompilationError, statusSystemError:
 		return SubmissionStatus{value: raw}, nil
 	default:
@@ -41,6 +42,7 @@ func newStatusAccepted() SubmissionStatus            { return SubmissionStatus{v
 func newStatusWrongAnswer() SubmissionStatus         { return SubmissionStatus{value: statusWrongAnswer} }
 func newStatusTimeLimitExceeded() SubmissionStatus   { return SubmissionStatus{value: statusTimeLimitExceeded} }
 func newStatusMemoryLimitExceeded() SubmissionStatus { return SubmissionStatus{value: statusMemoryLimitExceeded} }
+func newStatusOutputLimitExceeded() SubmissionStatus { return SubmissionStatus{value: statusOutputLimitExceeded} }
 func newStatusRuntimeError() SubmissionStatus        { return SubmissionStatus{value: statusRuntimeError} }
 func newStatusCompilationError() SubmissionStatus    { return SubmissionStatus{value: statusCompilationError} }
 func newStatusSystemError() SubmissionStatus         { return SubmissionStatus{value: statusSystemError} }
@@ -52,7 +54,8 @@ func (s SubmissionStatus) IsRunning() bool { return s.value == statusRunning }
 func (s SubmissionStatus) IsFinal() bool {
 	switch s.value {
 	case statusAccepted, statusWrongAnswer, statusTimeLimitExceeded,
-		statusMemoryLimitExceeded, statusRuntimeError, statusCompilationError, statusSystemError:
+		statusMemoryLimitExceeded, statusOutputLimitExceeded,
+		statusRuntimeError, statusCompilationError, statusSystemError:
 		return true
 	}
 	return false

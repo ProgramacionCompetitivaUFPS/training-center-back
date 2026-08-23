@@ -22,6 +22,7 @@ const (
 	FailureWrongAnswer         FailureKind = "WRONG_ANSWER"
 	FailureTimeLimitExceeded   FailureKind = "TIME_LIMIT_EXCEEDED"
 	FailureMemoryLimitExceeded FailureKind = "MEMORY_LIMIT_EXCEEDED"
+	FailureOutputLimitExceeded FailureKind = "OUTPUT_LIMIT_EXCEEDED"
 	FailureRuntimeError        FailureKind = "RUNTIME_ERROR"
 )
 
@@ -210,6 +211,11 @@ func (uc *ValidateSolutionsUseCase) checkSolution(ctx context.Context, sol Solut
 		})
 		if err != nil {
 			return nil, err
+		}
+
+		// Ahead of the exit code: see judgeAttempt for why it cannot carry this.
+		if runResult.OutputLimitExceeded {
+			return &SolutionFailure{FileKey: sol.FileKey, Kind: FailureOutputLimitExceeded, TestCase: tc.Name}, nil
 		}
 
 		switch runResult.ExitCode {

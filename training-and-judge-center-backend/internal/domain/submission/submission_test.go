@@ -193,3 +193,35 @@ func TestSubmission_MarkFinal_FromFinal_Fails(t *testing.T) {
 // kb reads better than taking the address of a local at every call site. The
 // verdicts take a pointer because a run may produce no measurement at all.
 func kb(v int) *int { return &v }
+
+// A cut-off output says nothing about whether the solution was right, so it is
+// its own verdict and not a wrong answer.
+func TestSubmission_MarkOutputLimitExceeded(t *testing.T) {
+	s := newRunningSubmission(t)
+
+	if err := s.MarkOutputLimitExceeded(120, kb(2048), testNow); err != nil {
+		t.Fatalf("MarkOutputLimitExceeded: %v", err)
+	}
+
+	if got := s.Status().String(); got != "OUTPUT_LIMIT_EXCEEDED" {
+		t.Errorf("status: got %q, want OUTPUT_LIMIT_EXCEEDED", got)
+	}
+	if !s.Status().IsFinal() {
+		t.Error("the verdict is not final, so the stale sweep would overwrite it with SYSTEM_ERROR")
+	}
+	if s.JudgedAt() == nil {
+		t.Error("judgedAt was not set")
+	}
+}
+
+// NewStatus is what restores a verdict read back from the database; a verdict
+// missing from it cannot survive a round trip.
+func TestNewStatus_AcceptsOutputLimitExceeded(t *testing.T) {
+	got, err := submission.NewStatus("OUTPUT_LIMIT_EXCEEDED")
+	if err != nil {
+		t.Fatalf("NewStatus: %v", err)
+	}
+	if got.String() != "OUTPUT_LIMIT_EXCEEDED" {
+		t.Errorf("status: got %q", got.String())
+	}
+}

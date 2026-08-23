@@ -1751,7 +1751,7 @@ Salió de cargar el contexto con el código delante, y cada uno deja el proyecto
 | 2 | el corazón: la salida deja de pasar por el worker | ✅ |
 | 3 | la comparación por tokens al pool liviano | ✅ |
 | 4 | A5: la memoria consumida se mide de verdad | ✅ |
-| 5 | el veredicto `OUTPUT_LIMIT_EXCEEDED` | |
+| 5 | el veredicto `OUTPUT_LIMIT_EXCEEDED` | ✅ |
 
 **Y el encuadre de "difícil de verificar localmente" quedó corregido**: es cierto para la suite —los tests del pool mockean Docker— pero **no para los mecanismos**. Todo lo riesgoso de este paso se puede medir con Docker real, incluido levantar un `dind` de verdad y ver qué alcanza un container creado por el demonio de adentro. Lo que sí queda para la Fase 8 es la parte de Kubernetes propiamente dicha: que el `emptyDir` se comparta entre los dos containers del pod.
 
@@ -1897,6 +1897,42 @@ Los cuatro exit codes intactos, **incluido el 137 que produce el `-XX:OnOutOfMem
 Con el costo real sobre la mesa gana el argumento de fondo: **el cero centinela es la forma de bug que este rediseño viene encontrando una y otra vez** — `RunRequest.MemoryKb` que se asignaba y nadie leía, `CheckerLanguage` en su valor cero llegando al adapter, `MaxUsage` devolviendo 0 y la API afirmando "usaste 0 KB". Un `*int` hace que *"no lo medimos"* no se pueda representar como *"0 KB"*. Y no introduce nada nuevo para los clientes: `MarkTimeLimitExceeded` y `MarkCompilationError` ya dejaban el campo en `NULL`, y los cinco endpoints ya lo declaran `*int`.
 
 **Anotado y no hecho**: el TLE **ahora sí tiene medición** (`exit=124` escribe `%M`), pero `MarkTimeLimitExceeded` no recibe memoria y se descarta. Sumarla es otro cambio de firma del dominio, y la memoria de una solución que se colgó no le sirve a nadie. Si alguna vez se quiere, el dato está ahí.
+
+**22. El límite de salida lo impone `ulimit -f`, pero lo detecta el tamaño del archivo (commit 5).** El documento proponía `ulimit -f` para las dos cosas. Medido contra las tres imágenes reales, sirve para lo primero y **no** para lo segundo:
+
+| | exit al pasarse | archivo |
+|---|---|---|
+| cpp20 | **153** (SIGXFSZ) | truncado exacto |
+| python310 | **1** | truncado exacto |
+| java17 | **0** ← termina "bien" | truncado exacto |
+
+El kernel trunca perfecto en los tres, pero cada runtime contesta la señal distinto — justo la tabla de exit codes por lenguaje que A4 peleó para no tener. Java es el peor caso: `PrintStream` **se traga los `IOException` por diseño**, así que el programa sale con 0 y su salida cortada se compararía como wrong answer, en silencio.
+
+**Lo que decide es el tamaño**, que el worker ya lee para el preview. El truco que lo hace exacto: el `ulimit` se pone **un bloque de 512 por encima** de `maxOutputBytes`, así una salida legítima del límite justo no se marca y cualquier cosa más larga queda por arriba. Medido en los cuatro bordes: `límite-1` pasa, `límite` pasa, `límite+1` es OLE, `20 MiB` queda cortado en `límite+512` y es OLE.
+
+**El TLE y el MLE sobrevivieron intactos** con el `ulimit` puesto —124 y 137 en los tres lenguajes—, que era el riesgo de regresión. Y el `%M` se sigue escribiendo aunque el proceso muera por `SIGXFSZ`.
+
+**Se agregó `ulimit -c 0`** además: el mensaje `core dumped` aparece en el shell, y aunque hoy no cae ningún archivo (el default ya es 0, verificado mirando `/sandbox`), eso depende de una configuración del demonio que no controlamos. Un core de un proceso de medio giga en el disco del `dind` no vale el riesgo de confiar en un default.
+
+**23. Se evaluó no dar veredicto y dejar que la comparación falle sola, y una medición lo descartó (commit 5).** El argumento era bueno: una respuesta correcta no puede pasar del límite por diseño, así que una salida cortada va a diferir de la esperada igual. **Pero la comparación por tokens saltea el espacio en blanco.** Medido con el binario real: un concursante que imprime la respuesta correcta y después se le va un bucle imprimiendo saltos de línea deja 8 389 120 bytes en el archivo y **queda ACEPTADO**.
+
+O sea que cortar y comparar no da sólo un diagnóstico peor: da un **veredicto equivocado** en un caso plausible —un `print` de más en un bucle es de los bugs más comunes que hay—. Ése es el argumento que decidió; el del diagnóstico es accesorio, y es el mismo que el Paso 6 usó para el MLE de Java (penaliza igual, pero deja de mandar al concursante a buscar un bug que no tiene).
+
+**24. Se evaluó reportarlo como wrong answer con un motivo visible fuera de competencia, y cuesta más, no menos (commit 5).** La propuesta apoyaba en dos piezas que **no existen**, verificado contra el código: la API de una submission expone `Status`, tiempos y memoria y **ningún campo de mensaje** —ni siquiera el `CompileLog`, que se guarda pero no sale por ningún handler—, y **no hay ninguna noción de "mostrar según la modalidad"**: la salida esperada no se le muestra al concursante nunca, en ninguna. `Contest.Status(now)` existe pero nadie lo usa para gatear esto.
+
+Costaría una columna nueva (con migración), un campo en cinco endpoints, y **inventar el gate de modalidad**. Contra un veredicto, que es un string más en una columna `TEXT` sin CHECK.
+
+Y de fondo: el veredicto **no es información secreta**. "Imprimiste de más" no dice nada sobre la respuesta correcta, a diferencia de la salida esperada, que sí la regala. Es de la misma familia que `TIME_LIMIT_EXCEEDED` y `MEMORY_LIMIT_EXCEEDED`, que ya se muestran siempre.
+
+**Decisión explícita del usuario, y no es un diferimiento**: no se agrega más realimentación al concursante, porque **alejaría el sistema de las condiciones reales de competencia**.
+
+**25. El veredicto gana sobre el exit code, y eso no es estética (commit 5).** Si el caso de uso mirara primero el exit code, la misma conducta daría `RUNTIME_ERROR` en C++ (153 cae en el `default`), `WRONG_ANSWER` en Python (1, con la salida cortada) y **aprobado** en Java (0). El chequeo va antes del `switch`, en los dos casos de uso.
+
+**26. El veredicto existe en el juez de referencia, y el spec del proyecto tenía deriva propia (commit 5).** Verificado: DOMjudge tiene `output-limit` como tipo de resultado de primera clase, junto a `timelimit`, `memory-limit`, `run-error` y `wrong-answer` — el mismo juez del que este documento ya sacó los 8192 kB. *(No pude confirmar si el estándar CLICS lo exige en su tabla; no lo doy por hecho.)*
+
+Pero `specs/Judge System/README.md` **documentaba dos veredictos que no existen**: `PRESENTATION_ERROR`, con tabla propia y todo, y `RUNTIME_EXCEPTION` por `RUNTIME_ERROR`; y no mencionaba `SYSTEM_ERROR`. Además su pseudocódigo de la comparación por defecto describía una comparación **por líneas** que devuelve `PRESENTATION_ERROR`, cuando el código compara por **tokens**. Es la misma deriva que el Paso 5 tuvo que cerrar en ese mismo archivo por el orden de argv.
+
+Se corrigió entero: las dos tablas de veredictos, el diagrama de transiciones, la prioridad —que además no era una prioridad entre problemas sino *el primer caso que falla decide*—, y la sección de la comparación por defecto, que ahora dice lo que `cmd/compare` hace, incluidos sus exit codes y que su memoria sigue al token más grande.
 
 
 #### La entrada del caso de prueba SÍ viaja por el volumen — sub-decisión de D7, resuelta
