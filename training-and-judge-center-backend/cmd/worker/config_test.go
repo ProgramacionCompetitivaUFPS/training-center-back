@@ -7,6 +7,7 @@ import (
 	"strings"
 	"testing"
 
+	adapterjudge "github.com/training-judge-center/backend/internal/adapter/judge"
 	"github.com/training-judge-center/backend/internal/config"
 	"gopkg.in/yaml.v3"
 )
@@ -59,6 +60,11 @@ func validConfig() judgeConfigFile {
 				ArtifactPath:    "/sandbox/{name}",
 				ArtifactRun:     "/sandbox/{name}",
 			},
+			// The default checker: image and artifactRun only, like the shipped config.
+			adapterjudge.CompareLanguage: {
+				Image:       "judge-runner:compare",
+				ArtifactRun: "/usr/local/bin/compare",
+			},
 		},
 		// The budgets are exactly what maxConcurrentInTests demands, so any
 		// mutation of a size or a budget shows up as a failure.
@@ -67,7 +73,8 @@ func validConfig() judgeConfigFile {
 				testLang: {CPU: "1", MemoryBytes: 1 << 30},
 			}},
 			poolLight: {BudgetBytes: 1 << 30, Languages: map[string]judgePoolLanguageConfig{
-				testLang: {CPU: "1", MemoryBytes: 512 << 20},
+				testLang:                     {CPU: "1", MemoryBytes: 512 << 20},
+				adapterjudge.CompareLanguage: {CPU: "1", MemoryBytes: 128 << 20},
 			}},
 		},
 	}}
@@ -227,9 +234,12 @@ func TestValidateJudgeConfig_RejectsBrokenConfigs(t *testing.T) {
 // A language with no runCmd is not one solutions are written in, so none of the
 // solution-side rules reach it. That is what will keep the compare image, which
 // only runs a fixed binary, from needing a heavy pool entry.
+// A language nobody writes solutions in — the default checker is one, and any
+// future tool would be another — is exempt from the rules that only make sense
+// for a language that runs contestant code.
 func TestValidateJudgeConfig_ExemptsLanguagesWithoutRunCmd(t *testing.T) {
 	cfg := validConfig()
-	cfg.Judge.Languages["compare"] = judgeLanguageConfig{Image: "judge-runner:compare"}
+	cfg.Judge.Languages["some-tool"] = judgeLanguageConfig{Image: "judge-runner:some-tool"}
 
 	if err := validateJudgeConfig(cfg); err != nil {
 		t.Fatalf("expected a language without runCmd to be exempt, got: %v", err)
@@ -483,5 +493,53 @@ func TestJudgeConfig_EveryHeavyLanguageCanHonourTheLimitsThePlatformAllows(t *te
 			t.Errorf("pool %q, language %q: memoryBytes is %d, but a problem may declare %d MB, which needs %d with memoryFactor %v",
 				poolHeavy, lang, sizing.MemoryBytes, maxMB, need, factor)
 		}
+	}
+}
+
+// The default checker is claimed by every submission to a problem without a
+// custom one. Missing from either place, nothing fails until the first such
+// submission — which in a contest is the worst possible moment.
+func TestValidateJudgeConfig_RequiresTheDefaultChecker(t *testing.T) {
+	tests := []struct {
+		name    string
+		mutate  func(*judgeConfigFile)
+		wantMsg string
+	}{
+		{
+			// Caught by the older rule about pools sizing undeclared languages,
+			// which fires first. Pinned anyway: what matters is that it is caught.
+			"the language is not declared",
+			func(c *judgeConfigFile) { delete(c.Judge.Languages, adapterjudge.CompareLanguage) },
+			"sizes undeclared language",
+		},
+		{
+			"the language is declared with nothing to run",
+			func(c *judgeConfigFile) {
+				c.Judge.Languages[adapterjudge.CompareLanguage] = judgeLanguageConfig{Image: "judge-runner:compare"}
+			},
+			"has no artifactRun",
+		},
+		{
+			"the light pool does not size it",
+			func(c *judgeConfigFile) {
+				delete(c.Judge.Pools[poolLight].Languages, adapterjudge.CompareLanguage)
+			},
+			"does not size",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cfg := validConfig()
+			tt.mutate(&cfg)
+
+			err := validateJudgeConfig(cfg)
+			if err == nil {
+				t.Fatal("expected an error, got nil")
+			}
+			if !strings.Contains(err.Error(), tt.wantMsg) {
+				t.Errorf("expected the error to mention %q, got: %v", tt.wantMsg, err)
+			}
+		})
 	}
 }

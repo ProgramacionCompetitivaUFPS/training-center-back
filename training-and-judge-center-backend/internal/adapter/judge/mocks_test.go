@@ -255,11 +255,16 @@ type mockPoolDockerClient struct {
 	// lastCreateMemory is how a test sees the ceiling a claim asked for: the
 	// pool creates the container straight at it.
 	lastCreateMemory atomic.Int64
+	// lastCreateImage is how a test sees which language was claimed.
+	lastCreateImage atomic.Value
 }
 
 func (m *mockPoolDockerClient) ContainerCreate(_ context.Context, opts client.ContainerCreateOptions) (client.ContainerCreateResult, error) {
 	if opts.HostConfig != nil {
 		m.lastCreateMemory.Store(opts.HostConfig.Resources.Memory)
+	}
+	if opts.Config != nil {
+		m.lastCreateImage.Store(opts.Config.Image)
 	}
 	return client.ContainerCreateResult{ID: fmt.Sprintf("pool-ctr-%d", m.idCounter.Add(1))}, nil
 }
@@ -296,7 +301,8 @@ func testPoolCfg() judgepool.PoolConfig {
 		IdleTimeout:  time.Hour,
 		ReapInterval: time.Hour,
 		Languages: map[string]judgepool.LanguageConfig{
-			testLang: {Image: "judge:cpp20", MemoryBytes: testMemBytes},
+			testLang:        {Image: "judge:cpp20", MemoryBytes: testMemBytes},
+			CompareLanguage: {Image: "judge-runner:compare", MemoryBytes: testMemBytes},
 		},
 	}
 }
@@ -332,6 +338,8 @@ func testArtifactCfg() ArtifactConfig {
 				ArtifactPath: "/sandbox/{name}",
 				RunCmd:       "/sandbox/{name}",
 			},
+			// The default checker carries no artifact: its binary is in the image.
+			CompareLanguage: {RunCmd: "/usr/local/bin/compare"},
 		},
 	}
 }

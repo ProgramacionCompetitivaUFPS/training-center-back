@@ -165,9 +165,10 @@ func TestJudgeSubmission_CustomChecker_RunsTheCheckerInTheSandbox(t *testing.T) 
 	}
 }
 
-// The same path without a custom checker must not reach the light pool at all,
-// because token comparison still runs in the worker.
-func TestJudgeSubmission_NoCustomChecker_ClaimsNoLightPoolContainer(t *testing.T) {
+// The same path without a custom checker now reaches the light pool too, with
+// our own comparison binary: nothing about the contestant output travels
+// through the worker any more, whichever checker the problem declares.
+func TestJudgeSubmission_NoCustomChecker_RunsCompareInTheLightPool(t *testing.T) {
 	root := t.TempDir()
 	checker, poolDocker := newTestOutputChecker(t, &mockDockerExecClient{}, storedArtifact("ELF binary"), root)
 	executor := &boundaryExecutor{root: root}
@@ -188,10 +189,13 @@ func TestJudgeSubmission_NoCustomChecker_ClaimsNoLightPoolContainer(t *testing.T
 		t.Fatalf("Execute: %v", err)
 	}
 
-	if got := poolDocker.idCounter.Load(); got != 0 {
-		t.Errorf("expected no light pool container, the pool created %d", got)
+	if got := poolDocker.idCounter.Load(); got != 1 {
+		t.Errorf("expected one light pool container, the pool created %d", got)
+	}
+	if got := poolDocker.lastCreateImage.Load(); got != "judge-runner:compare" {
+		t.Errorf("image: got %v, want the compare image", got)
 	}
 	if got := sub.Status().String(); got != "ACCEPTED" {
-		t.Errorf("verdict: got %q, want ACCEPTED — the tokens match", got)
+		t.Errorf("verdict: got %q, want ACCEPTED — the checker exited 0", got)
 	}
 }

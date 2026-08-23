@@ -32,13 +32,13 @@ func NewOutputChecker(p *pool.Pool, docker dockerExecClient, cfg ArtifactConfig,
 // BeginChecking downloads the compiled checker and injects it into a light pool
 // container, which then checks every output of the judging.
 func (c *OutputChecker) BeginChecking(ctx context.Context, checkerPath string, language submission.Language, judgingID string) (appjudge.CheckerSession, error) {
-	// Token comparison still runs in the worker, so no container is claimed for a
-	// problem without a custom checker. Step 7 moves it to the light pool.
-	if checkerPath == "" {
-		return &tokenCheckerSession{judgingDir: path.Join(c.judgingRoot, judgingID)}, nil
+	// No custom checker: the default one is a pool entry of its own, and its
+	// artifact is already inside the image, so there is nothing to download.
+	hasCustomChecker := checkerPath != ""
+	lang := CompareLanguage
+	if hasCustomChecker {
+		lang = language.String()
 	}
-
-	lang := language.String()
 	langCfg, ok := c.cfg.Languages[lang]
 	if !ok {
 		slog.ErrorContext(ctx, "output_checker: unknown language in config", "language", lang)
@@ -47,9 +47,12 @@ func (c *OutputChecker) BeginChecking(ctx context.Context, checkerPath string, l
 
 	// Downloading first keeps the failure path simple: no container is held
 	// while storage is being read.
-	artifact, err := downloadArtifact(ctx, c.reader, checkerPath)
-	if err != nil {
-		return nil, err
+	var artifact []byte
+	if hasCustomChecker {
+		var err error
+		if artifact, err = downloadArtifact(ctx, c.reader, checkerPath); err != nil {
+			return nil, err
+		}
 	}
 
 	container, err := c.pool.Claim(ctx, lang, pool.LanguageCeiling)
@@ -68,6 +71,10 @@ func (c *OutputChecker) BeginChecking(ctx context.Context, checkerPath string, l
 			runCmd:    withArtifactName(langCfg.RunCmd, name),
 		},
 		judgingDir: path.Join(c.judgingRoot, judgingID),
+	}
+
+	if !hasCustomChecker {
+		return s, nil
 	}
 
 	artifactPath := withArtifactName(langCfg.ArtifactPath, name)

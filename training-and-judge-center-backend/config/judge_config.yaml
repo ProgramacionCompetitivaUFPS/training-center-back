@@ -58,6 +58,14 @@ judge:
       artifactPath:    "/sandbox/{name}.py"   # the artifact is the source itself
       artifactRun:     "python3 /sandbox/{name}.py"
 
+    # The default checker, used whenever a problem declares none. Deliberately
+    # partial: it runs our own binary, already inside its image, so it has no
+    # toolchain, compiles nothing, and never runs a contestant solution — which
+    # is also why the rules that apply to languages with a runCmd skip it.
+    compare:
+      image: "judge-runner:compare"
+      artifactRun: "/usr/local/bin/compare"
+
   # Sizing belongs to the POOL, not to the language: the same language can need
   # different limits depending on what the container is used for.
   # Budgets are carved out of the dind container's memory, minus the daemon reserve.
@@ -82,3 +90,6 @@ judge:
         cpp20:     { cpu: "1", memoryBytes: 536870912 }   # 512 MiB
         java17:    { cpu: "1", memoryBytes: 1073741824 }  # 1 GiB, for the JVM
         python310: { cpu: "1", memoryBytes: 536870912 }   # 512 MiB
+        # 2x the measured floor: compare streams, so its memory follows the
+        # largest single token (bounded by maxTokenBytes) and not the file sizes.
+        compare:   { cpu: "1", memoryBytes: 134217728 }   # 128 MiB

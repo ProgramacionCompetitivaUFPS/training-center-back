@@ -156,6 +156,17 @@ func main() {
 	lightPool.Start()
 	defer lightPool.Stop()
 
+	// Before anything is judged: a mount whose source the daemon resolves
+	// elsewhere is silent, and would turn every submission into a wrong answer.
+	probeCtx, cancelProbe := context.WithTimeout(context.Background(), 30*time.Second)
+	if err := adapterjudge.VerifySharedVolume(probeCtx, lightPool, dockerClient, judgepool.SharedVolumePath); err != nil {
+		cancelProbe()
+		slog.Error("worker: the judging volume is not shared with the sandboxes", "error", err)
+		os.Exit(1)
+	}
+	cancelProbe()
+	slog.Info("worker: judging volume verified end to end")
+
 	executor := adapterjudge.NewExecutor(heavyPool, dockerClient, executorCfg, judgepool.SharedVolumePath)
 	artifactCfg := adapterjudge.ArtifactConfig{Languages: artifactLanguages}
 	artifactCompiler := adapterjudge.NewArtifactCompiler(heavyPool, dockerClient, artifactCfg)
@@ -449,6 +460,15 @@ func validateJudgeConfig(cfg judgeConfigFile) error {
 				return fmt.Errorf("pool %q, language %q: memoryBytes is not positive", poolName, lang)
 			}
 		}
+	}
+	// The default checker is claimed by every submission to a problem without a
+	// custom one, which is most of the traffic. Missing here, the first such
+	// submission fails with "unknown language" — mid-competition.
+	if cfg.Judge.Languages[adapterjudge.CompareLanguage].ArtifactRun == "" {
+		return fmt.Errorf("language %q has no artifactRun: nothing would run for a problem without a custom checker", adapterjudge.CompareLanguage)
+	}
+	if _, ok := cfg.Judge.Pools[poolLight].Languages[adapterjudge.CompareLanguage]; !ok {
+		return fmt.Errorf("pool %q does not size %q, so the default checker could never be claimed", poolLight, adapterjudge.CompareLanguage)
 	}
 	for lang, lc := range cfg.Judge.Languages {
 		if lc.Image == "" {
