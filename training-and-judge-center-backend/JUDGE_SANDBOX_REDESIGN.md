@@ -1087,7 +1087,7 @@ Con los datos reales no explotaba: el peor de los 12 paquetes BOCA son 28.8 MB, 
 
 **Arreglado en D14 por los dos lados**: el tope baja a 100 MB y el worker sube a 2 GiB.
 
-### `buildTar` duplica en memoria cada archivo que entra al container — pendiente, va al Paso 6.5
+### `buildTar` duplicaba en memoria cada archivo que entra al container — ✅ RESUELTO en el Paso 6.5
 
 Encontrado al desglosar la memoria del worker. La API de Docker tiene una sola forma de meter un archivo en un container: `CopyToContainer` recibe un `io.Reader` que debe entregar un **stream tar**. El tar es inevitable; **materializarlo entero en memoria no**.
 
@@ -1102,18 +1102,19 @@ func buildTar(filename string, content []byte, mode int64) io.Reader {
 }
 ```
 
-Devuelve un `io.Reader`, o sea que *aparenta* ser un stream, pero para cuando devuelve ya construyó todo: el archivo existe dos veces al mismo tiempo.
+Devolvía un `io.Reader`, o sea que *aparentaba* ser un stream, pero para cuando devolvía ya había construido todo: el archivo existía dos veces al mismo tiempo.
 
 **Medido** contra un archivo de 27.4 MB (el tamaño del input más grande de los paquetes reales), consumiendo el reader como lo hace el cliente de Docker:
 
 | | Asignado durante la operación | Pico de heap |
 |---|---|---|
-| `buildTar` actual | 27.4 MB | **55.0 MB** |
+| `buildTar` original | 27.4 MB | **55.0 MB** |
 | con `io.Pipe` + goroutine | **0.0 MB** | 27.6 MB |
+| con `io.MultiReader` ← **lo adoptado** | **0.0 MB** | 27.6 MB |
 
-Por qué está escrito así: es la forma obvia, y hasta el Paso 5 todo lo que se copiaba era chico (el fuente ≤ 1 MB, el artefacto compilado unos MB). Los inputs de decenas de MB entraron al cuadro cuando el checker pasó a recibir sus tres archivos por la API.
+Por qué estaba escrito así: es la forma obvia, y hasta el Paso 5 todo lo que se copiaba era chico (el fuente ≤ 1 MB, el artefacto compilado unos MB). Los inputs de decenas de MB entraron al cuadro cuando el checker pasó a recibir sus tres archivos por la API.
 
-**La parte delicada del arreglo**: con `io.Pipe`, si `CopyToContainer` falla temprano y nadie cierra el lado lector, la goroutine escritora **queda bloqueada para siempre** — un goroutine leak que además retiene el archivo. Antes de implementarlo hay que verificar que el cliente de moby cierre el reader que recibe en **todos** los caminos de error, o cerrarlo explícitamente desde el llamador.
+**La parte que este documento marcaba como delicada quedó disuelta, no resuelta.** El plan era `io.Pipe`, y con él había que garantizar que alguien cerrara el lado lector o la goroutine escritora quedaba bloqueada para siempre. Al verificarlo resultó que el riesgo era real por dos vías —ver el Paso 6.5, punto 1— y que una tercera forma, `io.MultiReader`, da la misma propiedad de memoria sin goroutine y por lo tanto sin nada que cerrar.
 
 **Sigue valiendo después del Paso 7**: aunque el input y la salida del concursante pasen al volumen compartido, por la API siguen viajando el fuente de la solución, el artefacto del checker y la **salida esperada** (que D7 punto 5 prohíbe poner en el volumen).
 
@@ -1671,17 +1672,54 @@ Tres experimentos de esta tanda dieron un resultado equivocado antes de dar el c
 
 El patrón común: **un experimento que "pasa" no prueba que el mecanismo funcione**; hace falta un control que demuestre que el experimento sabe fallar.
 
-### Paso 6.5 — `buildTar` deja de duplicar ← SIGUIENTE
+### Paso 6.5 — `buildTar` deja de duplicar ✅ COMPLETO
 
-Cambiar `buildTar` de `bytes.Buffer` a `io.Pipe` + goroutine, para que el tar se transmita en vez de materializarse. Medido: pico de heap de 55.0 → 27.6 MB para un archivo de 27.4 MB, con **cero** asignación durante la operación.
+`buildTar` pasó de materializar el tar en un `bytes.Buffer` a transmitirlo. Medido: pico de heap de 55.0 → 27.6 MB para un archivo de 27.4 MB, con **cero** asignación durante la operación. La firma no cambió, así que los seis llamadores, los puertos y los mocks quedaron intactos.
 
 Es un paso propio porque no pertenece a ninguno de los dos vecinos: no es memoria de containers (Paso 6) ni depende del volumen compartido (Paso 7), y **sigue valiendo después del Paso 7** — el fuente de la solución, el artefacto del checker y la salida esperada siguen viajando por la API de Docker.
 
-Está aislado en un archivo (`internal/adapter/judge/docker_exec.go`), no toca ningún puerto ni caso de uso, y sus llamadores no cambian de firma.
+#### Lo que se decidió en el camino
 
-**Lo que hay que resolver al hacerlo**: con `io.Pipe`, si `CopyToContainer` falla temprano y nadie cierra el lado lector, la goroutine escritora queda bloqueada para siempre — goroutine leak que además retiene el archivo. Hay que verificar que el cliente de moby cierre el reader en **todos** los caminos de error, o cerrarlo explícitamente desde el llamador. El detalle completo está en la sección de bugs.
+**1. `io.MultiReader` en vez del `io.Pipe` que este documento prescribía, y el riesgo del leak resultó peor de lo anotado.**
 
-### Paso 7 — Volumen compartido y comparación por tokens a pool liviano (D7, D6)
+El documento pedía verificar si el cliente de moby cierra el reader en todos los caminos de error. Verificado leyendo el código: **no**. Una vez que la petición llega a `http.Client.Do` sí —`net/http` cierra el `Body` en todos sus caminos, y `*io.PipeReader` implementa `Close()`, así que la aserción `body.(io.ReadCloser)` de `NewRequestWithContext` toma el nuestro y no un `NopCloser`—, pero hay dos caminos anteriores donde nadie lo toca: `trimID` (`container_copy.go`) devuelve error sin llegar a `putRaw`, y `http.NewRequestWithContext` puede fallar antes de asignar el body.
+
+Y apareció una vía que el documento no anticipaba, más inmediata que las dos anteriores: **nuestros propios tests**. El mock por defecto de `CopyToContainer` devuelve sin leer nada, y el helper `firstTarEntry` lee sólo la primera entrada y suelta el reader. Medido, con control: 20 de 20 pipes abandonados dejan una goroutine bloqueada; el mismo pipe drenado por completo deja 0.
+
+`io.MultiReader` da la misma propiedad de memoria sin goroutine: `archive/tar` escribe sólo el header a un buffer chico, y detrás van el contenido del llamador —sin copiarlo— y la cola de ceros. Como nadie empuja, no hay nada que se pueda bloquear ni nada que cerrar, y la firma sigue devolviendo `io.Reader`.
+
+**Lo que hay que saber al leer el código**: la cola son el relleno del último bloque de 512 más los dos bloques de ceros que cierran un tar, y su tamaño depende sólo de `len(content)`. El `%512` de afuera en `(512 - len%512) % 512` es lo que evita meter un bloque de relleno entero cuando el archivo mide un múltiplo exacto.
+
+**2. El body pasa de `Content-Length` a `Transfer-Encoding: chunked`, y el demonio lo acepta.** `http.NewRequest` sólo calcula la longitud para `*bytes.Buffer`, `*bytes.Reader` y `*strings.Reader`, así que cualquier variante en streaming —ésta o la del `io.Pipe`— cambia la codificación. Ningún test del repo puede verlo: los mocks reciben el `io.Reader` directo y nunca pasan por HTTP.
+
+Verificado de las dos formas, con el `buildTar` real. Lo que va por el cable, leído con `httputil.DumpRequestOut`:
+
+| | header |
+|---|---|
+| materializado (`*bytes.Buffer`) | `Content-Length: 27401728` |
+| streaming (`buildTar`) | `Transfer-Encoding: chunked` |
+
+Y contra un demonio real, copiando a un container de verdad y leyendo el archivo de vuelta: 5 bytes y 27.4 MB aterrizan con sha256 idéntico y con el modo correcto (0644 y 0755). **El control que le da valor a esas filas**: un tar cuyo header declara 4096 bytes de más fue **rechazado** por el demonio (`unexpected EOF`), o sea que valida el stream y el experimento sabe fallar. El chequeo se escribió como un test temporal dentro del paquete —para llamar a la función real y no a una copia— y se borró después de correrlo, igual que las verificaciones contra imágenes reales de los Pasos 3 y 4.
+
+#### Tests
+
+`docker_exec_test.go`, espejando el archivo fuente (M5). Dos tests, porque son dos propiedades distintas: el formato y la no-copia.
+
+**El oráculo del formato es `archive/tar` haciendo el trabajo completo**, y el stream tiene que ser **byte por byte idéntico**. Lo intuitivo —desarmar el tar con `tar.Reader` y ver que el archivo salga bien— **no sirve**: `tar.Reader` da `io.EOF` limpio cuando el stream se termina, así que acepta un tar sin marcador de fin. Ese oráculo pasaría en verde justo con la mutación que más importa.
+
+Cinco mutaciones, cada una en rojo exactamente donde corresponde:
+
+| Mutación | Casos en rojo |
+|---|---|
+| el tail sin los dos bloques de fin de archivo | los **7** de la tabla |
+| el tail sin el relleno del último bloque | **5** de 7 |
+| se cae el `%512` de afuera | **solo 2**: `empty file` y `exactly one record` |
+| vuelve el `bytes.Buffer` | **solo** `DoesNotCopyTheContent` |
+| el contenido antes del header | los 7, **y además** `DoesNotCopyTheContent` |
+
+Tres cosas se leen de ahí. La segunda mutación deja dos casos en verde y **está bien**: son justo aquellos donde el relleno vale cero, así que no hay nada que romper. La tercera pone en rojo sólo esos mismos dos, que es la demostración de que las filas de 0 y 512 bytes se ganan el lugar en la tabla. Y la cuarta es la que más dice: volver al `bytes.Buffer` deja el test de igualdad **en verde**, porque la implementación vieja produce un tar perfectamente válido — sólo que copiando. El test del formato, solo, nunca habría notado una regresión al comportamiento que este paso elimina.
+
+### Paso 7 — Volumen compartido y comparación por tokens a pool liviano (D7, D6) ← SIGUIENTE
 
 El `emptyDir` en `worker.yaml` montado en `dind` y en `worker`, el UUID por judging con la raíz no listable, `RunTestCase` escribiendo al volumen, y `copyOutput` eliminado. `CheckRequest` pasa de recibir bytes a recibir una ruta, y la comparación por tokens se muda a pool liviano con la imagen del paso 1.
 
