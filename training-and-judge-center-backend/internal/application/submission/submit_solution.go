@@ -10,8 +10,8 @@ import (
 
 	"github.com/google/uuid"
 	appshared "github.com/training-judge-center/backend/internal/application/shared"
-	domainSubmission "github.com/training-judge-center/backend/internal/domain/submission"
 	"github.com/training-judge-center/backend/internal/domain/shared"
+	domainSubmission "github.com/training-judge-center/backend/internal/domain/submission"
 	"github.com/training-judge-center/backend/pkg/apperror"
 )
 
@@ -89,19 +89,10 @@ func (uc *SubmitSolutionUseCase) Execute(ctx context.Context, in SubmitSolutionI
 			"only PUBLISHED problems can receive submissions")
 	}
 
-	// 6. Accessibility check
-	if !problem.IsPublic {
-		isModifier := false
-		for _, mid := range problem.ModifierIDs {
-			if mid == in.CurrentUser.ID {
-				isModifier = true
-				break
-			}
-		}
-		if !isModifier {
-			return nil, apperror.NewForbidden(domainSubmission.ErrCodeProblemNotAccessible,
-				"only modifiers can submit to PRIVATE problems")
-		}
+	// 6. Accessibility check — mirrors Problem.CanBeEditedBy: author, admin, or modifier.
+	if !problem.IsPublic && !canSubmitToPrivate(problem, in.CurrentUser) {
+		return nil, apperror.NewForbidden(domainSubmission.ErrCodeProblemNotAccessible,
+			"only the author, an admin, or a modifier can submit to PRIVATE problems")
 	}
 
 	userID := in.CurrentUser.ID
@@ -199,4 +190,18 @@ func (uc *SubmitSolutionUseCase) Execute(ctx context.Context, in SubmitSolutionI
 		FileSize:     len(in.FileData),
 		FileHash:     fileHash,
 	}, nil
+}
+
+// canSubmitToPrivate mirrors Problem.CanBeEditedBy, which the problem domain
+// owns: a private problem is reachable by its author, an admin, or a modifier.
+func canSubmitToPrivate(p *ProblemInfo, u appshared.CurrentUser) bool {
+	if p.AuthorID == u.ID || u.IsAdmin() {
+		return true
+	}
+	for _, mid := range p.ModifierIDs {
+		if mid == u.ID {
+			return true
+		}
+	}
+	return false
 }

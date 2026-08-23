@@ -23,15 +23,15 @@ func NewProblemProvider(db infraPostgres.Querier) *ProblemProvider {
 func (p *ProblemProvider) GetProblemBySlug(ctx context.Context, slug string) (*appSubmission.ProblemInfo, error) {
 	q := infraPostgres.GetQuerier(ctx, p.db)
 
-	var id, pSlug, title, status, accessibility string
+	var id, authorID, pSlug, title, status, accessibility string
 	var modifierIDs []string
 	var testCasesKey *string
 
 	err := q.QueryRow(ctx, `
-		SELECT id, slug, title, status, accessibility, modifiers_ids, test_cases_key
+		SELECT id, author_id, slug, title, status, accessibility, modifiers_ids, test_cases_key
 		FROM problems
 		WHERE slug = $1
-	`, slug).Scan(&id, &pSlug, &title, &status, &accessibility, &modifierIDs, &testCasesKey)
+	`, slug).Scan(&id, &authorID, &pSlug, &title, &status, &accessibility, &modifierIDs, &testCasesKey)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, apperror.NewNotFound(domainProblem.ErrCodeProblemNotFound, "problem not found")
@@ -45,6 +45,7 @@ func (p *ProblemProvider) GetProblemBySlug(ctx context.Context, slug string) (*a
 
 	return &appSubmission.ProblemInfo{
 		ID:           id,
+		AuthorID:     authorID,
 		Slug:         pSlug,
 		Title:        title,
 		IsPublished:  status == "PUBLISHED",

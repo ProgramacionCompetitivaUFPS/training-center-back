@@ -188,3 +188,31 @@ func TestSubmitSolution_QueueError_DoesNotFailSubmit(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, "PENDING", out.Status)
 }
+
+// A private problem is reachable by its author and by an admin, not only by the
+// modifier list — the same rule Problem.CanBeEditedBy states in the domain.
+// Without this a setter could not submit to the problem they just published.
+func TestSubmitSolution_PrivateProblem_AuthorSucceeds(t *testing.T) {
+	uc := newUseCase(privateProblemOwnedBy(testUserID), cleanRepo(), nil)
+	out, err := uc.Execute(ctx(), validInput())
+	require.NoError(t, err)
+	assert.Equal(t, "PENDING", out.Status)
+}
+
+func TestSubmitSolution_PrivateProblem_AdminSucceeds(t *testing.T) {
+	uc := newUseCase(privateProblemOwnedBy("someone-else"), cleanRepo(), nil)
+	in := validInput()
+	in.CurrentUser = asAdmin(testUserID)
+	out, err := uc.Execute(ctx(), in)
+	require.NoError(t, err)
+	assert.Equal(t, "PENDING", out.Status)
+}
+
+func privateProblemOwnedBy(authorID string) *mockProblemProvider {
+	return &mockProblemProvider{fn: func(_ string) (*ProblemInfo, error) {
+		return &ProblemInfo{
+			ID: testProblemID, AuthorID: authorID, Slug: testProblemSlug, Title: "T",
+			IsPublished: true, IsPublic: false,
+		}, nil
+	}}
+}
