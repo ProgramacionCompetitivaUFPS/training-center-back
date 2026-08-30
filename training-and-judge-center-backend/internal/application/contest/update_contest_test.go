@@ -155,6 +155,26 @@ func TestUpdateContest_AdminCanUnlockAnyContest(t *testing.T) {
 	}
 }
 
+func TestUpdateContest_SetShowTeamMembers(t *testing.T) {
+	contest := newTestContest(callerID)
+	uc := newUpdateContestUseCase(repoWith(contest), groupFound(), isLead(), defaultProblemProvider())
+
+	show := true
+	out, err := uc.Execute(context.Background(), UpdateContestInput{
+		CurrentUser:     asCoach(callerID),
+		GroupID:         testGroupID,
+		ContestID:       testContestID,
+		ShowTeamMembers: &show,
+	})
+
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !out.ShowTeamMembers {
+		t.Error("expected showTeamMembers to be true")
+	}
+}
+
 func TestUpdateContest_NonOwnerNonAdminCannotLock(t *testing.T) {
 	contest := newTestContest(otherID) // owned by otherID
 	uc := newUpdateContestUseCase(repoWith(contest), groupFound(), isLead(), defaultProblemProvider())

@@ -118,6 +118,9 @@ func (m *mockHandlerUserRepo) FindByNickname(_ context.Context, _ domainuser.Nic
 func (m *mockHandlerUserRepo) FindAll(_ context.Context, _ domainuser.UserFilter) ([]*domainuser.User, int, error) {
 	return nil, 0, nil
 }
+func (m *mockHandlerUserRepo) SearchActive(_ context.Context, _ string, _ int) ([]*domainuser.User, error) {
+	return nil, nil
+}
 
 type mockHandlerDeactRepo struct {
 	findPendingByUserIDFn func(ctx context.Context, userID string) (*domainuser.DeactivationRequest, error)

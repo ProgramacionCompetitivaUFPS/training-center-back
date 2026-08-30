@@ -23,6 +23,7 @@ import (
 // @Param        accessibility query string false "Filter by accessibility"
 // @Param        status query string false "Filter by status"
 // @Param        author query string false "Filter by author nickname"
+// @Param        search query string false "Filter by title (partial match)"
 // @Success      200 {object} listProblemsResponse
 // @Failure      401 {object} apperror.AppError
 // @Router       /problems [get]
@@ -66,6 +67,7 @@ func (h *Handler) ListProblems(w http.ResponseWriter, r *http.Request) {
 		Accessibility:  queryStringPtr(r.URL.Query().Get("accessibility")),
 		Status:         queryStringPtr(r.URL.Query().Get("status")),
 		AuthorNickname: queryStringPtr(r.URL.Query().Get("author")),
+		Search:         r.URL.Query().Get("search"),
 		Page:           page,
 		Limit:          limit,
 	}

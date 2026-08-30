@@ -34,6 +34,9 @@ func (m *mockUserRepo) FindByNickname(_ context.Context, _ domainuser.Nickname) 
 func (m *mockUserRepo) FindAll(_ context.Context, _ domainuser.UserFilter) ([]*domainuser.User, int, error) {
 	return nil, 0, nil
 }
+func (m *mockUserRepo) SearchActive(_ context.Context, _ string, _ int) ([]*domainuser.User, error) {
+	return nil, nil
+}
 
 type mockRefreshTokenRepo struct {
 	saveFn                 func(ctx context.Context, token *domainuser.RefreshToken) error

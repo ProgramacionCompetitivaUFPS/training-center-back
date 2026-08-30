@@ -35,6 +35,7 @@ type GetContestOutput struct {
 	FreezeMinutes     int
 	EnablePostContest bool
 	Locked            *bool // nil when caller is not Lead or Admin (omitted from JSON)
+	ShowTeamMembers   bool
 	ParticipantCount  int
 	IsRegistered      bool
 	Group             GroupDisplay
@@ -114,7 +115,7 @@ func (uc *GetContestUseCase) Execute(ctx context.Context, in GetContestInput) (*
 		return nil, err
 	}
 
-	showProblems := isAdmin || (isMember && status != domainContest.StatusScheduled)
+	showProblems := isAdmin || isLead || (isMember && status != domainContest.StatusScheduled)
 
 	problemDisplays := []ProblemDetailDisplay{}
 	if showProblems && len(c.Problems()) > 0 {
@@ -175,6 +176,7 @@ func (uc *GetContestUseCase) Execute(ctx context.Context, in GetContestInput) (*
 		FreezeMinutes:     c.FreezeMinutes(),
 		EnablePostContest: c.EnablePostContest(),
 		Locked:            locked,
+		ShowTeamMembers:   c.ShowTeamMembers(),
 		ParticipantCount:  participantCount,
 		IsRegistered:      isRegistered,
 		Group:             GroupDisplay{ID: group.ID, Name: group.Name},

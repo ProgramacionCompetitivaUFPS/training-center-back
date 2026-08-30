@@ -185,13 +185,6 @@ func (r *Repository) FindByNickname(ctx context.Context, nickname domainUser.Nic
 	return u, nil
 }
 
-func escapeILIKE(s string) string {
-	s = strings.ReplaceAll(s, `\`, `\\`)
-	s = strings.ReplaceAll(s, `%`, `\%`)
-	s = strings.ReplaceAll(s, `_`, `\_`)
-	return s
-}
-
 var sortColumnMap = map[domainUser.SortField]string{
 	domainUser.SortByCreatedAt:     "created_at",
 	domainUser.SortByName:          "name",
@@ -246,7 +239,7 @@ func (r *Repository) FindAll(ctx context.Context, filter domainUser.UserFilter) 
 
 	// Text search
 	if filter.SearchTerm != "" {
-		searchPattern := "%" + escapeILIKE(filter.SearchTerm) + "%"
+		searchPattern := "%" + infraPostgres.EscapeILIKE(filter.SearchTerm) + "%"
 		switch filter.SearchField {
 		case domainUser.SearchByName:
 			conditions = append(conditions, fmt.Sprintf("name ILIKE $%d", n))
@@ -331,4 +324,41 @@ func (r *Repository) FindAll(ctx context.Context, filter domainUser.UserFilter) 
 	}
 
 	return users, totalCount, nil
+}
+
+// SearchActive matches only name/nickname (never email/institution, unlike
+// FindAll's SearchByAll) and skips the COUNT query — autocomplete callers
+// only need a capped result list, not pagination metadata.
+func (r *Repository) SearchActive(ctx context.Context, term string, limit int) ([]*domainUser.User, error) {
+	pattern := "%" + infraPostgres.EscapeILIKE(term) + "%"
+	query := fmt.Sprintf(
+		`SELECT %s FROM users WHERE status = $1 AND (name ILIKE $2 OR nickname ILIKE $2) ORDER BY name ASC LIMIT $3`,
+		userColumns,
+	)
+
+	rows, err := r.querier.Query(ctx, query, domainUser.StatusActive.String(), pattern, limit)
+	if err != nil {
+		slog.ErrorContext(ctx, "database error searching active users", "error", err)
+		return nil, apperror.NewInternal()
+	}
+	defer rows.Close()
+
+	var users []*domainUser.User
+	for rows.Next() {
+		u, err := scanUser(rows)
+		if err != nil {
+			slog.ErrorContext(ctx, "database error scanning user row", "error", err)
+			return nil, apperror.NewInternal()
+		}
+		if u != nil {
+			users = append(users, u)
+		}
+	}
+
+	if err := rows.Err(); err != nil {
+		slog.ErrorContext(ctx, "database error iterating user rows", "error", err)
+		return nil, apperror.NewInternal()
+	}
+
+	return users, nil
 }

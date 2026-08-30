@@ -17,6 +17,7 @@ type ListProblemsInput struct {
 	Accessibility  *string
 	Tags           []string
 	AuthorNickname *string
+	Search         string
 	Page           int
 	Limit          int
 }
@@ -49,9 +50,10 @@ func (uc *ListProblemsUseCase) Execute(ctx context.Context, in ListProblemsInput
 	}
 
 	filters := problem.ListFilters{
-		Tags:  in.Tags,
-		Page:  in.Page,
-		Limit: in.Limit,
+		Tags:   in.Tags,
+		Search: in.Search,
+		Page:   in.Page,
+		Limit:  in.Limit,
 	}
 
 	if in.Status != nil {

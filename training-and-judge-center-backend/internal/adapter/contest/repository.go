@@ -199,6 +199,11 @@ func (r *Repository) listContests(ctx context.Context, baseCond string, baseArgs
 		}
 	}
 
+	if filters.Search != "" {
+		conds = append(conds, "name ILIKE $"+strconv.Itoa(len(args)+1))
+		args = append(args, "%"+infraPostgres.EscapeILIKE(filters.Search)+"%")
+	}
+
 	where := ""
 	if len(conds) > 0 {
 		where = "WHERE " + strings.Join(conds, " AND ")

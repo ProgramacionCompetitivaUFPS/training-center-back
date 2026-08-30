@@ -89,6 +89,7 @@ type mockUserRepository struct {
 	findByNicknameFn func(ctx context.Context, nickname domain.Nickname) (*domain.User, error)
 	updateFn         func(ctx context.Context, u *domain.User) error
 	findAllFn        func(ctx context.Context, filter domain.UserFilter) ([]*domain.User, int, error)
+	searchActiveFn   func(ctx context.Context, term string, limit int) ([]*domain.User, error)
 }
 
 func (m *mockUserRepository) Save(ctx context.Context, u *domain.User) error {
@@ -126,6 +127,12 @@ func (m *mockUserRepository) FindAll(ctx context.Context, filter domain.UserFilt
 		return m.findAllFn(ctx, filter)
 	}
 	return nil, 0, nil
+}
+func (m *mockUserRepository) SearchActive(ctx context.Context, term string, limit int) ([]*domain.User, error) {
+	if m.searchActiveFn != nil {
+		return m.searchActiveFn(ctx, term, limit)
+	}
+	return nil, nil
 }
 
 func newNoConflictRepo() *mockUserRepository {

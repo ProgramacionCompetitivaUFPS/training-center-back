@@ -68,6 +68,7 @@ func toGetContestResponse(out *appContest.GetContestOutput) getContestResponse {
 		FreezeMinutes:     out.FreezeMinutes,
 		EnablePostContest: out.EnablePostContest,
 		Locked:            out.Locked,
+		ShowTeamMembers:   out.ShowTeamMembers,
 		ParticipantCount:  out.ParticipantCount,
 		IsRegistered:      out.IsRegistered,
 		Group:             groupDisplay{ID: out.Group.ID, Name: out.Group.Name},

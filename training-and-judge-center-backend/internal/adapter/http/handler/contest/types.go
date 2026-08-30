@@ -62,6 +62,7 @@ type updateContestRequest struct {
 	ParticipationMode *string               `json:"participationMode"`
 	TeamSizeMin       *int                  `json:"teamSizeMin"`
 	TeamSizeMax       *int                  `json:"teamSizeMax"`
+	ShowTeamMembers   *bool                 `json:"showTeamMembers"`
 }
 
 // ── Response types ───────────────────────────────────────────────────────────
@@ -104,6 +105,7 @@ type getContestResponse struct {
 	FreezeMinutes     int                     `json:"freezeMinutes"`
 	EnablePostContest bool                    `json:"enablePostContest"`
 	Locked            *bool                   `json:"locked,omitempty"`
+	ShowTeamMembers   bool                    `json:"showTeamMembers"`
 	ParticipantCount  int                     `json:"participantCount"`
 	IsRegistered      bool                    `json:"isRegistered"`
 	Group             groupDisplay            `json:"group"`
@@ -296,6 +298,7 @@ type contestResponse struct {
 	FreezeMinutes     int              `json:"freezeMinutes"`
 	EnablePostContest bool             `json:"enablePostContest"`
 	Locked            bool             `json:"locked"`
+	ShowTeamMembers   bool             `json:"showTeamMembers"`
 	ParticipationMode string           `json:"participationMode"`
 	TeamSizeMin       int              `json:"teamSizeMin"`
 	TeamSizeMax       int              `json:"teamSizeMax"`
