@@ -14,4 +14,6 @@ const (
 	ErrCodeContestNotFound            = "CONTEST_NOT_FOUND"
 	ErrCodeContestNotActive           = "CONTEST_NOT_ACTIVE"
 	ErrCodeNoSubmissionsToRejudge     = "NO_SUBMISSIONS_TO_REJUDGE"
+	ErrCodeValidationPipelineNotReady = "VALIDATION_PIPELINE_NOT_READY"
+	ErrCodeValidationTimedOut         = "VALIDATION_TIMED_OUT"
 )

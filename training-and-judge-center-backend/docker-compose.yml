@@ -133,8 +133,12 @@ services:
       POD_MEMORY_LIMIT: ${POD_MEMORY_LIMIT:-8589934592}
       POD_CPU_LIMIT: ${POD_CPU_LIMIT:-4000}
       JUDGE_CONFIG: /config/judge_config.yaml
+      # A volume name and not a path: here the daemon is the host's, so it
+      # would resolve a path on the host and mount an empty directory.
+      JUDGE_VOLUME_SOURCE: judging
     volumes:
       - problem_uploads:/data/uploads
+      - judging:/judging
       - //./pipe/docker_engine://./pipe/docker_engine
       # Linux / macOS: uncomment the line below, comment out the line above
       # - /var/run/docker.sock:/var/run/docker.sock
@@ -176,6 +180,7 @@ services:
 
 volumes:
   postgres_data:
+  judging:
   problem_uploads:
   rabbitmq_data:
   certbot_etc:

@@ -1,30 +1,95 @@
 judge:
   idleTimeoutMinutes: 10
-  memoryOverheadBytes: 536870912  # 512 MiB reservado para el proceso worker
-  cpuOverheadCores: 1             # cores reservados para worker + daemon Docker (se restan del semáforo)
-  staleRunningAfterMinutes: 10    # submissions en RUNNING más viejas que esto se marcan SYSTEM_ERROR
 
+  # Both reserves are carved out of the dind container's budget, where the Docker
+  # daemon and the containers it creates live — not out of the worker's.
+  dockerDaemonReserveBytes: 1073741824  # 1 GiB, sized for 5 concurrent judgings
+  dockerDaemonReserveCores: 1           # subtracted from the concurrency semaphore
+
+  staleRunningAfterMinutes: 10    # RUNNING submissions older than this become SYSTEM_ERROR
+  staleValidationAfterMinutes: 20 # same for publish validations; above the client's 9 min HTTP timeout
+
+  # Language properties: true no matter which pool runs the container.
+  # In the artifact* fields, {name} is replaced with Checker or Validator.
   languages:
     cpp20:
       image: "judge-runner:cpp20"
-      cpu: "1"
-      memoryBytes: 2147483648  # 2 GiB
-      compileCmd: "g++ -std=c++20 -O2 -o /sandbox/solution /sandbox/solution.cpp"
-      runCmd: "/sandbox/solution"
       extension: "cpp"
+      memoryFactor: 1.0        # a native binary reserves nothing of its own
+      compileCmd: "g++ -std=c++20 -O2 -o /sandbox/Solution /sandbox/Solution.cpp"
+      runCmd: "/sandbox/Solution"
+      artifactSource:  "/sandbox/{name}.cpp"
+      artifactCompile: "g++ -std=c++20 -O2 -o /sandbox/{name} /sandbox/{name}.cpp"
+      artifactPath:    "/sandbox/{name}"
+      artifactRun:     "/sandbox/{name}"
 
     java17:
       image: "judge-runner:java17"
-      cpu: "1"
-      memoryBytes: 2147483648  # 2 GiB — más alto por la JVM
-      compileCmd: "javac -encoding UTF-8 /sandbox/solution.java"
-      runCmd: "java -cp /sandbox solution"
       extension: "java"
+      # Container needed per usable MB: MaxRAMPercentage=90 hands 10% to non-heap
+      # and the GC keeps a little more. Without the factor a Java solution gets
+      # 86% of what the problem declares against C++ and Python getting 99%.
+      memoryFactor: 1.15
+      compileCmd: "javac -encoding UTF-8 /sandbox/Solution.java"
+      # Both percentages, because the JVM applies MinRAMPercentage instead of
+      # MaxRAMPercentage below ~250 MB of container: with only the max set, a
+      # solution gets 47% of a small container and 72% of a large one.
+      # OnOutOfMemoryError makes the JVM SIGKILL itself, so a Java MLE reports
+      # exit 137 like every other language instead of a bare exit 1. The single
+      # quotes are load-bearing: runCmd is interpolated into an sh -c string.
+      runCmd: "java -XX:MaxRAMPercentage=90 -XX:MinRAMPercentage=90 '-XX:OnOutOfMemoryError=kill -9 %p' -cp /sandbox Solution"
+      artifactSource:  "/sandbox/{name}.java"
+      # -d keeps the .class files out of /sandbox, so the JAR cannot pick up the source.
+      artifactCompile: "javac -encoding UTF-8 -d /sandbox/classes /sandbox/{name}.java && jar --create --file /sandbox/{name}.jar --main-class {name} -C /sandbox/classes ."
+      artifactPath:    "/sandbox/{name}.jar"
+      # Same OnOutOfMemoryError as runCmd, and for the same reason: a checker
+      # that exceeds the light pool's memory must exit 137 and not 1, which is
+      # indistinguishable from it rejecting the contestant's output.
+      artifactRun:     "java '-XX:OnOutOfMemoryError=kill -9 %p' -jar /sandbox/{name}.jar"
 
     python310:
       image: "judge-runner:python310"
-      cpu: "1"
-      memoryBytes: 1073741824  # 1 GiB
-      compileCmd: ""           # vacío = lenguaje interpretado, se omite la compilación
-      runCmd: "python3 /sandbox/solution.py"
       extension: "py"
+      memoryFactor: 1.0        # the interpreter costs ~5 MiB, fixed rather than proportional
+      compileCmd: ""           # empty = interpreted language, compilation is skipped
+      runCmd: "python3 /sandbox/Solution.py"
+      artifactSource:  "/sandbox/{name}.py"
+      artifactCompile: "python3 -m py_compile /sandbox/{name}.py"
+      artifactPath:    "/sandbox/{name}.py"   # the artifact is the source itself
+      artifactRun:     "python3 /sandbox/{name}.py"
+
+    # The default checker, used whenever a problem declares none. Deliberately
+    # partial: it runs our own binary, already inside its image, so it has no
+    # toolchain, compiles nothing, and never runs a contestant solution — which
+    # is also why the rules that apply to languages with a runCmd skip it.
+    compare:
+      image: "judge-runner:compare"
+      artifactRun: "/usr/local/bin/compare"
+
+  # Sizing belongs to the POOL, not to the language: the same language can need
+  # different limits depending on what the container is used for.
+  # Budgets are carved out of the dind container's memory, minus the daemon reserve.
+  # Budgets are sized at N3: (maxConcurrent - 1) * largest + sum(all languages),
+  # so every language stays warm even when all judgings run the heaviest one.
+  # They must add up with dockerDaemonReserveBytes to the dind memory limit.
+  pools:
+    heavy:  # compiles every language, and runs contestant solutions
+      budgetBytes: 17985175552  # 16.75 GiB
+      languages:
+        # This is the ceiling a claim can ask for, so it cannot be under
+        # maxMemoryLimitGlobal (2048 MB in virtual_object.json). It only applies
+        # in full when a problem declares no memory limit, or when compiling:
+        # a judging resizes the container down to the problem's own limit.
+        cpp20:     { cpu: "1", memoryBytes: 2147483648 }  # 2 GiB
+        java17:    { cpu: "1", memoryBytes: 2550136832 }  # 2.375 GiB: 2048 MB x 1.19, room for the memoryFactor
+        python310: { cpu: "1", memoryBytes: 2147483648 }  # 2 GiB
+
+    light:  # runs already-compiled checkers and validators, never compiles
+      budgetBytes: 6710886400  # 6.25 GiB
+      languages:
+        cpp20:     { cpu: "1", memoryBytes: 536870912 }   # 512 MiB
+        java17:    { cpu: "1", memoryBytes: 1073741824 }  # 1 GiB, for the JVM
+        python310: { cpu: "1", memoryBytes: 536870912 }   # 512 MiB
+        # 2x the measured floor: compare streams, so its memory follows the
+        # largest single token (bounded by maxTokenBytes) and not the file sizes.
+        compare:   { cpu: "1", memoryBytes: 134217728 }   # 128 MiB

@@ -16,8 +16,12 @@ import (
 	"github.com/jackc/pgx/v5"
 	infraPostgres "github.com/training-judge-center/backend/internal/adapter/postgres"
 	appJudge "github.com/training-judge-center/backend/internal/application/judge"
+	appProblem "github.com/training-judge-center/backend/internal/application/problem"
 	"github.com/training-judge-center/backend/pkg/apperror"
 )
+
+// Defensive read limit per file, mirroring the maxFileSizeTestCaseInputMB that upload enforces.
+const maxTestCaseFileBytes = 64 << 20
 
 type TestCaseProvider struct {
 	reader gcsReader
@@ -45,33 +49,34 @@ func (p *TestCaseProvider) GetTestCases(ctx context.Context, problemID string) (
 		return []appJudge.TestCase{}, nil
 	}
 
-	rc, err := p.reader.readObject(ctx, *testCasesKey)
+	zipKey := appProblem.TestCasesZipKey(*testCasesKey)
+	rc, err := p.reader.readObject(ctx, zipKey)
 	if err != nil {
 		if errors.Is(err, storage.ErrObjectNotExist) {
-			slog.ErrorContext(ctx, "test_case_provider: ZIP not found in GCS", "key", *testCasesKey)
+			slog.ErrorContext(ctx, "test_case_provider: ZIP not found in GCS", "key", zipKey)
 			return nil, apperror.NewNotFound(apperror.ErrCodeNotFound, "test cases not found")
 		}
-		slog.ErrorContext(ctx, "test_case_provider: failed to open ZIP from GCS", "key", *testCasesKey, "error", err)
+		slog.ErrorContext(ctx, "test_case_provider: failed to open ZIP from GCS", "key", zipKey, "error", err)
 		return nil, apperror.NewInternal()
 	}
 	defer rc.Close()
 
 	zipData, err := io.ReadAll(rc)
 	if err != nil {
-		slog.ErrorContext(ctx, "test_case_provider: failed to read ZIP", "key", *testCasesKey, "error", err)
+		slog.ErrorContext(ctx, "test_case_provider: failed to read ZIP", "key", zipKey, "error", err)
 		return nil, apperror.NewInternal()
 	}
 
-	testCases, err := parseTestCasesZip(zipData)
+	testCases, err := parseTestCasesZip(zipData, maxTestCaseFileBytes)
 	if err != nil {
-		slog.ErrorContext(ctx, "test_case_provider: failed to parse ZIP", "key", *testCasesKey, "error", err)
+		slog.ErrorContext(ctx, "test_case_provider: failed to parse ZIP", "key", zipKey, "error", err)
 		return nil, apperror.NewInternal()
 	}
 	return testCases, nil
 }
 
 // parseTestCasesZip follows the ICPC Problem Package Format (data/sample/ and data/secret/).
-func parseTestCasesZip(data []byte) ([]appJudge.TestCase, error) {
+func parseTestCasesZip(data []byte, maxFileBytes int) ([]appJudge.TestCase, error) {
 	r, err := zip.NewReader(bytes.NewReader(data), int64(len(data)))
 	if err != nil {
 		return nil, fmt.Errorf("invalid zip: %w", err)
@@ -84,11 +89,13 @@ func parseTestCasesZip(data []byte) ([]appJudge.TestCase, error) {
 		cleanPath := filepath.ToSlash(filepath.Clean(f.Name))
 
 		// strings.Index handles optional root-prefix dirs (e.g. "problem-abc/data/secret/001.in").
+		// Stripping only "data/" (not "data/sample/"/"data/secret/") keeps the
+		// sample/secret group as part of relPath, e.g. "secret/001.in".
 		var relPath string
 		if idx := strings.Index(cleanPath, "data/sample/"); idx >= 0 {
-			relPath = cleanPath[idx+len("data/sample/"):]
+			relPath = cleanPath[idx+len("data/"):]
 		} else if idx := strings.Index(cleanPath, "data/secret/"); idx >= 0 {
-			relPath = cleanPath[idx+len("data/secret/"):]
+			relPath = cleanPath[idx+len("data/"):]
 		} else {
 			continue
 		}
@@ -104,10 +111,14 @@ func parseTestCasesZip(data []byte) ([]appJudge.TestCase, error) {
 		if err != nil {
 			return nil, fmt.Errorf("open %s in zip: %w", cleanPath, err)
 		}
-		content, readErr := io.ReadAll(io.LimitReader(rc, 64*1024*1024))
+		// One byte past the cap: LimitReader on its own would truncate in silence.
+		content, readErr := io.ReadAll(io.LimitReader(rc, int64(maxFileBytes)+1))
 		rc.Close()
 		if readErr != nil {
 			return nil, fmt.Errorf("read %s in zip: %w", cleanPath, readErr)
+		}
+		if len(content) > maxFileBytes {
+			return nil, fmt.Errorf("%s in zip exceeds the %d byte limit", cleanPath, maxFileBytes)
 		}
 
 		switch ext {
@@ -129,6 +140,7 @@ func parseTestCasesZip(data []byte) ([]appJudge.TestCase, error) {
 	testCases := make([]appJudge.TestCase, 0, len(names))
 	for _, name := range names {
 		testCases = append(testCases, appJudge.TestCase{
+			Name:           name,
 			Input:          inputs[name],
 			ExpectedOutput: answers[name],
 		})

@@ -1,229 +1,45 @@
 package judge
 
 import (
-	"archive/tar"
-	"bufio"
 	"bytes"
 	"context"
-	"encoding/binary"
-	"encoding/json"
 	"fmt"
-	"io"
-	"net"
-	"sync/atomic"
+	"os"
 	"testing"
 	"time"
 
-	"github.com/moby/moby/api/types/container"
 	"github.com/moby/moby/client"
 	judgepool "github.com/training-judge-center/backend/internal/adapter/judge/pool"
 	appjudge "github.com/training-judge-center/backend/internal/application/judge"
 	"github.com/training-judge-center/backend/internal/domain/submission"
 )
 
-// --- pipeConn: net.Conn backed by io.PipeReader for test attach results ---
-
-type pipeConn struct{ *io.PipeReader }
-
-func (pipeConn) Write(b []byte) (int, error)        { return len(b), nil }
-func (pipeConn) LocalAddr() net.Addr                 { return nil }
-func (pipeConn) RemoteAddr() net.Addr                { return nil }
-func (pipeConn) SetDeadline(_ time.Time) error       { return nil }
-func (pipeConn) SetReadDeadline(_ time.Time) error   { return nil }
-func (pipeConn) SetWriteDeadline(_ time.Time) error  { return nil }
-
-// --- attach helpers ---
-
-// fakeAttach returns an ExecAttachResult whose reader yields content then EOF.
-func fakeAttach(content []byte) client.ExecAttachResult {
-	pr, pw := io.Pipe()
-	go func() {
-		_, _ = pw.Write(content)
-		pw.Close()
-	}()
-	conn := pipeConn{pr}
-	return client.ExecAttachResult{
-		HijackedResponse: client.HijackedResponse{
-			Conn:   conn,
-			Reader: bufio.NewReader(conn),
-		},
-	}
-}
-
-// blockingAttach returns an ExecAttachResult that blocks until ctx is done.
-func blockingAttach(ctx context.Context) client.ExecAttachResult {
-	pr, pw := io.Pipe()
-	go func() {
-		<-ctx.Done()
-		pw.CloseWithError(ctx.Err())
-	}()
-	conn := pipeConn{pr}
-	return client.ExecAttachResult{
-		HijackedResponse: client.HijackedResponse{
-			Conn:   conn,
-			Reader: bufio.NewReader(conn),
-		},
-	}
-}
-
-// stdcopyFrame encodes data in Docker's multiplexed stream format.
-// streamType: 1 = stdout, 2 = stderr.
-func stdcopyFrame(streamType byte, data []byte) []byte {
-	frame := make([]byte, 8+len(data))
-	frame[0] = streamType
-	binary.BigEndian.PutUint32(frame[4:], uint32(len(data)))
-	copy(frame[8:], data)
-	return frame
-}
-
-// outputTar wraps content in a tar archive, mimicking CopyFromContainer's response.
-func outputTar(content []byte) io.ReadCloser {
-	var buf bytes.Buffer
-	tw := tar.NewWriter(&buf)
-	_ = tw.WriteHeader(&tar.Header{Name: "output.txt", Mode: 0644, Size: int64(len(content))})
-	_, _ = tw.Write(content)
-	_ = tw.Close()
-	return io.NopCloser(&buf)
-}
-
-// statsBody returns JSON-encoded StatsResponse with the given peak memory usage.
-func statsBody(maxUsageBytes uint64) io.ReadCloser {
-	stats := container.StatsResponse{
-		MemoryStats: container.MemoryStats{MaxUsage: maxUsageBytes},
-	}
-	data, _ := json.Marshal(stats)
-	return io.NopCloser(bytes.NewReader(data))
-}
-
-// --- mockDockerExecClient ---
-
-type mockDockerExecClient struct {
-	copyToContainerFn   func(context.Context, string, client.CopyToContainerOptions) (client.CopyToContainerResult, error)
-	execCreateFn        func(context.Context, string, client.ExecCreateOptions) (client.ExecCreateResult, error)
-	execAttachFn        func(context.Context, string, client.ExecAttachOptions) (client.ExecAttachResult, error)
-	execInspectFn       func(context.Context, string, client.ExecInspectOptions) (client.ExecInspectResult, error)
-	copyFromContainerFn func(context.Context, string, client.CopyFromContainerOptions) (client.CopyFromContainerResult, error)
-	containerStatsFn    func(context.Context, string, client.ContainerStatsOptions) (client.ContainerStatsResult, error)
-
-	execCreateCnt atomic.Int64
-}
-
-func (m *mockDockerExecClient) CopyToContainer(ctx context.Context, id string, opts client.CopyToContainerOptions) (client.CopyToContainerResult, error) {
-	if m.copyToContainerFn != nil {
-		return m.copyToContainerFn(ctx, id, opts)
-	}
-	return client.CopyToContainerResult{}, nil
-}
-
-func (m *mockDockerExecClient) ExecCreate(ctx context.Context, id string, opts client.ExecCreateOptions) (client.ExecCreateResult, error) {
-	m.execCreateCnt.Add(1)
-	if m.execCreateFn != nil {
-		return m.execCreateFn(ctx, id, opts)
-	}
-	return client.ExecCreateResult{ID: "exec-1"}, nil
-}
-
-func (m *mockDockerExecClient) ExecAttach(ctx context.Context, id string, opts client.ExecAttachOptions) (client.ExecAttachResult, error) {
-	if m.execAttachFn != nil {
-		return m.execAttachFn(ctx, id, opts)
-	}
-	return fakeAttach(nil), nil
-}
-
-func (m *mockDockerExecClient) ExecInspect(ctx context.Context, id string, opts client.ExecInspectOptions) (client.ExecInspectResult, error) {
-	if m.execInspectFn != nil {
-		return m.execInspectFn(ctx, id, opts)
-	}
-	return client.ExecInspectResult{ExitCode: 0}, nil
-}
-
-func (m *mockDockerExecClient) CopyFromContainer(ctx context.Context, id string, opts client.CopyFromContainerOptions) (client.CopyFromContainerResult, error) {
-	if m.copyFromContainerFn != nil {
-		return m.copyFromContainerFn(ctx, id, opts)
-	}
-	return client.CopyFromContainerResult{Content: outputTar(nil)}, nil
-}
-
-func (m *mockDockerExecClient) ContainerStats(ctx context.Context, id string, opts client.ContainerStatsOptions) (client.ContainerStatsResult, error) {
-	if m.containerStatsFn != nil {
-		return m.containerStatsFn(ctx, id, opts)
-	}
-	return client.ContainerStatsResult{Body: statsBody(0)}, nil
-}
-
-// --- mockPoolDockerClient: satisfies pool's unexported dockerLifecycle ---
-
-type mockPoolDockerClient struct {
-	idCounter atomic.Int64
-}
-
-func (m *mockPoolDockerClient) ContainerCreate(_ context.Context, _ client.ContainerCreateOptions) (client.ContainerCreateResult, error) {
-	return client.ContainerCreateResult{ID: fmt.Sprintf("pool-ctr-%d", m.idCounter.Add(1))}, nil
-}
-
-func (m *mockPoolDockerClient) ContainerStart(_ context.Context, _ string, _ client.ContainerStartOptions) (client.ContainerStartResult, error) {
-	return client.ContainerStartResult{}, nil
-}
-
-func (m *mockPoolDockerClient) ContainerRemove(_ context.Context, _ string, _ client.ContainerRemoveOptions) (client.ContainerRemoveResult, error) {
-	return client.ContainerRemoveResult{}, nil
-}
-
-func (m *mockPoolDockerClient) Ping(_ context.Context, _ client.PingOptions) (client.PingResult, error) {
-	return client.PingResult{}, nil
-}
-
-// --- test setup ---
-
-const (
-	testLang     = "cpp20"
-	testMemBytes = 512 * 1024 * 1024 // 512 MB
-)
-
-func testPoolCfg() judgepool.PoolConfig {
-	return judgepool.PoolConfig{
-		MemLimitBytes: 4 * testMemBytes,
-		IdleTimeout:   time.Hour,
-		ReapInterval:  time.Hour,
-		Languages: map[string]judgepool.LanguageConfig{
-			testLang: {Image: "judge:cpp20", MemoryBytes: testMemBytes},
-		},
-	}
-}
-
 func testExecCfg() ExecutorConfig {
 	return ExecutorConfig{
 		Languages: map[string]LanguageExecConfig{
 			testLang: {
-				CompileCmd: "g++ -std=c++20 -o /sandbox/solution /sandbox/solution.cpp",
-				RunCmd:     "/sandbox/solution",
-				Extension:  "cpp",
+				CompileCmd:   "g++ -std=c++20 -o /sandbox/solution /sandbox/solution.cpp",
+				RunCmd:       "/sandbox/solution",
+				Extension:    "cpp",
+				MemoryFactor: 1.0,
 			},
 		},
 	}
 }
 
-func newTestPoolForExecutor(t *testing.T) (*judgepool.Pool, *mockPoolDockerClient) {
-	t.Helper()
-	poolMock := &mockPoolDockerClient{}
-	p := judgepool.NewPool(testPoolCfg(), poolMock)
-	p.Start()
-	t.Cleanup(p.Stop)
-	return p, poolMock
-}
-
 func newTestSession(t *testing.T, docker *mockDockerExecClient) (*Session, *judgepool.Pool) {
 	t.Helper()
-	p, _ := newTestPoolForExecutor(t)
-	c, err := p.Claim(context.Background(), testLang)
+	p, _ := newTestPool(t)
+	c, err := p.Claim(context.Background(), testLang, judgepool.LanguageCeiling)
 	if err != nil {
 		t.Fatalf("pool.Claim: %v", err)
 	}
 	s := &Session{
-		container: c,
-		pool:      p,
-		docker:    docker,
-		langCfg:   testExecCfg().Languages[testLang],
+		container:  c,
+		pool:       p,
+		docker:     docker,
+		langCfg:    testExecCfg().Languages[testLang],
+		judgingDir: newTestJudgingDir(t),
 	}
 	return s, p
 }
@@ -232,10 +48,10 @@ func newTestSession(t *testing.T, docker *mockDockerExecClient) (*Session, *judg
 
 // 1. BeginSession with a language absent from ExecutorConfig returns error without claiming.
 func TestExecutor_BeginSession_UnknownLanguage(t *testing.T) {
-	p, poolMock := newTestPoolForExecutor(t)
-	e := NewExecutor(p, &mockDockerExecClient{}, ExecutorConfig{Languages: map[string]LanguageExecConfig{}})
+	p, poolMock := newTestPool(t)
+	e := NewExecutor(p, &mockDockerExecClient{}, ExecutorConfig{Languages: map[string]LanguageExecConfig{}}, t.TempDir())
 
-	_, err := e.BeginSession(context.Background(), submission.RestoreLanguage("rust"))
+	_, err := e.BeginSession(context.Background(), submission.RestoreLanguage("rust"), testProblemMemoryKb, "judging-1")
 	if err == nil {
 		t.Fatal("expected error for unknown language, got nil")
 	}
@@ -246,10 +62,10 @@ func TestExecutor_BeginSession_UnknownLanguage(t *testing.T) {
 
 // 2. BeginSession for a known language claims a container and returns a *Session.
 func TestExecutor_BeginSession_Success(t *testing.T) {
-	p, _ := newTestPoolForExecutor(t)
-	e := NewExecutor(p, &mockDockerExecClient{}, testExecCfg())
+	p, _ := newTestPool(t)
+	e := NewExecutor(p, &mockDockerExecClient{}, testExecCfg(), t.TempDir())
 
-	sess, err := e.BeginSession(context.Background(), submission.RestoreLanguage(testLang))
+	sess, err := e.BeginSession(context.Background(), submission.RestoreLanguage(testLang), testProblemMemoryKb, "judging-1")
 	if err != nil {
 		t.Fatalf("BeginSession: %v", err)
 	}
@@ -351,19 +167,16 @@ func TestSession_Compile_LogTruncated(t *testing.T) {
 	}
 }
 
-// 7. RunTestCase with exit code 0 returns the program output.
+// 7. RunTestCase with exit code 0 previews what the program left in the volume.
 func TestSession_RunTestCase_Accepted(t *testing.T) {
 	expected := []byte("42\n")
-	mock := &mockDockerExecClient{
-		copyFromContainerFn: func(_ context.Context, _ string, _ client.CopyFromContainerOptions) (client.CopyFromContainerResult, error) {
-			return client.CopyFromContainerResult{Content: outputTar(expected)}, nil
-		},
-	}
+	mock := &mockDockerExecClient{}
 	s, _ := newTestSession(t, mock)
 	defer s.Close(context.Background())
+	writeContestantOutput(t, s.judgingDir, expected)
 
 	result, err := s.RunTestCase(context.Background(), appjudge.RunRequest{
-		Input: []byte("1\n"), TimeLimitMs: 1000, MemoryKb: 262144,
+		Input: []byte("1\n"), TimeLimitMs: 1000,
 	})
 	if err != nil {
 		t.Fatalf("RunTestCase: %v", err)
@@ -371,8 +184,8 @@ func TestSession_RunTestCase_Accepted(t *testing.T) {
 	if result.ExitCode != 0 {
 		t.Errorf("ExitCode = %d, want 0", result.ExitCode)
 	}
-	if !bytes.Equal(result.Output, expected) {
-		t.Errorf("Output = %q, want %q", result.Output, expected)
+	if !bytes.Equal(result.OutputPreview, expected) {
+		t.Errorf("OutputPreview = %q, want %q", result.OutputPreview, expected)
 	}
 }
 
@@ -387,7 +200,7 @@ func TestSession_RunTestCase_TLE(t *testing.T) {
 	defer s.Close(context.Background())
 
 	result, err := s.RunTestCase(context.Background(), appjudge.RunRequest{
-		Input: []byte("1\n"), TimeLimitMs: 1000, MemoryKb: 262144,
+		Input: []byte("1\n"), TimeLimitMs: 1000,
 	})
 	if err != nil {
 		t.Fatalf("RunTestCase: %v", err)
@@ -408,7 +221,7 @@ func TestSession_RunTestCase_MLE(t *testing.T) {
 	defer s.Close(context.Background())
 
 	result, err := s.RunTestCase(context.Background(), appjudge.RunRequest{
-		Input: []byte("1\n"), TimeLimitMs: 1000, MemoryKb: 262144,
+		Input: []byte("1\n"), TimeLimitMs: 1000,
 	})
 	if err != nil {
 		t.Fatalf("RunTestCase: %v", err)
@@ -418,25 +231,56 @@ func TestSession_RunTestCase_MLE(t *testing.T) {
 	}
 }
 
-// 10. ContainerStats MaxUsage is reported in KB.
-func TestSession_RunTestCase_MemoryKb(t *testing.T) {
-	const maxUsage = 256 * 1024 * 1024 // 256 MB → 262144 KB
-	mock := &mockDockerExecClient{
-		containerStatsFn: func(_ context.Context, _ string, _ client.ContainerStatsOptions) (client.ContainerStatsResult, error) {
-			return client.ContainerStatsResult{Body: statsBody(maxUsage)}, nil
-		},
-	}
-	s, _ := newTestSession(t, mock)
+// 10. The memory a run used comes from what /usr/bin/time left behind, not from
+// the container's cgroup: MemoryStats.MaxUsage is a cgroup v1 field that reports
+// nothing on v2, and the container is reused across test cases anyway.
+func TestSession_RunTestCase_MemoryComesFromTheRunsOwnMeasurement(t *testing.T) {
+	s, _ := newTestSession(t, &mockDockerExecClient{})
 	defer s.Close(context.Background())
+	writeMemoryMeasurement(t, s.judgingDir, "262144\n")
 
 	result, err := s.RunTestCase(context.Background(), appjudge.RunRequest{
-		Input: []byte("1\n"), TimeLimitMs: 1000, MemoryKb: 262144,
+		Input: []byte("1\n"), TimeLimitMs: 1000,
 	})
 	if err != nil {
 		t.Fatalf("RunTestCase: %v", err)
 	}
-	if result.MemoryKb != 262144 {
-		t.Errorf("MemoryKb = %d, want 262144", result.MemoryKb)
+	if result.MemoryKb == nil {
+		t.Fatal("MemoryKb is nil, want the measurement the run left")
+	}
+	if *result.MemoryKb != 262144 {
+		t.Errorf("MemoryKb = %d, want 262144", *result.MemoryKb)
+	}
+}
+
+// Nothing measurable is reported as nothing: a zero would tell the contestant
+// their solution used no memory at all, which is what the old cgroup field did
+// on every single verdict.
+func TestSession_RunTestCase_UnreadableMeasurementIsNilNotZero(t *testing.T) {
+	tests := []struct {
+		name    string
+		content string
+	}{
+		{"the file is empty", ""},
+		{"the file holds something that is not a number", "Command exited with non-zero status 124\n103424"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			s, _ := newTestSession(t, &mockDockerExecClient{})
+			defer s.Close(context.Background())
+			writeMemoryMeasurement(t, s.judgingDir, tt.content)
+
+			result, err := s.RunTestCase(context.Background(), appjudge.RunRequest{
+				Input: []byte("1\n"), TimeLimitMs: 1000,
+			})
+			if err != nil {
+				t.Fatalf("RunTestCase: %v", err)
+			}
+			if result.MemoryKb != nil {
+				t.Errorf("MemoryKb = %d, want nil", *result.MemoryKb)
+			}
+		})
 	}
 }
 
@@ -452,7 +296,7 @@ func TestSession_RunTestCase_SafetyNet_Discards(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
 	defer cancel()
 	_, err := s.RunTestCase(ctx, appjudge.RunRequest{
-		Input: []byte("1\n"), TimeLimitMs: 1000, MemoryKb: 262144,
+		Input: []byte("1\n"), TimeLimitMs: 1000,
 	})
 	if err == nil {
 		t.Fatal("expected error from safety net, got nil")
@@ -469,12 +313,12 @@ func TestSession_Close_ReleasesContainer(t *testing.T) {
 	p.Start()
 	t.Cleanup(p.Stop)
 
-	c, _ := p.Claim(context.Background(), testLang)
+	c, _ := p.Claim(context.Background(), testLang, judgepool.LanguageCeiling)
 	s := &Session{container: c, pool: p, docker: &mockDockerExecClient{}, langCfg: testExecCfg().Languages[testLang]}
 
 	_ = s.Close(context.Background())
 
-	c2, err := p.Claim(context.Background(), testLang)
+	c2, err := p.Claim(context.Background(), testLang, judgepool.LanguageCeiling)
 	if err != nil {
 		t.Fatalf("Claim after Close: %v", err)
 	}
@@ -496,5 +340,207 @@ func TestSession_Close_AfterDiscard_Noop(t *testing.T) {
 	}
 	if mock.execCreateCnt.Load() != cntBefore {
 		t.Error("Close must not make Docker calls when container is nil")
+	}
+}
+
+// The port speaks kilobytes because that is what the problem declares; the pool
+// speaks bytes. The conversion is one multiplication, and getting it wrong gives
+// a container a thousandth of its limit without anything failing visibly.
+func TestExecutor_BeginSession_ProblemLimitReachesThePoolInBytes(t *testing.T) {
+	p, poolMock := newTestPool(t)
+	e := NewExecutor(p, &mockDockerExecClient{}, testExecCfg(), t.TempDir())
+
+	sess, err := e.BeginSession(context.Background(), submission.RestoreLanguage(testLang), testProblemMemoryKb, "judging-1")
+	if err != nil {
+		t.Fatalf("BeginSession: %v", err)
+	}
+	// The judging directory is unwritable until Close unlocks it, so leaving the
+	// session open makes t.TempDir cleanup fail for anyone who is not root.
+	defer sess.Close(context.Background())
+
+	const want = int64(testProblemMemoryKb) * 1024
+	if got := poolMock.lastCreateMemory.Load(); got != want {
+		t.Errorf("container created with Memory = %d bytes, want %d (%d KB)", got, want, testProblemMemoryKb)
+	}
+}
+
+// timeout(1) SIGKILLs a second after its own deadline, so the worker's deadline
+// has to sit past that. Under it, a run that dies late — a Java OOM takes
+// seconds, not microseconds — would be discarded as broken infrastructure and
+// end in SYSTEM_ERROR instead of producing a verdict.
+func TestSession_RunTestCase_SafetyNetOutlivesTheInContainerKill(t *testing.T) {
+	const timeLimitMs = 1000
+	// wallBackstop = max(2, ceil(2*timeLimit)) = 2s, and timeout --kill-after=1s
+	// makes the process certainly dead one second later.
+	const certainlyDead = 3 * time.Second
+
+	var deadline time.Time
+	var haveDeadline bool
+	mock := &mockDockerExecClient{
+		execCreateFn: func(ctx context.Context, _ string, _ client.ExecCreateOptions) (client.ExecCreateResult, error) {
+			deadline, haveDeadline = ctx.Deadline()
+			return client.ExecCreateResult{ID: "exec-1"}, nil
+		},
+	}
+	s, _ := newTestSession(t, mock)
+
+	start := time.Now()
+	if _, err := s.RunTestCase(context.Background(), appjudge.RunRequest{
+		Input: []byte("1\n"), TimeLimitMs: timeLimitMs,
+	}); err != nil {
+		t.Fatalf("RunTestCase: %v", err)
+	}
+
+	if !haveDeadline {
+		t.Fatal("the exec call must carry a deadline")
+	}
+	if got := deadline.Sub(start); got <= certainlyDead {
+		t.Errorf("worker deadline is %v after the start, want more than %v — it would give up before the in-container SIGKILL",
+			got, certainlyDead)
+	}
+}
+
+// The checker and validator paths assert their command; the solution path did
+// not, so dropping --kill-after went unnoticed. That flag is what guarantees
+// the process is dead before the worker's own deadline, and without it a slow
+// run turns into a discarded container and SYSTEM_ERROR instead of a verdict.
+func TestSession_RunTestCase_WrapsTheCommandInTheInContainerTimeout(t *testing.T) {
+	var cmds [][]string
+	mock := &mockDockerExecClient{}
+	recordExecs(mock, &cmds)
+	s, _ := newTestSession(t, mock)
+
+	if _, err := s.RunTestCase(context.Background(), appjudge.RunRequest{
+		Input: []byte("1\n"), TimeLimitMs: 1000,
+	}); err != nil {
+		t.Fatalf("RunTestCase: %v", err)
+	}
+
+	if len(cmds) != 1 || len(cmds[0]) != 3 || cmds[0][0] != "sh" || cmds[0][1] != "-c" {
+		t.Fatalf("expected one command through sh -c, got: %v", cmds)
+	}
+	// The write limit comes first so it reaches everything below it; time wraps
+	// timeout and not the other way round; and -q keeps the diagnostic line GNU
+	// time prints on a non-zero exit out of the measurement file.
+	want := fmt.Sprintf("ulimit -c 0; ulimit -f %d; ", outputLimitBlocks) +
+		"/usr/bin/time -q -f %M -o " + judgingMemPath(s.judgingDir) +
+		" timeout --kill-after=1s 2s " + testExecCfg().Languages[testLang].RunCmd +
+		" < " + judgingInputPath(s.judgingDir) + " > " + judgingOutputPath(s.judgingDir) + " 2>/dev/null"
+	if cmds[0][2] != want {
+		t.Errorf("command:\n got %q\nwant %q", cmds[0][2], want)
+	}
+}
+
+// A runtime that reserves memory of its own would otherwise charge that reserve
+// to the contestant: without the factor a Java solution gets 86% of the limit
+// the problem declared, against 99% for a native binary.
+func TestExecutor_BeginSession_MemoryFactorBuysBackTheRuntimeReserve(t *testing.T) {
+	p, poolMock := newTestPool(t)
+	cfg := testExecCfg()
+	lc := cfg.Languages[testLang]
+	lc.MemoryFactor = 1.5
+	cfg.Languages[testLang] = lc
+	e := NewExecutor(p, &mockDockerExecClient{}, cfg, t.TempDir())
+
+	sess, err := e.BeginSession(context.Background(), submission.RestoreLanguage(testLang), testProblemMemoryKb, "judging-1")
+	if err != nil {
+		t.Fatalf("BeginSession: %v", err)
+	}
+	// The judging directory is unwritable until Close unlocks it, so leaving the
+	// session open makes t.TempDir cleanup fail for anyone who is not root.
+	defer sess.Close(context.Background())
+
+	const want = int64(float64(testProblemMemoryKb) * 1024 * 1.5)
+	if got := poolMock.lastCreateMemory.Load(); got != want {
+		t.Errorf("container created with Memory = %d, want %d (the problem's %d KB times 1.5)",
+			got, want, testProblemMemoryKb)
+	}
+}
+
+// The input reaching the sandbox through the filesystem instead of the Docker
+// API is the whole point: it used to be copied twice per test case, once into
+// each container.
+func TestSession_RunTestCase_WritesTheInputToTheVolume(t *testing.T) {
+	docker := &mockDockerExecClient{
+		copyToContainerFn: func(context.Context, string, client.CopyToContainerOptions) (client.CopyToContainerResult, error) {
+			t.Error("the input went through the Docker API; it belongs in the volume")
+			return client.CopyToContainerResult{}, nil
+		},
+	}
+	s, _ := newTestSession(t, docker)
+	defer s.Close(context.Background())
+
+	if _, err := s.RunTestCase(context.Background(), appjudge.RunRequest{
+		Input: []byte("1 2\n"), TimeLimitMs: 1000,
+	}); err != nil {
+		t.Fatalf("RunTestCase: %v", err)
+	}
+
+	got, err := os.ReadFile(judgingInputPath(s.judgingDir))
+	if err != nil {
+		t.Fatalf("reading the input back: %v", err)
+	}
+	if string(got) != "1 2\n" {
+		t.Errorf("input.txt: got %q, want the test case input", got)
+	}
+}
+
+// The safety net nils the container out, so cleanup placed after that guard
+// would leave one directory per rescued judging in the shared volume forever.
+func TestSession_Close_RemovesTheJudgingDirectoryEvenWithoutAContainer(t *testing.T) {
+	s, _ := newTestSession(t, &mockDockerExecClient{})
+	dir := s.judgingDir
+	s.container = nil // what the safety net leaves behind
+
+	if err := s.Close(context.Background()); err != nil {
+		t.Fatalf("Close: %v", err)
+	}
+
+	if _, err := os.Stat(dir); !os.IsNotExist(err) {
+		t.Errorf("the judging directory survived Close: %v", err)
+	}
+}
+
+// The exit code cannot carry this: the three runtimes answer the signal that
+// stops an oversized write with 153, 1 and 0. What decides is the file size,
+// which works because the write limit sits one block above the reported one.
+func TestSession_RunTestCase_OutputLimitIsDecidedByTheFileSize(t *testing.T) {
+	tests := []struct {
+		name        string
+		outputBytes int
+		want        bool
+	}{
+		{"well under the limit", 1024, false},
+		{"one byte under the limit", maxOutputBytes - 1, false},
+		{"exactly the limit is still legal", maxOutputBytes, false},
+		{"one byte over", maxOutputBytes + 1, true},
+		{"cut off by the kernel at the write limit", outputLimitBlocks * 512, true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			s, _ := newTestSession(t, &mockDockerExecClient{})
+			defer s.Close(context.Background())
+			writeContestantOutput(t, s.judgingDir, make([]byte, tt.outputBytes))
+
+			result, err := s.RunTestCase(context.Background(), appjudge.RunRequest{
+				Input: []byte("1\n"), TimeLimitMs: 1000,
+			})
+			if err != nil {
+				t.Fatalf("RunTestCase: %v", err)
+			}
+			if result.OutputLimitExceeded != tt.want {
+				t.Errorf("OutputLimitExceeded = %v for %d bytes, want %v",
+					result.OutputLimitExceeded, tt.outputBytes, tt.want)
+			}
+		})
+	}
+}
+
+// The write limit has to land above the reported one, or an output of exactly
+// the limit would be cut and then read as having gone over it.
+func TestOutputLimitBlocks_LeaveRoomAboveTheReportedLimit(t *testing.T) {
+	if got := outputLimitBlocks * 512; got <= maxOutputBytes {
+		t.Errorf("the kernel would cut at %d, at or below the %d we report", got, maxOutputBytes)
 	}
 }

@@ -1,13 +1,14 @@
 package judge
 
 import (
-	"archive/tar"
 	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
 	"io"
 	"log/slog"
+	"os"
+	"strconv"
 	"strings"
 	"time"
 
@@ -18,20 +19,41 @@ import (
 	"github.com/training-judge-center/backend/internal/adapter/judge/pool"
 	appjudge "github.com/training-judge-center/backend/internal/application/judge"
 	"github.com/training-judge-center/backend/pkg/apperror"
+	"github.com/training-judge-center/backend/pkg/judgelimits"
+	"github.com/training-judge-center/backend/pkg/strutil"
 )
 
 const (
 	maxCompileLogBytes = 10 * 1024
-	maxOutputBytes     = 64 << 20
-	compileTimeout     = 30 * time.Second
+	// maxOutputBytes is the output limit a run is held to, enforced below and
+	// reported as a verdict. It is also what a checker has to hold in a light
+	// pool container: 64 MiB made every language run out of memory there. It
+	// lives in judgelimits because cmd/compare has to agree with it.
+	maxOutputBytes = judgelimits.MaxOutputBytes
+	// outputPreviewBytes is read back for the wrong-answer report. It is above
+	// the application layer's own preview so its truncation marker stays honest.
+	outputPreviewBytes = 4 << 10
+	// outputLimitBlocks is what ulimit -f takes: 512-byte blocks, and one more
+	// than maxOutputBytes needs so that going over is visible in the file size.
+	outputLimitBlocks = maxOutputBytes/512 + 1
+	compileTimeout    = 30 * time.Second
+	// runGrace is what the worker waits past the in-container timeout before
+	// assuming the daemon is stuck and the container has to go. It has to
+	// outlast the SIGKILL that timeout(1) sends a second after its deadline,
+	// and also cover the two Docker round trips the same deadline wraps.
+	runGrace = 5 * time.Second
 )
 
 type Session struct {
-	container *pool.Container // nil after Discard by safety net
-	pool      *pool.Pool
-	docker    dockerExecClient
-	langCfg   LanguageExecConfig
+	container  *pool.Container // nil after Discard by safety net
+	pool       *pool.Pool
+	docker     dockerExecClient
+	langCfg    LanguageExecConfig
+	judgingDir string
 }
+
+// SolutionBaseName is a solution's source filename inside the sandbox; judge_config.yaml must spell it the same.
+const SolutionBaseName = "Solution"
 
 func (s *Session) Compile(ctx context.Context, req appjudge.CompileRequest) (appjudge.CompileResult, error) {
 	ctx30, cancel := context.WithTimeout(ctx, compileTimeout)
@@ -39,7 +61,7 @@ func (s *Session) Compile(ctx context.Context, req appjudge.CompileRequest) (app
 
 	if _, err := s.docker.CopyToContainer(ctx30, s.container.ID(), client.CopyToContainerOptions{
 		DestinationPath: "/sandbox",
-		Content:         buildTar("solution."+s.langCfg.Extension, req.SourceCode),
+		Content:         buildTar(SolutionBaseName+"."+s.langCfg.Extension, req.SourceCode, modeSource),
 	}); err != nil {
 		slog.ErrorContext(ctx, "executor: copy source failed", "container_id", s.container.ID(), "error", err)
 		return appjudge.CompileResult{}, apperror.NewInternal()
@@ -77,29 +99,40 @@ func (s *Session) Compile(ctx context.Context, req appjudge.CompileRequest) (app
 
 	return appjudge.CompileResult{
 		Success: inspectRes.ExitCode == 0,
-		Log:     truncateString(outBuf.String()+errBuf.String(), maxCompileLogBytes),
+		Log:     strutil.Truncate(outBuf.String()+errBuf.String(), maxCompileLogBytes),
 	}, nil
 }
 
 func (s *Session) RunTestCase(ctx context.Context, req appjudge.RunRequest) (appjudge.RunResult, error) {
-	if _, err := s.docker.CopyToContainer(ctx, s.container.ID(), client.CopyToContainerOptions{
-		DestinationPath: "/sandbox",
-		Content:         buildTar("input.txt", req.Input),
-	}); err != nil {
-		slog.ErrorContext(ctx, "executor: copy input failed", "container_id", s.container.ID(), "error", err)
+	// Straight to the shared volume: the sandbox reads it from there, and so
+	// does the checker, instead of each getting its own copy through the API.
+	if err := os.WriteFile(judgingInputPath(s.judgingDir), req.Input, judgingFileMode); err != nil {
+		slog.ErrorContext(ctx, "executor: write input failed", "error", err)
 		return appjudge.RunResult{}, apperror.NewInternal()
 	}
 
 	wallBackstopSecs := max(2, (req.TimeLimitMs*2+999)/1000)
+	// The write limit sits one block ABOVE maxOutputBytes on purpose: an output
+	// of exactly the limit stays legal, and anything longer lands above it, which
+	// is what makes the excess visible in the file size. The exit code cannot be
+	// used for it — the three runtimes answer SIGXFSZ with 153, 1 and 0.
+	// ulimit -c 0 keeps a core dump of a half-gigabyte process off the disk
+	// instead of trusting the daemon's default.
+	//
+	// time wraps timeout and not the other way round: inside, a TLE would kill
+	// it too and no measurement would be written. -q keeps the diagnostic line
+	// GNU time prints on a non-zero exit out of the file, which is every TLE and
+	// every MLE.
 	cmd := fmt.Sprintf(
-		"timeout --kill-after=1s %ds %s < /sandbox/input.txt > /sandbox/output.txt 2>/dev/null",
-		wallBackstopSecs, s.langCfg.RunCmd,
+		"ulimit -c 0; ulimit -f %d; /usr/bin/time -q -f %%M -o %s timeout --kill-after=1s %ds %s < %s > %s 2>/dev/null",
+		outputLimitBlocks, judgingMemPath(s.judgingDir), wallBackstopSecs, s.langCfg.RunCmd,
+		judgingInputPath(s.judgingDir), judgingOutputPath(s.judgingDir),
 	)
 
-	safetyCtx, cancel := context.WithTimeout(ctx, time.Duration(wallBackstopSecs+2)*time.Second)
+	safetyCtx, cancel := context.WithTimeout(ctx, time.Duration(wallBackstopSecs)*time.Second+runGrace)
 	defer cancel()
 
-	cpuBeforeNs, _ := s.readStats(ctx)
+	cpuBeforeNs := s.readCPUNanos(ctx)
 	execRes, err := s.docker.ExecCreate(safetyCtx, s.container.ID(), client.ExecCreateOptions{
 		Cmd: []string{"sh", "-c", cmd},
 	})
@@ -133,93 +166,103 @@ func (s *Session) RunTestCase(ctx context.Context, req appjudge.RunRequest) (app
 		return appjudge.RunResult{}, apperror.NewInternal()
 	}
 
-	cpuAfterNs, memoryKb := s.readStats(ctx)
+	cpuAfterNs := s.readCPUNanos(ctx)
 	cpuTimeMs := 0
 	if cpuAfterNs > cpuBeforeNs {
 		cpuTimeMs = int((cpuAfterNs - cpuBeforeNs) / 1_000_000)
 	}
 
+	preview, exceeded := s.readOutput(ctx)
 	result := appjudge.RunResult{
-		ExitCode: inspectRes.ExitCode,
-		TimeMs:   cpuTimeMs,
-		MemoryKb: memoryKb,
-		Output:   s.copyOutput(ctx),
+		ExitCode:            inspectRes.ExitCode,
+		TimeMs:              cpuTimeMs,
+		MemoryKb:            s.readMemoryKb(ctx),
+		OutputPreview:       preview,
+		OutputLimitExceeded: exceeded,
 	}
-	s.cleanup(ctx)
+	// No per-case cleanup: the shell redirection truncates output.txt before the
+	// program starts, the worker overwrites input.txt, and Close removes both.
 	return result, nil
 }
 
 func (s *Session) Close(ctx context.Context) error {
+	// Ahead of the container guard on purpose: the safety net nils the container
+	// out, and the judging directory would then stay in the volume forever.
+	if err := removeJudgingDir(s.judgingDir); err != nil {
+		slog.ErrorContext(ctx, "executor: judging directory cleanup failed", "error", err)
+	}
 	if s.container == nil {
 		return nil
 	}
-	s.runWait(ctx, []string{"sh", "-c", "rm -rf /sandbox/*"})
+	if err := runAndWait(ctx, s.docker, s.container.ID(), []string{"sh", "-c", "rm -rf /sandbox/*"}); err != nil {
+		slog.ErrorContext(ctx, "executor: sandbox cleanup failed", "container_id", s.container.ID(), "error", err)
+	}
 	s.pool.Release(s.container)
 	return nil
 }
 
-func (s *Session) readStats(ctx context.Context) (uint64, int) {
+// readCPUNanos returns the container's cumulative CPU time. Memory does not
+// come from here: MemoryStats.MaxUsage is a cgroup v1 field, absent on v2, and
+// the container is reused across test cases anyway.
+func (s *Session) readCPUNanos(ctx context.Context) uint64 {
 	statsRes, err := s.docker.ContainerStats(ctx, s.container.ID(), client.ContainerStatsOptions{Stream: false})
 	if err != nil {
-		return 0, 0
+		return 0
 	}
 	defer statsRes.Body.Close()
 	var stats container.StatsResponse
 	if err := json.NewDecoder(statsRes.Body).Decode(&stats); err != nil {
-		return 0, 0
+		return 0
 	}
-	return stats.CPUStats.CPUUsage.TotalUsage, int(stats.MemoryStats.MaxUsage / 1024)
+	return stats.CPUStats.CPUUsage.TotalUsage
 }
 
-func (s *Session) copyOutput(ctx context.Context) []byte {
-	res, err := s.docker.CopyFromContainer(ctx, s.container.ID(), client.CopyFromContainerOptions{
-		SourcePath: "/sandbox/output.txt",
-	})
+// readMemoryKb picks up the peak RSS /usr/bin/time left behind: the run's own,
+// isolated from whatever else passed through this container. nil rather than
+// zero when there is nothing to read, so no verdict claims a solution used no
+// memory at all.
+func (s *Session) readMemoryKb(ctx context.Context) *int {
+	raw, err := os.ReadFile(judgingMemPath(s.judgingDir))
 	if err != nil {
+		slog.ErrorContext(ctx, "executor: reading the memory measurement failed", "error", err)
 		return nil
 	}
-	defer res.Content.Close()
-	return extractFirstFile(res.Content, maxOutputBytes)
-}
-
-func (s *Session) cleanup(ctx context.Context) {
-	s.runWait(ctx, []string{"sh", "-c", "rm -f /sandbox/input.txt /sandbox/output.txt"})
-}
-
-func (s *Session) runWait(ctx context.Context, cmd []string) {
-	execRes, err := s.docker.ExecCreate(ctx, s.container.ID(), client.ExecCreateOptions{Cmd: cmd})
+	kb, err := strconv.Atoi(strings.TrimSpace(string(raw)))
 	if err != nil {
-		return
-	}
-	att, err := s.docker.ExecAttach(ctx, execRes.ID, client.ExecAttachOptions{})
-	if err != nil {
-		return
-	}
-	_, _ = io.Copy(io.Discard, att.Reader)
-	att.Conn.Close()
-}
-
-func buildTar(filename string, content []byte) io.Reader {
-	var buf bytes.Buffer
-	tw := tar.NewWriter(&buf)
-	_ = tw.WriteHeader(&tar.Header{Name: filename, Mode: 0644, Size: int64(len(content))})
-	_, _ = tw.Write(content)
-	_ = tw.Close()
-	return &buf
-}
-
-func extractFirstFile(r io.Reader, maxBytes int64) []byte {
-	tr := tar.NewReader(r)
-	if _, err := tr.Next(); err != nil {
+		slog.ErrorContext(ctx, "executor: the memory measurement is not a number", "content", strutil.Truncate(string(raw), 200))
 		return nil
 	}
-	data, _ := io.ReadAll(&io.LimitedReader{R: tr, N: maxBytes})
-	return data
+	return &kb
 }
 
-func truncateString(s string, maxBytes int) string {
-	if len(s) <= maxBytes {
-		return s
+// readOutput brings back only what the wrong-answer report needs, and whether
+// the run wrote past the limit. The output itself stays in the volume for the
+// checker to read.
+//
+// The size is what decides: the write limit sits one block above
+// maxOutputBytes, so an output that went over lands above it, whatever the
+// runtime did with the signal that stopped it.
+func (s *Session) readOutput(ctx context.Context) ([]byte, bool) {
+	outputPath := judgingOutputPath(s.judgingDir)
+	info, err := os.Stat(outputPath)
+	if err != nil {
+		slog.ErrorContext(ctx, "executor: output file missing after the run", "error", err)
+		return nil, false
 	}
-	return s[:maxBytes]
+	exceeded := info.Size() > maxOutputBytes
+
+	f, err := os.Open(outputPath)
+	if err != nil {
+		slog.ErrorContext(ctx, "executor: opening the output failed", "error", err)
+		return nil, exceeded
+	}
+	defer f.Close()
+
+	preview := make([]byte, outputPreviewBytes)
+	n, err := io.ReadFull(f, preview)
+	if err != nil && err != io.EOF && err != io.ErrUnexpectedEOF {
+		slog.ErrorContext(ctx, "executor: reading the output failed", "error", err)
+		return nil, exceeded
+	}
+	return preview[:n], exceeded
 }

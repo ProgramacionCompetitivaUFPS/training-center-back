@@ -10,11 +10,11 @@
 # Prerrequisitos (capa 1, aparte):
 #   1. terraform apply                                              (cluster + infra de nube)
 #   2. gcloud container clusters get-credentials training-center --zone us-east1-b
-#   3. Si el registro nació vacío (recreación/migración): backend YA empujado (imagen v*) Y
-#      las 3 imágenes de lenguaje del judge (scripts/build-judge-images.sh + tag + push como
-#      judge-runner-{cpp20,java17,python310}:v0.1.0). Si faltan, este script corre entero sin
-#      error, pero el judge-worker queda en crash-loop silencioso (prepull-language-images:
-#      "manifest unknown") hasta que las subas.
+#   3. Si el registro nacio vacio (recreacion/migracion): backend YA empujado (imagen v*) Y
+#      las 4 imagenes del sandbox del judge (scripts/build-judge-images.sh + tag + push), en
+#      las versiones que declara judge/images-configmap.yaml. Si faltan, este script corre
+#      entero sin error, pero el judge-worker queda en crash-loop silencioso
+#      (prepull-language-images: "manifest unknown") hasta que las subas.
 #
 # Uso (desde cmd, para saltar la execution policy de PowerShell):
 #   powershell -ExecutionPolicy Bypass -File deploy\k8s\bootstrap.ps1
@@ -110,6 +110,7 @@ Apply-Tpl "app/api.yaml"
 Write-Host "==> KEDA + judge" -ForegroundColor Cyan
 kubectl apply --server-side -f https://github.com/kedacore/keda/releases/download/v2.20.1/keda-2.20.1.yaml
 kubectl wait --for=condition=available deployment/keda-operator -n keda --timeout=180s
+kubectl apply -f "$K8S/judge/images-configmap.yaml"
 Apply-Tpl "judge/worker.yaml"
 kubectl apply -f "$K8S/judge/keda.yaml"
 

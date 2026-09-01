@@ -23,8 +23,26 @@ spec:
           value: "true"
           effect: NoSchedule
       volumes:
+        # Both sizeLimits bound the blast radius rather than any single judging:
+        # going over one EVICTS THE POD, judgings in flight and all, so they sit
+        # well above what is needed. They also have to sit well BELOW the node's
+        # allocatable ephemeral storage, measured at 17.53Gi on an e2-standard-8
+        # with a 50GB disk — a cap the disk cannot reach bounds nothing.
         - name: dind-storage
-          emptyDir: {}
+          # The four judge images are ~920MB on disk; the rest is the writable
+          # layer of up to ten live containers, plus room for the images to grow.
+          emptyDir:
+            sizeLimit: 10Gi
+        # Where the contestant's output and the test case input live, so they
+        # never travel through the worker. Disk-backed on purpose: never add
+        # medium: Memory, whose pages are charged to the sandbox's cgroup and
+        # cannot be reclaimed, silently shrinking the contestant's memory limit.
+        - name: judging
+          # 5 concurrent judgings hold ~360MiB: an input under its 64MiB cap, an
+          # output under its 8MiB one, and the memory reading. The rest absorbs
+          # directories a failed Close would leave behind.
+          emptyDir:
+            sizeLimit: 2Gi
       initContainers:
         - name: dind
           image: docker:27-dind
@@ -37,16 +55,24 @@ spec:
           args:
             - --host=tcp://0.0.0.0:2375
             - --host=unix:///var/run/docker.sock
+          # requests == limits on every container puts the pod in Guaranteed QoS.
+          # The worker reads limits.cpu/limits.memory below through the Downward
+          # API, so they must be what the node actually reserved.
+          # cpu 6 -> maxConcurrent 5 (minus the daemon reserve core).
           resources:
             requests:
-              cpu: "2"
-              memory: 8Gi
+              cpu: "6"
+              memory: 24Gi
             limits:
-              cpu: "3"
-              memory: 10Gi
+              cpu: "6"
+              memory: 24Gi
           volumeMounts:
             - name: dind-storage
               mountPath: /var/lib/docker
+            # The daemon runs in here, so it resolves the bind source in this
+            # filesystem. Without this mount the sandboxes get an empty dir.
+            - name: judging
+              mountPath: /judging
           startupProbe:
             exec:
               command: ["docker", "info"]
@@ -57,6 +83,16 @@ spec:
           env:
             - name: DOCKER_HOST
               value: tcp://localhost:2375
+            - name: RUNNER_VERSION
+              valueFrom:
+                configMapKeyRef:
+                  name: judge-images
+                  key: RUNNER_VERSION
+            - name: COMPARE_VERSION
+              valueFrom:
+                configMapKeyRef:
+                  name: judge-images
+                  key: COMPARE_VERSION
           command:
             - /bin/sh
             - -c
@@ -67,14 +103,26 @@ spec:
                 'http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/default/token' \
                 | sed 's/.*"access_token":"\([^"]*\)".*/\1/')
               echo "$TOKEN" | docker login -u oauth2accesstoken --password-stdin https://us-east1-docker.pkg.dev
-              for lang in cpp20 java17 python310; do
-                docker pull "$REG/judge-runner-$lang:v0.1.0"
-                docker tag  "$REG/judge-runner-$lang:v0.1.0" "judge-runner:$lang"
+              for entry in "cpp20:$RUNNER_VERSION" "java17:$RUNNER_VERSION" "python310:$RUNNER_VERSION" "compare:$COMPARE_VERSION"; do
+                lang="${entry%%:*}"
+                version="${entry##*:}"
+                docker pull "$REG/judge-runner-$lang:$version"
+                docker tag  "$REG/judge-runner-$lang:$version" "judge-runner:$lang"
               done
               echo "prepull: all language images ready"
+          # Small, but required: QoS looks at init containers too, and one
+          # without resources would drop the whole pod to Burstable. Free —
+          # this runs before the worker starts, inside its share.
+          resources:
+            requests:
+              cpu: 200m
+              memory: 256Mi
+            limits:
+              cpu: 200m
+              memory: 256Mi
       containers:
         - name: worker
-          image: __IMAGE__   # placeholder: se sustituye por la versión al aplicar (bootstrap) / lo actualiza el CD con set image. NO aplicar directo sin sustituir.
+          image: __IMAGE__   # placeholder, substituted at apply time by bootstrap and updated by CD's set image. Never apply this file unsubstituted.
           command: ["/bin/worker"]
           envFrom:
             - configMapRef:
@@ -84,6 +132,10 @@ spec:
               value: tcp://localhost:2375
             - name: JUDGE_CONFIG
               value: /config/judge_config.yaml
+            # What the daemon resolves the judging mount against. A path here,
+            # because the daemon lives in the dind sidecar and sees this one.
+            - name: JUDGE_VOLUME_SOURCE
+              value: /judging
             - name: DB_PASSWORD
               valueFrom:
                 secretKeyRef:
@@ -107,10 +159,16 @@ spec:
                   containerName: dind
                   resource: limits.cpu
                   divisor: 1m
+          # 1 core: decompressing a 100 MB test case ZIP is the worker's
+          # dominant CPU cost, and 500m halved its throughput. 2Gi holds
+          # maxConcurrent judgings worth of test data.
           resources:
             requests:
-              cpu: 250m
-              memory: 256Mi
+              cpu: "1"
+              memory: 2Gi
             limits:
-              cpu: 500m
-              memory: 512Mi
+              cpu: "1"
+              memory: 2Gi
+          volumeMounts:
+            - name: judging
+              mountPath: /judging

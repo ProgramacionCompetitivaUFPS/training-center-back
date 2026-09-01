@@ -463,3 +463,78 @@ func TestGetStandingsUseCase_CompilationErrorNotCountedAsWrongAttempt(t *testing
 		t.Errorf("wrongAttempts=%d, want 0 (CE excluded)", prob.Attempts)
 	}
 }
+
+// The verdicts that penalise are literal strings here, not the domain type, so
+// one added to the domain does not reach this list on its own. Every verdict
+// that means "the contestant tried and failed" has to cost a penalty, or a
+// submission would be free.
+func TestGetStandingsUseCase_EveryFailedAttemptPenalises(t *testing.T) {
+	tests := []struct {
+		verdict   string
+		penalised bool
+	}{
+		{"WRONG_ANSWER", true},
+		{"TIME_LIMIT_EXCEEDED", true},
+		{"MEMORY_LIMIT_EXCEEDED", true},
+		{"OUTPUT_LIMIT_EXCEEDED", true},
+		{"RUNTIME_ERROR", true},
+		// Neither is the contestant's attempt failing on its merits: ICPC rules
+		// leave both out.
+		{"COMPILATION_ERROR", false},
+		{"SYSTEM_ERROR", false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.verdict, func(t *testing.T) {
+			regs := []*domainContest.ContestRegistration{reg(callerID)}
+			subs := []ContestSubmissionData{
+				sub(callerID, "A", tt.verdict, 30),
+				sub(callerID, "A", "ACCEPTED", 60),
+			}
+			uc := newGetStandingsUseCase(activeContest(), regs, subs, emptyCache(), visibleGroup(), isMemberNotLead())
+
+			out, err := uc.Execute(context.Background(), GetStandingsInput{
+				CurrentUser: asContestant(callerID),
+				GroupID:     testGroupID,
+				ContestID:   testContestID,
+				Page:        1,
+				Limit:       50,
+			})
+			if err != nil {
+				t.Fatalf("Execute: %v", err)
+			}
+
+			// The difference against a clean solve, not the absolute number: the
+			// solve time itself is measured from time.Now() and truncates.
+			got := out.Entries[0].TotalPenalty - cleanSolvePenalty(t)
+			want := 0
+			if tt.penalised {
+				want = 20
+			}
+			if got != want {
+				t.Errorf("%s cost %d minutes of penalty, want %d", tt.verdict, got, want)
+			}
+		})
+	}
+}
+
+// cleanSolvePenalty is what the same solve costs with no failed attempt before
+// it, so a test can measure what an attempt added.
+func cleanSolvePenalty(t *testing.T) int {
+	t.Helper()
+	regs := []*domainContest.ContestRegistration{reg(callerID)}
+	subs := []ContestSubmissionData{sub(callerID, "A", "ACCEPTED", 60)}
+	uc := newGetStandingsUseCase(activeContest(), regs, subs, emptyCache(), visibleGroup(), isMemberNotLead())
+
+	out, err := uc.Execute(context.Background(), GetStandingsInput{
+		CurrentUser: asContestant(callerID),
+		GroupID:     testGroupID,
+		ContestID:   testContestID,
+		Page:        1,
+		Limit:       50,
+	})
+	if err != nil {
+		t.Fatalf("baseline Execute: %v", err)
+	}
+	return out.Entries[0].TotalPenalty
+}

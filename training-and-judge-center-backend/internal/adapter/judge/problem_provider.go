@@ -9,6 +9,7 @@ import (
 	"github.com/jackc/pgx/v5"
 	infraPostgres "github.com/training-judge-center/backend/internal/adapter/postgres"
 	appJudge "github.com/training-judge-center/backend/internal/application/judge"
+	"github.com/training-judge-center/backend/internal/domain/submission"
 	"github.com/training-judge-center/backend/pkg/apperror"
 )
 
@@ -20,8 +21,12 @@ func NewProblemProvider(db infraPostgres.Querier) *ProblemProvider {
 	return &ProblemProvider{db: db}
 }
 
+// The stored JSON also carries the uploaded filename, which the judge no longer
+// needs: the artifact has a fixed name inside the sandbox.
 type dbCheckerJSON struct {
-	FileKey string `json:"fileKey"`
+	FileKey     string  `json:"fileKey"`
+	Language    string  `json:"language"`
+	CompiledKey *string `json:"compiledKey,omitempty"`
 }
 
 func (p *ProblemProvider) GetLimits(ctx context.Context, problemID string) (appJudge.ProblemLimits, error) {
@@ -58,7 +63,23 @@ func (p *ProblemProvider) GetLimits(ctx context.Context, problemID string) (appJ
 			return appJudge.ProblemLimits{}, apperror.NewInternal()
 		}
 		limits.HasCustomChecker = true
-		limits.CheckerPath = checker.FileKey
+
+		if checker.CompiledKey == nil {
+			// A checker that was never compiled: publish validation should
+			// have blocked this problem from ever reaching PUBLISHED, so
+			// this is an anomaly, not a normal state — worth surfacing, but
+			// falling back to token comparison (CheckerPath left empty) is
+			// safer than failing every judge run for this problem.
+			slog.WarnContext(ctx, "problem_provider: checker has no compiled artifact", "problem_id", problemID)
+		} else {
+			lang, err := submission.NewLanguage(checker.Language)
+			if err != nil {
+				slog.ErrorContext(ctx, "problem_provider: invalid checker language", "error", err, "problem_id", problemID, "language", checker.Language)
+				return appJudge.ProblemLimits{}, apperror.NewInternal()
+			}
+			limits.CheckerPath = *checker.CompiledKey
+			limits.CheckerLanguage = lang
+		}
 	}
 
 	return limits, nil

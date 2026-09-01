@@ -6,6 +6,7 @@
 go run cmd/api/main.go
 go run cmd/migrate/main.go up|down|status
 go run cmd/seed/main.go                 # seed admin user from ADMIN_* env vars (idempotent)
+go run cmd/worker/main.go                # judge worker: consumes the submission queue
 go test ./...
 go test -v ./internal/domain/problem/...
 go test -v ./internal/application/problem/...
@@ -14,7 +15,6 @@ bash tests/test_e2e.sh                  # requires running http
 ```
 
 **Dev env vars:**
-- `MOCK_AUTH=1` — reads user from `X-Mock-User` header
 - `STORAGE_BACKEND=local` — local filesystem instead of GCS
 
 ## Architecture
@@ -26,15 +26,22 @@ Full conventions live in `training-and-judge-center-backend/ARCHITECTURE.md` —
 Go backend: DDD + Hexagonal Architecture. Dependency direction: `domain/` ← `application/` ← `adapter/` ← `cmd/`.
 
 ```
-adapter/http/      ← driving adapter (handlers, middleware, router)
-adapter/postgres/  ← shared DB infrastructure
-adapter/user/      ← driven adapters: user domain
-adapter/problem/   ← driven adapters: problem domain
-adapter/group/     ← driven adapters: group domain
-adapter/material/  ← driven adapters: material domain
-adapter/auth/      ← driven adapter: authentication (transversal)
-adapter/email/     ← driven adapter: email (transversal)
-adapter/ratelimit/ ← driven adapter: rate limiting (transversal)
+adapter/http/       ← driving adapter (handlers, middleware, router)
+adapter/postgres/   ← shared DB infrastructure
+adapter/user/       ← driven adapters: user domain
+adapter/problem/    ← driven adapters: problem domain
+adapter/group/      ← driven adapters: group domain
+adapter/material/   ← driven adapters: material domain
+adapter/contest/    ← driven adapters: contest domain
+adapter/team/       ← driven adapters: team domain
+adapter/submission/ ← driven adapters: submission domain
+adapter/judge/      ← driven adapter: sandbox execution (pool, executor, sessions)
+adapter/queue/      ← driven adapter: RabbitMQ
+adapter/storage/    ← driven adapter: object storage (GCS or local)
+adapter/auth/       ← driven adapter: authentication (transversal)
+adapter/email/      ← driven adapter: email (transversal)
+adapter/ratelimit/  ← driven adapter: rate limiting (transversal)
+adapter/config/     ← driven adapter: platform settings from virtual_object.json
 ```
 
 `adapter/http/` must NOT import `adapter/postgres/`, `adapter/user/`, etc. — only `application/` and `domain/shared/`.
@@ -47,7 +54,7 @@ adapter/ratelimit/ ← driven adapter: rate limiting (transversal)
 
 - One file per concept: `user.go`, `email.go`, `status.go`, `repository.go`, `errors.go`
 - `New*()` validates and returns `apperror` on failure; `Restore*()` bypasses validation — no error return, no `New*` calls inside
-- `domain/shared/` — only `UserID` and `Role` (business primitives). `CurrentUser` → `application/shared/`
+- `domain/shared/` — only `UserID`, `GroupID` and `Role` (business primitives). `CurrentUser` → `application/shared/`
 - `errors.go` — string constants only (`ErrCodeEmailConflict = "EMAIL_CONFLICT"`); no sentinel `var ErrX = errors.New(...)`
 - Repository ports: primary aggregate → `repository.go`; secondary aggregates → `<aggregate>_repository.go`
 - Tests: `package <domain>_test`; table tests for value objects, individual functions for aggregates
@@ -62,7 +69,7 @@ adapter/ratelimit/ ← driven adapter: rate limiting (transversal)
 - Logging: `slog.ErrorContext(ctx, ...)` always; never `slog.Error(...)`
 - Tests: `mocks_test.go` for shared infrastructure; `mock*` naming; `testutil.AsAdmin/AsCoach/AsContestant` for CurrentUser helpers
 
-### Adapters — §6 (Ad1–Ad11)
+### Adapters — §6 (Ad1–Ad13)
 
 - Struct name = port name; no domain/tech prefix in type name — package provides context (`user.Repository`, not `user.UserRepository`)
 - Repositories: field type `postgres.Querier`; call `postgres.GetQuerier(ctx, r.db)` at the start of every method — reads and writes
@@ -99,7 +106,7 @@ adapter/ratelimit/ ← driven adapter: rate limiting (transversal)
 
 **`ListFilters.Statuses`:** empty slice = no status filter. Visibility of DRAFTs is controlled by `ViewerModifierID`. The use case must not pre-fill with all statuses.
 
-**`domain/shared/` vs `application/shared/`:** `UserID` and `Role` are business primitives → `domain/shared/`. `CurrentUser` is request context → `application/shared/`. Never add request-lifecycle concepts to `domain/shared/`.
+**`domain/shared/` vs `application/shared/`:** `UserID`, `GroupID` and `Role` are business primitives → `domain/shared/`. `CurrentUser` is request context → `application/shared/`. Never add request-lifecycle concepts to `domain/shared/`.
 
 **Cross-domain data:** each domain defines its own display types locally (e.g., `UserDisplay` in `application/problem/user_provider.go`). Never import `domain/user` from other domains — each domain queries what it needs via its own port and adapter.
 
@@ -107,8 +114,8 @@ adapter/ratelimit/ ← driven adapter: rate limiting (transversal)
 
 **Adapter double-logging:** the adapter logs the raw error before returning `apperror.NewInternal()`. The application layer must NOT log errors that come from adapters — they were already logged at the boundary.
 
-**Estado de los dominios:** todos los dominios del backend (`user`, `problem`, `group`, `material`, `contest`, `team`, `submission`) tienen capa de dominio, `application/` y handlers HTTP implementados. El **Judge System** está mayormente implementado: pool de containers (`adapter/judge/pool/`), executor/session (`adapter/judge/`), use case con retries (`application/judge/`) y el binario `cmd/worker/` (RUNNER_ARCHITECTURE.md lo llama `cmd/judge` — es el mismo componente). Pendientes: consumidor concurrente con semáforo (hoy es serial), `Pool.IsHealthy()` + `os.Exit` si el pool se degrada, goroutine de recuperación (§874), y despliegue DinD en GKE.
+**Estado de los dominios:** todos los dominios del backend (`user`, `problem`, `group`, `material`, `contest`, `team`, `submission`) tienen capa de dominio, `application/` y handlers HTTP implementados. El **Judge System** está implementado y probado de punta a punta contra GKE: dos pools de containers (`adapter/judge/pool/`, `heavy` y `light`), executor/session, compilación y ejecución de checkers y validators **dentro del sandbox**, consumidor concurrente con semáforo, `Pool.IsHealthy()` con `os.Exit`, recuperación de trabajos stale, y el binario `cmd/worker/`.
 
-**Endpoints pendientes principales:**
-- `POST /problems/p/{slug}/publish` — requiere Judge System; bloquea DRAFT→PUBLISHED por API.
-- `GET /users/me/dashboard` — dashboard de actividad cross-domain (misc-4).
+> `RUNNER_ARCHITECTURE.md` lo llama `cmd/judge` — es el mismo componente — y describe el diseño **anterior** al rediseño del sandbox. La fuente de verdad de cómo funciona hoy el judge es `training-and-judge-center-backend/JUDGE_SANDBOX_REDESIGN.md`.
+
+**Pendientes del judge:** ya no quedan endpoints principales sin implementar (`publish` y `GET /users/me/dashboard` existen). Lo que queda son ítems acotados —el `BackendConfig` del Ingress, deriva de documentación, y refactors chicos— listados al final de `JUDGE_SANDBOX_REDESIGN.md`.

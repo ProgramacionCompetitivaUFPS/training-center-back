@@ -1,4 +1,4 @@
-﻿package problem
+package problem
 
 import (
 	"context"
@@ -11,9 +11,9 @@ import (
 	"github.com/google/uuid"
 	"golang.org/x/sync/errgroup"
 
+	appshared "github.com/training-judge-center/backend/internal/application/shared"
 	"github.com/training-judge-center/backend/internal/domain/problem"
 	"github.com/training-judge-center/backend/internal/domain/shared"
-	appshared "github.com/training-judge-center/backend/internal/application/shared"
 	"github.com/training-judge-center/backend/pkg/apperror"
 )
 
@@ -22,6 +22,11 @@ const (
 	FileTypeSolution  = "solution"
 	FileTypeChecker   = "checker"
 	FileTypeValidator = "validator"
+
+	// Verifier sources are stored under the same name the judge writes them as
+	// inside the sandbox, so the bucket can be navigated without the database.
+	verifierBaseNameChecker   = "Checker"
+	verifierBaseNameValidator = "Validator"
 )
 
 type UploadProblemFilesInput struct {
@@ -46,23 +51,26 @@ type fileAction struct {
 }
 
 type UploadProblemFilesUseCase struct {
-	repo      problem.Repository
-	storage   ProblemFileRepository
-	zipParser ZipParser
-	settings  problem.PlatformSettings
+	repo           problem.Repository
+	validationRepo problem.ProblemValidationRepository
+	storage        ProblemFileRepository
+	zipParser      ZipParser
+	settings       problem.PlatformSettings
 }
 
 func NewUploadProblemFilesUseCase(
 	repo problem.Repository,
+	validationRepo problem.ProblemValidationRepository,
 	storage ProblemFileRepository,
 	zipParser ZipParser,
 	settings problem.PlatformSettings,
 ) *UploadProblemFilesUseCase {
 	return &UploadProblemFilesUseCase{
-		repo:      repo,
-		storage:   storage,
-		zipParser: zipParser,
-		settings:  settings,
+		repo:           repo,
+		validationRepo: validationRepo,
+		storage:        storage,
+		zipParser:      zipParser,
+		settings:       settings,
 	}
 }
 
@@ -83,6 +91,10 @@ func (uc *UploadProblemFilesUseCase) Execute(ctx context.Context, input UploadPr
 
 	if !p.CanBeEditedBy(shared.RestoreUserID(input.CurrentUser.ID), input.CurrentUser.IsAdmin()) {
 		return nil, apperror.NewForbidden(ErrCodeInsufficientPermissions, "Only the problem author, Admin, or assigned modifiers can update this problem")
+	}
+
+	if err := ensureNoActiveValidation(ctx, uc.validationRepo, p.ID()); err != nil {
+		return nil, err
 	}
 
 	now := time.Now()
@@ -146,7 +158,7 @@ func (uc *UploadProblemFilesUseCase) handleTestCases(ctx context.Context, p *pro
 
 	uploadInstanceID := uuid.New().String()
 	basePath := fmt.Sprintf("problems/%s/%s/%s", p.Slug().String(), FileTypeTestCases, uploadInstanceID)
-	zipKey := fmt.Sprintf("%s/testcases.zip", basePath)
+	zipKey := TestCasesZipKey(basePath)
 
 	allNewKeys := make([]string, 0, len(sampleFiles)+1)
 	allNewKeys = append(allNewKeys, zipKey)
@@ -218,11 +230,11 @@ func (uc *UploadProblemFilesUseCase) handleSolution(ctx context.Context, p *prob
 }
 
 func (uc *UploadProblemFilesUseCase) handleChecker(ctx context.Context, p *problem.Problem, input UploadProblemFilesInput, now time.Time) (fileAction, error) {
-	return uc.handleVerifier(ctx, p, input, FileTypeChecker, p.Checker, func(f problem.JudgingFile) { p.SetChecker(f, now) }, now)
+	return uc.handleVerifier(ctx, p, input, FileTypeChecker, verifierBaseNameChecker, p.Checker, func(f problem.JudgingFile) { p.SetChecker(f, now) }, now)
 }
 
 func (uc *UploadProblemFilesUseCase) handleValidator(ctx context.Context, p *problem.Problem, input UploadProblemFilesInput, now time.Time) (fileAction, error) {
-	return uc.handleVerifier(ctx, p, input, FileTypeValidator, p.Validator, func(f problem.JudgingFile) { p.SetValidator(f, now) }, now)
+	return uc.handleVerifier(ctx, p, input, FileTypeValidator, verifierBaseNameValidator, p.Validator, func(f problem.JudgingFile) { p.SetValidator(f, now) }, now)
 }
 
 func (uc *UploadProblemFilesUseCase) handleVerifier(
@@ -230,6 +242,7 @@ func (uc *UploadProblemFilesUseCase) handleVerifier(
 	p *problem.Problem,
 	input UploadProblemFilesInput,
 	fileType string,
+	baseName string,
 	getVerifier func() *problem.JudgingFile,
 	setVerifier func(problem.JudgingFile),
 	now time.Time,
@@ -246,7 +259,7 @@ func (uc *UploadProblemFilesUseCase) handleVerifier(
 		return fileAction{}, err
 	}
 
-	fileKey := fmt.Sprintf("problems/%s/%s/%s", p.Slug().String(), fileType, cleanName)
+	fileKey := fmt.Sprintf("problems/%s/%s/%s%s", p.Slug().String(), fileType, baseName, filepath.Ext(cleanName))
 	verifierObj, err := problem.NewVerifierFile(cleanName, fileKey, lang)
 	if err != nil {
 		return fileAction{}, err

@@ -85,12 +85,13 @@ This document centralizes the complete business logic of the Judge System and de
 | `PENDING` | Queued for judging, not yet started |
 | `RUNNING` | Currently being judged |
 | `ACCEPTED` | All test cases passed |
-| `WRONG_ANSWER` | Output does not match expected |
-| `PRESENTATION_ERROR` | Output format incorrect (whitespace, newlines) |
-| `TIME_LIMIT_EXCEEDED` | Execution exceeded time limit |
-| `MEMORY_LIMIT_EXCEEDED` | Execution exceeded memory limit |
-| `RUNTIME_EXCEPTION` | Program crashed during execution |
+| `WRONG_ANSWER` | Output does not match the expected one |
+| `TIME_LIMIT_EXCEEDED` | Execution exceeded the time limit |
+| `MEMORY_LIMIT_EXCEEDED` | Execution exceeded the memory limit |
+| `OUTPUT_LIMIT_EXCEEDED` | The program wrote more than the output limit allows |
+| `RUNTIME_ERROR` | Program failed during execution |
 | `COMPILATION_ERROR` | Code failed to compile |
+| `SYSTEM_ERROR` | The judge itself failed, after exhausting its retries |
 
 ### State Transitions
 
@@ -101,40 +102,51 @@ PENDING ──(worker picks up)──> RUNNING
                     ▼                           ▼
               COMPILATION_ERROR            (execution)
                                                │
-                         ┌──────────┬──────────┼──────────┬──────────┐
-                         ▼          ▼          ▼          ▼          ▼
-                    ACCEPTED    WRONG_ANSWER   TLE       MLE         RE
-                                     │
-                                     ▼
-                              PRESENTATION_ERROR
+                    ┌──────────┬──────────┬────┴─────┬──────────┐
+                    ▼          ▼          ▼          ▼          ▼
+               ACCEPTED   WRONG_ANSWER   TLE / MLE / OLE   RUNTIME_ERROR
+
+SYSTEM_ERROR is reachable from either branch: it means the judge failed, not
+the submission.
 ```
 
 ---
 
 ## 🔹 Verdict Priority
 
-When a submission has multiple issues, the verdict is determined by this priority (highest first):
+Test cases run in order and the **first one that fails decides the verdict** —
+there is no scoring across cases. Within a single test case, the order is:
 
 | Priority | Verdict | Condition |
 |----------|---------|-----------|
-| 1 | `COMPILATION_ERROR` | Code does not compile |
-| 2 | `RUNTIME_EXCEPTION` | Program crashed (SIGSEGV, SIGFPE, etc.) |
-| 3 | `TIME_LIMIT_EXCEEDED` | Execution time > limit |
-| 4 | `MEMORY_LIMIT_EXCEEDED` | Memory usage > limit |
-| 5 | `PRESENTATION_ERROR` | Output format incorrect |
-| 6 | `WRONG_ANSWER` | Output content incorrect |
-| 7 | `ACCEPTED` | All test cases passed |
+| 1 | `COMPILATION_ERROR` | Code does not compile; no test case runs |
+| 2 | `OUTPUT_LIMIT_EXCEEDED` | The run wrote past the output limit |
+| 3 | `TIME_LIMIT_EXCEEDED` | The run was killed at the time limit, or its CPU time exceeded it |
+| 4 | `MEMORY_LIMIT_EXCEEDED` | The kernel killed the run for exceeding the memory limit |
+| 5 | `RUNTIME_ERROR` | The run ended with any other non-zero exit code |
+| 6 | `WRONG_ANSWER` | The run finished, and the checker rejected its output |
+| 7 | `ACCEPTED` | Every test case passed |
 
-### PRESENTATION_ERROR vs WRONG_ANSWER
+`OUTPUT_LIMIT_EXCEEDED` comes before the exit code on purpose: the three
+runtimes answer the signal that stops an oversized write with three different
+exit codes (153 in C++, 1 in Python, 0 in Java), so reading the exit code would
+report a runtime error, a wrong answer and a pass for the very same behaviour.
+
+### There is no PRESENTATION_ERROR
+
+Output is compared token by token, so whitespace differences are not a verdict
+of their own:
 
 | Issue | Verdict |
 |-------|---------|
-| Extra spaces at end of line | PRESENTATION_ERROR |
-| Extra blank line at end | PRESENTATION_ERROR |
-| Missing newline at end | PRESENTATION_ERROR |
-| Wrong numeric format (1.0 vs 1) | PRESENTATION_ERROR |
-| Completely wrong output | WRONG_ANSWER |
-| Partial correct output | WRONG_ANSWER |
+| Extra spaces at end of line | `ACCEPTED` |
+| Extra blank line at end | `ACCEPTED` |
+| Missing newline at end | `ACCEPTED` |
+| CRLF instead of LF | `ACCEPTED` |
+| Wrong numeric format (1.0 vs 1) | `WRONG_ANSWER` — different tokens |
+| Completely or partially wrong output | `WRONG_ANSWER` |
+
+A problem that needs stricter formatting than that declares a custom checker.
 
 ---
 
@@ -289,43 +301,45 @@ securityContext:
 
 ### Default Comparison (No Checker)
 
-Line-by-line comparison with these rules:
+Token-by-token comparison, run by our own `compare` binary inside a sandbox
+container rather than in the worker. Both files are split into whitespace-
+delimited tokens and compared in order:
 
-1. Split output into lines
-2. Trim trailing whitespace from each line
-3. Remove trailing empty lines
-4. Compare line by line
+1. Split both outputs on any run of whitespace
+2. Compare token by token, in order
+3. Accept if both run out of tokens at the same point
 
-```python
-def compare(expected, actual):
-    exp_lines = [line.rstrip() for line in expected.strip().split('\n')]
-    act_lines = [line.rstrip() for line in actual.strip().split('\n')]
-    
-    if exp_lines == act_lines:
-        return "ACCEPTED"
-    
-    # Check for presentation errors
-    if normalize(expected) == normalize(actual):
-        return "PRESENTATION_ERROR"
-    
-    return "WRONG_ANSWER"
-```
+Whitespace itself is therefore never significant: line endings, trailing
+spaces, blank lines and a missing final newline all compare equal. Tokens are
+compared as text, so `1.0` and `1` are different.
+
+The comparison streams both files, so its memory follows the largest single
+token rather than the size of the outputs.
+
+Exit codes: `0` accepted, `1` rejected, `3` the comparison itself could not run
+(an unreadable file, or a single token beyond its buffer). The judge treats any
+non-zero exit as a rejection.
 
 ### Custom Checker
 
 When problem has a checker:
 
+The argument order is testlib's, so a checker written for Codeforces runs here
+unchanged. Note that the contestant's output comes **before** the jury's answer.
+
 ```bash
-./checker input.txt expected.txt actual.txt
+./checker input.txt output.txt answer.txt
 # Exit code 0 = ACCEPTED
-# Exit code 1 = WRONG_ANSWER
-# Exit code 2 = PRESENTATION_ERROR (optional)
+# Any other exit code = rejected, with the checker's stderr as the reason
 ```
 
 Checker receives:
-- `input.txt`: Test case input
-- `expected.txt`: Expected output (may be ignored)
-- `actual.txt`: User's output
+- `input.txt`: Test case input — testlib's `inf`
+- `output.txt`: The contestant's output — testlib's `ouf`
+- `answer.txt`: The jury's answer (may be ignored) — testlib's `ans`
+
+The distinction matters: testlib reports a malformed read on `ouf` as a wrong
+answer, and the same malformed read on `ans` as a fatal jury error.
 
 ---
 

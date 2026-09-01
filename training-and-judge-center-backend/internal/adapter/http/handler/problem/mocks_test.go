@@ -166,6 +166,59 @@ func (m *mockContestRejudgeProviderH) IsLeadOfGroup(_ context.Context, _, _ stri
 	return m.isLeadOfGroup, nil
 }
 
+// ── ProblemValidationRepository mock ─────────────────────────────────────────
+
+type mockValidationRepositoryH struct {
+	saveFn                  func(ctx context.Context, v *domainProblem.ProblemValidation) error
+	findByIDFn              func(ctx context.Context, id string) (*domainProblem.ProblemValidation, error)
+	findLatestByProblemIDFn func(ctx context.Context, problemID string) (*domainProblem.ProblemValidation, bool, error)
+}
+
+func (m *mockValidationRepositoryH) Save(ctx context.Context, v *domainProblem.ProblemValidation) error {
+	if m.saveFn != nil {
+		return m.saveFn(ctx, v)
+	}
+	return nil
+}
+func (m *mockValidationRepositoryH) FindByID(ctx context.Context, id string) (*domainProblem.ProblemValidation, error) {
+	if m.findByIDFn != nil {
+		return m.findByIDFn(ctx, id)
+	}
+	return nil, apperror.NewNotFound("VALIDATION_NOT_FOUND", "validation not found")
+}
+func (m *mockValidationRepositoryH) FindLatestByProblemID(ctx context.Context, problemID string) (*domainProblem.ProblemValidation, bool, error) {
+	if m.findLatestByProblemIDFn != nil {
+		return m.findLatestByProblemIDFn(ctx, problemID)
+	}
+	return nil, false, nil
+}
+
+// ── ValidationQueue mock ─────────────────────────────────────────────────────
+
+type mockValidationQueueH struct {
+	publishFn func(ctx context.Context, msg appProblem.ValidationQueueMessage) error
+}
+
+func (m *mockValidationQueueH) Publish(ctx context.Context, msg appProblem.ValidationQueueMessage) error {
+	if m.publishFn != nil {
+		return m.publishFn(ctx, msg)
+	}
+	return nil
+}
+
+// ── ProblemStatusProvider mock ───────────────────────────────────────────────
+
+type mockProblemStatusProviderH struct {
+	getStatusFn func(ctx context.Context, problemID string) (string, error)
+}
+
+func (m *mockProblemStatusProviderH) GetStatus(ctx context.Context, problemID string) (string, error) {
+	if m.getStatusFn != nil {
+		return m.getStatusFn(ctx, problemID)
+	}
+	return "PUBLISHED", nil
+}
+
 // ── Handler constructor helpers ──────────────────────────────────────────────
 
 func newHandlerWithStatistics(uc *appProblem.GetProblemStatisticsUseCase) *Handler {
@@ -202,6 +255,21 @@ func newHandlerWithListModifiers(repo domainProblem.Repository, userProvider app
 
 func newHandlerWithRejudgeContest(repo domainProblem.Repository, rejudger appProblem.SubmissionRejudger, contestProvider appProblem.ContestRejudgeProvider) *Handler {
 	return &Handler{rejudgeContestSubmissions: appProblem.NewRejudgeContestSubmissionsUseCase(repo, rejudger, contestProvider)}
+}
+
+func newHandlerWithPublish(repo domainProblem.Repository, validationRepo domainProblem.ProblemValidationRepository, queue appProblem.ValidationQueue, statusProvider appProblem.ProblemStatusProvider) *Handler {
+	statusCheck := appProblem.NewGetProblemValidationStatusUseCase(validationRepo, statusProvider)
+	return &Handler{
+		publishProblem:         appProblem.NewPublishProblemUseCase(repo, validationRepo, queue),
+		awaitProblemValidation: appProblem.NewAwaitProblemValidationUseCase(statusCheck),
+	}
+}
+
+func newHandlerWithGetLatestValidation(repo domainProblem.Repository, validationRepo domainProblem.ProblemValidationRepository, statusProvider appProblem.ProblemStatusProvider) *Handler {
+	statusCheck := appProblem.NewGetProblemValidationStatusUseCase(validationRepo, statusProvider)
+	return &Handler{
+		getLatestProblemValidation: appProblem.NewGetLatestProblemValidationUseCase(repo, validationRepo, statusCheck),
+	}
 }
 
 // ── Problem fixtures ─────────────────────────────────────────────────────────
@@ -259,6 +327,28 @@ func draftProblemWithModifier(modifierID string) *domainProblem.Problem {
 		[]shared.UserID{shared.RestoreUserID(modifierID)},
 		[]domainProblem.LanguageOverride{},
 		nil, []domainProblem.JudgingFile{},
+		nil, nil, nil,
+		testNow, testNow,
+	)
+}
+
+func completeDraftProblem() *domainProblem.Problem {
+	statement := "Solve this problem"
+	timeLimit := 2000
+	memoryLimit := 256
+	testCasesKey := "problems/test-problem/testCases/abc"
+	solution, err := domainProblem.NewSolutionFile("sol.cpp", "key-1", "cpp20")
+	if err != nil {
+		panic(err)
+	}
+	return domainProblem.RestoreProblem(
+		"p1", "test-problem", "Test Problem",
+		&statement, &timeLimit, &memoryLimit, []string{},
+		"DRAFT", "PRIVATE",
+		shared.RestoreUserID("u1"),
+		[]shared.UserID{},
+		[]domainProblem.LanguageOverride{},
+		&testCasesKey, []domainProblem.JudgingFile{solution},
 		nil, nil, nil,
 		testNow, testNow,
 	)

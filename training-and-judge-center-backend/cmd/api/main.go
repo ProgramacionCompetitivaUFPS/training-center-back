@@ -146,26 +146,29 @@ func main() {
 		}
 	}
 
-	icpcParser := problem.NewICPCParser(
-		settingsProvider.MaxFileSizeTestCaseMB(),
-		settingsProvider.MaxFileSizeDefaultMB(),
-		settingsProvider.MaxFileCountTestCase(),
-		settingsProvider.MaxFileCountSample(),
-		cfg.VirtualObject.LanguageExtensions,
-	)
+	icpcParser := problem.NewICPCParser(problem.ICPCParserConfig{
+		MaxUncompressedSizeMB: settingsProvider.MaxFileSizeTestCaseMB(),
+		MaxTestCaseInputMB:    cfg.VirtualObject.MaxFileSizeTestCaseInputMB,
+		MaxTestCaseAnswerMB:   cfg.VirtualObject.MaxFileSizeTestCaseAnswerMB,
+		MaxMetadataFileSizeMB: settingsProvider.MaxFileSizeDefaultMB(),
+		MaxFiles:              settingsProvider.MaxFileCountTestCase(),
+		MaxSampleFiles:        settingsProvider.MaxFileCountSample(),
+		LanguageExtensions:    cfg.VirtualObject.LanguageExtensions,
+	})
 	zipParser := problem.NewZipParser(icpcParser)
 	packageParser := problem.NewICPCPackageParser(icpcParser)
 
 	userProvider := problem.NewUserProvider(dbPool)
 	problemStatisticsProvider := problem.NewStatisticsProvider(dbPool)
 	problemActiveContestChecker := problem.NewActiveContestChecker(dbPool)
+	problemValidationRepo := problem.NewProblemValidationRepository(dbPool)
 
 	// Problem use cases
 	createProblemUseCase := appProblem.NewCreateProblemUseCase(problemRepo, settingsProvider)
 	importProblemUseCase := appProblem.NewImportProblemUseCase(problemRepo, fileStorage, packageParser, settingsProvider)
-	updateProblemUseCase := appProblem.NewUpdateProblemUseCase(problemRepo, settingsProvider)
-	uploadProblemFilesUseCase := appProblem.NewUploadProblemFilesUseCase(problemRepo, fileStorage, zipParser, settingsProvider)
-	deleteProblemFileUseCase := appProblem.NewDeleteProblemFileUseCase(problemRepo, fileStorage)
+	updateProblemUseCase := appProblem.NewUpdateProblemUseCase(problemRepo, problemValidationRepo, settingsProvider)
+	uploadProblemFilesUseCase := appProblem.NewUploadProblemFilesUseCase(problemRepo, problemValidationRepo, fileStorage, zipParser, settingsProvider)
+	deleteProblemFileUseCase := appProblem.NewDeleteProblemFileUseCase(problemRepo, problemValidationRepo, fileStorage)
 	addModifierUseCase := appProblem.NewAddModifierUseCase(problemRepo, userProvider)
 	removeModifierUseCase := appProblem.NewRemoveModifierUseCase(problemRepo, userProvider)
 	listModifiersUseCase := appProblem.NewListModifiersUseCase(problemRepo, userProvider)
@@ -455,6 +458,7 @@ func main() {
 
 	// submission queue — RabbitMQ when URL is set, no-op otherwise
 	var submissionQueue appsubmission.SubmissionQueue
+	var validationQueue appProblem.ValidationQueue
 	if cfg.RabbitMQURL != "" {
 		rmq, err := adapterqueue.NewRabbitMQQueue(cfg.RabbitMQURL)
 		if err != nil {
@@ -462,10 +466,12 @@ func main() {
 			os.Exit(1)
 		}
 		defer rmq.Close()
-		submissionQueue = rmq
+		submissionQueue = adapterqueue.NewRabbitMQSubmissionQueue(rmq)
+		validationQueue = adapterqueue.NewRabbitMQValidationQueue(rmq)
 		slog.Info("using RabbitMQ submission queue")
 	} else {
 		submissionQueue = adaptersubmission.NoOpQueue{}
+		validationQueue = problem.NoOpValidationQueue{}
 		slog.Info("using no-op submission queue (RABBITMQ_URL not set)")
 	}
 
@@ -474,6 +480,12 @@ func main() {
 	rejudgeSubmissionsUseCase := appProblem.NewRejudgeSubmissionsUseCase(problemRepo, submissionRejudger)
 	rejudgeContestSubmissionsUseCase := appProblem.NewRejudgeContestSubmissionsUseCase(problemRepo, submissionRejudger, contestRejudgeProvider)
 	adminRejudgeSubmissionsUseCase := appProblem.NewAdminRejudgeSubmissionsUseCase(problemRepo, submissionRejudger, contestRejudgeProvider)
+
+	publishProblemUseCase := appProblem.NewPublishProblemUseCase(problemRepo, problemValidationRepo, validationQueue)
+	problemStatusProvider := problem.NewProblemStatusProvider(dbPool)
+	getProblemValidationStatusUseCase := appProblem.NewGetProblemValidationStatusUseCase(problemValidationRepo, problemStatusProvider)
+	awaitProblemValidationUseCase := appProblem.NewAwaitProblemValidationUseCase(getProblemValidationStatusUseCase)
+	getLatestProblemValidationUseCase := appProblem.NewGetLatestProblemValidationUseCase(problemRepo, problemValidationRepo, getProblemValidationStatusUseCase)
 
 	problemHandler := handlerProblem.NewHandler(
 		createProblemUseCase,
@@ -487,6 +499,9 @@ func main() {
 		getProblemUseCase,
 		listProblemsUseCase,
 		unpublishProblemUseCase,
+		publishProblemUseCase,
+		awaitProblemValidationUseCase,
+		getLatestProblemValidationUseCase,
 		changeAccessibilityUseCase,
 		deleteProblemUseCase,
 		getProblemStatisticsUseCase,

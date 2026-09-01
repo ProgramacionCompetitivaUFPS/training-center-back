@@ -238,7 +238,10 @@ func (uc *GetStandingsUseCase) rebuild(ctx context.Context, contestID string) (*
 			t := sub.SubmittedAt
 			attempt.AcceptedAt = &t
 			p.Problems[sub.ProblemID] = attempt
-		case "WRONG_ANSWER", "TIME_LIMIT_EXCEEDED", "MEMORY_LIMIT_EXCEEDED", "RUNTIME_ERROR":
+		// Literal strings rather than the domain type, so a verdict added there
+		// does not reach this list on its own — see the test that pins them.
+		case "WRONG_ANSWER", "TIME_LIMIT_EXCEEDED", "MEMORY_LIMIT_EXCEEDED",
+			"OUTPUT_LIMIT_EXCEEDED", "RUNTIME_ERROR":
 			attempt.WrongAttemptTimes = append(attempt.WrongAttemptTimes, sub.SubmittedAt)
 			p.Problems[sub.ProblemID] = attempt
 		}
