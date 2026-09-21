@@ -13,6 +13,7 @@ type Handler struct {
 	adminUpdateUser         *appuser.AdminUpdateUserUseCase
 	adminDeactivateUser     *appuser.AdminDeactivateUserUseCase
 	listUsers               *appuser.ListUsersUseCase
+	listUserFilterOptions   *appuser.ListUserFilterOptionsUseCase
 	requestEmailChange      *appuser.RequestEmailChangeUseCase
 	confirmEmailChange      *appuser.ConfirmEmailChangeUseCase
 	requestPasswordRecovery *appuser.RequestPasswordRecoveryUseCase
@@ -36,6 +37,7 @@ func NewHandler(
 	adminUpdateUser *appuser.AdminUpdateUserUseCase,
 	adminDeactivateUser *appuser.AdminDeactivateUserUseCase,
 	listUsers *appuser.ListUsersUseCase,
+	listUserFilterOptions *appuser.ListUserFilterOptionsUseCase,
 	requestEmailChange *appuser.RequestEmailChangeUseCase,
 	confirmEmailChange *appuser.ConfirmEmailChangeUseCase,
 	requestPasswordRecovery *appuser.RequestPasswordRecoveryUseCase,
@@ -58,6 +60,7 @@ func NewHandler(
 		adminUpdateUser:         adminUpdateUser,
 		adminDeactivateUser:     adminDeactivateUser,
 		listUsers:               listUsers,
+		listUserFilterOptions:   listUserFilterOptions,
 		requestEmailChange:      requestEmailChange,
 		confirmEmailChange:      confirmEmailChange,
 		requestPasswordRecovery: requestPasswordRecovery,

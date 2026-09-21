@@ -20,6 +20,19 @@ type Repository interface {
 	// term, ordered by name. Intended for lightweight autocomplete — unlike
 	// FindAll it never matches email/institution and never computes a total count.
 	SearchActive(ctx context.Context, term string, limit int) ([]*User, error)
+	// FindFilterOptions returns the distinct, non-empty country/city/institution
+	// values currently in use across all users, sorted alphabetically. Lets a
+	// caller populate a closed selector instead of a free-text filter whose
+	// exact spelling the caller can't guess.
+	FindFilterOptions(ctx context.Context) (FilterOptions, error)
+}
+
+// FilterOptions is the result of FindFilterOptions — the distinct values a
+// country/city/institution filter selector can offer.
+type FilterOptions struct {
+	Countries    []string
+	Cities       []string
+	Institutions []string
 }
 
 type SortField string
