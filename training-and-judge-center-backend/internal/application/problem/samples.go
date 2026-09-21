@@ -4,6 +4,7 @@ import (
 	"context"
 	"path"
 	"sort"
+	"strconv"
 	"strings"
 )
 
@@ -52,7 +53,7 @@ func loadSamples(ctx context.Context, storage ProblemFileRepository, testCasesKe
 			names = append(names, name)
 		}
 	}
-	sort.Strings(names)
+	sortSampleNames(names)
 
 	samples := make([]SampleTestCase, 0, len(names))
 	for _, name := range names {
@@ -60,4 +61,24 @@ func loadSamples(ctx context.Context, storage ProblemFileRepository, testCasesKe
 	}
 
 	return samples, nil
+}
+
+// sortSampleNames sorts numerically (so "10" doesn't land before "2") only when every
+// name is a plain number, matching the usual ICPC sample naming convention (1.in, 2.in, ...).
+// If any name doesn't parse as a number, it falls back to plain alphabetical order for the
+// whole set, rather than mixing both criteria.
+func sortSampleNames(names []string) {
+	values := make(map[string]int, len(names))
+	for _, name := range names {
+		n, err := strconv.Atoi(name)
+		if err != nil {
+			sort.Strings(names)
+			return
+		}
+		values[name] = n
+	}
+
+	sort.Slice(names, func(i, j int) bool {
+		return values[names[i]] < values[names[j]]
+	})
 }
