@@ -92,7 +92,9 @@ func (r *Repository) Update(ctx context.Context, u *domainUser.User) error {
 		if errors.As(err, &pgErr) && pgErr.Code == infraPostgres.UniqueViolation {
 			switch pgErr.ConstraintName {
 			case "users_nickname_key":
-				return apperror.NewConflict(domainUser.ErrCodeNicknameConflict, "nickname already in use")
+				return apperror.NewConflictWithDetails(domainUser.ErrCodeNicknameConflict, "nickname already in use", []apperror.FieldError{
+					{Field: "nickname", Message: "nickname already in use"},
+				})
 			case "users_email_key":
 				return apperror.NewConflict(domainUser.ErrCodeEmailConflict, "email already in use")
 			}

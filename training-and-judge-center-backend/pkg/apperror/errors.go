@@ -39,6 +39,18 @@ func NewConflict(code, message string) *AppError {
 	}
 }
 
+// NewConflictWithDetails is NewConflict plus field-level details, for a
+// conflict the caller should highlight on a specific form field (e.g. a
+// duplicate nickname) rather than show only as a generic message.
+func NewConflictWithDetails(code, message string, details []FieldError) *AppError {
+	return &AppError{
+		Kind:    KindConflict,
+		Code:    code,
+		Message: message,
+		Details: details,
+	}
+}
+
 func NewNotFound(code, message string) *AppError {
 	return &AppError{
 		Kind:    KindNotFound,
