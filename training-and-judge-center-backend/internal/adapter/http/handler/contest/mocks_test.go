@@ -174,6 +174,12 @@ func (m *mockParticipantProfileProvider) GetProfiles(_ context.Context, _ []stri
 	return map[string]*appcontest.ParticipantProfile{}, nil
 }
 
+type mockTeamDisplayProvider struct{}
+
+func (m *mockTeamDisplayProvider) GetDisplays(_ context.Context, _ []string) (map[string]*appcontest.TeamDisplay, error) {
+	return map[string]*appcontest.TeamDisplay{}, nil
+}
+
 type mockTeamParticipRepo struct{}
 
 func (s *mockTeamParticipRepo) Save(_ context.Context, _ *domainContest.ContestTeamParticipation) error {

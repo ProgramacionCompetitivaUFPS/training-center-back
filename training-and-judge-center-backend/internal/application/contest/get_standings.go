@@ -3,6 +3,7 @@ package contest
 import (
 	"context"
 	"log/slog"
+	"sort"
 	"time"
 
 	"golang.org/x/sync/errgroup"
@@ -30,6 +31,45 @@ type RankedEntry struct {
 	TotalPenalty    int
 	LastAcceptedAt  *time.Time
 	Problems        map[string]RankedProblem // key: problemID
+	// Participant is populated by buildOutput after ranking (RankStandings
+	// does not set it); it carries the display fields the API contract needs.
+	Participant StandingParticipantDisplay
+}
+
+// StandingParticipantDisplay is the enriched, contestant-facing view of a
+// standings row's participant — an individual user or a team.
+type StandingParticipantDisplay struct {
+	ID          string
+	Type        string // "INDIVIDUAL" or "TEAM"
+	DisplayName string
+	Nickname    string   // INDIVIDUAL only
+	Name        string   // INDIVIDUAL only
+	Members     []string // TEAM only; nicknames, populated only when the contest shows team members
+	Country     *string  // INDIVIDUAL only
+	City        *string  // INDIVIDUAL only
+	Institution *string  // INDIVIDUAL only
+}
+
+// StandingsProblemDisplay is one entry of the contest's problem list, as
+// shown in the standings header row.
+type StandingsProblemDisplay struct {
+	ID       string // internal problem ID, used to correlate with RankedEntry.Problems
+	Position int
+	Slug     string
+	Title    string
+}
+
+// ContestSummaryDisplay is the standings-facing summary of the contest itself.
+type ContestSummaryDisplay struct {
+	ID            string
+	Name          string
+	Status        string
+	StartTime     time.Time
+	EndTime       time.Time
+	Penalty       int
+	FreezeMinutes int
+	IsFrozen      bool
+	FrozenAt      *time.Time
 }
 
 type GetStandingsInput struct {
@@ -52,11 +92,13 @@ type StandingsMeta struct {
 }
 
 type GetStandingsOutput struct {
-	Entries []RankedEntry
-	Total   int
-	Page    int
-	Limit   int
-	Meta    StandingsMeta
+	Contest  ContestSummaryDisplay
+	Problems []StandingsProblemDisplay
+	Entries  []RankedEntry
+	Total    int
+	Page     int
+	Limit    int
+	Meta     StandingsMeta
 }
 
 type GetStandingsUseCase struct {
@@ -65,6 +107,8 @@ type GetStandingsUseCase struct {
 	submissionProvider   StandingsSubmissionProvider
 	teamParticipProvider TeamParticipantProvider
 	profileProvider      ParticipantProfileProvider
+	teamDisplayProvider  TeamDisplayProvider
+	problemProvider      ProblemProvider
 	groupProvider        GroupProvider
 	memberProvider       GroupMemberProvider
 	standingsCache       StandingsCache
@@ -78,6 +122,8 @@ func NewGetStandingsUseCase(
 	submissionProvider StandingsSubmissionProvider,
 	teamParticipProvider TeamParticipantProvider,
 	profileProvider ParticipantProfileProvider,
+	teamDisplayProvider TeamDisplayProvider,
+	problemProvider ProblemProvider,
 	groupProvider GroupProvider,
 	memberProvider GroupMemberProvider,
 	standingsCache StandingsCache,
@@ -89,6 +135,8 @@ func NewGetStandingsUseCase(
 		submissionProvider:   submissionProvider,
 		teamParticipProvider: teamParticipProvider,
 		profileProvider:      profileProvider,
+		teamDisplayProvider:  teamDisplayProvider,
+		problemProvider:      problemProvider,
 		groupProvider:        groupProvider,
 		memberProvider:       memberProvider,
 		standingsCache:       standingsCache,
@@ -154,14 +202,14 @@ func (uc *GetStandingsUseCase) Execute(ctx context.Context, in GetStandingsInput
 		if time.Since(cached.LastUpdated) > uc.staleness {
 			go uc.backgroundRefresh(in.ContestID)
 		}
-		return uc.buildOutput(cached, contest, applyFreeze, status, freezeTime, in), nil
+		return uc.buildOutput(ctx, cached, contest, applyFreeze, status, freezeTime, in)
 	}
 
 	rebuilt, err := uc.rebuild(ctx, in.ContestID)
 	if err != nil {
 		return nil, err
 	}
-	return uc.buildOutput(rebuilt, contest, applyFreeze, status, freezeTime, in), nil
+	return uc.buildOutput(ctx, rebuilt, contest, applyFreeze, status, freezeTime, in)
 }
 
 func (uc *GetStandingsUseCase) rebuild(ctx context.Context, contestID string) (*CachedStandings, error) {
@@ -260,10 +308,25 @@ func (uc *GetStandingsUseCase) rebuild(ctx context.Context, contestID string) (*
 		profiles = map[string]*ParticipantProfile{}
 	}
 
+	teamIDs := make([]string, 0, len(teamMembers))
+	for teamID := range teamMembers {
+		teamIDs = append(teamIDs, teamID)
+	}
+	teamDisplays, err := uc.teamDisplayProvider.GetDisplays(ctx, teamIDs)
+	if err != nil {
+		slog.WarnContext(ctx, "rebuild: team name enrichment degraded", "error", err)
+		teamDisplays = map[string]*TeamDisplay{}
+	}
+	teamNames := make(map[string]string, len(teamDisplays))
+	for teamID, d := range teamDisplays {
+		teamNames[teamID] = d.Name
+	}
+
 	cached := &CachedStandings{
 		Participants: participants,
 		TeamMembers:  teamMembers,
 		Profiles:     profiles,
+		TeamNames:    teamNames,
 		LastUpdated:  time.Now(),
 	}
 	if err := uc.standingsCache.Set(ctx, contestID, cached); err != nil {
@@ -286,13 +349,14 @@ func (uc *GetStandingsUseCase) backgroundRefresh(contestID string) {
 }
 
 func (uc *GetStandingsUseCase) buildOutput(
+	ctx context.Context,
 	cached *CachedStandings,
 	contest *domainContest.Contest,
 	applyFreeze bool,
 	status domainContest.Status,
 	freezeTime *time.Time,
 	in GetStandingsInput,
-) *GetStandingsOutput {
+) (*GetStandingsOutput, error) {
 	var effectiveFreezeTime *time.Time
 	if applyFreeze {
 		effectiveFreezeTime = freezeTime
@@ -300,6 +364,9 @@ func (uc *GetStandingsUseCase) buildOutput(
 
 	participants := FilterStandingsByProfile(cached, in.Country, in.City, in.Institution)
 	entries := RankStandings(participants, contest.StartTime(), contest.Penalty().Value(), effectiveFreezeTime)
+	for i := range entries {
+		entries[i].Participant = buildParticipantDisplay(entries[i], cached, contest.ShowTeamMembers())
+	}
 
 	total := len(entries)
 	start := (in.Page - 1) * in.Limit
@@ -320,11 +387,108 @@ func (uc *GetStandingsUseCase) buildOutput(
 		meta.FrozenAt = freezeTime
 	}
 
-	return &GetStandingsOutput{
-		Entries: entries[start:end],
-		Total:   total,
-		Page:    in.Page,
-		Limit:   in.Limit,
-		Meta:    meta,
+	problems, err := uc.buildProblemsDisplay(ctx, contest)
+	if err != nil {
+		return nil, err
 	}
+
+	return &GetStandingsOutput{
+		Contest: ContestSummaryDisplay{
+			ID:            contest.ID(),
+			Name:          contest.Name().Value(),
+			Status:        status.String(),
+			StartTime:     contest.StartTime(),
+			EndTime:       contest.EndTime(),
+			Penalty:       contest.Penalty().Value(),
+			FreezeMinutes: contest.FreezeMinutes(),
+			IsFrozen:      meta.IsFrozen,
+			FrozenAt:      meta.FrozenAt,
+		},
+		Problems: problems,
+		Entries:  entries[start:end],
+		Total:    total,
+		Page:     in.Page,
+		Limit:    in.Limit,
+		Meta:     meta,
+	}, nil
+}
+
+// buildParticipantDisplay enriches a ranked entry with the display fields the
+// API contract needs. It reads only from cached data — no I/O here.
+func buildParticipantDisplay(entry RankedEntry, cached *CachedStandings, showTeamMembers bool) StandingParticipantDisplay {
+	if entry.ParticipantType == "TEAM" {
+		display := StandingParticipantDisplay{
+			ID:          entry.ContestantID,
+			Type:        "TEAM",
+			DisplayName: cached.TeamNames[entry.ContestantID],
+		}
+		if showTeamMembers {
+			members := make([]string, 0, len(cached.TeamMembers[entry.ContestantID]))
+			for _, memberID := range cached.TeamMembers[entry.ContestantID] {
+				if p := cached.Profiles[memberID]; p != nil && p.Nickname != "" {
+					members = append(members, p.Nickname)
+				}
+			}
+			sort.Strings(members)
+			display.Members = members
+		}
+		return display
+	}
+
+	profile := cached.Profiles[entry.ContestantID]
+	if profile == nil {
+		return StandingParticipantDisplay{ID: entry.ContestantID, Type: "INDIVIDUAL"}
+	}
+	return StandingParticipantDisplay{
+		ID:          entry.ContestantID,
+		Type:        "INDIVIDUAL",
+		DisplayName: profile.Nickname,
+		Nickname:    profile.Nickname,
+		Name:        profile.Name,
+		Country:     nilIfEmpty(profile.Country),
+		City:        nilIfEmpty(profile.City),
+		Institution: nilIfEmpty(profile.Institution),
+	}
+}
+
+func nilIfEmpty(s string) *string {
+	if s == "" {
+		return nil
+	}
+	return &s
+}
+
+// buildProblemsDisplay resolves the contest's problem list into the
+// slug/title pairs the standings header needs, in contest position order.
+func (uc *GetStandingsUseCase) buildProblemsDisplay(ctx context.Context, contest *domainContest.Contest) ([]StandingsProblemDisplay, error) {
+	cps := contest.Problems()
+	if len(cps) == 0 {
+		return []StandingsProblemDisplay{}, nil
+	}
+
+	ids := make([]string, len(cps))
+	for i, cp := range cps {
+		ids[i] = cp.ProblemID()
+	}
+	infos, err := uc.problemProvider.FindByIDs(ctx, ids)
+	if err != nil {
+		return nil, err
+	}
+
+	displays := make([]StandingsProblemDisplay, 0, len(cps))
+	for _, cp := range cps {
+		info, ok := infos[cp.ProblemID()]
+		if !ok {
+			slog.ErrorContext(ctx, "contest references problem not found in problems table",
+				"contest_id", contest.ID(), "problem_id", cp.ProblemID())
+			continue
+		}
+		displays = append(displays, StandingsProblemDisplay{
+			ID:       cp.ProblemID(),
+			Position: cp.Order(),
+			Slug:     info.Slug,
+			Title:    info.Title,
+		})
+	}
+	return displays, nil
 }
