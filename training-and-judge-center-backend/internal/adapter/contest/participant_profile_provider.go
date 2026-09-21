@@ -24,7 +24,7 @@ func (p *ParticipantProfileProvider) GetProfiles(ctx context.Context, userIDs []
 	}
 
 	q := infraPostgres.GetQuerier(ctx, p.db)
-	rows, err := q.Query(ctx, `SELECT id, country, city, institution FROM users WHERE id = ANY($1)`, userIDs)
+	rows, err := q.Query(ctx, `SELECT id, nickname, name, country, city, institution FROM users WHERE id = ANY($1)`, userIDs)
 	if err != nil {
 		slog.ErrorContext(ctx, "failed to get participant profiles", "error", err)
 		return nil, apperror.NewInternal()
@@ -33,7 +33,7 @@ func (p *ParticipantProfileProvider) GetProfiles(ctx context.Context, userIDs []
 
 	for rows.Next() {
 		var profile appContest.ParticipantProfile
-		if err := rows.Scan(&profile.ID, &profile.Country, &profile.City, &profile.Institution); err != nil {
+		if err := rows.Scan(&profile.ID, &profile.Nickname, &profile.Name, &profile.Country, &profile.City, &profile.Institution); err != nil {
 			slog.ErrorContext(ctx, "failed to scan participant profile", "error", err)
 			return nil, apperror.NewInternal()
 		}

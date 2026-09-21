@@ -471,6 +471,19 @@ func (m *mockParticipantProfileProvider) GetProfiles(ctx context.Context, userID
 	return map[string]*ParticipantProfile{}, nil
 }
 
+// ── TeamDisplayProvider mock ─────────────────────────────────────────────────
+
+type mockTeamDisplayProvider struct {
+	getDisplaysFn func(ctx context.Context, teamIDs []string) (map[string]*TeamDisplay, error)
+}
+
+func (m *mockTeamDisplayProvider) GetDisplays(ctx context.Context, teamIDs []string) (map[string]*TeamDisplay, error) {
+	if m.getDisplaysFn != nil {
+		return m.getDisplaysFn(ctx, teamIDs)
+	}
+	return map[string]*TeamDisplay{}, nil
+}
+
 // ── TransactionManager mock ──────────────────────────────────────────────────
 
 type mockTransactionManager struct {

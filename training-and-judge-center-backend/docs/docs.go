@@ -6279,17 +6279,26 @@ const docTemplate = `{
         "contest.getStandingsResponse": {
             "type": "object",
             "properties": {
-                "entries": {
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/contest.rankedEntry"
-                    }
+                "contest": {
+                    "$ref": "#/definitions/contest.standingsContestDisplay"
                 },
-                "meta": {
-                    "$ref": "#/definitions/contest.standingsMeta"
+                "filters": {
+                    "$ref": "#/definitions/contest.standingsFilters"
                 },
                 "pagination": {
                     "$ref": "#/definitions/contest.standingsPagination"
+                },
+                "problems": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/contest.standingsProblemHeader"
+                    }
+                },
+                "standings": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/contest.standingEntry"
+                    }
                 }
             }
         },
@@ -6503,52 +6512,6 @@ const docTemplate = `{
                 }
             }
         },
-        "contest.rankedEntry": {
-            "type": "object",
-            "properties": {
-                "contestantId": {
-                    "type": "string"
-                },
-                "lastAcceptedAt": {
-                    "type": "string"
-                },
-                "participantType": {
-                    "type": "string"
-                },
-                "problems": {
-                    "type": "object",
-                    "additionalProperties": {
-                        "$ref": "#/definitions/contest.rankedProblem"
-                    }
-                },
-                "problemsSolved": {
-                    "type": "integer"
-                },
-                "rank": {
-                    "type": "integer"
-                },
-                "totalPenalty": {
-                    "type": "integer"
-                }
-            }
-        },
-        "contest.rankedProblem": {
-            "type": "object",
-            "properties": {
-                "acceptedAt": {
-                    "type": "string"
-                },
-                "attempts": {
-                    "type": "integer"
-                },
-                "isSolved": {
-                    "type": "boolean"
-                },
-                "penalty": {
-                    "type": "integer"
-                }
-            }
-        },
         "contest.registrationItem": {
             "type": "object",
             "properties": {
@@ -6594,19 +6557,129 @@ const docTemplate = `{
                 }
             }
         },
-        "contest.standingsMeta": {
+        "contest.standingEntry": {
             "type": "object",
             "properties": {
-                "contestStatus": {
+                "participant": {
+                    "$ref": "#/definitions/contest.standingParticipant"
+                },
+                "problems": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/contest.standingProblemResult"
+                    }
+                },
+                "problemsSolved": {
+                    "type": "integer"
+                },
+                "rank": {
+                    "type": "integer"
+                },
+                "totalPenalty": {
+                    "type": "integer"
+                }
+            }
+        },
+        "contest.standingParticipant": {
+            "type": "object",
+            "properties": {
+                "city": {
                     "type": "string"
                 },
+                "country": {
+                    "type": "string"
+                },
+                "displayName": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "institution": {
+                    "type": "string"
+                },
+                "members": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "name": {
+                    "type": "string"
+                },
+                "nickname": {
+                    "type": "string"
+                },
+                "type": {
+                    "type": "string"
+                }
+            }
+        },
+        "contest.standingProblemResult": {
+            "type": "object",
+            "properties": {
+                "attempts": {
+                    "type": "integer"
+                },
+                "penalty": {
+                    "type": "integer"
+                },
+                "position": {
+                    "type": "integer"
+                },
+                "status": {
+                    "type": "string"
+                },
+                "time": {
+                    "type": "integer"
+                }
+            }
+        },
+        "contest.standingsContestDisplay": {
+            "type": "object",
+            "properties": {
+                "endTime": {
+                    "type": "string"
+                },
+                "freezeMinutes": {
+                    "type": "integer"
+                },
                 "frozenAt": {
+                    "type": "string"
+                },
+                "id": {
                     "type": "string"
                 },
                 "isFrozen": {
                     "type": "boolean"
                 },
-                "lastUpdated": {
+                "name": {
+                    "type": "string"
+                },
+                "penalty": {
+                    "type": "integer"
+                },
+                "startTime": {
+                    "type": "string"
+                },
+                "status": {
+                    "type": "string"
+                }
+            }
+        },
+        "contest.standingsFilters": {
+            "type": "object",
+            "properties": {
+                "city": {
+                    "type": "string"
+                },
+                "country": {
+                    "type": "string"
+                },
+                "filteredTotal": {
+                    "type": "integer"
+                },
+                "institution": {
                     "type": "string"
                 }
             }
@@ -6631,6 +6704,20 @@ const docTemplate = `{
                 },
                 "totalPages": {
                     "type": "integer"
+                }
+            }
+        },
+        "contest.standingsProblemHeader": {
+            "type": "object",
+            "properties": {
+                "position": {
+                    "type": "integer"
+                },
+                "slug": {
+                    "type": "string"
+                },
+                "title": {
+                    "type": "string"
                 }
             }
         },
