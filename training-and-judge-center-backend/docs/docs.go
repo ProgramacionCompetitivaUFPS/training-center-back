@@ -7849,6 +7849,12 @@ const docTemplate = `{
                 "problemJudgingUpdatedAt": {
                     "type": "string"
                 },
+                "samples": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/problem.sampleResp"
+                    }
+                },
                 "slug": {
                     "type": "string"
                 },
@@ -8042,6 +8048,20 @@ const docTemplate = `{
                 },
                 "submissionsQueued": {
                     "type": "integer"
+                }
+            }
+        },
+        "problem.sampleResp": {
+            "type": "object",
+            "properties": {
+                "input": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "output": {
+                    "type": "string"
                 }
             }
         },
