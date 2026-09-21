@@ -77,7 +77,7 @@ func NewProblem(
 		status:        NewStatusDraft(),
 		accessibility: NewAccessibilityPrivate(),
 		authorID:      authorID,
-		modifierIDs:   []shared.UserID{},
+		modifierIDs:   []shared.UserID{authorID},
 		solutions:     []JudgingFile{},
 		createdAt:     t,
 		updatedAt:     t,
