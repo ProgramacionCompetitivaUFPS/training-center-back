@@ -68,8 +68,8 @@ func TestNewProblem_SetsInitialState(t *testing.T) {
 	if p.Accessibility().String() != "PRIVATE" {
 		t.Errorf("accessibility: got %q, want PRIVATE", p.Accessibility().String())
 	}
-	if len(p.ModifierIDs()) != 0 {
-		t.Errorf("modifierIDs: got %d, want 0", len(p.ModifierIDs()))
+	if len(p.ModifierIDs()) != 1 || p.ModifierIDs()[0] != shared.RestoreUserID(testAuthorID) {
+		t.Errorf("modifierIDs: got %v, want [%s] (the author)", p.ModifierIDs(), testAuthorID)
 	}
 	if len(p.Solutions()) != 0 {
 		t.Errorf("solutions: got %d, want 0", len(p.Solutions()))

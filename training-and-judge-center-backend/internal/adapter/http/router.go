@@ -216,6 +216,7 @@ func NewRouter(h *Handlers, s *Services, allowedOrigins []string) *chi.Mux {
 		r.Use(middleware.RequireRole(shared.RoleAdmin))
 
 		r.Get("/users", h.User.ListUsers)
+		r.Get("/users/filters", h.User.ListUserFilterOptions)
 		r.Put("/users/{id}", h.User.AdminUpdateUser)
 		r.Post("/users/{id}/deactivate", h.User.AdminDeactivateUser)
 

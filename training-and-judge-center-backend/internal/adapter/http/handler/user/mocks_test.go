@@ -88,9 +88,10 @@ func (m *mockTokenService) ValidateToken(token string) (*domainuser.TokenClaims,
 }
 
 type mockHandlerUserRepo struct {
-	findByIDFn    func(ctx context.Context, id string) (*domainuser.User, error)
-	findByEmailFn func(ctx context.Context, email domainuser.Email) (*domainuser.User, error)
-	updateFn      func(ctx context.Context, u *domainuser.User) error
+	findByIDFn          func(ctx context.Context, id string) (*domainuser.User, error)
+	findByEmailFn       func(ctx context.Context, email domainuser.Email) (*domainuser.User, error)
+	updateFn            func(ctx context.Context, u *domainuser.User) error
+	findFilterOptionsFn func(ctx context.Context) (domainuser.FilterOptions, error)
 }
 
 func (m *mockHandlerUserRepo) Save(_ context.Context, _ *domainuser.User) error { return nil }
@@ -120,6 +121,12 @@ func (m *mockHandlerUserRepo) FindAll(_ context.Context, _ domainuser.UserFilter
 }
 func (m *mockHandlerUserRepo) SearchActive(_ context.Context, _ string, _ int) ([]*domainuser.User, error) {
 	return nil, nil
+}
+func (m *mockHandlerUserRepo) FindFilterOptions(ctx context.Context) (domainuser.FilterOptions, error) {
+	if m.findFilterOptionsFn != nil {
+		return m.findFilterOptionsFn(ctx)
+	}
+	return domainuser.FilterOptions{}, nil
 }
 
 type mockHandlerDeactRepo struct {
