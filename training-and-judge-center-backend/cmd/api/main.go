@@ -172,7 +172,7 @@ func main() {
 	addModifierUseCase := appProblem.NewAddModifierUseCase(problemRepo, userProvider)
 	removeModifierUseCase := appProblem.NewRemoveModifierUseCase(problemRepo, userProvider)
 	listModifiersUseCase := appProblem.NewListModifiersUseCase(problemRepo, userProvider)
-	getProblemUseCase := appProblem.NewGetProblemUseCase(problemRepo, userProvider)
+	getProblemUseCase := appProblem.NewGetProblemUseCase(problemRepo, userProvider, fileStorage)
 	listProblemsUseCase := appProblem.NewListProblemsUseCase(problemRepo, userProvider)
 	unpublishProblemUseCase := appProblem.NewUnpublishProblemUseCase(problemRepo, problemActiveContestChecker)
 	changeAccessibilityUseCase := appProblem.NewChangeAccessibilityUseCase(problemRepo)

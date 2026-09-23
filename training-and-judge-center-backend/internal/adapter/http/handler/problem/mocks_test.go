@@ -78,11 +78,26 @@ func (m *mockStatsProvider) GetByProblemID(_ context.Context, _ string) (*appPro
 
 // ── FileStorage mock ─────────────────────────────────────────────────────────
 
-type mockFileStorageH struct{}
+type mockFileStorageH struct {
+	listFilesFn    func(ctx context.Context, prefix string) ([]string, error)
+	downloadFileFn func(ctx context.Context, path string) ([]byte, error)
+}
 
 func (m *mockFileStorageH) UploadFile(_ context.Context, _ string, _ []byte) error  { return nil }
 func (m *mockFileStorageH) DeleteFile(_ context.Context, _ string) error            { return nil }
 func (m *mockFileStorageH) DeleteFilesWithPrefix(_ context.Context, _ string) error { return nil }
+func (m *mockFileStorageH) ListFiles(ctx context.Context, prefix string) ([]string, error) {
+	if m.listFilesFn != nil {
+		return m.listFilesFn(ctx, prefix)
+	}
+	return nil, nil
+}
+func (m *mockFileStorageH) DownloadFile(ctx context.Context, path string) ([]byte, error) {
+	if m.downloadFileFn != nil {
+		return m.downloadFileFn(ctx, path)
+	}
+	return nil, nil
+}
 
 // ── ActiveContestChecker mock ────────────────────────────────────────────────
 
@@ -225,6 +240,10 @@ func newHandlerWithStatistics(uc *appProblem.GetProblemStatisticsUseCase) *Handl
 	return &Handler{getProblemStatistics: uc}
 }
 
+func newHandlerWithGetProblem(repo domainProblem.Repository, userProvider appProblem.UserProvider, storage appProblem.ProblemFileRepository) *Handler {
+	return &Handler{getProblem: appProblem.NewGetProblemUseCase(repo, userProvider, storage)}
+}
+
 func newHandlerWithUnpublish(repo domainProblem.Repository, checker appProblem.ActiveContestChecker) *Handler {
 	return &Handler{unpublishProblem: appProblem.NewUnpublishProblemUseCase(repo, checker)}
 }
@@ -285,6 +304,21 @@ func publishedProblem() *domainProblem.Problem {
 		[]shared.UserID{},
 		[]domainProblem.LanguageOverride{},
 		nil, []domainProblem.JudgingFile{},
+		nil, nil, nil,
+		testNow, testNow,
+	)
+}
+
+func publishedProblemWithTestCases() *domainProblem.Problem {
+	key := "problems/test-problem/testcases/xyz"
+	return domainProblem.RestoreProblem(
+		"p1", "test-problem", "Test Problem",
+		nil, nil, nil, []string{},
+		"PUBLISHED", "PUBLIC",
+		shared.RestoreUserID("u1"),
+		[]shared.UserID{},
+		[]domainProblem.LanguageOverride{},
+		&key, []domainProblem.JudgingFile{},
 		nil, nil, nil,
 		testNow, testNow,
 	)

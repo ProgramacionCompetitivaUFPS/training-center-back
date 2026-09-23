@@ -27,15 +27,17 @@ type GetProblemOutput struct {
 	Author    ModifierDisplay
 	Modifiers []ModifierDisplay
 	Files     *FilesAvailability
+	Samples   []SampleTestCase
 }
 
 type GetProblemUseCase struct {
 	repo         problem.Repository
 	userProvider UserProvider
+	storage      ProblemFileRepository
 }
 
-func NewGetProblemUseCase(repo problem.Repository, userProvider UserProvider) *GetProblemUseCase {
-	return &GetProblemUseCase{repo: repo, userProvider: userProvider}
+func NewGetProblemUseCase(repo problem.Repository, userProvider UserProvider, storage ProblemFileRepository) *GetProblemUseCase {
+	return &GetProblemUseCase{repo: repo, userProvider: userProvider, storage: storage}
 }
 
 func (uc *GetProblemUseCase) Execute(ctx context.Context, in GetProblemInput) (*GetProblemOutput, error) {
@@ -62,9 +64,15 @@ func (uc *GetProblemUseCase) Execute(ctx context.Context, in GetProblemInput) (*
 		return nil, err
 	}
 
+	samples, err := loadSamples(ctx, uc.storage, p.TestCasesKey())
+	if err != nil {
+		return nil, err
+	}
+
 	out := &GetProblemOutput{
 		Problem: problemToDTO(p),
 		Author:  ModifierDisplay{Nickname: authorDisplay.Nickname, Name: authorDisplay.Name},
+		Samples: samples,
 	}
 
 	if isModifier {

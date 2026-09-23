@@ -104,6 +104,8 @@ type mockFileStorage struct {
 	uploadFileFn            func(ctx context.Context, path string, content []byte) error
 	deleteFileFn            func(ctx context.Context, path string) error
 	deleteFilesWithPrefixFn func(ctx context.Context, prefix string) error
+	listFilesFn             func(ctx context.Context, prefix string) ([]string, error)
+	downloadFileFn          func(ctx context.Context, path string) ([]byte, error)
 }
 
 func (m *mockFileStorage) UploadFile(ctx context.Context, path string, content []byte) error {
@@ -123,6 +125,18 @@ func (m *mockFileStorage) DeleteFilesWithPrefix(ctx context.Context, prefix stri
 		return m.deleteFilesWithPrefixFn(ctx, prefix)
 	}
 	return nil
+}
+func (m *mockFileStorage) ListFiles(ctx context.Context, prefix string) ([]string, error) {
+	if m.listFilesFn != nil {
+		return m.listFilesFn(ctx, prefix)
+	}
+	return nil, nil
+}
+func (m *mockFileStorage) DownloadFile(ctx context.Context, path string) ([]byte, error) {
+	if m.downloadFileFn != nil {
+		return m.downloadFileFn(ctx, path)
+	}
+	return nil, nil
 }
 
 // ── ZipParser mock ───────────────────────────────────────────────────────────
@@ -355,6 +369,21 @@ func newDraftProblemWithModifier() *domainProblem.Problem {
 		[]shared.UserID{shared.RestoreUserID(modifierID)},
 		[]domainProblem.LanguageOverride{},
 		nil, []domainProblem.JudgingFile{},
+		nil, nil, nil,
+		testNow, testNow,
+	)
+}
+
+func newPublishedProblemWithTestCases() *domainProblem.Problem {
+	key := "problems/test-problem/testcases/xyz"
+	return domainProblem.RestoreProblem(
+		testProbID, testSlug, "Test Problem",
+		nil, nil, nil, []string{},
+		"PUBLISHED", "PUBLIC",
+		shared.RestoreUserID(authorID),
+		[]shared.UserID{},
+		[]domainProblem.LanguageOverride{},
+		&key, []domainProblem.JudgingFile{},
 		nil, nil, nil,
 		testNow, testNow,
 	)

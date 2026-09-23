@@ -3,6 +3,7 @@ package problem
 import (
 	"context"
 	"errors"
+	"io"
 	"log/slog"
 
 	"cloud.google.com/go/storage"
@@ -92,4 +93,43 @@ func (r *GCSFileRepository) DeleteFilesWithPrefix(ctx context.Context, prefix st
 	}
 
 	return g.Wait()
+}
+
+func (r *GCSFileRepository) ListFiles(ctx context.Context, prefix string) ([]string, error) {
+	it := r.client.Bucket(r.bucket).Objects(ctx, &storage.Query{Prefix: prefix})
+
+	var names []string
+	for {
+		attrs, err := it.Next()
+		if errors.Is(err, iterator.Done) {
+			break
+		}
+		if err != nil {
+			slog.ErrorContext(ctx, "gcs: failed to list objects", "prefix", prefix, "error", err)
+			return nil, apperror.NewInternal()
+		}
+		names = append(names, attrs.Name)
+	}
+
+	return names, nil
+}
+
+func (r *GCSFileRepository) DownloadFile(ctx context.Context, path string) ([]byte, error) {
+	reader, err := r.client.Bucket(r.bucket).Object(path).NewReader(ctx)
+	if err != nil {
+		if errors.Is(err, storage.ErrObjectNotExist) {
+			return nil, apperror.NewNotFound(apperror.ErrCodeNotFound, "file not found")
+		}
+		slog.ErrorContext(ctx, "gcs: failed to open reader", "path", path, "error", err)
+		return nil, apperror.NewInternal()
+	}
+	defer reader.Close()
+
+	content, err := io.ReadAll(reader)
+	if err != nil {
+		slog.ErrorContext(ctx, "gcs: failed to read object", "path", path, "error", err)
+		return nil, apperror.NewInternal()
+	}
+
+	return content, nil
 }

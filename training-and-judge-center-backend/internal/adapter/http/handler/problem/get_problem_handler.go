@@ -55,6 +55,11 @@ func (h *Handler) GetProblem(w http.ResponseWriter, r *http.Request) {
 		judgingUpdatedAt = &s
 	}
 
+	samples := make([]sampleResp, len(out.Samples))
+	for i, s := range out.Samples {
+		samples[i] = sampleResp{Name: s.Name, Input: s.Input, Output: s.Output}
+	}
+
 	resp := getProblemResponse{
 		Slug:                    p.Slug,
 		Title:                   p.Title,
@@ -66,6 +71,7 @@ func (h *Handler) GetProblem(w http.ResponseWriter, r *http.Request) {
 		Status:                  p.Status,
 		Accessibility:           p.Accessibility,
 		Author:                  authorResp{Nickname: out.Author.Nickname, Name: out.Author.Name},
+		Samples:                 samples,
 		CreatedAt:               p.CreatedAt.UTC().Format(time.RFC3339),
 		UpdatedAt:               p.UpdatedAt.UTC().Format(time.RFC3339),
 		ProblemJudgingUpdatedAt: judgingUpdatedAt,

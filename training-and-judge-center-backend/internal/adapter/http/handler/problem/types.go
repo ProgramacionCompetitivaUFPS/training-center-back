@@ -40,6 +40,12 @@ type modifierResp struct {
 	Name     string `json:"name"`
 }
 
+type sampleResp struct {
+	Name   string `json:"name"`
+	Input  string `json:"input"`
+	Output string `json:"output"`
+}
+
 type getProblemResponse struct {
 	Slug                    string             `json:"slug"`
 	Title                   string             `json:"title"`
@@ -53,6 +59,7 @@ type getProblemResponse struct {
 	Author                  authorResp         `json:"author"`
 	Modifiers               []modifierResp     `json:"modifiers,omitempty"`
 	Files                   *filesResp         `json:"files,omitempty"`
+	Samples                 []sampleResp       `json:"samples,omitempty"`
 	CreatedAt               string             `json:"createdAt"`
 	UpdatedAt               string             `json:"updatedAt"`
 	ProblemJudgingUpdatedAt *string            `json:"problemJudgingUpdatedAt"`
