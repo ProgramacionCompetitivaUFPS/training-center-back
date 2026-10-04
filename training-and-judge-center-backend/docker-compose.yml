@@ -118,6 +118,8 @@ services:
     build: .
     container_name: training-center-worker
     entrypoint: ["/bin/worker"]
+    # the worker exits when the broker drops; Kubernetes restarts it, Compose needs this
+    restart: unless-stopped
     environment:
       DB_HOST: postgres
       DB_PORT: "5432"
