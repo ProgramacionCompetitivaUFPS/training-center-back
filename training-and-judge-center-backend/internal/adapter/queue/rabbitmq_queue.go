@@ -3,9 +3,11 @@ package queue
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log/slog"
 	"sync"
+	"time"
 
 	amqp "github.com/rabbitmq/amqp091-go"
 	"github.com/training-judge-center/backend/pkg/apperror"
@@ -82,6 +84,12 @@ func (q *RabbitMQQueue) connect() error {
 		conn.Close()
 		return fmt.Errorf("rabbitmq: open channel: %w", err)
 	}
+	// Confirms make Publish return only once the broker has taken the message.
+	if err = ch.Confirm(false); err != nil {
+		ch.Close()
+		conn.Close()
+		return fmt.Errorf("rabbitmq: enable publisher confirms: %w", err)
+	}
 	if _, err = ch.QueueDeclare(
 		submissionQueueName,
 		true,  // durable
@@ -111,13 +119,13 @@ func (q *RabbitMQQueue) publishEnvelope(ctx context.Context, kind messageKind, p
 	q.mu.Lock()
 	defer q.mu.Unlock()
 
-	if err := q.publishLocked(body, priority); err != nil {
+	if err := q.publishLocked(ctx, body, priority); err != nil {
 		slog.WarnContext(ctx, "rabbitmq: publish failed, reconnecting", "error", err)
 		if reconErr := q.connect(); reconErr != nil {
 			slog.ErrorContext(ctx, "rabbitmq: reconnect failed", "error", reconErr)
 			return apperror.NewInternal()
 		}
-		if err := q.publishLocked(body, priority); err != nil {
+		if err := q.publishLocked(ctx, body, priority); err != nil {
 			slog.ErrorContext(ctx, "rabbitmq: publish failed after reconnect", "error", err)
 			return apperror.NewInternal()
 		}
@@ -125,8 +133,14 @@ func (q *RabbitMQQueue) publishEnvelope(ctx context.Context, kind messageKind, p
 	return nil
 }
 
-func (q *RabbitMQQueue) publishLocked(body []byte, priority uint8) error {
-	return q.ch.Publish(
+// confirmTimeout bounds the wait for the broker to acknowledge one message.
+const confirmTimeout = 10 * time.Second
+
+func (q *RabbitMQQueue) publishLocked(ctx context.Context, body []byte, priority uint8) error {
+	confirmCtx, cancel := context.WithTimeout(ctx, confirmTimeout)
+	defer cancel()
+	confirmation, err := q.ch.PublishWithDeferredConfirmWithContext(
+		confirmCtx,
 		"",                  // default exchange
 		submissionQueueName, // routing key
 		false,               // mandatory
@@ -138,6 +152,17 @@ func (q *RabbitMQQueue) publishLocked(body []byte, priority uint8) error {
 			Body:         body,
 		},
 	)
+	if err != nil {
+		return err
+	}
+	acked, err := confirmation.WaitContext(confirmCtx)
+	if err != nil {
+		return err
+	}
+	if !acked {
+		return errors.New("rabbitmq: broker nacked the message")
+	}
+	return nil
 }
 
 // Consume listens for deliveries and dispatches each one to whichever handler

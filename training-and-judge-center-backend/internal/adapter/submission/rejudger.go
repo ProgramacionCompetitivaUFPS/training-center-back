@@ -116,7 +116,7 @@ func (r *Rejudger) resetToPending(ctx context.Context, ids []string) ([]previous
 		)
 		UPDATE submissions s
 		SET status = 'PENDING', judged_at = NULL, time_ms = NULL, memory_kb = NULL, compile_log = NULL,
-			requeue_count = 0, updated_at = now()
+			queued_at = NULL, requeue_count = 0, updated_at = now()
 		FROM prev
 		WHERE s.id = prev.id
 		RETURNING prev.id, prev.status, prev.judged_at, prev.time_ms, prev.memory_kb, prev.compile_log
