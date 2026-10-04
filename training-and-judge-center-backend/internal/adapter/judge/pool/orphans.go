@@ -25,6 +25,7 @@ type dockerCleaner interface {
 // RemoveOrphans force-removes every labelled sandbox container, running or not.
 // Call it once at startup, before any pool exists: whatever carries the label then
 // belongs to a worker process that is gone. It returns how many it removed.
+// This holds only while the daemon is exclusive to one worker; two workers on the same daemon would delete each other's live sandboxes.
 func RemoveOrphans(ctx context.Context, docker dockerCleaner) (int, error) {
 	list, err := docker.ContainerList(ctx, client.ContainerListOptions{
 		All:     true,

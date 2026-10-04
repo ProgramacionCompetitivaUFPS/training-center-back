@@ -52,7 +52,7 @@ const docTemplate = `{
                         }
                     },
                     "400": {
-                        "description": "Bad Request",
+                        "description": "PROBLEM_NOT_PUBLISHED, NO_SUBMISSIONS_TO_REJUDGE, PROBLEM_NOT_IN_CONTEST",
                         "schema": {
                             "$ref": "#/definitions/apperror.AppError"
                         }
@@ -106,6 +106,12 @@ const docTemplate = `{
                         "description": "OK",
                         "schema": {
                             "$ref": "#/definitions/submission.rejudgeSubmissionResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "PROBLEM_NOT_PUBLISHED",
+                        "schema": {
+                            "$ref": "#/definitions/apperror.AppError"
                         }
                     },
                     "401": {
@@ -1222,7 +1228,7 @@ const docTemplate = `{
                         }
                     },
                     "400": {
-                        "description": "Bad Request",
+                        "description": "CONTEST_NOT_ACTIVE, PROBLEM_NOT_IN_CONTEST, PROBLEM_NOT_PUBLISHED, NO_SUBMISSIONS_TO_REJUDGE",
                         "schema": {
                             "$ref": "#/definitions/apperror.AppError"
                         }
@@ -4377,6 +4383,63 @@ const docTemplate = `{
                 }
             }
         },
+        "/problems/p/{slug}/publish": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "problems"
+                ],
+                "summary": "Publish problem",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Problem slug",
+                        "name": "slug",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/problem.publishResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/problem.publishFailureResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/apperror.AppError"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/apperror.AppError"
+                        }
+                    },
+                    "503": {
+                        "description": "Service Unavailable",
+                        "schema": {
+                            "$ref": "#/definitions/apperror.AppError"
+                        }
+                    }
+                }
+            }
+        },
         "/problems/p/{slug}/rejudge": {
             "post": {
                 "security": [
@@ -4405,6 +4468,12 @@ const docTemplate = `{
                         "description": "OK",
                         "schema": {
                             "$ref": "#/definitions/problem.rejudgeResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "BAD_REQUEST (contestId is not supported here), PROBLEM_NOT_PUBLISHED, NO_SUBMISSIONS_TO_REJUDGE",
+                        "schema": {
+                            "$ref": "#/definitions/apperror.AppError"
                         }
                     },
                     "401": {
@@ -4696,6 +4765,57 @@ const docTemplate = `{
                 }
             }
         },
+        "/problems/p/{slug}/validation": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "problems"
+                ],
+                "summary": "Get the latest validation attempt for a problem",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Problem slug",
+                        "name": "slug",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/problem.latestValidationResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/apperror.AppError"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/apperror.AppError"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/apperror.AppError"
+                        }
+                    }
+                }
+            }
+        },
         "/submissions/{submissionId}": {
             "get": {
                 "security": [
@@ -4778,7 +4898,7 @@ const docTemplate = `{
                         }
                     },
                     "400": {
-                        "description": "Bad Request",
+                        "description": "NO_REJUDGE_NEEDED, PROBLEM_NOT_PUBLISHED",
                         "schema": {
                             "$ref": "#/definitions/apperror.AppError"
                         }
@@ -7879,6 +7999,20 @@ const docTemplate = `{
                 }
             }
         },
+        "problem.compilationErrorsResp": {
+            "type": "object",
+            "properties": {
+                "errors": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "file": {
+                    "type": "string"
+                }
+            }
+        },
         "problem.createProblemRequest": {
             "type": "object",
             "properties": {
@@ -7915,6 +8049,43 @@ const docTemplate = `{
             "type": "object",
             "properties": {
                 "confirmSlug": {
+                    "type": "string"
+                }
+            }
+        },
+        "problem.failedInputResp": {
+            "type": "object",
+            "properties": {
+                "file": {
+                    "type": "string"
+                },
+                "reason": {
+                    "type": "string"
+                }
+            }
+        },
+        "problem.failedTestCaseResp": {
+            "type": "object",
+            "properties": {
+                "actual": {
+                    "type": "string"
+                },
+                "case": {
+                    "type": "string"
+                },
+                "details": {
+                    "type": "string"
+                },
+                "expected": {
+                    "type": "string"
+                },
+                "status": {
+                    "type": "string"
+                },
+                "timeLimit": {
+                    "type": "integer"
+                },
+                "verdict": {
                     "type": "string"
                 }
             }
@@ -8046,6 +8217,47 @@ const docTemplate = `{
                 }
             }
         },
+        "problem.latestValidationResponse": {
+            "type": "object",
+            "properties": {
+                "compilationErrors": {
+                    "$ref": "#/definitions/problem.compilationErrorsResp"
+                },
+                "failedInputs": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/problem.failedInputResp"
+                    }
+                },
+                "failedTestCases": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/problem.failedTestCaseResp"
+                    }
+                },
+                "found": {
+                    "type": "boolean"
+                },
+                "passed": {
+                    "type": "boolean"
+                },
+                "status": {
+                    "type": "string"
+                },
+                "terminal": {
+                    "type": "boolean"
+                },
+                "validationLogs": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "validationSummary": {
+                    "$ref": "#/definitions/problem.validationSummaryResp"
+                }
+            }
+        },
         "problem.listModifiersResponse": {
             "type": "object",
             "properties": {
@@ -8134,6 +8346,67 @@ const docTemplate = `{
                 },
                 "updatedAt": {
                     "type": "string"
+                }
+            }
+        },
+        "problem.publishFailureResponse": {
+            "type": "object",
+            "properties": {
+                "compilationErrors": {
+                    "$ref": "#/definitions/problem.compilationErrorsResp"
+                },
+                "error": {
+                    "type": "string"
+                },
+                "failedInputs": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/problem.failedInputResp"
+                    }
+                },
+                "failedTestCases": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/problem.failedTestCaseResp"
+                    }
+                },
+                "message": {
+                    "type": "string"
+                },
+                "missingFields": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "validationLogs": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                }
+            }
+        },
+        "problem.publishResponse": {
+            "type": "object",
+            "properties": {
+                "message": {
+                    "type": "string"
+                },
+                "slug": {
+                    "type": "string"
+                },
+                "status": {
+                    "type": "string"
+                },
+                "validationLogs": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "validationSummary": {
+                    "$ref": "#/definitions/problem.validationSummaryResp"
                 }
             }
         },
@@ -8276,6 +8549,23 @@ const docTemplate = `{
                 },
                 "title": {
                     "type": "string"
+                }
+            }
+        },
+        "problem.validationSummaryResp": {
+            "type": "object",
+            "properties": {
+                "allPassed": {
+                    "type": "boolean"
+                },
+                "sampleCases": {
+                    "type": "integer"
+                },
+                "secretCases": {
+                    "type": "integer"
+                },
+                "solutionsTested": {
+                    "type": "integer"
                 }
             }
         },

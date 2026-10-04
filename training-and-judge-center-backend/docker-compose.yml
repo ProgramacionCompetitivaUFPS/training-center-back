@@ -117,6 +117,9 @@ services:
   judge-worker:
     build: .
     container_name: training-center-worker
+    # The Docker daemon must be exclusive to one worker: at startup it removes every
+    # container labelled com.trainingcenter.role=judge-sandbox. Do not run two workers
+    # against the same daemon.
     entrypoint: ["/bin/worker"]
     # the worker exits when the broker drops; Kubernetes restarts it, Compose needs this
     restart: unless-stopped

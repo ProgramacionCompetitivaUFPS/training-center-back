@@ -23,6 +23,7 @@ type rejudgeResponse struct {
 // @Security     BearerAuth
 // @Param        slug path string true "Problem slug"
 // @Success      200 {object} rejudgeResponse
+// @Failure      400 {object} apperror.AppError "BAD_REQUEST (contestId is not supported here), PROBLEM_NOT_PUBLISHED, NO_SUBMISSIONS_TO_REJUDGE"
 // @Failure      401 {object} apperror.AppError
 // @Failure      403 {object} apperror.AppError
 // @Failure      404 {object} apperror.AppError
