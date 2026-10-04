@@ -78,6 +78,12 @@ func (uc *RejudgeSubmissionUseCase) Execute(ctx context.Context, in RejudgeSubmi
 		}
 	}
 
+	// A deleted problem leaves its submissions without a problem_id.
+	if sub.ProblemID() == "" {
+		return nil, apperror.NewNotFound(domainsubmission.ErrCodeProblemNotFound,
+			"the problem of this submission no longer exists, so it cannot be rejudged")
+	}
+
 	published, err := uc.judgingProvider.IsPublished(ctx, sub.ProblemID())
 	if err != nil {
 		return nil, err
