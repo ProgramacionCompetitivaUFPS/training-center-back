@@ -53,7 +53,7 @@ const (
 	defaultDockerDaemonReserveBytes    = 512 << 20 // 512 MiB
 	defaultDockerDaemonReserveCores    = 1
 	defaultStaleRunningAfterMinutes    = 10
-	defaultStalePendingAfterMinutes    = 15
+	defaultStalePendingAfterMinutes    = 2
 	defaultStaleValidationAfterMinutes = 20
 )
 
@@ -233,8 +233,9 @@ func main() {
 		time.Duration(judgeCfg.Judge.StaleRunningAfterMinutes)*time.Minute,
 	)
 
+	trackedSubmissionQueue := adaptersubmission.NewTrackedQueue(dbPool, adapterqueue.NewRabbitMQSubmissionQueue(queue))
 	recoverStalePendingSubmissionsUseCase := appjudge.NewRecoverStalePendingSubmissionsUseCase(
-		adaptersubmission.NewStalePendingRecoverer(dbPool, adapterqueue.NewRabbitMQSubmissionQueue(queue)),
+		adaptersubmission.NewStalePendingRecoverer(dbPool, trackedSubmissionQueue),
 		time.Duration(judgeCfg.Judge.StalePendingAfterMinutes)*time.Minute,
 	)
 
@@ -363,6 +364,8 @@ func main() {
 				SubmissionID: msg.SubmissionID,
 			}); err != nil {
 				slog.ErrorContext(ctx, "worker: judge execution failed", "error", err, "submission_id", msg.SubmissionID)
+				// Acked either way; if it never started, let the recoverer re-publish it.
+				trackedSubmissionQueue.Unqueue(ctx, msg.SubmissionID)
 			}
 			return nil
 		}),

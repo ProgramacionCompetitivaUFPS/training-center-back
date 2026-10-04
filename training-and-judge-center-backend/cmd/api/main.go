@@ -472,7 +472,7 @@ func main() {
 			os.Exit(1)
 		}
 		defer rmq.Close()
-		submissionQueue = adapterqueue.NewRabbitMQSubmissionQueue(rmq)
+		submissionQueue = adaptersubmission.NewTrackedQueue(dbPool, adapterqueue.NewRabbitMQSubmissionQueue(rmq))
 		validationQueue = adapterqueue.NewRabbitMQValidationQueue(rmq)
 		slog.Info("using RabbitMQ submission queue")
 	} else {
