@@ -16,6 +16,8 @@ var testNow = time.Date(2025, 1, 15, 12, 0, 0, 0, time.UTC)
 type mockSubmissionUpdater struct {
 	getByIDFn func(ctx context.Context, id submission.SubmissionID) (*submission.Submission, error)
 	updateFn  func(ctx context.Context, s *submission.Submission) error
+	claimFn   func(ctx context.Context, id submission.SubmissionID) (bool, error)
+	claims    int
 }
 
 func (m *mockSubmissionUpdater) GetByID(ctx context.Context, id submission.SubmissionID) (*submission.Submission, error) {
@@ -23,6 +25,14 @@ func (m *mockSubmissionUpdater) GetByID(ctx context.Context, id submission.Submi
 		return m.getByIDFn(ctx, id)
 	}
 	return pendingSubmission(), nil
+}
+
+func (m *mockSubmissionUpdater) Claim(ctx context.Context, id submission.SubmissionID) (bool, error) {
+	m.claims++
+	if m.claimFn != nil {
+		return m.claimFn(ctx, id)
+	}
+	return true, nil
 }
 
 func (m *mockSubmissionUpdater) Update(ctx context.Context, s *submission.Submission) error {

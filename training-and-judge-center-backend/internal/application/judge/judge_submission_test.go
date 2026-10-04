@@ -816,3 +816,49 @@ func TestJudgeSubmission_OutputLimitWinsOverTheExitCode(t *testing.T) {
 		})
 	}
 }
+
+// Two messages for the same submission can both read it as PENDING; only the
+// one that wins the atomic claim may judge it.
+func TestJudgeSubmission_LosingTheClaim_DoesNotJudge(t *testing.T) {
+	updater := &mockSubmissionUpdater{
+		claimFn: func(_ context.Context, _ submission.SubmissionID) (bool, error) { return false, nil },
+	}
+	executorCalled := false
+	uc := newJudgeSubmissionUseCase(
+		updater,
+		&mockSourceCodeDownloader{},
+		&mockProblemProvider{},
+		&mockTestCaseProvider{},
+		&mockExecutor{
+			beginSessionFn: func(_ context.Context, _ submission.Language, _ int, _ string) (ExecutionSession, error) {
+				executorCalled = true
+				return &mockExecutionSession{}, nil
+			},
+		},
+		&mockOutputChecker{},
+	)
+
+	if err := uc.Execute(context.Background(), JudgeSubmissionInput{SubmissionID: submissionID}); err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	if executorCalled {
+		t.Error("the submission was judged although another worker had claimed it")
+	}
+}
+
+func TestJudgeSubmission_WinningTheClaim_Judges(t *testing.T) {
+	updater := &mockSubmissionUpdater{}
+	uc := newJudgeSubmissionUseCase(
+		updater,
+		&mockSourceCodeDownloader{},
+		&mockProblemProvider{},
+		&mockTestCaseProvider{},
+		&mockExecutor{},
+		&mockOutputChecker{},
+	)
+
+	_ = uc.Execute(context.Background(), JudgeSubmissionInput{SubmissionID: submissionID})
+	if updater.claims != 1 {
+		t.Errorf("claims = %d, want 1", updater.claims)
+	}
+}
