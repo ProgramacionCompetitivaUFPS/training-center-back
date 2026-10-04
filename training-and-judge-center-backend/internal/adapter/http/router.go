@@ -19,6 +19,9 @@ import (
 	"github.com/training-judge-center/backend/internal/domain/user"
 )
 
+// Largest legitimate JSON body is a 150,000-character statement (~600 KB in UTF-8).
+const maxJSONBodyBytes = 1 << 20
+
 type Handlers struct {
 	Problem    *problem.Handler
 	User       *handlerUser.Handler
@@ -48,6 +51,8 @@ func NewRouter(h *Handlers, s *Services, allowedOrigins []string) *chi.Mux {
 	r.Use(chimw.RequestID)
 	r.Use(chimw.Logger)
 	r.Use(chimw.Recoverer)
+	r.Use(middleware.LimitBody(maxJSONBodyBytes))
+	r.Use(middleware.ValidateText())
 
 	r.Get("/swagger/*", httpSwagger.WrapHandler)
 
