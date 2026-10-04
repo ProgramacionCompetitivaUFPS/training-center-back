@@ -152,6 +152,16 @@ func main() {
 
 	idleTimeout := time.Duration(judgeCfg.Judge.IdleTimeoutMinutes) * time.Minute
 
+	// Before any pool exists, so whatever carries the label belongs to a worker that is gone.
+	cleanupCtx, cancelCleanup := context.WithTimeout(context.Background(), 30*time.Second)
+	removed, err := judgepool.RemoveOrphans(cleanupCtx, dockerClient)
+	cancelCleanup()
+	if err != nil {
+		slog.Error("worker: could not clean up leftover sandboxes", "error", err)
+		os.Exit(1)
+	}
+	slog.Info("worker: leftover sandboxes removed", "count", removed)
+
 	heavyPool := judgepool.NewPool(poolConfigFor(judgeCfg, poolHeavy, idleTimeout, volumeSource), dockerClient)
 	heavyPool.Start()
 	defer heavyPool.Stop()
@@ -380,6 +390,9 @@ func main() {
 		}),
 	); err != nil {
 		slog.Error("worker: consume loop ended with error", "error", err)
+		// os.Exit skips the defers, and the sandboxes would outlive the worker.
+		lightPool.Stop()
+		heavyPool.Stop()
 		os.Exit(1)
 	}
 

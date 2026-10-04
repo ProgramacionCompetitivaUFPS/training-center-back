@@ -1296,6 +1296,12 @@ El `Rejudger` publicaba el mensaje en la cola **antes** de poner la submission e
 
 Migraciones: `036` agrega `queued_at` y `requeue_count`. Límite conocido: si el broker perdiera mensajes ya confirmados (fallo de disco), esto no lo detecta; los mensajes son persistentes y la cola durable.
 
+### Los contenedores del pool quedaban huérfanos al terminar el worker — ✅ RESUELTO tras la validación del módulo de problemas
+
+En Kubernetes el sidecar `dind` se reinicia con el pod y arranca con un daemon limpio, así que esto no se veía. En el compose local el daemon es el del host: cada reinicio del worker (caída del broker con `restart: unless-stopped`, `up --build`, `kill -9`) dejaba su juego completo de contenedores `judge-runner:*`, y el siguiente proceso no sabía que existían. Los del `reaper` sólo alcanzan lo que el `Pool` tiene en memoria.
+
+Se etiquetan los contenedores del pool, se eliminan los etiquetados al arrancar (por etiqueta, nunca por imagen) y `Pool.Stop` vacía los suyos con un tope de 15 s. El camino de la caída del broker salía con `os.Exit(1)` y se saltaba los `defer`; ahora llama a `Stop` antes. Los restos anteriores a la etiqueta no se tocan y se borran a mano una vez.
+
 ## Plan de ejecución
 
 **Regla de cada paso**: el proyecto compila y la suite queda en verde al terminarlo. Nada de estados intermedios rotos — en Go no se puede migrar media interfaz, así que cada cambio de puerto arrastra a sus llamadores y mocks en el mismo paso.

@@ -52,13 +52,35 @@ func (p *Pool) Start() {
 	go p.reap()
 }
 
-// Safe to call multiple times.
+// drainTimeout bounds how long Stop spends removing the pool's containers.
+const drainTimeout = 15 * time.Second
+
+// Safe to call multiple times. After the reaper is down it removes every container
+// the pool still holds, busy or not: nothing is judging once the worker stops.
 func (p *Pool) Stop() {
 	p.stopOnce.Do(func() {
 		p.cancelFn()
 		close(p.stop)
+		<-p.done
+		p.drain()
 	})
-	<-p.done
+}
+
+func (p *Pool) drain() {
+	ctx, cancel := context.WithTimeout(context.Background(), drainTimeout)
+	defer cancel()
+
+	p.mu.Lock()
+	all := p.containers
+	p.containers = nil
+	p.allocatedBytes = 0
+	p.mu.Unlock()
+
+	for _, c := range all {
+		if _, err := p.docker.ContainerRemove(ctx, c.id, client.ContainerRemoveOptions{Force: true}); err != nil {
+			slog.Error("pool: failed to remove a container on shutdown", "container_id", c.id, "error", err)
+		}
+	}
 }
 
 // IsHealthy reports whether the Docker daemon backing the pool is reachable.
@@ -222,7 +244,8 @@ func (p *Pool) createContainer(ctx context.Context, langCfg LanguageConfig, memo
 			Image: langCfg.Image,
 			// sleep infinity keeps the container alive so the executor can
 			// issue docker exec calls without a running service inside.
-			Cmd: []string{"sleep", "infinity"},
+			Cmd:    []string{"sleep", "infinity"},
+			Labels: map[string]string{SandboxLabelKey: SandboxLabelValue},
 		},
 		HostConfig: &container.HostConfig{
 			// Every container of a pool mounts the judging volume the same way.
