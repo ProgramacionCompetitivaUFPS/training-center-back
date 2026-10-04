@@ -5,6 +5,7 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"github.com/training-judge-center/backend/internal/adapter/http/handler"
 	"github.com/training-judge-center/backend/internal/adapter/http/middleware"
@@ -12,6 +13,9 @@ import (
 	"github.com/training-judge-center/backend/internal/application/shared"
 	"github.com/training-judge-center/backend/pkg/apperror"
 )
+
+// A title holds at most 200 characters, so a longer pattern can never match.
+const maxSearchLength = 200
 
 // @Summary      List problems
 // @Tags         problems
@@ -23,8 +27,9 @@ import (
 // @Param        accessibility query string false "Filter by accessibility"
 // @Param        status query string false "Filter by status"
 // @Param        author query string false "Filter by author nickname"
-// @Param        search query string false "Filter by title (partial match)"
+// @Param        search query string false "Filter by title (partial match, max 200 characters)"
 // @Success      200 {object} listProblemsResponse
+// @Failure      400 {object} apperror.AppError
 // @Failure      401 {object} apperror.AppError
 // @Router       /problems [get]
 func (h *Handler) ListProblems(w http.ResponseWriter, r *http.Request) {
@@ -54,6 +59,16 @@ func (h *Handler) ListProblems(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	search := r.URL.Query().Get("search")
+	if utf8.RuneCountInString(search) > maxSearchLength {
+		handler.WriteJSON(r.Context(), w, http.StatusBadRequest, apperror.AppError{
+			Code:    apperror.ErrCodeValidationError,
+			Message: "Invalid request parameters",
+			Details: []apperror.FieldError{{Field: "search", Message: "Search must not exceed 200 characters"}},
+		})
+		return
+	}
+
 	var tags []string
 	if raw := r.URL.Query().Get("tags"); raw != "" {
 		tags = strings.Split(raw, ",")
@@ -67,7 +82,7 @@ func (h *Handler) ListProblems(w http.ResponseWriter, r *http.Request) {
 		Accessibility:  queryStringPtr(r.URL.Query().Get("accessibility")),
 		Status:         queryStringPtr(r.URL.Query().Get("status")),
 		AuthorNickname: queryStringPtr(r.URL.Query().Get("author")),
-		Search:         r.URL.Query().Get("search"),
+		Search:         search,
 		Page:           page,
 		Limit:          limit,
 	}
