@@ -53,6 +53,7 @@ const (
 	defaultDockerDaemonReserveBytes    = 512 << 20 // 512 MiB
 	defaultDockerDaemonReserveCores    = 1
 	defaultStaleRunningAfterMinutes    = 10
+	defaultStalePendingAfterMinutes    = 15
 	defaultStaleValidationAfterMinutes = 20
 )
 
@@ -232,6 +233,11 @@ func main() {
 		time.Duration(judgeCfg.Judge.StaleRunningAfterMinutes)*time.Minute,
 	)
 
+	recoverStalePendingSubmissionsUseCase := appjudge.NewRecoverStalePendingSubmissionsUseCase(
+		adaptersubmission.NewStalePendingRecoverer(dbPool, adapterqueue.NewRabbitMQSubmissionQueue(queue)),
+		time.Duration(judgeCfg.Judge.StalePendingAfterMinutes)*time.Minute,
+	)
+
 	// problem validation use case
 
 	validateSolutionsUseCase := appjudge.NewValidateSolutionsUseCase(
@@ -323,6 +329,22 @@ func main() {
 			case <-ctx.Done():
 				return
 			case <-ticker.C:
+				requeued, failed, err := recoverStalePendingSubmissionsUseCase.Execute(ctx)
+				if err == nil && (requeued > 0 || failed > 0) {
+					slog.Info("worker: stale pending submissions recovered", "requeued", requeued, "failed", failed)
+				}
+			}
+		}
+	}()
+
+	go func() {
+		ticker := time.NewTicker(5 * time.Minute)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-ticker.C:
 				count, err := recoverStaleValidationsUseCase.Execute(ctx)
 				if err == nil && count > 0 {
 					slog.Info("worker: stale problem validations recovered", "count", count)
@@ -397,6 +419,7 @@ type judgeSection struct {
 	DockerDaemonReserveBytes    int64                          `yaml:"dockerDaemonReserveBytes"`
 	DockerDaemonReserveCores    int                            `yaml:"dockerDaemonReserveCores"`
 	StaleRunningAfterMinutes    int                            `yaml:"staleRunningAfterMinutes"`
+	StalePendingAfterMinutes    int                            `yaml:"stalePendingAfterMinutes"`
 	StaleValidationAfterMinutes int                            `yaml:"staleValidationAfterMinutes"`
 	Languages                   map[string]judgeLanguageConfig `yaml:"languages"`
 	Pools                       map[string]judgePoolConfig     `yaml:"pools"`
@@ -586,6 +609,9 @@ func applyJudgeConfigDefaults(cfg *judgeConfigFile) {
 	}
 	if cfg.Judge.StaleRunningAfterMinutes <= 0 {
 		cfg.Judge.StaleRunningAfterMinutes = defaultStaleRunningAfterMinutes
+	}
+	if cfg.Judge.StalePendingAfterMinutes <= 0 {
+		cfg.Judge.StalePendingAfterMinutes = defaultStalePendingAfterMinutes
 	}
 	if cfg.Judge.StaleValidationAfterMinutes <= 0 {
 		cfg.Judge.StaleValidationAfterMinutes = defaultStaleValidationAfterMinutes
