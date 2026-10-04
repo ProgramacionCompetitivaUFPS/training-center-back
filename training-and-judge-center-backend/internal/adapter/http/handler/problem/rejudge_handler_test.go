@@ -135,3 +135,19 @@ func TestRejudge_NoJudgingUpdatedAt_Returns400(t *testing.T) {
 		t.Fatalf("expected 400, got %d: %s", w.Code, w.Body.String())
 	}
 }
+
+// A filter that is silently ignored would rejudge the whole problem.
+func TestRejudge_ContestIDParam_Returns400(t *testing.T) {
+	rejudger := &mockSubmissionRejudgerH{}
+	h := newHandlerWithRejudge(repoReturning(publishedProblemWithJudging()), rejudger)
+
+	r := authedRequest(http.MethodPost, "/problems/p/test-problem/rejudge?contestId=c1", nil)
+	r.SetPathValue("slug", "test-problem")
+	w := httptest.NewRecorder()
+
+	wrapAuth(http.HandlerFunc(h.Rejudge)).ServeHTTP(w, r)
+
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400, got %d: %s", w.Code, w.Body.String())
+	}
+}

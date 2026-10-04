@@ -34,6 +34,13 @@ func (h *Handler) Rejudge(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// A silent filter would let a caller rejudge the whole problem believing it was one contest.
+	if r.URL.Query().Has("contestId") {
+		handler.WriteError(r.Context(), w, apperror.NewBadRequest(apperror.ErrCodeBadRequest,
+			"contestId is not supported on this endpoint; use POST /admin/problems/{slug}/rejudge?contestId=... (admin) or POST /groups/{groupId}/contests/{contestId}/problems/{slug}/rejudge"))
+		return
+	}
+
 	slug := r.PathValue("slug")
 	currentUser := shared.CurrentUser{ID: cu.ID, Role: cu.Role}
 
