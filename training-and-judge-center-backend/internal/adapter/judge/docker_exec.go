@@ -44,7 +44,7 @@ func extractFirstFile(r io.Reader, maxBytes int64) []byte {
 // runAndWait runs cmd to completion inside the container, discarding whatever
 // it prints. Callers use it for cleanup, where the output carries nothing.
 func runAndWait(ctx context.Context, docker dockerExecClient, containerID string, cmd []string) error {
-	execRes, err := docker.ExecCreate(ctx, containerID, client.ExecCreateOptions{Cmd: cmd})
+	execRes, err := docker.ExecCreate(ctx, containerID, client.ExecCreateOptions{Cmd: cmd, AttachStdout: true, AttachStderr: true})
 	if err != nil {
 		return err
 	}

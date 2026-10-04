@@ -133,8 +133,12 @@ func (s *Session) RunTestCase(ctx context.Context, req appjudge.RunRequest) (app
 	defer cancel()
 
 	cpuBeforeNs := s.readCPUNanos(ctx)
+	// Without attached streams the daemon answers the start as soon as the
+	// process spawns, and everything below would read a run still in flight.
 	execRes, err := s.docker.ExecCreate(safetyCtx, s.container.ID(), client.ExecCreateOptions{
-		Cmd: []string{"sh", "-c", cmd},
+		Cmd:          []string{"sh", "-c", cmd},
+		AttachStdout: true,
+		AttachStderr: true,
 	})
 	if err != nil {
 		slog.ErrorContext(ctx, "executor: exec create failed", "container_id", s.container.ID(), "error", err)
@@ -163,6 +167,11 @@ func (s *Session) RunTestCase(ctx context.Context, req appjudge.RunRequest) (app
 	inspectRes, err := s.docker.ExecInspect(ctx, execRes.ID, client.ExecInspectOptions{})
 	if err != nil {
 		slog.ErrorContext(ctx, "executor: exec inspect failed", "container_id", s.container.ID(), "error", err)
+		return appjudge.RunResult{}, apperror.NewInternal()
+	}
+	// A running exec has no exit code yet: failing beats a verdict built on a 0.
+	if inspectRes.Running {
+		slog.ErrorContext(ctx, "executor: exec still running after its stream closed", "container_id", s.container.ID())
 		return appjudge.RunResult{}, apperror.NewInternal()
 	}
 

@@ -12,6 +12,7 @@ import (
 	judgepool "github.com/training-judge-center/backend/internal/adapter/judge/pool"
 	appjudge "github.com/training-judge-center/backend/internal/application/judge"
 	"github.com/training-judge-center/backend/internal/domain/submission"
+	"github.com/training-judge-center/backend/pkg/apperror"
 )
 
 func testExecCfg() ExecutorConfig {
@@ -543,4 +544,59 @@ func TestOutputLimitBlocks_LeaveRoomAboveTheReportedLimit(t *testing.T) {
 	if got := outputLimitBlocks * 512; got <= maxOutputBytes {
 		t.Errorf("the kernel would cut at %d, at or below the %d we report", got, maxOutputBytes)
 	}
+}
+
+// Without attached streams the daemon returns the exec start as soon as the
+// process spawns, so the run's exit code and output files are read too early.
+func TestSession_RunTestCase_AttachesTheStreamsSoTheExecBlocks(t *testing.T) {
+	var got client.ExecCreateOptions
+	mock := &mockDockerExecClient{
+		execCreateFn: func(_ context.Context, _ string, opts client.ExecCreateOptions) (client.ExecCreateResult, error) {
+			got = opts
+			return client.ExecCreateResult{ID: "exec-1"}, nil
+		},
+	}
+	s, _ := newTestSession(t, mock)
+
+	if _, err := s.RunTestCase(context.Background(), appjudge.RunRequest{
+		Input: []byte("1\n"), TimeLimitMs: 1000,
+	}); err != nil {
+		t.Fatalf("RunTestCase: %v", err)
+	}
+	if !got.AttachStdout || !got.AttachStderr {
+		t.Errorf("AttachStdout/AttachStderr = %v/%v, want both true", got.AttachStdout, got.AttachStderr)
+	}
+}
+
+// The sandbox cleanup has to finish before the container goes back to the pool.
+func TestSession_Close_CleanupExecAttachesTheStreams(t *testing.T) {
+	var got client.ExecCreateOptions
+	mock := &mockDockerExecClient{
+		execCreateFn: func(_ context.Context, _ string, opts client.ExecCreateOptions) (client.ExecCreateResult, error) {
+			got = opts
+			return client.ExecCreateResult{ID: "exec-1"}, nil
+		},
+	}
+	s, _ := newTestSession(t, mock)
+
+	_ = s.Close(context.Background())
+	if !got.AttachStdout || !got.AttachStderr {
+		t.Errorf("AttachStdout/AttachStderr = %v/%v, want both true", got.AttachStdout, got.AttachStderr)
+	}
+}
+
+// A Running exec has no exit code yet; reporting its zero would be a false verdict.
+func TestSession_RunTestCase_ExecStillRunningAfterAttachIsAnError(t *testing.T) {
+	mock := &mockDockerExecClient{
+		execInspectFn: func(_ context.Context, _ string, _ client.ExecInspectOptions) (client.ExecInspectResult, error) {
+			return client.ExecInspectResult{Running: true}, nil
+		},
+	}
+	s, _ := newTestSession(t, mock)
+	defer s.Close(context.Background())
+
+	_, err := s.RunTestCase(context.Background(), appjudge.RunRequest{
+		Input: []byte("1\n"), TimeLimitMs: 1000,
+	})
+	assertAppErrorKind(t, err, apperror.KindInternal)
 }
