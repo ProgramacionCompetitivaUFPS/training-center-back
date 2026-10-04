@@ -412,3 +412,7 @@ func (noopSessionInvalidator) InvalidateSession(context.Context, string, time.Ti
 func (noopSessionInvalidator) IsSessionInvalidated(context.Context, string) (bool, error) {
 	return false, nil
 }
+
+func newHandlerWithListProblems(repo domainProblem.Repository, userProvider appProblem.UserProvider) *Handler {
+	return &Handler{listProblems: appProblem.NewListProblemsUseCase(repo, userProvider)}
+}
