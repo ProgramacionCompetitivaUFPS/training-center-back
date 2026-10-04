@@ -36,7 +36,7 @@ As a system administrator, I want to list all users in the platform with paginat
    * **Given** an authenticated user has the ADMIN role
    * **When** they request GET /admin/users?page=2&limit=50
    * **Then** the system returns users 51-100
-   * **And** pagination metadata shows currentPage=2, totalPages calculated correctly
+   * **And** pagination metadata shows page=2, totalPages calculated correctly
 
 5. **Scenario**: Deactivated users included in list
    * **Given** some users have status DEACTIVATED
@@ -128,7 +128,7 @@ As an administrator, I want to search users by name, nickname, email, or institu
    * **Given** an authenticated user has the ADMIN role
    * **When** they search for a term that matches no users
    * **Then** the system returns HTTP 200 with empty users array
-   * **And** pagination shows totalCount=0
+   * **And** pagination shows total=0
 
 6. **Scenario**: Search without specifying field (searches all)
    * **Given** an authenticated user has the ADMIN role
@@ -272,10 +272,12 @@ List all users in the platform with optional filters, search, sorting, and pagin
     }
   ],
   "pagination": {
-    "totalCount": 150,
-    "currentPage": 1,
+    "page": 1,
+    "limit": 20,
+    "total": 150,
     "totalPages": 8,
-    "itemsPerPage": 20
+    "hasNextPage": true,
+    "hasPrevPage": false
   }
 }
 ```
@@ -298,10 +300,12 @@ List all users in the platform with optional filters, search, sorting, and pagin
 | users[].updatedAt | string | Last modification timestamp (ISO 8601, nullable) |
 | users[].deactivatedAt | string \| null | Deactivation timestamp (ISO 8601 or null) |
 | pagination | object | Pagination metadata |
-| pagination.totalCount | integer | Total number of users matching filters |
-| pagination.currentPage | integer | Current page number |
+| pagination.page | integer | Current page number |
+| pagination.limit | integer | Number of items per page |
+| pagination.total | integer | Total number of users matching filters |
 | pagination.totalPages | integer | Total number of pages |
-| pagination.itemsPerPage | integer | Number of items per page |
+| pagination.hasNextPage | boolean | Whether a following page exists |
+| pagination.hasPrevPage | boolean | Whether a preceding page exists |
 
 **Error Responses**:
 
@@ -412,7 +416,7 @@ List all users in the platform with optional filters, search, sorting, and pagin
 - **FR-030**: The system MUST validate that page is a positive integer (minimum 1).
 - **FR-031**: The system MUST validate that limit is between 1 and 100 (inclusive).
 - **FR-032**: The system MUST reject requests where limit exceeds 100 with HTTP 400 VALIDATION_ERROR.
-- **FR-033**: The system MUST return pagination metadata (totalCount, currentPage, totalPages, itemsPerPage).
+- **FR-033**: The system MUST return pagination metadata (page, limit, total, totalPages, hasNextPage, hasPrevPage).
 - **FR-034**: The system MUST return empty users array with correct pagination metadata when requested page exceeds available pages.
 
 ### Data Completeness

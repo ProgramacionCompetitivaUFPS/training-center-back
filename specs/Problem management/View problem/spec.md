@@ -71,7 +71,7 @@ As an authenticated user, I want to list problems with optional filters and pagi
    - **When** the user requests GET /problems without filters
    - **Then** the system returns HTTP 200 with PUBLISHED problems only
    - **And** results are paginated with default page=1 and limit=20
-   - **And** response includes pagination metadata (totalCount, currentPage, totalPages, itemsPerPage)
+   - **And** response includes pagination metadata (page, limit, total, totalPages, hasNextPage, hasPrevPage)
 
 2. **Scenario**: Modifier sees own draft problems in list
    - **Given** multiple problems exist including DRAFT problems where user is a modifier
@@ -116,7 +116,7 @@ As an authenticated user, I want to list problems with optional filters and pagi
    - **And** a user is authenticated
    - **When** the user requests GET /problems?page=2&limit=10
    - **Then** the system returns problems 11-20
-   - **And** pagination metadata shows currentPage=2, totalPages=5, itemsPerPage=10
+   - **And** pagination metadata shows page=2, totalPages=5, limit=10
 
 9. **Scenario**: Invalid pagination parameters
    - **Given** a user is authenticated
@@ -133,7 +133,7 @@ As an authenticated user, I want to list problems with optional filters and pagi
     - **And** a user is authenticated
     - **When** the user requests GET /problems?page=5&limit=10
     - **Then** the system returns HTTP 200 with empty problems array
-    - **And** pagination metadata shows totalCount=10, currentPage=5, totalPages=1
+    - **And** pagination metadata shows total=10, page=5, totalPages=1
 
 12. **Scenario**: Admin lists all problems
     - **Given** multiple problems exist (both DRAFT and PUBLISHED, from different authors)
@@ -331,10 +331,12 @@ Problems list retrieved successfully.
     }
   ],
   "pagination": {
-    "totalCount": 42,
-    "currentPage": 1,
+    "page": 1,
+    "limit": 20,
+    "total": 42,
     "totalPages": 3,
-    "itemsPerPage": 20
+    "hasNextPage": true,
+    "hasPrevPage": false
   }
 }
 ```
@@ -347,10 +349,12 @@ Problems list retrieved successfully.
 |-------|------|-------------|
 | problems | array | Array of problem summaries |
 | pagination | object | Pagination metadata |
-| pagination.totalCount | integer | Total number of problems matching filters |
-| pagination.currentPage | integer | Current page number |
+| pagination.page | integer | Current page number |
+| pagination.limit | integer | Number of items per page |
+| pagination.total | integer | Total number of problems matching filters |
 | pagination.totalPages | integer | Total number of pages |
-| pagination.itemsPerPage | integer | Number of items per page |
+| pagination.hasNextPage | boolean | Whether a following page exists |
+| pagination.hasPrevPage | boolean | Whether a preceding page exists |
 
 #### 400 Bad Request
 Invalid query parameters.
@@ -412,7 +416,7 @@ Authentication failed.
 - **FR-019**: The system MUST apply all filters using AND logic when multiple filters are provided
 - **FR-020**: The system MUST enforce visibility rules on filtered results (DRAFT problems only visible to modifiers/Admin)
 - **FR-021**: The system MUST support pagination with page and limit query parameters
-- **FR-022**: The system MUST return pagination metadata (totalCount, currentPage, totalPages, itemsPerPage)
+- **FR-022**: The system MUST return pagination metadata (page, limit, total, totalPages, hasNextPage, hasPrevPage)
 - **FR-023**: The system MUST default to page=1 and limit=20 if pagination parameters are not provided
 - **FR-024**: The system MUST validate that page is a positive integer (minimum 1)
 - **FR-025**: The system MUST validate that limit is between 1 and 100 (inclusive)
