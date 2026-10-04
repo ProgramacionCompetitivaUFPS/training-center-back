@@ -91,72 +91,131 @@ func (r *Rejudger) RejudgeByID(ctx context.Context, submissionID, problemID, use
 	return r.rejudgeOne(ctx, info, problemID, now)
 }
 
-// RejudgeBatch publishes all submissions to the queue and resets their DB status in one batch UPDATE.
-func (r *Rejudger) RejudgeBatch(ctx context.Context, subs []appProblem.SubmissionRejudgeInfo, problemID string, now time.Time) (int, error) {
-	published := make([]string, 0, len(subs))
-	for _, sub := range subs {
-		if err := r.queue.Publish(ctx, appSubmission.SubmissionQueueMessage{
-			SubmissionID: sub.ID,
-			Priority:     appSubmission.QueuePriorityRejudge,
-			EnqueuedAt:   now,
-			Metadata: appSubmission.SubmissionQueueMetadata{
-				ContestID: sub.ContestID,
-				ProblemID: problemID,
-				UserID:    sub.UserID,
-				Language:  sub.Language,
-			},
-		}); err != nil {
-			slog.ErrorContext(ctx, "rejudger: failed to enqueue submission", "submission_id", sub.ID, "error", err)
-			continue
+// previousState is what a submission looked like before its reset to PENDING,
+// kept so a failed publish can put it back.
+type previousState struct {
+	id         string
+	status     string
+	judgedAt   *time.Time
+	timeMs     *int
+	memoryKb   *int
+	compileLog *string
+}
+
+// resetToPending moves the given finished submissions back to PENDING and
+// returns their previous state. It must commit before anything is published:
+// the worker discards a message whose submission is not PENDING yet.
+func (r *Rejudger) resetToPending(ctx context.Context, ids []string) ([]previousState, error) {
+	q := infraPostgres.GetQuerier(ctx, r.db)
+	rows, err := q.Query(ctx, `
+		WITH prev AS (
+			SELECT id, status, judged_at, time_ms, memory_kb, compile_log
+			FROM submissions
+			WHERE id = ANY($1::text[]) AND status NOT IN ('PENDING', 'RUNNING')
+			FOR UPDATE
+		)
+		UPDATE submissions s
+		SET status = 'PENDING', judged_at = NULL, time_ms = NULL, memory_kb = NULL, compile_log = NULL
+		FROM prev
+		WHERE s.id = prev.id
+		RETURNING prev.id, prev.status, prev.judged_at, prev.time_ms, prev.memory_kb, prev.compile_log
+	`, ids)
+	if err != nil {
+		slog.ErrorContext(ctx, "rejudger: failed to reset submissions", "count", len(ids), "error", err)
+		return nil, apperror.NewInternal()
+	}
+	defer rows.Close()
+
+	var result []previousState
+	for rows.Next() {
+		var p previousState
+		if err := rows.Scan(&p.id, &p.status, &p.judgedAt, &p.timeMs, &p.memoryKb, &p.compileLog); err != nil {
+			slog.ErrorContext(ctx, "rejudger: failed to scan reset row", "error", err)
+			return nil, apperror.NewInternal()
 		}
-		published = append(published, sub.ID)
+		result = append(result, p)
 	}
-
-	if len(published) == 0 {
-		return 0, nil
+	if err := rows.Err(); err != nil {
+		slog.ErrorContext(ctx, "rejudger: error iterating reset rows", "error", err)
+		return nil, apperror.NewInternal()
 	}
+	return result, nil
+}
 
+// restore undoes resetToPending for a submission whose message never reached
+// the queue, so it is not left PENDING with nothing to judge it.
+func (r *Rejudger) restore(ctx context.Context, p previousState) {
 	q := infraPostgres.GetQuerier(ctx, r.db)
 	_, err := q.Exec(ctx, `
 		UPDATE submissions
-		SET status = 'PENDING', judged_at = NULL, time_ms = NULL, memory_kb = NULL, compile_log = NULL
-		WHERE id = ANY($1::uuid[]) AND status NOT IN ('PENDING', 'RUNNING')
-	`, published)
+		SET status = $2, judged_at = $3, time_ms = $4, memory_kb = $5, compile_log = $6
+		WHERE id = $1 AND status = 'PENDING'
+	`, p.id, p.status, p.judgedAt, p.timeMs, p.memoryKb, p.compileLog)
 	if err != nil {
-		// Messages already in queue; judge handles them — log but don't fail.
-		slog.ErrorContext(ctx, "rejudger: failed to batch reset submissions", "count", len(published), "error", err)
+		slog.ErrorContext(ctx, "rejudger: failed to restore submission after a failed enqueue", "submission_id", p.id, "error", err)
 	}
-	return len(published), nil
 }
 
-func (r *Rejudger) rejudgeOne(ctx context.Context, info appProblem.SubmissionRejudgeInfo, problemID string, now time.Time) error {
-	if err := r.queue.Publish(ctx, appSubmission.SubmissionQueueMessage{
-		SubmissionID: info.ID,
+func rejudgeMessage(sub appProblem.SubmissionRejudgeInfo, problemID string, now time.Time) appSubmission.SubmissionQueueMessage {
+	return appSubmission.SubmissionQueueMessage{
+		SubmissionID: sub.ID,
 		Priority:     appSubmission.QueuePriorityRejudge,
 		EnqueuedAt:   now,
 		Metadata: appSubmission.SubmissionQueueMetadata{
-			ContestID: info.ContestID,
+			ContestID: sub.ContestID,
 			ProblemID: problemID,
-			UserID:    info.UserID,
-			Language:  info.Language,
+			UserID:    sub.UserID,
+			Language:  sub.Language,
 		},
-	}); err != nil {
-		slog.ErrorContext(ctx, "rejudger: failed to enqueue submission", "submission_id", info.ID, "error", err)
-		return apperror.NewInternal()
+	}
+}
+
+// RejudgeBatch resets the submissions to PENDING and then publishes them; the
+// ones whose publish fails are put back as they were. It returns how many were queued.
+func (r *Rejudger) RejudgeBatch(ctx context.Context, subs []appProblem.SubmissionRejudgeInfo, problemID string, now time.Time) (int, error) {
+	ids := make([]string, len(subs))
+	for i, sub := range subs {
+		ids[i] = sub.ID
+	}
+	prev, err := r.resetToPending(ctx, ids)
+	if err != nil {
+		return 0, err
+	}
+	reset := make(map[string]previousState, len(prev))
+	for _, p := range prev {
+		reset[p.id] = p
 	}
 
-	q := infraPostgres.GetQuerier(ctx, r.db)
-	tag, err := q.Exec(ctx, `
-		UPDATE submissions
-		SET status = 'PENDING', judged_at = NULL, time_ms = NULL, memory_kb = NULL, compile_log = NULL
-		WHERE id = $1 AND status NOT IN ('PENDING', 'RUNNING')
-	`, info.ID)
-	if err != nil {
-		slog.ErrorContext(ctx, "rejudger: failed to reset submission after enqueue", "submission_id", info.ID, "error", err)
-		return nil // message already in queue; judge handles it
+	queued := 0
+	for _, sub := range subs {
+		p, ok := reset[sub.ID]
+		if !ok {
+			continue
+		}
+		if err := r.queue.Publish(ctx, rejudgeMessage(sub, problemID, now)); err != nil {
+			slog.ErrorContext(ctx, "rejudger: failed to enqueue submission", "submission_id", sub.ID, "error", err)
+			r.restore(ctx, p)
+			continue
+		}
+		queued++
 	}
-	if tag.RowsAffected() == 0 {
-		slog.WarnContext(ctx, "rejudger: submission already in progress, db reset skipped", "submission_id", info.ID)
+	return queued, nil
+}
+
+func (r *Rejudger) rejudgeOne(ctx context.Context, info appProblem.SubmissionRejudgeInfo, problemID string, now time.Time) error {
+	prev, err := r.resetToPending(ctx, []string{info.ID})
+	if err != nil {
+		return err
+	}
+	if len(prev) == 0 {
+		slog.WarnContext(ctx, "rejudger: submission already in progress, rejudge skipped", "submission_id", info.ID)
+		return nil
+	}
+
+	if err := r.queue.Publish(ctx, rejudgeMessage(info, problemID, now)); err != nil {
+		slog.ErrorContext(ctx, "rejudger: failed to enqueue submission", "submission_id", info.ID, "error", err)
+		r.restore(ctx, prev[0])
+		return apperror.NewInternal()
 	}
 	return nil
 }

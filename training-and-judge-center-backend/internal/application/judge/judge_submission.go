@@ -70,6 +70,7 @@ func (uc *JudgeSubmissionUseCase) Execute(ctx context.Context, in JudgeSubmissio
 	}
 
 	if !sub.Status().IsPending() {
+		slog.WarnContext(ctx, "judge: skipping a submission that is not pending", "submission_id", sub.ID(), "status", sub.Status().String())
 		return nil
 	}
 
