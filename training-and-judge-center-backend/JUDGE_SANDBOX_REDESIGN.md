@@ -1280,6 +1280,22 @@ docker run --rm --user 1000:1000 -e HOME=/tmp -e GOCACHE=/tmp/gc -e GOMODCACHE=/
 
 Las tres variables de entorno y el `-buildvcs=false` no son decorativos: sin ellas el uid 1000 no tiene dónde escribir la cache de Go, y `go build` falla por el stamping de VCS al no confiar en el repositorio. El arreglo se verificó en las dos direcciones — verde como `uid=0` y como `uid=1000` —, que es lo único que demuestra que ninguna de las dos ramas quedó rota.
 
+### Rejuzgar en ráfaga dejaba submissions en `PENDING` para siempre — ✅ RESUELTO tras la validación del módulo de problemas
+
+**Lo encontró la validación, no los tests.** Rejuzgar 10 envíos seguidos dejaba 9 en `PENDING` sin que el log mostrara un error.
+
+El `Rejudger` publicaba el mensaje en la cola **antes** de poner la submission en `PENDING`, y el worker descarta (con ack) cualquier mensaje cuya submission no esté `PENDING`. Si el worker recogía el mensaje antes de que el `UPDATE` se confirmara, veía el veredicto viejo, confirmaba sin juzgar, y el `UPDATE` posterior la dejaba `PENDING` sin ningún mensaje. Además el `UPDATE` masivo hacía `id = ANY($1::uuid[])` contra `submissions.id`, que es `text`: fallaba siempre, y sólo se registraba.
+
+**Lo que se hizo, y por qué en este orden:**
+
+- **Reset primero, publicar después**, con el estado previo devuelto por el propio `UPDATE` para restaurarlo si el `Publish` falla.
+- **Rejuzgar sólo problemas publicados** (400 `PROBLEM_NOT_PUBLISHED`; 404 `PROBLEM_NOT_FOUND` si el problema se borró y la submission quedó sin `problem_id`).
+- **Detectar mensajes perdidos de forma determinista, no por tiempo.** Una primera versión re-publicaba las `PENDING` con más de 15 minutos; con una cola larga habría duplicado envíos vivos y terminado en `SYSTEM_ERROR`. Ahora el `Publish` espera la confirmación del broker (`PublishWithDeferredConfirm`), un `TrackedQueue` la anota en `submissions.queued_at`, y el recuperador del worker sólo toca `PENDING` con `queued_at` vacío tras 2 minutos. Una submission confirmada no se toca por larga que sea la cola. Cada submission se recupera como máximo 5 veces (`requeue_count`), un barrido hace 100 como mucho y se detiene en el primer fallo de publicación.
+- **El worker confirmaba siempre el mensaje**, incluso si `Execute` fallaba antes de pasar a `RUNNING`; ahora, en ese caso, deja la submission como no encolada.
+- **Claim atómico.** Leer el estado y guardar `RUNNING` eran dos pasos; con dos mensajes de la misma submission ambos podían juzgarla. Ahora es un `UPDATE ... WHERE status = 'PENDING'` y el que pierde se retira.
+
+Migraciones: `036` agrega `queued_at` y `requeue_count`. Límite conocido: si el broker perdiera mensajes ya confirmados (fallo de disco), esto no lo detecta; los mensajes son persistentes y la cola durable.
+
 ## Plan de ejecución
 
 **Regla de cada paso**: el proyecto compila y la suite queda en verde al terminarlo. Nada de estados intermedios rotos — en Go no se puede migrar media interfaz, así que cada cambio de puerto arrastra a sus llamadores y mocks en el mismo paso.
