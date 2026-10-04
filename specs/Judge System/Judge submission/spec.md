@@ -631,8 +631,15 @@ def run_checker(
 
 - **FR-001**: The worker MUST acknowledge messages before processing to prevent duplicates.
 - **FR-002**: The worker MUST process messages in priority order.
-- **FR-003**: The worker MUST update submission status to RUNNING immediately.
+- **FR-003**: The worker MUST update submission status to RUNNING immediately, in a single atomic statement conditional on the status being PENDING; a message that loses it is dropped without judging, so two messages for the same submission never judge it twice.
 - **FR-004**: The worker MUST complete judging even if the message times out (re-ack).
+
+### Lost Messages
+
+- **FR-004.1**: The producer MUST wait for the broker to confirm each publish and record it (`submissions.queued_at`).
+- **FR-004.2**: The worker MUST periodically re-publish PENDING submissions that have no `queued_at` after a short grace period (`stalePendingAfterMinutes`), and MUST NOT touch PENDING submissions whose message was confirmed, however long the queue is.
+- **FR-004.3**: A submission already re-published 5 times (`requeue_count`) MUST be marked SYSTEM_ERROR, and a sweep MUST stop at its first publish failure.
+- **FR-004.4**: If judging fails before the submission starts, the worker MUST mark it as not queued so the recovery above picks it up.
 
 ### Compilation
 

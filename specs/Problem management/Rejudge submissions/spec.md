@@ -401,6 +401,15 @@ Submission doesn't need rejudging.
 }
 ```
 
+The problem is not PUBLISHED. This applies to every rejudge endpoint: only submissions of published problems can be rejudged.
+
+```json
+{
+  "error": "PROBLEM_NOT_PUBLISHED",
+  "message": "only submissions of PUBLISHED problems can be rejudged"
+}
+```
+
 #### 401 Unauthorized
 Authentication failed.
 
@@ -435,6 +444,15 @@ Submission not found.
 {
   "error": "NOT_FOUND",
   "message": "Submission not found"
+}
+```
+
+The problem of the submission was deleted, so the submission has no problem to be rejudged against.
+
+```json
+{
+  "error": "PROBLEM_NOT_FOUND",
+  "message": "the problem of this submission no longer exists, so it cannot be rejudged"
 }
 ```
 
@@ -667,6 +685,8 @@ Submission not found.
 - **FR-007**: The system MUST process all rejudging asynchronously (non-blocking).
 - **FR-008**: The system MUST execute the submission code against all current test cases during rejudging.
 - **FR-009**: The system MUST update the submission status based on rejudging results (ACCEPTED, WRONG_ANSWER, TIME_LIMIT_EXCEEDED, MEMORY_LIMIT_EXCEEDED, RUNTIME_ERROR, COMPILATION_ERROR, PRESENTATION_ERROR).
+- **FR-009.1**: The system MUST reject a rejudge (single, per problem, per contest or admin) with 400 PROBLEM_NOT_PUBLISHED unless the problem is PUBLISHED, and a single rejudge of a submission whose problem was deleted with 404 PROBLEM_NOT_FOUND.
+- **FR-009.2**: The system MUST reset a submission to PENDING before publishing its queue message, and MUST restore its previous verdict if the publish fails, so a rejudge never leaves a submission PENDING without a message.
 - **FR-010**: The system MUST NOT maintain a history of previous verdicts.
 
 **Standing Updates**
