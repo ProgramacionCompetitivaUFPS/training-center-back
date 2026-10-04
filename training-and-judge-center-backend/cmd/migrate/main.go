@@ -22,7 +22,7 @@ func main() {
 	}
 
 	command := os.Args[1]
-	cfg := config.Load()
+	cfg := config.LoadDatabase()
 	ctx := context.Background()
 
 	pool, err := infraPostgres.NewConnectionPool(ctx, cfg)

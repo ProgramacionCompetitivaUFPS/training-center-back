@@ -36,6 +36,19 @@ type Config struct {
 	RotationCacheEncryptionKey []byte // 32 raw bytes, decoded from base64
 }
 
+// LoadDatabase reads only the database settings, for binaries such as migrate
+// that must not demand secrets they never use.
+func LoadDatabase() *Config {
+	_ = godotenv.Load()
+	return &Config{
+		DBHost:     getEnv("DB_HOST", "localhost"),
+		DBPort:     getEnv("DB_PORT", "5432"),
+		DBUser:     getEnv("DB_USER", "postgres"),
+		DBPassword: getEnv("DB_PASSWORD", "postgres"),
+		DBName:     getEnv("DB_NAME", "training_center"),
+	}
+}
+
 func Load() *Config {
 	_ = godotenv.Load()
 	return &Config{

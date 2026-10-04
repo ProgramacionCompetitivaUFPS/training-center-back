@@ -53,6 +53,9 @@ import (
 	"github.com/training-judge-center/backend/pkg/apperror"
 )
 
+// rabbitmqConnectTimeout covers the broker accepting AMQP after it reports healthy.
+const rabbitmqConnectTimeout = time.Minute
+
 func main() {
 	cfg := config.Load()
 
@@ -463,7 +466,7 @@ func main() {
 	var submissionQueue appsubmission.SubmissionQueue
 	var validationQueue appProblem.ValidationQueue
 	if cfg.RabbitMQURL != "" {
-		rmq, err := adapterqueue.NewRabbitMQQueue(cfg.RabbitMQURL)
+		rmq, err := adapterqueue.ConnectRabbitMQQueue(cfg.RabbitMQURL, rabbitmqConnectTimeout)
 		if err != nil {
 			slog.Error("failed to connect to RabbitMQ", "error", err)
 			os.Exit(1)

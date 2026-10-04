@@ -3,7 +3,7 @@ set -e  # exit immediately if any command fails
 
 # Configuration
 API_URL="http://localhost:8080"
-PROBLEM_SLUG="e2e-test-problem-final"
+PROBLEM_SLUG="${PROBLEM_SLUG:-e2e-test-problem-$(date +%s)}"
 TMP_DIR="tmp_e2e_dummy_tc"
 TMP_ZIP="tmp_dummy_tc.zip"
 
@@ -92,8 +92,39 @@ if [ -z "$TOKEN" ]; then
 fi
 echo "    coach token acquired."
 
+RESP_FILE=$(mktemp)
+trap 'rm -f "$RESP_FILE"; cleanup' EXIT
+
+# expect_status <code> <curl args...>: fails the whole run unless the response has that status.
+expect_status() {
+  local want="$1"; shift
+  local got
+  got=$(curl -s -o "$RESP_FILE" -w '%{http_code}' "$@")
+  cat "$RESP_FILE"; echo ""
+  if [ "$got" != "$want" ]; then
+    echo "ERROR: expected HTTP $want, got $got" >&2
+    exit 1
+  fi
+}
+
+# make_zip <zip> <dir> <entry>: zips <dir> with '/' separators in the entry names.
+# Windows PowerShell 5.1's Compress-Archive writes '\', which the parser rejects.
+make_zip() {
+  local zip="$1" dir="$2" entry="$3"
+  rm -f "$zip"
+  local abs_zip
+  abs_zip="$(cd "$(dirname "$zip")" && pwd)/$(basename "$zip")"
+  if command -v zip > /dev/null 2>&1; then
+    (cd "$dir" && zip -qr "$abs_zip" "$entry")
+  elif python3 -c '' > /dev/null 2>&1; then
+    python3 -c 'import shutil,sys; shutil.make_archive(sys.argv[1][:-4], "zip", sys.argv[2])' "$abs_zip" "$dir"
+  else
+    (cd "$(dirname "$0")/.." && go run ./tests/zipdir "$abs_zip" "$OLDPWD/$dir")
+  fi
+}
+
 echo -e "\n1. Creating a Problem..."
-curl -X POST "$API_URL/problems" \
+expect_status 201 -X POST "$API_URL/problems" \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
@@ -103,10 +134,9 @@ curl -X POST "$API_URL/problems" \
     "memoryLimit": 256,
     "tags": ["math"]
   }'
-echo ""
 
 echo -e "\n2. Updating the Problem..."
-curl -X PUT "$API_URL/problems/p/$PROBLEM_SLUG" \
+expect_status 200 -X PUT "$API_URL/problems/p/$PROBLEM_SLUG" \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
@@ -115,46 +145,38 @@ curl -X PUT "$API_URL/problems/p/$PROBLEM_SLUG" \
     "memoryLimit": 512,
     "tags": ["graphs", "dp"]
   }'
-echo ""
 
 echo -e "\n3. Creating a dummy Zip file for File Upload test..."
 mkdir -p "$TMP_DIR/data/sample"
 echo "1" > "$TMP_DIR/data/sample/1.in"
 echo "1" > "$TMP_DIR/data/sample/1.ans"  # Parser expects .ans instead of .out
-# Create zip using PowerShell (for Windows compatibility)
-# We zip the 'data' folder to maintain the structure
-powershell.exe -NoProfile -Command "Compress-Archive -Path ./$TMP_DIR/data -DestinationPath ./$TMP_ZIP -Force"
+make_zip "$TMP_ZIP" "$TMP_DIR" data
 
 echo -e "\n4. Uploading Test Cases Zip..."
-curl -X POST "$API_URL/problems/p/$PROBLEM_SLUG/files" \
+expect_status 200 -X POST "$API_URL/problems/p/$PROBLEM_SLUG/files" \
   -H "Authorization: Bearer $TOKEN" \
   -F "file=@$TMP_ZIP" \
   -F "fileType=testcases"
-echo ""
 
 echo -e "\n5. Adding a Modifier ($ADMIN_NICKNAME)..."
-curl -X POST "$API_URL/problems/p/$PROBLEM_SLUG/modifiers" \
+expect_status 204 -X POST "$API_URL/problems/p/$PROBLEM_SLUG/modifiers" \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
     "userNickname": "'"$ADMIN_NICKNAME"'"
   }'
-echo ""
 
 echo -e "\n6. Listing Modifiers..."
-curl -X GET "$API_URL/problems/p/$PROBLEM_SLUG/modifiers" \
+expect_status 200 -X GET "$API_URL/problems/p/$PROBLEM_SLUG/modifiers" \
   -H "Authorization: Bearer $TOKEN"
-echo ""
 
 echo -e "\n7. Removing the Modifier..."
-curl -X DELETE "$API_URL/problems/p/$PROBLEM_SLUG/modifiers/$ADMIN_NICKNAME" \
+expect_status 204 -X DELETE "$API_URL/problems/p/$PROBLEM_SLUG/modifiers/$ADMIN_NICKNAME" \
   -H "Authorization: Bearer $TOKEN"
-echo ""
 
 echo -e "\n8. Deleting the Test Cases file..."
-curl -X DELETE "$API_URL/problems/p/$PROBLEM_SLUG/files/testcases" \
+expect_status 204 -X DELETE "$API_URL/problems/p/$PROBLEM_SLUG/files/testcases" \
   -H "Authorization: Bearer $TOKEN"
-echo ""
 
 echo -e "\n=================================="
 echo " E2E Tests Completed Successfully!"

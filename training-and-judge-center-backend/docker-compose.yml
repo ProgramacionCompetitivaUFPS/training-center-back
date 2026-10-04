@@ -26,9 +26,6 @@ services:
       DB_USER: ${POSTGRES_USER}
       DB_PASSWORD: ${POSTGRES_PASSWORD}
       DB_NAME: ${POSTGRES_DB}
-      JWT_SECRET: ${JWT_SECRET}
-      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID}
-      ROTATION_CACHE_ENCRYPTION_KEY: ${ROTATION_CACHE_ENCRYPTION_KEY}
     depends_on:
       postgres:
         condition: service_healthy
@@ -71,6 +68,7 @@ services:
   certbot:
     image: certbot/certbot
     container_name: training-center-certbot
+    profiles: ["tls"]
     volumes:
       - certbot_etc:/etc/letsencrypt
       - certbot_var:/var/lib/letsencrypt
@@ -130,8 +128,8 @@ services:
       STORAGE_BACKEND: ${STORAGE_BACKEND:-local}
       STORAGE_LOCAL_DIR: /data/uploads
       GCS_BUCKET: ${GCS_BUCKET:-}
-      POD_MEMORY_LIMIT: ${POD_MEMORY_LIMIT:-8589934592}
-      POD_CPU_LIMIT: ${POD_CPU_LIMIT:-4000}
+      POD_MEMORY_LIMIT: ${POD_MEMORY_LIMIT:-25769803776}
+      POD_CPU_LIMIT: ${POD_CPU_LIMIT:-6000}
       JUDGE_CONFIG: /config/judge_config.yaml
       # A volume name and not a path: here the daemon is the host's, so it
       # would resolve a path on the host and mount an empty directory.
@@ -139,9 +137,7 @@ services:
     volumes:
       - problem_uploads:/data/uploads
       - judging:/judging
-      - //./pipe/docker_engine://./pipe/docker_engine
-      # Linux / macOS: uncomment the line below, comment out the line above
-      # - /var/run/docker.sock:/var/run/docker.sock
+      - /var/run/docker.sock:/var/run/docker.sock
     depends_on:
       seed:
         condition: service_completed_successfully
@@ -173,7 +169,7 @@ services:
     volumes:
       - rabbitmq_data:/var/lib/rabbitmq
     healthcheck:
-      test: ["CMD", "rabbitmq-diagnostics", "ping"]
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "check_port_connectivity"]
       interval: 5s
       timeout: 5s
       retries: 10
@@ -181,6 +177,8 @@ services:
 volumes:
   postgres_data:
   judging:
+    # JUDGE_VOLUME_SOURCE refers to it by this name, so Compose must not prefix it.
+    name: judging
   problem_uploads:
   rabbitmq_data:
   certbot_etc:

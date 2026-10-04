@@ -42,6 +42,9 @@ const (
 // timeout; unlike the timeout itself it is not worth configuring.
 const reapInterval = time.Minute
 
+// rabbitmqConnectTimeout covers the broker accepting AMQP after it reports healthy.
+const rabbitmqConnectTimeout = time.Minute
+
 // Floors applied when the matching judge config key is missing or non-positive.
 // KnownFields rejects unknown keys but says nothing about absent ones, so every
 // optional value needs one.
@@ -88,7 +91,7 @@ func main() {
 	defer dockerClient.Close()
 
 	rabbitmqURL := getRequiredEnv("RABBITMQ_URL")
-	queue, err := adapterqueue.NewRabbitMQQueue(rabbitmqURL)
+	queue, err := adapterqueue.ConnectRabbitMQQueue(rabbitmqURL, rabbitmqConnectTimeout)
 	if err != nil {
 		slog.Error("worker: failed to connect to rabbitmq", "error", err)
 		os.Exit(1)
