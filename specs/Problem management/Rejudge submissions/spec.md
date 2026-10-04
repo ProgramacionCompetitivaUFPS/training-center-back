@@ -687,6 +687,7 @@ Submission not found.
 - **FR-009**: The system MUST update the submission status based on rejudging results (ACCEPTED, WRONG_ANSWER, TIME_LIMIT_EXCEEDED, MEMORY_LIMIT_EXCEEDED, RUNTIME_ERROR, COMPILATION_ERROR, PRESENTATION_ERROR).
 - **FR-009.1**: The system MUST reject a rejudge (single, per problem, per contest or admin) with 400 PROBLEM_NOT_PUBLISHED unless the problem is PUBLISHED, and a single rejudge of a submission whose problem was deleted with 404 PROBLEM_NOT_FOUND.
 - **FR-009.2**: The system MUST reset a submission to PENDING before publishing its queue message, and MUST restore its previous verdict if the publish fails, so a rejudge never leaves a submission PENDING without a message.
+- **FR-009.3**: `POST /problems/p/{slug}/rejudge` MUST answer 400 BAD_REQUEST when called with a `contestId` query parameter instead of ignoring it, and the message MUST point to the contest-scoped routes: `POST /groups/{groupId}/contests/{contestId}/problems/{slug}/rejudge` (contest owner, group Lead or admin, during an active contest) and `POST /admin/problems/{slug}/rejudge?contestId={contestId}` (admin, any contest status).
 - **FR-010**: The system MUST NOT maintain a history of previous verdicts.
 
 **Standing Updates**
@@ -829,7 +830,7 @@ The `problemJudgingUpdatedAt` timestamp is updated when ANY of the following fil
 
 ### Measurable Outcomes
 
-- **SC-001**: Contest owners and Leads can rejudge all affected submissions in their active contests via `POST /contests/{contestId}/problems/{slug}/rejudge` with HTTP 200.
+- **SC-001**: Contest owners, Leads and admins can rejudge all affected submissions in their active contests via `POST /contests/{contestId}/problems/{slug}/rejudge` with HTTP 200.
 - **SC-002**: Contestants can manually rejudge their own submissions outside active contests or in postcompetition via `POST /submissions/{submissionId}/rejudge` with HTTP 200.
 - **SC-002.1**: Contestants cannot rejudge their own submissions in active contests (submittedAt <= contest.endTime) - HTTP 403.
 - **SC-002.2**: Contestants can rejudge their own submissions in postcompetition (submittedAt > contest.endTime AND contest.enablePostContest = true) - HTTP 200.

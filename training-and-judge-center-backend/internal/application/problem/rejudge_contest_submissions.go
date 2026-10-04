@@ -58,7 +58,7 @@ func (uc *RejudgeContestSubmissionsUseCase) Execute(ctx context.Context, in Reju
 	}
 
 	userID := in.CurrentUser.ID
-	if contest.OwnerID != userID {
+	if contest.OwnerID != userID && !in.CurrentUser.IsAdmin() {
 		if contest.GroupID == nil {
 			return nil, apperror.NewForbidden(ErrCodeInsufficientPermissions,
 				"only the contest owner or Leads of the group can rejudge submissions")
