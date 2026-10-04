@@ -91,6 +91,11 @@ func (uc *RejudgeContestSubmissionsUseCase) Execute(ctx context.Context, in Reju
 		return nil, apperror.NewBadRequest(ErrCodeProblemNotInContest, "the specified problem is not part of this contest")
 	}
 
+	if !p.Status().IsPublished() {
+		return nil, apperror.NewBadRequest(ErrCodeProblemNotPublished,
+			"only PUBLISHED problems can be rejudged")
+	}
+
 	if p.JudgingUpdatedAt() == nil {
 		return nil, apperror.NewBadRequest(ErrCodeNoSubmissionsToRejudge,
 			"no judging updates have been recorded for this problem; nothing to rejudge")

@@ -48,6 +48,11 @@ func (uc *RejudgeSubmissionsUseCase) Execute(ctx context.Context, in RejudgeSubm
 			"Only the problem author, Admin, or assigned modifiers can rejudge submissions")
 	}
 
+	if !p.Status().IsPublished() {
+		return nil, apperror.NewBadRequest(ErrCodeProblemNotPublished,
+			"only PUBLISHED problems can be rejudged")
+	}
+
 	if p.JudgingUpdatedAt() == nil {
 		return nil, apperror.NewBadRequest(ErrCodeNoSubmissionsToRejudge,
 			"no judging updates have been recorded for this problem; nothing to rejudge")

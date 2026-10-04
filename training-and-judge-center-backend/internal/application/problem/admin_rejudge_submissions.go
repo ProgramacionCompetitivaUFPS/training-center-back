@@ -62,6 +62,11 @@ func (uc *AdminRejudgeSubmissionsUseCase) Execute(ctx context.Context, in AdminR
 		return nil, err
 	}
 
+	if !p.Status().IsPublished() {
+		return nil, apperror.NewBadRequest(ErrCodeProblemNotPublished,
+			"only PUBLISHED problems can be rejudged")
+	}
+
 	if p.JudgingUpdatedAt() == nil {
 		return nil, apperror.NewBadRequest(ErrCodeNoSubmissionsToRejudge,
 			"no judging updates have been recorded for this problem; nothing to rejudge")

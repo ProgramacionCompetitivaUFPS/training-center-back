@@ -78,6 +78,15 @@ func (uc *RejudgeSubmissionUseCase) Execute(ctx context.Context, in RejudgeSubmi
 		}
 	}
 
+	published, err := uc.judgingProvider.IsPublished(ctx, sub.ProblemID())
+	if err != nil {
+		return nil, err
+	}
+	if !published {
+		return nil, apperror.NewBadRequest(domainsubmission.ErrCodeProblemNotPublished,
+			"only submissions of PUBLISHED problems can be rejudged")
+	}
+
 	previousVerdict := sub.Status().String()
 
 	if err := uc.rejudger.RejudgeByID(ctx, sub.ID(), sub.ProblemID(), sub.UserID().String(), sub.ContestID(), sub.Language().String(), in.Now); err != nil {
