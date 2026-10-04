@@ -135,6 +135,13 @@ As an authenticated user, I want to list problems with optional filters and pagi
     - **Then** the system returns HTTP 200 with empty problems array
     - **And** pagination metadata shows totalCount=10, currentPage=5, totalPages=1
 
+12. **Scenario**: Admin lists all problems
+    - **Given** multiple problems exist (both DRAFT and PUBLISHED, from different authors)
+    - **And** a user is authenticated with ADMIN role
+    - **When** the user requests GET /problems
+    - **Then** the system returns HTTP 200 with problems in any status, including DRAFT problems the admin does not author or modify
+    - **And** the `status` filter still narrows the result as in scenario 3
+
 ---
 
 ### Edge Cases

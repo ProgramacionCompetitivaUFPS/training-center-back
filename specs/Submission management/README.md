@@ -35,7 +35,7 @@ Submission Management handles the core functionality of submitting solutions to 
 * `PENDING`: Submission is created and queued for judging (not yet started)
 * `RUNNING`: Submission is currently being judged/executed
 * `ACCEPTED`: Solution passed all test cases
-* `RUNTIME_EXCEPTION`: Solution crashed during execution
+* `RUNTIME_ERROR`: Solution crashed during execution
 * `TIME_LIMIT_EXCEEDED`: Solution exceeded time limit
 * `MEMORY_LIMIT_EXCEEDED`: Solution exceeded memory limit
 * `COMPILATION_ERROR`: Solution failed to compile

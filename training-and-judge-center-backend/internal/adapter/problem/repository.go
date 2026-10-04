@@ -137,16 +137,18 @@ func (r *Repository) Save(ctx context.Context, p *domainProblem.Problem) error {
 }
 
 func (r *Repository) FindBySlug(ctx context.Context, slug domainProblem.Slug) (*domainProblem.Problem, error) {
-	query := `
-		SELECT id, slug, title, statement, time_limit, memory_limit,
-			tags, status, accessibility, author_id, modifiers_ids, lang_overrides,
-			test_cases_key, solutions, checker, validator, judging_updated_at,
-			created_at, updated_at
-		FROM problems
-		WHERE slug = $1
-	`
+	query := "SELECT " + problemColumns("statement") + " FROM problems WHERE slug = $1"
 	row := r.db.QueryRow(ctx, query, slug.String())
 	return scanProblem(ctx, row)
+}
+
+// problemColumns is the column list scanProblem reads; statementExpr stands in for
+// the statement column so a caller that does not need it can skip the text.
+func problemColumns(statementExpr string) string {
+	return "id, slug, title, " + statementExpr + ", time_limit, memory_limit, " +
+		"tags, status, accessibility, author_id, modifiers_ids, lang_overrides, " +
+		"test_cases_key, solutions, checker, validator, judging_updated_at, " +
+		"created_at, updated_at"
 }
 
 func scanProblem(ctx context.Context, row pgx.Row) (*domainProblem.Problem, error) {
@@ -413,16 +415,14 @@ func (r *Repository) List(ctx context.Context, filters domainProblem.ListFilters
 	limitArg := nextArg(filters.Limit)
 	offsetArg := nextArg(offset)
 
+	// The list response carries no statement, so it is not read from the table.
 	selectQuery := fmt.Sprintf(`
-		SELECT id, slug, title, statement, time_limit, memory_limit,
-			tags, status, accessibility, author_id, modifiers_ids, lang_overrides,
-			test_cases_key, solutions, checker, validator, judging_updated_at,
-			created_at, updated_at
+		SELECT %s
 		FROM problems
 		%s
 		ORDER BY created_at DESC
 		LIMIT %s OFFSET %s
-	`, where, limitArg, offsetArg)
+	`, problemColumns("NULL::text"), where, limitArg, offsetArg)
 
 	countQuery := fmt.Sprintf("SELECT COUNT(*) FROM problems %s", where)
 

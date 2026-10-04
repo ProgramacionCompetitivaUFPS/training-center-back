@@ -666,7 +666,7 @@ Submission not found.
 - **FR-006**: The system MUST change submission verdict to PENDING when rejudging is initiated.
 - **FR-007**: The system MUST process all rejudging asynchronously (non-blocking).
 - **FR-008**: The system MUST execute the submission code against all current test cases during rejudging.
-- **FR-009**: The system MUST update the submission status based on rejudging results (ACCEPTED, WRONG_ANSWER, TIME_LIMIT_EXCEEDED, MEMORY_LIMIT_EXCEEDED, RUNTIME_EXCEPTION, COMPILATION_ERROR, PRESENTATION_ERROR).
+- **FR-009**: The system MUST update the submission status based on rejudging results (ACCEPTED, WRONG_ANSWER, TIME_LIMIT_EXCEEDED, MEMORY_LIMIT_EXCEEDED, RUNTIME_ERROR, COMPILATION_ERROR, PRESENTATION_ERROR).
 - **FR-010**: The system MUST NOT maintain a history of previous verdicts.
 
 **Standing Updates**
@@ -723,7 +723,7 @@ Submission not found.
   - `contest_id` (string, UUID, FK to Contest, nullable - null for practice submissions)
   - `filePath` (string, storage path/key to solution file)
   - `fileHash` (string, SHA256 hash for duplicate detection)
-  - `status` (enum: `PENDING` | `RUNNING` | `ACCEPTED` | `WRONG_ANSWER` | `TIME_LIMIT_EXCEEDED` | `MEMORY_LIMIT_EXCEEDED` | `RUNTIME_EXCEPTION` | `COMPILATION_ERROR` | `PRESENTATION_ERROR`)
+  - `status` (enum: `PENDING` | `RUNNING` | `ACCEPTED` | `WRONG_ANSWER` | `TIME_LIMIT_EXCEEDED` | `MEMORY_LIMIT_EXCEEDED` | `RUNTIME_ERROR` | `COMPILATION_ERROR` | `PRESENTATION_ERROR`)
   - `submittedAt` (timestamp)
 
 - **Contest**: Represents a programming competition.  
@@ -758,7 +758,7 @@ Submission not found.
 | WRONG_ANSWER | Solution produced incorrect output |
 | TIME_LIMIT_EXCEEDED | Solution exceeded time limit |
 | MEMORY_LIMIT_EXCEEDED | Solution exceeded memory limit |
-| RUNTIME_EXCEPTION | Solution crashed during execution |
+| RUNTIME_ERROR | Solution crashed during execution |
 | COMPILATION_ERROR | Solution failed to compile |
 | PRESENTATION_ERROR | Solution output format is incorrect |
 | COMPILATION_ERROR | Solution failed to compile |

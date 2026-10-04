@@ -159,7 +159,7 @@ Code submission for a problem.
 - `userId` (string, UUID, FK to User)
 - `contestId` (string, UUID, FK to Contest, nullable)
 - `language` (enum: cpp20, java17, python310, etc.)
-- `verdict` (enum: ACCEPTED, WRONG_ANSWER, TIME_LIMIT_EXCEEDED, MEMORY_LIMIT_EXCEEDED, RUNTIME_EXCEPTION, COMPILATION_ERROR, SYSTEM_ERROR)
+- `verdict` (enum: ACCEPTED, WRONG_ANSWER, TIME_LIMIT_EXCEEDED, MEMORY_LIMIT_EXCEEDED, RUNTIME_ERROR, COMPILATION_ERROR, SYSTEM_ERROR)
 - `submittedAt` (timestamp)
 
 ### Contest_Problem

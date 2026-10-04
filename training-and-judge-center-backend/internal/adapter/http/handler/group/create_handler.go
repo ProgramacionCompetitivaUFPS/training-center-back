@@ -13,7 +13,7 @@ import (
 type createGroupRequest struct {
 	Name            string   `json:"name"`
 	Description     *string  `json:"description"`
-	JoinMode        string   `json:"joinMode"`
+	JoinPolicy      string   `json:"joinPolicy"`
 	Visibility      string   `json:"visibility"`
 	MemberNicknames []string `json:"memberNicknames,omitempty"`
 	LeadNicknames   []string `json:"leadNicknames,omitempty"`
@@ -61,7 +61,7 @@ func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
 	out, ucErr := h.createGroup.Execute(r.Context(), appGroup.CreateGroupInput{
 		Name:            body.Name,
 		Description:     body.Description,
-		JoinMode:        body.JoinMode,
+		JoinPolicy:      body.JoinPolicy,
 		Visibility:      body.Visibility,
 		MemberNicknames: body.MemberNicknames,
 		LeadNicknames:   body.LeadNicknames,

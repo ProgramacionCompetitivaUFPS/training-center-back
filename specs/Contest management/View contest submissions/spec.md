@@ -420,7 +420,7 @@ Full details visible (verdict, time, memory).
 **Submission Status Values**:
 
 During competition:
-- `PENDING`, `RUNNING`, `ACCEPTED`, `WRONG_ANSWER`, `TIME_LIMIT_EXCEEDED`, `MEMORY_LIMIT_EXCEEDED`, `RUNTIME_EXCEPTION`, `COMPILATION_ERROR`, `PRESENTATION_ERROR`, `SYSTEM_ERROR`
+- `PENDING`, `RUNNING`, `ACCEPTED`, `WRONG_ANSWER`, `TIME_LIMIT_EXCEEDED`, `MEMORY_LIMIT_EXCEEDED`, `RUNTIME_ERROR`, `COMPILATION_ERROR`, `PRESENTATION_ERROR`, `SYSTEM_ERROR`
 
 > Note: There is no `?` status. During freeze, other participants' post-freeze submissions are simply absent from the response rather than shown with an ambiguous status.
 
