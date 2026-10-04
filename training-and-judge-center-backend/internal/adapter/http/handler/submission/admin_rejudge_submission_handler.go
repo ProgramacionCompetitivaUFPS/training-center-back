@@ -14,6 +14,7 @@ import (
 // @Security     BearerAuth
 // @Param        submissionId path string true "Submission ID"
 // @Success      200 {object} rejudgeSubmissionResponse
+// @Failure      400 {object} apperror.AppError "PROBLEM_NOT_PUBLISHED"
 // @Failure      401 {object} apperror.AppError
 // @Failure      403 {object} apperror.AppError
 // @Failure      404 {object} apperror.AppError

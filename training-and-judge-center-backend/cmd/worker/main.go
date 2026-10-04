@@ -152,6 +152,7 @@ func main() {
 
 	idleTimeout := time.Duration(judgeCfg.Judge.IdleTimeoutMinutes) * time.Minute
 
+	// Assumes the Docker daemon is exclusive to this worker (a dind sidecar per pod, or the single compose stack): another worker sharing it would lose its live sandboxes here.
 	// Before any pool exists, so whatever carries the label belongs to a worker that is gone.
 	cleanupCtx, cancelCleanup := context.WithTimeout(context.Background(), 30*time.Second)
 	removed, err := judgepool.RemoveOrphans(cleanupCtx, dockerClient)

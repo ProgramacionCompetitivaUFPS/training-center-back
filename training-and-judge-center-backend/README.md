@@ -111,3 +111,7 @@ Para actualizar swagger usar:
 ```powershell
 swag init -g cmd/api/main.go -o docs
 ```
+
+# Worker del juez
+
+El daemon de Docker debe ser exclusivo de un worker: al arrancar, el worker elimina todos los contenedores con la etiqueta `com.trainingcenter.role=judge-sandbox` (huérfanos de ejecuciones anteriores). No ejecutar dos workers contra el mismo daemon; si lo hicieran, el segundo borraría los sandboxes activos del primero. En Kubernetes se cumple con un sidecar `dind` por pod; en el compose, con `container_name` fijo.
