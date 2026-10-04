@@ -352,3 +352,18 @@ func nilIfZero(n int) *int {
 	}
 	return &n
 }
+
+// ClaimForJudging moves a PENDING submission to RUNNING in a single statement, so
+// of two workers holding a message for the same submission only one wins.
+func (r *Repository) ClaimForJudging(ctx context.Context, id domainSubmission.SubmissionID) (bool, error) {
+	q := infraPostgres.GetQuerier(ctx, r.db)
+	tag, err := q.Exec(ctx, `
+		UPDATE submissions SET status = 'RUNNING', updated_at = now()
+		WHERE id = $1 AND status = 'PENDING'
+	`, id)
+	if err != nil {
+		slog.ErrorContext(ctx, "submission: failed to claim for judging", "id", id, "error", err)
+		return false, apperror.NewInternal()
+	}
+	return tag.RowsAffected() == 1, nil
+}

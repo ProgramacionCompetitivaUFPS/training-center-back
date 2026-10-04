@@ -22,3 +22,7 @@ func (u *SubmissionUpdater) GetByID(ctx context.Context, id submission.Submissio
 func (u *SubmissionUpdater) Update(ctx context.Context, s *submission.Submission) error {
 	return u.repo.Update(ctx, s)
 }
+
+func (u *SubmissionUpdater) Claim(ctx context.Context, id submission.SubmissionID) (bool, error) {
+	return u.repo.ClaimForJudging(ctx, id)
+}

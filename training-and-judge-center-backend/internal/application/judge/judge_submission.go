@@ -77,8 +77,14 @@ func (uc *JudgeSubmissionUseCase) Execute(ctx context.Context, in JudgeSubmissio
 	if err := sub.Start(now); err != nil {
 		return err
 	}
-	if err := uc.submissionUpdater.Update(ctx, sub); err != nil {
+	// Atomic: a second message for the same submission loses here instead of judging it twice.
+	claimed, err := uc.submissionUpdater.Claim(ctx, sub.ID())
+	if err != nil {
 		return err
+	}
+	if !claimed {
+		slog.WarnContext(ctx, "judge: another worker already took the submission", "submission_id", sub.ID())
+		return nil
 	}
 
 	sourceCode, err := uc.sourceCodeDownloader.Download(ctx, sub.SourceCodePath())

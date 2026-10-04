@@ -50,6 +50,9 @@ func (m *boundarySubmissionUpdater) GetByID(context.Context, submission.Submissi
 	return m.sub, nil
 }
 func (m *boundarySubmissionUpdater) Update(context.Context, *submission.Submission) error { return nil }
+func (m *boundarySubmissionUpdater) Claim(context.Context, submission.SubmissionID) (bool, error) {
+	return true, nil
+}
 
 type boundaryDownloader struct{}
 
