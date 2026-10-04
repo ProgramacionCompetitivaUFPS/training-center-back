@@ -106,7 +106,7 @@ func toContestResponse(out *appContest.ContestOutput) contestResponse {
 		TeamSizeMin:       out.TeamSizeMin,
 		TeamSizeMax:       out.TeamSizeMax,
 		Group:             groupDisplay{ID: out.Group.ID, Name: out.Group.Name},
-		Owner:             ownerDisplay{Nickname: out.Owner.Nickname, Name: out.Owner.Name},
+		Owner:             ownerDisplay{ID: out.Owner.ID, Nickname: out.Owner.Nickname, Name: out.Owner.Name},
 		Problems:          probs,
 		ProblemCount:      out.ProblemCount,
 		Status:            out.Status,

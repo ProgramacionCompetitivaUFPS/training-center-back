@@ -6981,7 +6981,7 @@ const docTemplate = `{
                 "description": {
                     "type": "string"
                 },
-                "joinMode": {
+                "joinPolicy": {
                     "type": "string"
                 },
                 "leadNicknames": {

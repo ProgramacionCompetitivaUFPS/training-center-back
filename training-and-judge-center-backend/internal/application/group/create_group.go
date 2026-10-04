@@ -16,7 +16,7 @@ import (
 type CreateGroupInput struct {
 	Name            string
 	Description     *string
-	JoinMode        string
+	JoinPolicy      string
 	Visibility      string
 	MemberNicknames []string
 	LeadNicknames   []string
@@ -78,7 +78,7 @@ func (uc *CreateGroupUseCase) Execute(ctx context.Context, input CreateGroupInpu
 		return nil, err
 	}
 
-	joinPolicy, err := domainGroup.NewJoinPolicy(input.JoinMode)
+	joinPolicy, err := domainGroup.NewJoinPolicy(input.JoinPolicy)
 	if err := apperror.AccumulateFieldErrors(err, &fieldErrs); err != nil {
 		return nil, err
 	}

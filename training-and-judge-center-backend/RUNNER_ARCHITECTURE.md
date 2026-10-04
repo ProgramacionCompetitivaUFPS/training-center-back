@@ -548,7 +548,7 @@ Veredicto por exit code + reloj de CPU (la comparación `TimeMs > timeLimit` la 
 137                       → MLE (proceso matado por cgroup, OOM)
 0 y TimeMs > timeLimit    → TLE (por CPU)
 0 y TimeMs ≤ timeLimit    → éxito (el output checker decide AC/WA)
-otro                      → RUNTIME_EXCEPTION
+otro                      → RUNTIME_ERROR
 ```
 
 #### Memoria: dos concerns distintos

@@ -478,7 +478,7 @@ Contest, group, or problem not found.
 * **FR-SS-034.2**: The system MUST change submission status from RUNNING to final status when judging completes.
 * **FR-SS-035**: The system MUST update submission status from RUNNING to final status after judging completes.
 * **FR-SS-036**: The system MUST store processing time (duration in milliseconds) after judging completes.
-* **FR-SS-037**: The system MUST store result verdict: ACCEPTED, WRONG_ANSWER, RUNTIME_EXCEPTION, TIME_LIMIT_EXCEEDED, MEMORY_LIMIT_EXCEEDED, COMPILATION_ERROR, PRESENTATION_ERROR.
+* **FR-SS-037**: The system MUST store result verdict: ACCEPTED, WRONG_ANSWER, RUNTIME_ERROR, TIME_LIMIT_EXCEEDED, MEMORY_LIMIT_EXCEEDED, COMPILATION_ERROR, PRESENTATION_ERROR.
 * **FR-SS-038**: The system MUST store `judgedAt` timestamp when judging completes.
 * **FR-SS-038.1**: The system MUST NOT start judging PENDING submissions when problem status is DRAFT.
 * **FR-SS-038.2**: The system MUST allow RUNNING submissions to complete even if problem status becomes DRAFT.
@@ -507,7 +507,7 @@ Contest, group, or problem not found.
   * `contest_id` (string, UUID, FK to Contest, nullable)
   * `submittedBy` (string, UUID, FK to User) - **primary link to user who submitted**
   * `standingId` (string, UUID, nullable) - userId OR teamId, determines which standing document to update
-  * `status` (enum: PENDING | RUNNING | ACCEPTED | WRONG_ANSWER | RUNTIME_EXCEPTION | TIME_LIMIT_EXCEEDED | MEMORY_LIMIT_EXCEEDED | COMPILATION_ERROR | PRESENTATION_ERROR)
+  * `status` (enum: PENDING | RUNNING | ACCEPTED | WRONG_ANSWER | RUNTIME_ERROR | TIME_LIMIT_EXCEEDED | MEMORY_LIMIT_EXCEEDED | COMPILATION_ERROR | PRESENTATION_ERROR)
   * `language` (string: cpp20, java17, python310)
   * `compiler` (string: g++, javac, py - includes version info)
   * `filePath` (string, storage path/key)
@@ -525,7 +525,7 @@ Contest, group, or problem not found.
 > * `RUNNING`: Submission is currently being judged/executed
 > * `ACCEPTED`: Solution passed all test cases
 > * `WRONG_ANSWER`: Solution produced incorrect output
-> * `RUNTIME_EXCEPTION`: Solution crashed during execution
+> * `RUNTIME_ERROR`: Solution crashed during execution
 > * `TIME_LIMIT_EXCEEDED`: Solution exceeded time limit
 > * `MEMORY_LIMIT_EXCEEDED`: Solution exceeded memory limit
 > * `COMPILATION_ERROR`: Solution failed to compile
@@ -736,8 +736,8 @@ If problem status is PUBLISHED:
           status: MEMORY_LIMIT_EXCEEDED
           result: MEMORY_LIMIT_EXCEEDED
         Else if runtime error:
-          status: RUNTIME_EXCEPTION
-          result: RUNTIME_EXCEPTION
+          status: RUNTIME_ERROR
+          result: RUNTIME_ERROR
         Else if wrong answer:
           status: WRONG_ANSWER
           result: WRONG_ANSWER

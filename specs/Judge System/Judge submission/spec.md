@@ -64,12 +64,12 @@ As the Judge System, I want to evaluate a submission against all test cases so t
 * **And** `memoryUsed` is set to the memory limit
 * **And** `judgedAt` is set to current timestamp
 
-6. **Scenario**: Judgment result - RUNTIME_EXCEPTION
+6. **Scenario**: Judgment result - RUNTIME_ERROR
 
 * **Given** a submission is being judged
 * **And** the source code compiles successfully
 * **When** the program crashes during execution (SIGSEGV, SIGFPE, etc.)
-* **Then** the submission status is updated to RUNTIME_EXCEPTION
+* **Then** the submission status is updated to RUNTIME_ERROR
 * **And** `judgedAt` is set to current timestamp
 
 7. **Scenario**: Judgment result - COMPILATION_ERROR
@@ -656,7 +656,7 @@ def run_checker(
 ### Verdict Determination
 
 - **FR-018**: If compilation fails → COMPILATION_ERROR.
-- **FR-019**: If process crashes (signal) → RUNTIME_EXCEPTION.
+- **FR-019**: If process crashes (signal) → RUNTIME_ERROR.
 - **FR-020**: If time limit exceeded → TIME_LIMIT_EXCEEDED.
 - **FR-021**: If memory limit exceeded → MEMORY_LIMIT_EXCEEDED.
 - **FR-022**: If output format wrong → PRESENTATION_ERROR.
