@@ -63,6 +63,20 @@ func newProblemWithJudgingUpdated() *domainProblem.Problem {
 	)
 }
 
+func newDraftProblemWithJudgingUpdated() *domainProblem.Problem {
+	return domainProblem.RestoreProblem(
+		testProbID, testSlug, "Test Problem",
+		nil, nil, nil, []string{},
+		"DRAFT", "PRIVATE",
+		shared.RestoreUserID(authorID),
+		[]shared.UserID{},
+		[]domainProblem.LanguageOverride{},
+		nil, []domainProblem.JudgingFile{},
+		nil, nil, &judgingUpdated,
+		testNow, testNow,
+	)
+}
+
 func newProblemNoJudgingUpdated() *domainProblem.Problem {
 	return domainProblem.RestoreProblem(
 		testProbID, testSlug, "Test Problem",
@@ -115,6 +129,14 @@ func TestRejudgeSubmissions_Execute(t *testing.T) {
 			user:        asContestant,
 			userID:      authorID,
 			wantErrCode: ErrCodeNoSubmissionsToRejudge,
+		},
+		{
+			name:        "unpublished problem — returns PROBLEM_NOT_PUBLISHED",
+			problem:     newDraftProblemWithJudgingUpdated(),
+			user:        asContestant,
+			userID:      authorID,
+			submissions: []SubmissionRejudgeInfo{sub1},
+			wantErrCode: ErrCodeProblemNotPublished,
 		},
 		{
 			name:        "stranger forbidden",
@@ -172,5 +194,41 @@ func TestRejudgeSubmissions_Execute(t *testing.T) {
 				t.Errorf("ProblemSlug = %q, want %q", out.ProblemSlug, testSlug)
 			}
 		})
+	}
+}
+
+func TestAdminRejudgeSubmissions_UnpublishedProblemIsRejected(t *testing.T) {
+	rejudger := &mockSubmissionRejudger{}
+	uc := NewAdminRejudgeSubmissionsUseCase(repoWith(newDraftProblemWithJudgingUpdated()), rejudger, &mockContestRejudgeProvider{})
+
+	_, err := uc.Execute(context.Background(), AdminRejudgeSubmissionsInput{
+		Slug: testSlug, CurrentUser: asAdmin("admin-user-id-0000-000000000001"), Now: testNow,
+	})
+
+	var ae *apperror.AppError
+	if !errors.As(err, &ae) || ae.Code != ErrCodeProblemNotPublished {
+		t.Fatalf("expected %s, got %v", ErrCodeProblemNotPublished, err)
+	}
+	if len(rejudger.rejudged) != 0 {
+		t.Errorf("nothing should be queued, got %v", rejudger.rejudged)
+	}
+}
+
+func TestRejudgeContestSubmissions_UnpublishedProblemIsRejected(t *testing.T) {
+	provider := &mockContestRejudgeProvider{contest: contestInGroup(testGroupID), isProblemInContest: true}
+	rejudger := &mockSubmissionRejudger{}
+	uc := NewRejudgeContestSubmissionsUseCase(repoWith(newDraftProblemWithJudgingUpdated()), rejudger, provider)
+
+	_, err := uc.Execute(context.Background(), RejudgeContestSubmissionsInput{
+		ContestID: testContestID, Slug: testSlug, GroupID: testGroupID,
+		CurrentUser: asContestant(authorID), Now: testNow,
+	})
+
+	var ae *apperror.AppError
+	if !errors.As(err, &ae) || ae.Code != ErrCodeProblemNotPublished {
+		t.Fatalf("expected %s, got %v", ErrCodeProblemNotPublished, err)
+	}
+	if len(rejudger.rejudged) != 0 {
+		t.Errorf("nothing should be queued, got %v", rejudger.rejudged)
 	}
 }
