@@ -190,6 +190,7 @@ func main() {
 	deactivationRequestRepo := user.NewDeactivationRequestRepository(dbPool)
 	deactivationAuditLogRepo := user.NewDeactivationAuditLogRepository(dbPool)
 	oauthIdentityRepo := user.NewOAuthIdentityRepository(dbPool)
+	globalGroupJoiner := user.NewGlobalGroupJoiner(dbPool)
 
 	// Infrastructure and cross-cutting services
 	txManager := postgres.NewTransactionManager(dbPool)
@@ -206,7 +207,7 @@ func main() {
 	googleVerifier := auth.NewGoogleVerifier(cfg.GoogleClientID)
 
 	// User use cases
-	createUserUseCase := appuser.NewCreateUserUseCase(userRepo)
+	createUserUseCase := appuser.NewCreateUserUseCase(userRepo, globalGroupJoiner, txManager)
 	loginUseCase := appuser.NewLoginUseCase(userRepo, refreshTokenRepo, jwtService, refreshTokenCodec, redisRateLimiter)
 	loginWithGoogleUseCase := appuser.NewLoginWithGoogleUseCase(userRepo, oauthIdentityRepo, refreshTokenRepo, jwtService, refreshTokenCodec, googleVerifier, txManager)
 	linkGoogleIdentityUseCase := appuser.NewLinkGoogleIdentityUseCase(userRepo, oauthIdentityRepo, googleVerifier, emailSender)

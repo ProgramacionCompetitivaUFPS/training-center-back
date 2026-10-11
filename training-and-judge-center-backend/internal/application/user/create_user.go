@@ -7,6 +7,7 @@ import (
 
 	"github.com/google/uuid"
 
+	appshared "github.com/training-judge-center/backend/internal/application/shared"
 	"github.com/training-judge-center/backend/internal/domain/user"
 	"github.com/training-judge-center/backend/pkg/apperror"
 )
@@ -22,11 +23,13 @@ type CreateUserInput struct {
 }
 
 type CreateUserUseCase struct {
-	repo user.Repository
+	repo              user.Repository
+	globalGroupJoiner GlobalGroupJoiner
+	txManager         appshared.TransactionManager
 }
 
-func NewCreateUserUseCase(repo user.Repository) *CreateUserUseCase {
-	return &CreateUserUseCase{repo: repo}
+func NewCreateUserUseCase(repo user.Repository, globalGroupJoiner GlobalGroupJoiner, txManager appshared.TransactionManager) *CreateUserUseCase {
+	return &CreateUserUseCase{repo: repo, globalGroupJoiner: globalGroupJoiner, txManager: txManager}
 }
 
 type CreateUserOutput struct {
@@ -65,7 +68,7 @@ func (uc *CreateUserUseCase) Execute(ctx context.Context, input CreateUserInput)
 	}
 
 	if len(fieldErrors) > 0 {
-		return nil,apperror.NewValidation(fieldErrors)
+		return nil, apperror.NewValidation(fieldErrors)
 	}
 
 	newID := uuid.New().String()
@@ -73,11 +76,16 @@ func (uc *CreateUserUseCase) Execute(ctx context.Context, input CreateUserInput)
 	newUser, err := user.NewUser(newID, now, email, password, input.Name, nickname, input.Country, input.City, input.Institution)
 	if err != nil {
 		slog.ErrorContext(ctx, "failed to build new user domain object", "error", err)
-		return nil,apperror.NewInternal()
+		return nil, apperror.NewInternal()
 	}
 
-	if err := uc.repo.Save(ctx, newUser); err != nil {
-		return nil,err
+	if err := uc.txManager.WithTx(ctx, func(txCtx context.Context) error {
+		if err := uc.repo.Save(txCtx, newUser); err != nil {
+			return err
+		}
+		return uc.globalGroupJoiner.AddToGlobalGroup(txCtx, newID)
+	}); err != nil {
+		return nil, err
 	}
 
 	return &CreateUserOutput{User: userToDTO(newUser)}, nil
