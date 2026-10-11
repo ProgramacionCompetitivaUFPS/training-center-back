@@ -23,7 +23,8 @@ func NewEmailResolver(db *pgxpool.Pool) *EmailResolver {
 // ResolveByEmail returns (nil, nil) when no user has that email.
 func (r *EmailResolver) ResolveByEmail(ctx context.Context, email string) (*appGroup.UserDisplay, error) {
 	const q = `SELECT id, nickname, name, email, role FROM users WHERE email = LOWER($1) LIMIT 1`
-	var id, nick, name, mail, role string
+	var id, nick, name, role string
+	var mail *string
 	err := r.db.QueryRow(ctx, q, email).Scan(&id, &nick, &name, &mail, &role)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
@@ -32,11 +33,17 @@ func (r *EmailResolver) ResolveByEmail(ctx context.Context, email string) (*appG
 		slog.ErrorContext(ctx, "EmailResolver.ResolveByEmail failed", "error", err)
 		return nil, apperror.NewInternal()
 	}
+	// email nunca es NULL en una fila que matchee `email = $1`, pero se escanea
+	// como nullable por consistencia con el resto de consultas de este paquete.
+	var emailVal string
+	if mail != nil {
+		emailVal = *mail
+	}
 	return &appGroup.UserDisplay{
 		ID:         id,
 		Nickname:   nick,
 		Name:       name,
-		Email:      mail,
+		Email:      emailVal,
 		SystemRole: role,
 	}, nil
 }

@@ -31,12 +31,20 @@ func (p *UserProvider) GetDisplays(ctx context.Context, userIDs []string) (map[s
 
 	out := make(map[string]*appGroup.UserDisplay, len(userIDs))
 	for rows.Next() {
-		var id, nickname, name, email, role string
+		var id, nickname, name, role string
+		var email *string
 		if err := rows.Scan(&id, &nickname, &name, &email, &role); err != nil {
 			slog.ErrorContext(ctx, "GetDisplays scan failed", "error", err)
 			return nil, apperror.NewInternal()
 		}
-		out[id] = &appGroup.UserDisplay{ID: id, Nickname: nickname, Name: name, Email: email, SystemRole: role}
+		// email es NULL para cuentas desactivadas (ver User.Deactivate) — una
+		// cuenta anonimizada sigue apareciendo en listados de miembros/líderes
+		// aunque ya no tenga correo.
+		var emailVal string
+		if email != nil {
+			emailVal = *email
+		}
+		out[id] = &appGroup.UserDisplay{ID: id, Nickname: nickname, Name: name, Email: emailVal, SystemRole: role}
 	}
 	if err := rows.Err(); err != nil {
 		slog.ErrorContext(ctx, "GetDisplays rows failed", "error", err)
