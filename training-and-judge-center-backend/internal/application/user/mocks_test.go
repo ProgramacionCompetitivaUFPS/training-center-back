@@ -226,6 +226,23 @@ func (m *mockTransactionManager) WithTx(ctx context.Context, fn func(txCtx conte
 	return fn(ctx)
 }
 
+// ── mockGlobalGroupJoiner ────────────────────────────────────────────────────
+
+type mockGlobalGroupJoiner struct {
+	addToGlobalGroupFn func(ctx context.Context, userID string) error
+}
+
+func (m *mockGlobalGroupJoiner) AddToGlobalGroup(ctx context.Context, userID string) error {
+	if m.addToGlobalGroupFn != nil {
+		return m.addToGlobalGroupFn(ctx, userID)
+	}
+	return nil
+}
+
+func newNoopGlobalGroupJoiner() *mockGlobalGroupJoiner {
+	return &mockGlobalGroupJoiner{}
+}
+
 // ── mockDeactivationRepo ──────────────────────────────────────────────────────
 
 type mockDeactivationRepo struct {
