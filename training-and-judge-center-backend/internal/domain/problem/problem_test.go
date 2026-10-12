@@ -269,8 +269,8 @@ func TestAddSolution_NewFile_Appends(t *testing.T) {
 	if len(p.Solutions()) != 1 {
 		t.Errorf("solutions: got %d, want 1", len(p.Solutions()))
 	}
-	if p.JudgingUpdatedAt() == nil {
-		t.Error("JudgingUpdatedAt: got nil, want non-nil")
+	if p.JudgingUpdatedAt() != nil {
+		t.Errorf("JudgingUpdatedAt: got %v, want nil", p.JudgingUpdatedAt())
 	}
 	if !p.UpdatedAt().Equal(later.UTC()) {
 		t.Errorf("updatedAt not refreshed: got %v, want %v", p.UpdatedAt(), later.UTC())
@@ -298,8 +298,8 @@ func TestAddSolution_DuplicateFilename_Replaces(t *testing.T) {
 	if p.Solutions()[0].FileKey() != "key-2" {
 		t.Errorf("updated key: got %q, want key-2", p.Solutions()[0].FileKey())
 	}
-	if p.JudgingUpdatedAt() == nil {
-		t.Error("JudgingUpdatedAt: got nil, want non-nil")
+	if p.JudgingUpdatedAt() != nil {
+		t.Errorf("JudgingUpdatedAt: got %v, want nil", p.JudgingUpdatedAt())
 	}
 }
 
@@ -316,8 +316,8 @@ func TestRemoveSolution_RemovesMatchingFile(t *testing.T) {
 	if len(p.Solutions()) != 0 {
 		t.Errorf("solutions: got %d, want 0", len(p.Solutions()))
 	}
-	if p.JudgingUpdatedAt() == nil {
-		t.Error("JudgingUpdatedAt: got nil, want non-nil")
+	if p.JudgingUpdatedAt() != nil {
+		t.Errorf("JudgingUpdatedAt: got %v, want nil", p.JudgingUpdatedAt())
 	}
 	if !p.UpdatedAt().Equal(later.UTC()) {
 		t.Errorf("updatedAt not refreshed: got %v, want %v", p.UpdatedAt(), later.UTC())
@@ -444,5 +444,31 @@ func TestRemoveValidator_ClearsValidatorAndUpdatesTimestamps(t *testing.T) {
 	}
 	if !p.UpdatedAt().Equal(later.UTC()) {
 		t.Errorf("updatedAt not refreshed: got %v, want %v", p.UpdatedAt(), later.UTC())
+	}
+}
+
+func TestJudgingComponents_UpdateJudgingUpdatedAt(t *testing.T) {
+	later := testNow.Add(time.Hour)
+	file := problem.RestoreJudgingFile("c.cpp", "key", "cpp20", nil, nil)
+
+	tests := []struct {
+		name string
+		do   func(p *problem.Problem)
+	}{
+		{"set test cases", func(p *problem.Problem) { p.SetTestCases("cases", later) }},
+		{"remove test cases", func(p *problem.Problem) { p.RemoveTestCases(later) }},
+		{"set checker", func(p *problem.Problem) { p.SetChecker(file, later) }},
+		{"remove checker", func(p *problem.Problem) { p.RemoveChecker(later) }},
+		{"set validator", func(p *problem.Problem) { p.SetValidator(file, later) }},
+		{"remove validator", func(p *problem.Problem) { p.RemoveValidator(later) }},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			p := newDraftProblem()
+			tt.do(p)
+			if p.JudgingUpdatedAt() == nil || !p.JudgingUpdatedAt().Equal(later.UTC()) {
+				t.Errorf("JudgingUpdatedAt: got %v, want %v", p.JudgingUpdatedAt(), later.UTC())
+			}
+		})
 	}
 }
