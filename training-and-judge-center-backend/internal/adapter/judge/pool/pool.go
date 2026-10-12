@@ -239,7 +239,7 @@ func (p *Pool) sharedVolumeBind() string {
 // Removes the dangling container if ContainerStart fails after ContainerCreate succeeds.
 // Caller must NOT hold p.mu.
 func (p *Pool) createContainer(ctx context.Context, langCfg LanguageConfig, memoryBytes int64) (string, error) {
-	// An init process (tini) as PID 1 reaps the zombies that every "timeout" wrapper of docker exec leaves behind.
+	// tini as PID 1 reaps the zombies each exec'd timeout leaves behind.
 	init := true
 	result, err := p.docker.ContainerCreate(ctx, client.ContainerCreateOptions{
 		Config: &container.Config{

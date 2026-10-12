@@ -9,8 +9,7 @@ import (
 	"github.com/training-judge-center/backend/pkg/apperror"
 )
 
-// writeMultipartParseError answers 413 only when the body outgrew its cap;
-// anything else, such as a JSON body, is a malformed request (400).
+// 413 only when the body outgrew its cap; anything else is a malformed request.
 func writeMultipartParseError(ctx context.Context, w http.ResponseWriter, err error) {
 	var tooLarge *http.MaxBytesError
 	if errors.As(err, &tooLarge) {
