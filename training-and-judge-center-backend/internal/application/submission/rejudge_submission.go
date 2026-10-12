@@ -73,6 +73,15 @@ func (uc *RejudgeSubmissionUseCase) Execute(ctx context.Context, in RejudgeSubmi
 		}
 	}
 
+	published, err := uc.judgingProvider.IsPublished(ctx, sub.ProblemID())
+	if err != nil {
+		return nil, err
+	}
+	if !published {
+		return nil, apperror.NewBadRequest(domainsubmission.ErrCodeProblemNotPublished,
+			"only submissions of PUBLISHED problems can be rejudged")
+	}
+
 	if !isAdmin {
 		judgingUpdatedAt, err := uc.judgingProvider.GetJudgingUpdatedAt(ctx, sub.ProblemID())
 		if err != nil {
@@ -82,15 +91,6 @@ func (uc *RejudgeSubmissionUseCase) Execute(ctx context.Context, in RejudgeSubmi
 			return nil, apperror.NewBadRequest(ErrCodeNoRejudgeNeeded,
 				"this submission does not need rejudging; judging components have not been updated since submission")
 		}
-	}
-
-	published, err := uc.judgingProvider.IsPublished(ctx, sub.ProblemID())
-	if err != nil {
-		return nil, err
-	}
-	if !published {
-		return nil, apperror.NewBadRequest(domainsubmission.ErrCodeProblemNotPublished,
-			"only submissions of PUBLISHED problems can be rejudged")
 	}
 
 	previousVerdict := sub.Status().String()

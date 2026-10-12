@@ -102,3 +102,32 @@ func TestRejudgeSubmission_DeletedProblem_OwnerReportsNotFound(t *testing.T) {
 		t.Error("nothing should be queued")
 	}
 }
+
+// Both rules apply to a DRAFT problem that was never judged again; the contestant
+// is told the problem is not published, which is what they can act on.
+func TestRejudgeSubmission_DraftProblem_ReportsNotPublishedBeforeNoRejudgeNeeded(t *testing.T) {
+	sub := finishedSubmission(testProblemID)
+	repo := &mockSubmissionRepo{findByIDFn: func(string) (*domainsubmission.Submission, error) { return sub, nil }}
+	rejudger := &mockSingleRejudger{}
+	uc := NewRejudgeSubmissionUseCase(repo, &mockNeverJudgedProvider{}, nil, rejudger)
+
+	_, err := uc.Execute(context.Background(), RejudgeSubmissionInput{SubmissionID: testSubmissionID, CurrentUser: testutil.AsContestant(testUserID), Now: testNow})
+
+	var ae *apperror.AppError
+	if !errors.As(err, &ae) || ae.Code != domainsubmission.ErrCodeProblemNotPublished {
+		t.Fatalf("expected %s, got %v", domainsubmission.ErrCodeProblemNotPublished, err)
+	}
+	if len(rejudger.calls) != 0 {
+		t.Error("nothing should be queued")
+	}
+}
+
+type mockNeverJudgedProvider struct{}
+
+func (m *mockNeverJudgedProvider) GetJudgingUpdatedAt(context.Context, string) (*time.Time, error) {
+	return nil, nil
+}
+
+func (m *mockNeverJudgedProvider) IsPublished(context.Context, string) (bool, error) {
+	return false, nil
+}

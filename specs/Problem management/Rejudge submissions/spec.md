@@ -126,7 +126,7 @@ As a contestant, I want to manually rejudge my submission when I notice the prob
    - **And** the authenticated user is NOT an admin
    - **And** the authenticated user is NOT a Lead
    - **When** they attempt to rejudge
-   - **Then** the system rejects with 403 Forbidden (INSUFFICIENT_PERMISSIONS)
+   - **Then** the system rejects with 403 Forbidden (ACCESS_DENIED)
 
 7. **Scenario**: Submission not found
    - **Given** the submissionId does not exist
@@ -425,7 +425,7 @@ User doesn't have permission or submission is in active contest.
 
 ```json
 {
-  "error": "INSUFFICIENT_PERMISSIONS",
+  "error": "ACCESS_DENIED",
   "message": "You can only rejudge your own submissions"
 }
 ```
@@ -685,7 +685,7 @@ Submission not found.
 - **FR-007**: The system MUST process all rejudging asynchronously (non-blocking).
 - **FR-008**: The system MUST execute the submission code against all current test cases during rejudging.
 - **FR-009**: The system MUST update the submission status based on rejudging results (ACCEPTED, WRONG_ANSWER, TIME_LIMIT_EXCEEDED, MEMORY_LIMIT_EXCEEDED, RUNTIME_ERROR, COMPILATION_ERROR, PRESENTATION_ERROR).
-- **FR-009.1**: The system MUST reject a rejudge (single, per problem, per contest or admin) with 400 PROBLEM_NOT_PUBLISHED unless the problem is PUBLISHED, and a single rejudge of a submission whose problem was deleted with 404 PROBLEM_NOT_FOUND.
+- **FR-009.1**: The system MUST reject a rejudge (single, per problem, per contest or admin) with 400 PROBLEM_NOT_PUBLISHED unless the problem is PUBLISHED, and a single rejudge of a submission whose problem was deleted with 404 PROBLEM_NOT_FOUND. The PROBLEM_NOT_PUBLISHED check is evaluated before NO_REJUDGE_NEEDED, so a contestant rejudging a submission of an unpublished problem always receives PROBLEM_NOT_PUBLISHED.
 - **FR-009.2**: The system MUST reset a submission to PENDING before publishing its queue message, and MUST restore its previous verdict if the publish fails, so a rejudge never leaves a submission PENDING without a message.
 - **FR-009.3**: `POST /problems/p/{slug}/rejudge` MUST answer 400 BAD_REQUEST when called with a `contestId` query parameter instead of ignoring it, and the message MUST point to the contest-scoped routes: `POST /groups/{groupId}/contests/{contestId}/problems/{slug}/rejudge` (contest owner, group Lead or admin, during an active contest) and `POST /admin/problems/{slug}/rejudge?contestId={contestId}` (admin, any contest status).
 - **FR-010**: The system MUST NOT maintain a history of previous verdicts.
