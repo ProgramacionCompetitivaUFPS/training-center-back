@@ -89,6 +89,8 @@ func main() {
 	defer redisClient.Close()
 	slog.Info("redis connected successfully")
 
+	txManager := postgres.NewTransactionManager(dbPool)
+
 	// Problem repositories & settings
 	problemRepo := problem.NewRepository(dbPool)
 	settingsProvider, err := platformConfig.NewPlatformSettings(cfg.VirtualObject)
@@ -164,6 +166,7 @@ func main() {
 	userProvider := problem.NewUserProvider(dbPool)
 	problemStatisticsProvider := problem.NewStatisticsProvider(dbPool)
 	problemActiveContestChecker := problem.NewActiveContestChecker(dbPool)
+	problemContestAssociationRemover := problem.NewContestAssociationRemover(dbPool)
 	problemValidationRepo := problem.NewProblemValidationRepository(dbPool)
 
 	// Problem use cases
@@ -179,7 +182,7 @@ func main() {
 	listProblemsUseCase := appProblem.NewListProblemsUseCase(problemRepo, userProvider)
 	unpublishProblemUseCase := appProblem.NewUnpublishProblemUseCase(problemRepo, problemActiveContestChecker)
 	changeAccessibilityUseCase := appProblem.NewChangeAccessibilityUseCase(problemRepo)
-	deleteProblemUseCase := appProblem.NewDeleteProblemUseCase(problemRepo, fileStorage, problemActiveContestChecker)
+	deleteProblemUseCase := appProblem.NewDeleteProblemUseCase(problemRepo, fileStorage, problemActiveContestChecker, problemContestAssociationRemover, txManager)
 	getProblemStatisticsUseCase := appProblem.NewGetProblemStatisticsUseCase(problemRepo, problemStatisticsProvider)
 
 	// User platform adapters
@@ -193,7 +196,6 @@ func main() {
 	globalGroupJoiner := user.NewGlobalGroupJoiner(dbPool)
 
 	// Infrastructure and cross-cutting services
-	txManager := postgres.NewTransactionManager(dbPool)
 	jwtService := auth.NewJWTService(cfg.JWTSecret, cfg.JWTExpirationHours)
 	emailSender := email.NewSMTPSender(cfg.SMTPHost, cfg.SMTPPort, cfg.SMTPUser, cfg.SMTPPassword, cfg.SMTPFrom)
 	redisRateLimiter := ratelimit.NewRedisRateLimiter(redisClient)

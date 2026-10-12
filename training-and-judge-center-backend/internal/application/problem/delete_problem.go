@@ -20,6 +20,8 @@ type DeleteProblemUseCase struct {
 	repo           problem.Repository
 	fileStorage    ProblemFileRepository
 	contestChecker ActiveContestChecker
+	contestRemover ContestAssociationRemover
+	txManager      appshared.TransactionManager
 }
 
 // maxRetries is the number of retry attempts for storage cleanup operations after
@@ -27,8 +29,20 @@ type DeleteProblemUseCase struct {
 // without blocking the response indefinitely.
 const maxRetries = 3
 
-func NewDeleteProblemUseCase(repo problem.Repository, fileStorage ProblemFileRepository, contestChecker ActiveContestChecker) *DeleteProblemUseCase {
-	return &DeleteProblemUseCase{repo: repo, fileStorage: fileStorage, contestChecker: contestChecker}
+func NewDeleteProblemUseCase(
+	repo problem.Repository,
+	fileStorage ProblemFileRepository,
+	contestChecker ActiveContestChecker,
+	contestRemover ContestAssociationRemover,
+	txManager appshared.TransactionManager,
+) *DeleteProblemUseCase {
+	return &DeleteProblemUseCase{
+		repo:           repo,
+		fileStorage:    fileStorage,
+		contestChecker: contestChecker,
+		contestRemover: contestRemover,
+		txManager:      txManager,
+	}
 }
 
 func (uc *DeleteProblemUseCase) Execute(ctx context.Context, in DeleteProblemInput) error {
@@ -60,7 +74,13 @@ func (uc *DeleteProblemUseCase) Execute(ctx context.Context, in DeleteProblemInp
 		return apperror.NewConflict(problem.ErrCodeProblemInActiveContest, "Cannot delete a problem that is currently being used in an active contest")
 	}
 
-	if err := uc.repo.Delete(ctx, p.ID()); err != nil {
+	err = uc.txManager.WithTx(ctx, func(txCtx context.Context) error {
+		if err := uc.contestRemover.RemoveProblemFromContests(txCtx, p.ID()); err != nil {
+			return err
+		}
+		return uc.repo.Delete(txCtx, p.ID())
+	})
+	if err != nil {
 		return err
 	}
 

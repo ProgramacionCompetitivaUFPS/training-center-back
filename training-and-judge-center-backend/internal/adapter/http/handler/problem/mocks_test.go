@@ -249,7 +249,7 @@ func newHandlerWithUnpublish(repo domainProblem.Repository, checker appProblem.A
 }
 
 func newHandlerWithDeleteProblem(repo domainProblem.Repository, checker appProblem.ActiveContestChecker) *Handler {
-	return &Handler{deleteProblem: appProblem.NewDeleteProblemUseCase(repo, &mockFileStorageH{}, checker)}
+	return &Handler{deleteProblem: appProblem.NewDeleteProblemUseCase(repo, &mockFileStorageH{}, checker, &mockContestAssociationRemoverH{}, &mockTxManagerH{})}
 }
 
 func newHandlerWithChangeAccessibility(repo domainProblem.Repository) *Handler {
@@ -415,4 +415,16 @@ func (noopSessionInvalidator) IsSessionInvalidated(context.Context, string) (boo
 
 func newHandlerWithListProblems(repo domainProblem.Repository, userProvider appProblem.UserProvider) *Handler {
 	return &Handler{listProblems: appProblem.NewListProblemsUseCase(repo, userProvider)}
+}
+
+type mockContestAssociationRemoverH struct{}
+
+func (m *mockContestAssociationRemoverH) RemoveProblemFromContests(_ context.Context, _ string) error {
+	return nil
+}
+
+type mockTxManagerH struct{}
+
+func (m *mockTxManagerH) WithTx(ctx context.Context, fn func(context.Context) error) error {
+	return fn(ctx)
 }
