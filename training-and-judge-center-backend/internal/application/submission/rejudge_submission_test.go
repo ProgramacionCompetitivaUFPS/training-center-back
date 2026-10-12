@@ -8,12 +8,16 @@ import (
 
 	"github.com/training-judge-center/backend/internal/domain/shared"
 	domainsubmission "github.com/training-judge-center/backend/internal/domain/submission"
+	"github.com/training-judge-center/backend/internal/testutil"
 	"github.com/training-judge-center/backend/pkg/apperror"
 )
 
 type mockJudgingProvider struct{ published bool }
 
-func (m *mockJudgingProvider) GetJudgingUpdatedAt(context.Context, string) (*time.Time, error) {
+func (m *mockJudgingProvider) GetJudgingUpdatedAt(_ context.Context, problemID string) (*time.Time, error) {
+	if problemID == "" {
+		return nil, errors.New("invalid input syntax for type uuid")
+	}
 	t := testNow.Add(time.Hour)
 	return &t, nil
 }
@@ -75,6 +79,20 @@ func TestRejudgeSubmission_DeletedProblem_ReportsNotFound(t *testing.T) {
 	uc, rejudger := newRejudgeUseCase(finishedSubmission(""), true)
 
 	_, err := uc.Execute(context.Background(), RejudgeSubmissionInput{SubmissionID: testSubmissionID, CurrentUser: asAdmin("admin-1"), Now: testNow})
+
+	var ae *apperror.AppError
+	if !errors.As(err, &ae) || ae.Code != domainsubmission.ErrCodeProblemNotFound {
+		t.Fatalf("expected %s, got %v", domainsubmission.ErrCodeProblemNotFound, err)
+	}
+	if len(rejudger.calls) != 0 {
+		t.Error("nothing should be queued")
+	}
+}
+
+func TestRejudgeSubmission_DeletedProblem_OwnerReportsNotFound(t *testing.T) {
+	uc, rejudger := newRejudgeUseCase(finishedSubmission(""), true)
+
+	_, err := uc.Execute(context.Background(), RejudgeSubmissionInput{SubmissionID: testSubmissionID, CurrentUser: testutil.AsContestant(testUserID), Now: testNow})
 
 	var ae *apperror.AppError
 	if !errors.As(err, &ae) || ae.Code != domainsubmission.ErrCodeProblemNotFound {
