@@ -15,7 +15,7 @@ func newListRegistrationsUseCase(
 	member *mockGroupMemberProvider,
 	nicknames *mockNicknameProvider,
 ) *ListContestRegistrationsUseCase {
-	return NewListContestRegistrationsUseCase(repo, reg, member, nicknames)
+	return NewListContestRegistrationsUseCase(repo, reg, mockTeamParticipRepo(), member, nicknames, &mockTeamDisplayProvider{})
 }
 
 func validListRegistrationsInput() ListContestRegistrationsInput {
@@ -128,5 +128,54 @@ func TestListContestRegistrations_ListError_Propagates(t *testing.T) {
 
 	if _, err := uc.Execute(context.Background(), validListRegistrationsInput()); err == nil {
 		t.Fatal("expected error from failed ListByContest")
+	}
+}
+
+func TestListContestRegistrations_TeamCountsAsOneEntryWithMembers(t *testing.T) {
+	reg := &mockRegistrationRepository{
+		listByContestFn: func(_ context.Context, _ string, _, _ int) ([]*domainContest.ContestRegistration, int, error) {
+			return []*domainContest.ContestRegistration{
+				domainContest.RestoreContestRegistration("r1", testContestID, callerID, time.Now()),
+			}, 1, nil
+		},
+	}
+	teamRepo := &mockTeamParticipationRepository{
+		listFn: func(_ context.Context, _ string, _, _ int) ([]*domainContest.ContestTeamParticipation, int, error) {
+			return []*domainContest.ContestTeamParticipation{
+				domainContest.RestoreContestTeamParticipation("tp1", testContestID, "team-1", []string{otherID, "member-2"}, time.Now()),
+			}, 1, nil
+		},
+	}
+	teamDisplays := &mockTeamDisplayProvider{
+		getDisplaysFn: func(_ context.Context, _ []string) (map[string]*TeamDisplay, error) {
+			return map[string]*TeamDisplay{"team-1": {ID: "team-1", Name: "Los Ñoños"}}, nil
+		},
+	}
+	uc := NewListContestRegistrationsUseCase(
+		repoWith(newTestContest(otherID)), reg, teamRepo, isMemberNotLead(), mockNicknames(), teamDisplays,
+	)
+
+	out, err := uc.Execute(context.Background(), validListRegistrationsInput())
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if out.Total != 2 {
+		t.Fatalf("expected total=2 (1 individual + 1 team, team counted once), got %d", out.Total)
+	}
+
+	var teamEntry *RegistrationEntry
+	for i := range out.Registrations {
+		if out.Registrations[i].Type == "TEAM" {
+			teamEntry = &out.Registrations[i]
+		}
+	}
+	if teamEntry == nil {
+		t.Fatal("expected one TEAM entry")
+	}
+	if teamEntry.TeamName != "Los Ñoños" {
+		t.Errorf("teamName=%q, want %q", teamEntry.TeamName, "Los Ñoños")
+	}
+	if len(teamEntry.Members) != 2 {
+		t.Errorf("expected 2 members in the team entry, got %d", len(teamEntry.Members))
 	}
 }

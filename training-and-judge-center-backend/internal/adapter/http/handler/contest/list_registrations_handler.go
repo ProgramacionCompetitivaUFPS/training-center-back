@@ -64,7 +64,10 @@ func (h *Handler) ListRegistrations(w http.ResponseWriter, r *http.Request) {
 	items := make([]registrationItem, len(out.Registrations))
 	for i, e := range out.Registrations {
 		items[i] = registrationItem{
+			Type:         e.Type,
 			Nickname:     e.Nickname,
+			TeamName:     e.TeamName,
+			Members:      e.Members,
 			RegisteredAt: e.RegisteredAt.UTC().Format(time.RFC3339),
 		}
 	}

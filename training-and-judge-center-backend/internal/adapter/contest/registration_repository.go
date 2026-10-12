@@ -89,13 +89,7 @@ func (r *RegistrationRepository) ListByContest(ctx context.Context, contestID st
 	var regs []*domainContest.ContestRegistration
 
 	g.Go(func() error {
-		err := q.QueryRow(gCtx, `
-			SELECT
-				(SELECT COUNT(*) FROM contest_registrations WHERE contest_id = $1) +
-				(SELECT COALESCE(SUM(array_length(selected_members, 1)), 0)
-				 FROM contest_team_participants WHERE contest_id = $1)`,
-			contestID,
-		).Scan(&total)
+		err := q.QueryRow(gCtx, `SELECT COUNT(*) FROM contest_registrations WHERE contest_id = $1`, contestID).Scan(&total)
 		if err != nil {
 			slog.ErrorContext(gCtx, "failed to count contest registrations for list", "contest_id", contestID, "error", err)
 			return apperror.NewInternal()
@@ -103,20 +97,11 @@ func (r *RegistrationRepository) ListByContest(ctx context.Context, contestID st
 		return nil
 	})
 
-	// Individual registrations and team registrations (one row per selected
-	// member, so a TEAM/MIXED contest's roster shows real people, not just
-	// whoever registered individually) are unioned before pagination.
 	g.Go(func() error {
 		rows, err := q.Query(gCtx, `
-			SELECT id, contest_id, user_id, registered_at FROM (
-				SELECT id, contest_id, user_id, registered_at
-				FROM contest_registrations
-				WHERE contest_id = $1
-				UNION ALL
-				SELECT ctp.id, ctp.contest_id, member_id, ctp.registered_at
-				FROM contest_team_participants ctp, unnest(ctp.selected_members) AS member_id
-				WHERE ctp.contest_id = $1
-			) combined
+			SELECT id, contest_id, user_id, registered_at
+			FROM contest_registrations
+			WHERE contest_id = $1
 			ORDER BY registered_at ASC
 			LIMIT $2 OFFSET $3`,
 			contestID, limit, offset,
@@ -192,17 +177,18 @@ func (r *RegistrationRepository) ExistsByContestAndUserOrTeam(ctx context.Contex
 	return exists, nil
 }
 
-// CountByContest counts real people registered, individually or as a
-// selected member of a registered team — not just rows in
-// contest_registrations, which is empty for every TEAM/MIXED contest.
+// CountByContest counts registered participants — individual registrations
+// plus registered teams, each team counting as one participant (matching
+// standings, where a team is a single ranked entry regardless of its
+// roster size) — not just rows in contest_registrations, which is empty
+// for every TEAM/MIXED contest.
 func (r *RegistrationRepository) CountByContest(ctx context.Context, contestID string) (int, error) {
 	q := infraPostgres.GetQuerier(ctx, r.db)
 	var count int
 	err := q.QueryRow(ctx, `
 		SELECT
 			(SELECT COUNT(*) FROM contest_registrations WHERE contest_id = $1) +
-			(SELECT COALESCE(SUM(array_length(selected_members, 1)), 0)
-			 FROM contest_team_participants WHERE contest_id = $1)`,
+			(SELECT COUNT(*) FROM contest_team_participants WHERE contest_id = $1)`,
 		contestID,
 	).Scan(&count)
 	if err != nil {
@@ -226,7 +212,7 @@ func (r *RegistrationRepository) CountByContestBulk(ctx context.Context, contest
 			SELECT contest_id, COUNT(*) AS cnt
 			FROM contest_registrations WHERE contest_id = ANY($1) GROUP BY contest_id
 			UNION ALL
-			SELECT contest_id, COALESCE(SUM(array_length(selected_members, 1)), 0) AS cnt
+			SELECT contest_id, COUNT(*) AS cnt
 			FROM contest_team_participants WHERE contest_id = ANY($1) GROUP BY contest_id
 		) combined
 		GROUP BY contest_id`,

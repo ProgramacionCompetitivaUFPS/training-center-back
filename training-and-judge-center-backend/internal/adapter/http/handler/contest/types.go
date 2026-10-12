@@ -182,8 +182,11 @@ type registrationStatusResponse struct {
 // ── List registrations response ───────────────────────────────────────────────
 
 type registrationItem struct {
-	Nickname     string `json:"nickname"`
-	RegisteredAt string `json:"registeredAt"`
+	Type         string   `json:"type"`
+	Nickname     string   `json:"nickname,omitempty"`
+	TeamName     string   `json:"teamName,omitempty"`
+	Members      []string `json:"members,omitempty"`
+	RegisteredAt string   `json:"registeredAt"`
 }
 
 type registrationsPagination struct {
