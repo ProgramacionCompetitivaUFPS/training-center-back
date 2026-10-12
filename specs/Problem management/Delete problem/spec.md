@@ -239,6 +239,7 @@ Problem with the specified slug does not exist.
 - **FR-009**: The system MUST perform hard delete of the Problem record.
 - **FR-010**: The system MUST delete all problem files from storage (test cases, solutions, checker, validator).
 - **FR-011**: The system MUST delete all Contest_Problem associations (remove problem from all contests).
+- **FR-011a**: After removing the associations, the system MUST renumber the remaining problems of each affected contest so their positions stay contiguous (1..n), preserving their relative order.
 - **FR-012**: The system MUST preserve all Submission records with problem_id intact.
 - **FR-013**: The system MUST preserve the problem title in submission records for historical reference.
 
