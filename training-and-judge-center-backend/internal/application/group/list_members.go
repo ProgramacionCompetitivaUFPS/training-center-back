@@ -19,11 +19,12 @@ type ListMembersInput struct {
 }
 
 type MemberItemDTO struct {
-	UserID   string
-	Nickname string
-	Name     string
-	Role     string
-	JoinedAt time.Time
+	UserID     string
+	Nickname   string
+	Name       string
+	Role       string
+	SystemRole string
+	JoinedAt   time.Time
 }
 
 type ListMembersOutput struct {
@@ -104,6 +105,7 @@ func (uc *ListMembersUseCase) Execute(ctx context.Context, input ListMembersInpu
 		if d := displays[uid]; d != nil {
 			item.Nickname = d.Nickname
 			item.Name = d.Name
+			item.SystemRole = d.SystemRole
 		}
 		items = append(items, item)
 	}
