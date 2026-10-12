@@ -201,17 +201,18 @@ func (p *Problem) RemoveTestCases(now time.Time) {
 	p.touchJudgingUpdatedAt(now)
 }
 
+// Solutions only serve publish-time validation, so they never move judgingUpdatedAt.
 func (p *Problem) AddSolution(solution JudgingFile, now time.Time) *JudgingFile {
 	for i, sol := range p.solutions {
 		if sol.Filename() == solution.Filename() {
 			old := sol
 			p.solutions[i] = solution
-			p.touchJudgingUpdatedAt(now)
+			p.updatedAt = now.UTC()
 			return &old
 		}
 	}
 	p.solutions = append(p.solutions, solution)
-	p.touchJudgingUpdatedAt(now)
+	p.updatedAt = now.UTC()
 	return nil
 }
 
@@ -219,7 +220,7 @@ func (p *Problem) RemoveSolution(filename string, now time.Time) error {
 	for i, sol := range p.solutions {
 		if sol.Filename() == filename {
 			p.solutions = append(p.solutions[:i], p.solutions[i+1:]...)
-			p.touchJudgingUpdatedAt(now)
+			p.updatedAt = now.UTC()
 			return nil
 		}
 	}
