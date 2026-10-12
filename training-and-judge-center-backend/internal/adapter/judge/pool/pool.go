@@ -239,6 +239,8 @@ func (p *Pool) sharedVolumeBind() string {
 // Removes the dangling container if ContainerStart fails after ContainerCreate succeeds.
 // Caller must NOT hold p.mu.
 func (p *Pool) createContainer(ctx context.Context, langCfg LanguageConfig, memoryBytes int64) (string, error) {
+	// An init process (tini) as PID 1 reaps the zombies that every "timeout" wrapper of docker exec leaves behind.
+	init := true
 	result, err := p.docker.ContainerCreate(ctx, client.ContainerCreateOptions{
 		Config: &container.Config{
 			Image: langCfg.Image,
@@ -250,6 +252,7 @@ func (p *Pool) createContainer(ctx context.Context, langCfg LanguageConfig, memo
 		HostConfig: &container.HostConfig{
 			// Every container of a pool mounts the judging volume the same way.
 			Binds: []string{p.sharedVolumeBind()},
+			Init:  &init,
 			Resources: container.Resources{
 				Memory: memoryBytes,
 				// MemorySwap == Memory disables swap entirely, making MLE
