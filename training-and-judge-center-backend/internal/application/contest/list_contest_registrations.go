@@ -3,6 +3,7 @@ package contest
 import (
 	"context"
 	"sort"
+	"strings"
 	"time"
 
 	appshared "github.com/training-judge-center/backend/internal/application/shared"
@@ -16,6 +17,9 @@ type ListContestRegistrationsInput struct {
 	ContestID   string
 	Page        int
 	Limit       int
+	// Search filters by a case-insensitive substring of the nickname (INDIVIDUAL)
+	// or of the team name or any member nickname (TEAM). Empty means no filter.
+	Search string
 }
 
 // RegistrationEntry is one registered participant: an individual or a team.
@@ -135,6 +139,16 @@ func (uc *ListContestRegistrationsUseCase) Execute(ctx context.Context, in ListC
 		})
 	}
 
+	if q := strings.ToLower(strings.TrimSpace(in.Search)); q != "" {
+		filtered := entries[:0]
+		for _, e := range entries {
+			if e.matches(q) {
+				filtered = append(filtered, e)
+			}
+		}
+		entries = filtered
+	}
+
 	sort.Slice(entries, func(i, j int) bool {
 		return entries[i].RegisteredAt.Before(entries[j].RegisteredAt)
 	})
@@ -155,4 +169,18 @@ func (uc *ListContestRegistrationsUseCase) Execute(ctx context.Context, in ListC
 		Page:          in.Page,
 		Limit:         in.Limit,
 	}, nil
+}
+
+// matches reports whether q (already lowercased) is a substring of the entry's
+// nickname, team name or any of its member nicknames.
+func (e RegistrationEntry) matches(q string) bool {
+	if strings.Contains(strings.ToLower(e.Nickname), q) || strings.Contains(strings.ToLower(e.TeamName), q) {
+		return true
+	}
+	for _, m := range e.Members {
+		if strings.Contains(strings.ToLower(m), q) {
+			return true
+		}
+	}
+	return false
 }

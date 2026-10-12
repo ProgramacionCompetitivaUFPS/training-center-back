@@ -179,3 +179,52 @@ func TestListContestRegistrations_TeamCountsAsOneEntryWithMembers(t *testing.T) 
 		t.Errorf("expected 2 members in the team entry, got %d", len(teamEntry.Members))
 	}
 }
+
+func TestListContestRegistrations_SearchMatchesNicknameTeamNameAndMembers(t *testing.T) {
+	reg := &mockRegistrationRepository{
+		listByContestFn: func(_ context.Context, _ string, _, _ int) ([]*domainContest.ContestRegistration, int, error) {
+			return []*domainContest.ContestRegistration{
+				domainContest.RestoreContestRegistration("r1", testContestID, "solo-1", time.Now()),
+				domainContest.RestoreContestRegistration("r2", testContestID, "solo-2", time.Now()),
+			}, 2, nil
+		},
+	}
+	teamRepo := &mockTeamParticipationRepository{
+		listFn: func(_ context.Context, _ string, _, _ int) ([]*domainContest.ContestTeamParticipation, int, error) {
+			return []*domainContest.ContestTeamParticipation{
+				domainContest.RestoreContestTeamParticipation("tp1", testContestID, "team-1", []string{"member-a", "member-b"}, time.Now()),
+			}, 1, nil
+		},
+	}
+	teamDisplays := &mockTeamDisplayProvider{
+		getDisplaysFn: func(_ context.Context, _ []string) (map[string]*TeamDisplay, error) {
+			return map[string]*TeamDisplay{"team-1": {ID: "team-1", Name: "Los Ñoños"}}, nil
+		},
+	}
+	uc := NewListContestRegistrationsUseCase(
+		repoWith(newTestContest(otherID)), reg, teamRepo, isMemberNotLead(), mockNicknames(), teamDisplays,
+	)
+
+	cases := []struct {
+		search string
+		want   int
+	}{
+		{"", 3},
+		{"SOLO-1", 1},        // individual nickname, case-insensitive
+		{"ñoños", 1},         // team name
+		{"nick_member-b", 1}, // team member nickname
+		{"solo", 2},
+		{"nadie", 0},
+	}
+	for _, tc := range cases {
+		in := validListRegistrationsInput()
+		in.Search = tc.search
+		out, err := uc.Execute(context.Background(), in)
+		if err != nil {
+			t.Fatalf("search=%q: unexpected error: %v", tc.search, err)
+		}
+		if out.Total != tc.want || len(out.Registrations) != tc.want {
+			t.Errorf("search=%q: total=%d len=%d, want %d", tc.search, out.Total, len(out.Registrations), tc.want)
+		}
+	}
+}
