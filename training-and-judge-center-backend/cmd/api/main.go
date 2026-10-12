@@ -437,6 +437,10 @@ func main() {
 	listTeamRegistrationsUseCase := appteam.NewListTeamRegistrationsUseCase(
 		teamContestProvider, teamGroupMemberChecker, contestTeamParticipationRepo, teamRepo, teamUserProvider,
 	)
+	getTeamRegistrationEligibilityUseCase := appteam.NewGetTeamRegistrationEligibilityUseCase(
+		teamMemberRepo, teamContestProvider, contestTeamParticipationRepo,
+		teamIndivChecker, teamGroupMemberChecker, teamUserProvider,
+	)
 
 	teamHandler := handlerteam.NewHandler(
 		createTeamUseCase,
@@ -451,6 +455,7 @@ func main() {
 		updateTeamRegistrationUseCase,
 		unregisterTeamFromContestUseCase,
 		listTeamRegistrationsUseCase,
+		getTeamRegistrationEligibilityUseCase,
 	)
 
 	// submission adapters

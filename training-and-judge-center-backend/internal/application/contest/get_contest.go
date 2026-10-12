@@ -36,6 +36,9 @@ type GetContestOutput struct {
 	EnablePostContest bool
 	Locked            *bool // nil when caller is not Lead or Admin (omitted from JSON)
 	ShowTeamMembers   bool
+	ParticipationMode string
+	TeamSizeMin       int
+	TeamSizeMax       int
 	ParticipantCount  int
 	IsRegistered      bool
 	Group             GroupDisplay
@@ -180,6 +183,9 @@ func (uc *GetContestUseCase) Execute(ctx context.Context, in GetContestInput) (*
 		EnablePostContest: c.EnablePostContest(),
 		Locked:            locked,
 		ShowTeamMembers:   c.ShowTeamMembers(),
+		ParticipationMode: c.ParticipationMode().String(),
+		TeamSizeMin:       c.TeamSize().Min(),
+		TeamSizeMax:       c.TeamSize().Max(),
 		ParticipantCount:  participantCount,
 		IsRegistered:      isRegistered,
 		Group:             GroupDisplay{ID: group.ID, Name: group.Name},
