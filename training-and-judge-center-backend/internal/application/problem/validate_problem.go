@@ -25,6 +25,8 @@ type ValidateProblemUseCase struct {
 	solutionValidator SolutionValidator
 	publisher         ProblemPublisher
 	txManager         appshared.TransactionManager
+	problemRepo       problem.Repository
+	stagedFiles       StagedFileCleaner
 }
 
 func NewValidateProblemUseCase(
@@ -34,6 +36,8 @@ func NewValidateProblemUseCase(
 	solutionValidator SolutionValidator,
 	publisher ProblemPublisher,
 	txManager appshared.TransactionManager,
+	problemRepo problem.Repository,
+	stagedFiles StagedFileCleaner,
 ) *ValidateProblemUseCase {
 	return &ValidateProblemUseCase{
 		validationRepo:    validationRepo,
@@ -42,6 +46,8 @@ func NewValidateProblemUseCase(
 		solutionValidator: solutionValidator,
 		publisher:         publisher,
 		txManager:         txManager,
+		problemRepo:       problemRepo,
+		stagedFiles:       stagedFiles,
 	}
 }
 
@@ -67,7 +73,11 @@ func (uc *ValidateProblemUseCase) Execute(ctx context.Context, in ValidateProble
 		return err
 	}
 
-	prep, err := uc.judgingPreparer.Prepare(ctx, v.ProblemID(), in.Slug)
+	if v.IsJudgingUpdate() {
+		return uc.executeJudgingUpdate(ctx, v, in.Slug, now)
+	}
+
+	prep, err := uc.judgingPreparer.Prepare(ctx, v.ProblemID(), in.Slug, nil)
 	if err != nil {
 		slog.ErrorContext(ctx, "validate_problem: judging preparation failed", "error", err, "validation_id", v.ID())
 		return uc.persistSystemError(ctx, v, now)
@@ -92,7 +102,7 @@ func (uc *ValidateProblemUseCase) Execute(ctx context.Context, in ValidateProble
 		}
 	}
 
-	result, err := uc.solutionValidator.Validate(ctx, v.ProblemID())
+	result, err := uc.solutionValidator.Validate(ctx, v.ProblemID(), nil)
 	if err != nil {
 		slog.ErrorContext(ctx, "validate_problem: solution validation failed", "error", err, "validation_id", v.ID())
 		return uc.persistSystemError(ctx, v, now)

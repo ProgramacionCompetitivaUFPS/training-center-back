@@ -21,7 +21,7 @@ func TestUploadProblemFiles_ActiveValidation_ReturnsConflict(t *testing.T) {
 			return runningValidationFixture(), true, nil
 		},
 	}
-	uc := NewUploadProblemFilesUseCase(repo, validationRepo, &mockFileStorage{}, nil, newDefaultSettings())
+	uc := NewUploadProblemFilesUseCase(repo, validationRepo, &mockFileStorage{}, nil, newDefaultSettings(), &mockActiveContestChecker{}, &mockAffectedContests{}, &mockValidationQueue{})
 
 	_, err := uc.Execute(context.Background(), UploadProblemFilesInput{
 		Slug:        testSlug,
@@ -73,7 +73,7 @@ func TestUploadProblemFiles_VerifierIsStoredUnderItsFixedName(t *testing.T) {
 				},
 			}
 			p := newDraftProblem()
-			uc := NewUploadProblemFilesUseCase(repoWith(p), &mockValidationRepository{}, storage, nil, newDefaultSettings())
+			uc := NewUploadProblemFilesUseCase(repoWith(p), &mockValidationRepository{}, storage, nil, newDefaultSettings(), &mockActiveContestChecker{}, &mockAffectedContests{}, &mockValidationQueue{})
 
 			_, err := uc.Execute(context.Background(), UploadProblemFilesInput{
 				Slug:        testSlug,
@@ -119,7 +119,7 @@ func TestUploadProblemFiles_TestCasesZipSitsInsideTheStoredPrefix(t *testing.T) 
 		},
 	}
 	p := newDraftProblem()
-	uc := NewUploadProblemFilesUseCase(repoWith(p), &mockValidationRepository{}, storage, parser, newDefaultSettings())
+	uc := NewUploadProblemFilesUseCase(repoWith(p), &mockValidationRepository{}, storage, parser, newDefaultSettings(), &mockActiveContestChecker{}, &mockAffectedContests{}, &mockValidationQueue{})
 
 	_, err := uc.Execute(context.Background(), UploadProblemFilesInput{
 		Slug:        testSlug,
@@ -190,7 +190,7 @@ func TestUploadProblemFiles_VerifierExtensions(t *testing.T) {
 					return nil
 				},
 			}
-			uc := NewUploadProblemFilesUseCase(repoWith(newDraftProblem()), &mockValidationRepository{}, storage, nil, newCppPythonJavaSettings())
+			uc := NewUploadProblemFilesUseCase(repoWith(newDraftProblem()), &mockValidationRepository{}, storage, nil, newCppPythonJavaSettings(), &mockActiveContestChecker{}, &mockAffectedContests{}, &mockValidationQueue{})
 
 			_, err := uc.Execute(context.Background(), UploadProblemFilesInput{
 				Slug:        testSlug,

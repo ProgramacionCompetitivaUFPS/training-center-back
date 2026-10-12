@@ -89,6 +89,7 @@ func main() {
 	defer redisClient.Close()
 	slog.Info("redis connected successfully")
 
+	// cross-cutting services
 	txManager := postgres.NewTransactionManager(dbPool)
 
 	// Problem repositories & settings
@@ -167,13 +168,13 @@ func main() {
 	problemStatisticsProvider := problem.NewStatisticsProvider(dbPool)
 	problemActiveContestChecker := problem.NewActiveContestChecker(dbPool)
 	problemContestAssociationRemover := problem.NewContestAssociationRemover(dbPool)
+	problemAffectedContestsProvider := problem.NewAffectedContestsProvider(dbPool)
 	problemValidationRepo := problem.NewProblemValidationRepository(dbPool)
 
 	// Problem use cases
 	createProblemUseCase := appProblem.NewCreateProblemUseCase(problemRepo, settingsProvider)
 	importProblemUseCase := appProblem.NewImportProblemUseCase(problemRepo, fileStorage, packageParser, settingsProvider)
 	updateProblemUseCase := appProblem.NewUpdateProblemUseCase(problemRepo, problemValidationRepo, settingsProvider)
-	uploadProblemFilesUseCase := appProblem.NewUploadProblemFilesUseCase(problemRepo, problemValidationRepo, fileStorage, zipParser, settingsProvider)
 	deleteProblemFileUseCase := appProblem.NewDeleteProblemFileUseCase(problemRepo, problemValidationRepo, fileStorage)
 	addModifierUseCase := appProblem.NewAddModifierUseCase(problemRepo, userProvider)
 	removeModifierUseCase := appProblem.NewRemoveModifierUseCase(problemRepo, userProvider)
@@ -483,6 +484,8 @@ func main() {
 		validationQueue = problem.NoOpValidationQueue{}
 		slog.Info("using no-op submission queue (RABBITMQ_URL not set)")
 	}
+
+	uploadProblemFilesUseCase := appProblem.NewUploadProblemFilesUseCase(problemRepo, problemValidationRepo, fileStorage, zipParser, settingsProvider, problemActiveContestChecker, problemAffectedContestsProvider, validationQueue)
 
 	submissionRejudger := adaptersubmission.NewRejudger(dbPool, submissionQueue)
 	contestRejudgeProvider := adaptercontest.NewContestRejudgeProvider(dbPool)

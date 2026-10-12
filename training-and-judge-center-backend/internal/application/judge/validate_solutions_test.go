@@ -489,3 +489,33 @@ func TestValidateSolutions_BothSessionsShareOneJudgingDirectory(t *testing.T) {
 		t.Errorf("checker got %q, the executor got %q — they must share one directory", checkerID, executorID)
 	}
 }
+
+func TestValidateSolutions_Candidate_UsesItsTestCasesAndCheckerPath(t *testing.T) {
+	var checkerPath string
+	checker := &mockOutputChecker{
+		beginCheckingFn: func(_ context.Context, path string, _ submission.Language, _ string) (CheckerSession, error) {
+			checkerPath = path
+			return &mockCheckerSession{checkFn: func(context.Context, []byte) (CheckResult, error) { return CheckResult{Accepted: true}, nil }}, nil
+		},
+	}
+	testCases := &mockTestCaseProvider{}
+	uc := newValidateSolutionsUseCase(&mockSolutionProvider{}, &mockSourceCodeDownloader{}, &mockProblemProvider{}, testCases, &mockExecutor{}, checker)
+
+	out, err := uc.Execute(context.Background(), ValidateSolutionsInput{
+		ProblemID: problemID,
+		Candidate: &JudgingCandidate{TestCasesKey: "problems/abc/testcases/new", Checker: candidateChecker()},
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if !out.Passed {
+		t.Errorf("expected the candidate to pass, got %+v", out.Failure)
+	}
+	if len(testCases.readAtKeys) != 1 || testCases.readAtKeys[0] != "problems/abc/testcases/new" {
+		t.Errorf("test cases read at: got %v", testCases.readAtKeys)
+	}
+	if checkerPath != candidateChecker().CompiledKey {
+		t.Errorf("checker path: got %q, want %q", checkerPath, candidateChecker().CompiledKey)
+	}
+}

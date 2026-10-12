@@ -12,4 +12,5 @@ type TestCase struct {
 
 type TestCaseProvider interface {
 	GetTestCases(ctx context.Context, problemID string) ([]TestCase, error)
+	GetTestCasesAt(ctx context.Context, testCasesKey string) ([]TestCase, error)
 }

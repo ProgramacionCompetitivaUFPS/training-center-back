@@ -2,6 +2,7 @@ package problem
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"log/slog"
 	"time"
@@ -25,14 +26,20 @@ func NewProblemValidationRepository(db infraPostgres.Querier) *ProblemValidation
 func (r *ProblemValidationRepository) Save(ctx context.Context, v *domainProblem.ProblemValidation) error {
 	q := infraPostgres.GetQuerier(ctx, r.db)
 
-	_, err := q.Exec(ctx,
-		`INSERT INTO problem_validations (id, problem_id, requested_by, status, requested_at, completed_at, result)
-		 VALUES ($1, $2, $3, $4, $5, $6, $7)
+	pendingChangeJSON, err := mapPendingChangeToDB(v.PendingChange())
+	if err != nil {
+		slog.ErrorContext(ctx, "problem_validation_repository: mapping pending change failed", "error", err, "validation_id", v.ID())
+		return apperror.NewInternal()
+	}
+
+	_, err = q.Exec(ctx,
+		`INSERT INTO problem_validations (id, problem_id, requested_by, status, requested_at, completed_at, result, pending_change)
+		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
 		 ON CONFLICT (id) DO UPDATE SET
 		   status = EXCLUDED.status,
 		   completed_at = EXCLUDED.completed_at,
 		   result = EXCLUDED.result`,
-		v.ID(), v.ProblemID(), v.RequestedBy().String(), v.Status().String(), v.RequestedAt(), v.CompletedAt(), v.ResultJSON(),
+		v.ID(), v.ProblemID(), v.RequestedBy().String(), v.Status().String(), v.RequestedAt(), v.CompletedAt(), v.ResultJSON(), pendingChangeJSON,
 	)
 	if err != nil {
 		var pgErr *pgconn.PgError
@@ -52,12 +59,13 @@ func (r *ProblemValidationRepository) FindByID(ctx context.Context, id string) (
 	var requestedAt time.Time
 	var completedAt *time.Time
 	var result *string
+	var pendingJSON []byte
 
 	err := q.QueryRow(ctx,
-		`SELECT problem_id, requested_by, status, requested_at, completed_at, result
+		`SELECT problem_id, requested_by, status, requested_at, completed_at, result, pending_change
 		 FROM problem_validations WHERE id = $1`,
 		id,
-	).Scan(&problemID, &requestedBy, &status, &requestedAt, &completedAt, &result)
+	).Scan(&problemID, &requestedBy, &status, &requestedAt, &completedAt, &result, &pendingJSON)
 
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, apperror.NewNotFound(apperror.ErrCodeNotFound, "problem validation not found")
@@ -67,10 +75,16 @@ func (r *ProblemValidationRepository) FindByID(ctx context.Context, id string) (
 		return nil, apperror.NewInternal()
 	}
 
+	pending, err := pendingChangeFromDB(pendingJSON)
+	if err != nil {
+		slog.ErrorContext(ctx, "problem_validation_repository: reading pending change failed", "error", err, "validation_id", id)
+		return nil, apperror.NewInternal()
+	}
+
 	return domainProblem.RestoreProblemValidation(
 		id, problemID, shared.RestoreUserID(requestedBy),
 		domainProblem.RestoreProblemValidationStatus(status),
-		requestedAt, completedAt, result,
+		requestedAt, completedAt, result, pending,
 	), nil
 }
 
@@ -81,13 +95,14 @@ func (r *ProblemValidationRepository) FindLatestByProblemID(ctx context.Context,
 	var requestedAt time.Time
 	var completedAt *time.Time
 	var result *string
+	var pendingJSON []byte
 
 	err := q.QueryRow(ctx,
-		`SELECT id, requested_by, status, requested_at, completed_at, result
+		`SELECT id, requested_by, status, requested_at, completed_at, result, pending_change
 		 FROM problem_validations WHERE problem_id = $1
 		 ORDER BY requested_at DESC LIMIT 1`,
 		problemID,
-	).Scan(&id, &requestedBy, &status, &requestedAt, &completedAt, &result)
+	).Scan(&id, &requestedBy, &status, &requestedAt, &completedAt, &result, &pendingJSON)
 
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, false, nil
@@ -97,10 +112,49 @@ func (r *ProblemValidationRepository) FindLatestByProblemID(ctx context.Context,
 		return nil, false, apperror.NewInternal()
 	}
 
+	pending, err := pendingChangeFromDB(pendingJSON)
+	if err != nil {
+		slog.ErrorContext(ctx, "problem_validation_repository: reading pending change failed", "error", err, "validation_id", id)
+		return nil, false, apperror.NewInternal()
+	}
+
 	v := domainProblem.RestoreProblemValidation(
 		id, problemID, shared.RestoreUserID(requestedBy),
 		domainProblem.RestoreProblemValidationStatus(status),
-		requestedAt, completedAt, result,
+		requestedAt, completedAt, result, pending,
 	)
 	return v, true, nil
+}
+
+type dbPendingChange struct {
+	TestCasesKey *string        `json:"testCasesKey,omitempty"`
+	Checker      *dbJudgingFile `json:"checker,omitempty"`
+}
+
+func mapPendingChangeToDB(change *domainProblem.PendingJudgingChange) ([]byte, error) {
+	if change == nil {
+		return nil, nil // SQL NULL
+	}
+	db := dbPendingChange{TestCasesKey: change.TestCasesKey()}
+	if c := change.Checker(); c != nil {
+		db.Checker = &dbJudgingFile{Filename: c.Filename(), FileKey: c.FileKey(), Language: c.Language()}
+	}
+	return json.Marshal(db)
+}
+
+func pendingChangeFromDB(data []byte) (*domainProblem.PendingJudgingChange, error) {
+	if len(data) == 0 {
+		return nil, nil
+	}
+	var db dbPendingChange
+	if err := json.Unmarshal(data, &db); err != nil {
+		return nil, err
+	}
+	var checker *domainProblem.JudgingFile
+	if db.Checker != nil {
+		f := domainProblem.RestoreJudgingFile(db.Checker.Filename, db.Checker.FileKey, db.Checker.Language, nil, nil)
+		checker = &f
+	}
+	change := domainProblem.RestorePendingJudgingChange(db.TestCasesKey, checker)
+	return &change, nil
 }

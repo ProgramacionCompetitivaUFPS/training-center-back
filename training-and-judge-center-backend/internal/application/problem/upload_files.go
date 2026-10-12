@@ -30,10 +30,12 @@ const (
 )
 
 type UploadProblemFilesInput struct {
-	Slug        string
-	FileType    string
-	FileName    string
-	FileData    []byte
+	Slug     string
+	FileType string
+	FileName string
+	FileData []byte
+	// ConfirmSlug is required to replace testCases or checker of a published problem in an active contest.
+	ConfirmSlug string
 	CurrentUser appshared.CurrentUser
 }
 
@@ -42,6 +44,9 @@ type UploadProblemFilesOutput struct {
 	FileType string
 	FileName string
 	Problem  ProblemDTO
+	// ValidationID is set when the change is staged and not in effect yet.
+	ValidationID     string
+	AffectedContests []ContestRef
 }
 
 type fileAction struct {
@@ -56,6 +61,9 @@ type UploadProblemFilesUseCase struct {
 	storage        ProblemFileRepository
 	zipParser      ZipParser
 	settings       problem.PlatformSettings
+	contestChecker ActiveContestChecker
+	contestLister  AffectedContestsProvider
+	queue          ValidationQueue
 }
 
 func NewUploadProblemFilesUseCase(
@@ -64,6 +72,9 @@ func NewUploadProblemFilesUseCase(
 	storage ProblemFileRepository,
 	zipParser ZipParser,
 	settings problem.PlatformSettings,
+	contestChecker ActiveContestChecker,
+	contestLister AffectedContestsProvider,
+	queue ValidationQueue,
 ) *UploadProblemFilesUseCase {
 	return &UploadProblemFilesUseCase{
 		repo:           repo,
@@ -71,6 +82,9 @@ func NewUploadProblemFilesUseCase(
 		storage:        storage,
 		zipParser:      zipParser,
 		settings:       settings,
+		contestChecker: contestChecker,
+		contestLister:  contestLister,
+		queue:          queue,
 	}
 }
 
@@ -86,7 +100,7 @@ func (uc *UploadProblemFilesUseCase) Execute(ctx context.Context, input UploadPr
 	}
 
 	if p.Status().IsPublished() {
-		return nil, apperror.NewBadRequest(ErrCodeProblemIsPublished, "Cannot upload files to a published problem. Unpublish first.")
+		return uc.executeOnPublished(ctx, p, input)
 	}
 
 	if !p.CanBeEditedBy(shared.RestoreUserID(input.CurrentUser.ID), input.CurrentUser.IsAdmin()) {
@@ -230,11 +244,11 @@ func (uc *UploadProblemFilesUseCase) handleSolution(ctx context.Context, p *prob
 }
 
 func (uc *UploadProblemFilesUseCase) handleChecker(ctx context.Context, p *problem.Problem, input UploadProblemFilesInput, now time.Time) (fileAction, error) {
-	return uc.handleVerifier(ctx, p, input, FileTypeChecker, verifierBaseNameChecker, p.Checker, func(f problem.JudgingFile) { p.SetChecker(f, now) }, now)
+	return uc.handleVerifier(ctx, p, input, FileTypeChecker, verifierBaseNameChecker, "", p.Checker, func(f problem.JudgingFile) { p.SetChecker(f, now) }, now)
 }
 
 func (uc *UploadProblemFilesUseCase) handleValidator(ctx context.Context, p *problem.Problem, input UploadProblemFilesInput, now time.Time) (fileAction, error) {
-	return uc.handleVerifier(ctx, p, input, FileTypeValidator, verifierBaseNameValidator, p.Validator, func(f problem.JudgingFile) { p.SetValidator(f, now) }, now)
+	return uc.handleVerifier(ctx, p, input, FileTypeValidator, verifierBaseNameValidator, "", p.Validator, func(f problem.JudgingFile) { p.SetValidator(f, now) }, now)
 }
 
 func (uc *UploadProblemFilesUseCase) handleVerifier(
@@ -243,6 +257,8 @@ func (uc *UploadProblemFilesUseCase) handleVerifier(
 	input UploadProblemFilesInput,
 	fileType string,
 	baseName string,
+	// stageID keeps the checker apart from the live one, under the judging update that owns it.
+	stageID string,
 	getVerifier func() *problem.JudgingFile,
 	setVerifier func(problem.JudgingFile),
 	now time.Time,
@@ -263,6 +279,9 @@ func (uc *UploadProblemFilesUseCase) handleVerifier(
 	}
 
 	fileKey := fmt.Sprintf("problems/%s/%s/%s%s", p.Slug().String(), fileType, baseName, filepath.Ext(cleanName))
+	if stageID != "" {
+		fileKey = stagedCheckerPrefix(p.Slug().String(), stageID) + baseName + filepath.Ext(cleanName)
+	}
 	verifierObj, err := problem.NewVerifierFile(cleanName, fileKey, lang)
 	if err != nil {
 		return fileAction{}, err

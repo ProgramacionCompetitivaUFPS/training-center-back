@@ -17,8 +17,12 @@ func NewJudgingPreparer(uc *appJudge.PrepareJudgingUseCase) *JudgingPreparer {
 	return &JudgingPreparer{uc: uc}
 }
 
-func (p *JudgingPreparer) Prepare(ctx context.Context, problemID, slug string) (*appProblem.JudgingPreparationResult, error) {
-	out, err := p.uc.Execute(ctx, appJudge.PrepareJudgingInput{ProblemID: problemID, Slug: slug})
+func (p *JudgingPreparer) Prepare(ctx context.Context, problemID, slug string, candidate *appProblem.JudgingCandidate) (*appProblem.JudgingPreparationResult, error) {
+	judgeCandidate, err := toJudgeCandidate(candidate)
+	if err != nil {
+		return nil, err
+	}
+	out, err := p.uc.Execute(ctx, appJudge.PrepareJudgingInput{ProblemID: problemID, Slug: slug, Candidate: judgeCandidate})
 	if err != nil {
 		return nil, err
 	}

@@ -13,6 +13,8 @@ import (
 
 type ValidateSolutionsInput struct {
 	ProblemID string
+	// Candidate replaces the problem's test cases and/or checker for this run only.
+	Candidate *JudgingCandidate
 }
 
 type FailureKind string
@@ -113,10 +115,11 @@ func (uc *ValidateSolutionsUseCase) Execute(ctx context.Context, in ValidateSolu
 		return nil, err
 	}
 
-	testCases, err := uc.testCaseProvider.GetTestCases(ctx, in.ProblemID)
+	testCases, err := uc.loadTestCases(ctx, in)
 	if err != nil {
 		return nil, err
 	}
+	limits = applyCandidateChecker(limits, in.Candidate)
 	sampleCases, secretCases := countByGroup(testCases)
 
 	for i, sol := range solutions {
@@ -260,4 +263,21 @@ func countByGroup(testCases []TestCase) (sample, secret int) {
 		}
 	}
 	return sample, secret
+}
+
+func (uc *ValidateSolutionsUseCase) loadTestCases(ctx context.Context, in ValidateSolutionsInput) ([]TestCase, error) {
+	if in.Candidate != nil && in.Candidate.TestCasesKey != "" {
+		return uc.testCaseProvider.GetTestCasesAt(ctx, in.Candidate.TestCasesKey)
+	}
+	return uc.testCaseProvider.GetTestCases(ctx, in.ProblemID)
+}
+
+func applyCandidateChecker(limits ProblemLimits, candidate *JudgingCandidate) ProblemLimits {
+	if candidate == nil || candidate.Checker == nil {
+		return limits
+	}
+	limits.HasCustomChecker = true
+	limits.CheckerPath = candidate.Checker.CompiledKey
+	limits.CheckerLanguage = candidate.Checker.Language
+	return limits
 }

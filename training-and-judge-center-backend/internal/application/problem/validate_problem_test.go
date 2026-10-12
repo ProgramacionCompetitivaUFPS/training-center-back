@@ -18,7 +18,7 @@ func newValidateProblemUseCase(
 	solutionValidator *mockSolutionValidator,
 	publisher *mockProblemPublisher,
 ) *ValidateProblemUseCase {
-	return NewValidateProblemUseCase(validationRepo, judgingPreparer, artifactWriter, solutionValidator, publisher, &mockTransactionManager{})
+	return NewValidateProblemUseCase(validationRepo, judgingPreparer, artifactWriter, solutionValidator, publisher, &mockTransactionManager{}, repoWith(nil), &mockStagedFiles{})
 }
 
 func TestValidateProblem_NotPending_IsIgnored(t *testing.T) {

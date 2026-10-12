@@ -29,5 +29,13 @@ type JudgingPreparationResult struct {
 // JudgingPreparer compiles a problem's checker/validator (if uploaded) and,
 // if the validator compiled, runs it against every test case's input.
 type JudgingPreparer interface {
-	Prepare(ctx context.Context, problemID, slug string) (*JudgingPreparationResult, error)
+	Prepare(ctx context.Context, problemID, slug string, candidate *JudgingCandidate) (*JudgingPreparationResult, error)
+}
+
+// JudgingCandidate mirrors judge.JudgingCandidate; empty fields keep what the problem has.
+type JudgingCandidate struct {
+	TestCasesKey       string
+	CheckerFileKey     string
+	CheckerLanguage    string
+	CheckerCompiledKey string
 }

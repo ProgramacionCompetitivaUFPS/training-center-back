@@ -243,3 +243,19 @@ func toFailedInputResps(inputs []appProblem.FailedInput) []failedInputResp {
 	}
 	return out
 }
+
+type affectedContestResp struct {
+	ID        string    `json:"id"`
+	Name      string    `json:"name"`
+	GroupID   string    `json:"groupId"`
+	StartTime time.Time `json:"startTime"`
+	EndTime   time.Time `json:"endTime"`
+}
+
+func toAffectedContestResps(contests []appProblem.ContestRef) []affectedContestResp {
+	out := make([]affectedContestResp, 0, len(contests))
+	for _, c := range contests {
+		out = append(out, affectedContestResp{ID: c.ID, Name: c.Name, GroupID: c.GroupID, StartTime: c.StartTime, EndTime: c.EndTime})
+	}
+	return out
+}

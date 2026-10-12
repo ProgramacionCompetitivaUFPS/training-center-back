@@ -60,7 +60,7 @@ func TestRestoreProblemValidation_PreservesFields(t *testing.T) {
 
 	v := problem.RestoreProblemValidation(
 		"validation-1", testProblemID, shared.RestoreUserID(testAuthorID),
-		status, testNow, &completedAt, &result,
+		status, testNow, &completedAt, &result, nil,
 	)
 
 	if v.ID() != "validation-1" {
@@ -145,5 +145,39 @@ func TestMarkSystemError_Running_TransitionsToSystemError(t *testing.T) {
 	}
 	if !v.Status().IsSystemError() {
 		t.Error("Status(): expected IsSystemError() true")
+	}
+}
+
+func TestNewPendingJudgingChange_NeedsSomethingToChange(t *testing.T) {
+	if _, err := problem.NewPendingJudgingChange(nil, nil); err == nil {
+		t.Error("expected an error for a change that replaces nothing")
+	}
+
+	key := "problems/p/testcases/x"
+	if _, err := problem.NewPendingJudgingChange(&key, nil); err != nil {
+		t.Errorf("test cases alone should be a valid change, got %v", err)
+	}
+}
+
+func TestNewJudgingUpdateValidation_CarriesTheChange(t *testing.T) {
+	key := "problems/p/testcases/x"
+	change, err := problem.NewPendingJudgingChange(&key, nil)
+	if err != nil {
+		t.Fatalf("NewPendingJudgingChange: %v", err)
+	}
+
+	v, err := problem.NewJudgingUpdateValidation("validation-1", testProblemID, shared.RestoreUserID(testAuthorID), change, testNow)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if !v.IsJudgingUpdate() || v.PendingChange() == nil || *v.PendingChange().TestCasesKey() != key {
+		t.Errorf("PendingChange(): got %+v", v.PendingChange())
+	}
+	if !v.Status().IsPending() {
+		t.Error("a new judging update starts PENDING")
+	}
+	if newPendingValidation(t).IsJudgingUpdate() {
+		t.Error("a publish validation is not a judging update")
 	}
 }

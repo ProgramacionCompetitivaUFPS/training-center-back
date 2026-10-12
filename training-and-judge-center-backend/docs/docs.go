@@ -4170,6 +4170,12 @@ const docTemplate = `{
                         "name": "file",
                         "in": "formData",
                         "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "The problem slug; required to replace testCases or checker of a published problem that is in an active contest",
+                        "name": "confirmSlug",
+                        "in": "formData"
                     }
                 ],
                 "responses": {
@@ -4177,6 +4183,13 @@ const docTemplate = `{
                         "description": "OK",
                         "schema": {
                             "$ref": "#/definitions/problem.getProblemResponse"
+                        }
+                    },
+                    "202": {
+                        "description": "Live update of a published problem accepted; it takes effect once validated",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
                         }
                     },
                     "400": {

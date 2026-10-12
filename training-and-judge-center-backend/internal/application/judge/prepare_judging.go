@@ -12,6 +12,8 @@ type PrepareJudgingInput struct {
 	// Slug is only used to build a readable storage path for the compiled
 	// artifacts — never to look anything up.
 	Slug string
+	// Candidate, when set, is validated in place of the problem's current test cases and checker.
+	Candidate *JudgingCandidate
 }
 
 type PrepareJudgingFailureKind string
@@ -78,7 +80,7 @@ func NewPrepareJudgingUseCase(
 // stopping at the first problem it finds, same fail-fast spirit as
 // ValidateSolutionsUseCase.
 func (uc *PrepareJudgingUseCase) Execute(ctx context.Context, in PrepareJudgingInput) (*PrepareJudgingOutput, error) {
-	checkerKey, failure, err := uc.prepareChecker(ctx, in.ProblemID, in.Slug)
+	checkerKey, failure, err := uc.prepareChecker(ctx, in)
 	if err != nil {
 		return nil, err
 	}
@@ -100,7 +102,7 @@ func (uc *PrepareJudgingUseCase) Execute(ctx context.Context, in PrepareJudgingI
 	}
 	out.ValidatorCompiledKey = validator.compiledKey
 
-	testCases, err := uc.testCaseProvider.GetTestCases(ctx, in.ProblemID)
+	testCases, err := uc.loadTestCases(ctx, in)
 	if err != nil {
 		return nil, err
 	}
@@ -128,8 +130,8 @@ func (uc *PrepareJudgingUseCase) Execute(ctx context.Context, in PrepareJudgingI
 	return out, nil
 }
 
-func (uc *PrepareJudgingUseCase) prepareChecker(ctx context.Context, problemID, slug string) (string, *PrepareJudgingFailure, error) {
-	source, err := uc.sourceProvider.GetCheckerSource(ctx, problemID)
+func (uc *PrepareJudgingUseCase) prepareChecker(ctx context.Context, in PrepareJudgingInput) (string, *PrepareJudgingFailure, error) {
+	source, compiledKey, err := uc.checkerToCompile(ctx, in)
 	if err != nil {
 		return "", nil, err
 	}
@@ -158,7 +160,6 @@ func (uc *PrepareJudgingUseCase) prepareChecker(ctx context.Context, problemID, 
 		}, nil
 	}
 
-	compiledKey := fmt.Sprintf("problems/%s/checker/compiled", slug)
 	if err := uc.uploader.Upload(ctx, compiledKey, result.Artifact); err != nil {
 		return "", nil, err
 	}
@@ -204,4 +205,27 @@ func (uc *PrepareJudgingUseCase) prepareValidator(ctx context.Context, problemID
 		compiledKey: compiledKey,
 		language:    source.Language,
 	}, nil, nil
+}
+
+// A candidate without a checker leaves the live checker's artifact alone: judging is using it.
+func (uc *PrepareJudgingUseCase) checkerToCompile(ctx context.Context, in PrepareJudgingInput) (*JudgingSource, string, error) {
+	if in.Candidate != nil {
+		if in.Candidate.Checker == nil {
+			return nil, "", nil
+		}
+		c := in.Candidate.Checker
+		return &JudgingSource{FileKey: c.FileKey, Language: c.Language}, c.CompiledKey, nil
+	}
+	source, err := uc.sourceProvider.GetCheckerSource(ctx, in.ProblemID)
+	if err != nil || source == nil {
+		return nil, "", err
+	}
+	return source, fmt.Sprintf("problems/%s/checker/compiled", in.Slug), nil
+}
+
+func (uc *PrepareJudgingUseCase) loadTestCases(ctx context.Context, in PrepareJudgingInput) ([]TestCase, error) {
+	if in.Candidate != nil && in.Candidate.TestCasesKey != "" {
+		return uc.testCaseProvider.GetTestCasesAt(ctx, in.Candidate.TestCasesKey)
+	}
+	return uc.testCaseProvider.GetTestCases(ctx, in.ProblemID)
 }
