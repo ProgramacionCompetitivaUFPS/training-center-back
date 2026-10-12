@@ -28,7 +28,7 @@ type GetSubmissionOutput struct {
 	Compiler      string
 	ExecutionTime *int
 	MemoryKb      *int
-	SourceCode    string
+	SourceCode    *string // nil when the stored source file no longer exists
 }
 
 type GetSubmissionUseCase struct {
@@ -97,8 +97,14 @@ func (uc *GetSubmissionUseCase) Execute(ctx context.Context, in GetSubmissionInp
 		}
 	}
 
-	sourceCode, err := uc.sourceCodeReader.Read(ctx, sub.SourceCodePath())
-	if err != nil {
+	// A missing source file only costs the source: the verdict and its metrics
+	// are still in the database, so the detail degrades instead of failing.
+	var sourceCode *string
+	data, err := uc.sourceCodeReader.Read(ctx, sub.SourceCodePath())
+	if err == nil {
+		s := string(data)
+		sourceCode = &s
+	} else if ae, ok := err.(*apperror.AppError); !ok || ae.Kind != apperror.KindNotFound {
 		return nil, err
 	}
 
@@ -134,6 +140,6 @@ func (uc *GetSubmissionUseCase) Execute(ctx context.Context, in GetSubmissionInp
 		Compiler:      sub.Compiler(),
 		ExecutionTime: sub.TimeMs(),
 		MemoryKb:      sub.MemoryKb(),
-		SourceCode:    string(sourceCode),
+		SourceCode:    sourceCode,
 	}, nil
 }

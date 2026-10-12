@@ -22,7 +22,7 @@ type getSubmissionResponse struct {
 	Compiler      string          `json:"compiler"`
 	ExecutionTime *int            `json:"executionTime"`
 	MemoryKb      *int            `json:"memoryKb"`
-	SourceCode    string          `json:"sourceCode"`
+	SourceCode    *string         `json:"sourceCode"` // null when the stored source file no longer exists
 }
 
 // GetSubmission handles GET /submissions/{submissionId}
