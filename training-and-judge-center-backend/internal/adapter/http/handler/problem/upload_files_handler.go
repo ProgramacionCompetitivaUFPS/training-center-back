@@ -76,7 +76,7 @@ func (h *Handler) UploadFiles(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if fileHeader.Size > limitBytes {
-		handler.WriteJSON(r.Context(), w, http.StatusRequestEntityTooLarge, apperror.AppError{Code: apperror.ErrCodePayloadTooLarge, Message: "File size exceeds allowed limit"})
+		handler.WriteError(r.Context(), w, apperror.NewPayloadTooLarge("File size exceeds allowed limit"))
 		return
 	}
 
@@ -87,7 +87,7 @@ func (h *Handler) UploadFiles(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if int64(len(fileData)) > limitBytes {
-		handler.WriteJSON(r.Context(), w, http.StatusRequestEntityTooLarge, apperror.AppError{Code: apperror.ErrCodePayloadTooLarge, Message: "File size exceeds allowed limit"})
+		handler.WriteError(r.Context(), w, apperror.NewPayloadTooLarge("File size exceeds allowed limit"))
 		return
 	}
 
@@ -96,7 +96,7 @@ func (h *Handler) UploadFiles(w http.ResponseWriter, r *http.Request) {
 
 	currentUser := shared.CurrentUser{ID: cu.ID, Role: cu.Role}
 
-	res, ucErr := h.uploadProblemFiles.Execute(ctx, appProblem.UploadProblemFilesInput{
+	out, ucErr := h.uploadProblemFiles.Execute(ctx, appProblem.UploadProblemFilesInput{
 		Slug:        slug,
 		FileType:    fileType,
 		FileName:    fileHeader.Filename,
@@ -110,18 +110,18 @@ func (h *Handler) UploadFiles(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	authorDisplay, _ := h.userProvider.GetDisplay(r.Context(), res.Problem.AuthorID)
-	if res.ValidationID != "" {
+	authorDisplay, _ := h.userProvider.GetDisplay(r.Context(), out.Problem.AuthorID)
+	if out.ValidationID != "" {
 		handler.WriteJSON(r.Context(), w, http.StatusAccepted, judgingUpdateResponse{
-			Message:          res.Message,
-			ValidationID:     res.ValidationID,
-			AffectedContests: toAffectedContests(res.AffectedContests),
-			Problem:          buildResponse(res.Problem, authorDisplay),
+			Message:          out.Message,
+			ValidationID:     out.ValidationID,
+			AffectedContests: toAffectedContests(out.AffectedContests),
+			Problem:          buildResponse(out.Problem, authorDisplay),
 		})
 		return
 	}
 	handler.WriteJSON(r.Context(), w, http.StatusOK, map[string]interface{}{
-		"message": res.Message,
-		"problem": buildResponse(res.Problem, authorDisplay),
+		"message": out.Message,
+		"problem": buildResponse(out.Problem, authorDisplay),
 	})
 }
