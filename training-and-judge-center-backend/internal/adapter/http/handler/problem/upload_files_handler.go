@@ -31,6 +31,7 @@ const (
 // @Success      200 {object} getProblemResponse
 // @Failure      400 {object} apperror.AppError
 // @Failure      401 {object} apperror.AppError
+// @Failure      413 {object} apperror.AppError
 // @Router       /problems/p/{slug}/files [post]
 func (h *Handler) UploadFiles(w http.ResponseWriter, r *http.Request) {
 	cu, ok := middleware.GetCurrentUser(r.Context())
@@ -52,7 +53,7 @@ func (h *Handler) UploadFiles(w http.ResponseWriter, r *http.Request) {
 	maxMemory := maxTestCaseBytes + multipartMemoryPaddingBytes
 	err := r.ParseMultipartForm(maxMemory)
 	if err != nil {
-		handler.WriteJSON(r.Context(), w, http.StatusBadRequest, apperror.AppError{Code: apperror.ErrCodeBadRequest, Message: "Failed to parse multipart form"})
+		writeMultipartParseError(r.Context(), w, err)
 		return
 	}
 
