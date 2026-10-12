@@ -20,8 +20,10 @@ func defaultListRegistrationsUC() *appcontest.ListContestRegistrationsUseCase {
 	return appcontest.NewListContestRegistrationsUseCase(
 		&mockRepoReturning{contest: scheduledContest()},
 		&mockRegistrationRepository{},
+		&mockTeamParticipRepo{},
 		&mockMemberProvider{isLead: false, isMember: true},
 		&mockNicknameProvider{},
+		&mockTeamDisplayProvider{},
 	)
 }
 
@@ -49,8 +51,10 @@ func TestListRegistrations_HappyPath_Returns200(t *testing.T) {
 				}, 1, nil
 			},
 		},
+		&mockTeamParticipRepo{},
 		&mockMemberProvider{isMember: true},
 		&mockNicknameProvider{},
+		&mockTeamDisplayProvider{},
 	)
 	h := newHandlerWithListRegistrations(uc)
 	r := authedRequest(http.MethodGet, "/groups/g1/contests/c1/registrations", nil)
@@ -65,6 +69,7 @@ func TestListRegistrations_HappyPath_Returns200(t *testing.T) {
 	}
 	var resp struct {
 		Registrations []struct {
+			Type         string `json:"type"`
 			Nickname     string `json:"nickname"`
 			RegisteredAt string `json:"registeredAt"`
 		} `json:"registrations"`
@@ -93,8 +98,10 @@ func TestListRegistrations_NonMember_Returns403(t *testing.T) {
 	uc := appcontest.NewListContestRegistrationsUseCase(
 		&mockRepoReturning{contest: scheduledContest()},
 		&mockRegistrationRepository{},
+		&mockTeamParticipRepo{},
 		&mockMemberProvider{isLead: false, isMember: false},
 		&mockNicknameProvider{},
+		&mockTeamDisplayProvider{},
 	)
 	h := newHandlerWithListRegistrations(uc)
 	r := authedRequest(http.MethodGet, "/groups/g1/contests/c1/registrations", nil)
@@ -113,8 +120,10 @@ func TestListRegistrations_ContestNotFound_Returns404(t *testing.T) {
 	uc := appcontest.NewListContestRegistrationsUseCase(
 		&mockRepoReturning{contest: nil},
 		&mockRegistrationRepository{},
+		&mockTeamParticipRepo{},
 		&mockMemberProvider{isMember: true},
 		&mockNicknameProvider{},
+		&mockTeamDisplayProvider{},
 	)
 	h := newHandlerWithListRegistrations(uc)
 	r := authedRequest(http.MethodGet, "/groups/g1/contests/missing/registrations", nil)

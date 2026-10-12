@@ -80,6 +80,7 @@ func toListMyContestsResponse(out *appContest.ListMyContestsOutput) listMyContes
 			Penalty:           item.Penalty,
 			FreezeMinutes:     item.FreezeMinutes,
 			EnablePostContest: item.EnablePostContest,
+			ParticipationMode: item.ParticipationMode,
 			ParticipantCount:  item.ParticipantCount,
 			IsRegistered:      item.IsRegistered,
 			ProblemCount:      item.ProblemCount,

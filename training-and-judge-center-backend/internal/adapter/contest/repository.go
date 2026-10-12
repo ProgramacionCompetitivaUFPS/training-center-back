@@ -238,7 +238,13 @@ func (r *Repository) listContests(ctx context.Context, baseCond string, baseArgs
 	}
 	defer rows.Close()
 
-	var result []*domainContest.Contest
+	// Problems are loaded in one batch after the rows are read (the querier
+	// can't run a second query while rows is open), so each row is kept as a
+	// builder until then.
+	var (
+		ids      []string
+		builders []func([]domainContest.ContestProblem) *domainContest.Contest
+	)
 	for rows.Next() {
 		var (
 			cID, name, groupID, ownerID                string
@@ -259,28 +265,41 @@ func (r *Repository) listContests(ctx context.Context, baseCond string, baseArgs
 			slog.ErrorContext(ctx, "failed to scan contest row", "error", err)
 			return nil, 0, apperror.NewInternal()
 		}
-		result = append(result, domainContest.RestoreContest(
-			cID,
-			domainContest.RestoreContestName(name),
-			description,
-			startTime, endTime,
-			domainContest.RestorePenalty(penalty),
-			freezeMinutes,
-			enablePostContest,
-			locked,
-			showTeamMembers,
-			shared.RestoreGroupID(groupID),
-			shared.RestoreUserID(ownerID),
-			domainContest.RestoreParticipationMode(participationMode),
-			domainContest.RestoreTeamSize(teamSizeMin, teamSizeMax),
-			nil,
-			createdAt,
-			updatedAt,
-		))
+		ids = append(ids, cID)
+		builders = append(builders, func(problems []domainContest.ContestProblem) *domainContest.Contest {
+			return domainContest.RestoreContest(
+				cID,
+				domainContest.RestoreContestName(name),
+				description,
+				startTime, endTime,
+				domainContest.RestorePenalty(penalty),
+				freezeMinutes,
+				enablePostContest,
+				locked,
+				showTeamMembers,
+				shared.RestoreGroupID(groupID),
+				shared.RestoreUserID(ownerID),
+				domainContest.RestoreParticipationMode(participationMode),
+				domainContest.RestoreTeamSize(teamSizeMin, teamSizeMax),
+				problems,
+				createdAt,
+				updatedAt,
+			)
+		})
 	}
 	if err := rows.Err(); err != nil {
 		slog.ErrorContext(ctx, "list contests rows error", "error", err)
 		return nil, 0, apperror.NewInternal()
+	}
+	rows.Close()
+
+	problemsByContest, err := r.loadProblemsByContestIDs(ctx, q, ids)
+	if err != nil {
+		return nil, 0, err
+	}
+	result := make([]*domainContest.Contest, len(builders))
+	for i, build := range builders {
+		result[i] = build(problemsByContest[ids[i]])
 	}
 
 	var total int
@@ -290,9 +309,6 @@ func (r *Repository) listContests(ctx context.Context, baseCond string, baseArgs
 		return nil, 0, apperror.NewInternal()
 	}
 
-	if result == nil {
-		result = []*domainContest.Contest{}
-	}
 	return result, total, nil
 }
 
@@ -348,4 +364,38 @@ func (r *Repository) loadProblems(ctx context.Context, q infraPostgres.Querier, 
 		return nil, apperror.NewInternal()
 	}
 	return problems, nil
+}
+
+// loadProblemsByContestIDs loads the problems of several contests in a single
+// query, keyed by contest ID and ordered by position.
+func (r *Repository) loadProblemsByContestIDs(ctx context.Context, q infraPostgres.Querier, contestIDs []string) (map[string][]domainContest.ContestProblem, error) {
+	result := make(map[string][]domainContest.ContestProblem, len(contestIDs))
+	if len(contestIDs) == 0 {
+		return result, nil
+	}
+	rows, err := q.Query(ctx, `
+		SELECT id, contest_id, problem_id, "order"
+		FROM contest_problems
+		WHERE contest_id = ANY($1)
+		ORDER BY contest_id, "order"`, contestIDs)
+	if err != nil {
+		slog.ErrorContext(ctx, "failed to load contest problems", "error", err, "contest_count", len(contestIDs))
+		return nil, apperror.NewInternal()
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var id, contestID, problemID string
+		var order int
+		if err := rows.Scan(&id, &contestID, &problemID, &order); err != nil {
+			slog.ErrorContext(ctx, "failed to scan contest problem", "error", err)
+			return nil, apperror.NewInternal()
+		}
+		result[contestID] = append(result[contestID], domainContest.RestoreContestProblem(id, problemID, order))
+	}
+	if err := rows.Err(); err != nil {
+		slog.ErrorContext(ctx, "contest problems rows error", "error", err)
+		return nil, apperror.NewInternal()
+	}
+	return result, nil
 }

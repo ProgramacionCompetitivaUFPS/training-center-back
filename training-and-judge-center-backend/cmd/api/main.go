@@ -378,7 +378,7 @@ func main() {
 		contestRepo, contestRegistrationRepo,
 	)
 	listContestRegistrationsUseCase := appcontest.NewListContestRegistrationsUseCase(
-		contestRepo, contestRegistrationRepo, contestMemberProvider, contestNicknameProvider,
+		contestRepo, contestRegistrationRepo, contestTeamParticipationRepo, contestMemberProvider, contestNicknameProvider, contestTeamDisplayProvider,
 	)
 	getStandingsUseCase := appcontest.NewGetStandingsUseCase(
 		contestRepo, contestRegistrationRepo, contestSubmissionProvider,

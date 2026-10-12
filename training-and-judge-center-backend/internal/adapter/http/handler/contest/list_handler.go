@@ -95,6 +95,7 @@ func toListContestsResponse(out *appContest.ListContestsOutput) listContestsResp
 			Penalty:           item.Penalty,
 			FreezeMinutes:     item.FreezeMinutes,
 			EnablePostContest: item.EnablePostContest,
+			ParticipationMode: item.ParticipationMode,
 			ParticipantCount:  item.ParticipantCount,
 			IsRegistered:      item.IsRegistered,
 			ProblemCount:      item.ProblemCount,

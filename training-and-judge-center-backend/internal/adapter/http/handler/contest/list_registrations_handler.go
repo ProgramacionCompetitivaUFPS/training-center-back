@@ -18,6 +18,7 @@ import (
 // @Param        contestId path  string true  "Contest ID"
 // @Param        page      query int    false "Page (default 1)"
 // @Param        limit     query int    false "Limit (default 50, max 100)"
+// @Param        search    query string false "Filter by nickname, team name or team member nickname"
 // @Success      200 {object} listRegistrationsResponse
 // @Failure      401 {object} apperror.AppError
 // @Failure      403 {object} apperror.AppError
@@ -55,6 +56,7 @@ func (h *Handler) ListRegistrations(w http.ResponseWriter, r *http.Request) {
 		ContestID:   contestID,
 		Page:        page,
 		Limit:       limit,
+		Search:      r.URL.Query().Get("search"),
 	})
 	if err != nil {
 		handler.WriteError(r.Context(), w, err)
@@ -64,7 +66,10 @@ func (h *Handler) ListRegistrations(w http.ResponseWriter, r *http.Request) {
 	items := make([]registrationItem, len(out.Registrations))
 	for i, e := range out.Registrations {
 		items[i] = registrationItem{
+			Type:         e.Type,
 			Nickname:     e.Nickname,
+			TeamName:     e.TeamName,
+			Members:      e.Members,
 			RegisteredAt: e.RegisteredAt.UTC().Format(time.RFC3339),
 		}
 	}
