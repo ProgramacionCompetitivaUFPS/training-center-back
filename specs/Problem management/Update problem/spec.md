@@ -132,6 +132,8 @@ As a Coach or Admin who has created a problem, I want to upload test cases, solu
    - **Then** the system rejects with 400 Bad Request (PROBLEM_IS_PUBLISHED)
    - **And** suggests unpublishing first to make changes
 
+   > **Exception**: `testCases` and `checker` of a published problem that is in an active contest can be replaced by the author or an Admin; see Scenario 6b.
+
 7. **Scenario**: Unauthorized upload attempt
    - **Given** a problem exists with status `DRAFT`
    - **And** the authenticated user is neither the author, an Admin, nor a modifier
@@ -768,7 +770,7 @@ Problem not found.
 - **FR-013**: The system MUST enforce file size limits (200 MB for test cases, 10 MB for others).
 - **FR-014**: The system MUST allow replacing existing files with new uploads.
 - **FR-015**: The system MUST allow multiple solution files to be uploaded.
-- **FR-016**: The system MUST only allow file uploads when problem status is `DRAFT`.
+- **FR-016**: The system MUST only allow file uploads when problem status is `DRAFT`, except for the replacement of `testCases` or `checker` of a `PUBLISHED` problem in an active contest; see FR-025a.
 - **FR-016b**: The system MUST update `problemJudgingUpdatedAt` timestamp when uploading judging components (testCases, checker, validator).
 - **FR-016c**: The system MUST NOT update `problemJudgingUpdatedAt` when uploading solution files.
 

@@ -250,7 +250,7 @@ As an Admin, I want to rejudge a specific submission regardless of judging compo
 - Submission code reference is invalid or missing (should fail gracefully).
 - Standing calculation fails during rejudge (should log error, not block rejudge).
 - Admin rejudges while contest owner simultaneously rejudges same submissions.
-- Rejudge request for a problem with status DRAFT (should be allowed - submissions exist from when problem was PUBLISHED).
+- Rejudge request for a problem with status DRAFT (rejected with 400 PROBLEM_NOT_PUBLISHED, see FR-009.1).
 - Network interruption during asynchronous rejudging.
 - Only checker updated (no test case changes) - submissions should still be rejudged.
 - Only validator updated (no test case changes) - submissions should still be rejudged.
@@ -712,7 +712,7 @@ Submission not found.
 - **FR-022**: The system MUST validate that submissions belong to the authenticated user (for contestant manual rejudge).
 - **FR-023**: The system MUST reject contestant manual rejudge requests for their own submissions in active contests (submittedAt <= contest.endTime).
 - **FR-023.1**: The system MUST allow contestant manual rejudge requests for their own submissions in postcompetition (submittedAt > contest.endTime AND contest.enablePostContest = true).
-- **FR-024**: The system MUST allow rejudging submissions of problems with status DRAFT (submissions may exist from when problem was PUBLISHED).
+- **FR-024**: The system MUST NOT rejudge submissions of a problem with status DRAFT, even though they may exist from when the problem was PUBLISHED; see FR-009.1.
 
 **General**
 - **FR-025**: The system MUST NOT return internal IDs in responses (except where needed as identifiers).
