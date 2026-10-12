@@ -8,8 +8,7 @@ import (
 	"github.com/training-judge-center/backend/pkg/apperror"
 )
 
-// The spec limits checkers and validators to Python and C++; solutions accept
-// every platform language.
+// Checkers and validators accept only these; solutions accept every platform language.
 var allowedVerifierExtensions = []string{".py", ".cpp"}
 
 func validateVerifierExtension(fileType, fileName string) error {

@@ -653,8 +653,6 @@ func TestClaim_MountsTheJudgingVolume(t *testing.T) {
 	}
 }
 
-// Without an init process, the zombies left by each exec'd "timeout" pile up
-// in the container until its memory limit is exhausted.
 func TestPool_CreatesContainersWithInit(t *testing.T) {
 	var hostCfg *container.HostConfig
 	mock := &mockDockerClient{

@@ -131,7 +131,6 @@ func (uc *JudgeSubmissionUseCase) Execute(ctx context.Context, in JudgeSubmissio
 	return uc.persistVerdict(ctx, sub)
 }
 
-// judgeAttempt runs one whole judging attempt; the verdict is stamped with the clock at the moment it is reached.
 // judgeAttempt runs one whole judging attempt. It returns (true, err) when infra
 // failed and sub carries no verdict, and (false, nil) once sub has a final one.
 func (uc *JudgeSubmissionUseCase) judgeAttempt(

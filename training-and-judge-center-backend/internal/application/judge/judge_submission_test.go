@@ -864,7 +864,6 @@ func TestJudgeSubmission_WinningTheClaim_Judges(t *testing.T) {
 	}
 }
 
-// judged_at must mark when the verdict is reached, not when the worker took the submission.
 func TestJudgeSubmission_JudgedAtIsTheVerdictInstant(t *testing.T) {
 	var judgedAt *time.Time
 	uc := newJudgeSubmissionUseCase(
@@ -893,7 +892,6 @@ func TestJudgeSubmission_JudgedAtIsTheVerdictInstant(t *testing.T) {
 	if judgedAt == nil {
 		t.Fatal("judgedAt: got nil, want the verdict instant")
 	}
-	// The first reading is the moment the worker took the submission.
 	took := start.Add(time.Minute)
 	if !judgedAt.After(took) {
 		t.Errorf("judgedAt = %v, want after the instant the submission was taken (%v)", judgedAt, took)

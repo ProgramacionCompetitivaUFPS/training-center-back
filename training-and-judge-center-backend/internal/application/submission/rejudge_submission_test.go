@@ -103,8 +103,6 @@ func TestRejudgeSubmission_DeletedProblem_OwnerReportsNotFound(t *testing.T) {
 	}
 }
 
-// Both rules apply to a DRAFT problem that was never judged again; the contestant
-// is told the problem is not published, which is what they can act on.
 func TestRejudgeSubmission_DraftProblem_ReportsNotPublishedBeforeNoRejudgeNeeded(t *testing.T) {
 	sub := finishedSubmission(testProblemID)
 	repo := &mockSubmissionRepo{findByIDFn: func(string) (*domainsubmission.Submission, error) { return sub, nil }}

@@ -54,7 +54,7 @@ func (uc *RejudgeSubmissionUseCase) Execute(ctx context.Context, in RejudgeSubmi
 		return nil, apperror.NewForbidden(domainsubmission.ErrCodeAccessDenied, "you can only rejudge your own submissions")
 	}
 
-	// A deleted problem leaves its submissions without a problem_id; no lookup below can use it.
+	// A deleted problem leaves its submissions without a problem_id.
 	if sub.ProblemID() == "" {
 		return nil, apperror.NewNotFound(domainsubmission.ErrCodeProblemNotFound,
 			"the problem of this submission no longer exists, so it cannot be rejudged")
