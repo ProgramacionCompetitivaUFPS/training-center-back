@@ -25,6 +25,7 @@ type ContestListItem struct {
 	Penalty           int
 	FreezeMinutes     int
 	EnablePostContest bool
+	ParticipationMode string
 	ParticipantCount  int
 	IsRegistered      bool
 	ProblemCount      int

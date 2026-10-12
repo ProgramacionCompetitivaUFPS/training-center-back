@@ -129,6 +129,7 @@ type contestListItem struct {
 	Penalty           int     `json:"penalty"`
 	FreezeMinutes     int     `json:"freezeMinutes"`
 	EnablePostContest bool    `json:"enablePostContest"`
+	ParticipationMode string  `json:"participationMode"`
 	ParticipantCount  int     `json:"participantCount"`
 	IsRegistered      bool    `json:"isRegistered"`
 	ProblemCount      int     `json:"problemCount"`
@@ -161,6 +162,7 @@ type myContestListItem struct {
 	Penalty           int          `json:"penalty"`
 	FreezeMinutes     int          `json:"freezeMinutes"`
 	EnablePostContest bool         `json:"enablePostContest"`
+	ParticipationMode string       `json:"participationMode"`
 	ParticipantCount  int          `json:"participantCount"`
 	IsRegistered      bool         `json:"isRegistered"`
 	ProblemCount      int          `json:"problemCount"`
