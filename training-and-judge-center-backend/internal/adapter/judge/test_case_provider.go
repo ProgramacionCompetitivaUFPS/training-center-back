@@ -49,7 +49,11 @@ func (p *TestCaseProvider) GetTestCases(ctx context.Context, problemID string) (
 		return []appJudge.TestCase{}, nil
 	}
 
-	zipKey := appProblem.TestCasesZipKey(*testCasesKey)
+	return p.GetTestCasesAt(ctx, *testCasesKey)
+}
+
+func (p *TestCaseProvider) GetTestCasesAt(ctx context.Context, testCasesKey string) ([]appJudge.TestCase, error) {
+	zipKey := appProblem.TestCasesZipKey(testCasesKey)
 	rc, err := p.reader.readObject(ctx, zipKey)
 	if err != nil {
 		if errors.Is(err, storage.ErrObjectNotExist) {

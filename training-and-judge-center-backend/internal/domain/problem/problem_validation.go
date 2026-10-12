@@ -8,22 +8,26 @@ import (
 )
 
 type ProblemValidation struct {
-	id          string
-	problemID   string
-	requestedBy shared.UserID
-	status      ProblemValidationStatus
-	requestedAt time.Time
-	completedAt *time.Time
-	resultJSON  *string
+	id            string
+	problemID     string
+	requestedBy   shared.UserID
+	status        ProblemValidationStatus
+	requestedAt   time.Time
+	completedAt   *time.Time
+	resultJSON    *string
+	pendingChange *PendingJudgingChange
 }
 
-func (v *ProblemValidation) ID() string                      { return v.id }
-func (v *ProblemValidation) ProblemID() string               { return v.problemID }
-func (v *ProblemValidation) RequestedBy() shared.UserID      { return v.requestedBy }
-func (v *ProblemValidation) Status() ProblemValidationStatus { return v.status }
-func (v *ProblemValidation) RequestedAt() time.Time          { return v.requestedAt }
-func (v *ProblemValidation) CompletedAt() *time.Time         { return v.completedAt }
-func (v *ProblemValidation) ResultJSON() *string             { return v.resultJSON }
+func (v *ProblemValidation) ID() string                           { return v.id }
+func (v *ProblemValidation) ProblemID() string                    { return v.problemID }
+func (v *ProblemValidation) RequestedBy() shared.UserID           { return v.requestedBy }
+func (v *ProblemValidation) Status() ProblemValidationStatus      { return v.status }
+func (v *ProblemValidation) RequestedAt() time.Time               { return v.requestedAt }
+func (v *ProblemValidation) CompletedAt() *time.Time              { return v.completedAt }
+func (v *ProblemValidation) ResultJSON() *string                  { return v.resultJSON }
+func (v *ProblemValidation) PendingChange() *PendingJudgingChange { return v.pendingChange }
+
+func (v *ProblemValidation) IsJudgingUpdate() bool { return v.pendingChange != nil }
 
 func NewProblemValidation(id, problemID string, requestedBy shared.UserID, now time.Time) (*ProblemValidation, error) {
 	if id == "" || problemID == "" {
@@ -45,15 +49,17 @@ func RestoreProblemValidation(
 	requestedAt time.Time,
 	completedAt *time.Time,
 	resultJSON *string,
+	pendingChange *PendingJudgingChange,
 ) *ProblemValidation {
 	return &ProblemValidation{
-		id:          id,
-		problemID:   problemID,
-		requestedBy: requestedBy,
-		status:      status,
-		requestedAt: requestedAt,
-		completedAt: completedAt,
-		resultJSON:  resultJSON,
+		id:            id,
+		problemID:     problemID,
+		requestedBy:   requestedBy,
+		status:        status,
+		requestedAt:   requestedAt,
+		completedAt:   completedAt,
+		resultJSON:    resultJSON,
+		pendingChange: pendingChange,
 	}
 }
 
@@ -99,4 +105,14 @@ func (v *ProblemValidation) MarkSystemError(resultJSON string, now time.Time) er
 	}
 	v.status = NewProblemValidationStatusSystemError()
 	return nil
+}
+
+// NewJudgingUpdateValidation opens the ticket that validates a replacement of a published problem's judging files.
+func NewJudgingUpdateValidation(id, problemID string, requestedBy shared.UserID, change PendingJudgingChange, now time.Time) (*ProblemValidation, error) {
+	v, err := NewProblemValidation(id, problemID, requestedBy, now)
+	if err != nil {
+		return nil, err
+	}
+	v.pendingChange = &change
+	return v, nil
 }

@@ -72,6 +72,7 @@ func (m *mockProblemProvider) GetLimits(ctx context.Context, problemID string) (
 
 type mockTestCaseProvider struct {
 	getTestCasesFn func(ctx context.Context, problemID string) ([]TestCase, error)
+	readAtKeys     []string
 }
 
 func (m *mockTestCaseProvider) GetTestCases(ctx context.Context, problemID string) ([]TestCase, error) {
@@ -79,6 +80,11 @@ func (m *mockTestCaseProvider) GetTestCases(ctx context.Context, problemID strin
 		return m.getTestCasesFn(ctx, problemID)
 	}
 	return []TestCase{{Input: []byte("1 2"), ExpectedOutput: []byte("3")}}, nil
+}
+
+func (m *mockTestCaseProvider) GetTestCasesAt(ctx context.Context, testCasesKey string) ([]TestCase, error) {
+	m.readAtKeys = append(m.readAtKeys, testCasesKey)
+	return m.GetTestCases(ctx, "")
 }
 
 // ── Executor mock ────────────────────────────────────────────────────────────

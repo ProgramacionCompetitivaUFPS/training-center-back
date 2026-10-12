@@ -102,7 +102,7 @@ func (r *Repository) Save(ctx context.Context, p *domainProblem.Problem) error {
 		modifierStrings[i] = id.Value()
 	}
 
-	_, err = r.db.Exec(ctx, query,
+	_, err = infraPostgres.GetQuerier(ctx, r.db).Exec(ctx, query,
 		p.ID(),
 		slug,
 		title,

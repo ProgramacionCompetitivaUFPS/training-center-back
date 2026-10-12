@@ -191,6 +191,7 @@ func main() {
 	var outputChecker appjudge.OutputChecker
 	var artifactUploader appjudge.ArtifactUploader
 	var validatorRunner appjudge.ValidatorRunner
+	var stagedFileCleaner appproblem.StagedFileCleaner
 
 	switch storageBackend {
 	case "gcs":
@@ -209,6 +210,7 @@ func main() {
 		outputChecker = adapterjudge.NewOutputChecker(lightPool, dockerClient, artifactCfg, gcsClient, gcsBucket, judgepool.SharedVolumePath)
 		artifactUploader = adapterjudge.NewArtifactUploader(gcsClient, gcsBucket)
 		validatorRunner = adapterjudge.NewValidatorRunner(lightPool, dockerClient, artifactCfg, gcsClient, gcsBucket)
+		stagedFileCleaner = adapterproblem.NewGCSFileRepository(gcsClient, gcsBucket)
 		slog.Info("worker: using GCS storage backend", "bucket", gcsBucket)
 	default:
 		sourceCodeDownloader = adapterjudge.NewSourceCodeDownloaderLocal(storageLocalDir)
@@ -216,6 +218,12 @@ func main() {
 		outputChecker = adapterjudge.NewOutputCheckerLocal(lightPool, dockerClient, artifactCfg, storageLocalDir, judgepool.SharedVolumePath)
 		artifactUploader = adapterjudge.NewArtifactUploaderLocal(storageLocalDir)
 		validatorRunner = adapterjudge.NewValidatorRunnerLocal(lightPool, dockerClient, artifactCfg, storageLocalDir)
+		localFiles, err := adapterproblem.NewLocalFileRepository(storageLocalDir)
+		if err != nil {
+			slog.Error("worker: failed to create local file storage", "error", err)
+			os.Exit(1)
+		}
+		stagedFileCleaner = localFiles
 		slog.Info("worker: using local storage backend", "dir", storageLocalDir)
 	}
 
@@ -276,6 +284,7 @@ func main() {
 
 	problemValidationRepo := adapterproblem.NewProblemValidationRepository(dbPool)
 	problemPublisher := adapterproblem.NewProblemPublisher(dbPool)
+	problemRepo := adapterproblem.NewRepository(dbPool)
 
 	validateProblemUseCase := appproblem.NewValidateProblemUseCase(
 		problemValidationRepo,
@@ -284,6 +293,8 @@ func main() {
 		solutionValidator,
 		problemPublisher,
 		txManager,
+		problemRepo,
+		stagedFileCleaner,
 	)
 
 	staleValidationRecoverer := adapterproblem.NewStaleValidationRecoverer(dbPool)

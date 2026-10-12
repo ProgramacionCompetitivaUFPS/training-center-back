@@ -198,9 +198,11 @@ func (m *mockValidationQueue) Publish(ctx context.Context, msg ValidationQueueMe
 
 type mockJudgingPreparer struct {
 	prepareFn func(ctx context.Context, problemID, slug string) (*JudgingPreparationResult, error)
+	candidates []*JudgingCandidate
 }
 
-func (m *mockJudgingPreparer) Prepare(ctx context.Context, problemID, slug string) (*JudgingPreparationResult, error) {
+func (m *mockJudgingPreparer) Prepare(ctx context.Context, problemID, slug string, candidate *JudgingCandidate) (*JudgingPreparationResult, error) {
+	m.candidates = append(m.candidates, candidate)
 	if m.prepareFn != nil {
 		return m.prepareFn(ctx, problemID, slug)
 	}
@@ -236,9 +238,11 @@ func (m *mockJudgingArtifactWriter) SetValidatorCompiledKey(ctx context.Context,
 
 type mockSolutionValidator struct {
 	validateFn func(ctx context.Context, problemID string) (*SolutionValidationResult, error)
+	candidates []*JudgingCandidate
 }
 
-func (m *mockSolutionValidator) Validate(ctx context.Context, problemID string) (*SolutionValidationResult, error) {
+func (m *mockSolutionValidator) Validate(ctx context.Context, problemID string, candidate *JudgingCandidate) (*SolutionValidationResult, error) {
+	m.candidates = append(m.candidates, candidate)
 	if m.validateFn != nil {
 		return m.validateFn(ctx, problemID)
 	}
@@ -456,4 +460,24 @@ func (m *mockTxManager) WithTx(ctx context.Context, fn func(context.Context) err
 		return m.err
 	}
 	return fn(ctx)
+}
+
+// ── AffectedContestsProvider / StagedFileCleaner mocks ───────────────────────
+
+type mockAffectedContests struct {
+	contests []ContestRef
+	err      error
+}
+
+func (m *mockAffectedContests) ListOpenContestsOfProblem(_ context.Context, _ string) ([]ContestRef, error) {
+	return m.contests, m.err
+}
+
+type mockStagedFiles struct {
+	deletedPrefixes []string
+}
+
+func (m *mockStagedFiles) DeleteFilesWithPrefix(_ context.Context, prefix string) error {
+	m.deletedPrefixes = append(m.deletedPrefixes, prefix)
+	return nil
 }

@@ -172,3 +172,39 @@ func TestFindLatestByProblemID_NotFound_ReturnsFalseNoError(t *testing.T) {
 		t.Errorf("expected nil ProblemValidation, got %v", v)
 	}
 }
+
+func TestPendingChange_RoundTrip(t *testing.T) {
+	key := "problems/p/testcases/x"
+	checker := domainProblem.RestoreJudgingFile("Checker.cpp", "problems/p/checker/v1/Checker.cpp", "cpp20", nil, nil)
+	change, err := domainProblem.NewPendingJudgingChange(&key, &checker)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	data, err := mapPendingChangeToDB(&change)
+	if err != nil {
+		t.Fatalf("mapPendingChangeToDB: %v", err)
+	}
+	got, err := pendingChangeFromDB(data)
+	if err != nil {
+		t.Fatalf("pendingChangeFromDB: %v", err)
+	}
+
+	if got.TestCasesKey() == nil || *got.TestCasesKey() != key {
+		t.Errorf("TestCasesKey: got %v, want %s", got.TestCasesKey(), key)
+	}
+	if got.Checker() == nil || got.Checker().FileKey() != checker.FileKey() || got.Checker().Language() != "cpp20" {
+		t.Errorf("Checker: got %+v", got.Checker())
+	}
+}
+
+func TestPendingChange_AbsentIsNull(t *testing.T) {
+	data, err := mapPendingChangeToDB(nil)
+	if err != nil || data != nil {
+		t.Fatalf("a publish validation must store NULL, got %q, %v", data, err)
+	}
+	got, err := pendingChangeFromDB(nil)
+	if err != nil || got != nil {
+		t.Errorf("NULL must read back as no change, got %+v, %v", got, err)
+	}
+}

@@ -34,6 +34,19 @@ As a Coach or Admin who has created a problem, I want to update the problem's me
    - **Then** the system rejects with 400 Bad Request (PROBLEM_IS_PUBLISHED)
    - **And** suggests unpublishing first to make changes
 
+   > **Exception**: `testCases` and `checker` of a published problem that is in an active contest can be replaced by the author or an Admin; see Scenario 6b.
+
+6b. **Scenario**: Replace test cases or checker of a published problem in an active contest
+   - **Given** a problem exists with status `PUBLISHED` and is part of an active contest
+   - **And** the authenticated user is the author or an Admin
+   - **When** they upload `testCases` or `checker` with `confirmSlug` equal to the problem slug
+   - **Then** the system responds `202 Accepted` with a `validationId` and the open contests that include the problem
+   - **And** the new files are staged apart and validated against the existing solutions, with the new checker compiled aside
+   - **And** the problem keeps being judged with the current files until the validation passes
+   - **And** when it passes, the new files replace the current ones and `problemJudgingUpdatedAt` is updated, in one step
+   - **And** when it fails, the problem is left untouched and the staged files are removed; the result is available at `GET /problems/p/{slug}/validation`
+   - **And** submissions already judged are not rejudged automatically; whoever may rejudge each contest does it
+
 4. **Scenario**: Unauthorized update attempt
    - **Given** a problem exists with status `DRAFT`
    - **And** the authenticated user is neither the author, an Admin, nor a modifier
@@ -381,7 +394,7 @@ Problem not found.
 
 Upload files for a problem (test cases, solution, checker, validator).
 
-> **Important**: Only the problem author, Admin, or modifier can upload files. Problem must be in `DRAFT` status. Files are uploaded directly to the backend. Use multipart/form-data.
+> **Important**: Only the problem author, Admin, or modifier can upload files. Problem must be in `DRAFT` status. The exception is `testCases` and `checker` of a published problem in an active contest, which only the author or an Admin can replace by sending `confirmSlug` (see Scenario 6b). Files are uploaded directly to the backend. Use multipart/form-data.
 
 **Headers**:
 
@@ -402,6 +415,7 @@ Upload files for a problem (test cases, solution, checker, validator).
 |-------|------|----------|-------------|
 | fileType | string | Yes | Type of file: `testCases`, `solution`, `checker`, `validator` |
 | file | file | Yes | The file to upload |
+| confirmSlug | string | Only for a live judging update | The problem slug; required to replace `testCases` or `checker` of a published problem in an active contest |
 
 **File Requirements**:
 
@@ -444,6 +458,20 @@ File uploaded successfully.
     "checker": false,
     "validator": false
   }
+}
+```
+
+#### 202 Accepted
+A judging update of a published problem in an active contest was accepted; it takes effect once it passes validation.
+
+```json
+{
+  "message": "Judging update accepted; it takes effect once it passes validation",
+  "validationId": "f4c1d2e0-1111-4a2b-9c3d-000000000000",
+  "affectedContests": [
+    {"id": "5403d49f-895f-43ba-88ce-adf37a76dfa4", "name": "Round 1", "groupId": "00000000-0000-0000-0000-000000000002", "startTime": "2026-10-12T03:04:21Z", "endTime": "2026-10-13T04:04:21Z"}
+  ],
+  "problem": {}
 }
 ```
 
@@ -756,6 +784,13 @@ Problem not found.
 - **FR-023**: Modifiers MUST NOT be able to delete the problem (only author/Admin can).
 - **FR-024**: The system MUST allow listing all modifiers for a problem.
 - **FR-025**: The system MUST allow removing modifiers by the author or Admin.
+
+**Live judging update**
+- **FR-025a**: The system MUST allow only the author or an Admin to replace `testCases` or `checker` of a `PUBLISHED` problem, and only while it is in an active contest; modifiers MUST NOT.
+- **FR-025b**: The system MUST require `confirmSlug` equal to the problem slug for that replacement.
+- **FR-025c**: The system MUST NOT put the new files in effect until every solution passes with them (and the new checker compiles); until then the problem is judged with the current files.
+- **FR-025d**: The system MUST update `problemJudgingUpdatedAt` at the moment the new files take effect, not when they are uploaded.
+- **FR-025e**: Solutions and validators of a `PUBLISHED` problem MUST still require unpublishing first.
 
 **General**
 - **FR-026**: The system MUST NOT return internal IDs in any response.

@@ -40,6 +40,10 @@ func (m *mockJudgeTestCaseProvider) GetTestCases(_ context.Context, _ string) ([
 	return []appJudge.TestCase{{Name: "sample/001", Input: []byte("1"), ExpectedOutput: []byte("1")}}, nil
 }
 
+func (m *mockJudgeTestCaseProvider) GetTestCasesAt(ctx context.Context, _ string) ([]appJudge.TestCase, error) {
+	return m.GetTestCases(ctx, "")
+}
+
 type mockJudgeExecutionSession struct {
 	compileFn func(ctx context.Context, req appJudge.CompileRequest) (appJudge.CompileResult, error)
 }
@@ -103,7 +107,7 @@ func newTestSolutionValidator(
 func TestSolutionValidator_AllPass_TranslatesToPassedResult(t *testing.T) {
 	v := newTestSolutionValidator(&mockJudgeSolutionProvider{}, &mockJudgeProblemProvider{}, &mockJudgeTestCaseProvider{}, &mockJudgeExecutor{})
 
-	result, err := v.Validate(context.Background(), testValidationProblemID)
+	result, err := v.Validate(context.Background(), testValidationProblemID, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -131,7 +135,7 @@ func TestSolutionValidator_CompileFailure_TranslatesFailureFields(t *testing.T) 
 	}
 	v := newTestSolutionValidator(&mockJudgeSolutionProvider{}, &mockJudgeProblemProvider{}, &mockJudgeTestCaseProvider{}, executor)
 
-	result, err := v.Validate(context.Background(), testValidationProblemID)
+	result, err := v.Validate(context.Background(), testValidationProblemID, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -157,7 +161,7 @@ func TestSolutionValidator_UnderlyingError_Propagates(t *testing.T) {
 	solutions := &erroringSolutionProvider{err: wantErr}
 	v := newTestSolutionValidator(solutions, &mockJudgeProblemProvider{}, &mockJudgeTestCaseProvider{}, &mockJudgeExecutor{})
 
-	_, err := v.Validate(context.Background(), testValidationProblemID)
+	_, err := v.Validate(context.Background(), testValidationProblemID, nil)
 	var appErr *apperror.AppError
 	if !errors.As(err, &appErr) || appErr.Code != "PROBLEM_NOT_FOUND" {
 		t.Errorf("expected the underlying error to propagate untouched, got %v", err)

@@ -38,5 +38,5 @@ type SolutionValidationResult struct {
 // SolutionValidator is implemented by an adapter that delegates to judge's
 // execution engine and translates its result into this package's own types.
 type SolutionValidator interface {
-	Validate(ctx context.Context, problemID string) (*SolutionValidationResult, error)
+	Validate(ctx context.Context, problemID string, candidate *JudgingCandidate) (*SolutionValidationResult, error)
 }

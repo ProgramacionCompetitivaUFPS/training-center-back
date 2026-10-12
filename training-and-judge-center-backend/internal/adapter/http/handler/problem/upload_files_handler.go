@@ -28,7 +28,9 @@ const (
 // @Param        slug path string true "Problem slug"
 // @Param        fileType formData string true "File type (testCases, solution, checker, validator)"
 // @Param        file formData file true "File to upload"
+// @Param        confirmSlug formData string false "The problem slug; required to replace testCases or checker of a published problem that is in an active contest"
 // @Success      200 {object} getProblemResponse
+// @Success      202 {object} map[string]interface{} "Live update of a published problem accepted; it takes effect once validated"
 // @Failure      400 {object} apperror.AppError
 // @Failure      401 {object} apperror.AppError
 // @Failure      413 {object} apperror.AppError
@@ -99,6 +101,7 @@ func (h *Handler) UploadFiles(w http.ResponseWriter, r *http.Request) {
 		FileType:    fileType,
 		FileName:    fileHeader.Filename,
 		FileData:    fileData,
+		ConfirmSlug: r.FormValue("confirmSlug"),
 		CurrentUser: currentUser,
 	})
 
@@ -108,6 +111,15 @@ func (h *Handler) UploadFiles(w http.ResponseWriter, r *http.Request) {
 	}
 
 	authorDisplay, _ := h.userProvider.GetDisplay(r.Context(), res.Problem.AuthorID)
+	if res.ValidationID != "" {
+		handler.WriteJSON(r.Context(), w, http.StatusAccepted, map[string]interface{}{
+			"message":          res.Message,
+			"validationId":     res.ValidationID,
+			"affectedContests": toAffectedContestResps(res.AffectedContests),
+			"problem":          buildResponse(res.Problem, authorDisplay),
+		})
+		return
+	}
 	handler.WriteJSON(r.Context(), w, http.StatusOK, map[string]interface{}{
 		"message": res.Message,
 		"problem": buildResponse(res.Problem, authorDisplay),

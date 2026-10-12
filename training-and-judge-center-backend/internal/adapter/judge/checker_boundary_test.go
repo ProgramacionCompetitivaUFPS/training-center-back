@@ -76,6 +76,10 @@ func (boundaryTestCaseProvider) GetTestCases(context.Context, string) ([]appjudg
 	}, nil
 }
 
+func (p boundaryTestCaseProvider) GetTestCasesAt(ctx context.Context, _ string) ([]appjudge.TestCase, error) {
+	return p.GetTestCases(ctx, "")
+}
+
 // boundaryExecutor stands for the heavy pool. It leaves the contestant's output
 // in the judging directory it was named, which is the only place the checker
 // under test can find it: the two sides agreeing on that path is the seam.

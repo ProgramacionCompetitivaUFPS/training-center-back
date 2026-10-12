@@ -18,8 +18,12 @@ func NewSolutionValidator(uc *appJudge.ValidateSolutionsUseCase) *SolutionValida
 	return &SolutionValidator{uc: uc}
 }
 
-func (v *SolutionValidator) Validate(ctx context.Context, problemID string) (*appProblem.SolutionValidationResult, error) {
-	out, err := v.uc.Execute(ctx, appJudge.ValidateSolutionsInput{ProblemID: problemID})
+func (v *SolutionValidator) Validate(ctx context.Context, problemID string, candidate *appProblem.JudgingCandidate) (*appProblem.SolutionValidationResult, error) {
+	judgeCandidate, err := toJudgeCandidate(candidate)
+	if err != nil {
+		return nil, err
+	}
+	out, err := v.uc.Execute(ctx, appJudge.ValidateSolutionsInput{ProblemID: problemID, Candidate: judgeCandidate})
 	if err != nil {
 		return nil, err
 	}

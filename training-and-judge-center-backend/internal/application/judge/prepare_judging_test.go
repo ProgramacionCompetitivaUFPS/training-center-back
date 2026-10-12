@@ -230,3 +230,88 @@ func TestPrepareJudging_ValidatorSessionOpensOnTheStoredArtifact(t *testing.T) {
 		t.Errorf("expected the session to be closed once, got %d", session.closeCalls)
 	}
 }
+
+func candidateChecker() *CandidateChecker {
+	return &CandidateChecker{
+		FileKey:     "problems/abc/checker/ticket-1/Checker.cpp",
+		Language:    submission.RestoreLanguage("cpp20"),
+		CompiledKey: "problems/abc/checker/ticket-1/compiled",
+	}
+}
+
+func TestPrepareJudging_CandidateChecker_CompilesItApartFromTheLiveOne(t *testing.T) {
+	sources := &mockJudgingSourceProvider{
+		getCheckerSourceFn: func(context.Context, string) (*JudgingSource, error) {
+			t.Fatal("the live checker must not be read when a candidate checker is validated")
+			return nil, nil
+		},
+	}
+	var downloaded []string
+	downloader := &mockSourceCodeDownloader{downloadFn: func(_ context.Context, path string) ([]byte, error) {
+		downloaded = append(downloaded, path)
+		return []byte("code"), nil
+	}}
+	uploader := &mockArtifactUploader{}
+	uc := newPrepareJudgingUseCase(sources, downloader, &mockArtifactCompiler{}, uploader, &mockTestCaseProvider{}, &mockValidatorRunner{})
+
+	out, err := uc.Execute(context.Background(), PrepareJudgingInput{
+		ProblemID: problemID, Slug: "abc",
+		Candidate: &JudgingCandidate{Checker: candidateChecker()},
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	want := candidateChecker()
+	if out.CheckerCompiledKey != want.CompiledKey {
+		t.Errorf("CheckerCompiledKey: got %q, want %q", out.CheckerCompiledKey, want.CompiledKey)
+	}
+	if _, ok := uploader.uploaded[want.CompiledKey]; !ok {
+		t.Errorf("expected the artifact uploaded at %q", want.CompiledKey)
+	}
+	if len(downloaded) != 1 || downloaded[0] != want.FileKey {
+		t.Errorf("downloaded: got %v, want [%s]", downloaded, want.FileKey)
+	}
+}
+
+func TestPrepareJudging_CandidateWithoutChecker_LeavesTheLiveCheckerAlone(t *testing.T) {
+	sources := &mockJudgingSourceProvider{
+		getCheckerSourceFn: func(context.Context, string) (*JudgingSource, error) {
+			t.Fatal("the live checker must not be recompiled by a test-cases-only update")
+			return nil, nil
+		},
+	}
+	uploader := &mockArtifactUploader{}
+	uc := newPrepareJudgingUseCase(sources, &mockSourceCodeDownloader{}, &mockArtifactCompiler{}, uploader, &mockTestCaseProvider{}, &mockValidatorRunner{})
+
+	out, err := uc.Execute(context.Background(), PrepareJudgingInput{
+		ProblemID: problemID, Slug: "abc",
+		Candidate: &JudgingCandidate{TestCasesKey: "problems/abc/testcases/new"},
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if out.CheckerCompiledKey != "" || len(uploader.uploaded) != 0 {
+		t.Errorf("nothing about the checker should be built, got %q and %v", out.CheckerCompiledKey, uploader.uploaded)
+	}
+}
+
+func TestPrepareJudging_CandidateTestCases_AreTheOnesTheValidatorChecks(t *testing.T) {
+	sources := &mockJudgingSourceProvider{
+		getValidatorSourceFn: func(context.Context, string) (*JudgingSource, error) { return validatorSource(), nil },
+	}
+	testCases := &mockTestCaseProvider{}
+	uc := newPrepareJudgingUseCase(sources, &mockSourceCodeDownloader{}, &mockArtifactCompiler{}, &mockArtifactUploader{}, testCases, &mockValidatorRunner{})
+
+	if _, err := uc.Execute(context.Background(), PrepareJudgingInput{
+		ProblemID: problemID, Slug: "abc",
+		Candidate: &JudgingCandidate{TestCasesKey: "problems/abc/testcases/new"},
+	}); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if len(testCases.readAtKeys) != 1 || testCases.readAtKeys[0] != "problems/abc/testcases/new" {
+		t.Errorf("test cases read at: got %v", testCases.readAtKeys)
+	}
+}
