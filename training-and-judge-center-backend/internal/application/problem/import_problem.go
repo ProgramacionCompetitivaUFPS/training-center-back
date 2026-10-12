@@ -222,6 +222,10 @@ func (uc *ImportProblemUseCase) uploadVerifier(
 	now time.Time,
 ) error {
 	cleanName := filepath.Base(f.Path)
+	if err := validateVerifierExtension(fileType, cleanName); err != nil {
+		cleanup()
+		return err
+	}
 	ext := strings.ToLower(filepath.Ext(cleanName))
 	lang, ok := uc.platformSettings.LanguageByExtension(ext)
 	if !ok {
