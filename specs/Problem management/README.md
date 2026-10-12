@@ -358,6 +358,8 @@ problem-package.zip/
 
 Imported problems are created with status `DRAFT` and accessibility `PRIVATE`.
 
+Only `problem.yaml` (with `name`) is required to import. Test cases, solutions and validators are optional at import time; test cases are required to publish.
+
 ---
 
 ## 🔹 Content Deletion
