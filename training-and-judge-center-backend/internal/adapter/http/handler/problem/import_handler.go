@@ -22,6 +22,7 @@ import (
 // @Success      201 {object} getProblemResponse
 // @Failure      400 {object} apperror.AppError
 // @Failure      401 {object} apperror.AppError
+// @Failure      413 {object} apperror.AppError
 // @Router       /problems/import [post]
 func (h *Handler) Import(w http.ResponseWriter, r *http.Request) {
 	cu, ok := middleware.GetCurrentUser(r.Context())
@@ -35,10 +36,7 @@ func (h *Handler) Import(w http.ResponseWriter, r *http.Request) {
 
 	maxUploadBytes := int64(h.settings.MaxFileSizeTestCaseMB()) << 20
 	if err := r.ParseMultipartForm(maxUploadBytes); err != nil {
-		handler.WriteJSON(r.Context(), w, http.StatusRequestEntityTooLarge, apperror.AppError{
-			Code:    apperror.ErrCodePayloadTooLarge,
-			Message: "File exceeds maximum allowed size",
-		})
+		writeMultipartParseError(r.Context(), w, err)
 		return
 	}
 

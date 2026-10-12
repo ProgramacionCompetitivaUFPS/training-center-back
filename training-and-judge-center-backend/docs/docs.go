@@ -3775,7 +3775,7 @@ const docTemplate = `{
                     },
                     {
                         "type": "string",
-                        "description": "Filter by title (partial match)",
+                        "description": "Filter by title (partial match, max 200 characters)",
                         "name": "search",
                         "in": "query"
                     }
@@ -3785,6 +3785,12 @@ const docTemplate = `{
                         "description": "OK",
                         "schema": {
                             "$ref": "#/definitions/problem.listProblemsResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/apperror.AppError"
                         }
                     },
                     "401": {
@@ -3892,6 +3898,12 @@ const docTemplate = `{
                     },
                     "401": {
                         "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/apperror.AppError"
+                        }
+                    },
+                    "413": {
+                        "description": "Request Entity Too Large",
                         "schema": {
                             "$ref": "#/definitions/apperror.AppError"
                         }
@@ -4175,6 +4187,12 @@ const docTemplate = `{
                     },
                     "401": {
                         "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/apperror.AppError"
+                        }
+                    },
+                    "413": {
+                        "description": "Request Entity Too Large",
                         "schema": {
                             "$ref": "#/definitions/apperror.AppError"
                         }
