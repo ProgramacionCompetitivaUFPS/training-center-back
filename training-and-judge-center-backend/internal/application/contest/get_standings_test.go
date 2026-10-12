@@ -223,6 +223,34 @@ func TestGetStandingsUseCase_CacheMissRebuild(t *testing.T) {
 	}
 }
 
+func TestGetStandingsUseCase_PostCompetitionSubmissionsExcludedFromRebuild(t *testing.T) {
+	regs := []*domainContest.ContestRegistration{reg(callerID), reg(otherID)}
+	subs := []ContestSubmissionData{
+		sub(callerID, "A", "ACCEPTED", 90), // during the contest (ends 60m ago)
+		sub(otherID, "A", "ACCEPTED", 30),  // postcompetition (practice) — after endTime
+	}
+	uc := newGetStandingsUseCase(finishedContest(), regs, subs, emptyCache(), visibleGroup(), isMemberNotLead())
+
+	out, err := uc.Execute(context.Background(), GetStandingsInput{
+		CurrentUser: asContestant(callerID),
+		GroupID:     testGroupID,
+		ContestID:   testContestID,
+		Page:        1,
+		Limit:       50,
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	for _, e := range out.Entries {
+		if e.ContestantID == otherID && e.ProblemsSolved != 0 {
+			t.Errorf("otherID's postcompetition ACCEPTED must not count: solved=%d, want 0", e.ProblemsSolved)
+		}
+		if e.ContestantID == callerID && e.ProblemsSolved != 1 {
+			t.Errorf("callerID's during-contest ACCEPTED must count: solved=%d, want 1", e.ProblemsSolved)
+		}
+	}
+}
+
 func TestGetStandingsUseCase_FiltersByCountryEndToEnd(t *testing.T) {
 	regs := []*domainContest.ContestRegistration{reg(callerID), reg(otherID)}
 	subs := []ContestSubmissionData{

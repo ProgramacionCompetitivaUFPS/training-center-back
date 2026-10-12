@@ -205,14 +205,14 @@ func (uc *GetStandingsUseCase) Execute(ctx context.Context, in GetStandingsInput
 		return uc.buildOutput(ctx, cached, contest, applyFreeze, status, freezeTime, in)
 	}
 
-	rebuilt, err := uc.rebuild(ctx, in.ContestID)
+	rebuilt, err := uc.rebuild(ctx, in.ContestID, contest.EndTime())
 	if err != nil {
 		return nil, err
 	}
 	return uc.buildOutput(ctx, rebuilt, contest, applyFreeze, status, freezeTime, in)
 }
 
-func (uc *GetStandingsUseCase) rebuild(ctx context.Context, contestID string) (*CachedStandings, error) {
+func (uc *GetStandingsUseCase) rebuild(ctx context.Context, contestID string, endTime time.Time) (*CachedStandings, error) {
 	g, gctx := errgroup.WithContext(ctx)
 
 	var regs []*domainContest.ContestRegistration
@@ -272,6 +272,9 @@ func (uc *GetStandingsUseCase) rebuild(ctx context.Context, contestID string) (*
 	}
 
 	for _, sub := range subs {
+		if sub.SubmittedAt.After(endTime) {
+			continue // postcompetition (practice) submission — must not affect official standings
+		}
 		contestantID, ok := userToContestant[sub.UserID]
 		if !ok {
 			continue
@@ -346,7 +349,13 @@ func (uc *GetStandingsUseCase) backgroundRefresh(contestID string) {
 	}
 	defer uc.standingsCache.ReleaseRefreshLock(ctx, contestID)
 
-	if _, err := uc.rebuild(ctx, contestID); err != nil {
+	contest, err := uc.contestRepo.FindByID(ctx, contestID)
+	if err != nil {
+		slog.ErrorContext(ctx, "standings background refresh failed to load contest", "contest_id", contestID, "error", err)
+		return
+	}
+
+	if _, err := uc.rebuild(ctx, contestID, contest.EndTime()); err != nil {
 		slog.ErrorContext(ctx, "standings background refresh failed", "contest_id", contestID, "error", err)
 	}
 }
