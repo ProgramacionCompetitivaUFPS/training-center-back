@@ -202,12 +202,12 @@ As a problem author or Admin, I want to assign other users as modifiers so that 
    - **Given** a problem exists
    - **And** the authenticated user is the author
    - **When** they attempt to add a non-existent user as modifier
-   - **Then** the system rejects with 400 Bad Request (USER_NOT_FOUND)
+   - **Then** the system rejects with 404 Not Found (USER_NOT_FOUND)
 
 6. **Scenario**: Add already existing modifier
    - **Given** a problem already has user X as modifier
    - **When** the author attempts to add user X again
-   - **Then** the system rejects with 400 Bad Request (ALREADY_MODIFIER)
+   - **Then** the system rejects with 409 Conflict (MODIFIER_ALREADY_EXISTS)
 
 7. **Scenario**: List modifiers
    - **Given** a problem exists with modifiers assigned
@@ -592,23 +592,6 @@ Modifier added successfully.
 }
 ```
 
-#### 400 Bad Request
-User is already a modifier or user not found.
-
-```json
-{
-  "error": "ALREADY_MODIFIER",
-  "message": "User is already a modifier for this problem"
-}
-```
-
-```json
-{
-  "error": "USER_NOT_FOUND",
-  "message": "User with nickname 'coach_jane' not found"
-}
-```
-
 #### 401 Unauthorized
 Authentication failed.
 
@@ -623,7 +606,24 @@ Only author or Admin can add modifiers.
 ```
 
 #### 404 Not Found
-Problem not found.
+Problem not found, or the user to add does not exist.
+
+```json
+{
+  "error": "USER_NOT_FOUND",
+  "message": "User with nickname 'coach_jane' not found"
+}
+```
+
+#### 409 Conflict
+The user is already a modifier of the problem.
+
+```json
+{
+  "error": "MODIFIER_ALREADY_EXISTS",
+  "message": "User is already a modifier for this problem"
+}
+```
 
 ---
 
