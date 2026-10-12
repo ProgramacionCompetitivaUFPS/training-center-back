@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/moby/moby/api/types/container"
 	"github.com/moby/moby/client"
 )
 
@@ -649,5 +650,25 @@ func TestClaim_MountsTheJudgingVolume(t *testing.T) {
 				t.Errorf("binds: got %v, want [%q]", binds, tt.want)
 			}
 		})
+	}
+}
+
+// Without an init process, the zombies left by each exec'd "timeout" pile up
+// in the container until its memory limit is exhausted.
+func TestPool_CreatesContainersWithInit(t *testing.T) {
+	var hostCfg *container.HostConfig
+	mock := &mockDockerClient{
+		createFn: func(_ context.Context, opts client.ContainerCreateOptions) (client.ContainerCreateResult, error) {
+			hostCfg = opts.HostConfig
+			return client.ContainerCreateResult{ID: "ctr-init"}, nil
+		},
+	}
+	p := newTestPool(t, testCfg(1), mock)
+
+	if _, err := p.Claim(context.Background(), "cpp20", LanguageCeiling); err != nil {
+		t.Fatal(err)
+	}
+	if hostCfg == nil || hostCfg.Init == nil || !*hostCfg.Init {
+		t.Errorf("HostConfig.Init = %v, want true", hostCfg)
 	}
 }
