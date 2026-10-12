@@ -95,6 +95,10 @@ func TestGetContest_HappyPath_Returns200(t *testing.T) {
 	if resp.Status != "SCHEDULED" {
 		t.Errorf("expected SCHEDULED, got %q", resp.Status)
 	}
+	if resp.ParticipationMode != "INDIVIDUAL" || resp.TeamSizeMin != 2 || resp.TeamSizeMax != 5 {
+		t.Errorf("expected INDIVIDUAL with team size 2–5, got %q %d–%d",
+			resp.ParticipationMode, resp.TeamSizeMin, resp.TeamSizeMax)
+	}
 }
 
 func TestGetContest_NotFound_Returns404(t *testing.T) {

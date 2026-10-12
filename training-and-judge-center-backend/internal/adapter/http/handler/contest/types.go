@@ -106,6 +106,9 @@ type getContestResponse struct {
 	EnablePostContest bool                    `json:"enablePostContest"`
 	Locked            *bool                   `json:"locked,omitempty"`
 	ShowTeamMembers   bool                    `json:"showTeamMembers"`
+	ParticipationMode string                  `json:"participationMode"`
+	TeamSizeMin       int                     `json:"teamSizeMin"`
+	TeamSizeMax       int                     `json:"teamSizeMax"`
 	ParticipantCount  int                     `json:"participantCount"`
 	IsRegistered      bool                    `json:"isRegistered"`
 	Group             groupDisplay            `json:"group"`
