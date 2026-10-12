@@ -46,6 +46,8 @@ func kindToStatus(k apperror.Kind) int {
 		return http.StatusTooManyRequests
 	case apperror.KindServiceUnavailable:
 		return http.StatusServiceUnavailable
+	case apperror.KindPayloadTooLarge:
+		return http.StatusRequestEntityTooLarge
 	default:
 		return http.StatusInternalServerError
 	}

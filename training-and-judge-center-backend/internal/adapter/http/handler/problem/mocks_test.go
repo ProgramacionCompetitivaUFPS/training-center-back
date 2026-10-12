@@ -428,3 +428,29 @@ type mockTxManagerH struct{}
 func (m *mockTxManagerH) WithTx(ctx context.Context, fn func(context.Context) error) error {
 	return fn(ctx)
 }
+
+// ── PlatformSettings ─────────────────────────────────────────────────────────
+
+func newTestSettings() domainProblem.PlatformSettings {
+	s, err := domainProblem.NewPlatformSettings(
+		10000, 512,
+		map[string]domainProblem.LanguageLimit{},
+		map[string]struct{}{"cpp": {}},
+		map[string]string{".cpp": "cpp"},
+		map[string]struct{}{"dp": {}},
+		4, 10, 50, 100, 10,
+	)
+	if err != nil {
+		panic(err)
+	}
+	return s
+}
+
+// The rejections these tests exercise happen before any use case runs.
+func newHandlerWithImport() *Handler {
+	return &Handler{settings: newTestSettings()}
+}
+
+func newHandlerWithUploadFiles() *Handler {
+	return &Handler{settings: newTestSettings()}
+}

@@ -30,7 +30,7 @@ const (
 // @Param        file formData file true "File to upload"
 // @Param        confirmSlug formData string false "The problem slug; required to replace testCases or checker of a published problem that is in an active contest"
 // @Success      200 {object} getProblemResponse
-// @Success      202 {object} map[string]interface{} "Live update of a published problem accepted; it takes effect once validated"
+// @Success      202 {object} judgingUpdateResponse "Live update of a published problem accepted; it takes effect once validated"
 // @Failure      400 {object} apperror.AppError
 // @Failure      401 {object} apperror.AppError
 // @Failure      413 {object} apperror.AppError
@@ -55,7 +55,7 @@ func (h *Handler) UploadFiles(w http.ResponseWriter, r *http.Request) {
 	maxMemory := maxTestCaseBytes + multipartMemoryPaddingBytes
 	err := r.ParseMultipartForm(maxMemory)
 	if err != nil {
-		writeMultipartParseError(r.Context(), w, err)
+		handler.WriteError(r.Context(), w, multipartParseError(err))
 		return
 	}
 
@@ -112,11 +112,11 @@ func (h *Handler) UploadFiles(w http.ResponseWriter, r *http.Request) {
 
 	authorDisplay, _ := h.userProvider.GetDisplay(r.Context(), res.Problem.AuthorID)
 	if res.ValidationID != "" {
-		handler.WriteJSON(r.Context(), w, http.StatusAccepted, map[string]interface{}{
-			"message":          res.Message,
-			"validationId":     res.ValidationID,
-			"affectedContests": toAffectedContestResps(res.AffectedContests),
-			"problem":          buildResponse(res.Problem, authorDisplay),
+		handler.WriteJSON(r.Context(), w, http.StatusAccepted, judgingUpdateResponse{
+			Message:          res.Message,
+			ValidationID:     res.ValidationID,
+			AffectedContests: toAffectedContests(res.AffectedContests),
+			Problem:          buildResponse(res.Problem, authorDisplay),
 		})
 		return
 	}

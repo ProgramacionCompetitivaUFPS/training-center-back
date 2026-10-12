@@ -105,3 +105,11 @@ func NewTooManyRequests(code, message string, retryAfter int) *AppError {
 		RetryAfter: retryAfter,
 	}
 }
+
+func NewPayloadTooLarge(message string) *AppError {
+	return &AppError{
+		Kind:    KindPayloadTooLarge,
+		Code:    ErrCodePayloadTooLarge,
+		Message: message,
+	}
+}

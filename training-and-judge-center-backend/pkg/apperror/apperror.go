@@ -12,6 +12,7 @@ const (
 	KindInternal           Kind = "INTERNAL"
 	KindTooManyRequests    Kind = "TOO_MANY_REQUESTS"
 	KindServiceUnavailable Kind = "SERVICE_UNAVAILABLE"
+	KindPayloadTooLarge    Kind = "PAYLOAD_TOO_LARGE"
 )
 
 type FieldError struct {
