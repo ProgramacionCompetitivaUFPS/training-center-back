@@ -254,6 +254,9 @@ func (uc *UploadProblemFilesUseCase) handleVerifier(
 	}
 
 	cleanName := filepath.Base(input.FileName)
+	if err := validateVerifierExtension(fileType, cleanName); err != nil {
+		return fileAction{}, err
+	}
 	lang, err := uc.getLanguageForFile(cleanName, fileType)
 	if err != nil {
 		return fileAction{}, err

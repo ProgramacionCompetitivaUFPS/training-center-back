@@ -144,3 +144,78 @@ func TestUploadProblemFiles_TestCasesZipSitsInsideTheStoredPrefix(t *testing.T) 
 	}
 	t.Errorf("ZIP key %q not among the uploaded keys %v", want, uploaded)
 }
+
+func newCppPythonJavaSettings() domainProblem.PlatformSettings {
+	s, err := domainProblem.NewPlatformSettings(
+		10000,
+		512,
+		map[string]domainProblem.LanguageLimit{},
+		map[string]struct{}{"cpp": {}, "python": {}, "java": {}},
+		map[string]string{".cpp": "cpp", ".py": "python", ".java": "java"},
+		map[string]struct{}{"dp": {}},
+		4,
+		10,
+		50,
+		100,
+		10,
+	)
+	if err != nil {
+		panic(err)
+	}
+	return s
+}
+
+func TestUploadProblemFiles_VerifierExtensions(t *testing.T) {
+	tests := []struct {
+		name     string
+		fileType string
+		fileName string
+		wantErr  bool
+	}{
+		{"checker cpp", FileTypeChecker, "Checker.cpp", false},
+		{"checker py", FileTypeChecker, "Checker.py", false},
+		{"checker java", FileTypeChecker, "Main.java", true},
+		{"validator cpp", FileTypeValidator, "Validator.cpp", false},
+		{"validator py", FileTypeValidator, "Validator.py", false},
+		{"validator java", FileTypeValidator, "Main.java", true},
+		{"solution java", FileTypeSolution, "Main.java", false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			uploaded := false
+			storage := &mockFileStorage{
+				uploadFileFn: func(_ context.Context, _ string, _ []byte) error {
+					uploaded = true
+					return nil
+				},
+			}
+			uc := NewUploadProblemFilesUseCase(repoWith(newDraftProblem()), &mockValidationRepository{}, storage, nil, newCppPythonJavaSettings())
+
+			_, err := uc.Execute(context.Background(), UploadProblemFilesInput{
+				Slug:        testSlug,
+				FileType:    tt.fileType,
+				FileName:    tt.fileName,
+				FileData:    []byte("code"),
+				CurrentUser: asCoach(authorID),
+			})
+
+			if !tt.wantErr {
+				if err != nil {
+					t.Fatalf("unexpected error: %v", err)
+				}
+				return
+			}
+			var appErr *apperror.AppError
+			if !errors.As(err, &appErr) || appErr.Code != apperror.ErrCodeValidationError {
+				t.Fatalf("expected a validation error, got %v", err)
+			}
+			if len(appErr.Details) != 1 || appErr.Details[0].Field != "file" {
+				t.Errorf("details: got %+v, want a single entry on field \"file\"", appErr.Details)
+			}
+			if uploaded {
+				t.Error("a rejected file must not reach storage")
+			}
+		})
+	}
+}
