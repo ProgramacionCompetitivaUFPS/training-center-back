@@ -348,7 +348,8 @@ func judgingFileFromDB(data []byte) (*domainProblem.JudgingFile, error) {
 }
 
 func (r *Repository) Delete(ctx context.Context, id string) error {
-	tag, err := r.db.Exec(ctx, `DELETE FROM problems WHERE id = $1`, id)
+	q := infraPostgres.GetQuerier(ctx, r.db)
+	tag, err := q.Exec(ctx, `DELETE FROM problems WHERE id = $1`, id)
 	if err != nil {
 		slog.ErrorContext(ctx, "Database error in Delete", "error", err, "problem_id", id)
 		return apperror.NewInternal()

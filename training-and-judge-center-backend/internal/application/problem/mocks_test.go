@@ -432,3 +432,28 @@ func repoWith(p *domainProblem.Problem) *mockProblemRepository {
 		},
 	}
 }
+
+// ── ContestAssociationRemover / TransactionManager mocks ─────────────────────
+
+type mockContestAssociationRemover struct {
+	removedIDs []string
+	err        error
+}
+
+func (m *mockContestAssociationRemover) RemoveProblemFromContests(_ context.Context, problemID string) error {
+	m.removedIDs = append(m.removedIDs, problemID)
+	return m.err
+}
+
+type mockTxManager struct {
+	calls int
+	err   error
+}
+
+func (m *mockTxManager) WithTx(ctx context.Context, fn func(context.Context) error) error {
+	m.calls++
+	if m.err != nil {
+		return m.err
+	}
+	return fn(ctx)
+}
