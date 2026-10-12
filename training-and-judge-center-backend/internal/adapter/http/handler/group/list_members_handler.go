@@ -53,11 +53,12 @@ func (h *Handler) ListMembers(w http.ResponseWriter, r *http.Request) {
 	items := make([]memberListItemResp, 0, len(out.Members))
 	for _, m := range out.Members {
 		items = append(items, memberListItemResp{
-			UserID:   m.UserID,
-			Nickname: m.Nickname,
-			Name:     m.Name,
-			Role:     m.Role,
-			JoinedAt: m.JoinedAt.UTC().Format(time.RFC3339),
+			UserID:     m.UserID,
+			Nickname:   m.Nickname,
+			Name:       m.Name,
+			Role:       m.Role,
+			SystemRole: m.SystemRole,
+			JoinedAt:   m.JoinedAt.UTC().Format(time.RFC3339),
 		})
 	}
 

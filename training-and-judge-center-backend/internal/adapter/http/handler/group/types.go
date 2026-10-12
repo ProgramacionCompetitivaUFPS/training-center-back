@@ -138,11 +138,12 @@ type changeRoleResp struct {
 }
 
 type memberListItemResp struct {
-	UserID   string `json:"userId"`
-	Nickname string `json:"nickname"`
-	Name     string `json:"name"`
-	Role     string `json:"role"`
-	JoinedAt string `json:"joinedAt"`
+	UserID     string `json:"userId"`
+	Nickname   string `json:"nickname"`
+	Name       string `json:"name"`
+	Role       string `json:"role"`
+	SystemRole string `json:"systemRole,omitempty"`
+	JoinedAt   string `json:"joinedAt"`
 }
 
 type listMembersResp struct {
