@@ -1561,6 +1561,12 @@ const docTemplate = `{
                         "description": "Limit (default 50, max 100)",
                         "name": "limit",
                         "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Filter by nickname, team name or team member nickname",
+                        "name": "search",
+                        "in": "query"
                     }
                 ],
                 "responses": {
@@ -2080,6 +2086,71 @@ const docTemplate = `{
                     },
                     "409": {
                         "description": "Conflict",
+                        "schema": {
+                            "$ref": "#/definitions/apperror.AppError"
+                        }
+                    }
+                }
+            }
+        },
+        "/groups/{groupId}/contests/{contestId}/team-registrations/{teamId}/eligibility": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "teams"
+                ],
+                "summary": "Get which team members can be selected for a contest registration",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Group ID",
+                        "name": "groupId",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Contest ID",
+                        "name": "contestId",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Team ID",
+                        "name": "teamId",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/team.teamRegistrationEligibilityResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/apperror.AppError"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/apperror.AppError"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
                         "schema": {
                             "$ref": "#/definitions/apperror.AppError"
                         }
@@ -6271,6 +6342,9 @@ const docTemplate = `{
                 "participantCount": {
                     "type": "integer"
                 },
+                "participationMode": {
+                    "type": "string"
+                },
                 "penalty": {
                     "type": "integer"
                 },
@@ -6439,6 +6513,9 @@ const docTemplate = `{
                 "participantCount": {
                     "type": "integer"
                 },
+                "participationMode": {
+                    "type": "string"
+                },
                 "penalty": {
                     "type": "integer"
                 },
@@ -6456,6 +6533,12 @@ const docTemplate = `{
                 },
                 "status": {
                     "type": "string"
+                },
+                "teamSizeMax": {
+                    "type": "integer"
+                },
+                "teamSizeMin": {
+                    "type": "integer"
                 },
                 "updatedAt": {
                     "type": "string"
@@ -6591,6 +6674,9 @@ const docTemplate = `{
                 "participantCount": {
                     "type": "integer"
                 },
+                "participationMode": {
+                    "type": "string"
+                },
                 "penalty": {
                     "type": "integer"
                 },
@@ -6701,10 +6787,22 @@ const docTemplate = `{
         "contest.registrationItem": {
             "type": "object",
             "properties": {
+                "members": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
                 "nickname": {
                     "type": "string"
                 },
                 "registeredAt": {
+                    "type": "string"
+                },
+                "teamName": {
+                    "type": "string"
+                },
+                "type": {
                     "type": "string"
                 }
             }
@@ -7574,6 +7672,9 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "role": {
+                    "type": "string"
+                },
+                "systemRole": {
                     "type": "string"
                 },
                 "userId": {
@@ -9075,6 +9176,24 @@ const docTemplate = `{
                 }
             }
         },
+        "team.memberEligibilityResponse": {
+            "type": "object",
+            "properties": {
+                "eligible": {
+                    "type": "boolean"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "nickname": {
+                    "type": "string"
+                },
+                "reason": {
+                    "description": "Reason is the error code registration would fail with for this member:\nMEMBER_NOT_IN_GROUP, MEMBER_ALREADY_REGISTERED or MEMBER_IN_ANOTHER_TEAM.\nOmitted when the member is eligible.",
+                    "type": "string"
+                }
+            }
+        },
         "team.myTeamItem": {
             "type": "object",
             "properties": {
@@ -9190,6 +9309,20 @@ const docTemplate = `{
                 },
                 "name": {
                     "type": "string"
+                }
+            }
+        },
+        "team.teamRegistrationEligibilityResponse": {
+            "type": "object",
+            "properties": {
+                "members": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/team.memberEligibilityResponse"
+                    }
+                },
+                "teamAlreadyRegistered": {
+                    "type": "boolean"
                 }
             }
         },
