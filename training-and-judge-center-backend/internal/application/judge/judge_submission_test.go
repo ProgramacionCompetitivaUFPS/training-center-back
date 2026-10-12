@@ -341,6 +341,7 @@ func TestJudgeSubmission_TxError_ReturnsError(t *testing.T) {
 		txManager:            &mockFailingTxManager{fn: func() { txCalled = true }},
 		retry:                RetryConfig{MaxAttempts: 1},
 		sleep:                func(time.Duration) {},
+		now:                  time.Now,
 	}
 
 	if err := uc.Execute(context.Background(), JudgeSubmissionInput{SubmissionID: submissionID}); err == nil {
@@ -860,5 +861,41 @@ func TestJudgeSubmission_WinningTheClaim_Judges(t *testing.T) {
 	_ = uc.Execute(context.Background(), JudgeSubmissionInput{SubmissionID: submissionID})
 	if updater.claims != 1 {
 		t.Errorf("claims = %d, want 1", updater.claims)
+	}
+}
+
+// judged_at must mark when the verdict is reached, not when the worker took the submission.
+func TestJudgeSubmission_JudgedAtIsTheVerdictInstant(t *testing.T) {
+	var judgedAt *time.Time
+	uc := newJudgeSubmissionUseCase(
+		&mockSubmissionUpdater{
+			updateFn: func(_ context.Context, s *submission.Submission) error {
+				judgedAt = s.JudgedAt()
+				return nil
+			},
+		},
+		&mockSourceCodeDownloader{},
+		&mockProblemProvider{},
+		&mockTestCaseProvider{},
+		&mockExecutor{},
+		&mockOutputChecker{},
+	)
+	start := time.Date(2026, 1, 1, 12, 0, 0, 0, time.UTC)
+	calls := 0
+	uc.now = func() time.Time {
+		calls++
+		return start.Add(time.Duration(calls) * time.Minute)
+	}
+
+	if err := uc.Execute(context.Background(), JudgeSubmissionInput{SubmissionID: submissionID}); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if judgedAt == nil {
+		t.Fatal("judgedAt: got nil, want the verdict instant")
+	}
+	// The first reading is the moment the worker took the submission.
+	took := start.Add(time.Minute)
+	if !judgedAt.After(took) {
+		t.Errorf("judgedAt = %v, want after the instant the submission was taken (%v)", judgedAt, took)
 	}
 }
