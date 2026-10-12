@@ -59,7 +59,7 @@ type getProblemResponse struct {
 	Author                  authorResp         `json:"author"`
 	Modifiers               []modifierResp     `json:"modifiers,omitempty"`
 	Files                   *filesResp         `json:"files,omitempty"`
-	Samples                 []sampleResp       `json:"samples,omitempty"`
+	Samples                 []sampleResp       `json:"samples"`
 	CreatedAt               string             `json:"createdAt"`
 	UpdatedAt               string             `json:"updatedAt"`
 	ProblemJudgingUpdatedAt *string            `json:"problemJudgingUpdatedAt"`
