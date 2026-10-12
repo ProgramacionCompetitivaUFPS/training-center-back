@@ -65,16 +65,21 @@ func TestRestoreJudgingFile_PreservesFields(t *testing.T) {
 
 func TestNewVerifierFile(t *testing.T) {
 	tests := []struct {
-		name    string
-		lang    string
-		wantErr bool
+		name     string
+		filename string
+		lang     string
+		wantErr  bool
 	}{
-		{"valid language returns file", "cpp20", false},
-		{"empty language returns error", "", true},
+		{"valid language returns file", "checker.cpp", "cpp20", false},
+		{"empty language returns error", "checker.cpp", "", true},
+		{"python is allowed", "checker.py", "python310", false},
+		{"extension is case-insensitive", "Checker.CPP", "cpp20", false},
+		{"java is not allowed", "Main.java", "java17", true},
+		{"no extension is not allowed", "checker", "cpp20", true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			_, err := problem.NewVerifierFile("checker.cpp", "file-key", tt.lang)
+			_, err := problem.NewVerifierFile(tt.filename, "file-key", tt.lang)
 			if tt.wantErr && err == nil {
 				t.Error("expected error, got nil")
 				return

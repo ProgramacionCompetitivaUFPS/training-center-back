@@ -197,7 +197,7 @@ func (m *mockValidationQueue) Publish(ctx context.Context, msg ValidationQueueMe
 // ── JudgingPreparer mock ─────────────────────────────────────────────────────
 
 type mockJudgingPreparer struct {
-	prepareFn func(ctx context.Context, problemID, slug string) (*JudgingPreparationResult, error)
+	prepareFn  func(ctx context.Context, problemID, slug string) (*JudgingPreparationResult, error)
 	candidates []*JudgingCandidate
 }
 
@@ -464,20 +464,40 @@ func (m *mockTxManager) WithTx(ctx context.Context, fn func(context.Context) err
 
 // ── AffectedContestsProvider / StagedFileCleaner mocks ───────────────────────
 
-type mockAffectedContests struct {
+type mockAffectedContestsProvider struct {
 	contests []ContestRef
 	err      error
 }
 
-func (m *mockAffectedContests) ListOpenContestsOfProblem(_ context.Context, _ string) ([]ContestRef, error) {
+func (m *mockAffectedContestsProvider) ListOpenContestsOfProblem(_ context.Context, _ string) ([]ContestRef, error) {
 	return m.contests, m.err
 }
 
-type mockStagedFiles struct {
+type mockStagedFileCleaner struct {
 	deletedPrefixes []string
 }
 
-func (m *mockStagedFiles) DeleteFilesWithPrefix(_ context.Context, prefix string) error {
+func (m *mockStagedFileCleaner) DeleteFilesWithPrefix(_ context.Context, prefix string) error {
 	m.deletedPrefixes = append(m.deletedPrefixes, prefix)
 	return nil
+}
+
+func newCppPythonJavaSettings() domainProblem.PlatformSettings {
+	s, err := domainProblem.NewPlatformSettings(
+		10000,
+		512,
+		map[string]domainProblem.LanguageLimit{},
+		map[string]struct{}{"cpp": {}, "python": {}, "java": {}},
+		map[string]string{".cpp": "cpp", ".py": "python", ".java": "java"},
+		map[string]struct{}{"dp": {}},
+		4,
+		10,
+		50,
+		100,
+		10,
+	)
+	if err != nil {
+		panic(err)
+	}
+	return s
 }
