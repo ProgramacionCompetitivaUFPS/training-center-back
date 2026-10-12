@@ -210,7 +210,7 @@ func (r *Repository) ExistsByHashAndUserAndProblem(ctx context.Context, fileHash
 
 const selectCols = `
 	SELECT id, problem_id, user_id, contest_id, standing_id,
-	       language, compiler, status, visibility, source_code_path,
+	       language, COALESCE(compiler, ''), status, visibility, source_code_path,
 	       file_hash, file_size, submitted_at,
 	       judged_at, time_ms, memory_kb, compile_log,
 	       COALESCE(problem_title, ''), COALESCE(problem_slug, '')
