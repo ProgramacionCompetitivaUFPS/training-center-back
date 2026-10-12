@@ -244,7 +244,7 @@ func toFailedInputResps(inputs []appProblem.FailedInput) []failedInputResp {
 	return out
 }
 
-type affectedContestResp struct {
+type affectedContest struct {
 	ID        string    `json:"id"`
 	Name      string    `json:"name"`
 	GroupID   string    `json:"groupId"`
@@ -252,10 +252,17 @@ type affectedContestResp struct {
 	EndTime   time.Time `json:"endTime"`
 }
 
-func toAffectedContestResps(contests []appProblem.ContestRef) []affectedContestResp {
-	out := make([]affectedContestResp, 0, len(contests))
+func toAffectedContests(contests []appProblem.ContestRef) []affectedContest {
+	out := make([]affectedContest, 0, len(contests))
 	for _, c := range contests {
-		out = append(out, affectedContestResp{ID: c.ID, Name: c.Name, GroupID: c.GroupID, StartTime: c.StartTime, EndTime: c.EndTime})
+		out = append(out, affectedContest{ID: c.ID, Name: c.Name, GroupID: c.GroupID, StartTime: c.StartTime, EndTime: c.EndTime})
 	}
 	return out
+}
+
+type judgingUpdateResponse struct {
+	Message          string             `json:"message"`
+	ValidationID     string             `json:"validationId"`
+	AffectedContests []affectedContest  `json:"affectedContests"`
+	Problem          getProblemResponse `json:"problem"`
 }

@@ -36,7 +36,7 @@ func (h *Handler) Import(w http.ResponseWriter, r *http.Request) {
 
 	maxUploadBytes := int64(h.settings.MaxFileSizeTestCaseMB()) << 20
 	if err := r.ParseMultipartForm(maxUploadBytes); err != nil {
-		writeMultipartParseError(r.Context(), w, err)
+		handler.WriteError(r.Context(), w, multipartParseError(err))
 		return
 	}
 

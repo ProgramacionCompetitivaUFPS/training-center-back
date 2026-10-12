@@ -1,25 +1,19 @@
 package problem
 
 import (
-	"context"
 	"errors"
 	"net/http"
 
-	"github.com/training-judge-center/backend/internal/adapter/http/handler"
 	"github.com/training-judge-center/backend/pkg/apperror"
 )
 
 // 413 only when the body outgrew its cap; anything else is a malformed request.
-func writeMultipartParseError(ctx context.Context, w http.ResponseWriter, err error) {
+func multipartParseError(err error) *apperror.AppError {
 	var tooLarge *http.MaxBytesError
 	if errors.As(err, &tooLarge) {
-		handler.WriteJSON(ctx, w, http.StatusRequestEntityTooLarge, apperror.AppError{
-			Code:    apperror.ErrCodePayloadTooLarge,
-			Message: "File exceeds maximum allowed size",
-		})
-		return
+		return apperror.NewPayloadTooLarge("File exceeds maximum allowed size")
 	}
-	handler.WriteError(ctx, w, apperror.NewValidation([]apperror.FieldError{
+	return apperror.NewValidation([]apperror.FieldError{
 		{Field: "file", Message: "Request body must be multipart/form-data"},
-	}))
+	})
 }

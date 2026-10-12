@@ -4188,8 +4188,7 @@ const docTemplate = `{
                     "202": {
                         "description": "Live update of a published problem accepted; it takes effect once validated",
                         "schema": {
-                            "type": "object",
-                            "additionalProperties": true
+                            "$ref": "#/definitions/problem.judgingUpdateResponse"
                         }
                     },
                     "400": {
@@ -7994,6 +7993,26 @@ const docTemplate = `{
                 }
             }
         },
+        "problem.affectedContest": {
+            "type": "object",
+            "properties": {
+                "endTime": {
+                    "type": "string"
+                },
+                "groupId": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "startTime": {
+                    "type": "string"
+                }
+            }
+        },
         "problem.authorResp": {
             "type": "object",
             "properties": {
@@ -8202,6 +8221,26 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "updatedAt": {
+                    "type": "string"
+                }
+            }
+        },
+        "problem.judgingUpdateResponse": {
+            "type": "object",
+            "properties": {
+                "affectedContests": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/problem.affectedContest"
+                    }
+                },
+                "message": {
+                    "type": "string"
+                },
+                "problem": {
+                    "$ref": "#/definitions/problem.getProblemResponse"
+                },
+                "validationId": {
                     "type": "string"
                 }
             }
