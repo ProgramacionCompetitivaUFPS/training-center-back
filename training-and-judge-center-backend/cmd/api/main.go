@@ -387,7 +387,7 @@ func main() {
 		contestRepo, contestRegistrationRepo,
 	)
 	listContestRegistrationsUseCase := appcontest.NewListContestRegistrationsUseCase(
-		contestRepo, contestRegistrationRepo, contestTeamParticipationRepo, contestMemberProvider, contestNicknameProvider, contestTeamDisplayProvider,
+		contestRepo, contestRegistrationRepo, contestTeamParticipationRepo, contestGroupProvider, contestMemberProvider, contestNicknameProvider, contestTeamDisplayProvider,
 	)
 	getStandingsUseCase := appcontest.NewGetStandingsUseCase(
 		contestRepo, contestRegistrationRepo, contestSubmissionProvider,
@@ -399,8 +399,7 @@ func main() {
 	)
 	listContestSubmissionsUseCase := appcontest.NewListContestSubmissionsUseCase(
 		contestRepo, contestGroupProvider, contestMemberProvider,
-		contestParticipantProvider, contestSubmissionsProvider,
-		contestCallerStandingProvider,
+		contestSubmissionsProvider, contestCallerStandingProvider,
 	)
 	deleteContestUseCase := appcontest.NewDeleteContestUseCase(
 		contestRepo, contestMemberProvider, contestStandingsCache,

@@ -29,6 +29,7 @@ type RichSubmissionData struct {
 	JudgedAt            *time.Time
 	TimeMs              *int
 	MemoryKb            *int
+	Visibility          string // "PRIVATE" | "PUBLIC"
 }
 
 type ContestSubmissionProvider interface {

@@ -44,6 +44,7 @@ type ListContestRegistrationsUseCase struct {
 	repo                domainContest.Repository
 	registrationRepo    domainContest.RegistrationRepository
 	teamParticipRepo    domainContest.TeamParticipationRepository
+	groupProvider       GroupProvider
 	memberProvider      GroupMemberProvider
 	nicknameProvider    ParticipantNicknameProvider
 	teamDisplayProvider TeamDisplayProvider
@@ -53,6 +54,7 @@ func NewListContestRegistrationsUseCase(
 	repo domainContest.Repository,
 	registrationRepo domainContest.RegistrationRepository,
 	teamParticipRepo domainContest.TeamParticipationRepository,
+	groupProvider GroupProvider,
 	memberProvider GroupMemberProvider,
 	nicknameProvider ParticipantNicknameProvider,
 	teamDisplayProvider TeamDisplayProvider,
@@ -61,6 +63,7 @@ func NewListContestRegistrationsUseCase(
 		repo:                repo,
 		registrationRepo:    registrationRepo,
 		teamParticipRepo:    teamParticipRepo,
+		groupProvider:       groupProvider,
 		memberProvider:      memberProvider,
 		nicknameProvider:    nicknameProvider,
 		teamDisplayProvider: teamDisplayProvider,
@@ -76,12 +79,20 @@ func (uc *ListContestRegistrationsUseCase) Execute(ctx context.Context, in ListC
 		return nil, apperror.NewNotFound(domainContest.ErrCodeContestNotFound, "contest not found")
 	}
 
-	role, err := uc.memberProvider.GetMemberRole(ctx, in.CurrentUser.ID, in.GroupID)
+	// Whoever can see the contest can see who is in it: anyone for a visible
+	// group, only members (or Admin) for a hidden one.
+	group, err := uc.groupProvider.FindByID(ctx, in.GroupID)
 	if err != nil {
 		return nil, err
 	}
-	if role == nil && !in.CurrentUser.IsAdmin() {
-		return nil, apperror.NewForbidden(ErrCodeNotGroupMember, "only group members can view contest registrations")
+	if !group.IsVisible && !in.CurrentUser.IsAdmin() {
+		role, err := uc.memberProvider.GetMemberRole(ctx, in.CurrentUser.ID, in.GroupID)
+		if err != nil {
+			return nil, err
+		}
+		if role == nil {
+			return nil, apperror.NewNotFound(domainContest.ErrCodeContestNotFound, "contest not found")
+		}
 	}
 
 	regs, _, err := uc.registrationRepo.ListByContest(ctx, in.ContestID, 1, maxStandingsParticipants)

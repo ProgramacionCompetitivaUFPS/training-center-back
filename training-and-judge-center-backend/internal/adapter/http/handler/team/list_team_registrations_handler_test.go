@@ -50,7 +50,7 @@ func TestListTeamRegistrations_UnauthenticatedReturns401(t *testing.T) {
 	}
 }
 
-func TestListTeamRegistrations_NotGroupMemberReturns403(t *testing.T) {
+func TestListTeamRegistrations_HiddenGroupNonMemberReturns404(t *testing.T) {
 	groupChecker := &mockGroupChecker{
 		fn: func(_ string, _ []string) (map[string]bool, error) {
 			return map[string]bool{"u1": false}, nil
@@ -63,15 +63,15 @@ func TestListTeamRegistrations_NotGroupMemberReturns403(t *testing.T) {
 	w := httptest.NewRecorder()
 	r := listRegistrationsRequest("g1", "c1")
 	wrapAuth(http.HandlerFunc(h.ListTeamRegistrations)).ServeHTTP(w, r)
-	if w.Code != http.StatusForbidden {
-		t.Fatalf("expected 403, got %d\nbody: %s", w.Code, w.Body.String())
+	if w.Code != http.StatusNotFound {
+		t.Fatalf("expected 404, got %d\nbody: %s", w.Code, w.Body.String())
 	}
 	var body apperror.AppError
 	if err := json.NewDecoder(w.Body).Decode(&body); err != nil {
 		t.Fatalf("decode error: %v", err)
 	}
-	if body.Code != appTeam.ErrCodeMemberNotInGroup {
-		t.Errorf("expected %s, got %s", appTeam.ErrCodeMemberNotInGroup, body.Code)
+	if body.Code != appTeam.ErrCodeContestNotFound {
+		t.Errorf("expected %s, got %s", appTeam.ErrCodeContestNotFound, body.Code)
 	}
 }
 

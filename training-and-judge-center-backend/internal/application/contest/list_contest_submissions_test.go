@@ -15,29 +15,15 @@ func newListSubmissionsUseCase(
 	contest *domainContest.Contest,
 	group *GroupInfo,
 	memberProvider *mockGroupMemberProvider,
-	participantProvider *mockContestParticipantProvider,
 	subsProvider *mockContestSubmissionsProvider,
 ) *ListContestSubmissionsUseCase {
 	return NewListContestSubmissionsUseCase(
 		repoWith(contest),
 		&mockGroupProvider{findByIDFn: func(_ context.Context, _ string) (*GroupInfo, error) { return group, nil }},
 		memberProvider,
-		participantProvider,
 		subsProvider,
 		&mockCallerStandingProvider{},
 	)
-}
-
-func registeredParticipant() *mockContestParticipantProvider {
-	return &mockContestParticipantProvider{
-		isRegisteredFn: func(_ context.Context, _, _ string) (bool, error) { return true, nil },
-	}
-}
-
-func notRegisteredParticipant() *mockContestParticipantProvider {
-	return &mockContestParticipantProvider{
-		isRegisteredFn: func(_ context.Context, _, _ string) (bool, error) { return false, nil },
-	}
 }
 
 func frozenActiveContest() *domainContest.Contest {
@@ -130,17 +116,59 @@ func baseInput() ListContestSubmissionsInput {
 
 // ── tests ─────────────────────────────────────────────────────────────────────
 
-func TestListContestSubmissions_NotRegistered_Returns403(t *testing.T) {
-	uc := newListSubmissionsUseCase(activeContest(), visibleGroup(), isMemberNotLead(), notRegisteredParticipant(), subsProvider(nil))
+func TestListContestSubmissions_VisibleGroupSpectator_CanList(t *testing.T) {
+	uc := newListSubmissionsUseCase(finishedContest(), visibleGroup(), notLead(), subsProvider([]RichSubmissionData{
+		richSub("s1", otherID, "ACCEPTED", 5),
+	}))
 
-	_, err := uc.Execute(context.Background(), baseInput())
-	if err == nil {
-		t.Fatal("expected 403 error, got nil")
+	out, err := uc.Execute(context.Background(), baseInput())
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(out.Submissions) != 1 {
+		t.Errorf("len(submissions)=%d, want 1", len(out.Submissions))
+	}
+}
+
+func TestListContestSubmissions_CanViewDetail(t *testing.T) {
+	publicSub := richSub("public", otherID, "ACCEPTED", 5)
+	publicSub.Visibility = "PUBLIC"
+	privateSub := richSub("private", otherID, "ACCEPTED", 6)
+	privateSub.Visibility = "PRIVATE"
+	ownSub := richSub("own", callerID, "ACCEPTED", 7)
+	ownSub.Visibility = "PRIVATE"
+	uc := newListSubmissionsUseCase(finishedContest(), visibleGroup(), notLead(), subsProvider([]RichSubmissionData{
+		publicSub, privateSub, ownSub,
+	}))
+
+	out, err := uc.Execute(context.Background(), baseInput())
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	want := map[string]bool{"public": true, "private": false, "own": true}
+	for _, s := range out.Submissions {
+		if s.CanViewDetail != want[s.ID] {
+			t.Errorf("%s: CanViewDetail=%v, want %v", s.ID, s.CanViewDetail, want[s.ID])
+		}
+	}
+}
+
+func TestListContestSubmissions_Lead_CanViewEveryDetail(t *testing.T) {
+	privateSub := richSub("private", otherID, "ACCEPTED", 5)
+	privateSub.Visibility = "PRIVATE"
+	uc := newListSubmissionsUseCase(finishedContest(), visibleGroup(), isLead(), subsProvider([]RichSubmissionData{privateSub}))
+
+	out, err := uc.Execute(context.Background(), baseInput())
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !out.Submissions[0].CanViewDetail {
+		t.Error("lead should be able to open any submission")
 	}
 }
 
 func TestListContestSubmissions_HiddenGroupNonMember_Returns404(t *testing.T) {
-	uc := newListSubmissionsUseCase(activeContest(), hiddenGroup(), notLead(), registeredParticipant(), subsProvider(nil))
+	uc := newListSubmissionsUseCase(activeContest(), hiddenGroup(), notLead(), subsProvider(nil))
 
 	_, err := uc.Execute(context.Background(), baseInput())
 	if err == nil {
@@ -157,7 +185,7 @@ func TestListContestSubmissions_ActiveContest_NoExecutionDetails(t *testing.T) {
 	sub.TimeMs = &timeMs
 	sub.MemoryKb = &memKb
 
-	uc := newListSubmissionsUseCase(activeContest(), visibleGroup(), isMemberNotLead(), registeredParticipant(), subsProvider([]RichSubmissionData{sub}))
+	uc := newListSubmissionsUseCase(activeContest(), visibleGroup(), isMemberNotLead(), subsProvider([]RichSubmissionData{sub}))
 
 	out, err := uc.Execute(context.Background(), baseInput())
 	if err != nil {
@@ -191,7 +219,7 @@ func TestListContestSubmissions_FinishedContest_ReturnsFullDetails(t *testing.T)
 	sub.TimeMs = &timeMs
 	sub.MemoryKb = &memKb
 
-	uc := newListSubmissionsUseCase(finishedContest(), visibleGroup(), isMemberNotLead(), registeredParticipant(), subsProvider([]RichSubmissionData{sub}))
+	uc := newListSubmissionsUseCase(finishedContest(), visibleGroup(), isMemberNotLead(), subsProvider([]RichSubmissionData{sub}))
 
 	out, err := uc.Execute(context.Background(), baseInput())
 	if err != nil {
@@ -215,7 +243,7 @@ func TestListContestSubmissions_FreezePeriod_OwnSubmissionsAlwaysVisible(t *test
 	postFreeze := time.Now().Add(-20 * time.Minute)
 	ownSub := richSubWithTime("s1", callerID, "ACCEPTED", postFreeze)
 
-	uc := newListSubmissionsUseCase(frozenActiveContest(), visibleGroup(), isMemberNotLead(), registeredParticipant(), subsProvider([]RichSubmissionData{ownSub}))
+	uc := newListSubmissionsUseCase(frozenActiveContest(), visibleGroup(), isMemberNotLead(), subsProvider([]RichSubmissionData{ownSub}))
 
 	out, err := uc.Execute(context.Background(), baseInput())
 	if err != nil {
@@ -234,7 +262,7 @@ func TestListContestSubmissions_FreezePeriod_OthersPostFreezeHidden(t *testing.T
 	preFreeze := time.Now().Add(-45 * time.Minute)
 	otherPreSub := richSubWithTime("s1", otherID, "WRONG_ANSWER", preFreeze)
 
-	uc := newListSubmissionsUseCase(frozenActiveContest(), visibleGroup(), isMemberNotLead(), registeredParticipant(), subsProvider([]RichSubmissionData{otherSub, otherPreSub}))
+	uc := newListSubmissionsUseCase(frozenActiveContest(), visibleGroup(), isMemberNotLead(), subsProvider([]RichSubmissionData{otherSub, otherPreSub}))
 
 	out, err := uc.Execute(context.Background(), baseInput())
 	if err != nil {
@@ -252,7 +280,7 @@ func TestListContestSubmissions_Lead_SeesAllDuringFreeze(t *testing.T) {
 	postFreeze := time.Now().Add(-20 * time.Minute)
 	otherSub := richSubWithTime("s1", otherID, "ACCEPTED", postFreeze)
 
-	uc := newListSubmissionsUseCase(frozenActiveContest(), visibleGroup(), isLead(), registeredParticipant(), subsProvider([]RichSubmissionData{otherSub}))
+	uc := newListSubmissionsUseCase(frozenActiveContest(), visibleGroup(), isLead(), subsProvider([]RichSubmissionData{otherSub}))
 
 	input := baseInput()
 	input.CurrentUser = asCoach(callerID)
@@ -277,7 +305,7 @@ func TestListContestSubmissions_PhaseFilter_Competition(t *testing.T) {
 		richSubWithTime("s2", callerID, "WRONG_ANSWER", postCompetition),
 	}
 
-	uc := newListSubmissionsUseCase(finishedContest(), visibleGroup(), isMemberNotLead(), registeredParticipant(), subsProvider(subs))
+	uc := newListSubmissionsUseCase(finishedContest(), visibleGroup(), isMemberNotLead(), subsProvider(subs))
 
 	input := baseInput()
 	input.Phase = "competition"
@@ -300,7 +328,7 @@ func TestListContestSubmissions_Pagination(t *testing.T) {
 		subs[i] = richSub("s"+string(rune('1'+i)), callerID, "ACCEPTED", 10*(i+1))
 	}
 
-	uc := newListSubmissionsUseCase(activeContest(), visibleGroup(), isMemberNotLead(), registeredParticipant(), subsProvider(subs))
+	uc := newListSubmissionsUseCase(activeContest(), visibleGroup(), isMemberNotLead(), subsProvider(subs))
 
 	input := baseInput()
 	input.Page = 2
@@ -319,7 +347,7 @@ func TestListContestSubmissions_Pagination(t *testing.T) {
 }
 
 func TestListContestSubmissions_Meta_ContestContext(t *testing.T) {
-	uc := newListSubmissionsUseCase(frozenActiveContest(), visibleGroup(), isMemberNotLead(), registeredParticipant(), subsProvider(nil))
+	uc := newListSubmissionsUseCase(frozenActiveContest(), visibleGroup(), isMemberNotLead(), subsProvider(nil))
 
 	out, err := uc.Execute(context.Background(), baseInput())
 	if err != nil {
@@ -342,7 +370,7 @@ func TestListContestSubmissions_TeamSubmission_ShowsTeamInfo(t *testing.T) {
 	members := []string{"alice", "bob", "carol"}
 	sub := teamSub("s1", callerID, teamID, teamName, "ACCEPTED", time.Now().Add(-30*time.Minute), members)
 
-	uc := newListSubmissionsUseCase(activeContest(), visibleGroup(), isMemberNotLead(), registeredParticipant(), subsProvider([]RichSubmissionData{sub}))
+	uc := newListSubmissionsUseCase(activeContest(), visibleGroup(), isMemberNotLead(), subsProvider([]RichSubmissionData{sub}))
 
 	out, err := uc.Execute(context.Background(), baseInput())
 	if err != nil {
@@ -389,7 +417,7 @@ func TestListContestSubmissions_TeamSubmission_ShowsMembersWhenEnabled(t *testin
 		testNow, nil,
 	)
 
-	uc := newListSubmissionsUseCase(contest, visibleGroup(), isMemberNotLead(), registeredParticipant(), subsProvider([]RichSubmissionData{sub}))
+	uc := newListSubmissionsUseCase(contest, visibleGroup(), isMemberNotLead(), subsProvider([]RichSubmissionData{sub}))
 
 	out, err := uc.Execute(context.Background(), baseInput())
 	if err != nil {
@@ -420,7 +448,6 @@ func TestListContestSubmissions_FreezePeriod_TeamOwnSubmissionsAlwaysVisible(t *
 		repoWith(frozenActiveContest()),
 		&mockGroupProvider{findByIDFn: func(_ context.Context, _ string) (*GroupInfo, error) { return visibleGroup(), nil }},
 		isMemberNotLead(),
-		registeredParticipant(),
 		subsProvider([]RichSubmissionData{sub}),
 		standingProvider,
 	)

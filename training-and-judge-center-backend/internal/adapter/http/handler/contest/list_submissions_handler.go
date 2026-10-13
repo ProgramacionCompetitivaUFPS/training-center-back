@@ -113,6 +113,8 @@ func toListSubmissionsResponse(out *appContest.ListContestSubmissionsOutput) lis
 			TimeMs:      s.TimeMs,
 			MemoryKb:    s.MemoryKb,
 			Phase:       s.Phase,
+
+			CanViewDetail: s.CanViewDetail,
 		}
 		if s.JudgedAt != nil {
 			v := s.JudgedAt.UTC().Format(time.RFC3339)

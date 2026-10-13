@@ -79,7 +79,8 @@ func (p *ContestSubmissionProvider) ListByContest(
 			s.submitted_at,
 			s.judged_at,
 			s.time_ms,
-			s.memory_kb
+			s.memory_kb,
+			s.visibility
 		FROM submissions s
 		JOIN problems p ON p.id = s.problem_id
 		JOIN users u ON u.id = s.user_id
@@ -127,6 +128,7 @@ func (p *ContestSubmissionProvider) ListByContest(
 			&judgedAt,
 			&timeMs,
 			&memKb,
+			&d.Visibility,
 		); err != nil {
 			slog.ErrorContext(ctx, "failed to scan contest submission row", "error", err)
 			return nil, apperror.NewInternal()
