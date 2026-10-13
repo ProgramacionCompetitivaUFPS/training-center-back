@@ -32,31 +32,6 @@ func (m *mockSubmissionsContestRepo) ListByGroupIDs(_ context.Context, _ []strin
 	return nil, 0, nil
 }
 
-// ── participant provider always registered ────────────────────────────────────
-
-type mockParticipantRegistered struct{}
-
-func (m *mockParticipantRegistered) IsRegistered(_ context.Context, _, _ string) (bool, error) {
-	return true, nil
-}
-func (m *mockParticipantRegistered) CountParticipants(_ context.Context, _ string) (int, error) {
-	return 0, nil
-}
-func (m *mockParticipantRegistered) CountParticipantsBulk(_ context.Context, contestIDs []string) (map[string]int, error) {
-	result := make(map[string]int, len(contestIDs))
-	for _, id := range contestIDs {
-		result[id] = 0
-	}
-	return result, nil
-}
-func (m *mockParticipantRegistered) IsRegisteredBulk(_ context.Context, contestIDs []string, _ string) (map[string]bool, error) {
-	result := make(map[string]bool, len(contestIDs))
-	for _, id := range contestIDs {
-		result[id] = true
-	}
-	return result, nil
-}
-
 // ── helpers ───────────────────────────────────────────────────────────────────
 
 func activeContestForSubmissions() *domainContest.Contest {
@@ -85,7 +60,6 @@ func defaultListSubmissionsUC(subs []appcontest.RichSubmissionData) *appcontest.
 		&mockSubmissionsContestRepo{contest: activeContestForSubmissions()},
 		&mockGroupProvider{},
 		&mockMemberProvider{isLead: true, isMember: true},
-		&mockParticipantRegistered{},
 		&mockContestSubmissionsProvider{subs: subs},
 		&mockCallerStandingProvider{},
 	)

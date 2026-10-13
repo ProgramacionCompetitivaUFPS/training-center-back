@@ -6,7 +6,6 @@ import (
 
 	appShared "github.com/training-judge-center/backend/internal/application/shared"
 	domainContest "github.com/training-judge-center/backend/internal/domain/contest"
-	domainShared "github.com/training-judge-center/backend/internal/domain/shared"
 	domainTeam "github.com/training-judge-center/backend/internal/domain/team"
 	"github.com/training-judge-center/backend/pkg/apperror"
 )
@@ -58,17 +57,6 @@ func NewListTeamRegistrationsUseCase(
 }
 
 func (uc *ListTeamRegistrationsUseCase) Execute(ctx context.Context, in ListTeamRegistrationsInput) (*ListTeamRegistrationsOutput, error) {
-	requesterID := domainShared.RestoreUserID(in.CurrentUser.ID)
-
-	// Must be a member of the contest's group.
-	membership, err := uc.groupChecker.AreUsersGroupMembers(ctx, in.GroupID, []string{requesterID.Value()})
-	if err != nil {
-		return nil, err
-	}
-	if !membership[requesterID.Value()] && !in.CurrentUser.IsAdmin() {
-		return nil, apperror.NewForbidden(ErrCodeMemberNotInGroup, "you are not a member of this group")
-	}
-
 	// Contest must belong to the given group.
 	contest, err := uc.contestProvider.GetContestInfo(ctx, in.ContestID)
 	if err != nil {
@@ -76,6 +64,19 @@ func (uc *ListTeamRegistrationsUseCase) Execute(ctx context.Context, in ListTeam
 	}
 	if contest.GroupID != in.GroupID {
 		return nil, apperror.NewNotFound(ErrCodeContestNotFound, "contest not found")
+	}
+
+	// Whoever can see the contest can see its teams: anyone for a visible
+	// group, only members (or Admin) for a hidden one.
+	if !contest.GroupIsVisible && !in.CurrentUser.IsAdmin() {
+		requesterID := in.CurrentUser.ID
+		membership, err := uc.groupChecker.AreUsersGroupMembers(ctx, in.GroupID, []string{requesterID})
+		if err != nil {
+			return nil, err
+		}
+		if !membership[requesterID] {
+			return nil, apperror.NewNotFound(ErrCodeContestNotFound, "contest not found")
+		}
 	}
 
 	participations, total, err := uc.teamParticipRepo.List(ctx, in.ContestID, in.Page, in.Limit)

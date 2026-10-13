@@ -308,6 +308,9 @@ type submissionItem struct {
 	TimeMs      *int                `json:"timeMs,omitempty"`
 	MemoryKb    *int                `json:"memoryKb,omitempty"`
 	Phase       *string             `json:"phase,omitempty"`
+
+	// CanViewDetail tells whether the caller may open this submission's detail.
+	CanViewDetail bool `json:"canViewDetail"`
 }
 
 type submissionsContestMeta struct {

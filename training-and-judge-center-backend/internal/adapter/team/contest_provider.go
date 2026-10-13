@@ -25,14 +25,15 @@ func (p *ContestProvider) GetContestInfo(ctx context.Context, contestID string) 
 	q := infraPostgres.GetQuerier(ctx, p.db)
 
 	var groupID, mode string
+	var groupIsVisible bool
 	var sizeMin, sizeMax int
 	var startTime, endTime time.Time
 
 	err := q.QueryRow(ctx,
-		`SELECT group_id, participation_mode, team_size_min, team_size_max, start_time, end_time
-		 FROM contests WHERE id=$1`,
+		`SELECT c.group_id, g.visibility = 'VISIBLE', c.participation_mode, c.team_size_min, c.team_size_max, c.start_time, c.end_time
+		 FROM contests c JOIN groups g ON g.id = c.group_id WHERE c.id=$1`,
 		contestID,
-	).Scan(&groupID, &mode, &sizeMin, &sizeMax, &startTime, &endTime)
+	).Scan(&groupID, &groupIsVisible, &mode, &sizeMin, &sizeMax, &startTime, &endTime)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, apperror.NewNotFound(domainContest.ErrCodeContestNotFound, "contest not found")
@@ -54,6 +55,7 @@ func (p *ContestProvider) GetContestInfo(ctx context.Context, contestID string) 
 	return &appTeam.ContestInfo{
 		ID:                contestID,
 		GroupID:           groupID,
+		GroupIsVisible:    groupIsVisible,
 		ParticipationMode: mode,
 		TeamSizeMin:       sizeMin,
 		TeamSizeMax:       sizeMax,

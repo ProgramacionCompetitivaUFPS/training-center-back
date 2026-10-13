@@ -21,6 +21,7 @@ func defaultListRegistrationsUC() *appcontest.ListContestRegistrationsUseCase {
 		&mockRepoReturning{contest: scheduledContest()},
 		&mockRegistrationRepository{},
 		&mockTeamParticipRepo{},
+		&mockGroupProvider{},
 		&mockMemberProvider{isLead: false, isMember: true},
 		&mockNicknameProvider{},
 		&mockTeamDisplayProvider{},
@@ -52,6 +53,7 @@ func TestListRegistrations_HappyPath_Returns200(t *testing.T) {
 			},
 		},
 		&mockTeamParticipRepo{},
+		&mockGroupProvider{},
 		&mockMemberProvider{isMember: true},
 		&mockNicknameProvider{},
 		&mockTeamDisplayProvider{},
@@ -94,11 +96,12 @@ func TestListRegistrations_HappyPath_Returns200(t *testing.T) {
 	}
 }
 
-func TestListRegistrations_NonMember_Returns403(t *testing.T) {
+func TestListRegistrations_HiddenGroupNonMember_Returns404(t *testing.T) {
 	uc := appcontest.NewListContestRegistrationsUseCase(
 		&mockRepoReturning{contest: scheduledContest()},
 		&mockRegistrationRepository{},
 		&mockTeamParticipRepo{},
+		&mockHiddenGroupProvider{},
 		&mockMemberProvider{isLead: false, isMember: false},
 		&mockNicknameProvider{},
 		&mockTeamDisplayProvider{},
@@ -111,9 +114,16 @@ func TestListRegistrations_NonMember_Returns403(t *testing.T) {
 
 	wrapAuth(http.HandlerFunc(h.ListRegistrations)).ServeHTTP(w, r)
 
-	if w.Code != http.StatusForbidden {
-		t.Fatalf("expected 403, got %d: %s", w.Code, w.Body.String())
+	if w.Code != http.StatusNotFound {
+		t.Fatalf("expected 404, got %d: %s", w.Code, w.Body.String())
 	}
+}
+
+// mockHiddenGroupProvider reports every group as NOT_VISIBLE.
+type mockHiddenGroupProvider struct{ mockGroupProvider }
+
+func (s *mockHiddenGroupProvider) FindByID(_ context.Context, groupID string) (*appcontest.GroupInfo, error) {
+	return &appcontest.GroupInfo{ID: groupID, Name: "Hidden Group", IsVisible: false}, nil
 }
 
 func TestListRegistrations_ContestNotFound_Returns404(t *testing.T) {
@@ -121,6 +131,7 @@ func TestListRegistrations_ContestNotFound_Returns404(t *testing.T) {
 		&mockRepoReturning{contest: nil},
 		&mockRegistrationRepository{},
 		&mockTeamParticipRepo{},
+		&mockGroupProvider{},
 		&mockMemberProvider{isMember: true},
 		&mockNicknameProvider{},
 		&mockTeamDisplayProvider{},

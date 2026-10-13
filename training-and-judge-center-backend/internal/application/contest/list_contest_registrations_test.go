@@ -15,7 +15,7 @@ func newListRegistrationsUseCase(
 	member *mockGroupMemberProvider,
 	nicknames *mockNicknameProvider,
 ) *ListContestRegistrationsUseCase {
-	return NewListContestRegistrationsUseCase(repo, reg, mockTeamParticipRepo(), member, nicknames, &mockTeamDisplayProvider{})
+	return NewListContestRegistrationsUseCase(repo, reg, mockTeamParticipRepo(), groupProviderWith(visibleGroup()), member, nicknames, &mockTeamDisplayProvider{})
 }
 
 func validListRegistrationsInput() ListContestRegistrationsInput {
@@ -75,13 +75,26 @@ func TestListContestRegistrations_ContestNotFound(t *testing.T) {
 	}
 }
 
-func TestListContestRegistrations_NonMember_Returns403(t *testing.T) {
+func TestListContestRegistrations_VisibleGroupNonMemberCanView(t *testing.T) {
 	uc := newListRegistrationsUseCase(repoWith(newTestContest(otherID)), mockRegistrations(), notLead(), mockNicknames())
 
 	_, err := uc.Execute(context.Background(), validListRegistrationsInput())
 
-	if err == nil {
-		t.Fatal("expected 403 for non-member")
+	if err != nil {
+		t.Fatalf("non-member of a visible group should see registrations, got %v", err)
+	}
+}
+
+func TestListContestRegistrations_HiddenGroupNonMember_Returns404(t *testing.T) {
+	uc := NewListContestRegistrationsUseCase(
+		repoWith(newTestContest(otherID)), mockRegistrations(), mockTeamParticipRepo(),
+		groupProviderWith(hiddenGroup()), notLead(), mockNicknames(), &mockTeamDisplayProvider{},
+	)
+
+	_, err := uc.Execute(context.Background(), validListRegistrationsInput())
+
+	if !isNotFound(err) {
+		t.Fatalf("expected not found for non-member of a hidden group, got %v", err)
 	}
 }
 
@@ -152,7 +165,7 @@ func TestListContestRegistrations_TeamCountsAsOneEntryWithMembers(t *testing.T) 
 		},
 	}
 	uc := NewListContestRegistrationsUseCase(
-		repoWith(newTestContest(otherID)), reg, teamRepo, isMemberNotLead(), mockNicknames(), teamDisplays,
+		repoWith(newTestContest(otherID)), reg, teamRepo, groupProviderWith(visibleGroup()), isMemberNotLead(), mockNicknames(), teamDisplays,
 	)
 
 	out, err := uc.Execute(context.Background(), validListRegistrationsInput())
@@ -202,7 +215,7 @@ func TestListContestRegistrations_SearchMatchesNicknameTeamNameAndMembers(t *tes
 		},
 	}
 	uc := NewListContestRegistrationsUseCase(
-		repoWith(newTestContest(otherID)), reg, teamRepo, isMemberNotLead(), mockNicknames(), teamDisplays,
+		repoWith(newTestContest(otherID)), reg, teamRepo, groupProviderWith(visibleGroup()), isMemberNotLead(), mockNicknames(), teamDisplays,
 	)
 
 	cases := []struct {
@@ -227,4 +240,13 @@ func TestListContestRegistrations_SearchMatchesNicknameTeamNameAndMembers(t *tes
 			t.Errorf("search=%q: total=%d len=%d, want %d", tc.search, out.Total, len(out.Registrations), tc.want)
 		}
 	}
+}
+
+func groupProviderWith(g *GroupInfo) *mockGroupProvider {
+	return &mockGroupProvider{findByIDFn: func(_ context.Context, _ string) (*GroupInfo, error) { return g, nil }}
+}
+
+func isNotFound(err error) bool {
+	ae, ok := err.(*apperror.AppError)
+	return ok && ae.Kind == apperror.KindNotFound
 }

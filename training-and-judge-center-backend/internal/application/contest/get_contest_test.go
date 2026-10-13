@@ -187,6 +187,36 @@ func TestGetContest_NonMemberCanAccessVisibleGroup(t *testing.T) {
 	}
 }
 
+func TestGetContest_NonMemberSeesProblemsOnceStarted(t *testing.T) {
+	started := domainContest.RestoreContest(
+		testContestID,
+		domainContest.RestoreContestName("Started Contest"),
+		nil,
+		time.Now().Add(-2*time.Hour),
+		time.Now().Add(-time.Hour),
+		domainContest.RestorePenalty(20),
+		0, false, false, false,
+		shared.RestoreGroupID(testGroupID),
+		shared.RestoreUserID(otherID),
+		domainContest.RestoreParticipationMode("INDIVIDUAL"), domainContest.RestoreTeamSize(2, 5),
+		[]domainContest.ContestProblem{
+			domainContest.RestoreContestProblem("cp-1", testProblemID, 1),
+		},
+		testNow.Add(-time.Hour),
+		nil,
+	)
+	uc := newGetContestUseCase(repoWith(started), groupFound(), notLead(), defaultProblemProvider(), mockParticipants())
+
+	out, err := uc.Execute(context.Background(), validGetInput())
+
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(out.Problems) != 1 {
+		t.Errorf("non-member of a visible group should see problems once started, got %d", len(out.Problems))
+	}
+}
+
 func TestGetContest_DurationInSeconds(t *testing.T) {
 	uc := newGetContestUseCase(repoWith(newTestContest(callerID)), groupFound(), isMemberNotLead(), defaultProblemProvider(), mockParticipants())
 

@@ -118,10 +118,9 @@ func (uc *GetContestUseCase) Execute(ctx context.Context, in GetContestInput) (*
 		return nil, err
 	}
 
-	// isRegistered cubre a quien se inscribió siendo miembro y luego salió del
-	// grupo: la membresía era el requisito para inscribirse, no algo que deba
-	// seguir vigente para no perder acceso a una competencia ya en curso.
-	showProblems := isAdmin || isLead || ((isMember || isRegistered) && status != domainContest.StatusScheduled)
+	// Quien puede ver la competencia ve sus problemas una vez que empieza; antes
+	// sólo Lead y Admin, para no filtrar los enunciados.
+	showProblems := isAdmin || isLead || status != domainContest.StatusScheduled
 
 	problemDisplays := []ProblemDetailDisplay{}
 	if showProblems && len(c.Problems()) > 0 {
