@@ -109,7 +109,8 @@ func (r *InvitationRepository) FindByGroup(ctx context.Context, groupID string, 
 
 	var total int
 	countQ := `SELECT COUNT(*) FROM group_invitations ` + where
-	if err := db.QueryRow(ctx, countQ, args...).Scan(&total); err != nil {
+	// ErrNoRows only comes from a malformed group id, which has no invitations: total stays zero.
+	if err := db.QueryRow(ctx, countQ, args...).Scan(&total); err != nil && !errors.Is(err, pgx.ErrNoRows) {
 		slog.ErrorContext(ctx, "InvitationRepository.FindByGroup count failed", "group_id", groupID, "error", err)
 		return nil, 0, apperror.NewInternal()
 	}
