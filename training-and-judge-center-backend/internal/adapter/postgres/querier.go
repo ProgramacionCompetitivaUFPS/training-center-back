@@ -13,9 +13,11 @@ type Querier interface {
 	QueryRow(ctx context.Context, sql string, arguments ...interface{}) pgx.Row
 }
 
+// GetQuerier returns the transaction in ctx, or defaultQuerier. Either way,
+// reads by a malformed uuid come back as "no rows" (see malformedUUIDAsNoRows).
 func GetQuerier(ctx context.Context, defaultQuerier Querier) Querier {
 	if tx := TxFromContext(ctx); tx != nil {
-		return tx
+		return malformedUUIDAsNoRows{tx}
 	}
-	return defaultQuerier
+	return malformedUUIDAsNoRows{defaultQuerier}
 }
