@@ -9,6 +9,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"log/slog"
@@ -119,6 +120,10 @@ func main() {
 		capturedClient, capturedBucket := gcsClient, cfg.GCSBucket
 		sourceCodeReadFn = func(ctx context.Context, path string) ([]byte, error) {
 			rc, err := capturedClient.Bucket(capturedBucket).Object(path).NewReader(ctx)
+			if errors.Is(err, googleStorage.ErrObjectNotExist) {
+				slog.WarnContext(ctx, "gcs: source code not found", "path", path)
+				return nil, apperror.NewNotFound(appsubmission.ErrCodeSourceCodeNotFound, "source code not found")
+			}
 			if err != nil {
 				slog.ErrorContext(ctx, "gcs: failed to open source code reader", "path", path, "error", err)
 				return nil, apperror.NewInternal()
@@ -144,6 +149,10 @@ func main() {
 		sourceCodeReadFn = func(ctx context.Context, path string) ([]byte, error) {
 			fullPath := filepath.Join(capturedDir, path)
 			data, err := os.ReadFile(fullPath)
+			if errors.Is(err, os.ErrNotExist) {
+				slog.WarnContext(ctx, "local: source code not found", "path", fullPath)
+				return nil, apperror.NewNotFound(appsubmission.ErrCodeSourceCodeNotFound, "source code not found")
+			}
 			if err != nil {
 				slog.ErrorContext(ctx, "local: failed to read source code", "path", fullPath, "error", err)
 				return nil, apperror.NewInternal()

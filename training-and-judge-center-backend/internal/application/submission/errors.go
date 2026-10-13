@@ -10,4 +10,6 @@ const (
 
 	ErrCodeNoRejudgeNeeded              = "NO_REJUDGE_NEEDED"
 	ErrCodeCannotRejudgeInActiveContest = "CANNOT_REJUDGE_IN_ACTIVE_CONTEST"
+
+	ErrCodeSourceCodeNotFound = "SOURCE_CODE_NOT_FOUND"
 )

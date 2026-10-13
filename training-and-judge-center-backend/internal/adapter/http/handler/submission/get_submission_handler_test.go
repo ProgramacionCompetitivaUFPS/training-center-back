@@ -93,8 +93,8 @@ func TestGetSubmission_AuthorViewsPrivate_Returns200(t *testing.T) {
 	if body.SubmittedAt == "" {
 		t.Error("expected non-empty SubmittedAt")
 	}
-	if body.SourceCode != "int main(){}" {
-		t.Errorf("SourceCode = %q", body.SourceCode)
+	if body.SourceCode == nil || *body.SourceCode != "int main(){}" {
+		t.Errorf("SourceCode = %v", body.SourceCode)
 	}
 }
 
