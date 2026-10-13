@@ -19,8 +19,8 @@ const InvalidTextRepresentation = "22P02" // PostgreSQL invalid_text_representat
 // pgx.ErrNoRows and Query returns no rows.
 //
 // Exec is left alone: reporting "0 rows affected" for a failed write could
-// make an INSERT look successful. Inside a transaction Postgres still aborts
-// it, so a later statement in the same transaction fails as before.
+// make an INSERT look successful. GetQuerier doesn't apply it inside a
+// transaction, which the error has already aborted.
 type malformedUUIDAsNoRows struct {
 	Querier
 }

@@ -106,3 +106,20 @@ func TestMalformedUUIDAsNoRows_ExecKeepsTheError(t *testing.T) {
 		t.Errorf("Exec() error = %v, want the original error", err)
 	}
 }
+
+type fakeTx struct {
+	pgx.Tx
+	rowErr error
+}
+
+func (t fakeTx) QueryRow(context.Context, string, ...interface{}) pgx.Row {
+	return fakeRow{err: t.rowErr}
+}
+
+func TestGetQuerier_KeepsTheErrorInsideATransaction(t *testing.T) {
+	ctx := context.WithValue(context.Background(), txContextKey, pgx.Tx(fakeTx{rowErr: errMalformedUUID}))
+	q := GetQuerier(ctx, fakeQuerier{})
+	if got := q.QueryRow(ctx, "").Scan(); !errors.Is(got, errMalformedUUID) {
+		t.Errorf("Scan() = %v, want the original error: the transaction is already aborted", got)
+	}
+}
