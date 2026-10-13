@@ -23,6 +23,9 @@ func NewGroupProvider(db *pgxpool.Pool) *GroupProvider {
 func (p *GroupProvider) Exists(ctx context.Context, groupID string) (bool, error) {
 	var exists bool
 	err := infraPostgres.GetQuerier(ctx, p.db).QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM groups WHERE id = $1)`, groupID).Scan(&exists)
+	if errors.Is(err, pgx.ErrNoRows) { // malformed id: matches no group
+		return false, nil
+	}
 	if err != nil {
 		slog.ErrorContext(ctx, "GroupProvider.Exists failed", "error", err, "group_id", groupID)
 		return false, apperror.NewInternal()
@@ -78,6 +81,9 @@ func (p *GroupMemberProvider) IsMemberOfGroup(ctx context.Context, userID, group
 		`SELECT EXISTS(SELECT 1 FROM group_members WHERE group_id = $1 AND user_id = $2)`,
 		groupID, userID,
 	).Scan(&exists)
+	if errors.Is(err, pgx.ErrNoRows) { // malformed id: matches no membership
+		return false, nil
+	}
 	if err != nil {
 		slog.ErrorContext(ctx, "GroupMemberProvider.IsMemberOfGroup failed", "error", err, "group_id", groupID, "user_id", userID)
 		return false, apperror.NewInternal()

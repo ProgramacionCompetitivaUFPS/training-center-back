@@ -24,6 +24,9 @@ func NewUserProvider(db *pgxpool.Pool) *UserProvider {
 func (p *UserProvider) ExistsByID(ctx context.Context, userID string) (bool, error) {
 	var exists bool
 	err := infraPostgres.GetQuerier(ctx, p.db).QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM users WHERE id = $1)`, userID).Scan(&exists)
+	if errors.Is(err, pgx.ErrNoRows) { // malformed id: matches no user
+		return false, nil
+	}
 	if err != nil {
 		slog.ErrorContext(ctx, "database error checking user existence", "user_id", userID, "error", err)
 		return false, apperror.NewInternal()
