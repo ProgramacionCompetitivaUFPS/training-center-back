@@ -8,6 +8,7 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
+	infraPostgres "github.com/training-judge-center/backend/internal/adapter/postgres"
 	appGroup "github.com/training-judge-center/backend/internal/application/group"
 	"github.com/training-judge-center/backend/pkg/apperror"
 )
@@ -25,7 +26,7 @@ func (r *EmailResolver) ResolveByEmail(ctx context.Context, email string) (*appG
 	const q = `SELECT id, nickname, name, email, role FROM users WHERE email = LOWER($1) LIMIT 1`
 	var id, nick, name, role string
 	var mail *string
-	err := r.db.QueryRow(ctx, q, email).Scan(&id, &nick, &name, &mail, &role)
+	err := infraPostgres.GetQuerier(ctx, r.db).QueryRow(ctx, q, email).Scan(&id, &nick, &name, &mail, &role)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, nil

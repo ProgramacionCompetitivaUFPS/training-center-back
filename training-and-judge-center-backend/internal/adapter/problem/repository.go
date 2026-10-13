@@ -138,7 +138,7 @@ func (r *Repository) Save(ctx context.Context, p *domainProblem.Problem) error {
 
 func (r *Repository) FindBySlug(ctx context.Context, slug domainProblem.Slug) (*domainProblem.Problem, error) {
 	query := "SELECT " + problemColumns("statement") + " FROM problems WHERE slug = $1"
-	row := r.db.QueryRow(ctx, query, slug.String())
+	row := infraPostgres.GetQuerier(ctx, r.db).QueryRow(ctx, query, slug.String())
 	return scanProblem(ctx, row)
 }
 
@@ -242,7 +242,7 @@ func (r *Repository) ExistsBySlug(ctx context.Context, slug domainProblem.Slug) 
 	query := `SELECT EXISTS(SELECT 1 FROM problems WHERE slug = $1)`
 
 	var exists bool
-	err := r.db.QueryRow(ctx, query, slug.String()).Scan(&exists)
+	err := infraPostgres.GetQuerier(ctx, r.db).QueryRow(ctx, query, slug.String()).Scan(&exists)
 	if err != nil {
 		slog.ErrorContext(ctx, "Database error in ExistsBySlug", "error", err, "slug", slug.String())
 		return false, apperror.NewInternal()

@@ -7,6 +7,7 @@ import (
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
+	infraPostgres "github.com/training-judge-center/backend/internal/adapter/postgres"
 	appMaterial "github.com/training-judge-center/backend/internal/application/material"
 	"github.com/training-judge-center/backend/pkg/apperror"
 )
@@ -21,7 +22,7 @@ func NewGroupProvider(db *pgxpool.Pool) *GroupProvider {
 
 func (p *GroupProvider) Exists(ctx context.Context, groupID string) (bool, error) {
 	var exists bool
-	err := p.db.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM groups WHERE id = $1)`, groupID).Scan(&exists)
+	err := infraPostgres.GetQuerier(ctx, p.db).QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM groups WHERE id = $1)`, groupID).Scan(&exists)
 	if err != nil {
 		slog.ErrorContext(ctx, "GroupProvider.Exists failed", "error", err, "group_id", groupID)
 		return false, apperror.NewInternal()
@@ -31,7 +32,7 @@ func (p *GroupProvider) Exists(ctx context.Context, groupID string) (bool, error
 
 func (p *GroupProvider) FindVisibility(ctx context.Context, groupID string) (appMaterial.GroupVisibility, bool, error) {
 	var visibility string
-	err := p.db.QueryRow(ctx, `SELECT visibility FROM groups WHERE id = $1`, groupID).Scan(&visibility)
+	err := infraPostgres.GetQuerier(ctx, p.db).QueryRow(ctx, `SELECT visibility FROM groups WHERE id = $1`, groupID).Scan(&visibility)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return "", false, nil
@@ -54,7 +55,7 @@ func NewGroupMemberProvider(db *pgxpool.Pool) *GroupMemberProvider {
 
 func (p *GroupMemberProvider) IsLeadOfGroup(ctx context.Context, userID, groupID string) (bool, error) {
 	var role string
-	err := p.db.QueryRow(ctx,
+	err := infraPostgres.GetQuerier(ctx, p.db).QueryRow(ctx,
 		`SELECT member_role FROM group_members WHERE group_id = $1 AND user_id = $2`,
 		groupID, userID,
 	).Scan(&role)
@@ -73,7 +74,7 @@ func (p *GroupMemberProvider) IsLeadOfGroup(ctx context.Context, userID, groupID
 
 func (p *GroupMemberProvider) IsMemberOfGroup(ctx context.Context, userID, groupID string) (bool, error) {
 	var exists bool
-	err := p.db.QueryRow(ctx,
+	err := infraPostgres.GetQuerier(ctx, p.db).QueryRow(ctx,
 		`SELECT EXISTS(SELECT 1 FROM group_members WHERE group_id = $1 AND user_id = $2)`,
 		groupID, userID,
 	).Scan(&exists)
