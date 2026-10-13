@@ -8,6 +8,7 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
+	infraPostgres "github.com/training-judge-center/backend/internal/adapter/postgres"
 	appGroup "github.com/training-judge-center/backend/internal/application/group"
 	"github.com/training-judge-center/backend/pkg/apperror"
 )
@@ -25,7 +26,7 @@ func (r *NicknameResolver) ResolveByNickname(ctx context.Context, nickname strin
 	const q = `SELECT id, nickname, name, email, role FROM users WHERE nickname = LOWER($1) LIMIT 1`
 	var id, nick, name, role string
 	var email *string
-	err := r.db.QueryRow(ctx, q, nickname).Scan(&id, &nick, &name, &email, &role)
+	err := infraPostgres.GetQuerier(ctx, r.db).QueryRow(ctx, q, nickname).Scan(&id, &nick, &name, &email, &role)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, nil

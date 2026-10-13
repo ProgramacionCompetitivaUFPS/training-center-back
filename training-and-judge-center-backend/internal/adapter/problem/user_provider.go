@@ -8,6 +8,7 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
+	infraPostgres "github.com/training-judge-center/backend/internal/adapter/postgres"
 	appProblem "github.com/training-judge-center/backend/internal/application/problem"
 	"github.com/training-judge-center/backend/pkg/apperror"
 )
@@ -22,7 +23,10 @@ func NewUserProvider(db *pgxpool.Pool) *UserProvider {
 
 func (p *UserProvider) ExistsByID(ctx context.Context, userID string) (bool, error) {
 	var exists bool
-	err := p.db.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM users WHERE id = $1)`, userID).Scan(&exists)
+	err := infraPostgres.GetQuerier(ctx, p.db).QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM users WHERE id = $1)`, userID).Scan(&exists)
+	if errors.Is(err, pgx.ErrNoRows) { // malformed id: matches no user
+		return false, nil
+	}
 	if err != nil {
 		slog.ErrorContext(ctx, "database error checking user existence", "user_id", userID, "error", err)
 		return false, apperror.NewInternal()
@@ -32,7 +36,7 @@ func (p *UserProvider) ExistsByID(ctx context.Context, userID string) (bool, err
 
 func (p *UserProvider) GetDisplay(ctx context.Context, userID string) (*appProblem.UserDisplay, error) {
 	var nickname, name string
-	err := p.db.QueryRow(ctx, `SELECT nickname, name FROM users WHERE id = $1`, userID).Scan(&nickname, &name)
+	err := infraPostgres.GetQuerier(ctx, p.db).QueryRow(ctx, `SELECT nickname, name FROM users WHERE id = $1`, userID).Scan(&nickname, &name)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return &appProblem.UserDisplay{Nickname: "unknown", Name: ""}, nil
@@ -47,7 +51,7 @@ func (p *UserProvider) GetDisplays(ctx context.Context, userIDs []string) (map[s
 	if len(userIDs) == 0 {
 		return map[string]*appProblem.UserDisplay{}, nil
 	}
-	rows, err := p.db.Query(ctx, `SELECT id, nickname, name FROM users WHERE id = ANY($1)`, userIDs)
+	rows, err := infraPostgres.GetQuerier(ctx, p.db).Query(ctx, `SELECT id, nickname, name FROM users WHERE id = ANY($1)`, userIDs)
 	if err != nil {
 		slog.ErrorContext(ctx, "database error fetching user displays", "error", err)
 		return nil, apperror.NewInternal()
@@ -72,7 +76,7 @@ func (p *UserProvider) GetDisplays(ctx context.Context, userIDs []string) (map[s
 
 func (p *UserProvider) GetIDByNickname(ctx context.Context, nickname string) (string, bool, error) {
 	var id string
-	err := p.db.QueryRow(ctx, `SELECT id FROM users WHERE nickname = LOWER($1)`, nickname).Scan(&id)
+	err := infraPostgres.GetQuerier(ctx, p.db).QueryRow(ctx, `SELECT id FROM users WHERE nickname = LOWER($1)`, nickname).Scan(&id)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return "", false, nil

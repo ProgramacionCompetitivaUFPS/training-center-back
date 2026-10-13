@@ -6,6 +6,7 @@ import (
 
 	"github.com/jackc/pgx/v5/pgxpool"
 
+	infraPostgres "github.com/training-judge-center/backend/internal/adapter/postgres"
 	appGroup "github.com/training-judge-center/backend/internal/application/group"
 	"github.com/training-judge-center/backend/pkg/apperror"
 )
@@ -22,7 +23,7 @@ func (p *UserProvider) GetDisplays(ctx context.Context, userIDs []string) (map[s
 	if len(userIDs) == 0 {
 		return map[string]*appGroup.UserDisplay{}, nil
 	}
-	rows, err := p.db.Query(ctx, `SELECT id, nickname, name, email, role FROM users WHERE id = ANY($1)`, userIDs)
+	rows, err := infraPostgres.GetQuerier(ctx, p.db).Query(ctx, `SELECT id, nickname, name, email, role FROM users WHERE id = ANY($1)`, userIDs)
 	if err != nil {
 		slog.ErrorContext(ctx, "GetDisplays query failed", "error", err)
 		return nil, apperror.NewInternal()
