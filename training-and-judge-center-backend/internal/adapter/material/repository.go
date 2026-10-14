@@ -299,6 +299,66 @@ func (r *Repository) DistinctTags(ctx context.Context, groupID string, statuses 
 	return tags, nil
 }
 
+func (r *Repository) DistinctAuthorIDs(ctx context.Context, groupID string, statuses []material.Status, sampleSize int) ([]string, error) {
+	var conds []string
+	var args []any
+	idx := 1
+
+	nextArg := func(v any) string {
+		args = append(args, v)
+		s := fmt.Sprintf("$%d", idx)
+		idx++
+		return s
+	}
+
+	conds = append(conds, fmt.Sprintf("group_id = %s", nextArg(groupID)))
+	if len(statuses) > 0 {
+		statusStrings := make([]string, len(statuses))
+		for i, s := range statuses {
+			statusStrings[i] = s.String()
+		}
+		conds = append(conds, fmt.Sprintf("status = ANY(%s)", nextArg(statusStrings)))
+	}
+	limitArg := nextArg(sampleSize)
+
+	// Same bounded-sample rationale as DistinctTags: scan only the `sampleSize` most recent
+	// materials, not every material the group has ever had.
+	query := fmt.Sprintf(`
+		SELECT DISTINCT author_id
+		FROM (
+			SELECT author_id
+			FROM materials
+			WHERE %s
+			ORDER BY created_at DESC
+			LIMIT %s
+		) recent
+	`, strings.Join(conds, " AND "), limitArg)
+
+	q := infraPostgres.GetQuerier(ctx, r.db)
+	rows, err := q.Query(ctx, query, args...)
+	if err != nil {
+		slog.ErrorContext(ctx, "database error in DistinctAuthorIDs", "error", err, "group_id", groupID)
+		return nil, apperror.NewInternal()
+	}
+	defer rows.Close()
+
+	authorIDs := []string{}
+	for rows.Next() {
+		var authorID string
+		if scanErr := rows.Scan(&authorID); scanErr != nil {
+			slog.ErrorContext(ctx, "database error scanning DistinctAuthorIDs", "error", scanErr, "group_id", groupID)
+			return nil, apperror.NewInternal()
+		}
+		authorIDs = append(authorIDs, authorID)
+	}
+	if err := rows.Err(); err != nil {
+		slog.ErrorContext(ctx, "database error in DistinctAuthorIDs", "error", err, "group_id", groupID)
+		return nil, apperror.NewInternal()
+	}
+
+	return authorIDs, nil
+}
+
 func (r *Repository) Delete(ctx context.Context, id string) error {
 	q := infraPostgres.GetQuerier(ctx, r.db)
 	tag, err := q.Exec(ctx, `DELETE FROM materials WHERE id = $1`, id)

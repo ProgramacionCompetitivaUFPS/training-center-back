@@ -34,6 +34,9 @@ func (s *stubMaterialRepo) List(_ context.Context, _ string, _ domainMaterial.Li
 func (s *stubMaterialRepo) DistinctTags(_ context.Context, _ string, _ []domainMaterial.Status, _ int) ([]string, error) {
 	return nil, nil
 }
+func (s *stubMaterialRepo) DistinctAuthorIDs(_ context.Context, _ string, _ []domainMaterial.Status, _ int) ([]string, error) {
+	return nil, nil
+}
 func (s *stubMaterialRepo) Delete(_ context.Context, _ string) error { return nil }
 
 // ── Provider stubs ────────────────────────────────────────────────────────────

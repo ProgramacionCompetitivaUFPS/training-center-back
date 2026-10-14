@@ -5,16 +5,17 @@ import (
 )
 
 type Handler struct {
-	createMaterial    *appMaterial.CreateMaterialUseCase
-	updateMaterial    *appMaterial.UpdateMaterialUseCase
-	getMaterial       *appMaterial.GetMaterialUseCase
-	listMaterials     *appMaterial.ListMaterialsUseCase
-	listMaterialTags  *appMaterial.ListMaterialTagsUseCase
-	publishMaterial   *appMaterial.PublishMaterialUseCase
-	unpublishMaterial *appMaterial.UnpublishMaterialUseCase
-	pinMaterial       *appMaterial.PinMaterialUseCase
-	unpinMaterial     *appMaterial.UnpinMaterialUseCase
-	deleteMaterial    *appMaterial.DeleteMaterialUseCase
+	createMaterial      *appMaterial.CreateMaterialUseCase
+	updateMaterial      *appMaterial.UpdateMaterialUseCase
+	getMaterial         *appMaterial.GetMaterialUseCase
+	listMaterials       *appMaterial.ListMaterialsUseCase
+	listMaterialTags    *appMaterial.ListMaterialTagsUseCase
+	listMaterialAuthors *appMaterial.ListMaterialAuthorsUseCase
+	publishMaterial     *appMaterial.PublishMaterialUseCase
+	unpublishMaterial   *appMaterial.UnpublishMaterialUseCase
+	pinMaterial         *appMaterial.PinMaterialUseCase
+	unpinMaterial       *appMaterial.UnpinMaterialUseCase
+	deleteMaterial      *appMaterial.DeleteMaterialUseCase
 }
 
 func NewHandler(
@@ -23,6 +24,7 @@ func NewHandler(
 	getMaterial *appMaterial.GetMaterialUseCase,
 	listMaterials *appMaterial.ListMaterialsUseCase,
 	listMaterialTags *appMaterial.ListMaterialTagsUseCase,
+	listMaterialAuthors *appMaterial.ListMaterialAuthorsUseCase,
 	publishMaterial *appMaterial.PublishMaterialUseCase,
 	unpublishMaterial *appMaterial.UnpublishMaterialUseCase,
 	pinMaterial *appMaterial.PinMaterialUseCase,
@@ -30,15 +32,16 @@ func NewHandler(
 	deleteMaterial *appMaterial.DeleteMaterialUseCase,
 ) *Handler {
 	return &Handler{
-		createMaterial:    createMaterial,
-		updateMaterial:    updateMaterial,
-		getMaterial:       getMaterial,
-		listMaterials:     listMaterials,
-		listMaterialTags:  listMaterialTags,
-		publishMaterial:   publishMaterial,
-		unpublishMaterial: unpublishMaterial,
-		pinMaterial:       pinMaterial,
-		unpinMaterial:     unpinMaterial,
-		deleteMaterial:    deleteMaterial,
+		createMaterial:      createMaterial,
+		updateMaterial:      updateMaterial,
+		getMaterial:         getMaterial,
+		listMaterials:       listMaterials,
+		listMaterialTags:    listMaterialTags,
+		listMaterialAuthors: listMaterialAuthors,
+		publishMaterial:     publishMaterial,
+		unpublishMaterial:   unpublishMaterial,
+		pinMaterial:         pinMaterial,
+		unpinMaterial:       unpinMaterial,
+		deleteMaterial:      deleteMaterial,
 	}
 }
