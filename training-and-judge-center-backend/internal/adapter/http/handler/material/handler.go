@@ -9,6 +9,7 @@ type Handler struct {
 	updateMaterial    *appMaterial.UpdateMaterialUseCase
 	getMaterial       *appMaterial.GetMaterialUseCase
 	listMaterials     *appMaterial.ListMaterialsUseCase
+	listMaterialTags  *appMaterial.ListMaterialTagsUseCase
 	publishMaterial   *appMaterial.PublishMaterialUseCase
 	unpublishMaterial *appMaterial.UnpublishMaterialUseCase
 	pinMaterial       *appMaterial.PinMaterialUseCase
@@ -21,6 +22,7 @@ func NewHandler(
 	updateMaterial *appMaterial.UpdateMaterialUseCase,
 	getMaterial *appMaterial.GetMaterialUseCase,
 	listMaterials *appMaterial.ListMaterialsUseCase,
+	listMaterialTags *appMaterial.ListMaterialTagsUseCase,
 	publishMaterial *appMaterial.PublishMaterialUseCase,
 	unpublishMaterial *appMaterial.UnpublishMaterialUseCase,
 	pinMaterial *appMaterial.PinMaterialUseCase,
@@ -32,6 +34,7 @@ func NewHandler(
 		updateMaterial:    updateMaterial,
 		getMaterial:       getMaterial,
 		listMaterials:     listMaterials,
+		listMaterialTags:  listMaterialTags,
 		publishMaterial:   publishMaterial,
 		unpublishMaterial: unpublishMaterial,
 		pinMaterial:       pinMaterial,

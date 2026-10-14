@@ -134,12 +134,23 @@ func (r *Repository) List(ctx context.Context, groupID string, filters material.
 		conds = append(conds, fmt.Sprintf("published_at < %s", nextArg(to)))
 	}
 
-	// FTS: store the $N ref so it can be reused in ORDER BY without a second parameter.
+	// FTS: build the prefix tsquery server-side from Postgres's own tokenization of the raw
+	// query (to_tsvector), instead of re-splitting it in Go. A Go-side split disagreed with
+	// Postgres on compound tokens — e.g. "Node.js" is ONE lexeme ('node.js', type "host") to
+	// Postgres, not "node" + "js" — so ANDing separately-split prefixes silently failed to
+	// match anything Postgres treats as a single compound token (dotted names, hostnames,
+	// etc.). Reusing to_tsvector('simple', ...) for the query text guarantees the same
+	// tokenization rules apply on both sides. ftsRef holds the whole subquery expression
+	// (not a bare $N), reused as-is in listOrderBy's ts_rank.
 	var ftsRef string
 	const ftsVector = `(setweight(to_tsvector('simple', title), 'A') || setweight(to_tsvector('simple', COALESCE(content, '')), 'B'))`
 	if filters.SearchQuery != nil && *filters.SearchQuery != "" {
-		ftsRef = nextArg(*filters.SearchQuery)
-		conds = append(conds, fmt.Sprintf("%s @@ plainto_tsquery('simple', %s)", ftsVector, ftsRef))
+		rawRef := nextArg(*filters.SearchQuery)
+		ftsRef = fmt.Sprintf(
+			"(SELECT string_agg(lexeme || ':*', ' & ') FROM unnest(tsvector_to_array(to_tsvector('simple', %s))) AS lexeme)",
+			rawRef,
+		)
+		conds = append(conds, fmt.Sprintf("%s @@ to_tsquery('simple', %s)", ftsVector, ftsRef))
 	}
 
 	where := "WHERE " + strings.Join(conds, " AND ")
@@ -210,7 +221,7 @@ func listOrderBy(sortBy material.SortField, ftsRef, ftsVector string) string {
 	case material.SortByRelevance:
 		if ftsRef != "" {
 			return fmt.Sprintf(
-				"ts_rank(%s, plainto_tsquery('simple', %s)) DESC, published_at DESC NULLS LAST, created_at DESC",
+				"ts_rank(%s, to_tsquery('simple', %s)) DESC, published_at DESC NULLS LAST, created_at DESC",
 				ftsVector, ftsRef,
 			)
 		}
@@ -225,6 +236,67 @@ func listOrderBy(sortBy material.SortField, ftsRef, ftsVector string) string {
 		}
 		return "pinned DESC, pinned_at DESC NULLS LAST, published_at DESC NULLS LAST, created_at DESC"
 	}
+}
+
+func (r *Repository) DistinctTags(ctx context.Context, groupID string, statuses []material.Status, sampleSize int) ([]string, error) {
+	var conds []string
+	var args []any
+	idx := 1
+
+	nextArg := func(v any) string {
+		args = append(args, v)
+		s := fmt.Sprintf("$%d", idx)
+		idx++
+		return s
+	}
+
+	conds = append(conds, fmt.Sprintf("group_id = %s", nextArg(groupID)))
+	if len(statuses) > 0 {
+		statusStrings := make([]string, len(statuses))
+		for i, s := range statuses {
+			statusStrings[i] = s.String()
+		}
+		conds = append(conds, fmt.Sprintf("status = ANY(%s)", nextArg(statusStrings)))
+	}
+	limitArg := nextArg(sampleSize)
+
+	// Bound the scan to the `sampleSize` most recent materials instead of unnesting every
+	// material's tags in the group — cost stays flat no matter how large the group grows.
+	query := fmt.Sprintf(`
+		SELECT DISTINCT tag
+		FROM (
+			SELECT tags
+			FROM materials
+			WHERE %s
+			ORDER BY created_at DESC
+			LIMIT %s
+		) recent, unnest(recent.tags) AS tag
+		ORDER BY tag
+	`, strings.Join(conds, " AND "), limitArg)
+
+	q := infraPostgres.GetQuerier(ctx, r.db)
+	rows, err := q.Query(ctx, query, args...)
+	if err != nil {
+		slog.ErrorContext(ctx, "database error in DistinctTags", "error", err, "group_id", groupID)
+		return nil, apperror.NewInternal()
+	}
+	defer rows.Close()
+
+	tags := []string{}
+	for rows.Next() {
+		var tag string
+		if scanErr := rows.Scan(&tag); scanErr != nil {
+			slog.ErrorContext(ctx, "database error scanning DistinctTags", "error", scanErr, "group_id", groupID)
+			return nil, apperror.NewInternal()
+		}
+		tags = append(tags, tag)
+	}
+	if err := rows.Err(); err != nil {
+		slog.ErrorContext(ctx, "database error in DistinctTags", "error", err, "group_id", groupID)
+		return nil, apperror.NewInternal()
+	}
+
+	return tags, nil
 }
 
 func (r *Repository) Delete(ctx context.Context, id string) error {
