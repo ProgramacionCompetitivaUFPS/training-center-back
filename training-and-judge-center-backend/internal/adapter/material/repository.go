@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"regexp"
 	"strings"
 	"time"
 
@@ -135,11 +136,15 @@ func (r *Repository) List(ctx context.Context, groupID string, filters material.
 	}
 
 	// FTS: store the $N ref so it can be reused in ORDER BY without a second parameter.
+	// Built as a prefix tsquery (each word gets `:*`) instead of plainto_tsquery so that
+	// a partially-typed word (as the user is still typing) matches, not just whole words.
 	var ftsRef string
 	const ftsVector = `(setweight(to_tsvector('simple', title), 'A') || setweight(to_tsvector('simple', COALESCE(content, '')), 'B'))`
 	if filters.SearchQuery != nil && *filters.SearchQuery != "" {
-		ftsRef = nextArg(*filters.SearchQuery)
-		conds = append(conds, fmt.Sprintf("%s @@ plainto_tsquery('simple', %s)", ftsVector, ftsRef))
+		if tsQuery := toPrefixTsQuery(*filters.SearchQuery); tsQuery != "" {
+			ftsRef = nextArg(tsQuery)
+			conds = append(conds, fmt.Sprintf("%s @@ to_tsquery('simple', %s)", ftsVector, ftsRef))
+		}
 	}
 
 	where := "WHERE " + strings.Join(conds, " AND ")
@@ -203,6 +208,25 @@ func (r *Repository) List(ctx context.Context, groupID string, filters material.
 	return result, total, nil
 }
 
+// tsQueryWord matches a maximal run of letters/digits — mirrors how the 'simple' dictionary
+// already tokenizes text when building the tsvector, so query-side splitting stays consistent.
+var tsQueryWord = regexp.MustCompile(`[\p{L}\p{N}]+`)
+
+// toPrefixTsQuery turns free text into a prefix tsquery string (e.g. "stack over" -> "stack:* & over:*"),
+// so a partially-typed word still matches instead of requiring the whole word (plainto_tsquery's behavior).
+// Returns "" when the input has no word characters at all (e.g. only punctuation).
+func toPrefixTsQuery(q string) string {
+	words := tsQueryWord.FindAllString(strings.ToLower(q), -1)
+	if len(words) == 0 {
+		return ""
+	}
+	parts := make([]string, len(words))
+	for i, w := range words {
+		parts[i] = w + ":*"
+	}
+	return strings.Join(parts, " & ")
+}
+
 // listOrderBy builds the ORDER BY clause.
 // When a search query is active, pinned boost is suppressed (FR-032).
 func listOrderBy(sortBy material.SortField, ftsRef, ftsVector string) string {
@@ -210,7 +234,7 @@ func listOrderBy(sortBy material.SortField, ftsRef, ftsVector string) string {
 	case material.SortByRelevance:
 		if ftsRef != "" {
 			return fmt.Sprintf(
-				"ts_rank(%s, plainto_tsquery('simple', %s)) DESC, published_at DESC NULLS LAST, created_at DESC",
+				"ts_rank(%s, to_tsquery('simple', %s)) DESC, published_at DESC NULLS LAST, created_at DESC",
 				ftsVector, ftsRef,
 			)
 		}
@@ -225,6 +249,59 @@ func listOrderBy(sortBy material.SortField, ftsRef, ftsVector string) string {
 		}
 		return "pinned DESC, pinned_at DESC NULLS LAST, published_at DESC NULLS LAST, created_at DESC"
 	}
+}
+
+func (r *Repository) DistinctTags(ctx context.Context, groupID string, statuses []material.Status) ([]string, error) {
+	var conds []string
+	var args []any
+	idx := 1
+
+	nextArg := func(v any) string {
+		args = append(args, v)
+		s := fmt.Sprintf("$%d", idx)
+		idx++
+		return s
+	}
+
+	conds = append(conds, fmt.Sprintf("m.group_id = %s", nextArg(groupID)))
+	if len(statuses) > 0 {
+		statusStrings := make([]string, len(statuses))
+		for i, s := range statuses {
+			statusStrings[i] = s.String()
+		}
+		conds = append(conds, fmt.Sprintf("m.status = ANY(%s)", nextArg(statusStrings)))
+	}
+
+	query := fmt.Sprintf(`
+		SELECT DISTINCT tag
+		FROM materials m, unnest(m.tags) AS tag
+		WHERE %s
+		ORDER BY tag
+	`, strings.Join(conds, " AND "))
+
+	q := infraPostgres.GetQuerier(ctx, r.db)
+	rows, err := q.Query(ctx, query, args...)
+	if err != nil {
+		slog.ErrorContext(ctx, "database error in DistinctTags", "error", err, "group_id", groupID)
+		return nil, apperror.NewInternal()
+	}
+	defer rows.Close()
+
+	tags := []string{}
+	for rows.Next() {
+		var tag string
+		if scanErr := rows.Scan(&tag); scanErr != nil {
+			slog.ErrorContext(ctx, "database error scanning DistinctTags", "error", scanErr, "group_id", groupID)
+			return nil, apperror.NewInternal()
+		}
+		tags = append(tags, tag)
+	}
+	if err := rows.Err(); err != nil {
+		slog.ErrorContext(ctx, "database error in DistinctTags", "error", err, "group_id", groupID)
+		return nil, apperror.NewInternal()
+	}
+
+	return tags, nil
 }
 
 func (r *Repository) Delete(ctx context.Context, id string) error {

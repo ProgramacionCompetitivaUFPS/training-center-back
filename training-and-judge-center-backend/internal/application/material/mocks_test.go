@@ -15,10 +15,11 @@ var testNow = time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
 // ── Repository mock ──────────────────────────────────────────────────────────
 
 type mockMaterialRepository struct {
-	saveFn     func(ctx context.Context, m *domainMaterial.Material) error
-	findByIDFn func(ctx context.Context, id string) (*domainMaterial.Material, error)
-	listFn     func(ctx context.Context, groupID string, f domainMaterial.ListFilters) ([]*domainMaterial.Material, int, error)
-	deleteFn   func(ctx context.Context, id string) error
+	saveFn         func(ctx context.Context, m *domainMaterial.Material) error
+	findByIDFn     func(ctx context.Context, id string) (*domainMaterial.Material, error)
+	listFn         func(ctx context.Context, groupID string, f domainMaterial.ListFilters) ([]*domainMaterial.Material, int, error)
+	distinctTagsFn func(ctx context.Context, groupID string, statuses []domainMaterial.Status) ([]string, error)
+	deleteFn       func(ctx context.Context, id string) error
 }
 
 func (m *mockMaterialRepository) Save(ctx context.Context, mat *domainMaterial.Material) error {
@@ -38,6 +39,12 @@ func (m *mockMaterialRepository) List(ctx context.Context, groupID string, f dom
 		return m.listFn(ctx, groupID, f)
 	}
 	return nil, 0, nil
+}
+func (m *mockMaterialRepository) DistinctTags(ctx context.Context, groupID string, statuses []domainMaterial.Status) ([]string, error) {
+	if m.distinctTagsFn != nil {
+		return m.distinctTagsFn(ctx, groupID, statuses)
+	}
+	return nil, nil
 }
 func (m *mockMaterialRepository) Delete(ctx context.Context, id string) error {
 	if m.deleteFn != nil {

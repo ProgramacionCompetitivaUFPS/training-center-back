@@ -133,6 +133,7 @@ func NewRouter(h *Handlers, s *Services, allowedOrigins []string) *chi.Mux {
 			r.Route("/{groupId}/materials", func(r chi.Router) {
 				r.Post("/", h.Material.Create)
 				r.Get("/", h.Material.List)
+				r.Get("/tags", h.Material.ListTags)
 				r.Get("/{materialId}", h.Material.Get)
 				r.Patch("/{materialId}", h.Material.Update)
 				r.Delete("/{materialId}", h.Material.Delete)

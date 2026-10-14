@@ -37,5 +37,8 @@ type Repository interface {
 	Save(ctx context.Context, m *Material) error
 	FindByID(ctx context.Context, id string) (*Material, error)
 	List(ctx context.Context, groupID string, filters ListFilters) ([]*Material, int, error)
+	// DistinctTags returns the distinct tags actually used by materials in groupID,
+	// restricted to the given statuses (empty means no status constraint).
+	DistinctTags(ctx context.Context, groupID string, statuses []Status) ([]string, error)
 	Delete(ctx context.Context, id string) error
 }
