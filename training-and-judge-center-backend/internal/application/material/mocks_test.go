@@ -18,7 +18,7 @@ type mockMaterialRepository struct {
 	saveFn         func(ctx context.Context, m *domainMaterial.Material) error
 	findByIDFn     func(ctx context.Context, id string) (*domainMaterial.Material, error)
 	listFn         func(ctx context.Context, groupID string, f domainMaterial.ListFilters) ([]*domainMaterial.Material, int, error)
-	distinctTagsFn func(ctx context.Context, groupID string, statuses []domainMaterial.Status) ([]string, error)
+	distinctTagsFn func(ctx context.Context, groupID string, statuses []domainMaterial.Status, sampleSize int) ([]string, error)
 	deleteFn       func(ctx context.Context, id string) error
 }
 
@@ -40,9 +40,9 @@ func (m *mockMaterialRepository) List(ctx context.Context, groupID string, f dom
 	}
 	return nil, 0, nil
 }
-func (m *mockMaterialRepository) DistinctTags(ctx context.Context, groupID string, statuses []domainMaterial.Status) ([]string, error) {
+func (m *mockMaterialRepository) DistinctTags(ctx context.Context, groupID string, statuses []domainMaterial.Status, sampleSize int) ([]string, error) {
 	if m.distinctTagsFn != nil {
-		return m.distinctTagsFn(ctx, groupID, statuses)
+		return m.distinctTagsFn(ctx, groupID, statuses, sampleSize)
 	}
 	return nil, nil
 }

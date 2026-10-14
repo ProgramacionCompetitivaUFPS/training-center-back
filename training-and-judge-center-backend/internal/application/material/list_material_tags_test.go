@@ -34,9 +34,11 @@ func TestListMaterialTags_NotVisibleGroup_NonMember_Returns403(t *testing.T) {
 
 func TestListMaterialTags_Lead_SeesAllStatuses(t *testing.T) {
 	var capturedStatuses []domainMaterial.Status
+	var capturedSampleSize int
 	repo := &mockMaterialRepository{
-		distinctTagsFn: func(_ context.Context, _ string, statuses []domainMaterial.Status) ([]string, error) {
+		distinctTagsFn: func(_ context.Context, _ string, statuses []domainMaterial.Status, sampleSize int) ([]string, error) {
 			capturedStatuses = statuses
+			capturedSampleSize = sampleSize
 			return []string{"tutorial", "midterm-2026"}, nil
 		},
 	}
@@ -49,6 +51,9 @@ func TestListMaterialTags_Lead_SeesAllStatuses(t *testing.T) {
 	if capturedStatuses != nil {
 		t.Errorf("expected no status constraint for a lead, got %v", capturedStatuses)
 	}
+	if capturedSampleSize != tagSuggestionSampleSize {
+		t.Errorf("expected sampleSize %d, got %d", tagSuggestionSampleSize, capturedSampleSize)
+	}
 	if len(out.Tags) != 2 || out.Tags[0] != "tutorial" || out.Tags[1] != "midterm-2026" {
 		t.Errorf("unexpected tags: %v", out.Tags)
 	}
@@ -57,7 +62,7 @@ func TestListMaterialTags_Lead_SeesAllStatuses(t *testing.T) {
 func TestListMaterialTags_Admin_SeesAllStatuses(t *testing.T) {
 	var capturedStatuses []domainMaterial.Status
 	repo := &mockMaterialRepository{
-		distinctTagsFn: func(_ context.Context, _ string, statuses []domainMaterial.Status) ([]string, error) {
+		distinctTagsFn: func(_ context.Context, _ string, statuses []domainMaterial.Status, _ int) ([]string, error) {
 			capturedStatuses = statuses
 			return []string{"tutorial"}, nil
 		},
@@ -77,7 +82,7 @@ func TestListMaterialTags_Admin_SeesAllStatuses(t *testing.T) {
 func TestListMaterialTags_NonLeadMember_FiltersToPublished(t *testing.T) {
 	var capturedStatuses []domainMaterial.Status
 	repo := &mockMaterialRepository{
-		distinctTagsFn: func(_ context.Context, _ string, statuses []domainMaterial.Status) ([]string, error) {
+		distinctTagsFn: func(_ context.Context, _ string, statuses []domainMaterial.Status, _ int) ([]string, error) {
 			capturedStatuses = statuses
 			return []string{"tutorial"}, nil
 		},

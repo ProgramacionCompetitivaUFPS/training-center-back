@@ -13,7 +13,9 @@ type listTagsResponse struct {
 
 // ListTags handles GET /groups/{groupId}/materials/tags
 //
-// @Summary      List distinct material tags used in a group
+// @Summary      List distinct material tags used by the group's most recent materials
+// @Description  Returns a sample (not an exhaustive registry) meant for filter suggestions —
+// @Description  a tag outside the sample is still a valid value for the `tags` filter on List.
 // @Tags         materials
 // @Produce      json
 // @Security     BearerAuth

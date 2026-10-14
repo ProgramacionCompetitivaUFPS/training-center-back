@@ -251,7 +251,7 @@ func listOrderBy(sortBy material.SortField, ftsRef, ftsVector string) string {
 	}
 }
 
-func (r *Repository) DistinctTags(ctx context.Context, groupID string, statuses []material.Status) ([]string, error) {
+func (r *Repository) DistinctTags(ctx context.Context, groupID string, statuses []material.Status, sampleSize int) ([]string, error) {
 	var conds []string
 	var args []any
 	idx := 1
@@ -263,21 +263,29 @@ func (r *Repository) DistinctTags(ctx context.Context, groupID string, statuses 
 		return s
 	}
 
-	conds = append(conds, fmt.Sprintf("m.group_id = %s", nextArg(groupID)))
+	conds = append(conds, fmt.Sprintf("group_id = %s", nextArg(groupID)))
 	if len(statuses) > 0 {
 		statusStrings := make([]string, len(statuses))
 		for i, s := range statuses {
 			statusStrings[i] = s.String()
 		}
-		conds = append(conds, fmt.Sprintf("m.status = ANY(%s)", nextArg(statusStrings)))
+		conds = append(conds, fmt.Sprintf("status = ANY(%s)", nextArg(statusStrings)))
 	}
+	limitArg := nextArg(sampleSize)
 
+	// Bound the scan to the `sampleSize` most recent materials instead of unnesting every
+	// material's tags in the group — cost stays flat no matter how large the group grows.
 	query := fmt.Sprintf(`
 		SELECT DISTINCT tag
-		FROM materials m, unnest(m.tags) AS tag
-		WHERE %s
+		FROM (
+			SELECT tags
+			FROM materials
+			WHERE %s
+			ORDER BY created_at DESC
+			LIMIT %s
+		) recent, unnest(recent.tags) AS tag
 		ORDER BY tag
-	`, strings.Join(conds, " AND "))
+	`, strings.Join(conds, " AND "), limitArg)
 
 	q := infraPostgres.GetQuerier(ctx, r.db)
 	rows, err := q.Query(ctx, query, args...)

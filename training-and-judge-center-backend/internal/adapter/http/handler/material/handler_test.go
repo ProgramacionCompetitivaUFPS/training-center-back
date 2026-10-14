@@ -31,7 +31,7 @@ func (s *stubMaterialRepo) FindByID(ctx context.Context, id string) (*domainMate
 func (s *stubMaterialRepo) List(_ context.Context, _ string, _ domainMaterial.ListFilters) ([]*domainMaterial.Material, int, error) {
 	return nil, 0, nil
 }
-func (s *stubMaterialRepo) DistinctTags(_ context.Context, _ string, _ []domainMaterial.Status) ([]string, error) {
+func (s *stubMaterialRepo) DistinctTags(_ context.Context, _ string, _ []domainMaterial.Status, _ int) ([]string, error) {
 	return nil, nil
 }
 func (s *stubMaterialRepo) Delete(_ context.Context, _ string) error { return nil }
