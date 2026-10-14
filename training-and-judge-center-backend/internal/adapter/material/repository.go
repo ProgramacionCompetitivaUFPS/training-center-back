@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
-	"regexp"
 	"strings"
 	"time"
 
@@ -135,16 +134,23 @@ func (r *Repository) List(ctx context.Context, groupID string, filters material.
 		conds = append(conds, fmt.Sprintf("published_at < %s", nextArg(to)))
 	}
 
-	// FTS: store the $N ref so it can be reused in ORDER BY without a second parameter.
-	// Built as a prefix tsquery (each word gets `:*`) instead of plainto_tsquery so that
-	// a partially-typed word (as the user is still typing) matches, not just whole words.
+	// FTS: build the prefix tsquery server-side from Postgres's own tokenization of the raw
+	// query (to_tsvector), instead of re-splitting it in Go. A Go-side split disagreed with
+	// Postgres on compound tokens — e.g. "Node.js" is ONE lexeme ('node.js', type "host") to
+	// Postgres, not "node" + "js" — so ANDing separately-split prefixes silently failed to
+	// match anything Postgres treats as a single compound token (dotted names, hostnames,
+	// etc.). Reusing to_tsvector('simple', ...) for the query text guarantees the same
+	// tokenization rules apply on both sides. ftsRef holds the whole subquery expression
+	// (not a bare $N), reused as-is in listOrderBy's ts_rank.
 	var ftsRef string
 	const ftsVector = `(setweight(to_tsvector('simple', title), 'A') || setweight(to_tsvector('simple', COALESCE(content, '')), 'B'))`
 	if filters.SearchQuery != nil && *filters.SearchQuery != "" {
-		if tsQuery := toPrefixTsQuery(*filters.SearchQuery); tsQuery != "" {
-			ftsRef = nextArg(tsQuery)
-			conds = append(conds, fmt.Sprintf("%s @@ to_tsquery('simple', %s)", ftsVector, ftsRef))
-		}
+		rawRef := nextArg(*filters.SearchQuery)
+		ftsRef = fmt.Sprintf(
+			"(SELECT string_agg(lexeme || ':*', ' & ') FROM unnest(tsvector_to_array(to_tsvector('simple', %s))) AS lexeme)",
+			rawRef,
+		)
+		conds = append(conds, fmt.Sprintf("%s @@ to_tsquery('simple', %s)", ftsVector, ftsRef))
 	}
 
 	where := "WHERE " + strings.Join(conds, " AND ")
@@ -206,25 +212,6 @@ func (r *Repository) List(ctx context.Context, groupID string, filters material.
 	}
 
 	return result, total, nil
-}
-
-// tsQueryWord matches a maximal run of letters/digits — mirrors how the 'simple' dictionary
-// already tokenizes text when building the tsvector, so query-side splitting stays consistent.
-var tsQueryWord = regexp.MustCompile(`[\p{L}\p{N}]+`)
-
-// toPrefixTsQuery turns free text into a prefix tsquery string (e.g. "stack over" -> "stack:* & over:*"),
-// so a partially-typed word still matches instead of requiring the whole word (plainto_tsquery's behavior).
-// Returns "" when the input has no word characters at all (e.g. only punctuation).
-func toPrefixTsQuery(q string) string {
-	words := tsQueryWord.FindAllString(strings.ToLower(q), -1)
-	if len(words) == 0 {
-		return ""
-	}
-	parts := make([]string, len(words))
-	for i, w := range words {
-		parts[i] = w + ":*"
-	}
-	return strings.Join(parts, " & ")
 }
 
 // listOrderBy builds the ORDER BY clause.
