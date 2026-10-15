@@ -39,11 +39,12 @@ func NewSearchUsersUseCase(repo user.Repository) *SearchUsersUseCase {
 }
 
 // Execute finds active users whose name or nickname partially matches the
-// query. Intended for authenticated Coach/Admin autocomplete flows (problem
-// modifiers, group invites, contest problem pickers) — deliberately matches
-// only name/nickname (never email/institution, unlike the admin user list's
-// SearchByAll) so the endpoint can't be used to confirm whether a given email
-// belongs to an account.
+// query. Open to any authenticated role (problem modifiers and group invites
+// are Coach/Admin-only in practice, but team invites come from Contestants
+// too) — deliberately matches only name/nickname (never email/institution,
+// unlike the admin user list's SearchByAll) so the endpoint can't be used to
+// confirm whether a given email belongs to an account, and already excludes
+// deactivated users (SearchActive).
 func (uc *SearchUsersUseCase) Execute(ctx context.Context, in SearchUsersInput) (*SearchUsersOutput, error) {
 	if len([]rune(in.Query)) < minSearchQueryLength {
 		return nil, apperror.NewValidation([]apperror.FieldError{
