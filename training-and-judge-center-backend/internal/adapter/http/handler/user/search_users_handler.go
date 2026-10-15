@@ -18,7 +18,7 @@ type searchUsersResponse struct {
 	Users []userSearchResultResp `json:"users"`
 }
 
-// @Summary      Search users (autocomplete, Coach/Admin only)
+// @Summary      Search users (autocomplete, any authenticated role)
 // @Tags         users
 // @Produce      json
 // @Security     BearerAuth
@@ -27,7 +27,6 @@ type searchUsersResponse struct {
 // @Success      200 {object} searchUsersResponse
 // @Failure      400 {object} apperror.AppError
 // @Failure      401 {object} apperror.AppError
-// @Failure      403 {object} apperror.AppError
 // @Router       /users/search [get]
 func (h *Handler) SearchUsers(w http.ResponseWriter, r *http.Request) {
 	limit := 0
