@@ -43,5 +43,9 @@ type Repository interface {
 	// filter suggestions, not to be an exhaustive tag registry (the UI also accepts typing any
 	// tag directly, so a tag outside the sample is still filterable, just not suggested).
 	DistinctTags(ctx context.Context, groupID string, statuses []Status, sampleSize int) ([]string, error)
+	// DistinctAuthorIDs returns the distinct author IDs of the `sampleSize` most recently
+	// created materials in groupID (same sampling rationale as DistinctTags — bounds the cost,
+	// feeds filter suggestions, not an exhaustive list).
+	DistinctAuthorIDs(ctx context.Context, groupID string, statuses []Status, sampleSize int) ([]string, error)
 	Delete(ctx context.Context, id string) error
 }

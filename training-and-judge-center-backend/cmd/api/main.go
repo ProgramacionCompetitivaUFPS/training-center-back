@@ -329,6 +329,7 @@ func main() {
 	getMaterialUseCase := appMaterial.NewGetMaterialUseCase(materialRepo, groupProvider, groupMemberProvider, authorProvider)
 	listMaterialsUseCase := appMaterial.NewListMaterialsUseCase(materialRepo, groupProvider, groupMemberProvider, authorProvider, authorIDProvider)
 	listMaterialTagsUseCase := appMaterial.NewListMaterialTagsUseCase(materialRepo, groupProvider, groupMemberProvider)
+	listMaterialAuthorsUseCase := appMaterial.NewListMaterialAuthorsUseCase(materialRepo, groupProvider, groupMemberProvider, authorProvider)
 	publishMaterialUseCase := appMaterial.NewPublishMaterialUseCase(materialRepo, groupProvider, authorProvider)
 	unpublishMaterialUseCase := appMaterial.NewUnpublishMaterialUseCase(materialRepo, groupProvider, authorProvider)
 	pinMaterialUseCase := appMaterial.NewPinMaterialUseCase(materialRepo, groupProvider, groupMemberProvider, authorProvider)
@@ -337,7 +338,7 @@ func main() {
 
 	materialHandler := handlerMaterial.NewHandler(
 		createMaterialUseCase, updateMaterialUseCase, getMaterialUseCase, listMaterialsUseCase,
-		listMaterialTagsUseCase,
+		listMaterialTagsUseCase, listMaterialAuthorsUseCase,
 		publishMaterialUseCase, unpublishMaterialUseCase, pinMaterialUseCase, unpinMaterialUseCase,
 		deleteMaterialUseCase,
 	)

@@ -1,4 +1,4 @@
-﻿package material
+package material
 
 import (
 	"context"
@@ -15,11 +15,12 @@ var testNow = time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
 // ── Repository mock ──────────────────────────────────────────────────────────
 
 type mockMaterialRepository struct {
-	saveFn         func(ctx context.Context, m *domainMaterial.Material) error
-	findByIDFn     func(ctx context.Context, id string) (*domainMaterial.Material, error)
-	listFn         func(ctx context.Context, groupID string, f domainMaterial.ListFilters) ([]*domainMaterial.Material, int, error)
-	distinctTagsFn func(ctx context.Context, groupID string, statuses []domainMaterial.Status, sampleSize int) ([]string, error)
-	deleteFn       func(ctx context.Context, id string) error
+	saveFn              func(ctx context.Context, m *domainMaterial.Material) error
+	findByIDFn          func(ctx context.Context, id string) (*domainMaterial.Material, error)
+	listFn              func(ctx context.Context, groupID string, f domainMaterial.ListFilters) ([]*domainMaterial.Material, int, error)
+	distinctTagsFn      func(ctx context.Context, groupID string, statuses []domainMaterial.Status, sampleSize int) ([]string, error)
+	distinctAuthorIDsFn func(ctx context.Context, groupID string, statuses []domainMaterial.Status, sampleSize int) ([]string, error)
+	deleteFn            func(ctx context.Context, id string) error
 }
 
 func (m *mockMaterialRepository) Save(ctx context.Context, mat *domainMaterial.Material) error {
@@ -43,6 +44,12 @@ func (m *mockMaterialRepository) List(ctx context.Context, groupID string, f dom
 func (m *mockMaterialRepository) DistinctTags(ctx context.Context, groupID string, statuses []domainMaterial.Status, sampleSize int) ([]string, error) {
 	if m.distinctTagsFn != nil {
 		return m.distinctTagsFn(ctx, groupID, statuses, sampleSize)
+	}
+	return nil, nil
+}
+func (m *mockMaterialRepository) DistinctAuthorIDs(ctx context.Context, groupID string, statuses []domainMaterial.Status, sampleSize int) ([]string, error) {
+	if m.distinctAuthorIDsFn != nil {
+		return m.distinctAuthorIDsFn(ctx, groupID, statuses, sampleSize)
 	}
 	return nil, nil
 }
@@ -102,8 +109,8 @@ func groupVisibilityNotFound() *mockGroupVisibilityProvider {
 // ── GroupMemberProvider mock ─────────────────────────────────────────────────
 
 type mockGroupMemberProvider struct {
-	isLeadFn    func(ctx context.Context, userID, groupID string) (bool, error)
-	isMemberFn  func(ctx context.Context, userID, groupID string) (bool, error)
+	isLeadFn   func(ctx context.Context, userID, groupID string) (bool, error)
+	isMemberFn func(ctx context.Context, userID, groupID string) (bool, error)
 }
 
 func (m *mockGroupMemberProvider) IsLeadOfGroup(ctx context.Context, userID, groupID string) (bool, error) {
