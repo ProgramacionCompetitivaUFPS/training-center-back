@@ -286,8 +286,12 @@ type mockContestSubmissionsProvider struct {
 	subs []appcontest.RichSubmissionData
 }
 
-func (m *mockContestSubmissionsProvider) ListByContest(_ context.Context, _ string, _ appcontest.ContestSubmissionFilters) ([]appcontest.RichSubmissionData, error) {
-	return m.subs, nil
+// ListByContest pages like the SQL adapter does: Limit/Offset over the stored rows.
+func (m *mockContestSubmissionsProvider) ListByContest(_ context.Context, _ string, f appcontest.ContestSubmissionFilters) ([]appcontest.RichSubmissionData, int, error) {
+	total := len(m.subs)
+	start := min(f.Offset, total)
+	end := min(start+f.Limit, total)
+	return m.subs[start:end], total, nil
 }
 
 // ── TeamSelectionChecker no-op ───────────────────────────────────────────────

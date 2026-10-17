@@ -23,7 +23,7 @@ func (p *ContestSubmissionProvider) ListByContest(
 	ctx context.Context,
 	contestID string,
 	filters appContest.ContestSubmissionFilters,
-) ([]appContest.RichSubmissionData, error) {
+) ([]appContest.RichSubmissionData, int, error) {
 	q := infraPostgres.GetQuerier(ctx, p.db)
 
 	args := []any{contestID}
@@ -50,6 +50,38 @@ func (p *ContestSubmissionProvider) ListByContest(
 			)`, n, n)
 		args = append(args, *filters.Nickname)
 		n++
+	}
+	if filters.SubmittedAtMost != nil {
+		where += fmt.Sprintf(" AND s.submitted_at <= $%d", n)
+		args = append(args, *filters.SubmittedAtMost)
+		n++
+	}
+	if filters.SubmittedAfter != nil {
+		where += fmt.Sprintf(" AND s.submitted_at > $%d", n)
+		args = append(args, *filters.SubmittedAfter)
+		n++
+	}
+	if filters.FreezeAt != nil {
+		// NULL standing_id never matches the caller, so it stays hidden after the freeze
+		where += fmt.Sprintf(" AND (s.submitted_at < $%d OR s.standing_id::text = $%d)", n, n+1)
+		args = append(args, *filters.FreezeAt, filters.ExceptStandingID)
+		n += 2
+	}
+
+	// p and u are inner joins in the page query too, so the count matches it row for row
+	var total int
+	countQuery := `
+		SELECT COUNT(*)
+		FROM submissions s
+		JOIN problems p ON p.id = s.problem_id
+		JOIN users u ON u.id = s.user_id
+		WHERE s.contest_id = $1` + where
+	if err := q.QueryRow(ctx, countQuery, args...).Scan(&total); err != nil {
+		slog.ErrorContext(ctx, "failed to count contest submissions", "contest_id", contestID, "error", err)
+		return nil, 0, apperror.NewInternal()
+	}
+	if total == 0 || filters.Offset >= total {
+		return nil, total, nil
 	}
 
 	// correlated subquery avoids multiple rows per submission from team joins
@@ -88,12 +120,14 @@ func (p *ContestSubmissionProvider) ListByContest(
 		LEFT JOIN contest_team_participants ctp ON ctp.team_id::text = s.standing_id::text AND ctp.contest_id = s.contest_id
 		LEFT JOIN teams t ON t.id = ctp.team_id
 		WHERE s.contest_id = $1%s
-		ORDER BY s.submitted_at DESC, s.id`, where)
+		ORDER BY s.submitted_at DESC, s.id
+		LIMIT $%d OFFSET $%d`, where, n, n+1)
+	args = append(args, filters.Limit, filters.Offset)
 
 	rows, err := q.Query(ctx, query, args...)
 	if err != nil {
 		slog.ErrorContext(ctx, "failed to list contest submissions", "contest_id", contestID, "error", err)
-		return nil, apperror.NewInternal()
+		return nil, 0, apperror.NewInternal()
 	}
 	defer rows.Close()
 
@@ -131,7 +165,7 @@ func (p *ContestSubmissionProvider) ListByContest(
 			&d.Visibility,
 		); err != nil {
 			slog.ErrorContext(ctx, "failed to scan contest submission row", "error", err)
-			return nil, apperror.NewInternal()
+			return nil, 0, apperror.NewInternal()
 		}
 		if standingID != nil {
 			d.StandingID = *standingID
@@ -146,7 +180,7 @@ func (p *ContestSubmissionProvider) ListByContest(
 	}
 	if err := rows.Err(); err != nil {
 		slog.ErrorContext(ctx, "contest submissions rows error", "error", err)
-		return nil, apperror.NewInternal()
+		return nil, 0, apperror.NewInternal()
 	}
-	return result, nil
+	return result, total, nil
 }
