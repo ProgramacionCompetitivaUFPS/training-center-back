@@ -11,9 +11,17 @@
 -- DROP INDEX CONCURRENTLY por la misma razón que en la 038/039 (materials recibe
 -- escrituras). DROP COLUMN no lleva CONCURRENTLY — no existe para eso: es un cambio de
 -- catálogo, el lock que toma es breve sin importar el tamaño de la tabla, a diferencia
--- de construir o tirar un índice.
+-- de construir o tirar un índice. "Breve" es cuánto tarda una vez que lo consigue, no
+-- cuánto espera para conseguirlo: ACCESS EXCLUSIVE necesita que termine cualquier otra
+-- transacción con un lock sobre materials, y mientras espera, encola detrás de sí toda
+-- lectura/escritura nueva a la tabla (aunque esas sí serían compatibles entre ellas). Un
+-- lock_timeout acotado hace que falle rápido y limpio en vez de colgarse indefinidamente
+-- si hay algo más reteniendo la tabla — se reintenta la migración cuando esa transacción
+-- termine.
 DROP INDEX CONCURRENTLY IF EXISTS idx_materials_search;
+SET lock_timeout = '5s';
 ALTER TABLE materials DROP COLUMN IF EXISTS search_vector;
+RESET lock_timeout;
 
 -- +goose Down
 
