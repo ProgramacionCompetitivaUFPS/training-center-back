@@ -157,6 +157,7 @@ func NewRouter(h *Handlers, s *Services, allowedOrigins []string) *chi.Mux {
 			r.Get("/", h.Problem.ListProblems)
 			r.Post("/", h.Problem.Create)
 			r.Post("/import", h.Problem.Import)
+			r.Get("/tags", h.Problem.ListTags)
 
 			r.Route("/p/{slug}", func(r chi.Router) {
 				r.Get("/", h.Problem.GetProblem)
