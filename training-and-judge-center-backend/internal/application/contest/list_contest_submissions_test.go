@@ -296,7 +296,11 @@ func TestListContestSubmissions_Lead_SeesAllDuringFreeze(t *testing.T) {
 }
 
 func TestListContestSubmissions_PhaseFilter(t *testing.T) {
-	endTime := finishedContest().EndTime()
+	// One instance, reused below: finishedContest() reads time.Now() internally, so calling
+	// it again per subtest drifted endTime from the boundary the use case actually derived,
+	// making the equality check below flaky by a few hundred microseconds.
+	contest := finishedContest()
+	endTime := contest.EndTime()
 	tests := []struct {
 		phase              string
 		wantAtMost, wantAf bool
@@ -308,7 +312,7 @@ func TestListContestSubmissions_PhaseFilter(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.phase, func(t *testing.T) {
 			var got ContestSubmissionFilters
-			uc := newListSubmissionsUseCase(finishedContest(), visibleGroup(), isMemberNotLead(), capturingSubsProvider(&got))
+			uc := newListSubmissionsUseCase(contest, visibleGroup(), isMemberNotLead(), capturingSubsProvider(&got))
 
 			input := baseInput()
 			input.Phase = tt.phase
