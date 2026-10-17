@@ -19,9 +19,17 @@ ALTER TABLE materials DROP COLUMN IF EXISTS search_vector;
 
 -- Camino de vuelta, poco crítico (solo se usa si hay que revertir): el ADD COLUMN con
 -- STORED reescribe la tabla completa y no admite CONCURRENTLY de ninguna forma, así que
--- esa parte no se puede hacer más segura — se deja tal cual.
-ALTER TABLE materials ADD COLUMN search_vector TSVECTOR GENERATED ALWAYS AS (
+-- esa parte no se puede hacer más segura — se deja tal cual. IF NOT EXISTS sí, para que
+-- un reintento tras un fallo a medias no choque con "la columna ya existe".
+ALTER TABLE materials ADD COLUMN IF NOT EXISTS search_vector TSVECTOR GENERATED ALWAYS AS (
     setweight(to_tsvector('english', title), 'A') ||
     setweight(to_tsvector('english', coalesce(content, '')), 'B')
 ) STORED;
-CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_materials_search ON materials USING GIN(search_vector);
+
+-- Si un intento previo de CREATE INDEX CONCURRENTLY falló a medias, Postgres deja el
+-- índice creado pero marcado INVALID — y como el nombre ya existe, IF NOT EXISTS lo
+-- daría por "ya está" sin reconstruirlo nunca. Se tira primero sin condición (es idempotente
+-- y barato: a lo sumo reconstruye uno que ya estaba bien) para que el intento siguiente
+-- siempre arranque limpio.
+DROP INDEX CONCURRENTLY IF EXISTS idx_materials_search;
+CREATE INDEX CONCURRENTLY idx_materials_search ON materials USING GIN(search_vector);
