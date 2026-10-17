@@ -394,14 +394,14 @@ func (m *mockStandingsCache) Invalidate(ctx context.Context, contestID string) e
 // ── ContestSubmissionsProvider mock ──────────────────────────────────────────
 
 type mockContestSubmissionsProvider struct {
-	listByContestFn func(ctx context.Context, contestID string, filters ContestSubmissionFilters) ([]RichSubmissionData, error)
+	listByContestFn func(ctx context.Context, contestID string, filters ContestSubmissionFilters) ([]RichSubmissionData, int, error)
 }
 
-func (m *mockContestSubmissionsProvider) ListByContest(ctx context.Context, contestID string, filters ContestSubmissionFilters) ([]RichSubmissionData, error) {
+func (m *mockContestSubmissionsProvider) ListByContest(ctx context.Context, contestID string, filters ContestSubmissionFilters) ([]RichSubmissionData, int, error) {
 	if m.listByContestFn != nil {
 		return m.listByContestFn(ctx, contestID, filters)
 	}
-	return nil, nil
+	return nil, 0, nil
 }
 
 // ── CallerStandingProvider mock ───────────────────────────────────────────────
