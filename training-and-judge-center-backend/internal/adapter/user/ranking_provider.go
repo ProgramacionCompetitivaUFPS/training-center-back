@@ -4,6 +4,9 @@ import (
 	"context"
 	"log/slog"
 
+	"github.com/jackc/pgx/v5"
+	"golang.org/x/sync/errgroup"
+
 	infraPostgres "github.com/training-judge-center/backend/internal/adapter/postgres"
 	appuser "github.com/training-judge-center/backend/internal/application/user"
 	"github.com/training-judge-center/backend/pkg/apperror"
@@ -14,6 +17,7 @@ type RankingProvider struct {
 }
 
 var _ appuser.RankingProvider = (*RankingProvider)(nil)
+var _ appuser.RankingSource = (*RankingProvider)(nil)
 
 func NewRankingProvider(db infraPostgres.Querier) *RankingProvider {
 	return &RankingProvider{db: db}
@@ -58,4 +62,54 @@ func (p *RankingProvider) GetRanking(ctx context.Context, userID string) (proble
 		return 0, nil, 0, apperror.NewInternal()
 	}
 	return problemsSolved, pos, totalUsers, nil
+}
+
+// GetAllRankings is GetRanking's whole-platform counterpart, used only by
+// CachedRankingProvider to rebuild the cache. Same accepted_pairs → user_solved shape
+// as GetRanking, but returns every user's count in one pass instead of discarding all
+// but one — this is the query whose cost CachedRankingProvider amortizes across however
+// many profile views happen before the cache goes stale.
+func (p *RankingProvider) GetAllRankings(ctx context.Context) (map[string]int, int, error) {
+	q := infraPostgres.GetQuerier(ctx, p.db)
+
+	g, gctx := errgroup.WithContext(ctx)
+
+	var rows pgx.Rows
+	var queryErr error
+	var totalUsers int
+
+	g.Go(func() error {
+		rows, queryErr = q.Query(gctx, `
+			SELECT user_id, COUNT(DISTINCT problem_id)::INTEGER AS solved
+			FROM submissions
+			WHERE status = 'ACCEPTED'
+			GROUP BY user_id`,
+		)
+		return queryErr
+	})
+	g.Go(func() error {
+		return q.QueryRow(gctx, `SELECT COUNT(*)::INTEGER FROM users WHERE status = 'ACTIVE'`).Scan(&totalUsers)
+	})
+
+	if err := g.Wait(); err != nil {
+		slog.ErrorContext(ctx, "profile stats: failed to rebuild platform ranking", "error", err)
+		return nil, 0, apperror.NewInternal()
+	}
+	defer rows.Close()
+
+	solved := make(map[string]int)
+	for rows.Next() {
+		var userID string
+		var count int
+		if err := rows.Scan(&userID, &count); err != nil {
+			slog.ErrorContext(ctx, "profile stats: failed to scan ranking row", "error", err)
+			return nil, 0, apperror.NewInternal()
+		}
+		solved[userID] = count
+	}
+	if err := rows.Err(); err != nil {
+		slog.ErrorContext(ctx, "profile stats: error iterating ranking rows", "error", err)
+		return nil, 0, apperror.NewInternal()
+	}
+	return solved, totalUsers, nil
 }
