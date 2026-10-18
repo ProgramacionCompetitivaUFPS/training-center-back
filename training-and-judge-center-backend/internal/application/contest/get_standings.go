@@ -145,33 +145,46 @@ func NewGetStandingsUseCase(
 	}
 }
 
-func (uc *GetStandingsUseCase) Execute(ctx context.Context, in GetStandingsInput) (*GetStandingsOutput, error) {
-	contest, err := uc.contestRepo.FindByID(ctx, in.ContestID)
+// authorize loads the contest and enforces the same visibility rule GetStandings
+// and ExecuteFilterOptions both need: a hidden group's standings/filter data is
+// only visible to its members, leads, or an admin. Returns the contest plus the
+// caller's role flags so Execute can reuse them for the freeze/realtime check.
+func (uc *GetStandingsUseCase) authorize(ctx context.Context, groupID, contestID string, currentUser appshared.CurrentUser) (*domainContest.Contest, bool, bool, error) {
+	contest, err := uc.contestRepo.FindByID(ctx, contestID)
 	if err != nil {
-		return nil, err
+		return nil, false, false, err
 	}
-	if contest.GroupID().Value() != in.GroupID {
-		return nil, apperror.NewNotFound(domainContest.ErrCodeContestNotFound, "contest not found")
+	if contest.GroupID().Value() != groupID {
+		return nil, false, false, apperror.NewNotFound(domainContest.ErrCodeContestNotFound, "contest not found")
 	}
 
-	group, err := uc.groupProvider.FindByID(ctx, in.GroupID)
+	group, err := uc.groupProvider.FindByID(ctx, groupID)
 	if err != nil {
-		return nil, err
+		return nil, false, false, err
 	}
 
-	isAdmin := in.CurrentUser.IsAdmin()
+	isAdmin := currentUser.IsAdmin()
 	isMember, isLead := false, false
 	if !isAdmin {
-		role, err := uc.memberProvider.GetMemberRole(ctx, in.CurrentUser.ID, in.GroupID)
+		role, err := uc.memberProvider.GetMemberRole(ctx, currentUser.ID, groupID)
 		if err != nil {
-			return nil, err
+			return nil, false, false, err
 		}
 		isMember = role != nil
 		isLead = role != nil && *role == "LEAD"
 	}
 
 	if !group.IsVisible && !isMember && !isLead && !isAdmin {
-		return nil, apperror.NewNotFound(domainContest.ErrCodeContestNotFound, "contest not found")
+		return nil, false, false, apperror.NewNotFound(domainContest.ErrCodeContestNotFound, "contest not found")
+	}
+
+	return contest, isAdmin, isLead, nil
+}
+
+func (uc *GetStandingsUseCase) Execute(ctx context.Context, in GetStandingsInput) (*GetStandingsOutput, error) {
+	contest, isAdmin, isLead, err := uc.authorize(ctx, in.GroupID, in.ContestID, in.CurrentUser)
+	if err != nil {
+		return nil, err
 	}
 
 	now := time.Now()
@@ -208,6 +221,68 @@ func (uc *GetStandingsUseCase) Execute(ctx context.Context, in GetStandingsInput
 		return nil, err
 	}
 	return uc.buildOutput(ctx, rebuilt, contest, applyFreeze, status, freezeTime, in)
+}
+
+// GetStandingsFilterOptionsInput identifies the contest whose participants'
+// country/city/institution values should be listed.
+type GetStandingsFilterOptionsInput struct {
+	CurrentUser appshared.CurrentUser
+	GroupID     string
+	ContestID   string
+}
+
+// StandingsFilterOptionsOutput is the distinct, non-empty, alphabetically
+// sorted country/city/institution values across the contest's participants —
+// so the standings filter can offer a closed selector instead of free text
+// with an unknown exact spelling (same shape as the admin users filter).
+type StandingsFilterOptionsOutput struct {
+	Countries    []string
+	Cities       []string
+	Institutions []string
+}
+
+// ExecuteFilterOptions reads from the same StandingsCache entry GetStandings
+// rebuilds and keeps fresh — cached.Profiles already holds every individual
+// contestant's and team member's profile, so this needs no extra query.
+func (uc *GetStandingsUseCase) ExecuteFilterOptions(ctx context.Context, in GetStandingsFilterOptionsInput) (*StandingsFilterOptionsOutput, error) {
+	contest, _, _, err := uc.authorize(ctx, in.GroupID, in.ContestID, in.CurrentUser)
+	if err != nil {
+		return nil, err
+	}
+
+	cached, err := uc.standingsCache.Get(ctx, in.ContestID)
+	if err != nil || cached == nil {
+		cached, err = uc.rebuild(ctx, in.ContestID, contest.EndTime())
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	return &StandingsFilterOptionsOutput{
+		Countries:    distinctProfileField(cached.Profiles, func(p *ParticipantProfile) string { return p.Country }),
+		Cities:       distinctProfileField(cached.Profiles, func(p *ParticipantProfile) string { return p.City }),
+		Institutions: distinctProfileField(cached.Profiles, func(p *ParticipantProfile) string { return p.Institution }),
+	}, nil
+}
+
+// distinctProfileField returns the distinct, non-empty values field reads off
+// each profile, sorted alphabetically.
+func distinctProfileField(profiles map[string]*ParticipantProfile, field func(*ParticipantProfile) string) []string {
+	set := make(map[string]struct{}, len(profiles))
+	for _, p := range profiles {
+		if p == nil {
+			continue
+		}
+		if v := field(p); v != "" {
+			set[v] = struct{}{}
+		}
+	}
+	values := make([]string, 0, len(set))
+	for v := range set {
+		values = append(values, v)
+	}
+	sort.Strings(values)
+	return values
 }
 
 func (uc *GetStandingsUseCase) rebuild(ctx context.Context, contestID string, endTime time.Time) (*CachedStandings, error) {

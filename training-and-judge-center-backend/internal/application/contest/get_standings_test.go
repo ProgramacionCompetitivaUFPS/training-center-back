@@ -608,3 +608,96 @@ func cleanSolvePenalty(t *testing.T) int {
 	}
 	return out.Entries[0].TotalPenalty
 }
+
+func TestGetStandingsUseCase_ExecuteFilterOptions_CacheHitDerivesDistinctSortedValues(t *testing.T) {
+	cached := &CachedStandings{
+		Profiles: map[string]*ParticipantProfile{
+			callerID: {ID: callerID, Country: "Colombia", City: "Bogotá", Institution: "UFPS"},
+			otherID:  {ID: otherID, Country: "Argentina", City: "Bogotá", Institution: ""},
+		},
+		LastUpdated: time.Now(),
+	}
+	cache := &mockStandingsCache{
+		getFn: func(_ context.Context, _ string) (*CachedStandings, error) { return cached, nil },
+	}
+	uc := newGetStandingsUseCase(activeContest(), nil, nil, cache, visibleGroup(), isMemberNotLead())
+
+	out, err := uc.ExecuteFilterOptions(context.Background(), GetStandingsFilterOptionsInput{
+		CurrentUser: asContestant(callerID),
+		GroupID:     testGroupID,
+		ContestID:   testContestID,
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(out.Countries) != 2 || out.Countries[0] != "Argentina" || out.Countries[1] != "Colombia" {
+		t.Errorf("Countries = %v, want sorted [Argentina Colombia]", out.Countries)
+	}
+	if len(out.Cities) != 1 || out.Cities[0] != "Bogotá" {
+		t.Errorf("Cities = %v, want deduped [Bogotá]", out.Cities)
+	}
+	if len(out.Institutions) != 1 || out.Institutions[0] != "UFPS" {
+		t.Errorf("Institutions = %v, want [UFPS] (otherID's empty institution excluded)", out.Institutions)
+	}
+}
+
+func TestGetStandingsUseCase_ExecuteFilterOptions_CacheMissRebuildsFromSource(t *testing.T) {
+	regs := []*domainContest.ContestRegistration{reg(callerID), reg(otherID)}
+	profiles := map[string]*ParticipantProfile{
+		callerID: {ID: callerID, Country: "Colombia", City: "Bogotá", Institution: "UFPS"},
+		otherID:  {ID: otherID, Country: "Colombia", City: "Cali", Institution: "UFPS"},
+	}
+	var setCalled bool
+	cache := &mockStandingsCache{
+		setFn: func(_ context.Context, _ string, _ *CachedStandings) error { setCalled = true; return nil },
+	}
+	profileProvider := &mockParticipantProfileProvider{
+		getProfilesFn: func(_ context.Context, _ []string) (map[string]*ParticipantProfile, error) { return profiles, nil },
+	}
+	uc := NewGetStandingsUseCase(
+		&mockContestRepository{findByIDFn: func(_ context.Context, _ string) (*domainContest.Contest, error) { return activeContest(), nil }},
+		&mockRegistrationRepository{listByContestFn: func(_ context.Context, _ string, _, _ int) ([]*domainContest.ContestRegistration, int, error) {
+			return regs, len(regs), nil
+		}},
+		&mockStandingsSubmissionProvider{listByContestFn: func(_ context.Context, _ string) ([]ContestSubmissionData, error) { return nil, nil }},
+		&mockTeamParticipantProvider{},
+		profileProvider,
+		&mockTeamDisplayProvider{},
+		defaultProblemProvider(),
+		&mockGroupProvider{findByIDFn: func(_ context.Context, _ string) (*GroupInfo, error) { return visibleGroup(), nil }},
+		isMemberNotLead(),
+		cache,
+		testStaleness,
+	)
+
+	out, err := uc.ExecuteFilterOptions(context.Background(), GetStandingsFilterOptionsInput{
+		CurrentUser: asContestant(callerID),
+		GroupID:     testGroupID,
+		ContestID:   testContestID,
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !setCalled {
+		t.Error("expected the cache miss to trigger a rebuild that populates the cache")
+	}
+	if len(out.Countries) != 1 || out.Countries[0] != "Colombia" {
+		t.Errorf("Countries = %v, want deduped [Colombia]", out.Countries)
+	}
+	if len(out.Cities) != 2 {
+		t.Errorf("Cities = %v, want 2 distinct cities (Bogotá, Cali)", out.Cities)
+	}
+}
+
+func TestGetStandingsUseCase_ExecuteFilterOptions_NotFoundForNonMemberOfHiddenGroup(t *testing.T) {
+	uc := newGetStandingsUseCase(activeContest(), nil, nil, emptyCache(), hiddenGroup(), notLead())
+
+	_, err := uc.ExecuteFilterOptions(context.Background(), GetStandingsFilterOptionsInput{
+		CurrentUser: asContestant(callerID),
+		GroupID:     testGroupID,
+		ContestID:   testContestID,
+	})
+	if err == nil {
+		t.Fatal("expected not found error, got nil")
+	}
+}
