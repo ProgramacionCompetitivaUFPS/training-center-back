@@ -117,6 +117,7 @@ func NewRouter(h *Handlers, s *Services, allowedOrigins []string) *chi.Mux {
 				r.Get("/{contestId}/register/status", h.Contest.GetRegistrationStatus)
 				r.Get("/{contestId}/registrations", h.Contest.ListRegistrations)
 				r.Get("/{contestId}/standings", h.Contest.GetStandings)
+				r.Get("/{contestId}/standings/filters", h.Contest.GetStandingsFilterOptions)
 				r.Get("/{contestId}/submissions", h.Contest.ListContestSubmissions)
 				r.Route("/{contestId}/team-registrations", func(r chi.Router) {
 					r.Get("/", h.Team.ListTeamRegistrations)
