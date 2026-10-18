@@ -253,13 +253,22 @@ func main() {
 	getDashboardUseCase := appuser.NewGetDashboardUseCase(dashboardSubmissionProvider, dashboardContestProvider, dashboardMaterialProvider, problemsSolvedProvider)
 
 	// user profile stats adapters
-	rankingProvider := user.NewRankingProvider(dbPool)
+	rankingSource := user.NewRankingProvider(dbPool)
+	rankingCache := user.NewRankingCache(redisClient)
+	// Same 30s staleness as standings — nothing in HU-USR-21 requires this to be
+	// real-time (it tracks "progreso a largo plazo", explicitly not the live Dashboard),
+	// but there is no reason for it to be staler than standings either, and 30s keeps a
+	// live demo (solve something, immediately check the profile) from ever showing a
+	// visibly outdated number. See Validacion/rendimiento/resultados.md (tesis repo) for
+	// why this needed a cache at all: GetRanking aggregates every ACCEPTED submission
+	// platform-wide, not just the caller's own, on every profile view.
+	cachedRankingProvider := user.NewCachedRankingProvider(rankingSource, rankingCache, 30*time.Second)
 	submissionStatsProvider := adaptersubmission.NewSubmissionStatsProvider(dbPool)
 	contestParticipationProvider := adaptercontest.NewContestParticipationProvider(dbPool)
 	topicStatsProvider := problem.NewTopicStatsProvider(dbPool)
 
 	// user profile stats use case
-	getProfileStatsUseCase := appuser.NewGetProfileStatsUseCase(rankingProvider, submissionStatsProvider, contestParticipationProvider, topicStatsProvider)
+	getProfileStatsUseCase := appuser.NewGetProfileStatsUseCase(cachedRankingProvider, submissionStatsProvider, contestParticipationProvider, topicStatsProvider)
 
 	// Handlers
 	userHandler := handlerUser.NewHandler(createUserUseCase, getMyProfileUseCase, getUserByNicknameUseCase, updateUserUseCase, updatePasswordUseCase, adminUpdateUserUseCase, adminDeactivateUserUseCase, listUsersUseCase, listUserFilterOptionsUseCase, requestEmailChangeUseCase, confirmEmailChangeUseCase, requestPasswordRecoveryUseCase, resetPasswordUseCase, requestDeactivationUseCase, confirmDeactivationUseCase, getDashboardUseCase, getProfileStatsUseCase, searchUsersUseCase, linkGoogleIdentityUseCase, unlinkGoogleIdentityUseCase, setPasswordUseCase)

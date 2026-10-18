@@ -2,6 +2,7 @@ package contest
 
 import (
 	"context"
+	"errors"
 	"testing"
 	"time"
 
@@ -220,6 +221,41 @@ func TestGetStandingsUseCase_CacheMissRebuild(t *testing.T) {
 	}
 	if !setCalled {
 		t.Error("expected cache Set to be called on rebuild")
+	}
+}
+
+func TestGetStandingsUseCase_CacheGetErrorFallsBackToRebuild(t *testing.T) {
+	regs := []*domainContest.ContestRegistration{reg(callerID), reg(otherID)}
+	subs := []ContestSubmissionData{
+		sub(callerID, "A", "ACCEPTED", 90),
+	}
+	var setCalled bool
+	cache := &mockStandingsCache{
+		getFn: func(_ context.Context, _ string) (*CachedStandings, error) {
+			return nil, errors.New("redis unreachable")
+		},
+		setFn: func(_ context.Context, _ string, _ *CachedStandings) error {
+			setCalled = true
+			return nil
+		},
+	}
+	uc := newGetStandingsUseCase(activeContest(), regs, subs, cache, visibleGroup(), isMemberNotLead())
+
+	out, err := uc.Execute(context.Background(), GetStandingsInput{
+		CurrentUser: asContestant(callerID),
+		GroupID:     testGroupID,
+		ContestID:   testContestID,
+		Page:        1,
+		Limit:       50,
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v (a cache read failure should fall back to rebuild)", err)
+	}
+	if out.Total != 2 {
+		t.Errorf("total=%d, want 2", out.Total)
+	}
+	if !setCalled {
+		t.Error("expected the fallback rebuild to overwrite the cache entry")
 	}
 }
 
