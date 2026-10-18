@@ -151,6 +151,18 @@ func (m *mockProblemDisplayProvider) GetProblemByID(_ context.Context, id string
 	return &appsubmission.ProblemDisplay{Slug: "two-sum", Title: "Two Sum"}, nil
 }
 
+func (m *mockProblemDisplayProvider) GetProblemsByIDs(ctx context.Context, ids []string) (map[string]*appsubmission.ProblemDisplay, error) {
+	result := make(map[string]*appsubmission.ProblemDisplay, len(ids))
+	for _, id := range ids {
+		d, err := m.GetProblemByID(ctx, id)
+		if err != nil {
+			continue
+		}
+		result[id] = d
+	}
+	return result, nil
+}
+
 type mockUserDisplayProvider struct {
 	fn func(id string) (*appsubmission.UserDisplay, error)
 }
@@ -162,6 +174,18 @@ func (m *mockUserDisplayProvider) GetUserByID(_ context.Context, id string) (*ap
 	return &appsubmission.UserDisplay{ID: id, Nickname: "author"}, nil
 }
 
+func (m *mockUserDisplayProvider) GetUsersByIDs(ctx context.Context, ids []string) (map[string]*appsubmission.UserDisplay, error) {
+	result := make(map[string]*appsubmission.UserDisplay, len(ids))
+	for _, id := range ids {
+		d, err := m.GetUserByID(ctx, id)
+		if err != nil {
+			return nil, err
+		}
+		result[id] = d
+	}
+	return result, nil
+}
+
 type mockContestDisplayProvider struct {
 	fn func(id string) (*appsubmission.ContestDisplay, error)
 }
@@ -171,6 +195,18 @@ func (m *mockContestDisplayProvider) GetContestByID(_ context.Context, id string
 		return m.fn(id)
 	}
 	return &appsubmission.ContestDisplay{ID: id, Name: "Test Contest"}, nil
+}
+
+func (m *mockContestDisplayProvider) GetContestsByIDs(ctx context.Context, ids []string) (map[string]*appsubmission.ContestDisplay, error) {
+	result := make(map[string]*appsubmission.ContestDisplay, len(ids))
+	for _, id := range ids {
+		d, err := m.GetContestByID(ctx, id)
+		if err != nil {
+			return nil, err
+		}
+		result[id] = d
+	}
+	return result, nil
 }
 
 type mockTeamChecker struct {
