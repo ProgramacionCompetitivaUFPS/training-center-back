@@ -251,7 +251,11 @@ func (uc *GetStandingsUseCase) ExecuteFilterOptions(ctx context.Context, in GetS
 	}
 
 	cached, err := uc.standingsCache.Get(ctx, in.ContestID)
-	if err != nil || cached == nil {
+	if err == nil && cached != nil {
+		if time.Since(cached.LastUpdated) > uc.staleness {
+			go uc.backgroundRefresh(in.ContestID)
+		}
+	} else {
 		cached, err = uc.rebuild(ctx, in.ContestID, contest.EndTime())
 		if err != nil {
 			return nil, err

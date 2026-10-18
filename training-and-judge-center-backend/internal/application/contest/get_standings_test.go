@@ -641,6 +641,42 @@ func TestGetStandingsUseCase_ExecuteFilterOptions_CacheHitDerivesDistinctSortedV
 	}
 }
 
+func TestGetStandingsUseCase_ExecuteFilterOptions_StaleHitRefreshesInBackground(t *testing.T) {
+	cached := &CachedStandings{
+		Profiles: map[string]*ParticipantProfile{
+			callerID: {ID: callerID, Country: "Colombia"},
+		},
+		LastUpdated: time.Now().Add(-time.Hour), // long past testStaleness
+	}
+	refreshed := make(chan struct{}, 1)
+	cache := &mockStandingsCache{
+		getFn: func(_ context.Context, _ string) (*CachedStandings, error) { return cached, nil },
+		acquireRefreshLockFn: func(_ context.Context, _ string, _ time.Duration) (bool, error) {
+			refreshed <- struct{}{}
+			return false, nil // skip the rebuild itself; only the trigger matters here
+		},
+	}
+	uc := newGetStandingsUseCase(activeContest(), nil, nil, cache, visibleGroup(), isMemberNotLead())
+
+	out, err := uc.ExecuteFilterOptions(context.Background(), GetStandingsFilterOptionsInput{
+		CurrentUser: asContestant(callerID),
+		GroupID:     testGroupID,
+		ContestID:   testContestID,
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(out.Countries) != 1 || out.Countries[0] != "Colombia" {
+		t.Errorf("Countries = %v, want the stale [Colombia] (should not block on refresh)", out.Countries)
+	}
+
+	select {
+	case <-refreshed:
+	case <-time.After(2 * time.Second):
+		t.Fatal("expected a stale filter-options hit to start a background refresh within 2s")
+	}
+}
+
 func TestGetStandingsUseCase_ExecuteFilterOptions_CacheMissRebuildsFromSource(t *testing.T) {
 	regs := []*domainContest.ContestRegistration{reg(callerID), reg(otherID)}
 	profiles := map[string]*ParticipantProfile{
