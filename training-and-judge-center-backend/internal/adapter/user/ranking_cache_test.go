@@ -7,8 +7,8 @@ import (
 
 	"github.com/alicebob/miniredis/v2"
 	"github.com/redis/go-redis/v9"
-	appuser "github.com/training-judge-center/backend/internal/application/user"
 	"github.com/training-judge-center/backend/internal/adapter/user"
+	appuser "github.com/training-judge-center/backend/internal/application/user"
 )
 
 func newTestRankingCache(t *testing.T) (*user.RankingCache, *miniredis.Miniredis) {

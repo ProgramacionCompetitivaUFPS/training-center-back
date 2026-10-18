@@ -14,9 +14,9 @@ var _ appuser.RankingProvider = (*CachedRankingProvider)(nil)
 // platform-wide ranking from RankingCache instead of recomputing it from Postgres on
 // every call — same stale-while-revalidate shape as GetStandingsUseCase
 // (internal/application/contest/get_standings.go): a cache hit is served immediately
-// even if stale, a stale hit kicks a background rebuild for the *next* caller, and a
-// cold cache rebuilds synchronously under a refresh lock so concurrent callers don't
-// all rebuild at once.
+// even if stale, a stale hit kicks a background rebuild for the *next* caller (under a
+// refresh lock, so concurrent callers don't all rebuild at once), and a cold cache or a
+// cache read error rebuilds synchronously.
 //
 // Unlike standings, there is one ranking for the whole platform, not one per contest —
 // no contestID, no per-entity cache key.
@@ -38,11 +38,7 @@ func NewCachedRankingProvider(source appuser.RankingSource, cache appuser.Rankin
 
 func (p *CachedRankingProvider) GetRanking(ctx context.Context, userID string) (int, *int, int, error) {
 	cached, err := p.cache.Get(ctx)
-	if err != nil {
-		return 0, nil, 0, err
-	}
-
-	if cached != nil {
+	if err == nil && cached != nil {
 		if time.Since(cached.LastUpdated) > p.staleness {
 			go p.backgroundRefresh()
 		}
@@ -50,6 +46,9 @@ func (p *CachedRankingProvider) GetRanking(ctx context.Context, userID string) (
 		return solved, position, totalUsers, nil
 	}
 
+	// Cache miss or cache error (already logged by the cache adapter): fall back to the
+	// source so a Redis outage doesn't take profile stats down with it. rebuild's Set
+	// also overwrites an entry that failed to unmarshal, which would otherwise never expire.
 	rebuilt, err := p.rebuild(ctx)
 	if err != nil {
 		return 0, nil, 0, err

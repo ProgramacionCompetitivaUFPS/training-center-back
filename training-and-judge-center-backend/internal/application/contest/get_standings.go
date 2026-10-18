@@ -194,17 +194,15 @@ func (uc *GetStandingsUseCase) Execute(ctx context.Context, in GetStandingsInput
 	}
 
 	cached, err := uc.standingsCache.Get(ctx, in.ContestID)
-	if err != nil {
-		return nil, err
-	}
-
-	if cached != nil {
+	if err == nil && cached != nil {
 		if time.Since(cached.LastUpdated) > uc.staleness {
 			go uc.backgroundRefresh(in.ContestID)
 		}
 		return uc.buildOutput(ctx, cached, contest, applyFreeze, status, freezeTime, in)
 	}
 
+	// Cache miss or cache error (already logged by the cache adapter): rebuild from the
+	// source. rebuild's Set also overwrites an entry that failed to unmarshal.
 	rebuilt, err := uc.rebuild(ctx, in.ContestID, contest.EndTime())
 	if err != nil {
 		return nil, err

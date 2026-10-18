@@ -2,6 +2,7 @@ package user_test
 
 import (
 	"context"
+	"errors"
 	"sync"
 	"testing"
 	"time"
@@ -13,11 +14,11 @@ import (
 // fakeRankingSource counts calls and signals each one on a channel, so a test waiting
 // on a background refresh can block on that instead of a flaky sleep.
 type fakeRankingSource struct {
-	mu       sync.Mutex
-	calls    int
-	called   chan struct{}
-	solved   map[string]int
-	total    int
+	mu     sync.Mutex
+	calls  int
+	called chan struct{}
+	solved map[string]int
+	total  int
 }
 
 func newFakeRankingSource(solved map[string]int, total int) *fakeRankingSource {
@@ -42,14 +43,18 @@ func (f *fakeRankingSource) callCount() int {
 // serialization noise in tests that only care about the decorator's hit/miss/stale/lock
 // logic, not round-tripping through JSON.
 type fakeRankingCache struct {
-	mu      sync.Mutex
-	data    *appuser.CachedRanking
-	locked  bool
+	mu     sync.Mutex
+	data   *appuser.CachedRanking
+	locked bool
+	getErr error
 }
 
 func (c *fakeRankingCache) Get(context.Context) (*appuser.CachedRanking, error) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
+	if c.getErr != nil {
+		return nil, c.getErr
+	}
 	return c.data, nil
 }
 
@@ -109,6 +114,30 @@ func TestCachedRankingProvider_ColdCache_RebuildsAndServes(t *testing.T) {
 	}
 	if cache.data == nil {
 		t.Error("expected the rebuild to populate the cache")
+	}
+}
+
+func TestCachedRankingProvider_CacheGetError_FallsBackToSource(t *testing.T) {
+	source := newFakeRankingSource(map[string]int{"u1": 5, "u2": 3}, 10)
+	cache := &fakeRankingCache{getErr: errors.New("redis unreachable")}
+	p := user.NewCachedRankingProvider(source, cache, time.Minute)
+
+	solved, position, totalUsers, err := p.GetRanking(context.Background(), "u1")
+
+	if err != nil {
+		t.Fatalf("unexpected error: %v (a cache read failure should fall back to the source)", err)
+	}
+	if solved != 5 || totalUsers != 10 {
+		t.Errorf("got solved=%d totalUsers=%d, want 5/10 from the source", solved, totalUsers)
+	}
+	if position == nil || *position != 1 {
+		t.Errorf("position = %v, want 1", position)
+	}
+	if source.callCount() != 1 {
+		t.Errorf("source called %d times, want exactly 1", source.callCount())
+	}
+	if cache.data == nil {
+		t.Error("expected the fallback rebuild to overwrite the cache entry")
 	}
 }
 

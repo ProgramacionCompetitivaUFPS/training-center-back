@@ -4,7 +4,6 @@ import (
 	"context"
 	"log/slog"
 
-	"github.com/jackc/pgx/v5"
 	"golang.org/x/sync/errgroup"
 
 	infraPostgres "github.com/training-judge-center/backend/internal/adapter/postgres"
@@ -74,18 +73,37 @@ func (p *RankingProvider) GetAllRankings(ctx context.Context) (map[string]int, i
 
 	g, gctx := errgroup.WithContext(ctx)
 
-	var rows pgx.Rows
-	var queryErr error
+	var solved map[string]int
 	var totalUsers int
 
+	// The rows must be consumed and closed inside the goroutine: g.Wait() cancels gctx,
+	// so iterating them after Wait would read under a cancelled context.
 	g.Go(func() error {
-		rows, queryErr = q.Query(gctx, `
+		rows, err := q.Query(gctx, `
 			SELECT user_id, COUNT(DISTINCT problem_id)::INTEGER AS solved
 			FROM submissions
 			WHERE status = 'ACCEPTED'
 			GROUP BY user_id`,
 		)
-		return queryErr
+		if err != nil {
+			return err
+		}
+		defer rows.Close()
+
+		m := make(map[string]int)
+		for rows.Next() {
+			var userID string
+			var count int
+			if err := rows.Scan(&userID, &count); err != nil {
+				return err
+			}
+			m[userID] = count
+		}
+		if err := rows.Err(); err != nil {
+			return err
+		}
+		solved = m
+		return nil
 	})
 	g.Go(func() error {
 		return q.QueryRow(gctx, `SELECT COUNT(*)::INTEGER FROM users WHERE status = 'ACTIVE'`).Scan(&totalUsers)
@@ -93,22 +111,6 @@ func (p *RankingProvider) GetAllRankings(ctx context.Context) (map[string]int, i
 
 	if err := g.Wait(); err != nil {
 		slog.ErrorContext(ctx, "profile stats: failed to rebuild platform ranking", "error", err)
-		return nil, 0, apperror.NewInternal()
-	}
-	defer rows.Close()
-
-	solved := make(map[string]int)
-	for rows.Next() {
-		var userID string
-		var count int
-		if err := rows.Scan(&userID, &count); err != nil {
-			slog.ErrorContext(ctx, "profile stats: failed to scan ranking row", "error", err)
-			return nil, 0, apperror.NewInternal()
-		}
-		solved[userID] = count
-	}
-	if err := rows.Err(); err != nil {
-		slog.ErrorContext(ctx, "profile stats: error iterating ranking rows", "error", err)
 		return nil, 0, apperror.NewInternal()
 	}
 	return solved, totalUsers, nil
