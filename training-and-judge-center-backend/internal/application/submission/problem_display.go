@@ -17,3 +17,15 @@ func resolveProblemDisplay(ctx context.Context, provider ProblemDisplayProvider,
 	}
 	return &ProblemDisplay{Slug: sub.ProblemSlug(), Title: sub.ProblemTitle()}, nil
 }
+
+// resolveProblemDisplayFromMap is resolveProblemDisplay's list-friendly counterpart: same
+// fallback rule (missing/absent problem → the snapshot on the submission), but reads from a
+// map a caller already batched with GetProblemsByIDs instead of querying per submission.
+func resolveProblemDisplayFromMap(displays map[string]*ProblemDisplay, sub *domainSubmission.Submission) *ProblemDisplay {
+	if pid := sub.ProblemID(); pid != "" {
+		if p, ok := displays[pid]; ok {
+			return p
+		}
+	}
+	return &ProblemDisplay{Slug: sub.ProblemSlug(), Title: sub.ProblemTitle()}
+}

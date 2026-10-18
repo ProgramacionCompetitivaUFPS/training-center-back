@@ -143,3 +143,83 @@ func TestListMySubmissions_ContestSubmission_ContestIncluded(t *testing.T) {
 		t.Errorf("Contest.ID = %q, want %q", out.Submissions[0].Contest.ID, testContestID)
 	}
 }
+
+// TestListMySubmissions_ManyRows_BatchesProblemAndContestLookups is the regression guard for
+// the N+1 fix: many submissions sharing the same problem/contest must resolve correctly while
+// calling GetProblemsByIDs/GetContestsByIDs exactly once each, not once per row.
+func TestListMySubmissions_ManyRows_BatchesProblemAndContestLookups(t *testing.T) {
+	cid := testContestID
+	subs := []*domainsubmission.Submission{
+		aSubmission(testAuthorID, "PRIVATE", &cid),
+		aSubmission(testAuthorID, "PRIVATE", &cid),
+		aSubmission(testAuthorID, "PRIVATE", &cid),
+	}
+	repo := &mockSubmissionRepo{
+		listFn: func(_ domainsubmission.ListFilters) ([]*domainsubmission.Submission, int, error) {
+			return subs, len(subs), nil
+		},
+	}
+	prob := &mockProblemDisplayProvider{}
+	cont := &mockContestProvider{}
+	uc := newListMyUseCase(repo, prob, nil, cont, nil)
+
+	out, err := uc.Execute(context.Background(), ListMySubmissionsInput{
+		CurrentUser: callerUser(),
+		Page:        1,
+		Limit:       20,
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(out.Submissions) != 3 {
+		t.Fatalf("expected 3 submissions, got %d", len(out.Submissions))
+	}
+	for i, s := range out.Submissions {
+		if s.Problem.Slug != "two-sum" {
+			t.Errorf("Submissions[%d].Problem.Slug = %q, want two-sum", i, s.Problem.Slug)
+		}
+		if s.Contest == nil || s.Contest.ID != testContestID {
+			t.Errorf("Submissions[%d].Contest = %v, want ID %q", i, s.Contest, testContestID)
+		}
+	}
+	if prob.batchCalls != 1 {
+		t.Errorf("GetProblemsByIDs called %d times, want exactly 1 (batched)", prob.batchCalls)
+	}
+	if cont.batchCalls != 1 {
+		t.Errorf("GetContestsByIDs called %d times, want exactly 1 (batched)", cont.batchCalls)
+	}
+}
+
+// TestListMySubmissions_ContestMissingFromBatch_Returns404 mirrors what the single-row
+// GetContestByID would do if the contest didn't exist — a contest_id on a submission is never
+// stale the way problem_id can be, so this is a defensive data-consistency check, not a normal path.
+func TestListMySubmissions_ContestMissingFromBatch_Returns404(t *testing.T) {
+	cid := testContestID
+	sub := aSubmission(testAuthorID, "PRIVATE", &cid)
+	repo := &mockSubmissionRepo{
+		listFn: func(_ domainsubmission.ListFilters) ([]*domainsubmission.Submission, int, error) {
+			return []*domainsubmission.Submission{sub}, 1, nil
+		},
+	}
+	cont := &mockContestProvider{
+		fn: func(_ string) (*ContestDisplay, error) {
+			return nil, apperror.NewNotFound("CONTEST_NOT_FOUND", "not found")
+		},
+	}
+	uc := newListMyUseCase(repo, nil, nil, cont, nil)
+	_, err := uc.Execute(context.Background(), ListMySubmissionsInput{
+		CurrentUser: callerUser(),
+		Page:        1,
+		Limit:       20,
+	})
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+	ae, ok := err.(*apperror.AppError)
+	if !ok {
+		t.Fatalf("expected AppError, got %T", err)
+	}
+	if ae.Kind != apperror.KindNotFound {
+		t.Errorf("Kind = %q, want NOT_FOUND", ae.Kind)
+	}
+}
