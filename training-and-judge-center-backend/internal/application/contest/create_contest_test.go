@@ -63,6 +63,23 @@ func TestCreateContest_SuccessByAdmin(t *testing.T) {
 	}
 }
 
+func TestCreateContest_ShowTeamMembersIsPersisted(t *testing.T) {
+	uc := newCreateContestUseCase(&mockContestRepository{}, groupFound(), isLead(), defaultProblemProvider())
+
+	in := validCreateInput()
+	in.ParticipationMode = "TEAM"
+	in.ShowTeamMembers = true
+
+	out, err := uc.Execute(context.Background(), in)
+
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !out.ShowTeamMembers {
+		t.Error("ShowTeamMembers=true on input produced false on output — the field must reach domainContest.NewContest, same as UpdateContest already threads it through SetShowTeamMembers")
+	}
+}
+
 func TestCreateContest_SuccessWithProblems(t *testing.T) {
 	uc := newCreateContestUseCase(&mockContestRepository{}, groupFound(), isLead(), defaultProblemProvider())
 

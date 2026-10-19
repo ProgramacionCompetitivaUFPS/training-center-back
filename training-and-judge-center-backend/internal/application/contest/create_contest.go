@@ -21,6 +21,7 @@ type CreateContestInput struct {
 	Penalty           *int
 	FreezeMinutes     *int
 	EnablePostContest bool
+	ShowTeamMembers   bool
 	ParticipationMode string // "INDIVIDUAL" | "TEAM" | "MIXED"; defaults to "INDIVIDUAL"
 	TeamSizeMin       *int   // defaults to 2 when mode allows teams
 	TeamSizeMax       *int   // defaults to 5 when mode allows teams
@@ -158,6 +159,7 @@ func (uc *CreateContestUseCase) Execute(ctx context.Context, in CreateContestInp
 		penalty,
 		freezeMinutes,
 		in.EnablePostContest,
+		in.ShowTeamMembers,
 		shared.RestoreGroupID(in.GroupID),
 		shared.RestoreUserID(in.CurrentUser.ID),
 		mode,

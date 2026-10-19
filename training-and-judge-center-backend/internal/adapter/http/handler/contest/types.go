@@ -38,6 +38,7 @@ type createContestRequest struct {
 	Penalty           *int      `json:"penalty"`
 	FreezeMinutes     *int      `json:"freezeMinutes"`
 	EnablePostContest bool      `json:"enablePostContest"`
+	ShowTeamMembers   bool      `json:"showTeamMembers"`
 	ParticipationMode string    `json:"participationMode"`
 	TeamSizeMin       *int      `json:"teamSizeMin"`
 	TeamSizeMax       *int      `json:"teamSizeMax"`
