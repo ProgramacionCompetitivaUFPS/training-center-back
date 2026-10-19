@@ -52,6 +52,7 @@ func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
 		Penalty:           body.Penalty,
 		FreezeMinutes:     body.FreezeMinutes,
 		EnablePostContest: body.EnablePostContest,
+		ShowTeamMembers:   body.ShowTeamMembers,
 		ParticipationMode: body.ParticipationMode,
 		TeamSizeMin:       body.TeamSizeMin,
 		TeamSizeMax:       body.TeamSizeMax,
