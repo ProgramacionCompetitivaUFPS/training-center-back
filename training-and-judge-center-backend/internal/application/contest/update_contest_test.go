@@ -43,6 +43,22 @@ func TestUpdateContest_SuccessUpdateName(t *testing.T) {
 	}
 }
 
+// Same unit as GET/list: the frontend writes this response straight into the detail cache.
+func TestUpdateContest_DurationInSeconds(t *testing.T) {
+	uc := newUpdateContestUseCase(repoWith(newTestContest(callerID)), groupFound(), isLead(), defaultProblemProvider())
+
+	out, err := uc.Execute(context.Background(), validUpdateInput())
+
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	// testEnd - testStart = 5 hours = 18000 seconds
+	expected := 5 * 60 * 60
+	if out.Duration != expected {
+		t.Errorf("expected duration %d seconds, got %d", expected, out.Duration)
+	}
+}
+
 func TestUpdateContest_SuccessByAdmin(t *testing.T) {
 	contest := newTestContest(callerID)
 	uc := newUpdateContestUseCase(repoWith(contest), groupFound(), notLead(), defaultProblemProvider())
