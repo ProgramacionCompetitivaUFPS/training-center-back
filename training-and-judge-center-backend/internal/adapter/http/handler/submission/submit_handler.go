@@ -119,12 +119,20 @@ func (h *Handler) Submit(w http.ResponseWriter, r *http.Request) {
 }
 
 // readWorkspaceXML reads the optional block editor workspace part. It returns
-// nil when the part is absent; on a read failure it writes the error itself.
+// nil when the part is absent; on any failure it writes the error itself.
+// A workspaceXml sent as a plain text field is rejected rather than ignored:
+// ignoring it would store the submission as regular Python and silently drop
+// the blocks.
 // The read is capped one byte past the limit so the use case can reject an
 // oversized workspace instead of silently storing a truncated one.
 func readWorkspaceXML(w http.ResponseWriter, r *http.Request) ([]byte, bool) {
 	part, _, err := r.FormFile("workspaceXml")
 	if errors.Is(err, http.ErrMissingFile) {
+		if r.MultipartForm != nil && len(r.MultipartForm.Value["workspaceXml"]) > 0 {
+			handler.WriteError(r.Context(), w, apperror.NewBadRequest(appSubmission.ErrCodeInvalidBlocklyWorkspace,
+				"workspaceXml must be sent as a file part, not a text field"))
+			return nil, false
+		}
 		return nil, true
 	}
 	if err != nil {

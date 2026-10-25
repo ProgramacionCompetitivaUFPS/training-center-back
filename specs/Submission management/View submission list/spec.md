@@ -101,6 +101,7 @@ Each submission in list view contains:
 * `contest` ({ id, name } or null)
 * `submittedBy` ({ id, nickname })
 * `language` (string)
+* `isBlocklySubmission` (boolean: made with the block editor; `language` is then `python310`)
 * `executionTime` (integer, nullable)
 * `memoryKb` (integer, nullable)
 
@@ -153,6 +154,7 @@ List all submissions from the authenticated user.
         "nickname": "john_doe"
       },
       "language": "cpp20",
+      "isBlocklySubmission": false,
       "executionTime": 45,
       "memoryKb": 12288
     }

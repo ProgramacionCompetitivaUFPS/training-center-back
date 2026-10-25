@@ -511,7 +511,7 @@ Contest, group, or problem not found.
 
 **Block editor (Blockly)**
 * **FR-SS-048**: The system MUST accept an optional `workspaceXml` part with a submission. A submission that carries it is a block editor submission: it is judged exactly like a `python310` submission of the generated code (same limits, pool and verdicts).
-* **FR-SS-049**: The system MUST reject a `workspaceXml` sent with a language other than `python310`, larger than 512 KB, or that is not a single well-formed `<xml>` document free of DOCTYPE/ENTITY declarations (`INVALID_BLOCKLY_WORKSPACE`), before storing anything.
+* **FR-SS-049**: The system MUST reject a `workspaceXml` sent with a language other than `python310`, larger than 512 KB, sent as a text field instead of a file part, or that is not a single well-formed `<xml>` document free of DOCTYPE/ENTITY declarations (`INVALID_BLOCKLY_WORKSPACE`), before storing anything.
 * **FR-SS-050**: The system MUST store the workspace next to the source (`<id>.workspace.xml`) and mark the submission as `isBlocklySubmission`. No rendered image (SVG) of the blocks is accepted or stored: clients render the blocks from the workspace.
 
 ### Key Entities
