@@ -12,4 +12,6 @@ const (
 	ErrCodeCannotRejudgeInActiveContest = "CANNOT_REJUDGE_IN_ACTIVE_CONTEST"
 
 	ErrCodeSourceCodeNotFound = "SOURCE_CODE_NOT_FOUND"
+
+	ErrCodeInvalidBlocklyWorkspace = "INVALID_BLOCKLY_WORKSPACE"
 )

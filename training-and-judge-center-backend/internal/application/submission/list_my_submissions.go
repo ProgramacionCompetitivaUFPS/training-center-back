@@ -64,10 +64,9 @@ func (uc *ListMySubmissionsUseCase) Execute(ctx context.Context, in ListMySubmis
 		}
 	}
 
-	if in.Language != nil {
-		if _, err := domainsubmission.NewLanguage(*in.Language); err != nil {
-			return nil, err
-		}
+	language, blockly, err := languageFilter(in.Language)
+	if err != nil {
+		return nil, err
 	}
 
 	uid := shared.RestoreUserID(in.CurrentUser.ID)
@@ -75,7 +74,8 @@ func (uc *ListMySubmissionsUseCase) Execute(ctx context.Context, in ListMySubmis
 	f := domainsubmission.ListFilters{
 		UserID:          &uid,
 		Status:          in.Status,
-		Language:        in.Language,
+		Language:        language,
+		Blockly:         blockly,
 		SubmittedFrom:   in.SubmittedFrom,
 		SubmittedBefore: in.SubmittedBefore,
 		Page:            in.Page,
@@ -161,6 +161,7 @@ func (uc *ListMySubmissionsUseCase) Execute(ctx context.Context, in ListMySubmis
 			Contest:       contest,
 			SubmittedBy:   *me,
 			Language:      s.Language().String(),
+			IsBlockly:     s.IsBlockly(),
 			ExecutionTime: s.TimeMs(),
 			MemoryKb:      s.MemoryKb(),
 		})

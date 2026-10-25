@@ -108,6 +108,7 @@ func toListSubmissionsResponse(out *appContest.ListContestSubmissionsOutput) lis
 			},
 			SubmittedBy: by,
 			Language:    s.Language,
+			IsBlockly:   s.IsBlockly,
 			Status:      s.Status,
 			SubmittedAt: s.SubmittedAt.UTC().Format(time.RFC3339),
 			TimeMs:      s.TimeMs,

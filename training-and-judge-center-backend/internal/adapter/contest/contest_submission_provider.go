@@ -107,6 +107,7 @@ func (p *ContestSubmissionProvider) ListByContest(
 				ARRAY[]::text[]
 			),
 			s.language,
+			s.workspace_xml_path IS NOT NULL,
 			s.status,
 			s.submitted_at,
 			s.judged_at,
@@ -157,6 +158,7 @@ func (p *ContestSubmissionProvider) ListByContest(
 			&teamName,
 			&memberNicknames,
 			&d.Language,
+			&d.IsBlockly,
 			&d.Status,
 			&d.SubmittedAt,
 			&judgedAt,

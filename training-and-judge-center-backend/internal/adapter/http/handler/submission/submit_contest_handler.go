@@ -23,6 +23,7 @@ type submitContestResponse struct {
 	Compiler     string `json:"compiler"`
 	FileSize     int    `json:"fileSize"`
 	FileHash     string `json:"fileHash"`
+	IsBlockly    bool   `json:"isBlocklySubmission"`
 }
 
 // @Summary      Submit a solution to a contest problem
@@ -36,6 +37,7 @@ type submitContestResponse struct {
 // @Param        language    formData string true "Programming language"
 // @Param        compiler    formData string true "Compiler identifier"
 // @Param        file        formData file   true "Solution source file"
+// @Param        workspaceXml formData file  false "Block editor (Blockly) workspace; only with language python310"
 // @Success      201 {object} submitContestResponse
 // @Failure      400 {object} apperror.AppError
 // @Failure      401 {object} apperror.AppError
@@ -82,16 +84,22 @@ func (h *Handler) SubmitContest(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	workspaceXML, ok := readWorkspaceXML(w, r)
+	if !ok {
+		return
+	}
+
 	out, ucErr := h.submitContestSolution.Execute(r.Context(), appSubmission.SubmitContestSolutionInput{
-		CurrentUser: *cu,
-		GroupID:     groupID,
-		ContestID:   contestID,
-		ProblemSlug: problemSlug,
-		Language:    language,
-		Compiler:    compiler,
-		FileName:    fileHeader.Filename,
-		FileData:    fileData,
-		SubmittedAt: submittedAt,
+		CurrentUser:  *cu,
+		GroupID:      groupID,
+		ContestID:    contestID,
+		ProblemSlug:  problemSlug,
+		Language:     language,
+		Compiler:     compiler,
+		FileName:     fileHeader.Filename,
+		FileData:     fileData,
+		WorkspaceXML: workspaceXML,
+		SubmittedAt:  submittedAt,
 	})
 	if ucErr != nil {
 		handler.WriteError(r.Context(), w, ucErr)
@@ -110,5 +118,6 @@ func (h *Handler) SubmitContest(w http.ResponseWriter, r *http.Request) {
 		Compiler:     out.Compiler,
 		FileSize:     out.FileSize,
 		FileHash:     out.FileHash,
+		IsBlockly:    out.IsBlockly,
 	})
 }

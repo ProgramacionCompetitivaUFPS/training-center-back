@@ -5,8 +5,8 @@ import (
 	"time"
 
 	appshared "github.com/training-judge-center/backend/internal/application/shared"
-	domainSubmission "github.com/training-judge-center/backend/internal/domain/submission"
 	"github.com/training-judge-center/backend/internal/domain/shared"
+	domainSubmission "github.com/training-judge-center/backend/internal/domain/submission"
 	"github.com/training-judge-center/backend/pkg/apperror"
 )
 
@@ -29,6 +29,8 @@ type GetSubmissionOutput struct {
 	ExecutionTime *int
 	MemoryKb      *int
 	SourceCode    *string // nil when the stored source file no longer exists
+	IsBlockly     bool
+	WorkspaceXML  *string // block editor workspace; nil for regular submissions or when the file is gone
 }
 
 type GetSubmissionUseCase struct {
@@ -108,6 +110,17 @@ func (uc *GetSubmissionUseCase) Execute(ctx context.Context, in GetSubmissionInp
 		return nil, err
 	}
 
+	var workspaceXML *string
+	if wsPath := sub.WorkspaceXMLPath(); wsPath != nil {
+		data, err := uc.sourceCodeReader.Read(ctx, *wsPath)
+		if err == nil {
+			s := string(data)
+			workspaceXML = &s
+		} else if ae, ok := err.(*apperror.AppError); !ok || ae.Kind != apperror.KindNotFound {
+			return nil, err
+		}
+	}
+
 	problem, err := resolveProblemDisplay(ctx, uc.problemDisplay, sub)
 	if err != nil {
 		return nil, err
@@ -141,5 +154,7 @@ func (uc *GetSubmissionUseCase) Execute(ctx context.Context, in GetSubmissionInp
 		ExecutionTime: sub.TimeMs(),
 		MemoryKb:      sub.MemoryKb(),
 		SourceCode:    sourceCode,
+		IsBlockly:     sub.IsBlockly(),
+		WorkspaceXML:  workspaceXML,
 	}, nil
 }

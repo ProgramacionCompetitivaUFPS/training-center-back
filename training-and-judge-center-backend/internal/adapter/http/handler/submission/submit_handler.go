@@ -1,6 +1,7 @@
 package submission
 
 import (
+	"errors"
 	"io"
 	"log/slog"
 	"net/http"
@@ -26,6 +27,7 @@ type submitResponse struct {
 	Compiler     string `json:"compiler"`
 	FileSize     int    `json:"fileSize"`
 	FileHash     string `json:"fileHash"`
+	IsBlockly    bool   `json:"isBlocklySubmission"`
 }
 
 // @Summary      Submit a solution
@@ -37,6 +39,7 @@ type submitResponse struct {
 // @Param        language formData string true "Programming language"
 // @Param        compiler formData string true "Compiler identifier"
 // @Param        file     formData file   true "Solution source file"
+// @Param        workspaceXml formData file false "Block editor (Blockly) workspace; only with language python310"
 // @Success      201 {object} submitResponse
 // @Failure      400 {object} apperror.AppError
 // @Failure      401 {object} apperror.AppError
@@ -81,14 +84,20 @@ func (h *Handler) Submit(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	workspaceXML, ok := readWorkspaceXML(w, r)
+	if !ok {
+		return
+	}
+
 	out, ucErr := h.submitSolution.Execute(r.Context(), appSubmission.SubmitSolutionInput{
-		CurrentUser: *cu,
-		ProblemSlug: slug,
-		Language:    language,
-		Compiler:    compiler,
-		FileName:    fileHeader.Filename,
-		FileData:    fileData,
-		SubmittedAt: submittedAt,
+		CurrentUser:  *cu,
+		ProblemSlug:  slug,
+		Language:     language,
+		Compiler:     compiler,
+		FileName:     fileHeader.Filename,
+		FileData:     fileData,
+		WorkspaceXML: workspaceXML,
+		SubmittedAt:  submittedAt,
 	})
 	if ucErr != nil {
 		handler.WriteError(r.Context(), w, ucErr)
@@ -105,5 +114,38 @@ func (h *Handler) Submit(w http.ResponseWriter, r *http.Request) {
 		Compiler:     out.Compiler,
 		FileSize:     out.FileSize,
 		FileHash:     out.FileHash,
+		IsBlockly:    out.IsBlockly,
 	})
+}
+
+// readWorkspaceXML reads the optional block editor workspace part. It returns
+// nil when the part is absent; on any failure it writes the error itself.
+// A workspaceXml sent as a plain text field is rejected rather than ignored:
+// ignoring it would store the submission as regular Python and silently drop
+// the blocks.
+// The read is capped one byte past the limit so the use case can reject an
+// oversized workspace instead of silently storing a truncated one.
+func readWorkspaceXML(w http.ResponseWriter, r *http.Request) ([]byte, bool) {
+	part, _, err := r.FormFile("workspaceXml")
+	if errors.Is(err, http.ErrMissingFile) {
+		if r.MultipartForm != nil && len(r.MultipartForm.Value["workspaceXml"]) > 0 {
+			handler.WriteError(r.Context(), w, apperror.NewBadRequest(appSubmission.ErrCodeInvalidBlocklyWorkspace,
+				"workspaceXml must be sent as a file part, not a text field"))
+			return nil, false
+		}
+		return nil, true
+	}
+	if err != nil {
+		handler.WriteError(r.Context(), w, apperror.NewBadRequest(apperror.ErrCodeBadRequest, "workspaceXml must be sent as a file part"))
+		return nil, false
+	}
+	defer part.Close()
+
+	data, err := io.ReadAll(io.LimitReader(part, appSubmission.MaxBlocklyWorkspaceBytes+1))
+	if err != nil {
+		slog.ErrorContext(r.Context(), "submission: failed to read uploaded workspace", "error", err)
+		handler.WriteError(r.Context(), w, apperror.NewInternal())
+		return nil, false
+	}
+	return data, true
 }
