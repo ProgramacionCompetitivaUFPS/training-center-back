@@ -49,8 +49,8 @@ func TestRequestDeactivation_Success(t *testing.T) {
 		},
 	}
 
-	uc := NewRequestDeactivationUseCase(userRepo, deactRepo, mockEmail)
-	err := uc.Execute(context.Background(), RequestDeactivationInput{UserID: "user-1"})
+	uc := NewRequestDeactivationUseCase(userRepo, deactRepo, mockEmail, &mockRateLimiter{})
+	err := uc.Execute(context.Background(), RequestDeactivationInput{UserID: "user-1", Password: "Secret1!"})
 	
 	if err != nil {
 		t.Fatalf("expected nil, got %v", err)
@@ -67,7 +67,7 @@ func TestRequestDeactivation_AdminForbidden(t *testing.T) {
 		return adminUser, nil
 	}
 
-	uc := NewRequestDeactivationUseCase(userRepo, &mockDeactivationRepo{}, &mockEmailSender{})
+	uc := NewRequestDeactivationUseCase(userRepo, &mockDeactivationRepo{}, &mockEmailSender{}, &mockRateLimiter{})
 	err := uc.Execute(context.Background(), RequestDeactivationInput{UserID: "admin-1"})
 	
 	if err == nil {
@@ -85,7 +85,7 @@ func TestRequestDeactivation_UserNotFound(t *testing.T) {
 		return nil, nil
 	}
 
-	uc := NewRequestDeactivationUseCase(userRepo, &mockDeactivationRepo{}, &mockEmailSender{})
+	uc := NewRequestDeactivationUseCase(userRepo, &mockDeactivationRepo{}, &mockEmailSender{}, &mockRateLimiter{})
 	err := uc.Execute(context.Background(), RequestDeactivationInput{UserID: "non-existent"})
 
 	if err == nil {
@@ -103,8 +103,8 @@ func TestRequestDeactivation_UserRepoError(t *testing.T) {
 		return nil, apperror.NewInternal()
 	}
 
-	uc := NewRequestDeactivationUseCase(userRepo, &mockDeactivationRepo{}, &mockEmailSender{})
-	err := uc.Execute(context.Background(), RequestDeactivationInput{UserID: "user-1"})
+	uc := NewRequestDeactivationUseCase(userRepo, &mockDeactivationRepo{}, &mockEmailSender{}, &mockRateLimiter{})
+	err := uc.Execute(context.Background(), RequestDeactivationInput{UserID: "user-1", Password: "Secret1!"})
 
 	if err == nil {
 		t.Fatal("expected error, got nil")
@@ -126,8 +126,8 @@ func TestRequestDeactivation_InvalidatePendingError(t *testing.T) {
 		},
 	}
 
-	uc := NewRequestDeactivationUseCase(userRepo, deactRepo, &mockEmailSender{})
-	err := uc.Execute(context.Background(), RequestDeactivationInput{UserID: "user-1"})
+	uc := NewRequestDeactivationUseCase(userRepo, deactRepo, &mockEmailSender{}, &mockRateLimiter{})
+	err := uc.Execute(context.Background(), RequestDeactivationInput{UserID: "user-1", Password: "Secret1!"})
 
 	if err == nil {
 		t.Fatal("expected error, got nil")
@@ -149,8 +149,8 @@ func TestRequestDeactivation_SaveError(t *testing.T) {
 		},
 	}
 
-	uc := NewRequestDeactivationUseCase(userRepo, deactRepo, &mockEmailSender{})
-	err := uc.Execute(context.Background(), RequestDeactivationInput{UserID: "user-1"})
+	uc := NewRequestDeactivationUseCase(userRepo, deactRepo, &mockEmailSender{}, &mockRateLimiter{})
+	err := uc.Execute(context.Background(), RequestDeactivationInput{UserID: "user-1", Password: "Secret1!"})
 
 	if err == nil {
 		t.Fatal("expected error, got nil")
@@ -172,8 +172,8 @@ func TestRequestDeactivation_EmailDeliveryFailure(t *testing.T) {
 		},
 	}
 
-	uc := NewRequestDeactivationUseCase(userRepo, &mockDeactivationRepo{}, emailSender)
-	err := uc.Execute(context.Background(), RequestDeactivationInput{UserID: "user-1"})
+	uc := NewRequestDeactivationUseCase(userRepo, &mockDeactivationRepo{}, emailSender, &mockRateLimiter{})
+	err := uc.Execute(context.Background(), RequestDeactivationInput{UserID: "user-1", Password: "Secret1!"})
 
 	if err == nil {
 		t.Fatal("expected error, got nil")
@@ -181,5 +181,68 @@ func TestRequestDeactivation_EmailDeliveryFailure(t *testing.T) {
 	appErr, ok := err.(*apperror.AppError)
 	if !ok || appErr.Code != ErrCodeEmailDeliveryFailed {
 		t.Errorf("expected EMAIL_DELIVERY_FAILED, got %v", err)
+	}
+}
+
+// ── Password check (FL-USR-06) ────────────────────────────────────────────────
+
+func activeUserRepo(u *domain.User) *mockUserRepository {
+	repo := newNoConflictRepo()
+	repo.findByIDFn = func(_ context.Context, id string) (*domain.User, error) {
+		if id == u.ID() {
+			return u, nil
+		}
+		return nil, nil
+	}
+	return repo
+}
+
+func TestRequestDeactivation_WrongPassword_RejectedAndNoEmail(t *testing.T) {
+	u := newUserWithRole("user-1", domainShared.RoleContestant, domain.StatusActive)
+	emailSent := false
+	uc := NewRequestDeactivationUseCase(activeUserRepo(u), &mockDeactivationRepo{},
+		&mockEmailSender{sendFn: func(context.Context, appshared.EmailMessage) error { emailSent = true; return nil }},
+		&mockRateLimiter{})
+
+	err := uc.Execute(context.Background(), RequestDeactivationInput{UserID: "user-1", Password: "wrong-password"})
+
+	var appErr *apperror.AppError
+	if !errors.As(err, &appErr) || appErr.Kind != apperror.KindValidation {
+		t.Fatalf("expected a validation error for a wrong password, got %v", err)
+	}
+	if emailSent {
+		t.Error("no code must be emailed when the password is wrong")
+	}
+}
+
+func TestRequestDeactivation_GoogleOnlyAccount_NoPasswordNeeded(t *testing.T) {
+	email := "google-user@example.com"
+	u := domain.RestoreUser("user-g", &email, "", "Google User", "google_user", "", "", "",
+		domainShared.RoleContestant.String(), domain.StatusActive.String(), time.Now(), nil, nil)
+	uc := NewRequestDeactivationUseCase(activeUserRepo(u), &mockDeactivationRepo{}, &mockEmailSender{}, &mockRateLimiter{})
+
+	if err := uc.Execute(context.Background(), RequestDeactivationInput{UserID: "user-g"}); err != nil {
+		t.Fatalf("expected an account without password to request deactivation with the code alone, got %v", err)
+	}
+}
+
+func TestRequestDeactivation_PasswordAttemptsAreRateLimited(t *testing.T) {
+	u := newUserWithRole("user-1", domainShared.RoleContestant, domain.StatusActive)
+	var key string
+	var max int
+	rl := &mockRateLimiter{allowFn: func(_ context.Context, k string, m int, _ time.Duration) (bool, error) {
+		key, max = k, m
+		return false, nil
+	}}
+	uc := NewRequestDeactivationUseCase(activeUserRepo(u), &mockDeactivationRepo{}, &mockEmailSender{}, rl)
+
+	err := uc.Execute(context.Background(), RequestDeactivationInput{UserID: "user-1", Password: "Secret1!"})
+
+	var appErr *apperror.AppError
+	if !errors.As(err, &appErr) || appErr.Kind != apperror.KindTooManyRequests {
+		t.Fatalf("expected 429 when the limiter refuses, got %v", err)
+	}
+	if key != "rate_limit:request_deactivation:user-1" || max != 5 {
+		t.Errorf("unexpected limiter key/max: %q / %d", key, max)
 	}
 }

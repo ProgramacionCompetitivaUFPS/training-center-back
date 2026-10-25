@@ -16,23 +16,35 @@ import (
 
 type RequestDeactivationInput struct {
 	UserID string
+	// Current password. Required when the account has one; Google-only accounts (no password)
+	// confirm with the emailed code alone.
+	Password string
 }
 
+// Same budget as UpdatePassword: checking the password here must not become a way to guess it.
+const (
+	requestDeactivationRateLimitMaxAttempts = 5
+	requestDeactivationRateLimitWindow      = time.Hour
+)
+
 type RequestDeactivationUseCase struct {
-	userRepo        user.Repository
-	deactRepo       user.DeactivationRequestRepository
-	emailSender     appshared.EmailSender
+	userRepo    user.Repository
+	deactRepo   user.DeactivationRequestRepository
+	emailSender appshared.EmailSender
+	rateLimiter appshared.RateLimiter
 }
 
 func NewRequestDeactivationUseCase(
 	userRepo user.Repository,
 	deactRepo user.DeactivationRequestRepository,
 	emailSender appshared.EmailSender,
+	rateLimiter appshared.RateLimiter,
 ) *RequestDeactivationUseCase {
 	return &RequestDeactivationUseCase{
 		userRepo:    userRepo,
 		deactRepo:   deactRepo,
 		emailSender: emailSender,
+		rateLimiter: rateLimiter,
 	}
 }
 
@@ -47,6 +59,25 @@ func (uc *RequestDeactivationUseCase) Execute(ctx context.Context, input Request
 
 	if foundUser.Role() == domainShared.RoleAdmin {
 		return apperror.NewForbidden(ErrCodeAdminCannotRequestDeactivation, "Administrators cannot deactivate their own account")
+	}
+
+	// The form asks for the current password and the spec (FL-USR-06) says it's checked; it
+	// wasn't, so any text went through. Accounts without a password rely on the emailed code.
+	if foundUser.Password().HasPassword() {
+		allowed, err := uc.rateLimiter.Allow(ctx, "rate_limit:request_deactivation:"+foundUser.ID(),
+			requestDeactivationRateLimitMaxAttempts, requestDeactivationRateLimitWindow)
+		if err != nil {
+			return err
+		}
+		if !allowed {
+			return apperror.NewTooManyRequests(ErrCodeTooManyRequests,
+				"Too many deactivation attempts. Please try again in an hour.", int(requestDeactivationRateLimitWindow.Seconds()))
+		}
+		if !foundUser.Password().Compare(input.Password) {
+			return apperror.NewValidation([]apperror.FieldError{
+				{Field: "password", Message: "Current password is incorrect"},
+			})
+		}
 	}
 
 	now := time.Now()
