@@ -407,6 +407,21 @@ func newPublishedProblemWithModifier() *domainProblem.Problem {
 	)
 }
 
+func newPublishedProblemWithTestCasesAndModifier() *domainProblem.Problem {
+	key := "problems/test-problem/testcases/xyz"
+	return domainProblem.RestoreProblem(
+		testProbID, testSlug, "Test Problem",
+		nil, nil, nil, []string{},
+		"PUBLISHED", "PUBLIC",
+		shared.RestoreUserID(authorID),
+		[]shared.UserID{shared.RestoreUserID(modifierID)},
+		[]domainProblem.LanguageOverride{},
+		&key, []domainProblem.JudgingFile{},
+		nil, nil, nil,
+		testNow, testNow,
+	)
+}
+
 func newCompleteDraftProblem() *domainProblem.Problem {
 	statement := "Solve this problem"
 	timeLimit := 2000

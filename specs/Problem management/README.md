@@ -84,6 +84,8 @@ When changing from `PUBLIC` to `PRIVATE`:
 | Update accessibility | ✅ | ✅ | ✅ | ❌ |
 | Upload files | ✅ | ✅ | ✅ | ❌ |
 | Delete files | ✅ | ✅ | ✅ | ❌ |
+| View / download test cases | ✅ | ✅ | ✅ | ❌ |
+| Export problem (ICPC package) | ✅ | ✅ | ✅ | ❌ |
 | Publish/Unpublish | ✅ | ✅ | ✅ | ❌ |
 | Add modifier | ✅ | ✅ | ❌ | ❌ |
 | Remove modifier | ✅ | ✅ | ❌ | ❌ |
@@ -344,17 +346,18 @@ Problems can be imported from ICPC-format ZIP packages:
 
 ```
 problem-package.zip/
-├── problem.yaml              # Problem metadata
+├── problem.yaml              # name (required), time_limit (seconds), memory_limit (MiB)
 ├── problem_statement/
-│   └── problem.en.tex        # LaTeX statement
+│   └── problem.en.tex        # Statement
 ├── data/
-│   ├── sample/               # Sample test cases
-│   └── secret/               # Secret test cases
-├── solutions/                # Optional solutions
-│   └── accepted/
-├── output_validators/        # Optional custom checker
-└── input_validators/         # Optional input validator
+│   ├── sample/               # Sample test cases (.in / .ans)
+│   └── secret/               # Secret test cases (.in / .ans)
+├── solutions/                # Optional solutions, one file per solution
+├── checker.{cpp,py}          # Optional custom checker
+└── validator.{cpp,py}        # Optional input validator
 ```
+
+The same layout is what **View and Export Problem Files** writes when a problem is exported, so an exported package can be imported back.
 
 Imported problems are created with status `DRAFT` and accessibility `PRIVATE`.
 
