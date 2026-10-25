@@ -40,7 +40,7 @@ type InviteByNicknamesInput struct {
 type InviteByNicknamesResult struct {
 	Nickname   string
 	Status     InviteResultStatus
-	Invitation *GroupInvitationDTO // nil only when Status == InviteResultFailed
+	Invitation *GroupInvitationDTO // nil when Status is InviteResultFailed or InviteResultAlreadyMember
 	Invitee    *UserDisplay        // nil only when Status == InviteResultFailed
 	Reason     string              // populated only when Status != InviteResultInvited
 }

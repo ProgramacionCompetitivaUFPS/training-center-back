@@ -18,6 +18,11 @@ type requestDeactivationRequest struct {
 	Password string `json:"password"`
 }
 
+// maxRequestDeactivationBody caps the body here instead of relying on middleware.LimitBody, which
+// lets anything labelled multipart/* through untouched — a JSON body sent with that Content-Type
+// would otherwise be decoded with no size limit. The body is just a password.
+const maxRequestDeactivationBody = 4 << 10
+
 // @Summary      Request account deactivation
 // @Tags         users
 // @Produce      json
@@ -35,7 +40,12 @@ func (h *Handler) RequestDeactivation(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
 	var req requestDeactivationRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil && !errors.Is(err, io.EOF) {
+	if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, maxRequestDeactivationBody)).Decode(&req); err != nil && !errors.Is(err, io.EOF) {
+		var tooLarge *http.MaxBytesError
+		if errors.As(err, &tooLarge) {
+			handler.WriteJSON(r.Context(), w, http.StatusRequestEntityTooLarge, apperror.AppError{Code: "PAYLOAD_TOO_LARGE", Message: "Request body is too large"})
+			return
+		}
 		handler.WriteJSON(r.Context(), w, http.StatusBadRequest, apperror.AppError{Code: "INVALID_JSON", Message: "request body must be valid JSON"})
 		return
 	}
