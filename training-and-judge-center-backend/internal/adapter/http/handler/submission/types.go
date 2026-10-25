@@ -43,6 +43,7 @@ type submissionSummaryResponse struct {
 	Contest       *contestSummary `json:"contest"`
 	SubmittedBy   userSummary     `json:"submittedBy"`
 	Language      string          `json:"language"`
+	IsBlockly     bool            `json:"isBlocklySubmission"`
 	ExecutionTime *int            `json:"executionTime"`
 	MemoryKb      *int            `json:"memoryKb"`
 }
@@ -90,6 +91,7 @@ func toSummaryResponse(s appsubmission.SubmissionSummary) submissionSummaryRespo
 		Problem:       problemSummary{Slug: s.Problem.Slug, Title: s.Problem.Title},
 		SubmittedBy:   userSummary{ID: s.SubmittedBy.ID, Nickname: s.SubmittedBy.Nickname},
 		Language:      s.Language,
+		IsBlockly:     s.IsBlockly,
 		ExecutionTime: s.ExecutionTime,
 		MemoryKb:      s.MemoryKb,
 	}

@@ -23,6 +23,8 @@ type getSubmissionResponse struct {
 	ExecutionTime *int            `json:"executionTime"`
 	MemoryKb      *int            `json:"memoryKb"`
 	SourceCode    *string         `json:"sourceCode"` // null when the stored source file no longer exists
+	IsBlockly     bool            `json:"isBlocklySubmission"`
+	WorkspaceXML  *string         `json:"workspaceXml"` // block editor workspace; null for regular submissions
 }
 
 // GetSubmission handles GET /submissions/{submissionId}
@@ -59,17 +61,19 @@ func (h *Handler) GetSubmission(w http.ResponseWriter, r *http.Request) {
 	}
 
 	resp := getSubmissionResponse{
-		ID:          out.ID,
-		Status:      out.Status,
-		Visibility:  out.Visibility,
-		SubmittedAt: out.SubmittedAt.UTC().Format(time.RFC3339),
-		Problem:     problemSummary{Slug: out.Problem.Slug, Title: out.Problem.Title},
-		SubmittedBy: userSummary{ID: out.SubmittedBy.ID, Nickname: out.SubmittedBy.Nickname},
-		Language:    out.Language,
-		Compiler:    out.Compiler,
+		ID:            out.ID,
+		Status:        out.Status,
+		Visibility:    out.Visibility,
+		SubmittedAt:   out.SubmittedAt.UTC().Format(time.RFC3339),
+		Problem:       problemSummary{Slug: out.Problem.Slug, Title: out.Problem.Title},
+		SubmittedBy:   userSummary{ID: out.SubmittedBy.ID, Nickname: out.SubmittedBy.Nickname},
+		Language:      out.Language,
+		Compiler:      out.Compiler,
 		ExecutionTime: out.ExecutionTime,
 		MemoryKb:      out.MemoryKb,
-		SourceCode:  out.SourceCode,
+		SourceCode:    out.SourceCode,
+		IsBlockly:     out.IsBlockly,
+		WorkspaceXML:  out.WorkspaceXML,
 	}
 
 	if out.JudgedAt != nil {

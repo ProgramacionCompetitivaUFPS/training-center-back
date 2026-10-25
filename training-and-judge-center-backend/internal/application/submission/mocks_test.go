@@ -80,10 +80,15 @@ type mockSubmissionRepo struct {
 	findByIDFn   func(id string) (*domainsubmission.Submission, error)
 	updateVisFn  func(s *domainsubmission.Submission) error
 	listFn       func(f domainsubmission.ListFilters) ([]*domainsubmission.Submission, int, error)
+	saved        *domainsubmission.Submission
 }
 
-func (m *mockSubmissionRepo) Save(_ context.Context, _ *domainsubmission.Submission) error {
-	return m.saveErr
+func (m *mockSubmissionRepo) Save(_ context.Context, s *domainsubmission.Submission) error {
+	if m.saveErr != nil {
+		return m.saveErr
+	}
+	m.saved = s
+	return nil
 }
 
 func (m *mockSubmissionRepo) FindByID(_ context.Context, id string) (*domainsubmission.Submission, error) {
@@ -128,13 +133,20 @@ func cleanRepo() *mockSubmissionRepo { return &mockSubmissionRepo{} }
 type mockSourceStorage struct {
 	uploadErr error
 	deleteErr error
+	uploaded  []string
+	deleted   []string
 }
 
-func (m *mockSourceStorage) Upload(_ context.Context, _ string, _ []byte) error {
-	return m.uploadErr
+func (m *mockSourceStorage) Upload(_ context.Context, path string, _ []byte) error {
+	if m.uploadErr != nil {
+		return m.uploadErr
+	}
+	m.uploaded = append(m.uploaded, path)
+	return nil
 }
 
-func (m *mockSourceStorage) Delete(_ context.Context, _ string) error {
+func (m *mockSourceStorage) Delete(_ context.Context, path string) error {
+	m.deleted = append(m.deleted, path)
 	return m.deleteErr
 }
 

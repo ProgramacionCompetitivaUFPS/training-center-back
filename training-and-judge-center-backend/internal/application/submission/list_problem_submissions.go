@@ -130,6 +130,7 @@ func (uc *ListProblemSubmissionsUseCase) Execute(ctx context.Context, in ListPro
 			Contest:       nil,
 			SubmittedBy:   *user,
 			Language:      s.Language().String(),
+			IsBlockly:     s.IsBlockly(),
 			ExecutionTime: s.TimeMs(),
 			MemoryKb:      s.MemoryKb(),
 		})

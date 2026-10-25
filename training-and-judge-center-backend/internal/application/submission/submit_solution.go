@@ -22,7 +22,9 @@ type SubmitSolutionInput struct {
 	Compiler    string
 	FileName    string
 	FileData    []byte
-	SubmittedAt time.Time
+	// WorkspaceXML is the block editor workspace; nil for a regular submission.
+	WorkspaceXML []byte
+	SubmittedAt  time.Time
 }
 
 type SubmitSolutionOutput struct {
@@ -35,6 +37,7 @@ type SubmitSolutionOutput struct {
 	Compiler     string
 	FileSize     int
 	FileHash     string
+	IsBlockly    bool
 }
 
 type SubmitSolutionUseCase struct {
@@ -75,6 +78,11 @@ func (uc *SubmitSolutionUseCase) Execute(ctx context.Context, in SubmitSolutionI
 	langVO, ext, err := validateLanguage(in.Language, in.Compiler, in.FileName)
 	if err != nil {
 		return nil, err
+	}
+	if in.WorkspaceXML != nil {
+		if err := validateBlocklyWorkspace(in.Language, in.WorkspaceXML); err != nil {
+			return nil, err
+		}
 	}
 
 	// 4. Get problem
@@ -132,7 +140,8 @@ func (uc *SubmitSolutionUseCase) Execute(ctx context.Context, in SubmitSolutionI
 	submissionID := uuid.New().String()
 	storagePath := fmt.Sprintf("%s/%s/general/%s%s", problem.ID, userID, submissionID, ext)
 
-	if err := uc.sourceStorage.Upload(ctx, storagePath, in.FileData); err != nil {
+	workspacePath, err := uploadSubmissionFiles(ctx, uc.sourceStorage, storagePath, in.FileData, in.WorkspaceXML)
+	if err != nil {
 		return nil, err
 	}
 
@@ -153,14 +162,15 @@ func (uc *SubmitSolutionUseCase) Execute(ctx context.Context, in SubmitSolutionI
 		in.SubmittedAt,
 	)
 	if err != nil {
+		deleteSubmissionFiles(ctx, uc.sourceStorage, storagePath, workspacePath)
 		return nil, err
+	}
+	if workspacePath != nil {
+		sub.AttachBlocklyWorkspace(*workspacePath)
 	}
 
 	if err := uc.submissionRepo.Save(ctx, sub); err != nil {
-		if delErr := uc.sourceStorage.Delete(ctx, storagePath); delErr != nil {
-			slog.ErrorContext(ctx, "submission: failed to delete orphaned file after save error",
-				"path", storagePath, "error", delErr)
-		}
+		deleteSubmissionFiles(ctx, uc.sourceStorage, storagePath, workspacePath)
 		return nil, err
 	}
 
@@ -189,6 +199,7 @@ func (uc *SubmitSolutionUseCase) Execute(ctx context.Context, in SubmitSolutionI
 		Compiler:     in.Compiler,
 		FileSize:     len(in.FileData),
 		FileHash:     fileHash,
+		IsBlockly:    sub.IsBlockly(),
 	}, nil
 }
 

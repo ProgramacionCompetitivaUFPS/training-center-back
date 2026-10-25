@@ -33,29 +33,42 @@ type Submission struct {
 	timeMs     *int
 	memoryKb   *int
 	compileLog *string
+
+	// workspaceXMLPath is set only for submissions made with the block editor
+	// (Blockly): the generated Python is the source that gets judged, and the
+	// workspace is kept next to it so the blocks can be shown and reloaded.
+	workspaceXMLPath *string
 }
 
-func (s *Submission) ID() SubmissionID              { return s.id }
-func (s *Submission) ProblemID() ProblemID          { return s.problemID }
-func (s *Submission) ProblemTitle() string          { return s.problemTitle }
-func (s *Submission) ProblemSlug() string           { return s.problemSlug }
-func (s *Submission) UserID() shared.UserID         { return s.userID }
-func (s *Submission) ContestID() *ContestID         { return s.contestID }
-func (s *Submission) StandingID() *string           { return s.standingID }
-func (s *Submission) Language() Language            { return s.language }
-func (s *Submission) Compiler() string              { return s.compiler }
-func (s *Submission) Status() SubmissionStatus      { return s.status }
-func (s *Submission) Visibility() Visibility        { return s.visibility }
-func (s *Submission) SourceCodePath() string        { return s.sourceCodePath }
-func (s *Submission) FileHash() string              { return s.fileHash }
-func (s *Submission) FileSize() int                 { return s.fileSize }
-func (s *Submission) SubmittedAt() time.Time        { return s.submittedAt }
-func (s *Submission) JudgedAt() *time.Time          { return s.judgedAt }
-func (s *Submission) TimeMs() *int                  { return s.timeMs }
-func (s *Submission) MemoryKb() *int                { return s.memoryKb }
-func (s *Submission) CompileLog() *string           { return s.compileLog }
+func (s *Submission) ID() SubmissionID          { return s.id }
+func (s *Submission) ProblemID() ProblemID      { return s.problemID }
+func (s *Submission) ProblemTitle() string      { return s.problemTitle }
+func (s *Submission) ProblemSlug() string       { return s.problemSlug }
+func (s *Submission) UserID() shared.UserID     { return s.userID }
+func (s *Submission) ContestID() *ContestID     { return s.contestID }
+func (s *Submission) StandingID() *string       { return s.standingID }
+func (s *Submission) Language() Language        { return s.language }
+func (s *Submission) Compiler() string          { return s.compiler }
+func (s *Submission) Status() SubmissionStatus  { return s.status }
+func (s *Submission) Visibility() Visibility    { return s.visibility }
+func (s *Submission) SourceCodePath() string    { return s.sourceCodePath }
+func (s *Submission) FileHash() string          { return s.fileHash }
+func (s *Submission) FileSize() int             { return s.fileSize }
+func (s *Submission) SubmittedAt() time.Time    { return s.submittedAt }
+func (s *Submission) JudgedAt() *time.Time      { return s.judgedAt }
+func (s *Submission) TimeMs() *int              { return s.timeMs }
+func (s *Submission) MemoryKb() *int            { return s.memoryKb }
+func (s *Submission) CompileLog() *string       { return s.compileLog }
+func (s *Submission) WorkspaceXMLPath() *string { return s.workspaceXMLPath }
+
+// IsBlockly reports whether the submission was made with the block editor.
+func (s *Submission) IsBlockly() bool { return s.workspaceXMLPath != nil }
 
 func (s *Submission) SetVisibility(v Visibility) { s.visibility = v }
+
+// AttachBlocklyWorkspace records where the block editor workspace of this
+// submission is stored. Used on creation and when restoring from storage.
+func (s *Submission) AttachBlocklyWorkspace(path string) { s.workspaceXMLPath = &path }
 
 func NewSubmission(
 	id SubmissionID,

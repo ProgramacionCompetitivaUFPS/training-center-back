@@ -15,6 +15,7 @@ type SubmissionSummary struct {
 	Contest       *ContestDisplay
 	SubmittedBy   UserDisplay
 	Language      string
+	IsBlockly     bool
 	ExecutionTime *int
 	MemoryKb      *int
 }

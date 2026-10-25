@@ -161,6 +161,7 @@ func (uc *ListMySubmissionsUseCase) Execute(ctx context.Context, in ListMySubmis
 			Contest:       contest,
 			SubmittedBy:   *me,
 			Language:      s.Language().String(),
+			IsBlockly:     s.IsBlockly(),
 			ExecutionTime: s.TimeMs(),
 			MemoryKb:      s.MemoryKb(),
 		})

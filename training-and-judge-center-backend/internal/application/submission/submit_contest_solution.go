@@ -24,7 +24,9 @@ type SubmitContestSolutionInput struct {
 	Compiler    string
 	FileName    string
 	FileData    []byte
-	SubmittedAt time.Time
+	// WorkspaceXML is the block editor workspace; nil for a regular submission.
+	WorkspaceXML []byte
+	SubmittedAt  time.Time
 }
 
 type SubmitContestSolutionOutput struct {
@@ -39,6 +41,7 @@ type SubmitContestSolutionOutput struct {
 	Compiler     string
 	FileSize     int
 	FileHash     string
+	IsBlockly    bool
 }
 
 type SubmitContestSolutionUseCase struct {
@@ -85,6 +88,11 @@ func (uc *SubmitContestSolutionUseCase) Execute(ctx context.Context, in SubmitCo
 	langVO, ext, err := validateLanguage(in.Language, in.Compiler, in.FileName)
 	if err != nil {
 		return nil, err
+	}
+	if in.WorkspaceXML != nil {
+		if err := validateBlocklyWorkspace(in.Language, in.WorkspaceXML); err != nil {
+			return nil, err
+		}
 	}
 
 	// 4. Get contest info (validates contest exists and belongs to the group)
@@ -181,7 +189,8 @@ func (uc *SubmitContestSolutionUseCase) Execute(ctx context.Context, in SubmitCo
 	submissionID := uuid.New().String()
 	storagePath := fmt.Sprintf("%s/%s/%s/%s%s", problem.ID, userID, in.ContestID, submissionID, ext)
 
-	if err := uc.sourceStorage.Upload(ctx, storagePath, in.FileData); err != nil {
+	workspacePath, err := uploadSubmissionFiles(ctx, uc.sourceStorage, storagePath, in.FileData, in.WorkspaceXML)
+	if err != nil {
 		return nil, err
 	}
 
@@ -203,14 +212,15 @@ func (uc *SubmitContestSolutionUseCase) Execute(ctx context.Context, in SubmitCo
 		in.SubmittedAt,
 	)
 	if err != nil {
+		deleteSubmissionFiles(ctx, uc.sourceStorage, storagePath, workspacePath)
 		return nil, err
+	}
+	if workspacePath != nil {
+		sub.AttachBlocklyWorkspace(*workspacePath)
 	}
 
 	if err := uc.submissionRepo.Save(ctx, sub); err != nil {
-		if delErr := uc.sourceStorage.Delete(ctx, storagePath); delErr != nil {
-			slog.ErrorContext(ctx, "submission: failed to delete orphaned file after save error",
-				"path", storagePath, "error", delErr)
-		}
+		deleteSubmissionFiles(ctx, uc.sourceStorage, storagePath, workspacePath)
 		return nil, err
 	}
 
@@ -242,5 +252,6 @@ func (uc *SubmitContestSolutionUseCase) Execute(ctx context.Context, in SubmitCo
 		Compiler:     in.Compiler,
 		FileSize:     len(in.FileData),
 		FileHash:     fileHash,
+		IsBlockly:    sub.IsBlockly(),
 	}, nil
 }
