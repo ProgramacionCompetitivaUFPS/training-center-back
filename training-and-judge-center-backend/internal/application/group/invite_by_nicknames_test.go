@@ -7,6 +7,7 @@ import (
 
 	appshared "github.com/training-judge-center/backend/internal/application/shared"
 	domainGroup "github.com/training-judge-center/backend/internal/domain/group"
+	"github.com/training-judge-center/backend/internal/domain/shared"
 	"github.com/training-judge-center/backend/pkg/apperror"
 )
 
@@ -415,5 +416,33 @@ func TestInviteByNicknames_ExistingPendingInvitation_IsRevokedAndReplaced(t *tes
 	}
 	if len(invRepo.savedInvitations) != 1 || invRepo.savedInvitations[0].ID() == "old-inv" {
 		t.Errorf("expected a new invitation to be saved, got %+v", invRepo.savedInvitations)
+	}
+}
+
+// A nickname that already belongs to a member gets "already_member" and no invitation.
+func TestInviteByNicknames_AlreadyMemberIsReportedNotInvited(t *testing.T) {
+	g := inviteGroup(t)
+	memberRepo := leadMemberRepo("g1", "u1")
+	bob := shared.RestoreUserID("invitee-1")
+	m, _ := domainGroup.NewGroupMember("m-bob", "g1", bob, domainGroup.MemberRoleMember, domainGroup.JoinMethodDirectAdd, nil, testNow)
+	memberRepo.memberships[keyOf("g1", bob)] = m
+	emailSender := &mockEmailSender{}
+	uc := newInviteByNicknamesUseCase(
+		&mockGroupRepository{groups: []*domainGroup.Group{g}},
+		memberRepo,
+		&mockInvitationRepository{},
+		&mockNicknameResolver{users: map[string]*UserDisplay{"bob": {ID: "invitee-1", Nickname: "bob"}}},
+		emailSender,
+	)
+
+	out, err := uc.Execute(context.Background(), InviteByNicknamesInput{GroupID: "g1", Nicknames: []string{"bob"}, CurrentUser: asContestant("u1")})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(out.Results) != 1 || out.Results[0].Status != InviteResultAlreadyMember {
+		t.Fatalf("expected one already_member result, got %+v", out.Results)
+	}
+	if out.Results[0].Invitation != nil {
+		t.Error("no invitation must be issued for an existing member")
 	}
 }

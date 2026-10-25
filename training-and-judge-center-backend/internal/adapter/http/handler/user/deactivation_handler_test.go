@@ -172,3 +172,24 @@ func (noopSessionInvalidator) InvalidateSession(context.Context, string, time.Ti
 func (noopSessionInvalidator) IsSessionInvalidated(context.Context, string) (bool, error) {
 	return false, nil
 }
+
+// middleware.LimitBody lets multipart-labelled requests through untouched, so the request
+// deactivation handler caps its own JSON body. An oversized body labelled multipart must be
+// rejected before reaching the use case (nil here: reaching it would panic).
+func TestRequestDeactivation_OversizedMultipartLabelledBody_Returns413(t *testing.T) {
+	h := wrapWithAuth(
+		http.HandlerFunc((&Handler{}).RequestDeactivation),
+		&domainuser.TokenClaims{UserID: "user-abc", Role: shared.RoleContestant},
+	)
+	big := `{"password":"` + strings.Repeat("a", 64<<10) + `"}`
+	req := httptest.NewRequest(http.MethodPost, "/users/deactivation", strings.NewReader(big))
+	req.Header.Set("Authorization", "Bearer test-token")
+	req.Header.Set("Content-Type", "multipart/form-data; boundary=x")
+	rec := httptest.NewRecorder()
+
+	h.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusRequestEntityTooLarge {
+		t.Fatalf("expected 413, got %d: %s", rec.Code, rec.Body.String())
+	}
+}

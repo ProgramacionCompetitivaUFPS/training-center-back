@@ -240,7 +240,7 @@ func main() {
 	confirmEmailChangeUseCase := appuser.NewConfirmEmailChangeUseCase(userRepo, emailChangeRepo, emailSender, txManager)
 	requestPasswordRecoveryUseCase := appuser.NewRequestPasswordRecoveryUseCase(userRepo, passwordRecoveryRepo, emailSender, redisRateLimiter)
 	resetPasswordUseCase := appuser.NewResetPasswordUseCase(userRepo, passwordRecoveryRepo, sessionInvalidator, txManager, refreshTokenRepo)
-	requestDeactivationUseCase := appuser.NewRequestDeactivationUseCase(userRepo, deactivationRequestRepo, emailSender)
+	requestDeactivationUseCase := appuser.NewRequestDeactivationUseCase(userRepo, deactivationRequestRepo, emailSender, redisRateLimiter)
 	confirmDeactivationUseCase := appuser.NewConfirmDeactivationUseCase(userRepo, deactivationRequestRepo, deactivationAuditLogRepo, emailSender, sessionInvalidator, txManager, refreshTokenRepo)
 
 	// user dashboard adapters

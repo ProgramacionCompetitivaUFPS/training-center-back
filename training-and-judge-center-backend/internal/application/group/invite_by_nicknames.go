@@ -27,6 +27,8 @@ const (
 	// InviteResultFailed: no invitation exists for this nickname (unknown
 	// nickname or a persistence failure).
 	InviteResultFailed InviteResultStatus = "failed"
+	// InviteResultAlreadyMember: the user is already in the group; nothing was issued.
+	InviteResultAlreadyMember InviteResultStatus = "already_member"
 )
 
 type InviteByNicknamesInput struct {
@@ -38,7 +40,7 @@ type InviteByNicknamesInput struct {
 type InviteByNicknamesResult struct {
 	Nickname   string
 	Status     InviteResultStatus
-	Invitation *GroupInvitationDTO // nil only when Status == InviteResultFailed
+	Invitation *GroupInvitationDTO // nil when Status is InviteResultFailed or InviteResultAlreadyMember
 	Invitee    *UserDisplay        // nil only when Status == InviteResultFailed
 	Reason     string              // populated only when Status != InviteResultInvited
 }
@@ -134,6 +136,16 @@ func (uc *InviteByNicknamesUseCase) Execute(ctx context.Context, input InviteByN
 		}
 
 		inviteeID := shared.RestoreUserID(display.ID)
+		member, memberErr := uc.memberRepo.FindByGroupAndUser(ctx, input.GroupID, inviteeID)
+		if memberErr != nil {
+			results = append(results, InviteByNicknamesResult{Nickname: nickname, Status: InviteResultFailed, Reason: "membership lookup failed"})
+			continue
+		}
+		if member != nil {
+			results = append(results, InviteByNicknamesResult{Nickname: nickname, Status: InviteResultAlreadyMember, Reason: "user is already a member of this group", Invitee: display})
+			continue
+		}
+
 		var newInv *domainGroup.GroupInvitation
 
 		// One transaction per nickname: this is a best-effort batch, so a
