@@ -13,9 +13,13 @@ import (
 
 const refreshUnauthorizedMessage = "Invalid or expired session. Please log in again"
 
+// The SPA refreshes on every full page load (F5, new tab, pasted URL), so the budget has to
+// cover normal browsing: 20 per 10 min logged users out mid-contest and, being per user, kept
+// them out for 10 min even after logging in again. The limit only exists so one token holder
+// can't force a Postgres lookup per request; 30/min still caps that, and recovers in a minute.
 const (
-	refreshUserRateLimitMaxAttempts = 20
-	refreshUserRateLimitWindow      = 10 * time.Minute
+	refreshUserRateLimitMaxAttempts = 30
+	refreshUserRateLimitWindow      = time.Minute
 )
 
 type RefreshInput struct {

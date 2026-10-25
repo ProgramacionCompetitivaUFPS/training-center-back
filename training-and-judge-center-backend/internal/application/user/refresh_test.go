@@ -162,11 +162,11 @@ func TestRefresh_RateLimit_KeyedByUserID(t *testing.T) {
 	if capturedKey != "rate_limit:refresh:user:"+testRefreshUserID {
 		t.Errorf("expected key %q, got %q", "rate_limit:refresh:user:"+testRefreshUserID, capturedKey)
 	}
-	if capturedMax != 20 {
-		t.Errorf("expected maxAttempts 20, got %d", capturedMax)
+	if capturedMax != 30 {
+		t.Errorf("expected maxAttempts 30, got %d", capturedMax)
 	}
-	if capturedWindow != 10*time.Minute {
-		t.Errorf("expected window 10m, got %v", capturedWindow)
+	if capturedWindow != time.Minute {
+		t.Errorf("expected window 1m, got %v", capturedWindow)
 	}
 }
 
