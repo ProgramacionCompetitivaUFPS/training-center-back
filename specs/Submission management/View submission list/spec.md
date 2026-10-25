@@ -86,7 +86,7 @@ As a user, I want to see public submissions for a problem so that I can learn fr
 **Filters**
 
 * **FR-VSL-017**: System MUST support filtering by verdict (ACCEPTED, WRONG_ANSWER, etc.).
-* **FR-VSL-018**: System MUST support filtering by language (cpp20, java17, python310).
+* **FR-VSL-018**: System MUST support filtering by language (cpp20, java17, python310, blockly). Block editor submissions are stored as python310: `blockly` selects them and `python310` leaves them out, so each submission appears under exactly one filter. Every list item includes `isBlocklySubmission`.
 * **FR-VSL-019**: System MUST support filtering by problem (for contest submissions).
 * **FR-VSL-020**: System MUST support filtering by date range.
 
@@ -128,7 +128,7 @@ List all submissions from the authenticated user.
 | limit | integer | No | 20 | Items per page (max 100) |
 | verdict | string | No | - | Filter by verdict |
 | problemSlug | string | No | - | Filter by problem |
-| language | string | No | - | Filter by language |
+| language | string | No | - | Filter by language (cpp20, java17, python310, blockly) |
 | from | date | No | - | Filter from date (inclusive) |
 | to | date | No | - | Filter to date (inclusive) |
 | sort | string | No | submittedAt:desc | Sort order |
@@ -200,7 +200,7 @@ List public submissions for a problem (outside contests).
 | page | integer | No | 1 | Page number |
 | limit | integer | No | 20 | Items per page |
 | verdict | string | No | - | Filter by verdict |
-| language | string | No | - | Filter by language |
+| language | string | No | - | Filter by language (cpp20, java17, python310, blockly) |
 | mine | boolean | No | false | Include only my submissions |
 
 **Notes**:
