@@ -11,6 +11,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	domainSubmission "github.com/training-judge-center/backend/internal/domain/submission"
 	"github.com/training-judge-center/backend/pkg/apperror"
 )
 
@@ -115,4 +116,29 @@ func deleteSubmissionFiles(ctx context.Context, storage SourceStorage, sourcePat
 				"path", p, "error", err)
 		}
 	}
+}
+
+// blocklyFilterValue is the pseudo-language list filters accept for block
+// editor submissions, which are stored as python310.
+const blocklyFilterValue = "blockly"
+
+// languageFilter turns the list's language query into repository filters so
+// each submission shows up under exactly one language: "blockly" selects the
+// block editor submissions and "python310" leaves them out.
+func languageFilter(language *string) (*string, *bool, error) {
+	if language == nil {
+		return nil, nil, nil
+	}
+	if *language == blocklyFilterValue {
+		yes := true
+		return nil, &yes, nil
+	}
+	if _, err := domainSubmission.NewLanguage(*language); err != nil {
+		return nil, nil, err
+	}
+	if *language == blocklyLanguage {
+		no := false
+		return language, &no, nil
+	}
+	return language, nil, nil
 }

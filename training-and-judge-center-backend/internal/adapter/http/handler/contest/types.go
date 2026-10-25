@@ -303,6 +303,7 @@ type submissionItem struct {
 	Problem     submissionProblem   `json:"problem"`
 	SubmittedBy submissionSubmitter `json:"submittedBy"`
 	Language    string              `json:"language"`
+	IsBlockly   bool                `json:"isBlocklySubmission"`
 	Status      string              `json:"status"`
 	SubmittedAt string              `json:"submittedAt"`
 	JudgedAt    *string             `json:"judgedAt,omitempty"`

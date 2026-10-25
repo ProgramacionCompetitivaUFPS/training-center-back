@@ -326,6 +326,13 @@ func buildWhere(f domainSubmission.ListFilters) (string, []any) {
 		args = append(args, *f.Language)
 		i++
 	}
+	if f.Blockly != nil {
+		if *f.Blockly {
+			where += " AND workspace_xml_path IS NOT NULL"
+		} else {
+			where += " AND workspace_xml_path IS NULL"
+		}
+	}
 	if f.Visibility != nil {
 		where += fmt.Sprintf(" AND visibility = $%d", i)
 		args = append(args, *f.Visibility)

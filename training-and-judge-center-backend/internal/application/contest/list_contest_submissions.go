@@ -40,6 +40,7 @@ type SubmissionDisplay struct {
 	Problem     SubmissionProblemDisplay
 	SubmittedBy SubmissionSubmitterDisplay
 	Language    string
+	IsBlockly   bool
 	Status      string
 	SubmittedAt time.Time
 	JudgedAt    *time.Time // nil during ACTIVE for participants
@@ -177,6 +178,7 @@ func (uc *ListContestSubmissionsUseCase) Execute(ctx context.Context, in ListCon
 			Problem:     SubmissionProblemDisplay{Slug: sub.ProblemSlug, Title: sub.ProblemTitle, Order: sub.ProblemOrder},
 			SubmittedBy: submitter,
 			Language:    sub.Language,
+			IsBlockly:   sub.IsBlockly,
 			Status:      sub.Status,
 			SubmittedAt: sub.SubmittedAt,
 			CanViewDetail: isAdmin || isLead || sub.UserID == in.CurrentUser.ID ||

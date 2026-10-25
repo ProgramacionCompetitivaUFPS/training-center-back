@@ -186,3 +186,32 @@ func TestGetSubmission_Blockly_MissingWorkspace_StillReturnsDetail(t *testing.T)
 	assert.Nil(t, out.WorkspaceXML)
 	assert.NotNil(t, out.SourceCode)
 }
+
+func TestLanguageFilter(t *testing.T) {
+	str := func(s string) *string { return &s }
+
+	lang, blockly, err := languageFilter(nil)
+	require.NoError(t, err)
+	assert.Nil(t, lang)
+	assert.Nil(t, blockly)
+
+	lang, blockly, err = languageFilter(str("blockly"))
+	require.NoError(t, err)
+	assert.Nil(t, lang)
+	require.NotNil(t, blockly)
+	assert.True(t, *blockly)
+
+	lang, blockly, err = languageFilter(str("python310"))
+	require.NoError(t, err)
+	assert.Equal(t, "python310", *lang)
+	require.NotNil(t, blockly)
+	assert.False(t, *blockly)
+
+	lang, blockly, err = languageFilter(str("cpp20"))
+	require.NoError(t, err)
+	assert.Equal(t, "cpp20", *lang)
+	assert.Nil(t, blockly)
+
+	_, _, err = languageFilter(str("rust"))
+	assert.Error(t, err)
+}

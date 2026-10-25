@@ -8,11 +8,13 @@ import (
 )
 
 type ListFilters struct {
-	UserID          *shared.UserID
-	ProblemID       *ProblemID
-	ContestID       *ContestID
-	Status          *string
-	Language        *string
+	UserID    *shared.UserID
+	ProblemID *ProblemID
+	ContestID *ContestID
+	Status    *string
+	Language  *string
+	// Blockly narrows to block editor submissions (true) or excludes them (false).
+	Blockly         *bool
 	Visibility      *string
 	ExcludeContest  bool
 	SubmittedFrom   *time.Time

@@ -56,10 +56,9 @@ func (uc *ListProblemSubmissionsUseCase) Execute(ctx context.Context, in ListPro
 		}
 	}
 
-	if in.Language != nil {
-		if _, err := domainsubmission.NewLanguage(*in.Language); err != nil {
-			return nil, err
-		}
+	language, blockly, err := languageFilter(in.Language)
+	if err != nil {
+		return nil, err
 	}
 
 	problem, err := uc.problemBySlug.GetProblemBySlug(ctx, in.ProblemSlug)
@@ -74,7 +73,8 @@ func (uc *ListProblemSubmissionsUseCase) Execute(ctx context.Context, in ListPro
 		ProblemID:      &problem.ID,
 		ExcludeContest: true,
 		Status:         in.Status,
-		Language:       in.Language,
+		Language:       language,
+		Blockly:        blockly,
 		Page:           in.Page,
 		Limit:          in.Limit,
 	}

@@ -33,6 +33,7 @@ type RichSubmissionData struct {
 	TeamName            *string
 	TeamMemberNicknames []string
 	Language            string
+	IsBlockly           bool
 	Status              string
 	SubmittedAt         time.Time
 	JudgedAt            *time.Time
