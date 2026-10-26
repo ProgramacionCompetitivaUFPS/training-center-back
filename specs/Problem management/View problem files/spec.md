@@ -70,7 +70,26 @@ As the author, a modifier or an Admin, I want to read the code of the problem's 
 4. **Scenario**: Very long file
    - **Then** the source is cut at 256 KiB, `truncated` is `true` and `sizeBytes` still reports the real size
 
-### User Story 4 – Export a problem as an ICPC package (Priority: P2)
+### User Story 4 – Read a file in full (Priority: P1)
+
+As the author, a modifier or an Admin, I want to read the whole of anything I uploaded, not a cut preview, so that I can really check it: every line of a test input, the whole of a solution. A preview is only a quick look.
+
+**Acceptance Scenarios**:
+
+1. **Scenario**: Whole code file
+   - **When** `GET /problems/p/{slug}/files/{fileType}?full=true` is called
+   - **Then** the response has the complete source, `truncated` is `false` and `sizeBytes` is its size
+
+2. **Scenario**: Whole test case file
+   - **When** `GET /problems/p/{slug}/testcases/{kind}/{name}/input` (or `answer`) is called
+   - **Then** the response is the complete file as `text/plain`, however large (a test input can weigh up to 64 MB, which is why it is not sent inside a JSON)
+
+3. **Scenario**: A side the case does not have
+   - **Given** a case whose ZIP has the `.in` but not the `.ans`
+   - **When** the missing part is requested
+   - **Then** the system responds `404 PROBLEM_FILE_NOT_FOUND`
+
+### User Story 5 – Export a problem as an ICPC package (Priority: P2)
 
 As the author, a modifier or an Admin, I want to download a problem as an ICPC package so that I can back it up, move it to another instance or edit it offline, and import it again.
 
@@ -116,7 +135,8 @@ All these endpoints require authentication and are restricted to the problem's a
 | `GET /problems/p/{slug}/testcases` | `200` `{ hasTestCases, sampleCount, secretCount, cases: [{ kind, name, inputBytes, answerBytes }] }` | `kind` is `sample` or `secret`; a size is `null` if that file is missing |
 | `GET /problems/p/{slug}/testcases/{kind}/{name}` | `200` `{ kind, name, input, answer, inputTruncated, answerTruncated }` | `400 VALIDATION_ERROR` if `kind` is not `sample`/`secret`; `404 PROBLEM_FILE_NOT_FOUND` for an unknown case |
 | `GET /problems/p/{slug}/files/testcases` | `200` `application/zip` | `404 PROBLEM_FILE_NOT_FOUND` if no test cases were uploaded |
-| `GET /problems/p/{slug}/files/{fileType}?fileName=` | `200` `{ fileType, filename, language, content, truncated, sizeBytes }` | `fileType` is `solution`, `checker` or `validator` (case-insensitive); `fileName` is required for `solution`. `400 PROBLEM_MISSING_FILENAME` / `400 PROBLEM_INVALID_FILE_TYPE` (also for `testcases`, which is read with the two endpoints above); `404 PROBLEM_FILE_NOT_FOUND` if the problem has no such file |
+| `GET /problems/p/{slug}/testcases/{kind}/{name}/{part}` | `200` `text/plain; charset=utf-8` | `part` is `input` or `answer`; the whole file, never cut. `400 VALIDATION_ERROR` for a bad `kind` or `part`; `404 PROBLEM_FILE_NOT_FOUND` for an unknown case or a missing side. `Cache-Control: no-store`, `X-Content-Type-Options: nosniff` |
+| `GET /problems/p/{slug}/files/{fileType}?fileName=` | `200` `{ fileType, filename, language, content, truncated, sizeBytes }` | `fileType` is `solution`, `checker` or `validator` (case-insensitive); `fileName` is required for `solution`. With `full=true` the whole file is returned instead of the first 256 KiB. `400 PROBLEM_MISSING_FILENAME` / `400 PROBLEM_INVALID_FILE_TYPE` (also for `testcases`, which is read with the two endpoints above); `404 PROBLEM_FILE_NOT_FOUND` if the problem has no such file |
 | `GET /problems/p/{slug}/export` | `200` `application/zip` | |
 
 Errors common to all: `401` without a valid token, `403 INSUFFICIENT_PERMISSIONS` for anyone else, `404` if the problem does not exist. If the problem points at a file that is no longer in storage, the response is `404 PROBLEM_FILE_NOT_FOUND` with a message naming it (it is not reported as a missing problem).
@@ -142,6 +162,11 @@ ZIP responses carry `Content-Disposition: attachment; filename="..."` and `Cache
 * **FR-VF-012**: The system MUST return at most 256 KiB of a file, MUST say when it was cut, and MUST still report the real size.
 * **FR-VF-013**: A forbidden response MUST NOT include any file content.
 
+**Reading in full**
+* **FR-VF-014**: A preview MUST be a quick look only: the system MUST also offer a way to read every file in full (`full=true` for solutions, checker and validator; `.../{part}` for each file of a test case), under the same access rule.
+* **FR-VF-015**: The full text of a test case file MUST be served as plain text, one file per request, not inside a JSON, and without a size cap beyond the upload limit.
+* **FR-VF-016**: A forbidden response to a full read MUST NOT include any data.
+
 **Export**
 * **FR-VF-007**: The export MUST write only what **Problem Import** reads, in the layout above, so that importing the export recreates the problem.
 * **FR-VF-008**: The export MUST write `time_limit` in seconds and `memory_limit` in MiB, and MUST omit a limit that is not set.
@@ -157,5 +182,6 @@ ZIP responses carry `Content-Disposition: attachment; filename="..."` and `Cache
 - **SC-VF-001**: The author can see every uploaded case and read any of them without re-uploading.
 - **SC-VF-002**: An export imported under another slug exports again to the same files with identical content.
 - **SC-VF-003**: A user who is not author, modifier or Admin gets `403` on all these endpoints, including for published public problems.
+- **SC-VF-006**: The author can read the last line of any uploaded file, however large (tested with a 20 MB test input of two million lines).
 - **SC-VF-005**: The author can read the code of every solution, the checker and the validator of a problem, on drafts and on published problems.
 - **SC-VF-004**: Downloading the test cases returns exactly the bytes that were uploaded.

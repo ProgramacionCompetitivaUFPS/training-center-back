@@ -175,6 +175,7 @@ func NewRouter(h *Handlers, s *Services, allowedOrigins []string) *chi.Mux {
 				// Reading a problem's files: only its author, modifiers and Admin.
 				r.Get("/testcases", h.Problem.ListTestCases)
 				r.Get("/testcases/{kind}/{name}", h.Problem.GetTestCase)
+				r.Get("/testcases/{kind}/{name}/{part}", h.Problem.GetTestCasePart)
 				r.Get("/export", h.Problem.Export)
 
 				r.Get("/submissions", h.Submission.ListProblemSubmissions)

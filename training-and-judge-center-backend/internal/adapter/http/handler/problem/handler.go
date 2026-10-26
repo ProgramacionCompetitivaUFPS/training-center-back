@@ -31,6 +31,7 @@ type Handler struct {
 	downloadTestCases          *appProblem.DownloadTestCasesUseCase
 	exportProblem              *appProblem.ExportProblemUseCase
 	getSourceFile              *appProblem.GetSourceFileUseCase
+	getTestCasePart            *appProblem.GetTestCasePartUseCase
 	userProvider               appProblem.UserProvider
 	settings                   domainProblem.PlatformSettings
 }
@@ -61,6 +62,7 @@ func NewHandler(
 	downloadTestCases *appProblem.DownloadTestCasesUseCase,
 	exportProblem *appProblem.ExportProblemUseCase,
 	getSourceFile *appProblem.GetSourceFileUseCase,
+	getTestCasePart *appProblem.GetTestCasePartUseCase,
 	userProvider appProblem.UserProvider,
 	settings domainProblem.PlatformSettings,
 ) *Handler {
@@ -90,6 +92,7 @@ func NewHandler(
 		downloadTestCases:          downloadTestCases,
 		exportProblem:              exportProblem,
 		getSourceFile:              getSourceFile,
+		getTestCasePart:            getTestCasePart,
 		userProvider:               userProvider,
 		settings:                   settings,
 	}

@@ -2,6 +2,7 @@ package problem
 
 import (
 	"net/http"
+	"strconv"
 
 	"github.com/training-judge-center/backend/internal/adapter/http/handler"
 	appProblem "github.com/training-judge-center/backend/internal/application/problem"
@@ -24,6 +25,7 @@ type sourceFileResponse struct {
 // @Param        slug path string true "Problem slug"
 // @Param        fileType path string true "solution, checker or validator"
 // @Param        fileName query string false "Which solution (required for fileType=solution)"
+// @Param        full query bool false "Return the whole file instead of the first 256 KiB"
 // @Success      200 {object} sourceFileResponse
 // @Failure      400 {object} apperror.AppError
 // @Failure      401 {object} apperror.AppError
@@ -36,10 +38,12 @@ func (h *Handler) GetSourceFile(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	full, _ := strconv.ParseBool(r.URL.Query().Get("full"))
 	out, err := h.getSourceFile.Execute(r.Context(), appProblem.GetSourceFileInput{
 		Slug:        r.PathValue("slug"),
 		FileType:    r.PathValue("fileType"),
 		FileName:    r.URL.Query().Get("fileName"),
+		Full:        full,
 		CurrentUser: *cu,
 	})
 	if err != nil {

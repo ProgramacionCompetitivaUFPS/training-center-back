@@ -69,6 +69,7 @@ func handlerFor(p *domainProblem.Problem, storage appProblem.ProblemFileReposito
 		downloadTestCases: appProblem.NewDownloadTestCasesUseCase(repo, storage),
 		exportProblem:     appProblem.NewExportProblemUseCase(repo, storage),
 		getSourceFile:     appProblem.NewGetSourceFileUseCase(repo, storage),
+		getTestCasePart:   appProblem.NewGetTestCasePartUseCase(repo, storage),
 	}
 }
 
@@ -157,6 +158,55 @@ func TestGetTestCase_ReturnsInputAndAnswer(t *testing.T) {
 	_ = json.NewDecoder(w.Body).Decode(&resp)
 	if resp.Input != "5 6\n" || resp.Answer != "11\n" || resp.InputTruncated || resp.AnswerTruncated {
 		t.Errorf("unexpected response: %+v", resp)
+	}
+}
+
+func partParams(kind, name, part string) map[string]string {
+	return map[string]string{"slug": "test-problem", "kind": kind, "name": name, "part": part}
+}
+
+func TestGetTestCasePart_IsPlainTextThatNobodyMayCacheOrSniff(t *testing.T) {
+	h := handlerFor(publishedProblemWithTestCases(), storageWithCases(casesZip(t)))
+
+	w := serve(h.GetTestCasePart, partParams("secret", "1", "input"))
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+	if w.Body.String() != "5 6\n" {
+		t.Errorf("body = %q, want the file as stored", w.Body.String())
+	}
+	if got := w.Header().Get("Content-Type"); got != "text/plain; charset=utf-8" {
+		t.Errorf("Content-Type = %q", got)
+	}
+	if got := w.Header().Get("Cache-Control"); got != "no-store" {
+		t.Errorf("Cache-Control = %q: secret test data must not be cached", got)
+	}
+	if got := w.Header().Get("X-Content-Type-Options"); got != "nosniff" {
+		t.Errorf("X-Content-Type-Options = %q", got)
+	}
+}
+
+func TestGetTestCasePart_ErrorsMapToTheRightStatus(t *testing.T) {
+	h := handlerFor(publishedProblemWithTestCases(), storageWithCases(casesZip(t)))
+	cases := map[string]struct {
+		w    *httptest.ResponseRecorder
+		want int
+	}{
+		"bad part":     {serve(h.GetTestCasePart, partParams("secret", "1", "output")), http.StatusBadRequest},
+		"bad kind":     {serve(h.GetTestCasePart, partParams("hidden", "1", "input")), http.StatusBadRequest},
+		"unknown case": {serve(h.GetTestCasePart, partParams("secret", "99", "input")), http.StatusNotFound},
+	}
+	for name, tc := range cases {
+		if tc.w.Code != tc.want {
+			t.Errorf("%s: expected %d, got %d", name, tc.want, tc.w.Code)
+		}
+	}
+
+	stranger := handlerFor(someoneElsesProblem(), storageWithCases(casesZip(t)))
+	w := serve(stranger.GetTestCasePart, partParams("secret", "1", "input"))
+	if w.Code != http.StatusForbidden || bytes.Contains(w.Body.Bytes(), []byte("5 6")) {
+		t.Errorf("stranger: expected 403 without data, got %d: %s", w.Code, w.Body.String())
 	}
 }
 

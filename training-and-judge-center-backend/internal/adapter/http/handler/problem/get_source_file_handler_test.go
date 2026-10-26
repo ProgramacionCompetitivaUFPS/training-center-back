@@ -119,3 +119,26 @@ func TestGetSourceFile_Unauthenticated401(t *testing.T) {
 		t.Fatalf("expected 401, got %d", w.Code)
 	}
 }
+
+func TestGetSourceFile_FullQueryParamReturnsTheWholeFile(t *testing.T) {
+	long := make([]byte, appProblem.SourceFilePreviewMaxBytes+1000)
+	for i := range long {
+		long[i] = 'a'
+	}
+	storage := &mockFileStorageH{downloadFileFn: func(_ context.Context, _ string) ([]byte, error) { return long, nil }}
+	h := &Handler{getSourceFile: appProblem.NewGetSourceFileUseCase(repoReturning(problemWithJudgingFiles("u1")), storage)}
+
+	cut := serveSource(h, "solution", "?fileName=sol.cpp")
+	var cutBody sourceFileResponse
+	_ = json.NewDecoder(cut.Body).Decode(&cutBody)
+	if !cutBody.Truncated || len(cutBody.Content) != appProblem.SourceFilePreviewMaxBytes {
+		t.Errorf("default must stay a capped preview: truncated=%v len=%d", cutBody.Truncated, len(cutBody.Content))
+	}
+
+	full := serveSource(h, "solution", "?fileName=sol.cpp&full=true")
+	var fullBody sourceFileResponse
+	_ = json.NewDecoder(full.Body).Decode(&fullBody)
+	if fullBody.Truncated || len(fullBody.Content) != len(long) {
+		t.Errorf("full=true must return everything: truncated=%v len=%d want %d", fullBody.Truncated, len(fullBody.Content), len(long))
+	}
+}

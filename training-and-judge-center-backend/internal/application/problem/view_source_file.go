@@ -17,7 +17,10 @@ type GetSourceFileInput struct {
 	Slug     string
 	FileType string // solution | checker | validator
 	// FileName picks the solution (a problem can have several); ignored for checker/validator.
-	FileName    string
+	FileName string
+	// Full returns the whole file instead of the first SourceFilePreviewMaxBytes. These files are
+	// capped at upload (2 MB by default), so reading one in full is bounded.
+	Full        bool
 	CurrentUser appshared.CurrentUser
 }
 
@@ -73,7 +76,7 @@ func (uc *GetSourceFileUseCase) Execute(ctx context.Context, in GetSourceFileInp
 		Language:  file.Language(),
 		SizeBytes: len(data),
 	}
-	if len(data) > SourceFilePreviewMaxBytes {
+	if !in.Full && len(data) > SourceFilePreviewMaxBytes {
 		data = data[:SourceFilePreviewMaxBytes]
 		out.Truncated = true
 	}

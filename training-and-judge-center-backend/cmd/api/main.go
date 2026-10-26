@@ -199,6 +199,7 @@ func main() {
 	downloadTestCasesUseCase := appProblem.NewDownloadTestCasesUseCase(problemRepo, fileStorage)
 	exportProblemUseCase := appProblem.NewExportProblemUseCase(problemRepo, fileStorage)
 	getSourceFileUseCase := appProblem.NewGetSourceFileUseCase(problemRepo, fileStorage)
+	getTestCasePartUseCase := appProblem.NewGetTestCasePartUseCase(problemRepo, fileStorage)
 
 	// User platform adapters
 	userRepo := user.NewRepository(dbPool)
@@ -555,6 +556,7 @@ func main() {
 		downloadTestCasesUseCase,
 		exportProblemUseCase,
 		getSourceFileUseCase,
+		getTestCasePartUseCase,
 		userProvider,
 		settingsProvider,
 	)
