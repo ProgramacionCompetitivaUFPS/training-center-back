@@ -367,6 +367,8 @@ Only `problem.yaml` (with `name`) is required to import. Test cases, solutions a
 
 ## 🔹 Content Deletion
 
+A problem can only be deleted while it is a `DRAFT`: a published one must be unpublished first (which is itself refused while it is in an active contest).
+
 ### When a Problem is Deleted
 
 | Entity | Action |

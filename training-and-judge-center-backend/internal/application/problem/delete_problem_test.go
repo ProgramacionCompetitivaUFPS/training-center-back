@@ -4,6 +4,9 @@ import (
 	"context"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
+
+	appshared "github.com/training-judge-center/backend/internal/application/shared"
 	domainProblem "github.com/training-judge-center/backend/internal/domain/problem"
 	"github.com/training-judge-center/backend/pkg/apperror"
 )
@@ -142,7 +145,8 @@ func TestDeleteProblem_NotFound(t *testing.T) {
 }
 
 func TestDeleteProblem_RemovesContestAssociationsInTransaction(t *testing.T) {
-	p := newPublishedProblem()
+	// A draft can still belong to a (scheduled) contest: it was unpublished after being added.
+	p := newDraftProblem()
 	var deleted []string
 	repo := repoWith(p)
 	repo.deleteFn = func(_ context.Context, id string) error {
@@ -173,7 +177,7 @@ func TestDeleteProblem_RemovesContestAssociationsInTransaction(t *testing.T) {
 }
 
 func TestDeleteProblem_ContestRemovalFails_ProblemNotDeleted(t *testing.T) {
-	repo := repoWith(newPublishedProblem())
+	repo := repoWith(newDraftProblem())
 	deleteCalled := false
 	repo.deleteFn = func(_ context.Context, _ string) error {
 		deleteCalled = true
@@ -193,4 +197,31 @@ func TestDeleteProblem_ContestRemovalFails_ProblemNotDeleted(t *testing.T) {
 	if deleteCalled {
 		t.Error("problem must not be deleted when contest association removal fails")
 	}
+}
+
+func TestDeleteProblem_PublishedIsRejectedEvenForTheAuthorAndAdmin(t *testing.T) {
+	for name, user := range map[string]appshared.CurrentUser{"author": asCoach(authorID), "admin": asAdmin("someone-else")} {
+		t.Run(name, func(t *testing.T) {
+			deleted := false
+			repo := repoWith(newPublishedProblem())
+			repo.deleteFn = func(context.Context, string) error { deleted = true; return nil }
+			uc := NewDeleteProblemUseCase(repo, &mockFileStorage{}, &mockActiveContestChecker{}, &mockContestAssociationRemover{}, &mockTxManager{})
+
+			err := uc.Execute(context.Background(), DeleteProblemInput{Slug: testSlug, ConfirmSlug: testSlug, CurrentUser: user})
+
+			ae := appErr(t, err)
+			assert.Equal(t, apperror.KindBadRequest, ae.Kind)
+			assert.Equal(t, ErrCodeProblemIsPublished, ae.Code)
+			assert.False(t, deleted, "nothing may be deleted when the request is refused")
+		})
+	}
+}
+
+func TestDeleteProblem_AfterUnpublishingItCanBeDeleted(t *testing.T) {
+	// Unpublished = draft: the extra step is the whole point, not a permanent lock.
+	repo := repoWith(newDraftProblem())
+	uc := NewDeleteProblemUseCase(repo, &mockFileStorage{}, &mockActiveContestChecker{}, &mockContestAssociationRemover{}, &mockTxManager{})
+
+	err := uc.Execute(context.Background(), DeleteProblemInput{Slug: testSlug, ConfirmSlug: testSlug, CurrentUser: asCoach(authorID)})
+	assert.NoError(t, err)
 }

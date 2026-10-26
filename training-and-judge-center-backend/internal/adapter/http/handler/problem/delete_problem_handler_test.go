@@ -79,3 +79,26 @@ func TestDeleteProblem_SlugMismatch_Returns400(t *testing.T) {
 		t.Errorf("expected %s, got %s", domainProblem.ErrCodeSlugMismatch, errResp.Code)
 	}
 }
+
+func TestDeleteProblem_PublishedProblem_Returns400WithAClearCode(t *testing.T) {
+	// publishedProblem() is authored by u1, the user the mock token logs in as: the refusal
+	// is about the problem's state, not about who is asking.
+	h := newHandlerWithDeleteProblem(repoReturning(publishedProblem()), &mockActiveContestCheckerH{})
+
+	r := authedRequest(http.MethodDelete, "/problems/p/test-problem", mustJSON(`{"confirmSlug":"test-problem"}`))
+	r.SetPathValue("slug", "test-problem")
+	w := httptest.NewRecorder()
+
+	wrapAuth(http.HandlerFunc(h.DeleteProblem)).ServeHTTP(w, r)
+
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400, got %d: %s", w.Code, w.Body.String())
+	}
+	var body apperror.AppError
+	if err := json.NewDecoder(w.Body).Decode(&body); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if body.Code != "PROBLEM_IS_PUBLISHED" {
+		t.Errorf("code = %q, want PROBLEM_IS_PUBLISHED", body.Code)
+	}
+}

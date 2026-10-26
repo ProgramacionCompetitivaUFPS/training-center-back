@@ -128,3 +128,28 @@ func TestLoadSamples_IgnoresUnpairedFiles(t *testing.T) {
 		t.Errorf("expected sample %q, got %q", "1", samples[0].Name)
 	}
 }
+
+func TestLoadSamples_FindsThemUnderTheRootFolderOfThePackage(t *testing.T) {
+	key := "problems/test-problem/testcases/xyz"
+	storage := &mockFileStorage{
+		listFilesFn: func(_ context.Context, _ string) ([]string, error) {
+			return []string{
+				key + "/testcases.zip", // the uploaded ZIP lives under the same key
+				key + "/pkg/data/sample/1.in",
+				key + "/pkg/data/sample/1.ans",
+				key + "/pkg/data/sample/notes.txt",
+				key + "/pkg/data/secret/9.in", // a secret case is never an example
+				key + "/data/sample-extra/2.in",
+			}, nil
+		},
+		downloadFileFn: func(_ context.Context, path string) ([]byte, error) { return []byte(path), nil },
+	}
+
+	samples, err := loadSamples(context.Background(), storage, &key)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(samples) != 1 || samples[0].Name != "1" {
+		t.Fatalf("expected the single sample 1 found under pkg/, got %+v", samples)
+	}
+}

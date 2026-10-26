@@ -22,8 +22,11 @@ func loadSamples(ctx context.Context, storage ProblemFileRepository, testCasesKe
 		return []SampleTestCase{}, nil
 	}
 
-	prefix := *testCasesKey + "/data/sample/"
-	paths, err := storage.ListFiles(ctx, prefix)
+	// Everything under the key, not just <key>/data/sample/: a package zipped inside a root folder
+	// ("pkg/data/sample/1.in") was stored with that folder in the path, and looking only at
+	// <key>/data/sample/ made its examples vanish from the problem page.
+	base := *testCasesKey + "/"
+	paths, err := storage.ListFiles(ctx, base)
 	if err != nil {
 		return nil, err
 	}
@@ -31,6 +34,9 @@ func loadSamples(ctx context.Context, storage ProblemFileRepository, testCasesKe
 	inputs := make(map[string]string, len(paths))
 	outputs := make(map[string]string, len(paths))
 	for _, filePath := range paths {
+		if !isSampleFile(strings.TrimPrefix(filePath, base)) {
+			continue
+		}
 		ext := path.Ext(filePath)
 		name := strings.TrimSuffix(path.Base(filePath), ext)
 
@@ -81,4 +87,14 @@ func sortSampleNames(names []string) {
 	sort.Slice(names, func(i, j int) bool {
 		return values[names[i]] < values[names[j]]
 	})
+}
+
+// isSampleFile reports whether a path (relative to the test cases key) is an .in/.ans of a
+// data/sample directory, wherever the package's root folder is.
+func isSampleFile(rel string) bool {
+	if ext := path.Ext(rel); ext != ".in" && ext != ".ans" {
+		return false
+	}
+	dir := path.Dir(rel)
+	return dir == "data/sample" || strings.HasSuffix(dir, "/data/sample")
 }
