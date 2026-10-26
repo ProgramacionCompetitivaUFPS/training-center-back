@@ -87,7 +87,7 @@ When changing from `PUBLIC` to `PRIVATE`:
 | View / download test cases | ✅ | ✅ | ✅ | ❌ |
 | Export problem (ICPC package) | ✅ | ✅ | ✅ | ❌ |
 | Publish/Unpublish | ✅ | ✅ | ✅ | ❌ |
-| Add modifier | ✅ | ✅ | ❌ | ❌ |
+| Add modifier | ✅ | ✅ | ✅ | ❌ |
 | Remove modifier | ✅ | ✅ | ❌ | ❌ |
 | List modifiers | ✅ | ✅ | ✅ | ❌ |
 | Delete problem | ✅ | ✅ | ❌ | ❌ |
@@ -97,7 +97,8 @@ When changing from `PUBLIC` to `PRIVATE`:
 * **Author**: The user who created the problem. Automatically a modifier.
 * **Modifiers**: Users assigned by the author or Admin to help edit the problem.
 * Modifiers can edit metadata, upload/delete files, and publish/unpublish.
-* Modifiers **cannot** add other modifiers or delete the problem.
+* Modifiers can add other modifiers (they can already read and export every file), but **cannot** remove modifiers or delete the problem.
+* In a contest, the "can add" rule applies only to problems being added now: a problem already in the contest stays when another lead saves the list.
 
 ---
 

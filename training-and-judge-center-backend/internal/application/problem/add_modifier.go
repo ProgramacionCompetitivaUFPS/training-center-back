@@ -40,11 +40,11 @@ func (uc *AddModifierUseCase) Execute(ctx context.Context, input AddModifierInpu
 		return err
 	}
 
-	isAuthor := p.AuthorID() == shared.RestoreUserID(input.CurrentUser.ID)
-	isAdmin := input.CurrentUser.IsAdmin()
-
-	if !isAuthor && !isAdmin {
-		return apperror.NewForbidden(ErrCodeInsufficientPermissions, "Only the author or Admin can add modifiers")
+	// Whoever can edit the problem (author, Admin, another modifier) can bring in more
+	// collaborators; a modifier can already read and export every file, so this hands out nothing
+	// new. Removing them is still the author's and Admin's.
+	if !p.CanBeEditedBy(shared.RestoreUserID(input.CurrentUser.ID), input.CurrentUser.IsAdmin()) {
+		return apperror.NewForbidden(ErrCodeInsufficientPermissions, "Only the author, a modifier or Admin can add modifiers")
 	}
 
 	modifierID, err := resolveModifierID(ctx, uc.userProvider, input.UserNickname)

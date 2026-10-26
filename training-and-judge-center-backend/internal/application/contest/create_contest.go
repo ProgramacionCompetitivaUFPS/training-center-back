@@ -114,7 +114,7 @@ func (uc *CreateContestUseCase) Execute(ctx context.Context, in CreateContestInp
 			inputs[i] = ProblemOrderInput{Slug: s}
 		}
 		var err error
-		problemEntries, err = resolveContestProblems(ctx, uc.problemProvider, inputs, in.CurrentUser.ID, in.CurrentUser.IsAdmin())
+		problemEntries, err = resolveContestProblems(ctx, uc.problemProvider, inputs, in.CurrentUser.ID, in.CurrentUser.IsAdmin(), nil)
 		if err != nil {
 			return nil, err
 		}

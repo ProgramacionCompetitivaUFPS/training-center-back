@@ -162,6 +162,13 @@ As a Lead of a group, I want to update contest information (name, description, t
     * **Then** the system rejects with 403 Forbidden (PROBLEM_ACCESS_DENIED)
     * **And** indicates which problem(s) the user cannot add
 
+18a. **Scenario**: Another lead's PRIVATE problem stays when the list is saved
+    * **Given** a contest already contains PRIVATE problem P3, added by lead A (its author)
+    * **And** lead B of the same group is NOT a modifier of P3
+    * **When** B submits an update whose problem list includes P3 (for example to add a public problem P4, or to remove another one)
+    * **Then** the update succeeds and P3 is still in the contest
+    * **And** the "can add" rule is checked only for problems that were not in the contest before (a new PRIVATE problem B is not a modifier of is still rejected)
+
 19. **Scenario**: Update fails - problem not published
     * **Given** a contest exists
     * **And** the authenticated user is a Lead of the group
