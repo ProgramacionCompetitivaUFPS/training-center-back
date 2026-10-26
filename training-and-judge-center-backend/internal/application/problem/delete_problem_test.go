@@ -199,6 +199,27 @@ func TestDeleteProblem_ContestRemovalFails_ProblemNotDeleted(t *testing.T) {
 	}
 }
 
+// Contest submissions are the official result of a contest (finished or not): deleting the problem
+// would change its standings, so it is refused, for the author and for Admin alike.
+func TestDeleteProblem_RefusedWhenItHasSubmissionsInAContest(t *testing.T) {
+	for name, user := range map[string]appshared.CurrentUser{"author": asCoach(authorID), "admin": asAdmin("someone-else")} {
+		t.Run(name, func(t *testing.T) {
+			deleted := false
+			repo := repoWith(newPublishedProblem())
+			repo.deleteFn = func(context.Context, string) error { deleted = true; return nil }
+			removed := &mockContestAssociationRemover{}
+			uc := NewDeleteProblemUseCase(repo, &mockFileStorage{}, &mockActiveContestChecker{hasContestHistory: true}, removed, &mockTxManager{})
+
+			err := uc.Execute(context.Background(), DeleteProblemInput{Slug: testSlug, ConfirmSlug: testSlug, CurrentUser: user})
+
+			ae := appErr(t, err)
+			assert.Equal(t, apperror.KindConflict, ae.Kind)
+			assert.Equal(t, ErrCodeProblemHasContestHistory, ae.Code)
+			assert.False(t, deleted, "nothing may be deleted when the request is refused")
+		})
+	}
+}
+
 // Deleting a published problem is allowed (the interface warns first and offers to unpublish
 // instead); only an active contest blocks it, and the slug must still be typed to confirm.
 func TestDeleteProblem_PublishedCanBeDeletedByTheAuthorAndAdmin(t *testing.T) {

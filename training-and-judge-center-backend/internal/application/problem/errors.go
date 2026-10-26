@@ -16,4 +16,5 @@ const (
 	ErrCodeNoSubmissionsToRejudge     = "NO_SUBMISSIONS_TO_REJUDGE"
 	ErrCodeValidationPipelineNotReady = "VALIDATION_PIPELINE_NOT_READY"
 	ErrCodeValidationTimedOut         = "VALIDATION_TIMED_OUT"
+	ErrCodeProblemHasContestHistory   = "PROBLEM_HAS_CONTEST_HISTORY"
 )

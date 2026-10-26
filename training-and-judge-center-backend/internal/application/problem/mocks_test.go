@@ -288,12 +288,17 @@ func (m *mockProblemStatusProvider) GetStatus(ctx context.Context, problemID str
 // ── ActiveContestChecker mock ────────────────────────────────────────────────
 
 type mockActiveContestChecker struct {
-	inActive bool
-	err      error
+	inActive          bool
+	hasContestHistory bool
+	err               error
 }
 
 func (m *mockActiveContestChecker) IsProblemInActiveContest(_ context.Context, _ string) (bool, error) {
 	return m.inActive, m.err
+}
+
+func (m *mockActiveContestChecker) HasContestSubmissions(_ context.Context, _ string) (bool, error) {
+	return m.hasContestHistory, m.err
 }
 
 // ── PlatformSettings default ─────────────────────────────────────────────────

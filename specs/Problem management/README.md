@@ -368,7 +368,7 @@ Only `problem.yaml` (with `name`) is required to import. Test cases, solutions a
 
 ## 🔹 Content Deletion
 
-A published problem can be deleted (the author or Admin types its slug to confirm; an active contest still blocks it). The interface warns first and offers to unpublish it instead, which keeps its submissions and contest history.
+A published problem can be deleted (the author or Admin types its slug to confirm), except while it is in an active contest or once anyone has submitted it inside a contest (`PROBLEM_HAS_CONTEST_HISTORY`): those submissions are a contest's official result. The interface warns first and offers to unpublish it instead, which keeps its submissions and contest history.
 
 ### When a Problem is Deleted
 

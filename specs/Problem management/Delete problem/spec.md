@@ -55,13 +55,19 @@ As a problem author or Admin, I want to permanently delete a problem from the sy
    - **And** the problem is removed from the scheduled contest
    - **And** no notification is sent (contest hasn't started yet)
 
-6. **Scenario**: Delete problem in finished contest
-   - **Given** a problem exists and was included in a FINISHED contest
+6. **Scenario**: Delete problem in finished contest without submissions
+   - **Given** a problem exists and was included in a FINISHED contest, and nobody submitted it inside any contest
    - **And** the authenticated user is the author or Admin
    - **When** they delete the problem with correct confirmation
    - **Then** the system deletes the problem and Contest_Problem association
-   - **And** existing submissions remain accessible with preserved problem title
-   - **And** historical standings remain intact
+
+6a. **Scenario**: Delete problem with submissions made in a contest
+   - **Given** a problem has submissions made inside a contest (finished or not)
+   - **And** the authenticated user is the author or Admin
+   - **When** they delete the problem with correct confirmation
+   - **Then** the system rejects with HTTP 409 Conflict (PROBLEM_HAS_CONTEST_HISTORY)
+   - **And** nothing is deleted
+   - **And** the author can unpublish the problem instead: it keeps its files, submissions and the contest standings, and stops being used
 
 7. **Scenario**: Delete problem with no submissions
    - **Given** a problem exists with zero submissions
@@ -247,9 +253,10 @@ Problem with the specified slug does not exist.
 - **FR-014**: The system MUST NOT allow deletion of problems that are currently in ACTIVE contests (must return PROBLEM_IN_ACTIVE_CONTEST).
 - **FR-014a**: The interface SHOULD, when deletion of a `PUBLISHED` problem is requested, warn that contestants lose access and that contest associations are removed, and offer to unpublish it instead; the author or Admin may still delete it after typing the slug.
 - **FR-015**: The system MUST allow deletion of problems that are in SCHEDULED contests.
-- **FR-016**: The system MUST allow deletion of problems that are in FINISHED contests.
+- **FR-016**: The system MUST allow deletion of problems that are in FINISHED contests, as long as nobody submitted them inside a contest (see FR-019a).
+- **FR-019a**: The system MUST NOT allow deletion of a problem that has submissions made inside a contest, finished or not (must return HTTP 409 PROBLEM_HAS_CONTEST_HISTORY): those submissions are the official result of the contest and deleting the problem would change its standings. The problem can be unpublished instead.
 - **FR-018**: When a problem is deleted from a SCHEDULED contest, the system MUST remove it without notification.
-- **FR-019**: When a problem is deleted from a FINISHED contest, the system MUST preserve historical standings.
+- **FR-019**: When a problem is deleted from a FINISHED contest, the system MUST preserve historical standings (guaranteed by FR-019a: a problem with contest submissions cannot be deleted). The standings of a contest MUST keep working (never fail) for submissions whose problem was deleted before this rule existed; those submissions are ignored.
 
 **Submission Preservation**
 - **FR-020**: The system MUST NOT delete Submission records when a problem is deleted.
