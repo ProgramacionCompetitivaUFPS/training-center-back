@@ -199,7 +199,9 @@ func TestDeleteProblem_ContestRemovalFails_ProblemNotDeleted(t *testing.T) {
 	}
 }
 
-func TestDeleteProblem_PublishedIsRejectedEvenForTheAuthorAndAdmin(t *testing.T) {
+// Deleting a published problem is allowed (the interface warns first and offers to unpublish
+// instead); only an active contest blocks it, and the slug must still be typed to confirm.
+func TestDeleteProblem_PublishedCanBeDeletedByTheAuthorAndAdmin(t *testing.T) {
 	for name, user := range map[string]appshared.CurrentUser{"author": asCoach(authorID), "admin": asAdmin("someone-else")} {
 		t.Run(name, func(t *testing.T) {
 			deleted := false
@@ -209,19 +211,8 @@ func TestDeleteProblem_PublishedIsRejectedEvenForTheAuthorAndAdmin(t *testing.T)
 
 			err := uc.Execute(context.Background(), DeleteProblemInput{Slug: testSlug, ConfirmSlug: testSlug, CurrentUser: user})
 
-			ae := appErr(t, err)
-			assert.Equal(t, apperror.KindBadRequest, ae.Kind)
-			assert.Equal(t, ErrCodeProblemIsPublished, ae.Code)
-			assert.False(t, deleted, "nothing may be deleted when the request is refused")
+			assert.NoError(t, err)
+			assert.True(t, deleted)
 		})
 	}
-}
-
-func TestDeleteProblem_AfterUnpublishingItCanBeDeleted(t *testing.T) {
-	// Unpublished = draft: the extra step is the whole point, not a permanent lock.
-	repo := repoWith(newDraftProblem())
-	uc := NewDeleteProblemUseCase(repo, &mockFileStorage{}, &mockActiveContestChecker{}, &mockContestAssociationRemover{}, &mockTxManager{})
-
-	err := uc.Execute(context.Background(), DeleteProblemInput{Slug: testSlug, ConfirmSlug: testSlug, CurrentUser: asCoach(authorID)})
-	assert.NoError(t, err)
 }

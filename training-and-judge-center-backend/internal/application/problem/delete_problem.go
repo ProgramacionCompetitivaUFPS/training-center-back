@@ -74,13 +74,6 @@ func (uc *DeleteProblemUseCase) Execute(ctx context.Context, in DeleteProblemInp
 		return apperror.NewConflict(problem.ErrCodeProblemInActiveContest, "Cannot delete a problem that is currently being used in an active contest")
 	}
 
-	// A published problem is live: contestants can submit to it, contests can include it, and its
-	// history (submissions, standings) points at it. Deleting it takes a deliberate extra step, the
-	// same one editing and deleting its files already take: unpublish first.
-	if p.Status().IsPublished() {
-		return apperror.NewBadRequest(ErrCodeProblemIsPublished, "Cannot delete a published problem. Unpublish it first.")
-	}
-
 	err = uc.txManager.WithTx(ctx, func(txCtx context.Context) error {
 		if err := uc.contestRemover.RemoveProblemFromContests(txCtx, p.ID()); err != nil {
 			return err

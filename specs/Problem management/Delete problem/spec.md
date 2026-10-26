@@ -15,7 +15,7 @@ As a problem author or Admin, I want to permanently delete a problem from the sy
 **Acceptance Scenarios**:
 
 1. **Scenario**: Successful deletion with confirmation
-   - **Given** a problem exists with status `DRAFT` (a published one must be unpublished first, see scenario 1a)
+   - **Given** a problem exists (any status: DRAFT or PUBLISHED)
    - **And** the authenticated user is the author or Admin
    - **When** they request DELETE /problems/p/{slug} with correct slug confirmation in body
    - **Then** the system performs hard delete of:
@@ -24,16 +24,6 @@ As a problem author or Admin, I want to permanently delete a problem from the sy
      - All Contest_Problem associations (problem removed from all contests)
    - **And** preserves all Submission records with problem_id intact
    - **And** returns HTTP 204 No Content
-
-1a. **Scenario**: Delete a published problem
-   - **Given** a problem exists with status `PUBLISHED`
-   - **And** the authenticated user is the author or Admin
-   - **When** they delete it with correct confirmation
-   - **Then** the system rejects with HTTP 400 Bad Request
-   - **And** returns error code PROBLEM_IS_PUBLISHED, telling them to unpublish the problem first
-   - **And** nothing is deleted
-
-   > A published problem is live: contestants submit to it, contests include it, and submissions and standings point at it. Deleting it takes the same deliberate step that editing it and deleting its files already take: unpublish first. Unpublishing is itself refused while the problem is in an ACTIVE contest.
 
 2. **Scenario**: Deletion without confirmation
    - **Given** a problem exists
@@ -58,7 +48,7 @@ As a problem author or Admin, I want to permanently delete a problem from the sy
    - **And** indicates the problem must be removed from the active contest first
 
 5. **Scenario**: Delete problem in scheduled contest
-   - **Given** a problem is included in a SCHEDULED (future) contest and is `DRAFT` (it was unpublished after being added)
+   - **Given** a problem exists and is included in a SCHEDULED (future) contest
    - **And** the authenticated user is the author or Admin
    - **When** they delete the problem with correct confirmation
    - **Then** the system deletes the problem and Contest_Problem association
@@ -66,7 +56,7 @@ As a problem author or Admin, I want to permanently delete a problem from the sy
    - **And** no notification is sent (contest hasn't started yet)
 
 6. **Scenario**: Delete problem in finished contest
-   - **Given** a problem was included in a FINISHED contest and is `DRAFT` (it was unpublished afterwards)
+   - **Given** a problem exists and was included in a FINISHED contest
    - **And** the authenticated user is the author or Admin
    - **When** they delete the problem with correct confirmation
    - **Then** the system deletes the problem and Contest_Problem association
@@ -255,9 +245,9 @@ Problem with the specified slug does not exist.
 
 **Contest Impact**
 - **FR-014**: The system MUST NOT allow deletion of problems that are currently in ACTIVE contests (must return PROBLEM_IN_ACTIVE_CONTEST).
-- **FR-014a**: The system MUST NOT allow deletion of a `PUBLISHED` problem, whoever asks (must return HTTP 400 PROBLEM_IS_PUBLISHED). The author or Admin unpublishes it first. The active-contest check comes first, so a published problem in an active contest still gets the 409.
-- **FR-015**: The system MUST allow deletion of unpublished problems that are in SCHEDULED contests.
-- **FR-016**: The system MUST allow deletion of unpublished problems that were in FINISHED contests.
+- **FR-014a**: The interface SHOULD, when deletion of a `PUBLISHED` problem is requested, warn that contestants lose access and that contest associations are removed, and offer to unpublish it instead; the author or Admin may still delete it after typing the slug.
+- **FR-015**: The system MUST allow deletion of problems that are in SCHEDULED contests.
+- **FR-016**: The system MUST allow deletion of problems that are in FINISHED contests.
 - **FR-018**: When a problem is deleted from a SCHEDULED contest, the system MUST remove it without notification.
 - **FR-019**: When a problem is deleted from a FINISHED contest, the system MUST preserve historical standings.
 
@@ -309,7 +299,6 @@ For the canonical documentation of the `Problem`, `Contest_Problem`, `Submission
 - **SC-015**: Statistics for deleted problems return HTTP 404 Not Found.
 - **SC-016**: Submissions remain accessible after problem deletion.
 - **SC-017**: Deleted problem slugs become available for reuse.
-- **SC-018**: A `PUBLISHED` problem cannot be deleted by anyone; it has to be unpublished first (HTTP 400 PROBLEM_IS_PUBLISHED).
 - **SC-018**: Successful deletions return HTTP 204 No Content.
 - **SC-019**: Unauthenticated requests receive HTTP 401 Unauthorized.
 - **SC-020**: Non-existent problem slugs return HTTP 404 Not Found.
