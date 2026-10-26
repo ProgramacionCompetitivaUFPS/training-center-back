@@ -51,6 +51,8 @@ func (h *Handler) GetSourceFile(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// solutions, checker and validator are not for contestants: never to be cached
+	w.Header().Set("Cache-Control", "no-store")
 	handler.WriteJSON(r.Context(), w, http.StatusOK, sourceFileResponse{
 		FileType:  out.FileType,
 		Filename:  out.Filename,

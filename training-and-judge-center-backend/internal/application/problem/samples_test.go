@@ -138,6 +138,7 @@ func TestLoadSamples_FindsThemUnderTheRootFolderOfThePackage(t *testing.T) {
 				key + "/pkg/data/sample/1.in",
 				key + "/pkg/data/sample/1.ans",
 				key + "/pkg/data/sample/notes.txt",
+				key + "/pkg/data/sample/._1.in", // AppleDouble leftover of a macOS ZIP, not a case
 				key + "/pkg/data/secret/9.in", // a secret case is never an example
 				key + "/data/sample-extra/2.in",
 			}, nil

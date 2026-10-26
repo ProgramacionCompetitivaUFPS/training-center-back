@@ -112,6 +112,8 @@ func (h *Handler) GetTestCase(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// secret test data: never to be cached by the browser or a proxy
+	w.Header().Set("Cache-Control", "no-store")
 	handler.WriteJSON(r.Context(), w, http.StatusOK, testCaseResponse{
 		Kind:            out.Kind,
 		Name:            out.Name,

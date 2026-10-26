@@ -92,6 +92,9 @@ func sortSampleNames(names []string) {
 // isSampleFile reports whether a path (relative to the test cases key) is an .in/.ans of a
 // data/sample directory, wherever the package's root folder is.
 func isSampleFile(rel string) bool {
+	if strings.HasPrefix(path.Base(rel), "._") { // AppleDouble leftover, not a case
+		return false
+	}
 	if ext := path.Ext(rel); ext != ".in" && ext != ".ans" {
 		return false
 	}

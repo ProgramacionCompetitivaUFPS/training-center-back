@@ -66,26 +66,28 @@ func (uc *DeleteProblemUseCase) Execute(ctx context.Context, in DeleteProblemInp
 		return apperror.NewForbidden(ErrCodeInsufficientPermissions, "Only the problem author or Admin can delete this problem")
 	}
 
-	inActive, err := uc.contestChecker.IsProblemInActiveContest(ctx, p.ID())
-	if err != nil {
-		return err
-	}
-	if inActive {
-		return apperror.NewConflict(problem.ErrCodeProblemInActiveContest, "Cannot delete a problem that is currently being used in an active contest")
-	}
-
-	// Submissions made inside a contest are part of its official result: deleting the problem
-	// would silently change the standings of that contest, finished or not. Unpublishing it
-	// keeps all of that and still stops new use.
-	hasHistory, err := uc.contestChecker.HasContestSubmissions(ctx, p.ID())
-	if err != nil {
-		return err
-	}
-	if hasHistory {
-		return apperror.NewConflict(ErrCodeProblemHasContestHistory, "Cannot delete a problem with submissions made in a contest: it would change that contest's results. Unpublish it instead.")
-	}
-
 	err = uc.txManager.WithTx(ctx, func(txCtx context.Context) error {
+		// Submissions made inside a contest are part of its official result: deleting the problem
+		// would silently change the standings of that contest, finished or not. Unpublishing it
+		// keeps all of that and still stops new use. Checked inside the transaction, first, because
+		// it locks the problem row: a submission being inserted right now commits before the check
+		// and no new one can be inserted until the deletion ends.
+		hasHistory, err := uc.contestChecker.HasContestSubmissions(txCtx, p.ID())
+		if err != nil {
+			return err
+		}
+		if hasHistory {
+			return apperror.NewConflict(ErrCodeProblemHasContestHistory, "Cannot delete a problem with submissions made in a contest: it would change that contest's results. Unpublish it instead.")
+		}
+
+		inActive, err := uc.contestChecker.IsProblemInActiveContest(txCtx, p.ID())
+		if err != nil {
+			return err
+		}
+		if inActive {
+			return apperror.NewConflict(problem.ErrCodeProblemInActiveContest, "Cannot delete a problem that is currently being used in an active contest")
+		}
+
 		if err := uc.contestRemover.RemoveProblemFromContests(txCtx, p.ID()); err != nil {
 			return err
 		}

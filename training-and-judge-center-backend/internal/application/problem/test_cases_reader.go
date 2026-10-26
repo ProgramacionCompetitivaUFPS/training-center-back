@@ -53,7 +53,7 @@ func openTestCaseArchive(ctx context.Context, data []byte) (*testCaseArchive, er
 			continue
 		}
 		clean := path.Clean(strings.ReplaceAll(f.Name, "\\", "/"))
-		if strings.Contains(clean, "__MACOSX") || strings.HasSuffix(clean, ".DS_Store") {
+		if strings.Contains(clean, "__MACOSX") || strings.HasSuffix(clean, ".DS_Store") || strings.HasPrefix(path.Base(clean), "._") {
 			continue
 		}
 		ext := strings.ToLower(path.Ext(clean))

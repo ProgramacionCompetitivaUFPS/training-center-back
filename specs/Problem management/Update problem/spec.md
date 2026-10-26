@@ -782,9 +782,9 @@ Problem not found.
 - **FR-019**: For solutions, the system MUST allow specifying which solution to delete by filename.
 
 **Modifiers**
-- **FR-020**: The system MUST allow the problem author or Admin to assign other users as modifiers.
+- **FR-020**: The system MUST allow the problem author, Admin or an existing modifier to assign other users as modifiers.
 - **FR-021**: Modifiers MUST have permission to update metadata, upload/delete files.
-- **FR-022**: Modifiers MUST NOT be able to assign other modifiers (only author/Admin can).
+- **FR-022**: Modifiers MUST NOT be able to remove modifiers (only author/Admin can); they can add them.
 - **FR-023**: Modifiers MUST NOT be able to delete the problem (only author/Admin can).
 - **FR-024**: The system MUST allow listing all modifiers for a problem.
 - **FR-025**: The system MUST allow removing modifiers by the author or Admin.
@@ -842,7 +842,7 @@ For the canonical documentation of the `Problem` entity and its properties (incl
 - **SC-005**: Files can be deleted via `DELETE /problems/p/{slug}/files/{fileType}` with HTTP 200.
 - **SC-006**: Test cases ZIP structure is validated against ICPC format on upload.
 - **SC-007**: Only problem author, Admin, or assigned modifiers can modify problems.
-- **SC-008**: Modifiers can be added/removed only by the author or Admin.
+- **SC-008**: Modifiers can be added by the author, Admin or another modifier, and removed only by the author or Admin.
 - **SC-009**: Modifiers can edit and add other modifiers, but cannot remove modifiers or delete the problem.
 - **SC-010**: Contestant users attempting operations receive HTTP 403.
 - **SC-011**: No internal IDs are returned in any response.
