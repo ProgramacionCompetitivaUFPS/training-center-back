@@ -68,6 +68,7 @@ func handlerFor(p *domainProblem.Problem, storage appProblem.ProblemFileReposito
 		getTestCase:       appProblem.NewGetTestCaseUseCase(repo, storage),
 		downloadTestCases: appProblem.NewDownloadTestCasesUseCase(repo, storage),
 		exportProblem:     appProblem.NewExportProblemUseCase(repo, storage),
+		getSourceFile:     appProblem.NewGetSourceFileUseCase(repo, storage),
 	}
 }
 

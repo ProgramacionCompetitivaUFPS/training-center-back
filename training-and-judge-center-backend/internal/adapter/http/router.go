@@ -183,6 +183,7 @@ func NewRouter(h *Handlers, s *Services, allowedOrigins []string) *chi.Mux {
 				r.Route("/files", func(r chi.Router) {
 					r.Post("/", h.Problem.UploadFiles)
 					r.Get("/testcases", h.Problem.DownloadTestCases)
+					r.Get("/{fileType}", h.Problem.GetSourceFile)
 					r.Delete("/{fileType}", h.Problem.DeleteFile)
 				})
 

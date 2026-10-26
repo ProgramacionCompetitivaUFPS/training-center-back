@@ -49,7 +49,28 @@ As the author, a modifier or an Admin, I want to download the test cases ZIP exa
 2. **Scenario**: Nothing uploaded
    - **Then** the system responds `404 PROBLEM_FILE_NOT_FOUND`
 
-### User Story 3 – Export a problem as an ICPC package (Priority: P2)
+### User Story 3 – Read the code of a solution, checker or validator (Priority: P1)
+
+As the author, a modifier or an Admin, I want to read the code of the problem's solutions, checker and validator, so that I can check what the judge will actually run.
+
+**Acceptance Scenarios**:
+
+1. **Scenario**: Read a solution
+   - **Given** a problem with several solutions
+   - **When** `GET /problems/p/{slug}/files/solution?fileName=sol.cpp` is called
+   - **Then** the response has the file name as uploaded, its language and its source
+
+2. **Scenario**: Read the checker or the validator
+   - **When** `GET /problems/p/{slug}/files/checker` (or `validator`) is called
+   - **Then** the response has the same shape
+
+3. **Scenario**: A file the problem does not have
+   - **Then** the system responds `404 PROBLEM_FILE_NOT_FOUND`
+
+4. **Scenario**: Very long file
+   - **Then** the source is cut at 256 KiB, `truncated` is `true` and `sizeBytes` still reports the real size
+
+### User Story 4 – Export a problem as an ICPC package (Priority: P2)
 
 As the author, a modifier or an Admin, I want to download a problem as an ICPC package so that I can back it up, move it to another instance or edit it offline, and import it again.
 
@@ -88,13 +109,14 @@ This is the layout **Problem Import** reads. A root folder inside the uploaded t
 
 ## API Contract
 
-All three groups of endpoints require authentication and are restricted to the problem's author, its modifiers and Admin.
+All these endpoints require authentication and are restricted to the problem's author, its modifiers and Admin.
 
 | Endpoint | Success | Notes |
 |----------|---------|-------|
 | `GET /problems/p/{slug}/testcases` | `200` `{ hasTestCases, sampleCount, secretCount, cases: [{ kind, name, inputBytes, answerBytes }] }` | `kind` is `sample` or `secret`; a size is `null` if that file is missing |
 | `GET /problems/p/{slug}/testcases/{kind}/{name}` | `200` `{ kind, name, input, answer, inputTruncated, answerTruncated }` | `400 VALIDATION_ERROR` if `kind` is not `sample`/`secret`; `404 PROBLEM_FILE_NOT_FOUND` for an unknown case |
 | `GET /problems/p/{slug}/files/testcases` | `200` `application/zip` | `404 PROBLEM_FILE_NOT_FOUND` if no test cases were uploaded |
+| `GET /problems/p/{slug}/files/{fileType}?fileName=` | `200` `{ fileType, filename, language, content, truncated, sizeBytes }` | `fileType` is `solution`, `checker` or `validator` (case-insensitive); `fileName` is required for `solution`. `400 PROBLEM_MISSING_FILENAME` / `400 PROBLEM_INVALID_FILE_TYPE` (also for `testcases`, which is read with the two endpoints above); `404 PROBLEM_FILE_NOT_FOUND` if the problem has no such file |
 | `GET /problems/p/{slug}/export` | `200` `application/zip` | |
 
 Errors common to all: `401` without a valid token, `403 INSUFFICIENT_PERMISSIONS` for anyone else, `404` if the problem does not exist. If the problem points at a file that is no longer in storage, the response is `404 PROBLEM_FILE_NOT_FOUND` with a message naming it (it is not reported as a missing problem).
@@ -115,6 +137,11 @@ ZIP responses carry `Content-Disposition: attachment; filename="..."` and `Cache
 * **FR-VF-005**: A preview MUST return at most 64 KiB of each file, MUST say when it was cut, and MUST NOT return invalid UTF-8.
 * **FR-VF-006**: The download MUST return the uploaded ZIP unchanged.
 
+**Judging files**
+* **FR-VF-011**: The system MUST return the source of a solution, checker or validator, with the file name the author uploaded and its language.
+* **FR-VF-012**: The system MUST return at most 256 KiB of a file, MUST say when it was cut, and MUST still report the real size.
+* **FR-VF-013**: A forbidden response MUST NOT include any file content.
+
 **Export**
 * **FR-VF-007**: The export MUST write only what **Problem Import** reads, in the layout above, so that importing the export recreates the problem.
 * **FR-VF-008**: The export MUST write `time_limit` in seconds and `memory_limit` in MiB, and MUST omit a limit that is not set.
@@ -129,5 +156,6 @@ ZIP responses carry `Content-Disposition: attachment; filename="..."` and `Cache
 
 - **SC-VF-001**: The author can see every uploaded case and read any of them without re-uploading.
 - **SC-VF-002**: An export imported under another slug exports again to the same files with identical content.
-- **SC-VF-003**: A user who is not author, modifier or Admin gets `403` on all four endpoints, including for published public problems.
+- **SC-VF-003**: A user who is not author, modifier or Admin gets `403` on all these endpoints, including for published public problems.
+- **SC-VF-005**: The author can read the code of every solution, the checker and the validator of a problem, on drafts and on published problems.
 - **SC-VF-004**: Downloading the test cases returns exactly the bytes that were uploaded.
