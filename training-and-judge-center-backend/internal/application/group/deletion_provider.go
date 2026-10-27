@@ -5,10 +5,11 @@ import "context"
 // DeletionCounts holds pre-deletion counts for all entities associated with a group.
 // ContestIDs is also included so the use case can invalidate standings caches after deletion.
 type DeletionCounts struct {
-	ContestIDs       []string
-	MaterialsCount   int
-	SubmissionsCount int
-	MembersCount     int
+	ContestIDs           []string
+	ActiveContestsCount  int
+	MaterialsCount       int
+	SubmissionsCount     int
+	MembersCount         int
 }
 
 // GroupDeletionProvider queries aggregate counts across all group-owned entities

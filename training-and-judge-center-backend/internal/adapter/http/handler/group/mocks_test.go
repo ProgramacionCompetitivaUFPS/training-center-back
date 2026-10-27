@@ -299,6 +299,7 @@ func mockHandler() *Handler {
 		nil, /* listMembers */
 		nil, /* deleteGroup */
 		nil, /* updateGroup */
+		nil, /* listSoleLeadGroups */
 	)
 }
 

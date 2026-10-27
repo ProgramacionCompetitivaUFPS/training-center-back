@@ -80,6 +80,7 @@ func NewRouter(h *Handlers, s *Services, allowedOrigins []string) *chi.Mux {
 			r.Get("/{groupId}", h.Group.GetGroup)
 			r.Patch("/{groupId}", h.Group.UpdateGroup)
 			r.Delete("/{groupId}", h.Group.DeleteGroup)
+			r.Get("/{groupId}/deletion-impact", h.Group.GetDeletionImpact)
 			r.Post("/{groupId}/join", h.Group.Join)
 
 			r.Route("/{groupId}/invitations", func(r chi.Router) {
@@ -214,6 +215,7 @@ func NewRouter(h *Handlers, s *Services, allowedOrigins []string) *chi.Mux {
 		r.Get("/users/me/dashboard", h.User.GetDashboard)
 		r.Get("/users/me/stats", h.User.GetStats)
 		r.Get("/users/me/groups", h.Group.ListMyGroups)
+		r.Get("/users/me/sole-lead-groups", h.Group.ListMySoleLeadGroups)
 		r.Get("/users/me/teams", h.Team.ListMyTeams)
 		r.Get("/users/me/team-invitations", h.Team.ListMyInvitations)
 		r.Get("/users/me/submissions", h.Submission.ListMySubmissions)
@@ -239,6 +241,7 @@ func NewRouter(h *Handlers, s *Services, allowedOrigins []string) *chi.Mux {
 		r.Get("/users/filters", h.User.ListUserFilterOptions)
 		r.Put("/users/{id}", h.User.AdminUpdateUser)
 		r.Post("/users/{id}/deactivate", h.User.AdminDeactivateUser)
+		r.Get("/users/{id}/sole-lead-groups", h.Group.ListUserSoleLeadGroups)
 
 		r.Post("/problems/{slug}/rejudge", h.Problem.AdminRejudge)
 		r.Post("/submissions/{submissionId}/rejudge", h.Submission.AdminRejudgeSubmission)

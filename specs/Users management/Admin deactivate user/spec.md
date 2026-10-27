@@ -182,6 +182,7 @@ Target user not found.
 - **FR-015**: The system MUST update the user's `updatedAt` timestamp.
 - **FR-016**: The system MUST record an audit log of the deactivation (adminId, targetUserId, timestamp).
 - **FR-017**: The system MUST invalidate any pending email change or password recovery requests.
+- **FR-018**: The system MUST expose `GET /admin/users/{id}/sole-lead-groups` (Admin only) listing the groups where that user is the only lead, and the interface MUST show that list before the Admin confirms, warning that those groups would be left without a lead (only an Admin could manage them). The deactivation itself is not blocked.
 
 ### Key Entities
 
