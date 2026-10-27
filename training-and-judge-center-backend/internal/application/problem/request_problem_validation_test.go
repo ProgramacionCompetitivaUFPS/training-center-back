@@ -180,3 +180,49 @@ func TestPublish_WhileACheckIsRunning_ReturnsConflict(t *testing.T) {
 		t.Error("nothing should be published while the check runs")
 	}
 }
+
+func TestPublish_EditSavedAfterReadingTheProblem_ValidatesAgainInsteadOfPublishing(t *testing.T) {
+	check := passedCheckOnly("check-id", testNow)
+	publisher := &mockProblemPublisher{changedSinceRead: true} // the conditional UPDATE finds a newer updated_at
+	queue := &mockValidationQueue{}
+	uc := NewPublishProblemUseCase(repoWith(newCompleteDraftProblem()), latestIs(check), queue, publisher)
+
+	out, err := uc.Execute(context.Background(), PublishProblemInput{Slug: testSlug, CurrentUser: asAdmin(authorID)})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(queue.published) != 1 || out.ValidationID == "check-id" {
+		t.Errorf("expected a fresh validation to be queued, got %d queued and ValidationID %q", len(queue.published), out.ValidationID)
+	}
+}
+
+func TestPublish_LosingTheInsertRaceToACheckOnlyRun_ReturnsConflict(t *testing.T) {
+	winner, err := domainProblem.NewCheckOnlyValidation("check-id", testProbID, shared.RestoreUserID(authorID), testNow)
+	if err != nil {
+		t.Fatalf("fixture: %v", err)
+	}
+	calls := 0
+	validationRepo := &mockValidationRepository{
+		findLatestByProblemIDFn: func(_ context.Context, _ string) (*domainProblem.ProblemValidation, bool, error) {
+			calls++
+			if calls == 1 {
+				return nil, false, nil // first read: nothing running yet
+			}
+			return winner, true, nil // after the failed insert: a Validar run got there first
+		},
+		saveFn: func(_ context.Context, _ *domainProblem.ProblemValidation) error {
+			return apperror.NewConflict(domainProblem.ErrCodeValidationInProgress, "a validation is already in progress for this problem")
+		},
+	}
+	queue := &mockValidationQueue{}
+	uc := NewPublishProblemUseCase(repoWith(newCompleteDraftProblem()), validationRepo, queue, &mockProblemPublisher{})
+
+	_, err = uc.Execute(context.Background(), PublishProblemInput{Slug: testSlug, CurrentUser: asAdmin(authorID)})
+	var appErr *apperror.AppError
+	if !errors.As(err, &appErr) || appErr.Code != domainProblem.ErrCodeValidationInProgress {
+		t.Errorf("expected ErrCodeValidationInProgress, got %v", err)
+	}
+	if len(queue.published) != 0 {
+		t.Error("nothing should be queued when losing the race")
+	}
+}

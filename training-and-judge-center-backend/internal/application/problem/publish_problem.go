@@ -74,13 +74,18 @@ func (uc *PublishProblemUseCase) Execute(ctx context.Context, in PublishProblemI
 		case !latest.Status().IsFinal():
 			// A "Validar" run does not publish when it passes, so waiting on it would report a
 			// success for a problem that stays a draft.
-			return nil, apperror.NewConflict(problem.ErrCodeValidationInProgress, "A validation is already running for this problem; wait for it to finish and publish again")
+			return nil, problemValidationInProgress()
 		case latest.Status().IsPassed() && !latest.IsJudgingUpdate() && !p.UpdatedAt().After(latest.RequestedAt()):
 			// The draft was validated and has not changed since: publishing it needs no second run.
-			if err := uc.publisher.MarkPublished(ctx, p.ID(), time.Now()); err != nil {
+			// The check is repeated inside the UPDATE: an edit saved after the read above must not
+			// be published on the strength of this validation, so then it validates again.
+			published, err := uc.publisher.MarkPublishedIfUnchanged(ctx, p.ID(), p.UpdatedAt(), time.Now())
+			if err != nil {
 				return nil, err
 			}
-			return &PublishProblemOutput{Slug: p.Slug().String(), ValidationID: latest.ID()}, nil
+			if published {
+				return &PublishProblemOutput{Slug: p.Slug().String(), ValidationID: latest.ID()}, nil
+			}
 		}
 	}
 
@@ -89,6 +94,11 @@ func (uc *PublishProblemUseCase) Execute(ctx context.Context, in PublishProblemI
 		return nil, err
 	}
 	return &PublishProblemOutput{Slug: p.Slug().String(), ValidationID: id}, nil
+}
+
+// problemValidationInProgress is what a publish gets while a "Validar" run, which would not publish, holds the problem.
+func problemValidationInProgress() error {
+	return apperror.NewConflict(problem.ErrCodeValidationInProgress, "A validation is already running for this problem; wait for it to finish and publish again")
 }
 
 // enqueueValidation opens a validation ticket for the draft and queues it for the worker.
@@ -107,6 +117,10 @@ func enqueueValidation(ctx context.Context, validationRepo problem.ProblemValida
 	if err := validationRepo.Save(ctx, v); err != nil {
 		if isValidationInProgress(err) {
 			if existing, found, ferr := validationRepo.FindLatestByProblemID(ctx, p.ID()); ferr == nil && found {
+				if publishOnPass && !existing.PublishesOnPass() {
+					// Lost the race to a "Validar": that run will not publish, so a publish must not wait on it.
+					return "", problemValidationInProgress()
+				}
 				return existing.ID(), nil
 			}
 		}

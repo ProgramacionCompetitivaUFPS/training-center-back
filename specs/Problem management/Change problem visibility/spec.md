@@ -635,7 +635,7 @@ The latest attempt has not finished yet. `status` is omitted while the attempt i
 The latest attempt reached a terminal state (`PASSED`, `FAILED`, or `SYSTEM_ERROR`). Same report shape as the `200`/`400` bodies of `POST /publish`, plus:
 
 - `completedAt`: when the attempt finished.
-- `stale`: `true` when the problem was modified after the attempt was requested, so a pass no longer says anything about what is stored now. `POST /publish` only skips the validation when the latest attempt passed and is not stale.
+- `stale`: `true` when the draft was modified after the attempt was requested, so a pass no longer says anything about what is stored now. `POST /publish` only skips the validation when the latest attempt passed and is not stale. It is always `false` once the problem is published, because publishing itself moves `updatedAt`.
 
 ```json
 {
@@ -926,8 +926,8 @@ Problem not found.
 - **FR-033**: A validation requested that way MUST NOT change the problem's status, whether it passes or fails.
 - **FR-034**: `POST /validate` MUST answer without waiting for the validation to finish.
 - **FR-035**: Only one validation per problem MAY be in progress; requesting another MUST return the one in progress.
-- **FR-036**: `POST /publish` MUST NOT run the validation again when the latest validation passed and the problem has not been modified since it was requested; otherwise it MUST validate as before.
-- **FR-037**: `POST /publish` MUST reject with 409 (VALIDATION_IN_PROGRESS) while a validation requested with `POST /validate` is running.
+- **FR-036**: `POST /publish` MUST NOT run the validation again when the latest validation passed and the problem has not been modified since it was requested; otherwise it MUST validate as before. The check MUST be atomic with the publication: if the draft is edited between reading it and publishing it, the publish MUST validate again instead.
+- **FR-037**: `POST /publish` MUST reject with 409 (VALIDATION_IN_PROGRESS) while a validation requested with `POST /validate` is running, including when that run wins a concurrent request.
 - **FR-038**: `GET /validation` MUST report `stale: true` for an attempt requested before the problem's last modification, and `completedAt` for a finished attempt.
 
 ### Key Entities

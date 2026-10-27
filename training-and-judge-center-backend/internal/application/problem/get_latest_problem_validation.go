@@ -22,8 +22,9 @@ type GetLatestProblemValidationOutput struct {
 	Terminal bool
 	Passed   bool
 	Status   string
-	// Stale: the problem changed after this attempt was requested, so a pass no longer says
-	// anything about what is stored now. Only meaningful once Terminal.
+	// Stale: the draft changed after this attempt was requested, so a pass no longer says anything
+	// about what is stored now. Only meaningful once Terminal, and only for a draft: publishing, or
+	// applying a judging update, moves updated_at too, and that is not an edit of the validated content.
 	Stale       bool
 	CompletedAt *time.Time
 	Report      ValidationReport
@@ -81,7 +82,7 @@ func (uc *GetLatestProblemValidationUseCase) Execute(ctx context.Context, in Get
 		Terminal:    status.Terminal,
 		Passed:      status.Passed,
 		Status:      status.Status,
-		Stale:       p.UpdatedAt().After(existing.RequestedAt()),
+		Stale:       !p.Status().IsPublished() && p.UpdatedAt().After(existing.RequestedAt()),
 		CompletedAt: existing.CompletedAt(),
 		Report:      status.Report,
 	}, nil

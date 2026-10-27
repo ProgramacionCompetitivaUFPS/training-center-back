@@ -462,6 +462,10 @@ func newHandlerWithUploadFiles() *Handler {
 
 type mockProblemPublisherH struct{}
 
+func (m *mockProblemPublisherH) MarkPublishedIfUnchanged(_ context.Context, _ string, _, _ time.Time) (bool, error) {
+	return true, nil
+}
+
 func (m *mockProblemPublisherH) MarkPublished(_ context.Context, _ string, _ time.Time) error {
 	return nil
 }

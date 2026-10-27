@@ -143,3 +143,16 @@ func TestGetLatestProblemValidation_ProblemUnchangedSinceTheAttempt_IsNotStale(t
 		t.Error("expected a validation requested after the last change not to be stale")
 	}
 }
+
+func TestGetLatestProblemValidation_PublishedProblem_IsNeverStale(t *testing.T) {
+	check := passedCheckOnly("check-id", testNow.Add(-time.Hour)) // publishing moved updated_at after it
+	uc := newGetLatestProblemValidationUseCase(repoWith(newPublishedProblem()), latestIs(check), &mockProblemStatusProvider{})
+
+	out, err := uc.Execute(context.Background(), GetLatestProblemValidationInput{Slug: testSlug, CurrentUser: asAdmin(authorID)})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if out.Stale {
+		t.Error("a published problem must not report its validation as stale: publishing itself moves updated_at")
+	}
+}
