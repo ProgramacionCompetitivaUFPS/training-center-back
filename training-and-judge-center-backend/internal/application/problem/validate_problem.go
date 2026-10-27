@@ -116,6 +116,12 @@ func (uc *ValidateProblemUseCase) Execute(ctx context.Context, in ValidateProble
 		return uc.validationRepo.Save(ctx, v)
 	}
 
+	if !v.PublishesOnPass() {
+		// "Validar": the draft passed, and publishing it is left to the author.
+		_ = v.MarkPassed(string(resultJSON), now)
+		return uc.validationRepo.Save(ctx, v)
+	}
+
 	// Publishing the problem and marking the ticket PASSED must happen
 	// together: if MarkPublished succeeded but the ticket save failed, the
 	// unique-active-validation index would leave the problem stuck unable

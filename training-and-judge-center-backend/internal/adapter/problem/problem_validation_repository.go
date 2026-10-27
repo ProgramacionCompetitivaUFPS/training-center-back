@@ -33,13 +33,13 @@ func (r *ProblemValidationRepository) Save(ctx context.Context, v *domainProblem
 	}
 
 	_, err = q.Exec(ctx,
-		`INSERT INTO problem_validations (id, problem_id, requested_by, status, requested_at, completed_at, result, pending_change)
-		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+		`INSERT INTO problem_validations (id, problem_id, requested_by, status, requested_at, completed_at, result, pending_change, publish_on_pass)
+		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
 		 ON CONFLICT (id) DO UPDATE SET
 		   status = EXCLUDED.status,
 		   completed_at = EXCLUDED.completed_at,
 		   result = EXCLUDED.result`,
-		v.ID(), v.ProblemID(), v.RequestedBy().String(), v.Status().String(), v.RequestedAt(), v.CompletedAt(), v.ResultJSON(), pendingChangeJSON,
+		v.ID(), v.ProblemID(), v.RequestedBy().String(), v.Status().String(), v.RequestedAt(), v.CompletedAt(), v.ResultJSON(), pendingChangeJSON, v.PublishesOnPass(),
 	)
 	if err != nil {
 		var pgErr *pgconn.PgError
@@ -60,12 +60,13 @@ func (r *ProblemValidationRepository) FindByID(ctx context.Context, id string) (
 	var completedAt *time.Time
 	var result *string
 	var pendingJSON []byte
+	var publishOnPass bool
 
 	err := q.QueryRow(ctx,
-		`SELECT problem_id, requested_by, status, requested_at, completed_at, result, pending_change
+		`SELECT problem_id, requested_by, status, requested_at, completed_at, result, pending_change, publish_on_pass
 		 FROM problem_validations WHERE id = $1`,
 		id,
-	).Scan(&problemID, &requestedBy, &status, &requestedAt, &completedAt, &result, &pendingJSON)
+	).Scan(&problemID, &requestedBy, &status, &requestedAt, &completedAt, &result, &pendingJSON, &publishOnPass)
 
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, apperror.NewNotFound(apperror.ErrCodeNotFound, "problem validation not found")
@@ -84,7 +85,7 @@ func (r *ProblemValidationRepository) FindByID(ctx context.Context, id string) (
 	return domainProblem.RestoreProblemValidation(
 		id, problemID, shared.RestoreUserID(requestedBy),
 		domainProblem.RestoreProblemValidationStatus(status),
-		requestedAt, completedAt, result, pending,
+		requestedAt, completedAt, result, pending, publishOnPass,
 	), nil
 }
 
@@ -96,13 +97,14 @@ func (r *ProblemValidationRepository) FindLatestByProblemID(ctx context.Context,
 	var completedAt *time.Time
 	var result *string
 	var pendingJSON []byte
+	var publishOnPass bool
 
 	err := q.QueryRow(ctx,
-		`SELECT id, requested_by, status, requested_at, completed_at, result, pending_change
+		`SELECT id, requested_by, status, requested_at, completed_at, result, pending_change, publish_on_pass
 		 FROM problem_validations WHERE problem_id = $1
 		 ORDER BY requested_at DESC LIMIT 1`,
 		problemID,
-	).Scan(&id, &requestedBy, &status, &requestedAt, &completedAt, &result, &pendingJSON)
+	).Scan(&id, &requestedBy, &status, &requestedAt, &completedAt, &result, &pendingJSON, &publishOnPass)
 
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, false, nil
@@ -121,7 +123,7 @@ func (r *ProblemValidationRepository) FindLatestByProblemID(ctx context.Context,
 	v := domainProblem.RestoreProblemValidation(
 		id, problemID, shared.RestoreUserID(requestedBy),
 		domainProblem.RestoreProblemValidationStatus(status),
-		requestedAt, completedAt, result, pending,
+		requestedAt, completedAt, result, pending, publishOnPass,
 	)
 	return v, true, nil
 }

@@ -30,10 +30,11 @@ type PublishProblemUseCase struct {
 	repo           problem.Repository
 	validationRepo problem.ProblemValidationRepository
 	queue          ValidationQueue
+	publisher      ProblemPublisher
 }
 
-func NewPublishProblemUseCase(repo problem.Repository, validationRepo problem.ProblemValidationRepository, queue ValidationQueue) *PublishProblemUseCase {
-	return &PublishProblemUseCase{repo: repo, validationRepo: validationRepo, queue: queue}
+func NewPublishProblemUseCase(repo problem.Repository, validationRepo problem.ProblemValidationRepository, queue ValidationQueue, publisher ProblemPublisher) *PublishProblemUseCase {
+	return &PublishProblemUseCase{repo: repo, validationRepo: validationRepo, queue: queue, publisher: publisher}
 }
 
 func (uc *PublishProblemUseCase) Execute(ctx context.Context, in PublishProblemInput) (*PublishProblemOutput, error) {
@@ -61,38 +62,67 @@ func (uc *PublishProblemUseCase) Execute(ctx context.Context, in PublishProblemI
 		return &PublishProblemOutput{Slug: p.Slug().String(), MissingFields: missing, ValidationLogs: logs}, nil
 	}
 
-	// Reuse an in-flight validation instead of enqueueing a duplicate.
-	if existing, found, err := uc.validationRepo.FindLatestByProblemID(ctx, p.ID()); err != nil {
-		return nil, err
-	} else if found && !existing.Status().IsFinal() {
-		return &PublishProblemOutput{Slug: p.Slug().String(), ValidationID: existing.ID()}, nil
-	}
-
-	now := time.Now()
-	v, err := problem.NewProblemValidation(uuid.New().String(), p.ID(), viewerID, now)
+	latest, found, err := uc.validationRepo.FindLatestByProblemID(ctx, p.ID())
 	if err != nil {
 		return nil, err
 	}
-	if err := uc.validationRepo.Save(ctx, v); err != nil {
-		if isValidationInProgress(err) {
-			if existing, found, ferr := uc.validationRepo.FindLatestByProblemID(ctx, p.ID()); ferr == nil && found {
-				return &PublishProblemOutput{Slug: p.Slug().String(), ValidationID: existing.ID()}, nil
+	if found {
+		switch {
+		case !latest.Status().IsFinal() && latest.PublishesOnPass():
+			// Reuse an in-flight validation instead of enqueueing a duplicate.
+			return &PublishProblemOutput{Slug: p.Slug().String(), ValidationID: latest.ID()}, nil
+		case !latest.Status().IsFinal():
+			// A "Validar" run does not publish when it passes, so waiting on it would report a
+			// success for a problem that stays a draft.
+			return nil, apperror.NewConflict(problem.ErrCodeValidationInProgress, "A validation is already running for this problem; wait for it to finish and publish again")
+		case latest.Status().IsPassed() && !latest.IsJudgingUpdate() && !p.UpdatedAt().After(latest.RequestedAt()):
+			// The draft was validated and has not changed since: publishing it needs no second run.
+			if err := uc.publisher.MarkPublished(ctx, p.ID(), time.Now()); err != nil {
+				return nil, err
 			}
+			return &PublishProblemOutput{Slug: p.Slug().String(), ValidationID: latest.ID()}, nil
 		}
-		return nil, err
 	}
 
-	if err := uc.queue.Publish(ctx, ValidationQueueMessage{
+	id, err := enqueueValidation(ctx, uc.validationRepo, uc.queue, p, viewerID, true)
+	if err != nil {
+		return nil, err
+	}
+	return &PublishProblemOutput{Slug: p.Slug().String(), ValidationID: id}, nil
+}
+
+// enqueueValidation opens a validation ticket for the draft and queues it for the worker.
+// publishOnPass tells the worker whether to publish the problem when the ticket passes.
+// If another request opened a ticket in the meantime, that one is returned instead.
+func enqueueValidation(ctx context.Context, validationRepo problem.ProblemValidationRepository, queue ValidationQueue, p *problem.Problem, requestedBy shared.UserID, publishOnPass bool) (string, error) {
+	now := time.Now()
+	newTicket := problem.NewCheckOnlyValidation
+	if publishOnPass {
+		newTicket = problem.NewProblemValidation
+	}
+	v, err := newTicket(uuid.New().String(), p.ID(), requestedBy, now)
+	if err != nil {
+		return "", err
+	}
+	if err := validationRepo.Save(ctx, v); err != nil {
+		if isValidationInProgress(err) {
+			if existing, found, ferr := validationRepo.FindLatestByProblemID(ctx, p.ID()); ferr == nil && found {
+				return existing.ID(), nil
+			}
+		}
+		return "", err
+	}
+
+	if err := queue.Publish(ctx, ValidationQueueMessage{
 		ValidationID: v.ID(),
 		ProblemID:    p.ID(),
 		Slug:         p.Slug().String(),
 		Priority:     QueuePriorityPublishValidation,
 		EnqueuedAt:   now,
 	}); err != nil {
-		return nil, err
+		return "", err
 	}
-
-	return &PublishProblemOutput{Slug: p.Slug().String(), ValidationID: v.ID()}, nil
+	return v.ID(), nil
 }
 
 func isValidationInProgress(err error) bool {

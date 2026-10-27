@@ -16,6 +16,9 @@ type ProblemValidation struct {
 	completedAt   *time.Time
 	resultJSON    *string
 	pendingChange *PendingJudgingChange
+	// publishOnPass: the worker publishes the problem when this ticket passes. False for a ticket
+	// that only checks a draft ("Validar"): the author decides afterwards whether to publish.
+	publishOnPass bool
 }
 
 func (v *ProblemValidation) ID() string                           { return v.id }
@@ -28,6 +31,7 @@ func (v *ProblemValidation) ResultJSON() *string                  { return v.res
 func (v *ProblemValidation) PendingChange() *PendingJudgingChange { return v.pendingChange }
 
 func (v *ProblemValidation) IsJudgingUpdate() bool { return v.pendingChange != nil }
+func (v *ProblemValidation) PublishesOnPass() bool { return v.publishOnPass }
 
 func NewProblemValidation(id, problemID string, requestedBy shared.UserID, now time.Time) (*ProblemValidation, error) {
 	if id == "" || problemID == "" {
@@ -39,7 +43,19 @@ func NewProblemValidation(id, problemID string, requestedBy shared.UserID, now t
 		requestedBy: requestedBy,
 		status:      NewProblemValidationStatusPending(),
 		requestedAt: now.UTC(),
+		// every ticket published the problem until "Validar" existed, so that stays the default
+		publishOnPass: true,
 	}, nil
+}
+
+// NewCheckOnlyValidation opens the ticket that validates a draft without publishing it.
+func NewCheckOnlyValidation(id, problemID string, requestedBy shared.UserID, now time.Time) (*ProblemValidation, error) {
+	v, err := NewProblemValidation(id, problemID, requestedBy, now)
+	if err != nil {
+		return nil, err
+	}
+	v.publishOnPass = false
+	return v, nil
 }
 
 func RestoreProblemValidation(
@@ -50,6 +66,7 @@ func RestoreProblemValidation(
 	completedAt *time.Time,
 	resultJSON *string,
 	pendingChange *PendingJudgingChange,
+	publishOnPass bool,
 ) *ProblemValidation {
 	return &ProblemValidation{
 		id:            id,
@@ -60,6 +77,7 @@ func RestoreProblemValidation(
 		completedAt:   completedAt,
 		resultJSON:    resultJSON,
 		pendingChange: pendingChange,
+		publishOnPass: publishOnPass,
 	}
 }
 

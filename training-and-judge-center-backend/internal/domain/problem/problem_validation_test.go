@@ -60,7 +60,7 @@ func TestRestoreProblemValidation_PreservesFields(t *testing.T) {
 
 	v := problem.RestoreProblemValidation(
 		"validation-1", testProblemID, shared.RestoreUserID(testAuthorID),
-		status, testNow, &completedAt, &result, nil,
+		status, testNow, &completedAt, &result, nil, true,
 	)
 
 	if v.ID() != "validation-1" {

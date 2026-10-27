@@ -18,6 +18,7 @@ type Handler struct {
 	listProblems               *appProblem.ListProblemsUseCase
 	unpublishProblem           *appProblem.UnpublishProblemUseCase
 	publishProblem             *appProblem.PublishProblemUseCase
+	requestProblemValidation   *appProblem.RequestProblemValidationUseCase
 	awaitProblemValidation     *appProblem.AwaitProblemValidationUseCase
 	getLatestProblemValidation *appProblem.GetLatestProblemValidationUseCase
 	changeAccessibility        *appProblem.ChangeAccessibilityUseCase
@@ -49,6 +50,7 @@ func NewHandler(
 	listProblems *appProblem.ListProblemsUseCase,
 	unpublishProblem *appProblem.UnpublishProblemUseCase,
 	publishProblem *appProblem.PublishProblemUseCase,
+	requestProblemValidation *appProblem.RequestProblemValidationUseCase,
 	awaitProblemValidation *appProblem.AwaitProblemValidationUseCase,
 	getLatestProblemValidation *appProblem.GetLatestProblemValidationUseCase,
 	changeAccessibility *appProblem.ChangeAccessibilityUseCase,
@@ -79,6 +81,7 @@ func NewHandler(
 		listProblems:               listProblems,
 		unpublishProblem:           unpublishProblem,
 		publishProblem:             publishProblem,
+		requestProblemValidation:   requestProblemValidation,
 		awaitProblemValidation:     awaitProblemValidation,
 		getLatestProblemValidation: getLatestProblemValidation,
 		changeAccessibility:        changeAccessibility,

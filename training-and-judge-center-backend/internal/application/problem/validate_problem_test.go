@@ -198,6 +198,38 @@ func TestValidateProblem_Passed_MarksPublishedAndTicketPassed(t *testing.T) {
 	}
 }
 
+func TestValidateProblem_CheckOnlyPassed_MarksTicketPassedWithoutPublishing(t *testing.T) {
+	v, err := domainProblem.NewCheckOnlyValidation("validation-1", testProbID, shared.RestoreUserID(authorID), testNow)
+	if err != nil {
+		t.Fatalf("fixture: %v", err)
+	}
+	var savedStatuses []string
+	validationRepo := &mockValidationRepository{
+		findByIDFn: func(_ context.Context, _ string) (*domainProblem.ProblemValidation, error) { return v, nil },
+		saveFn: func(_ context.Context, saved *domainProblem.ProblemValidation) error {
+			savedStatuses = append(savedStatuses, saved.Status().String())
+			return nil
+		},
+	}
+	solutionValidator := &mockSolutionValidator{
+		validateFn: func(_ context.Context, _ string) (*SolutionValidationResult, error) {
+			return &SolutionValidationResult{SampleCases: 1, SecretCases: 2, SolutionsTested: 1, Passed: true}, nil
+		},
+	}
+	publisher := &mockProblemPublisher{}
+	uc := newValidateProblemUseCase(validationRepo, &mockJudgingPreparer{}, &mockJudgingArtifactWriter{}, solutionValidator, publisher)
+
+	if err := uc.Execute(context.Background(), ValidateProblemInput{ValidationID: "validation-1"}); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if publisher.calls != 0 {
+		t.Errorf("a check-only ticket must not publish the problem, MarkPublished was called %d time(s)", publisher.calls)
+	}
+	if len(savedStatuses) != 2 || savedStatuses[1] != "PASSED" {
+		t.Errorf("savedStatuses: got %v, want [RUNNING PASSED]", savedStatuses)
+	}
+}
+
 func TestValidateProblem_Failed_MarksTicketFailedWithoutPublishing(t *testing.T) {
 	v := newValidationFixture()
 	validationRepo := &mockValidationRepository{
