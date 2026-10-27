@@ -54,6 +54,8 @@ func (uc *LeaveTeamUseCase) Execute(ctx context.Context, in LeaveTeamInput) erro
 	}
 
 	return uc.txManager.WithTx(ctx, func(txCtx context.Context) error {
+		// Registrations the team can no longer fill (below the contest's minimum) are cancelled here;
+		// the confirmation told the member beforehand (GetLeaveImpactUseCase).
 		if _, err := uc.participationCleaner.RemoveUserFromScheduledParticipations(txCtx, in.TeamID, in.CurrentUser.ID); err != nil {
 			return err
 		}

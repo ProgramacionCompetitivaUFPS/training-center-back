@@ -13,6 +13,7 @@ type Handler struct {
 	acceptInvitation               *appTeam.AcceptInvitationUseCase
 	rejectInvitation               *appTeam.RejectInvitationUseCase
 	leaveTeam                      *appTeam.LeaveTeamUseCase
+	getLeaveImpact                 *appTeam.GetLeaveImpactUseCase
 	registerTeamToContest          *appTeam.RegisterTeamToContestUseCase
 	updateTeamRegistration         *appTeam.UpdateTeamRegistrationUseCase
 	unregisterTeamFromContest      *appTeam.UnregisterTeamFromContestUseCase
@@ -29,6 +30,7 @@ func NewHandler(
 	acceptInvitation *appTeam.AcceptInvitationUseCase,
 	rejectInvitation *appTeam.RejectInvitationUseCase,
 	leaveTeam *appTeam.LeaveTeamUseCase,
+	getLeaveImpact *appTeam.GetLeaveImpactUseCase,
 	registerTeamToContest *appTeam.RegisterTeamToContestUseCase,
 	updateTeamRegistration *appTeam.UpdateTeamRegistrationUseCase,
 	unregisterTeamFromContest *appTeam.UnregisterTeamFromContestUseCase,
@@ -44,6 +46,7 @@ func NewHandler(
 		acceptInvitation:               acceptInvitation,
 		rejectInvitation:               rejectInvitation,
 		leaveTeam:                      leaveTeam,
+		getLeaveImpact:                 getLeaveImpact,
 		registerTeamToContest:          registerTeamToContest,
 		updateTeamRegistration:         updateTeamRegistration,
 		unregisterTeamFromContest:      unregisterTeamFromContest,
