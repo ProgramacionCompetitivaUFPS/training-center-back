@@ -14,5 +14,6 @@ const (
 	ErrCodeTeamRegistrationNotFound       = "TEAM_REGISTRATION_NOT_FOUND"
 	ErrCodeContestHasTeamRegistrations    = "CONTEST_HAS_TEAM_REGISTRATIONS"
 	ErrCodeContestIsActive                = "CONTEST_IS_ACTIVE"
+	ErrCodeContestProblemsLocked          = "CONTEST_PROBLEMS_LOCKED"
 	ErrCodeFreezeTooLong                  = "FREEZE_TOO_LONG"
 )

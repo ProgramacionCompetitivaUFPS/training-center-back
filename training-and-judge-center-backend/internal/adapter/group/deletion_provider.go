@@ -100,8 +100,9 @@ func (p *DeletionProvider) GetDeletionCounts(ctx context.Context, groupID string
 	}, nil
 }
 
-// ListSoleLeadGroups returns the groups where the user is the only lead: if the user is deactivated,
-// nobody but an Admin can manage them any more.
+// ListSoleLeadGroups returns the groups where the user is the only active lead: if the user is
+// deactivated, nobody but an Admin can manage them any more. A deactivated user keeps their
+// membership, so another lead who is deactivated does not count as someone who can still manage it.
 func (p *DeletionProvider) ListSoleLeadGroups(ctx context.Context, userID string) ([]appGroup.SoleLeadGroup, error) {
 	q := infraPostgres.GetQuerier(ctx, p.db)
 	rows, err := q.Query(ctx, `
@@ -109,7 +110,10 @@ func (p *DeletionProvider) ListSoleLeadGroups(ctx context.Context, userID string
 		FROM group_members m
 		JOIN groups g ON g.id = m.group_id
 		WHERE m.user_id = $1::uuid AND m.member_role = 'LEAD'
-		  AND (SELECT COUNT(*) FROM group_members l WHERE l.group_id = m.group_id AND l.member_role = 'LEAD') = 1
+		  AND (SELECT COUNT(*)
+		       FROM group_members l
+		       JOIN users lu ON lu.id = l.user_id
+		       WHERE l.group_id = m.group_id AND l.member_role = 'LEAD' AND lu.status = 'ACTIVE') = 1
 		ORDER BY g.name`, userID)
 	if err != nil {
 		slog.ErrorContext(ctx, "DeletionProvider: failed to list sole-lead groups", "error", err, "user_id", userID)

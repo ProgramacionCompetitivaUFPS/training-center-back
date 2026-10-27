@@ -811,6 +811,7 @@ Group or contest not found.
 * **FR-UC-027**: When problems array is provided, it MUST replace the entire problem list (not merge).
 * **FR-UC-028**: The system MUST allow removing problems that have submissions.
 * **FR-UC-028.1**: When a problem is removed from a contest, its submissions MUST keep their `contest_id`; the standings MUST count only the problems the contest has now.
+* **FR-UC-028.2**: The problem list of a FINISHED contest MUST NOT be changed: the request MUST be rejected with HTTP 409 (CONTEST_PROBLEMS_LOCKED), because the final standings are the official result and count only the problems the contest has. Every other field can still be edited.
 
 **Standing Recalculation**
 * **FR-UC-029**: When a problem is added to a contest, the system MUST NOT recalculate Standing (no submissions exist yet).

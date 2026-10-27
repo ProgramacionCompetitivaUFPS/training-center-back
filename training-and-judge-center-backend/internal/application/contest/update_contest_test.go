@@ -369,6 +369,43 @@ func TestUpdateContest_NewPrivateProblemIsStillRefusedEvenIfAnotherOneIsAlreadyI
 	}
 }
 
+// The standings of a finished contest are its official result and count the problems the contest has,
+// so once it ends its problem list is closed (everything else can still be edited).
+func TestUpdateContest_ProblemListOfAFinishedContestIsClosed(t *testing.T) {
+	uc := newUpdateContestUseCase(repoWith(finishedContest()), groupFound(), isLead(), defaultProblemProvider())
+
+	problems := []ProblemOrderInput{{Slug: "problem-a", Order: 1}}
+	_, err := uc.Execute(context.Background(), UpdateContestInput{
+		CurrentUser: asCoach(callerID),
+		GroupID:     testGroupID,
+		ContestID:   testContestID,
+		Problems:    &problems,
+	})
+
+	var appErr *apperror.AppError
+	if !errors.As(err, &appErr) || appErr.Code != domainContest.ErrCodeContestProblemsLocked {
+		t.Errorf("expected %s, got %v", domainContest.ErrCodeContestProblemsLocked, err)
+	}
+}
+
+func TestUpdateContest_ANameCanStillBeEditedOnAFinishedContest(t *testing.T) {
+	uc := newUpdateContestUseCase(repoWith(finishedContest()), groupFound(), isLead(), defaultProblemProvider())
+
+	name := "Renamed after the end"
+	out, err := uc.Execute(context.Background(), UpdateContestInput{
+		CurrentUser: asCoach(callerID),
+		GroupID:     testGroupID,
+		ContestID:   testContestID,
+		Name:        &name,
+	})
+	if err != nil {
+		t.Fatalf("editing the name of a finished contest should work, got: %v", err)
+	}
+	if out.Name != name {
+		t.Errorf("name = %q, want %q", out.Name, name)
+	}
+}
+
 func TestUpdateContest_InvalidPenalty(t *testing.T) {
 	contest := newTestContest(callerID)
 	uc := newUpdateContestUseCase(repoWith(contest), groupFound(), isLead(), defaultProblemProvider())
