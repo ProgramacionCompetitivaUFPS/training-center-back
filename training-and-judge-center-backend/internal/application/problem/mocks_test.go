@@ -288,12 +288,17 @@ func (m *mockProblemStatusProvider) GetStatus(ctx context.Context, problemID str
 // ── ActiveContestChecker mock ────────────────────────────────────────────────
 
 type mockActiveContestChecker struct {
-	inActive bool
-	err      error
+	inActive          bool
+	hasContestHistory bool
+	err               error
 }
 
 func (m *mockActiveContestChecker) IsProblemInActiveContest(_ context.Context, _ string) (bool, error) {
 	return m.inActive, m.err
+}
+
+func (m *mockActiveContestChecker) HasContestSubmissions(_ context.Context, _ string) (bool, error) {
+	return m.hasContestHistory, m.err
 }
 
 // ── PlatformSettings default ─────────────────────────────────────────────────
@@ -402,6 +407,21 @@ func newPublishedProblemWithModifier() *domainProblem.Problem {
 		[]shared.UserID{shared.RestoreUserID(modifierID)},
 		[]domainProblem.LanguageOverride{},
 		nil, []domainProblem.JudgingFile{},
+		nil, nil, nil,
+		testNow, testNow,
+	)
+}
+
+func newPublishedProblemWithTestCasesAndModifier() *domainProblem.Problem {
+	key := "problems/test-problem/testcases/xyz"
+	return domainProblem.RestoreProblem(
+		testProbID, testSlug, "Test Problem",
+		nil, nil, nil, []string{},
+		"PUBLISHED", "PUBLIC",
+		shared.RestoreUserID(authorID),
+		[]shared.UserID{shared.RestoreUserID(modifierID)},
+		[]domainProblem.LanguageOverride{},
+		&key, []domainProblem.JudgingFile{},
 		nil, nil, nil,
 		testNow, testNow,
 	)

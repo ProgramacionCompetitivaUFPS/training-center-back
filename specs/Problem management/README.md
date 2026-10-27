@@ -84,8 +84,10 @@ When changing from `PUBLIC` to `PRIVATE`:
 | Update accessibility | ✅ | ✅ | ✅ | ❌ |
 | Upload files | ✅ | ✅ | ✅ | ❌ |
 | Delete files | ✅ | ✅ | ✅ | ❌ |
+| View / download test cases | ✅ | ✅ | ✅ | ❌ |
+| Export problem (ICPC package) | ✅ | ✅ | ✅ | ❌ |
 | Publish/Unpublish | ✅ | ✅ | ✅ | ❌ |
-| Add modifier | ✅ | ✅ | ❌ | ❌ |
+| Add modifier | ✅ | ✅ | ✅ | ❌ |
 | Remove modifier | ✅ | ✅ | ❌ | ❌ |
 | List modifiers | ✅ | ✅ | ✅ | ❌ |
 | Delete problem | ✅ | ✅ | ❌ | ❌ |
@@ -95,7 +97,8 @@ When changing from `PUBLIC` to `PRIVATE`:
 * **Author**: The user who created the problem. Automatically a modifier.
 * **Modifiers**: Users assigned by the author or Admin to help edit the problem.
 * Modifiers can edit metadata, upload/delete files, and publish/unpublish.
-* Modifiers **cannot** add other modifiers or delete the problem.
+* Modifiers can add other modifiers (they can already read and export every file), but **cannot** remove modifiers or delete the problem.
+* In a contest, the "can add" rule applies only to problems being added now: a problem already in the contest stays when another lead saves the list.
 
 ---
 
@@ -344,17 +347,18 @@ Problems can be imported from ICPC-format ZIP packages:
 
 ```
 problem-package.zip/
-├── problem.yaml              # Problem metadata
+├── problem.yaml              # name (required), time_limit (seconds), memory_limit (MiB)
 ├── problem_statement/
-│   └── problem.en.tex        # LaTeX statement
+│   └── problem.en.tex        # Statement
 ├── data/
-│   ├── sample/               # Sample test cases
-│   └── secret/               # Secret test cases
-├── solutions/                # Optional solutions
-│   └── accepted/
-├── output_validators/        # Optional custom checker
-└── input_validators/         # Optional input validator
+│   ├── sample/               # Sample test cases (.in / .ans)
+│   └── secret/               # Secret test cases (.in / .ans)
+├── solutions/                # Optional solutions, one file per solution
+├── checker.{cpp,py}          # Optional custom checker
+└── validator.{cpp,py}        # Optional input validator
 ```
+
+The same layout is what **View and Export Problem Files** writes when a problem is exported, so an exported package can be imported back.
 
 Imported problems are created with status `DRAFT` and accessibility `PRIVATE`.
 
@@ -363,6 +367,8 @@ Only `problem.yaml` (with `name`) is required to import. Test cases, solutions a
 ---
 
 ## 🔹 Content Deletion
+
+A published problem can be deleted (the author or Admin types its slug to confirm), except while it is in an active contest or once anyone has submitted it inside a contest (`PROBLEM_HAS_CONTEST_HISTORY`): those submissions are a contest's official result. The interface warns first and offers to unpublish it instead, which keeps its submissions and contest history.
 
 ### When a Problem is Deleted
 

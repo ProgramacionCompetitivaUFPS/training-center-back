@@ -194,6 +194,12 @@ func main() {
 	changeAccessibilityUseCase := appProblem.NewChangeAccessibilityUseCase(problemRepo)
 	deleteProblemUseCase := appProblem.NewDeleteProblemUseCase(problemRepo, fileStorage, problemActiveContestChecker, problemContestAssociationRemover, txManager)
 	getProblemStatisticsUseCase := appProblem.NewGetProblemStatisticsUseCase(problemRepo, problemStatisticsProvider)
+	listTestCasesUseCase := appProblem.NewListTestCasesUseCase(problemRepo, fileStorage)
+	getTestCaseUseCase := appProblem.NewGetTestCaseUseCase(problemRepo, fileStorage)
+	downloadTestCasesUseCase := appProblem.NewDownloadTestCasesUseCase(problemRepo, fileStorage)
+	exportProblemUseCase := appProblem.NewExportProblemUseCase(problemRepo, fileStorage)
+	getSourceFileUseCase := appProblem.NewGetSourceFileUseCase(problemRepo, fileStorage)
+	getTestCasePartUseCase := appProblem.NewGetTestCasePartUseCase(problemRepo, fileStorage)
 
 	// User platform adapters
 	userRepo := user.NewRepository(dbPool)
@@ -545,6 +551,12 @@ func main() {
 		rejudgeSubmissionsUseCase,
 		rejudgeContestSubmissionsUseCase,
 		adminRejudgeSubmissionsUseCase,
+		listTestCasesUseCase,
+		getTestCaseUseCase,
+		downloadTestCasesUseCase,
+		exportProblemUseCase,
+		getSourceFileUseCase,
+		getTestCasePartUseCase,
 		userProvider,
 		settingsProvider,
 	)

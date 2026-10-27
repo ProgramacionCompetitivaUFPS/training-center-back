@@ -207,11 +207,13 @@ As a problem author or Admin, I want to assign other users as modifiers so that 
    - **When** they remove the modifier
    - **Then** the modifier no longer has edit permissions
 
-4. **Scenario**: Modifier cannot add other modifiers
+4. **Scenario**: Modifier adds another modifier
    - **Given** a problem exists
    - **And** the authenticated user is a modifier (not author/Admin)
-   - **When** they attempt to add another modifier
-   - **Then** the system rejects with 403 Forbidden (INSUFFICIENT_PERMISSIONS)
+   - **When** they add another user as a modifier
+   - **Then** the modifier is associated with the problem (a modifier can already read and export every file, so this hands out no new access)
+   - **And** a user who is neither author, modifier nor Admin is rejected with 403 Forbidden (INSUFFICIENT_PERMISSIONS)
+   - **And** removing modifiers stays with the author and Admin
 
 5. **Scenario**: Add non-existent user as modifier
    - **Given** a problem exists
@@ -578,7 +580,7 @@ Problem or file not found.
 
 Add a modifier to a problem.
 
-> **Important**: Only the problem author or Admin can add modifiers. Modifiers can edit the problem but cannot add other modifiers or delete the problem.
+> **Important**: The problem author, Admin or any existing modifier can add modifiers (like sharing a file with edit access). Only the author or Admin can remove modifiers or delete the problem.
 
 **Headers**:
 
@@ -626,12 +628,12 @@ Modifier added successfully.
 Authentication failed.
 
 #### 403 Forbidden
-Only author or Admin can add modifiers.
+Only the author, a modifier or Admin can add modifiers.
 
 ```json
 {
   "error": "INSUFFICIENT_PERMISSIONS",
-  "message": "Only the problem author or Admin can add modifiers"
+  "message": "Only the author, a modifier or Admin can add modifiers"
 }
 ```
 
@@ -780,9 +782,9 @@ Problem not found.
 - **FR-019**: For solutions, the system MUST allow specifying which solution to delete by filename.
 
 **Modifiers**
-- **FR-020**: The system MUST allow the problem author or Admin to assign other users as modifiers.
+- **FR-020**: The system MUST allow the problem author, Admin or an existing modifier to assign other users as modifiers.
 - **FR-021**: Modifiers MUST have permission to update metadata, upload/delete files.
-- **FR-022**: Modifiers MUST NOT be able to assign other modifiers (only author/Admin can).
+- **FR-022**: Modifiers MUST NOT be able to remove modifiers (only author/Admin can); they can add them.
 - **FR-023**: Modifiers MUST NOT be able to delete the problem (only author/Admin can).
 - **FR-024**: The system MUST allow listing all modifiers for a problem.
 - **FR-025**: The system MUST allow removing modifiers by the author or Admin.
@@ -822,7 +824,7 @@ For the canonical documentation of the `Problem` entity and its properties (incl
 | Update accessibility | ✅ | ✅ | ✅ | ❌ |
 | Upload files | ✅ | ✅ | ✅ | ❌ |
 | Delete files | ✅ | ✅ | ✅ | ❌ |
-| Add modifier | ✅ | ✅ | ❌ | ❌ |
+| Add modifier | ✅ | ✅ | ✅ | ❌ |
 | Remove modifier | ✅ | ✅ | ❌ | ❌ |
 | List modifiers | ✅ | ✅ | ✅ | ❌ |
 | Delete problem | ✅ | ✅ | ❌ | ❌ |
@@ -840,8 +842,8 @@ For the canonical documentation of the `Problem` entity and its properties (incl
 - **SC-005**: Files can be deleted via `DELETE /problems/p/{slug}/files/{fileType}` with HTTP 200.
 - **SC-006**: Test cases ZIP structure is validated against ICPC format on upload.
 - **SC-007**: Only problem author, Admin, or assigned modifiers can modify problems.
-- **SC-008**: Modifiers can be added/removed only by the author or Admin.
-- **SC-009**: Modifiers can edit but cannot add other modifiers or delete the problem.
+- **SC-008**: Modifiers can be added by the author, Admin or another modifier, and removed only by the author or Admin.
+- **SC-009**: Modifiers can edit and add other modifiers, but cannot remove modifiers or delete the problem.
 - **SC-010**: Contestant users attempting operations receive HTTP 403.
 - **SC-011**: No internal IDs are returned in any response.
 - **SC-012**: `updatedAt` is refreshed on every modification.

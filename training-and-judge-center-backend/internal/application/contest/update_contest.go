@@ -123,7 +123,7 @@ func (uc *UpdateContestUseCase) Execute(ctx context.Context, in UpdateContestInp
 	problemsChanged := in.Problems != nil
 	var newProblemEntries []problemEntry
 	if problemsChanged {
-		newProblemEntries, err = uc.resolveProblems(ctx, *in.Problems, in.CurrentUser.ID, in.CurrentUser.IsAdmin())
+		newProblemEntries, err = uc.resolveProblems(ctx, *in.Problems, in.CurrentUser.ID, in.CurrentUser.IsAdmin(), c.Problems())
 		if err != nil {
 			return nil, err
 		}
@@ -281,14 +281,22 @@ func validateScalarFields(in UpdateContestInput, existing *domainContest.Contest
 	return result, nil
 }
 
-func (uc *UpdateContestUseCase) resolveProblems(ctx context.Context, inputs []ProblemOrderInput, userID string, isAdmin bool) ([]problemEntry, error) {
-	return resolveContestProblems(ctx, uc.problemProvider, inputs, userID, isAdmin)
+func (uc *UpdateContestUseCase) resolveProblems(ctx context.Context, inputs []ProblemOrderInput, userID string, isAdmin bool, current []domainContest.ContestProblem) ([]problemEntry, error) {
+	already := make(map[string]bool, len(current))
+	for _, cp := range current {
+		already[cp.ProblemID()] = true
+	}
+	return resolveContestProblems(ctx, uc.problemProvider, inputs, userID, isAdmin, already)
 }
 
 // resolveContestProblems deduplicates slugs, fetches problem metadata, and
 // validates that each problem is published and accessible to the caller.
 // Shared by CreateContestUseCase and UpdateContestUseCase.
-func resolveContestProblems(ctx context.Context, provider ProblemProvider, inputs []ProblemOrderInput, userID string, isAdmin bool) ([]problemEntry, error) {
+//
+// alreadyInContest holds the IDs of the problems the contest already has: the "can add" rule
+// applies only to problems being added now. A problem someone else put there stays when this
+// lead saves the list, whoever is allowed to touch the problem itself.
+func resolveContestProblems(ctx context.Context, provider ProblemProvider, inputs []ProblemOrderInput, userID string, isAdmin bool, alreadyInContest map[string]bool) ([]problemEntry, error) {
 	deduped := deduplicateBySlug(inputs)
 	if len(deduped) == 0 {
 		return nil, nil
@@ -313,7 +321,7 @@ func resolveContestProblems(ctx context.Context, provider ProblemProvider, input
 		if !info.IsPublished {
 			return nil, apperror.NewBadRequest(ErrCodeProblemNotPublished, "problem '"+entry.Slug+"' is not published")
 		}
-		if !info.CanAdd {
+		if !info.CanAdd && !alreadyInContest[info.ID] {
 			return nil, apperror.NewForbidden(ErrCodeProblemAccessDenied,
 				"cannot add private problem '"+entry.Slug+"' — you are not a modifier")
 		}

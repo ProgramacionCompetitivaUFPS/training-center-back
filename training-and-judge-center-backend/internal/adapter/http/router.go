@@ -172,11 +172,19 @@ func NewRouter(h *Handlers, s *Services, allowedOrigins []string) *chi.Mux {
 				r.Get("/statistics", h.Problem.GetStatistics)
 				r.Get("/validation", h.Problem.GetLatestValidation)
 
+				// Reading a problem's files: only its author, modifiers and Admin.
+				r.Get("/testcases", h.Problem.ListTestCases)
+				r.Get("/testcases/{kind}/{name}", h.Problem.GetTestCase)
+				r.Get("/testcases/{kind}/{name}/{part}", h.Problem.GetTestCasePart)
+				r.Get("/export", h.Problem.Export)
+
 				r.Get("/submissions", h.Submission.ListProblemSubmissions)
 				r.Post("/submissions", h.Submission.Submit)
 
 				r.Route("/files", func(r chi.Router) {
 					r.Post("/", h.Problem.UploadFiles)
+					r.Get("/testcases", h.Problem.DownloadTestCases)
+					r.Get("/{fileType}", h.Problem.GetSourceFile)
 					r.Delete("/{fileType}", h.Problem.DeleteFile)
 				})
 

@@ -449,7 +449,8 @@ func (p *ICPCParser) prepareZip(zipData []byte) (*ParsedZip, error) {
 		if strings.HasPrefix(cleanPath, "../") || filepath.IsAbs(cleanPath) {
 			return nil, apperror.NewValidation([]apperror.FieldError{{Field: "file", Message: "Invalid malicious path detected in ZIP"}})
 		}
-		if strings.Contains(cleanPath, "__MACOSX") || strings.HasSuffix(cleanPath, ".DS_Store") {
+		// macOS leftovers: the __MACOSX folder, .DS_Store and AppleDouble files (._name)
+		if strings.Contains(cleanPath, "__MACOSX") || strings.HasSuffix(cleanPath, ".DS_Store") || strings.HasPrefix(filepath.Base(cleanPath), "._") {
 			continue
 		}
 		if f.FileInfo().Mode()&os.ModeSymlink != 0 {

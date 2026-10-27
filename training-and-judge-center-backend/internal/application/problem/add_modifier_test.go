@@ -39,6 +39,20 @@ func TestAddModifier_Success_Admin(t *testing.T) {
 	}
 }
 
+func TestAddModifier_Success_AnotherModifier(t *testing.T) {
+	repo := repoWith(newDraftProblemWithModifier()) // modifierID is already a collaborator
+	uc := NewAddModifierUseCase(repo, providerResolving(newModifierID))
+
+	err := uc.Execute(context.Background(), AddModifierInput{
+		Slug:         testSlug,
+		UserNickname: newModifierNickname,
+		CurrentUser:  asCoach(modifierID),
+	})
+	if err != nil {
+		t.Fatalf("a collaborator should be able to bring in another one, got: %v", err)
+	}
+}
+
 func TestAddModifier_Forbidden_Stranger(t *testing.T) {
 	repo := repoWith(newDraftProblem())
 	uc := NewAddModifierUseCase(repo, providerResolving(newModifierID))

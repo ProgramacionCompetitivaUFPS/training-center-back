@@ -22,7 +22,7 @@ As a problem author or Admin, I want to permanently delete a problem from the sy
      - Problem record
      - All problem files (test cases, solutions, checker, validator)
      - All Contest_Problem associations (problem removed from all contests)
-   - **And** preserves all Submission records with problem_id intact
+   - **And** preserves all Submission records: their problem_id becomes NULL (foreign key ON DELETE SET NULL) and the problem title and slug stay in the submission
    - **And** returns HTTP 204 No Content
 
 2. **Scenario**: Deletion without confirmation
@@ -55,13 +55,19 @@ As a problem author or Admin, I want to permanently delete a problem from the sy
    - **And** the problem is removed from the scheduled contest
    - **And** no notification is sent (contest hasn't started yet)
 
-6. **Scenario**: Delete problem in finished contest
-   - **Given** a problem exists and was included in a FINISHED contest
+6. **Scenario**: Delete problem in finished contest without submissions
+   - **Given** a problem exists and was included in a FINISHED contest, and nobody submitted it inside any contest
    - **And** the authenticated user is the author or Admin
    - **When** they delete the problem with correct confirmation
    - **Then** the system deletes the problem and Contest_Problem association
-   - **And** existing submissions remain accessible with preserved problem title
-   - **And** historical standings remain intact
+
+6a. **Scenario**: Delete problem with submissions made in a contest
+   - **Given** a problem has submissions made inside a contest (finished or not)
+   - **And** the authenticated user is the author or Admin
+   - **When** they delete the problem with correct confirmation
+   - **Then** the system rejects with HTTP 409 Conflict (PROBLEM_HAS_CONTEST_HISTORY)
+   - **And** nothing is deleted
+   - **And** the author can unpublish the problem instead: it keeps its files, submissions and the contest standings, and stops being used
 
 7. **Scenario**: Delete problem with no submissions
    - **Given** a problem exists with zero submissions
@@ -109,7 +115,7 @@ As a problem author or Admin, I want to permanently delete a problem from the sy
     - **And** submissions exist for that problem
     - **When** a user views a submission via GET /submissions/{id}
     - **Then** the system returns the submission with preserved problem title
-    - **And** problem_id remains intact in the submission record
+    - **And** the submission's problem_id is null and its problem title and slug are the preserved snapshot (clients must not rely on problem_id being present)
 
 ---
 
@@ -240,21 +246,23 @@ Problem with the specified slug does not exist.
 - **FR-010**: The system MUST delete all problem files from storage (test cases, solutions, checker, validator).
 - **FR-011**: The system MUST delete all Contest_Problem associations (remove problem from all contests).
 - **FR-011a**: After removing the associations, the system MUST renumber the remaining problems of each affected contest so their positions stay contiguous (1..n), preserving their relative order.
-- **FR-012**: The system MUST preserve all Submission records with problem_id intact.
+- **FR-012**: The system MUST preserve all Submission records; their problem_id is set to NULL when the problem is deleted.
 - **FR-013**: The system MUST preserve the problem title in submission records for historical reference.
 
 **Contest Impact**
 - **FR-014**: The system MUST NOT allow deletion of problems that are currently in ACTIVE contests (must return PROBLEM_IN_ACTIVE_CONTEST).
+- **FR-014a**: The interface SHOULD, when deletion of a `PUBLISHED` problem is requested, warn that contestants lose access and that contest associations are removed, and offer to unpublish it instead; the author or Admin may still delete it after typing the slug.
 - **FR-015**: The system MUST allow deletion of problems that are in SCHEDULED contests.
-- **FR-016**: The system MUST allow deletion of problems that are in FINISHED contests.
+- **FR-016**: The system MUST allow deletion of problems that are in FINISHED contests, as long as nobody submitted them inside a contest (see FR-019a).
+- **FR-019a**: The system MUST NOT allow deletion of a problem that has submissions made inside a contest, finished or not (must return HTTP 409 PROBLEM_HAS_CONTEST_HISTORY): those submissions are the official result of the contest and deleting the problem would change its standings. The problem can be unpublished instead.
 - **FR-018**: When a problem is deleted from a SCHEDULED contest, the system MUST remove it without notification.
-- **FR-019**: When a problem is deleted from a FINISHED contest, the system MUST preserve historical standings.
+- **FR-019**: When a problem is deleted from a FINISHED contest, the system MUST preserve historical standings (guaranteed by FR-019a: a problem with contest submissions cannot be deleted). The standings of a contest MUST keep working (never fail) for submissions whose problem was deleted before this rule existed; those submissions are ignored.
 
 **Submission Preservation**
 - **FR-020**: The system MUST NOT delete Submission records when a problem is deleted.
 - **FR-021**: Submissions MUST remain accessible via View submission endpoint after problem deletion.
 - **FR-022**: Submissions MUST display the preserved problem title after problem deletion.
-- **FR-023**: The problem_id field in submissions MUST remain intact after problem deletion.
+- **FR-023**: The problem_id of a submission whose problem was deleted MUST be NULL, and the problem title and slug stored in the submission MUST identify the problem. Clients and acceptance tests MUST NOT expect problem_id to survive.
 
 **Post-Deletion Behavior**
 - **FR-024**: After deletion, GET /problems/p/{slug} MUST return HTTP 404 Not Found.
@@ -275,7 +283,7 @@ Problem with the specified slug does not exist.
 
 For the canonical documentation of the `Problem`, `Contest_Problem`, `Submission`, and `User` entities, please refer to the `README.md` at the root of the Problem management directory.
 
-> **Note on Deletion**: Problem deletion is a hard delete operation. The Problem record and all associated files are permanently removed. Contest_Problem associations are deleted to remove the problem from all contests. Submissions are preserved with problem_id and problemTitle intact for historical reference.
+> **Note on Deletion**: Problem deletion is a hard delete operation. The Problem record and all associated files are permanently removed. Contest_Problem associations are deleted to remove the problem from all contests. Submissions are preserved for historical reference: problem_id becomes NULL and the problem title and slug are kept in the submission.
 
 ## Success Criteria *(mandatory)*
 
@@ -289,7 +297,7 @@ For the canonical documentation of the `Problem`, `Contest_Problem`, `Submission
 - **SC-006**: Problem record is permanently deleted from database.
 - **SC-007**: All problem files are deleted from storage (test cases, solutions, checker, validator).
 - **SC-008**: All Contest_Problem associations are deleted (problem removed from all contests).
-- **SC-009**: All Submission records are preserved with problem_id intact.
+- **SC-009**: All Submission records are preserved (problem_id becomes NULL; problem title and slug are kept).
 - **SC-010**: Submissions display preserved problem title after deletion.
 - **SC-011**: Problems CANNOT be deleted from ACTIVE contests (rejected with 409 Conflict).
 - **SC-012**: Problems can be deleted from SCHEDULED contests without notification.

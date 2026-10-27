@@ -102,12 +102,17 @@ func (m *mockFileStorageH) DownloadFile(ctx context.Context, path string) ([]byt
 // ── ActiveContestChecker mock ────────────────────────────────────────────────
 
 type mockActiveContestCheckerH struct {
-	inActive bool
-	err      error
+	inActive          bool
+	hasContestHistory bool
+	err               error
 }
 
 func (m *mockActiveContestCheckerH) IsProblemInActiveContest(_ context.Context, _ string) (bool, error) {
 	return m.inActive, m.err
+}
+
+func (m *mockActiveContestCheckerH) HasContestSubmissions(_ context.Context, _ string) (bool, error) {
+	return m.hasContestHistory, m.err
 }
 
 // ── SubmissionRejudger mock ──────────────────────────────────────────────────

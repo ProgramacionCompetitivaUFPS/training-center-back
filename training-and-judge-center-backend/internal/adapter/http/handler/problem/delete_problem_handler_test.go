@@ -79,3 +79,18 @@ func TestDeleteProblem_SlugMismatch_Returns400(t *testing.T) {
 		t.Errorf("expected %s, got %s", domainProblem.ErrCodeSlugMismatch, errResp.Code)
 	}
 }
+
+func TestDeleteProblem_PublishedProblem_Returns204(t *testing.T) {
+	// publishedProblem() is authored by u1, the user the mock token logs in as
+	h := newHandlerWithDeleteProblem(repoReturning(publishedProblem()), &mockActiveContestCheckerH{})
+
+	r := authedRequest(http.MethodDelete, "/problems/p/test-problem", mustJSON(`{"confirmSlug":"test-problem"}`))
+	r.SetPathValue("slug", "test-problem")
+	w := httptest.NewRecorder()
+
+	wrapAuth(http.HandlerFunc(h.DeleteProblem)).ServeHTTP(w, r)
+
+	if w.Code != http.StatusNoContent {
+		t.Fatalf("expected 204, got %d: %s", w.Code, w.Body.String())
+	}
+}

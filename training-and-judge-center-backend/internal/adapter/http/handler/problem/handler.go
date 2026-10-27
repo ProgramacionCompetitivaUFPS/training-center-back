@@ -26,6 +26,12 @@ type Handler struct {
 	rejudgeSubmissions         *appProblem.RejudgeSubmissionsUseCase
 	rejudgeContestSubmissions  *appProblem.RejudgeContestSubmissionsUseCase
 	adminRejudgeSubmissions    *appProblem.AdminRejudgeSubmissionsUseCase
+	listTestCases              *appProblem.ListTestCasesUseCase
+	getTestCase                *appProblem.GetTestCaseUseCase
+	downloadTestCases          *appProblem.DownloadTestCasesUseCase
+	exportProblem              *appProblem.ExportProblemUseCase
+	getSourceFile              *appProblem.GetSourceFileUseCase
+	getTestCasePart            *appProblem.GetTestCasePartUseCase
 	userProvider               appProblem.UserProvider
 	settings                   domainProblem.PlatformSettings
 }
@@ -51,6 +57,12 @@ func NewHandler(
 	rejudgeSubmissions *appProblem.RejudgeSubmissionsUseCase,
 	rejudgeContestSubmissions *appProblem.RejudgeContestSubmissionsUseCase,
 	adminRejudgeSubmissions *appProblem.AdminRejudgeSubmissionsUseCase,
+	listTestCases *appProblem.ListTestCasesUseCase,
+	getTestCase *appProblem.GetTestCaseUseCase,
+	downloadTestCases *appProblem.DownloadTestCasesUseCase,
+	exportProblem *appProblem.ExportProblemUseCase,
+	getSourceFile *appProblem.GetSourceFileUseCase,
+	getTestCasePart *appProblem.GetTestCasePartUseCase,
 	userProvider appProblem.UserProvider,
 	settings domainProblem.PlatformSettings,
 ) *Handler {
@@ -75,6 +87,12 @@ func NewHandler(
 		rejudgeSubmissions:         rejudgeSubmissions,
 		rejudgeContestSubmissions:  rejudgeContestSubmissions,
 		adminRejudgeSubmissions:    adminRejudgeSubmissions,
+		listTestCases:              listTestCases,
+		getTestCase:                getTestCase,
+		downloadTestCases:          downloadTestCases,
+		exportProblem:              exportProblem,
+		getSourceFile:              getSourceFile,
+		getTestCasePart:            getTestCasePart,
 		userProvider:               userProvider,
 		settings:                   settings,
 	}
