@@ -28,6 +28,7 @@ type Handler struct {
 	listMembers          *appGroup.ListMembersUseCase
 	deleteGroup          *appGroup.DeleteGroupUseCase
 	updateGroup          *appGroup.UpdateGroupUseCase
+	listSoleLeadGroups   *appGroup.ListSoleLeadGroupsUseCase
 }
 
 func NewHandler(
@@ -54,6 +55,7 @@ func NewHandler(
 	listMembers *appGroup.ListMembersUseCase,
 	deleteGroup *appGroup.DeleteGroupUseCase,
 	updateGroup *appGroup.UpdateGroupUseCase,
+	listSoleLeadGroups *appGroup.ListSoleLeadGroupsUseCase,
 ) *Handler {
 	return &Handler{
 		createGroup:          createGroup,
@@ -79,5 +81,6 @@ func NewHandler(
 		listMembers:          listMembers,
 		deleteGroup:          deleteGroup,
 		updateGroup:          updateGroup,
+		listSoleLeadGroups:   listSoleLeadGroups,
 	}
 }

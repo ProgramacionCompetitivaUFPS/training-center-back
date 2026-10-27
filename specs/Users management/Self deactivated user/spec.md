@@ -381,6 +381,7 @@ Confirmation attempts exhausted. Must wait before retrying.
 - **FR-028**: The system MUST record an audit log of the deactivation (userId, originalEmail, originalNickname, timestamp, IP, userAgent).
 - **FR-029**: The system MUST update the user's `updatedAt` when confirming deactivation.
 - **FR-030**: Logs and API responses MUST not include PII of deactivated users.
+- **FR-031**: The system MUST expose `GET /users/me/sole-lead-groups` listing the groups where the user is the only lead, and the interface MUST show that list (and what it means: the group would be left without a lead, only an Admin could manage it) before the user requests the deactivation. The deactivation is not blocked.
 
 ### Key Entities
 

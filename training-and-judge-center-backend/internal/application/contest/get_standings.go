@@ -216,7 +216,7 @@ func (uc *GetStandingsUseCase) Execute(ctx context.Context, in GetStandingsInput
 
 	// Cache miss or cache error (already logged by the cache adapter): rebuild from the
 	// source. rebuild's Set also overwrites an entry that failed to unmarshal.
-	rebuilt, err := uc.rebuild(ctx, in.ContestID, contest.EndTime())
+	rebuilt, err := uc.rebuild(ctx, contest)
 	if err != nil {
 		return nil, err
 	}
@@ -256,7 +256,7 @@ func (uc *GetStandingsUseCase) ExecuteFilterOptions(ctx context.Context, in GetS
 			go uc.backgroundRefresh(in.ContestID)
 		}
 	} else {
-		cached, err = uc.rebuild(ctx, in.ContestID, contest.EndTime())
+		cached, err = uc.rebuild(ctx, contest)
 		if err != nil {
 			return nil, err
 		}
@@ -289,7 +289,16 @@ func distinctProfileField(profiles map[string]*ParticipantProfile, field func(*P
 	return values
 }
 
-func (uc *GetStandingsUseCase) rebuild(ctx context.Context, contestID string, endTime time.Time) (*CachedStandings, error) {
+// rebuild counts only the submissions of the problems the contest has right now: a problem taken out
+// of the contest stops counting (its column is gone, so its solves must not remain in the totals), and
+// counts again if it is put back, since its submissions keep their contest.
+func (uc *GetStandingsUseCase) rebuild(ctx context.Context, contest *domainContest.Contest) (*CachedStandings, error) {
+	contestID, endTime := contest.ID(), contest.EndTime()
+	inContest := make(map[string]bool, len(contest.Problems()))
+	for _, cp := range contest.Problems() {
+		inContest[cp.ProblemID()] = true
+	}
+
 	g, gctx := errgroup.WithContext(ctx)
 
 	var regs []*domainContest.ContestRegistration
@@ -351,6 +360,9 @@ func (uc *GetStandingsUseCase) rebuild(ctx context.Context, contestID string, en
 	for _, sub := range subs {
 		if sub.SubmittedAt.After(endTime) {
 			continue // postcompetition (practice) submission — must not affect official standings
+		}
+		if !inContest[sub.ProblemID] {
+			continue // the problem was taken out of the contest
 		}
 		contestantID, ok := userToContestant[sub.UserID]
 		if !ok {
@@ -432,7 +444,7 @@ func (uc *GetStandingsUseCase) backgroundRefresh(contestID string) {
 		return
 	}
 
-	if _, err := uc.rebuild(ctx, contestID, contest.EndTime()); err != nil {
+	if _, err := uc.rebuild(ctx, contest); err != nil {
 		slog.ErrorContext(ctx, "standings background refresh failed", "contest_id", contestID, "error", err)
 	}
 }

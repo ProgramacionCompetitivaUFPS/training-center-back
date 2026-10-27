@@ -77,6 +77,12 @@ func activeContest() *domainContest.Contest {
 	)
 }
 
+// withProblem puts a problem in the contest: standings count only the problems the contest has.
+func withProblem(c *domainContest.Contest, problemID string) *domainContest.Contest {
+	c.SetProblems([]domainContest.ContestProblem{domainContest.RestoreContestProblem("cp-"+problemID, problemID, 1)}, testNow)
+	return c
+}
+
 func finishedContest() *domainContest.Contest {
 	return domainContest.RestoreContest(
 		testContestID,
@@ -265,7 +271,7 @@ func TestGetStandingsUseCase_PostCompetitionSubmissionsExcludedFromRebuild(t *te
 		sub(callerID, "A", "ACCEPTED", 90), // during the contest (ends 60m ago)
 		sub(otherID, "A", "ACCEPTED", 30),  // postcompetition (practice) — after endTime
 	}
-	uc := newGetStandingsUseCase(finishedContest(), regs, subs, emptyCache(), visibleGroup(), isMemberNotLead())
+	uc := newGetStandingsUseCase(withProblem(finishedContest(), "A"), regs, subs, emptyCache(), visibleGroup(), isMemberNotLead())
 
 	out, err := uc.Execute(context.Background(), GetStandingsInput{
 		CurrentUser: asContestant(callerID),
@@ -506,13 +512,43 @@ func TestGetStandingsUseCase_Pagination(t *testing.T) {
 	}
 }
 
+// A problem taken out of the contest must stop counting: its column is gone, so leaving its solves in
+// the totals would show a score that no column explains (the submissions keep their contest, so
+// putting the problem back brings them back).
+func TestGetStandingsUseCase_ProblemTakenOutOfTheContestStopsCounting(t *testing.T) {
+	regs := []*domainContest.ContestRegistration{reg(callerID)}
+	subs := []ContestSubmissionData{
+		sub(callerID, "A", "ACCEPTED", 90),
+		sub(callerID, "B", "ACCEPTED", 80), // B is no longer in the contest
+		sub(callerID, "B", "WRONG_ANSWER", 70),
+	}
+	uc := newGetStandingsUseCase(withProblem(activeContest(), "A"), regs, subs, emptyCache(), visibleGroup(), isMemberNotLead())
+
+	out, err := uc.Execute(context.Background(), GetStandingsInput{
+		CurrentUser: asContestant(callerID),
+		GroupID:     testGroupID,
+		ContestID:   testContestID,
+		Page:        1, Limit: 50,
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	entry := out.Entries[0]
+	if entry.ProblemsSolved != 1 {
+		t.Errorf("solved=%d, want 1 (only A is in the contest)", entry.ProblemsSolved)
+	}
+	if _, counted := entry.Problems["B"]; counted {
+		t.Errorf("B is not in the contest and must not appear in the standings: %+v", entry.Problems["B"])
+	}
+}
+
 func TestGetStandingsUseCase_CompilationErrorNotCountedAsWrongAttempt(t *testing.T) {
 	regs := []*domainContest.ContestRegistration{reg(callerID)}
 	subs := []ContestSubmissionData{
 		sub(callerID, "A", "COMPILATION_ERROR", 90),
 		sub(callerID, "A", "ACCEPTED", 60),
 	}
-	uc := newGetStandingsUseCase(activeContest(), regs, subs, emptyCache(), visibleGroup(), isMemberNotLead())
+	uc := newGetStandingsUseCase(withProblem(activeContest(), "A"), regs, subs, emptyCache(), visibleGroup(), isMemberNotLead())
 
 	out, err := uc.Execute(context.Background(), GetStandingsInput{
 		CurrentUser: asContestant(callerID),
@@ -561,7 +597,7 @@ func TestGetStandingsUseCase_EveryFailedAttemptPenalises(t *testing.T) {
 				sub(callerID, "A", tt.verdict, 30),
 				sub(callerID, "A", "ACCEPTED", 60),
 			}
-			uc := newGetStandingsUseCase(activeContest(), regs, subs, emptyCache(), visibleGroup(), isMemberNotLead())
+			uc := newGetStandingsUseCase(withProblem(activeContest(), "A"), regs, subs, emptyCache(), visibleGroup(), isMemberNotLead())
 
 			out, err := uc.Execute(context.Background(), GetStandingsInput{
 				CurrentUser: asContestant(callerID),
@@ -594,7 +630,7 @@ func cleanSolvePenalty(t *testing.T) int {
 	t.Helper()
 	regs := []*domainContest.ContestRegistration{reg(callerID)}
 	subs := []ContestSubmissionData{sub(callerID, "A", "ACCEPTED", 60)}
-	uc := newGetStandingsUseCase(activeContest(), regs, subs, emptyCache(), visibleGroup(), isMemberNotLead())
+	uc := newGetStandingsUseCase(withProblem(activeContest(), "A"), regs, subs, emptyCache(), visibleGroup(), isMemberNotLead())
 
 	out, err := uc.Execute(context.Background(), GetStandingsInput{
 		CurrentUser: asContestant(callerID),

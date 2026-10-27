@@ -115,6 +115,12 @@ func (uc *UpdateContestUseCase) Execute(ctx context.Context, in UpdateContestInp
 		return nil, apperror.NewBadRequest(ErrCodeNoFieldsToUpdate, "at least one field must be provided for update")
 	}
 
+	// The standings of a finished contest are its official result: they count the problems the contest
+	// has, so once it has ended that list is closed (a lead can still edit everything else).
+	if in.Problems != nil && c.Status(time.Now()) == domainContest.StatusFinished {
+		return nil, apperror.NewConflict(domainContest.ErrCodeContestProblemsLocked, "the problems of a finished contest cannot be changed: its standings are the official result")
+	}
+
 	scalars, err := validateScalarFields(in, c)
 	if err != nil {
 		return nil, err

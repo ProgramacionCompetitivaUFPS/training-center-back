@@ -48,6 +48,41 @@ func NewDeleteGroupUseCase(
 	}
 }
 
+// DeletionImpact is what deleting a group would take with it, so the interface can show it before
+// asking for the confirmation.
+type DeletionImpact struct {
+	Contests       int
+	ActiveContests int
+	Materials      int
+	Members        int
+	Submissions    int
+}
+
+// Impact reports what Execute would delete. Same permission as the deletion itself.
+func (uc *DeleteGroupUseCase) Impact(ctx context.Context, groupID string, currentUser appshared.CurrentUser) (*DeletionImpact, error) {
+	g, err := uc.groupRepo.FindByID(ctx, groupID)
+	if err != nil {
+		return nil, err
+	}
+	if !g.CanBeDeleted() {
+		return nil, apperror.NewForbidden(domainGroup.ErrCodeCannotDeleteGlobalGroup, "the global group cannot be deleted")
+	}
+	if err := requireLeadOrAdmin(ctx, uc.memberRepo, groupID, currentUser); err != nil {
+		return nil, err
+	}
+	counts, err := uc.deletionProvider.GetDeletionCounts(ctx, groupID)
+	if err != nil {
+		return nil, err
+	}
+	return &DeletionImpact{
+		Contests:       len(counts.ContestIDs),
+		ActiveContests: counts.ActiveContestsCount,
+		Materials:      counts.MaterialsCount,
+		Members:        counts.MembersCount,
+		Submissions:    counts.SubmissionsCount,
+	}, nil
+}
+
 func (uc *DeleteGroupUseCase) Execute(ctx context.Context, in DeleteGroupInput) (*DeleteGroupOutput, error) {
 	g, err := uc.groupRepo.FindByID(ctx, in.GroupID)
 	if err != nil {

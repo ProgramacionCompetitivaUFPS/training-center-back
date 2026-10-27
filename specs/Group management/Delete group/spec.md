@@ -241,6 +241,8 @@ Group not found.
 
 **Response**
 * **FR-DG-021**: The system MUST return a deletion summary with counts of deleted entities.
+* **FR-DG-021a**: The system MUST expose `GET /groups/{groupId}/deletion-impact` (same permission as the deletion: a lead of the group or an Admin; 403 for the global group) returning `contests`, `activeContests`, `materials`, `members` and `submissions` (contest submissions that would be orphaned).
+* **FR-DG-021b**: The interface MUST show a one-line summary of that impact before confirming, and keep requiring the group name to be typed. When the group has active contests it MUST also show a warning and require an explicit acknowledgement that they are deleted with their standings. Deleting a group with active contests stays allowed (FR-DG-019): the warning is what protects the author from doing it by accident.
 * **FR-DG-022**: The system MUST NOT return internal IDs except for the deleted group ID.
 
 **Atomicity**

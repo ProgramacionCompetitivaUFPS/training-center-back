@@ -329,6 +329,7 @@ func main() {
 		addMemberUseCase, removeMemberUseCase, changeRoleUseCase, leaveGroupUseCase, listMembersUseCase,
 		deleteGroupUseCase,
 		updateGroupUseCase,
+		appGroup.NewListSoleLeadGroupsUseCase(groupDeletionProvider),
 	)
 
 	// Material platform adapters

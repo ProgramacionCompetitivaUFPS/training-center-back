@@ -235,3 +235,64 @@ func TestDeleteGroup_ConfirmationMismatch(t *testing.T) {
 		t.Errorf("expected code %s, got %s", ErrCodeConfirmationMismatch, ae.Code)
 	}
 }
+
+func TestDeleteGroupImpact_LeadSeesWhatWouldBeLost(t *testing.T) {
+	g := openGroupForDelete(t)
+	counts := defaultCounts()
+	counts.ActiveContestsCount = 1
+	uc := newDeleteGroupUseCase(&mockGroupRepository{groups: []*domainGroup.Group{g}}, leadMemberRepo("g1", "lead-1"), &mockGroupDeletionProvider{counts: counts})
+
+	got, err := uc.Impact(context.Background(), "g1", asCoach("lead-1"))
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	want := DeletionImpact{Contests: 2, ActiveContests: 1, Materials: 3, Members: 5, Submissions: 10}
+	if *got != want {
+		t.Errorf("impact = %+v, want %+v", *got, want)
+	}
+}
+
+func TestDeleteGroupImpact_AdminCanSeeItWithoutBelongingToTheGroup(t *testing.T) {
+	g := openGroupForDelete(t)
+	uc := newDeleteGroupUseCase(&mockGroupRepository{groups: []*domainGroup.Group{g}}, &mockMemberRepository{}, &mockGroupDeletionProvider{counts: defaultCounts()})
+
+	if _, err := uc.Impact(context.Background(), "g1", asAdmin("admin-1")); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestDeleteGroupImpact_SamePermissionAsTheDeletion(t *testing.T) {
+	g := openGroupForDelete(t)
+	uid := shared.RestoreUserID("member-1")
+	member, _ := domainGroup.NewGroupMember("m1", "g1", uid, domainGroup.MemberRoleMember, domainGroup.JoinMethodOpenJoin, nil, testNow)
+	repoWithMember := &mockMemberRepository{memberships: map[string]*domainGroup.GroupMember{keyOf("g1", uid): member}}
+
+	for name, tc := range map[string]struct {
+		members *mockMemberRepository
+		user    string
+	}{
+		"plain member": {repoWithMember, "member-1"},
+		"outsider":     {&mockMemberRepository{}, "outsider-1"},
+	} {
+		t.Run(name, func(t *testing.T) {
+			uc := newDeleteGroupUseCase(&mockGroupRepository{groups: []*domainGroup.Group{g}}, tc.members, &mockGroupDeletionProvider{counts: defaultCounts()})
+			_, err := uc.Impact(context.Background(), "g1", asCoach(tc.user))
+			ae, ok := err.(*apperror.AppError)
+			if !ok || ae.Kind != apperror.KindForbidden {
+				t.Errorf("expected FORBIDDEN, got %v", err)
+			}
+		})
+	}
+}
+
+func TestDeleteGroupImpact_GlobalGroupHasNoImpactToShow(t *testing.T) {
+	gn, _ := domainGroup.NewGroupName("Global Group")
+	global := domainGroup.RestoreGroup("global", gn, nil, domainGroup.VisibilityVisible, domainGroup.JoinPolicyOpen, true, shared.RestoreUserID("system"), time.Now(), time.Now())
+	uc := newDeleteGroupUseCase(&mockGroupRepository{groups: []*domainGroup.Group{global}}, &mockMemberRepository{}, &mockGroupDeletionProvider{})
+
+	_, err := uc.Impact(context.Background(), "global", asAdmin("admin-1"))
+	ae, ok := err.(*apperror.AppError)
+	if !ok || ae.Code != domainGroup.ErrCodeCannotDeleteGlobalGroup {
+		t.Errorf("expected %s, got %v", domainGroup.ErrCodeCannotDeleteGlobalGroup, err)
+	}
+}
