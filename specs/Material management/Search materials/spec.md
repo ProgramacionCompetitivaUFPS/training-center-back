@@ -40,7 +40,7 @@ As a group member, I want to search materials by text content so that I can quic
    * **And** a user is authenticated and is a member
    * **When** they request GET /groups/{groupId}/materials?q=nonexistent
    * **Then** the system returns HTTP 200 with empty materials array
-   * **And** pagination shows totalCount=0
+   * **And** pagination shows total=0
 
 5. **Scenario**: Search without query parameter (list all)
    * **Given** a group has multiple PUBLISHED materials
@@ -303,10 +303,12 @@ GET /groups/{groupId}/materials
     }
   ],
   "pagination": {
-    "totalCount": 2,
-    "currentPage": 1,
+    "page": 1,
+    "limit": 20,
+    "total": 2,
     "totalPages": 1,
-    "itemsPerPage": 20
+    "hasNextPage": false,
+    "hasPrevPage": false
   }
 }
 ```
@@ -328,10 +330,12 @@ GET /groups/{groupId}/materials
 | materials[].updatedAt | string | Last update timestamp (ISO 8601) |
 | materials[].publishedAt | string | Publication timestamp (ISO 8601, never null for PUBLISHED) |
 | pagination | object | Pagination metadata |
-| pagination.totalCount | integer | Total number of materials matching search |
-| pagination.currentPage | integer | Current page number |
+| pagination.page | integer | Current page number |
+| pagination.limit | integer | Number of items per page |
+| pagination.total | integer | Total number of materials matching search |
 | pagination.totalPages | integer | Total number of pages |
-| pagination.itemsPerPage | integer | Number of items per page |
+| pagination.hasNextPage | boolean | Whether a following page exists |
+| pagination.hasPrevPage | boolean | Whether a preceding page exists |
 
 ### Error Responses
 
@@ -466,7 +470,7 @@ GET /groups/{groupId}/materials
 - **FR-035**: The system MUST validate that `page` is a positive integer (minimum 1).
 - **FR-036**: The system MUST validate that `limit` is between 1 and 100 (inclusive).
 - **FR-037**: The system MUST enforce a maximum limit of 100 items per page.
-- **FR-038**: The system MUST return pagination metadata (totalCount, currentPage, totalPages, itemsPerPage).
+- **FR-038**: The system MUST return pagination metadata (page, limit, total, totalPages, hasNextPage, hasPrevPage).
 - **FR-039**: The system MUST return empty materials array with correct pagination metadata when requested page exceeds available pages.
 
 ### Permission Enforcement

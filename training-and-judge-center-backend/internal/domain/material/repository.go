@@ -37,5 +37,15 @@ type Repository interface {
 	Save(ctx context.Context, m *Material) error
 	FindByID(ctx context.Context, id string) (*Material, error)
 	List(ctx context.Context, groupID string, filters ListFilters) ([]*Material, int, error)
+	// DistinctTags returns the distinct tags used by the `sampleSize` most recently created
+	// materials in groupID (restricted to the given statuses; empty means no status constraint).
+	// Sampling bounds the cost regardless of how large the group grows — it's meant to feed
+	// filter suggestions, not to be an exhaustive tag registry (the UI also accepts typing any
+	// tag directly, so a tag outside the sample is still filterable, just not suggested).
+	DistinctTags(ctx context.Context, groupID string, statuses []Status, sampleSize int) ([]string, error)
+	// DistinctAuthorIDs returns the distinct author IDs of the `sampleSize` most recently
+	// created materials in groupID (same sampling rationale as DistinctTags — bounds the cost,
+	// feeds filter suggestions, not an exhaustive list).
+	DistinctAuthorIDs(ctx context.Context, groupID string, statuses []Status, sampleSize int) ([]string, error)
 	Delete(ctx context.Context, id string) error
 }

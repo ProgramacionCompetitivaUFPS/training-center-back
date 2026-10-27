@@ -20,7 +20,7 @@ func validCreateInput(role shared.Role) CreateGroupInput {
 	return CreateGroupInput{
 		Name:        "Algorithms Club",
 		Description: nil,
-		JoinMode:    "OPEN",
+		JoinPolicy:  "OPEN",
 		Visibility:  "VISIBLE",
 		CurrentUser: cu,
 	}
@@ -41,7 +41,7 @@ func TestCreateGroup_NonAdminNonCoachReturns403(t *testing.T) {
 
 	_, err := uc.Execute(context.Background(), CreateGroupInput{
 		Name:        "My Group",
-		JoinMode:    "OPEN",
+		JoinPolicy:  "OPEN",
 		Visibility:  "VISIBLE",
 		CurrentUser: asContestant("u1"),
 	})
@@ -91,7 +91,7 @@ func TestCreateGroup_EmptyNameReturnsValidationError(t *testing.T) {
 
 	_, err := uc.Execute(context.Background(), CreateGroupInput{
 		Name:        "",
-		JoinMode:    "OPEN",
+		JoinPolicy:  "OPEN",
 		Visibility:  "VISIBLE",
 		CurrentUser: asCoach("u1"),
 	})
@@ -104,12 +104,12 @@ func TestCreateGroup_EmptyNameReturnsValidationError(t *testing.T) {
 	}
 }
 
-func TestCreateGroup_InvalidJoinModeReturnsValidationError(t *testing.T) {
+func TestCreateGroup_InvalidJoinPolicyReturnsValidationError(t *testing.T) {
 	uc := newCreateGroupUseCase(&mockGroupRepository{}, nil, nil)
 
 	_, err := uc.Execute(context.Background(), CreateGroupInput{
 		Name:        "My Group",
-		JoinMode:    "INVALID_MODE",
+		JoinPolicy:  "INVALID_MODE",
 		Visibility:  "VISIBLE",
 		CurrentUser: asCoach("u1"),
 	})
@@ -127,7 +127,7 @@ func TestCreateGroup_InvalidVisibilityReturnsValidationError(t *testing.T) {
 
 	_, err := uc.Execute(context.Background(), CreateGroupInput{
 		Name:        "My Group",
-		JoinMode:    "OPEN",
+		JoinPolicy:  "OPEN",
 		Visibility:  "INVISIBLE",
 		CurrentUser: asCoach("u1"),
 	})
@@ -145,7 +145,7 @@ func TestCreateGroup_MultipleInvalidFieldsAccumulated(t *testing.T) {
 
 	_, err := uc.Execute(context.Background(), CreateGroupInput{
 		Name:        "",
-		JoinMode:    "NOPE",
+		JoinPolicy:  "NOPE",
 		Visibility:  "VISIBLE",
 		CurrentUser: asCoach("u1"),
 	})
@@ -187,7 +187,7 @@ func TestCreateGroup_InvalidPolicyCombinationReturnsError(t *testing.T) {
 
 	_, err := uc.Execute(context.Background(), CreateGroupInput{
 		Name:        "Secret Club",
-		JoinMode:    "OPEN",
+		JoinPolicy:  "OPEN",
 		Visibility:  "NOT_VISIBLE",
 		CurrentUser: asCoach("u1"),
 	})

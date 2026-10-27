@@ -8,6 +8,7 @@ type ListFilters struct {
 	AuthorID         *string
 	Tags             []string
 	Accessibility    *Accessibility
+	Search           string
 	Page             int
 	Limit            int
 }

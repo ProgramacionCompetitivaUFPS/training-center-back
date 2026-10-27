@@ -3,6 +3,7 @@ package contest
 import (
 	"context"
 	"log/slog"
+	"sort"
 	"time"
 
 	"golang.org/x/sync/errgroup"
@@ -30,6 +31,45 @@ type RankedEntry struct {
 	TotalPenalty    int
 	LastAcceptedAt  *time.Time
 	Problems        map[string]RankedProblem // key: problemID
+	// Participant is populated by buildOutput after ranking (RankStandings
+	// does not set it); it carries the display fields the API contract needs.
+	Participant StandingParticipantDisplay
+}
+
+// StandingParticipantDisplay is the enriched, contestant-facing view of a
+// standings row's participant — an individual user or a team.
+type StandingParticipantDisplay struct {
+	ID          string
+	Type        string // "INDIVIDUAL" or "TEAM"
+	DisplayName string
+	Nickname    string   // INDIVIDUAL only
+	Name        string   // INDIVIDUAL only
+	Members     []string // TEAM only; nicknames, populated only when the contest shows team members
+	Country     *string  // INDIVIDUAL only
+	City        *string  // INDIVIDUAL only
+	Institution *string  // INDIVIDUAL only
+}
+
+// StandingsProblemDisplay is one entry of the contest's problem list, as
+// shown in the standings header row.
+type StandingsProblemDisplay struct {
+	ID       string // internal problem ID, used to correlate with RankedEntry.Problems
+	Position int
+	Slug     string
+	Title    string
+}
+
+// ContestSummaryDisplay is the standings-facing summary of the contest itself.
+type ContestSummaryDisplay struct {
+	ID            string
+	Name          string
+	Status        string
+	StartTime     time.Time
+	EndTime       time.Time
+	Penalty       int
+	FreezeMinutes int
+	IsFrozen      bool
+	FrozenAt      *time.Time
 }
 
 type GetStandingsInput struct {
@@ -52,11 +92,13 @@ type StandingsMeta struct {
 }
 
 type GetStandingsOutput struct {
-	Entries []RankedEntry
-	Total   int
-	Page    int
-	Limit   int
-	Meta    StandingsMeta
+	Contest  ContestSummaryDisplay
+	Problems []StandingsProblemDisplay
+	Entries  []RankedEntry
+	Total    int
+	Page     int
+	Limit    int
+	Meta     StandingsMeta
 }
 
 type GetStandingsUseCase struct {
@@ -65,6 +107,8 @@ type GetStandingsUseCase struct {
 	submissionProvider   StandingsSubmissionProvider
 	teamParticipProvider TeamParticipantProvider
 	profileProvider      ParticipantProfileProvider
+	teamDisplayProvider  TeamDisplayProvider
+	problemProvider      ProblemProvider
 	groupProvider        GroupProvider
 	memberProvider       GroupMemberProvider
 	standingsCache       StandingsCache
@@ -78,6 +122,8 @@ func NewGetStandingsUseCase(
 	submissionProvider StandingsSubmissionProvider,
 	teamParticipProvider TeamParticipantProvider,
 	profileProvider ParticipantProfileProvider,
+	teamDisplayProvider TeamDisplayProvider,
+	problemProvider ProblemProvider,
 	groupProvider GroupProvider,
 	memberProvider GroupMemberProvider,
 	standingsCache StandingsCache,
@@ -89,6 +135,8 @@ func NewGetStandingsUseCase(
 		submissionProvider:   submissionProvider,
 		teamParticipProvider: teamParticipProvider,
 		profileProvider:      profileProvider,
+		teamDisplayProvider:  teamDisplayProvider,
+		problemProvider:      problemProvider,
 		groupProvider:        groupProvider,
 		memberProvider:       memberProvider,
 		standingsCache:       standingsCache,
@@ -97,33 +145,46 @@ func NewGetStandingsUseCase(
 	}
 }
 
-func (uc *GetStandingsUseCase) Execute(ctx context.Context, in GetStandingsInput) (*GetStandingsOutput, error) {
-	contest, err := uc.contestRepo.FindByID(ctx, in.ContestID)
+// authorize loads the contest and enforces the same visibility rule GetStandings
+// and ExecuteFilterOptions both need: a hidden group's standings/filter data is
+// only visible to its members, leads, or an admin. Returns the contest plus the
+// caller's role flags so Execute can reuse them for the freeze/realtime check.
+func (uc *GetStandingsUseCase) authorize(ctx context.Context, groupID, contestID string, currentUser appshared.CurrentUser) (*domainContest.Contest, bool, bool, error) {
+	contest, err := uc.contestRepo.FindByID(ctx, contestID)
 	if err != nil {
-		return nil, err
+		return nil, false, false, err
 	}
-	if contest.GroupID().Value() != in.GroupID {
-		return nil, apperror.NewNotFound(domainContest.ErrCodeContestNotFound, "contest not found")
+	if contest.GroupID().Value() != groupID {
+		return nil, false, false, apperror.NewNotFound(domainContest.ErrCodeContestNotFound, "contest not found")
 	}
 
-	group, err := uc.groupProvider.FindByID(ctx, in.GroupID)
+	group, err := uc.groupProvider.FindByID(ctx, groupID)
 	if err != nil {
-		return nil, err
+		return nil, false, false, err
 	}
 
-	isAdmin := in.CurrentUser.IsAdmin()
+	isAdmin := currentUser.IsAdmin()
 	isMember, isLead := false, false
 	if !isAdmin {
-		role, err := uc.memberProvider.GetMemberRole(ctx, in.CurrentUser.ID, in.GroupID)
+		role, err := uc.memberProvider.GetMemberRole(ctx, currentUser.ID, groupID)
 		if err != nil {
-			return nil, err
+			return nil, false, false, err
 		}
 		isMember = role != nil
 		isLead = role != nil && *role == "LEAD"
 	}
 
 	if !group.IsVisible && !isMember && !isLead && !isAdmin {
-		return nil, apperror.NewNotFound(domainContest.ErrCodeContestNotFound, "contest not found")
+		return nil, false, false, apperror.NewNotFound(domainContest.ErrCodeContestNotFound, "contest not found")
+	}
+
+	return contest, isAdmin, isLead, nil
+}
+
+func (uc *GetStandingsUseCase) Execute(ctx context.Context, in GetStandingsInput) (*GetStandingsOutput, error) {
+	contest, isAdmin, isLead, err := uc.authorize(ctx, in.GroupID, in.ContestID, in.CurrentUser)
+	if err != nil {
+		return nil, err
 	}
 
 	now := time.Now()
@@ -146,25 +207,98 @@ func (uc *GetStandingsUseCase) Execute(ctx context.Context, in GetStandingsInput
 	}
 
 	cached, err := uc.standingsCache.Get(ctx, in.ContestID)
-	if err != nil {
-		return nil, err
-	}
-
-	if cached != nil {
+	if err == nil && cached != nil {
 		if time.Since(cached.LastUpdated) > uc.staleness {
 			go uc.backgroundRefresh(in.ContestID)
 		}
-		return uc.buildOutput(cached, contest, applyFreeze, status, freezeTime, in), nil
+		return uc.buildOutput(ctx, cached, contest, applyFreeze, status, freezeTime, in)
 	}
 
-	rebuilt, err := uc.rebuild(ctx, in.ContestID)
+	// Cache miss or cache error (already logged by the cache adapter): rebuild from the
+	// source. rebuild's Set also overwrites an entry that failed to unmarshal.
+	rebuilt, err := uc.rebuild(ctx, contest)
 	if err != nil {
 		return nil, err
 	}
-	return uc.buildOutput(rebuilt, contest, applyFreeze, status, freezeTime, in), nil
+	return uc.buildOutput(ctx, rebuilt, contest, applyFreeze, status, freezeTime, in)
 }
 
-func (uc *GetStandingsUseCase) rebuild(ctx context.Context, contestID string) (*CachedStandings, error) {
+// GetStandingsFilterOptionsInput identifies the contest whose participants'
+// country/city/institution values should be listed.
+type GetStandingsFilterOptionsInput struct {
+	CurrentUser appshared.CurrentUser
+	GroupID     string
+	ContestID   string
+}
+
+// StandingsFilterOptionsOutput is the distinct, non-empty, alphabetically
+// sorted country/city/institution values across the contest's participants —
+// so the standings filter can offer a closed selector instead of free text
+// with an unknown exact spelling (same shape as the admin users filter).
+type StandingsFilterOptionsOutput struct {
+	Countries    []string
+	Cities       []string
+	Institutions []string
+}
+
+// ExecuteFilterOptions reads from the same StandingsCache entry GetStandings
+// rebuilds and keeps fresh — cached.Profiles already holds every individual
+// contestant's and team member's profile, so this needs no extra query.
+func (uc *GetStandingsUseCase) ExecuteFilterOptions(ctx context.Context, in GetStandingsFilterOptionsInput) (*StandingsFilterOptionsOutput, error) {
+	contest, _, _, err := uc.authorize(ctx, in.GroupID, in.ContestID, in.CurrentUser)
+	if err != nil {
+		return nil, err
+	}
+
+	cached, err := uc.standingsCache.Get(ctx, in.ContestID)
+	if err == nil && cached != nil {
+		if time.Since(cached.LastUpdated) > uc.staleness {
+			go uc.backgroundRefresh(in.ContestID)
+		}
+	} else {
+		cached, err = uc.rebuild(ctx, contest)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	return &StandingsFilterOptionsOutput{
+		Countries:    distinctProfileField(cached.Profiles, func(p *ParticipantProfile) string { return p.Country }),
+		Cities:       distinctProfileField(cached.Profiles, func(p *ParticipantProfile) string { return p.City }),
+		Institutions: distinctProfileField(cached.Profiles, func(p *ParticipantProfile) string { return p.Institution }),
+	}, nil
+}
+
+// distinctProfileField returns the distinct, non-empty values field reads off
+// each profile, sorted alphabetically.
+func distinctProfileField(profiles map[string]*ParticipantProfile, field func(*ParticipantProfile) string) []string {
+	set := make(map[string]struct{}, len(profiles))
+	for _, p := range profiles {
+		if p == nil {
+			continue
+		}
+		if v := field(p); v != "" {
+			set[v] = struct{}{}
+		}
+	}
+	values := make([]string, 0, len(set))
+	for v := range set {
+		values = append(values, v)
+	}
+	sort.Strings(values)
+	return values
+}
+
+// rebuild counts only the submissions of the problems the contest has right now: a problem taken out
+// of the contest stops counting (its column is gone, so its solves must not remain in the totals), and
+// counts again if it is put back, since its submissions keep their contest.
+func (uc *GetStandingsUseCase) rebuild(ctx context.Context, contest *domainContest.Contest) (*CachedStandings, error) {
+	contestID, endTime := contest.ID(), contest.EndTime()
+	inContest := make(map[string]bool, len(contest.Problems()))
+	for _, cp := range contest.Problems() {
+		inContest[cp.ProblemID()] = true
+	}
+
 	g, gctx := errgroup.WithContext(ctx)
 
 	var regs []*domainContest.ContestRegistration
@@ -224,6 +358,12 @@ func (uc *GetStandingsUseCase) rebuild(ctx context.Context, contestID string) (*
 	}
 
 	for _, sub := range subs {
+		if sub.SubmittedAt.After(endTime) {
+			continue // postcompetition (practice) submission — must not affect official standings
+		}
+		if !inContest[sub.ProblemID] {
+			continue // the problem was taken out of the contest
+		}
 		contestantID, ok := userToContestant[sub.UserID]
 		if !ok {
 			continue
@@ -238,7 +378,10 @@ func (uc *GetStandingsUseCase) rebuild(ctx context.Context, contestID string) (*
 			t := sub.SubmittedAt
 			attempt.AcceptedAt = &t
 			p.Problems[sub.ProblemID] = attempt
-		case "WRONG_ANSWER", "TIME_LIMIT_EXCEEDED", "MEMORY_LIMIT_EXCEEDED", "RUNTIME_ERROR":
+		// Literal strings rather than the domain type, so a verdict added there
+		// does not reach this list on its own — see the test that pins them.
+		case "WRONG_ANSWER", "TIME_LIMIT_EXCEEDED", "MEMORY_LIMIT_EXCEEDED",
+			"OUTPUT_LIMIT_EXCEEDED", "RUNTIME_ERROR":
 			attempt.WrongAttemptTimes = append(attempt.WrongAttemptTimes, sub.SubmittedAt)
 			p.Problems[sub.ProblemID] = attempt
 		}
@@ -260,10 +403,25 @@ func (uc *GetStandingsUseCase) rebuild(ctx context.Context, contestID string) (*
 		profiles = map[string]*ParticipantProfile{}
 	}
 
+	teamIDs := make([]string, 0, len(teamMembers))
+	for teamID := range teamMembers {
+		teamIDs = append(teamIDs, teamID)
+	}
+	teamDisplays, err := uc.teamDisplayProvider.GetDisplays(ctx, teamIDs)
+	if err != nil {
+		slog.WarnContext(ctx, "rebuild: team name enrichment degraded", "error", err)
+		teamDisplays = map[string]*TeamDisplay{}
+	}
+	teamNames := make(map[string]string, len(teamDisplays))
+	for teamID, d := range teamDisplays {
+		teamNames[teamID] = d.Name
+	}
+
 	cached := &CachedStandings{
 		Participants: participants,
 		TeamMembers:  teamMembers,
 		Profiles:     profiles,
+		TeamNames:    teamNames,
 		LastUpdated:  time.Now(),
 	}
 	if err := uc.standingsCache.Set(ctx, contestID, cached); err != nil {
@@ -280,19 +438,26 @@ func (uc *GetStandingsUseCase) backgroundRefresh(contestID string) {
 	}
 	defer uc.standingsCache.ReleaseRefreshLock(ctx, contestID)
 
-	if _, err := uc.rebuild(ctx, contestID); err != nil {
+	contest, err := uc.contestRepo.FindByID(ctx, contestID)
+	if err != nil {
+		slog.ErrorContext(ctx, "standings background refresh failed to load contest", "contest_id", contestID, "error", err)
+		return
+	}
+
+	if _, err := uc.rebuild(ctx, contest); err != nil {
 		slog.ErrorContext(ctx, "standings background refresh failed", "contest_id", contestID, "error", err)
 	}
 }
 
 func (uc *GetStandingsUseCase) buildOutput(
+	ctx context.Context,
 	cached *CachedStandings,
 	contest *domainContest.Contest,
 	applyFreeze bool,
 	status domainContest.Status,
 	freezeTime *time.Time,
 	in GetStandingsInput,
-) *GetStandingsOutput {
+) (*GetStandingsOutput, error) {
 	var effectiveFreezeTime *time.Time
 	if applyFreeze {
 		effectiveFreezeTime = freezeTime
@@ -300,6 +465,9 @@ func (uc *GetStandingsUseCase) buildOutput(
 
 	participants := FilterStandingsByProfile(cached, in.Country, in.City, in.Institution)
 	entries := RankStandings(participants, contest.StartTime(), contest.Penalty().Value(), effectiveFreezeTime)
+	for i := range entries {
+		entries[i].Participant = buildParticipantDisplay(entries[i], cached, contest.ShowTeamMembers())
+	}
 
 	total := len(entries)
 	start := (in.Page - 1) * in.Limit
@@ -320,11 +488,108 @@ func (uc *GetStandingsUseCase) buildOutput(
 		meta.FrozenAt = freezeTime
 	}
 
-	return &GetStandingsOutput{
-		Entries: entries[start:end],
-		Total:   total,
-		Page:    in.Page,
-		Limit:   in.Limit,
-		Meta:    meta,
+	problems, err := uc.buildProblemsDisplay(ctx, contest)
+	if err != nil {
+		return nil, err
 	}
+
+	return &GetStandingsOutput{
+		Contest: ContestSummaryDisplay{
+			ID:            contest.ID(),
+			Name:          contest.Name().Value(),
+			Status:        status.String(),
+			StartTime:     contest.StartTime(),
+			EndTime:       contest.EndTime(),
+			Penalty:       contest.Penalty().Value(),
+			FreezeMinutes: contest.FreezeMinutes(),
+			IsFrozen:      meta.IsFrozen,
+			FrozenAt:      meta.FrozenAt,
+		},
+		Problems: problems,
+		Entries:  entries[start:end],
+		Total:    total,
+		Page:     in.Page,
+		Limit:    in.Limit,
+		Meta:     meta,
+	}, nil
+}
+
+// buildParticipantDisplay enriches a ranked entry with the display fields the
+// API contract needs. It reads only from cached data — no I/O here.
+func buildParticipantDisplay(entry RankedEntry, cached *CachedStandings, showTeamMembers bool) StandingParticipantDisplay {
+	if entry.ParticipantType == "TEAM" {
+		display := StandingParticipantDisplay{
+			ID:          entry.ContestantID,
+			Type:        "TEAM",
+			DisplayName: cached.TeamNames[entry.ContestantID],
+		}
+		if showTeamMembers {
+			members := make([]string, 0, len(cached.TeamMembers[entry.ContestantID]))
+			for _, memberID := range cached.TeamMembers[entry.ContestantID] {
+				if p := cached.Profiles[memberID]; p != nil && p.Nickname != "" {
+					members = append(members, p.Nickname)
+				}
+			}
+			sort.Strings(members)
+			display.Members = members
+		}
+		return display
+	}
+
+	profile := cached.Profiles[entry.ContestantID]
+	if profile == nil {
+		return StandingParticipantDisplay{ID: entry.ContestantID, Type: "INDIVIDUAL"}
+	}
+	return StandingParticipantDisplay{
+		ID:          entry.ContestantID,
+		Type:        "INDIVIDUAL",
+		DisplayName: profile.Nickname,
+		Nickname:    profile.Nickname,
+		Name:        profile.Name,
+		Country:     nilIfEmpty(profile.Country),
+		City:        nilIfEmpty(profile.City),
+		Institution: nilIfEmpty(profile.Institution),
+	}
+}
+
+func nilIfEmpty(s string) *string {
+	if s == "" {
+		return nil
+	}
+	return &s
+}
+
+// buildProblemsDisplay resolves the contest's problem list into the
+// slug/title pairs the standings header needs, in contest position order.
+func (uc *GetStandingsUseCase) buildProblemsDisplay(ctx context.Context, contest *domainContest.Contest) ([]StandingsProblemDisplay, error) {
+	cps := contest.Problems()
+	if len(cps) == 0 {
+		return []StandingsProblemDisplay{}, nil
+	}
+
+	ids := make([]string, len(cps))
+	for i, cp := range cps {
+		ids[i] = cp.ProblemID()
+	}
+	infos, err := uc.problemProvider.FindByIDs(ctx, ids)
+	if err != nil {
+		return nil, err
+	}
+
+	displays := make([]StandingsProblemDisplay, 0, len(cps))
+	for _, cp := range cps {
+		info, ok := infos[cp.ProblemID()]
+		if !ok {
+			slog.ErrorContext(ctx, "contest references problem not found in problems table",
+				"contest_id", contest.ID(), "problem_id", cp.ProblemID())
+			continue
+		}
+		displays = append(displays, StandingsProblemDisplay{
+			ID:       cp.ProblemID(),
+			Position: cp.Order(),
+			Slug:     info.Slug,
+			Title:    info.Title,
+		})
+	}
+	return displays, nil
 }

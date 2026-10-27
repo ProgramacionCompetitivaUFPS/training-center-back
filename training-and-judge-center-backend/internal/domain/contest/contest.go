@@ -37,6 +37,7 @@ func NewContest(
 	penalty Penalty,
 	freezeMinutes int,
 	enablePostContest bool,
+	showTeamMembers bool,
 	groupID shared.GroupID,
 	ownerID shared.UserID,
 	participationMode ParticipationMode,
@@ -70,6 +71,7 @@ func NewContest(
 		freezeMinutes:     freezeMinutes,
 		enablePostContest: enablePostContest,
 		locked:            false,
+		showTeamMembers:   showTeamMembers,
 		groupID:           groupID,
 		ownerID:           ownerID,
 		participationMode: participationMode,
@@ -262,6 +264,13 @@ func (c *Contest) SetTeamSize(size TeamSize, now time.Time) {
 // SetLocked sets the locked flag and touches updatedAt.
 func (c *Contest) SetLocked(locked bool, now time.Time) {
 	c.locked = locked
+	t := now.UTC()
+	c.updatedAt = &t
+}
+
+// SetShowTeamMembers sets the show-team-members flag and touches updatedAt.
+func (c *Contest) SetShowTeamMembers(showTeamMembers bool, now time.Time) {
+	c.showTeamMembers = showTeamMembers
 	t := now.UTC()
 	c.updatedAt = &t
 }

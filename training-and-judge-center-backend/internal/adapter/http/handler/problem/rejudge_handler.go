@@ -23,6 +23,7 @@ type rejudgeResponse struct {
 // @Security     BearerAuth
 // @Param        slug path string true "Problem slug"
 // @Success      200 {object} rejudgeResponse
+// @Failure      400 {object} apperror.AppError "BAD_REQUEST (contestId is not supported here), PROBLEM_NOT_PUBLISHED, NO_SUBMISSIONS_TO_REJUDGE"
 // @Failure      401 {object} apperror.AppError
 // @Failure      403 {object} apperror.AppError
 // @Failure      404 {object} apperror.AppError
@@ -31,6 +32,13 @@ func (h *Handler) Rejudge(w http.ResponseWriter, r *http.Request) {
 	cu, ok := middleware.GetCurrentUser(r.Context())
 	if !ok {
 		handler.WriteJSON(r.Context(), w, http.StatusUnauthorized, apperror.AppError{Code: apperror.ErrCodeUnauthorized, Message: "Invalid or missing authentication token"})
+		return
+	}
+
+	// A silent filter would let a caller rejudge the whole problem believing it was one contest.
+	if r.URL.Query().Has("contestId") {
+		handler.WriteError(r.Context(), w, apperror.NewBadRequest(apperror.ErrCodeBadRequest,
+			"contestId is not supported on this endpoint; use POST /admin/problems/{slug}/rejudge?contestId=... (admin) or POST /groups/{groupId}/contests/{contestId}/problems/{slug}/rejudge"))
 		return
 	}
 

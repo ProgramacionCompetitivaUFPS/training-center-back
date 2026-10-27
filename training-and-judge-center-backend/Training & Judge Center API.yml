@@ -775,7 +775,7 @@ items:
               {
                 "name": "Grupo de prueba",
                 "description": "Descripción del grupo",
-                "joinMode": "OPEN",
+                "joinPolicy": "OPEN",
                 "visibility": "VISIBLE"
               }
           auth:
@@ -799,7 +799,7 @@ items:
               {
                 "name": "Grupo privado",
                 "description": null,
-                "joinMode": "INVITE",
+                "joinPolicy": "INVITE",
                 "visibility": "NOT_VISIBLE"
               }
           auth:
@@ -822,7 +822,7 @@ items:
             data: |-
               {
                 "name": "Grupo inválido",
-                "joinMode": "OPEN",
+                "joinPolicy": "OPEN",
                 "visibility": "NOT_VISIBLE"
               }
           auth:
@@ -845,7 +845,7 @@ items:
             data: |-
               {
                 "name": "Grupo sin permiso",
-                "joinMode": "OPEN",
+                "joinPolicy": "OPEN",
                 "visibility": "VISIBLE"
               }
           auth:
@@ -880,7 +880,7 @@ items:
           Respuesta esperada: 201 Created con { role: "MEMBER", joinedAt: "..." }
 
           Pasos:
-          1. Crea un grupo con joinMode OPEN (usar "Create Group")
+          1. Crea un grupo con joinPolicy OPEN (usar "Create Group")
           2. Copia el ID del grupo creado y reemplaza el :groupId
           3. Ejecuta con token_contestant
       - info:
@@ -933,7 +933,7 @@ items:
           Respuesta esperada: 403 Forbidden con { error: "INSUFFICIENT_PERMISSIONS" }
 
           Pasos:
-          1. Crea un grupo con joinMode INVITE (usar "Create Group - Private")
+          1. Crea un grupo con joinPolicy INVITE (usar "Create Group - Private")
           2. Copia el ID del grupo creado y reemplaza el :groupId
           3. Ejecuta con token_contestant
       - info:
@@ -980,11 +980,11 @@ items:
           followRedirects: true
           maxRedirects: 5
         docs: |
-          Error 403 INSUFFICIENT_PERMISSIONS: el grupo usa joinMode REQUEST, no permite unirse directamente.
+          Error 403 INSUFFICIENT_PERMISSIONS: el grupo usa joinPolicy REQUEST, no permite unirse directamente.
           Respuesta esperada: 403 Forbidden con { error: "INSUFFICIENT_PERMISSIONS" }
 
           Pasos:
-          1. Crea un grupo con joinMode REQUEST
+          1. Crea un grupo con joinPolicy REQUEST
           2. Copia el ID del grupo y reemplaza :groupId
           3. Ejecuta con token_contestant
           Para unirse a este tipo de grupo usa "Request Join" en la subcarpeta join requests.
@@ -1012,11 +1012,11 @@ items:
               followRedirects: true
               maxRedirects: 5
             docs: |
-              Happy path: contestant envía solicitud a un grupo con joinMode REQUEST, sin mensaje.
+              Happy path: contestant envía solicitud a un grupo con joinPolicy REQUEST, sin mensaje.
               Respuesta esperada: 201 Created con { id, groupId, status: "PENDING", message: null, createdAt }
 
               Pasos:
-              1. Crea un grupo con joinMode REQUEST (agrega ese campo a "Create Group")
+              1. Crea un grupo con joinPolicy REQUEST (agrega ese campo a "Create Group")
               2. Copia el ID del grupo y reemplaza :groupId
               3. Ejecuta con token_contestant
               Guarda el id de la solicitud retornada para usar en Approve/Reject Request.
@@ -1097,7 +1097,7 @@ items:
               followRedirects: true
               maxRedirects: 5
             docs: |
-              Error 400 INVALID_JOIN_POLICY: el grupo no acepta solicitudes (joinMode OPEN o INVITE).
+              Error 400 INVALID_JOIN_POLICY: el grupo no acepta solicitudes (joinPolicy OPEN o INVITE).
               Respuesta esperada: 400 Bad Request con { error: "INVALID_JOIN_POLICY" }
 
               Pasos:
@@ -1658,7 +1658,7 @@ items:
               Respuesta esperada: 201 Created con { "token": "<jwt>" }
 
               Pasos:
-              1. Crea un grupo con joinMode INVITE (usar "Create Group - Private", seq 5).
+              1. Crea un grupo con joinPolicy INVITE (usar "Create Group - Private", seq 5).
               2. Copia el ID del grupo creado y reemplaza :groupId.
               3. Ejecuta con token (Coach/Admin que es Lead del grupo).
               4. Guarda el token retornado para usar en "Accept Invite" (seq 4 y 5).
@@ -1682,7 +1682,7 @@ items:
               followRedirects: true
               maxRedirects: 5
             docs: |
-              Error 403 INSUFFICIENT_PERMISSIONS: el grupo no usa joinMode INVITE.
+              Error 403 INSUFFICIENT_PERMISSIONS: el grupo no usa joinPolicy INVITE.
               Respuesta esperada: 403 Forbidden con { error: "INSUFFICIENT_PERMISSIONS" }
 
               Pasos:

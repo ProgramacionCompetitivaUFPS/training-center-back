@@ -91,6 +91,7 @@ As a user, I want to view the details of my own submission so that I can review 
 
 * **FR-VS-012**: Source code MUST be retrieved from storage using the `filePath`.
 * **FR-VS-013**: Source code MUST be returned as text content in the response.
+* **FR-VS-014**: For block editor (Blockly) submissions the system MUST return `isBlocklySubmission: true` and the stored workspace as `workspaceXml` (null if the file no longer exists, without failing the request). List responses MUST include `isBlocklySubmission` too.
 
 ### Key Entities
 
@@ -152,7 +153,9 @@ Retrieve details of a specific submission.
   "compiler": "g++",
   "executionTime": 45,
   "memoryKb": 12288,
-  "sourceCode": "#include <iostream>\nint main() { ... }"
+  "sourceCode": "#include <iostream>\nint main() { ... }",
+  "isBlocklySubmission": false,
+  "workspaceXml": null
 }
 ```
 
@@ -173,6 +176,8 @@ Retrieve details of a specific submission.
 | executionTime | integer | Execution time in milliseconds (null if not judged) |
 | memoryKb | integer | Memory used in KB (null if not judged) |
 | sourceCode | string | Full source code content |
+| isBlocklySubmission | boolean | Whether it was made with the block editor (language is then `python310`) |
+| workspaceXml | string | Block editor workspace (null for regular submissions) |
 
 **Error Responses**:
 

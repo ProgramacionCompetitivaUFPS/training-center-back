@@ -13,6 +13,8 @@ jobs:
       id-token: write       # imprescindible: permite pedir el token OIDC para Workload Identity Federation
     steps:
       - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0   # hace falta la historia y los tags para saber si el comparador cambio desde la release anterior
 
       - name: Calcular el tag de la imagen
         id: tag
@@ -51,6 +53,51 @@ jobs:
           kubectl delete job migrate -n training-center --ignore-not-found
           sed "s|__IMAGE__|$IMAGE|" training-and-judge-center-backend/deploy/k8s/app/migrate-job.yaml | kubectl apply -f -
           kubectl wait --for=condition=complete job/migrate -n training-center --timeout=180s
+
+      # El comparador por defecto es codigo nuestro (cmd/compare), no un toolchain, asi que
+      # lo construye el CI. Su version la declara images-configmap.yaml: si el comparador
+      # cambio desde la release anterior y esa version no se subio, esto falla a proposito
+      # en vez de sobrescribir un tag ya publicado.
+      - name: Imagen del comparador y ConfigMap de versiones del judge
+        run: |
+          BASE=training-and-judge-center-backend
+          CM="$BASE/deploy/k8s/judge/images-configmap.yaml"
+          REG=us-east1-docker.pkg.dev/training-center-502916/training-center
+
+          version_at() { git show "$1:$CM" 2>/dev/null | grep -E '^ +COMPARE_VERSION:' | tr -d ' "' | cut -d: -f2; }
+
+          CURRENT=$(grep -E '^ +COMPARE_VERSION:' "$CM" | tr -d ' "' | cut -d: -f2)
+          echo "COMPARE_VERSION declarada: $CURRENT"
+
+          BUILD=no
+          if [ "${{ github.ref_type }}" = "tag" ]; then
+            PREV=$(git describe --tags --abbrev=0 "${{ github.ref_name }}^" 2>/dev/null || true)
+            if [ -z "$PREV" ]; then
+              echo "Sin release anterior: se construye el comparador."
+              BUILD=yes
+            elif git diff --quiet "$PREV" "${{ github.ref_name }}" -- "$BASE/cmd/compare" "$BASE/docker/judge/compare.Dockerfile"; then
+              echo "El comparador no cambio desde $PREV: nada que construir."
+            else
+              echo "El comparador cambio desde $PREV."
+              if [ "$(version_at "$PREV" || true)" = "$CURRENT" ]; then
+                echo "::error file=$CM::cmd/compare cambio desde $PREV pero COMPARE_VERSION sigue en $CURRENT. Subila antes de taguear."
+                exit 1
+              fi
+              BUILD=yes
+            fi
+          else
+            echo "Disparo manual: no se toca la imagen del comparador."
+          fi
+
+          if [ "$BUILD" = "yes" ]; then
+            IMAGE="$REG/judge-runner-compare:$CURRENT"
+            docker build -t "$IMAGE" -f "$BASE/docker/judge/compare.Dockerfile" "$BASE"
+            docker push "$IMAGE"
+          fi
+
+          # Siempre: el cluster tiene que reflejar lo que declara git. El pod en marcha sigue
+          # con la imagen que ya bajo; el proximo (el del set image de abajo) toma la nueva.
+          kubectl apply -f "$CM"
 
       - name: Desplegar (set image)
         run: |

@@ -68,7 +68,7 @@ As a user who has requested account deactivation, I want to confirm the operatio
      - Records `deactivatedAt` timestamp
      - **Unlinks the email from the account** (sets email to NULL)
      - **Anonymizes the nickname** to `user_anonimo_{10-char-uuid}` format
-     - Invalidates all active sessions and tokens
+     - Invalidates all active sessions and tokens, including every active refresh token (see [Refresh Session](../Refresh%20session/spec.md))
      - Sends a confirmation email (to the email before unlinking)
    - **And** all historical content displays with the anonymized nickname
    - **And** the service responds 204 No Content
@@ -357,7 +357,7 @@ Confirmation attempts exhausted. Must wait before retrying.
 - **FR-014.1**: The system MUST **anonymize the nickname** to format `user_anonimo_{10-char-uuid}` (e.g., `user_anonimo_a1b2c3d4e5`).
 - **FR-015**: The unlinked email MUST become available for registering a new account.
 - **FR-015.1**: The original nickname MUST become available for use by other accounts after anonymization.
-- **FR-016**: The system MUST invalidate all active sessions/tokens after successful deactivation confirmation.
+- **FR-016**: The system MUST invalidate all active sessions/tokens after successful deactivation confirmation — both by bumping the access-token revocation timestamp and by revoking every active refresh token row for the user (see [Refresh Session](../Refresh%20session/spec.md)). Additionally, `POST /auth/refresh` re-checks the user's status on every call, so even a refresh token not yet revoked cannot mint a new access token once the account is DEACTIVATED.
 - **FR-017**: A deactivated user MUST NOT be able to authenticate through any method (password or Google OAuth).
 - **FR-018**: The system MUST send a deactivation confirmation email (to the email before unlinking).
 
@@ -381,6 +381,7 @@ Confirmation attempts exhausted. Must wait before retrying.
 - **FR-028**: The system MUST record an audit log of the deactivation (userId, originalEmail, originalNickname, timestamp, IP, userAgent).
 - **FR-029**: The system MUST update the user's `updatedAt` when confirming deactivation.
 - **FR-030**: Logs and API responses MUST not include PII of deactivated users.
+- **FR-031**: The system MUST expose `GET /users/me/sole-lead-groups` listing the groups where the user is the only lead, and the interface MUST show that list (and what it means: the group would be left without a lead, only an Admin could manage it) before the user requests the deactivation. The deactivation is not blocked.
 
 ### Key Entities
 

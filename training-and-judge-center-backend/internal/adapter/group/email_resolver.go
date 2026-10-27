@@ -8,6 +8,7 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
+	infraPostgres "github.com/training-judge-center/backend/internal/adapter/postgres"
 	appGroup "github.com/training-judge-center/backend/internal/application/group"
 	"github.com/training-judge-center/backend/pkg/apperror"
 )
@@ -23,8 +24,9 @@ func NewEmailResolver(db *pgxpool.Pool) *EmailResolver {
 // ResolveByEmail returns (nil, nil) when no user has that email.
 func (r *EmailResolver) ResolveByEmail(ctx context.Context, email string) (*appGroup.UserDisplay, error) {
 	const q = `SELECT id, nickname, name, email, role FROM users WHERE email = LOWER($1) LIMIT 1`
-	var id, nick, name, mail, role string
-	err := r.db.QueryRow(ctx, q, email).Scan(&id, &nick, &name, &mail, &role)
+	var id, nick, name, role string
+	var mail *string
+	err := infraPostgres.GetQuerier(ctx, r.db).QueryRow(ctx, q, email).Scan(&id, &nick, &name, &mail, &role)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, nil
@@ -32,11 +34,17 @@ func (r *EmailResolver) ResolveByEmail(ctx context.Context, email string) (*appG
 		slog.ErrorContext(ctx, "EmailResolver.ResolveByEmail failed", "error", err)
 		return nil, apperror.NewInternal()
 	}
+	// email nunca es NULL en una fila que matchee `email = $1`, pero se escanea
+	// como nullable por consistencia con el resto de consultas de este paquete.
+	var emailVal string
+	if mail != nil {
+		emailVal = *mail
+	}
 	return &appGroup.UserDisplay{
 		ID:         id,
 		Nickname:   nick,
 		Name:       name,
-		Email:      mail,
+		Email:      emailVal,
 		SystemRole: role,
 	}, nil
 }

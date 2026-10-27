@@ -58,14 +58,18 @@ func (h *Handler) GetStandings(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	country := q.Get("country")
+	city := q.Get("city")
+	institution := q.Get("institution")
+
 	out, err := h.getStandings.Execute(r.Context(), appContest.GetStandingsInput{
 		CurrentUser: *caller,
 		GroupID:     groupID,
 		ContestID:   contestID,
 		Realtime:    realtime,
-		Country:     q.Get("country"),
-		City:        q.Get("city"),
-		Institution: q.Get("institution"),
+		Country:     country,
+		City:        city,
+		Institution: institution,
 		Page:        page,
 		Limit:       limit,
 	})
@@ -74,39 +78,24 @@ func (h *Handler) GetStandings(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	handler.WriteJSON(r.Context(), w, http.StatusOK, toGetStandingsResponse(out))
+	handler.WriteJSON(r.Context(), w, http.StatusOK, toGetStandingsResponse(out, country, city, institution))
 }
 
-func toGetStandingsResponse(out *appContest.GetStandingsOutput) getStandingsResponse {
-	entries := make([]rankedEntry, len(out.Entries))
+func toGetStandingsResponse(out *appContest.GetStandingsOutput, country, city, institution string) getStandingsResponse {
+	standings := make([]standingEntry, len(out.Entries))
 	for i, e := range out.Entries {
-		probs := make(map[string]rankedProblem, len(e.Problems))
-		for key, p := range e.Problems {
-			rp := rankedProblem{
-				Attempts: p.Attempts,
-				Penalty:  p.Penalty,
-				IsSolved: p.AcceptedAt != nil,
-			}
-			if p.AcceptedAt != nil {
-				s := p.AcceptedAt.UTC().Format(time.RFC3339)
-				rp.AcceptedAt = &s
-			}
-			probs[key] = rp
+		standings[i] = standingEntry{
+			Rank:           e.Rank,
+			Participant:    toStandingParticipant(e.Participant),
+			ProblemsSolved: e.ProblemsSolved,
+			TotalPenalty:   e.TotalPenalty,
+			Problems:       toStandingProblemResults(e.Problems, out.Problems, out.Contest.StartTime),
 		}
+	}
 
-		entry := rankedEntry{
-			Rank:            e.Rank,
-			ContestantID:    e.ContestantID,
-			ParticipantType: e.ParticipantType,
-			ProblemsSolved:  e.ProblemsSolved,
-			TotalPenalty:    e.TotalPenalty,
-			Problems:        probs,
-		}
-		if e.LastAcceptedAt != nil {
-			s := e.LastAcceptedAt.UTC().Format(time.RFC3339)
-			entry.LastAcceptedAt = &s
-		}
-		entries[i] = entry
+	problems := make([]standingsProblemHeader, len(out.Problems))
+	for i, p := range out.Problems {
+		problems[i] = standingsProblemHeader{Position: p.Position, Slug: p.Slug, Title: p.Title}
 	}
 
 	totalPages := 1
@@ -114,18 +103,32 @@ func toGetStandingsResponse(out *appContest.GetStandingsOutput) getStandingsResp
 		totalPages = (out.Total + out.Limit - 1) / out.Limit
 	}
 
-	meta := standingsMeta{
-		LastUpdated:   out.Meta.LastUpdated.UTC().Format(time.RFC3339),
-		IsFrozen:      out.Meta.IsFrozen,
-		ContestStatus: out.Meta.ContestStatus,
-	}
+	var frozenAt *string
 	if out.Meta.FrozenAt != nil {
 		s := out.Meta.FrozenAt.UTC().Format(time.RFC3339)
-		meta.FrozenAt = &s
+		frozenAt = &s
+	}
+
+	var freezeMinutes *int
+	if out.Contest.FreezeMinutes > 0 {
+		fm := out.Contest.FreezeMinutes
+		freezeMinutes = &fm
 	}
 
 	return getStandingsResponse{
-		Entries: entries,
+		Contest: standingsContestDisplay{
+			ID:            out.Contest.ID,
+			Name:          out.Contest.Name,
+			Status:        out.Contest.Status,
+			StartTime:     out.Contest.StartTime.UTC().Format(time.RFC3339),
+			EndTime:       out.Contest.EndTime.UTC().Format(time.RFC3339),
+			Penalty:       out.Contest.Penalty,
+			FreezeMinutes: freezeMinutes,
+			IsFrozen:      out.Contest.IsFrozen,
+			FrozenAt:      frozenAt,
+		},
+		Problems:  problems,
+		Standings: standings,
 		Pagination: standingsPagination{
 			Page:        out.Page,
 			Limit:       out.Limit,
@@ -134,6 +137,60 @@ func toGetStandingsResponse(out *appContest.GetStandingsOutput) getStandingsResp
 			HasNextPage: out.Page < totalPages,
 			HasPrevPage: out.Page > 1 && totalPages > 0,
 		},
-		Meta: meta,
+		Filters: standingsFilters{
+			Country:       nilIfEmptyString(country),
+			City:          nilIfEmptyString(city),
+			Institution:   nilIfEmptyString(institution),
+			FilteredTotal: out.Total,
+		},
 	}
+}
+
+func toStandingParticipant(p appContest.StandingParticipantDisplay) standingParticipant {
+	return standingParticipant{
+		ID:          p.ID,
+		Type:        p.Type,
+		DisplayName: p.DisplayName,
+		Nickname:    p.Nickname,
+		Name:        p.Name,
+		Members:     p.Members,
+		Country:     p.Country,
+		City:        p.City,
+		Institution: p.Institution,
+	}
+}
+
+// toStandingProblemResults reshapes the ranked-entry's problem map (keyed by
+// problem ID) into the ordered-by-position array the API contract exposes,
+// filling in NOT_ATTEMPTED for contest problems the entry never touched.
+func toStandingProblemResults(
+	entryProblems map[string]appContest.RankedProblem,
+	contestProblems []appContest.StandingsProblemDisplay,
+	contestStart time.Time,
+) []standingProblemResult {
+	results := make([]standingProblemResult, len(contestProblems))
+	for i, cp := range contestProblems {
+		rp, attempted := entryProblems[cp.ID]
+		result := standingProblemResult{Position: cp.Position, Status: "NOT_ATTEMPTED"}
+		if attempted {
+			result.Attempts = rp.Attempts
+			result.Penalty = rp.Penalty
+			if rp.AcceptedAt != nil {
+				result.Status = "ACCEPTED"
+				minutes := int(rp.AcceptedAt.Sub(contestStart).Minutes())
+				result.Time = &minutes
+			} else if rp.Attempts > 0 {
+				result.Status = "WRONG_ANSWER"
+			}
+		}
+		results[i] = result
+	}
+	return results
+}
+
+func nilIfEmptyString(s string) *string {
+	if s == "" {
+		return nil
+	}
+	return &s
 }

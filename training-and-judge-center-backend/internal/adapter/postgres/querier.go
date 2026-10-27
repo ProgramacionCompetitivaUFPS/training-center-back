@@ -13,9 +13,13 @@ type Querier interface {
 	QueryRow(ctx context.Context, sql string, arguments ...interface{}) pgx.Row
 }
 
+// GetQuerier returns the transaction in ctx, or defaultQuerier. Outside a
+// transaction, reads by a malformed uuid come back as "no rows" (see
+// malformedUUIDAsNoRows); inside one the error is kept, because Postgres has
+// already aborted the transaction and "no rows" would hide that.
 func GetQuerier(ctx context.Context, defaultQuerier Querier) Querier {
 	if tx := TxFromContext(ctx); tx != nil {
 		return tx
 	}
-	return defaultQuerier
+	return malformedUUIDAsNoRows{defaultQuerier}
 }

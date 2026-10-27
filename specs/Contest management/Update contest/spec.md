@@ -67,8 +67,8 @@ As a Lead of a group, I want to update contest information (name, description, t
    * **And** problem P2 has submissions in this contest
    * **When** they submit an update request removing problem slug P2
    * **Then** the system removes P2 from the contest
-   * **And** sets `contest_id` to `null` for all submissions to P2 in this contest
-   * **And** recalculates Standing if contest is ACTIVE (removing P2 from solved problems count)
+   * **And** the submissions to P2 keep their `contest_id` (putting P2 back brings its results back)
+   * **And** the standings count only the contest's current problems, so P2 no longer counts in solved totals or penalty (they refresh within the standings cache window)
    * **And** returns the updated contest data
 
 7. **Scenario**: Successful contest update - reorder problems
@@ -161,6 +161,13 @@ As a Lead of a group, I want to update contest information (name, description, t
     * **When** they submit an update request adding problem slug P3
     * **Then** the system rejects with 403 Forbidden (PROBLEM_ACCESS_DENIED)
     * **And** indicates which problem(s) the user cannot add
+
+18a. **Scenario**: Another lead's PRIVATE problem stays when the list is saved
+    * **Given** a contest already contains PRIVATE problem P3, added by lead A (its author)
+    * **And** lead B of the same group is NOT a modifier of P3
+    * **When** B submits an update whose problem list includes P3 (for example to add a public problem P4, or to remove another one)
+    * **Then** the update succeeds and P3 is still in the contest
+    * **And** the "can add" rule is checked only for problems that were not in the contest before (a new PRIVATE problem B is not a modifier of is still rejected)
 
 19. **Scenario**: Update fails - problem not published
     * **Given** a contest exists
@@ -405,7 +412,7 @@ Update an existing contest within a group.
 > - Only contest owner or Admin can lock/unlock contests
 > - Removing problems or changing penalty during ACTIVE contests triggers Standing recalculation
 > - Adding problems does NOT trigger Standing recalculation (no submissions exist yet)
-> - When a problem is removed, submissions to that problem have `contest_id` set to `null`
+> - When a problem is removed, its submissions keep their `contest_id`; the standings simply stop counting them (they count again if the problem is put back)
 > - endTime must always be in the future (cannot be set to past)
 > - endTime cannot be modified when postcompetition is active (submissions exist after endTime)
 > - endTime can only be reduced to time >= last submission before original endTime
@@ -803,11 +810,12 @@ Group or contest not found.
 * **FR-UC-026**: The system MUST silently deduplicate if the same problem slug appears multiple times in the problems array.
 * **FR-UC-027**: When problems array is provided, it MUST replace the entire problem list (not merge).
 * **FR-UC-028**: The system MUST allow removing problems that have submissions.
-* **FR-UC-028.1**: When a problem is removed from a contest, the system MUST set `contest_id` to `null` for all submissions to that problem in the contest.
+* **FR-UC-028.1**: When a problem is removed from a contest, its submissions MUST keep their `contest_id`; the standings MUST count only the problems the contest has now.
+* **FR-UC-028.2**: The problem list of a FINISHED contest MUST NOT be changed: the request MUST be rejected with HTTP 409 (CONTEST_PROBLEMS_LOCKED), because the final standings are the official result and count only the problems the contest has. Every other field can still be edited.
 
 **Standing Recalculation**
 * **FR-UC-029**: When a problem is added to a contest, the system MUST NOT recalculate Standing (no submissions exist yet).
-* **FR-UC-030**: When a problem is removed from an ACTIVE contest, the system MUST set `contest_id` to `null` for all submissions to that problem in the contest.
+* **FR-UC-030**: When a problem is removed from an ACTIVE contest, its submissions MUST keep their `contest_id` and MUST stop counting in the standings (solved totals, penalty and columns agree).
 * **FR-UC-031**: When a problem is removed from an ACTIVE contest, the system MUST recalculate Standing (removing the problem from solved counts).
 * **FR-UC-032**: When penalty is changed during an ACTIVE contest, the system MUST recalculate Standing with new penalty values.
 * **FR-UC-033**: Standing recalculation MUST only occur for ACTIVE contests (not for SCHEDULED or FINISHED contests).
@@ -899,9 +907,9 @@ When problems are added to contests:
 2. New problems will appear in standings once participants start submitting
 
 When problems are removed from ACTIVE contests:
-1. System sets `contest_id` to `null` for all submissions to the removed problem in the contest
-2. System recalculates Standing removing the problem from solved counts
-3. Submissions remain in the system but are no longer associated with the contest
+1. Submissions to the removed problem keep their `contest_id`
+2. Standing is recalculated counting only the contest's current problems, so the removed problem leaves the solved counts and penalty
+3. If the problem is put back, its results count again
 
 ---
 
@@ -927,7 +935,7 @@ When problems are removed from ACTIVE contests:
 * **SC-UC-016**: Partial updates work correctly (only provided fields are updated).
 * **SC-UC-017**: Immutable fields (group_id, owner_id) are ignored if provided.
 * **SC-UC-018**: Adding problems to contests does NOT recalculate Standing (no submissions exist yet).
-* **SC-UC-019**: Removing problems from ACTIVE contests sets `contest_id` to `null` for affected submissions.
+* **SC-UC-019**: Removing a problem from a contest does not change its submissions' `contest_id`; the standings stop counting them (and count them again if the problem is put back).
 * **SC-UC-020**: Removing problems from ACTIVE contests recalculates Standing.
 * **SC-UC-021**: Changing penalty during ACTIVE contests recalculates Standing.
 * **SC-UC-022**: Standing recalculation only occurs for ACTIVE contests.

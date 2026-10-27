@@ -5,8 +5,8 @@ import (
 	"time"
 
 	appshared "github.com/training-judge-center/backend/internal/application/shared"
-	domainSubmission "github.com/training-judge-center/backend/internal/domain/submission"
 	"github.com/training-judge-center/backend/internal/domain/shared"
+	domainSubmission "github.com/training-judge-center/backend/internal/domain/submission"
 	"github.com/training-judge-center/backend/pkg/apperror"
 )
 
@@ -28,7 +28,9 @@ type GetSubmissionOutput struct {
 	Compiler      string
 	ExecutionTime *int
 	MemoryKb      *int
-	SourceCode    string
+	SourceCode    *string // nil when the stored source file no longer exists
+	IsBlockly     bool
+	WorkspaceXML  *string // block editor workspace; nil for regular submissions or when the file is gone
 }
 
 type GetSubmissionUseCase struct {
@@ -97,9 +99,26 @@ func (uc *GetSubmissionUseCase) Execute(ctx context.Context, in GetSubmissionInp
 		}
 	}
 
-	sourceCode, err := uc.sourceCodeReader.Read(ctx, sub.SourceCodePath())
-	if err != nil {
+	// A missing source file only costs the source: the verdict and its metrics
+	// are still in the database, so the detail degrades instead of failing.
+	var sourceCode *string
+	data, err := uc.sourceCodeReader.Read(ctx, sub.SourceCodePath())
+	if err == nil {
+		s := string(data)
+		sourceCode = &s
+	} else if ae, ok := err.(*apperror.AppError); !ok || ae.Kind != apperror.KindNotFound {
 		return nil, err
+	}
+
+	var workspaceXML *string
+	if wsPath := sub.WorkspaceXMLPath(); wsPath != nil {
+		data, err := uc.sourceCodeReader.Read(ctx, *wsPath)
+		if err == nil {
+			s := string(data)
+			workspaceXML = &s
+		} else if ae, ok := err.(*apperror.AppError); !ok || ae.Kind != apperror.KindNotFound {
+			return nil, err
+		}
 	}
 
 	problem, err := resolveProblemDisplay(ctx, uc.problemDisplay, sub)
@@ -134,6 +153,8 @@ func (uc *GetSubmissionUseCase) Execute(ctx context.Context, in GetSubmissionInp
 		Compiler:      sub.Compiler(),
 		ExecutionTime: sub.TimeMs(),
 		MemoryKb:      sub.MemoryKb(),
-		SourceCode:    string(sourceCode),
+		SourceCode:    sourceCode,
+		IsBlockly:     sub.IsBlockly(),
+		WorkspaceXML:  workspaceXML,
 	}, nil
 }

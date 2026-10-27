@@ -31,7 +31,7 @@ func (r *JoinRequestRepository) Save(ctx context.Context, req *domainGroup.JoinR
 		VALUES ($1, $2, $3, $4, $5, $6)
 		ON CONFLICT (id) DO UPDATE SET status = EXCLUDED.status
 	`
-	db := r.dbFor(ctx)
+	db := infraPostgres.GetQuerier(ctx, r.db)
 	_, err := db.Exec(ctx, q,
 		req.ID(),
 		req.GroupID(),
@@ -56,7 +56,7 @@ func (r *JoinRequestRepository) FindByID(ctx context.Context, id string) (*domai
 		SELECT id, group_id, requester_user_id, message, status, created_at
 		FROM join_requests WHERE id = $1
 	`
-	req, err := scanJoinRequest(r.dbFor(ctx).QueryRow(ctx, q, id))
+	req, err := scanJoinRequest(infraPostgres.GetQuerier(ctx, r.db).QueryRow(ctx, q, id))
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, nil
@@ -78,7 +78,7 @@ func (r *JoinRequestRepository) FindByGroupAndUser(ctx context.Context, groupID 
 		ORDER BY CASE WHEN status = 'PENDING' THEN 0 ELSE 1 END, created_at DESC
 		LIMIT 1
 	`
-	req, err := scanJoinRequest(r.dbFor(ctx).QueryRow(ctx, q, groupID, userID.Value()))
+	req, err := scanJoinRequest(infraPostgres.GetQuerier(ctx, r.db).QueryRow(ctx, q, groupID, userID.Value()))
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, nil
@@ -90,7 +90,7 @@ func (r *JoinRequestRepository) FindByGroupAndUser(ctx context.Context, groupID 
 }
 
 func (r *JoinRequestRepository) FindByGroup(ctx context.Context, groupID string, filters domainGroup.JoinRequestFilters) ([]*domainGroup.JoinRequest, int, error) {
-	db := r.dbFor(ctx)
+	db := infraPostgres.GetQuerier(ctx, r.db)
 	args := []any{groupID}
 	idx := 2
 	where := "group_id = $1"
@@ -103,7 +103,8 @@ func (r *JoinRequestRepository) FindByGroup(ctx context.Context, groupID string,
 
 	countQuery := fmt.Sprintf("SELECT COUNT(*) FROM join_requests WHERE %s", where)
 	var total int
-	if err := db.QueryRow(ctx, countQuery, args...).Scan(&total); err != nil {
+	// ErrNoRows only comes from a malformed group id, which has no requests: total stays zero.
+	if err := db.QueryRow(ctx, countQuery, args...).Scan(&total); err != nil && !errors.Is(err, pgx.ErrNoRows) {
 		slog.ErrorContext(ctx, "JoinRequestRepository.FindByGroup count failed", "error", err)
 		return nil, 0, apperror.NewInternal()
 	}
@@ -152,7 +153,7 @@ func (r *JoinRequestRepository) FindByGroup(ctx context.Context, groupID string,
 }
 
 func (r *JoinRequestRepository) Delete(ctx context.Context, id string) error {
-	tag, err := r.dbFor(ctx).Exec(ctx, `DELETE FROM join_requests WHERE id = $1 AND status = 'PENDING'`, id)
+	tag, err := infraPostgres.GetQuerier(ctx, r.db).Exec(ctx, `DELETE FROM join_requests WHERE id = $1 AND status = 'PENDING'`, id)
 	if err != nil {
 		slog.ErrorContext(ctx, "JoinRequestRepository.Delete failed", "error", err)
 		return apperror.NewInternal()
@@ -182,17 +183,4 @@ func scanJoinRequest(row joinRequestScanner) (*domainGroup.JoinRequest, error) {
 		domainGroup.RestoreJoinRequestStatus(status),
 		createdAt,
 	), nil
-}
-
-type joinRequestDBQuerier interface {
-	Exec(ctx context.Context, sql string, arguments ...any) (pgconn.CommandTag, error)
-	QueryRow(ctx context.Context, sql string, args ...any) pgx.Row
-	Query(ctx context.Context, sql string, args ...any) (pgx.Rows, error)
-}
-
-func (r *JoinRequestRepository) dbFor(ctx context.Context) joinRequestDBQuerier {
-	if tx := infraPostgres.TxFromContext(ctx); tx != nil {
-		return tx
-	}
-	return r.db
 }

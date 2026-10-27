@@ -35,3 +35,32 @@ func (p *ContestProvider) GetContestByID(ctx context.Context, contestID string) 
 
 	return &appsubmission.ContestDisplay{ID: id, Name: name}, nil
 }
+
+func (p *ContestProvider) GetContestsByIDs(ctx context.Context, contestIDs []string) (map[string]*appsubmission.ContestDisplay, error) {
+	if len(contestIDs) == 0 {
+		return map[string]*appsubmission.ContestDisplay{}, nil
+	}
+	q := infraPostgres.GetQuerier(ctx, p.db)
+
+	rows, err := q.Query(ctx, `SELECT id, name FROM contests WHERE id = ANY($1)`, contestIDs)
+	if err != nil {
+		slog.ErrorContext(ctx, "submission: failed to get contest displays", "error", err)
+		return nil, apperror.NewInternal()
+	}
+	defer rows.Close()
+
+	result := make(map[string]*appsubmission.ContestDisplay, len(contestIDs))
+	for rows.Next() {
+		var id, name string
+		if err := rows.Scan(&id, &name); err != nil {
+			slog.ErrorContext(ctx, "submission: failed to scan contest display row", "error", err)
+			return nil, apperror.NewInternal()
+		}
+		result[id] = &appsubmission.ContestDisplay{ID: id, Name: name}
+	}
+	if err := rows.Err(); err != nil {
+		slog.ErrorContext(ctx, "submission: error iterating contest display rows", "error", err)
+		return nil, apperror.NewInternal()
+	}
+	return result, nil
+}

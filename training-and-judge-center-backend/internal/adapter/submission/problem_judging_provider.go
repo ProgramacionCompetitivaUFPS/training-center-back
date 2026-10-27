@@ -35,3 +35,22 @@ func (p *ProblemJudgingProvider) GetJudgingUpdatedAt(ctx context.Context, proble
 	}
 	return t, nil
 }
+
+func (p *ProblemJudgingProvider) IsPublished(ctx context.Context, problemID string) (bool, error) {
+	if problemID == "" {
+		return false, nil
+	}
+	q := infraPostgres.GetQuerier(ctx, p.db)
+	var published bool
+	err := q.QueryRow(ctx,
+		`SELECT status = 'PUBLISHED' FROM problems WHERE id = $1`, problemID,
+	).Scan(&published)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return false, nil
+		}
+		slog.ErrorContext(ctx, "submission: failed to get problem status", "problem_id", problemID, "error", err)
+		return false, apperror.NewInternal()
+	}
+	return published, nil
+}

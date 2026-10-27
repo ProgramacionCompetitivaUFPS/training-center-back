@@ -102,7 +102,7 @@ func (r *Repository) Save(ctx context.Context, p *domainProblem.Problem) error {
 		modifierStrings[i] = id.Value()
 	}
 
-	_, err = r.db.Exec(ctx, query,
+	_, err = infraPostgres.GetQuerier(ctx, r.db).Exec(ctx, query,
 		p.ID(),
 		slug,
 		title,
@@ -137,16 +137,18 @@ func (r *Repository) Save(ctx context.Context, p *domainProblem.Problem) error {
 }
 
 func (r *Repository) FindBySlug(ctx context.Context, slug domainProblem.Slug) (*domainProblem.Problem, error) {
-	query := `
-		SELECT id, slug, title, statement, time_limit, memory_limit,
-			tags, status, accessibility, author_id, modifiers_ids, lang_overrides,
-			test_cases_key, solutions, checker, validator, judging_updated_at,
-			created_at, updated_at
-		FROM problems
-		WHERE slug = $1
-	`
-	row := r.db.QueryRow(ctx, query, slug.String())
+	query := "SELECT " + problemColumns("statement") + " FROM problems WHERE slug = $1"
+	row := infraPostgres.GetQuerier(ctx, r.db).QueryRow(ctx, query, slug.String())
 	return scanProblem(ctx, row)
+}
+
+// problemColumns is the column list scanProblem reads; statementExpr stands in for
+// the statement column so a caller that does not need it can skip the text.
+func problemColumns(statementExpr string) string {
+	return "id, slug, title, " + statementExpr + ", time_limit, memory_limit, " +
+		"tags, status, accessibility, author_id, modifiers_ids, lang_overrides, " +
+		"test_cases_key, solutions, checker, validator, judging_updated_at, " +
+		"created_at, updated_at"
 }
 
 func scanProblem(ctx context.Context, row pgx.Row) (*domainProblem.Problem, error) {
@@ -240,7 +242,7 @@ func (r *Repository) ExistsBySlug(ctx context.Context, slug domainProblem.Slug) 
 	query := `SELECT EXISTS(SELECT 1 FROM problems WHERE slug = $1)`
 
 	var exists bool
-	err := r.db.QueryRow(ctx, query, slug.String()).Scan(&exists)
+	err := infraPostgres.GetQuerier(ctx, r.db).QueryRow(ctx, query, slug.String()).Scan(&exists)
 	if err != nil {
 		slog.ErrorContext(ctx, "Database error in ExistsBySlug", "error", err, "slug", slug.String())
 		return false, apperror.NewInternal()
@@ -250,9 +252,11 @@ func (r *Repository) ExistsBySlug(ctx context.Context, slug domainProblem.Slug) 
 }
 
 type dbJudgingFile struct {
-	Filename string `json:"filename"`
-	FileKey  string `json:"fileKey"`
-	Language string `json:"language"`
+	Filename    string     `json:"filename"`
+	FileKey     string     `json:"fileKey"`
+	Language    string     `json:"language"`
+	CompiledKey *string    `json:"compiledKey,omitempty"`
+	CompiledAt  *time.Time `json:"compiledAt,omitempty"`
 }
 
 type dbLangOverride struct {
@@ -280,6 +284,9 @@ func mapSolutionsToDB(solutions []domainProblem.JudgingFile) ([]byte, error) {
 			Filename: sol.Filename(),
 			FileKey:  sol.FileKey(),
 			Language: sol.Language(),
+			// CompiledKey/CompiledAt quedan sin usar a propósito: las soluciones
+			// las sigue compilando el Executor en cada ejecución, no se compilan
+			// de forma nativa como sí ocurre con checker/validator.
 		})
 	}
 	return json.Marshal(dbSolutions)
@@ -290,9 +297,11 @@ func mapJudgingFileToDB(file *domainProblem.JudgingFile) ([]byte, error) {
 		return nil, nil // SQL NULL
 	}
 	return json.Marshal(dbJudgingFile{
-		Filename: file.Filename(),
-		FileKey:  file.FileKey(),
-		Language: file.Language(),
+		Filename:    file.Filename(),
+		FileKey:     file.FileKey(),
+		Language:    file.Language(),
+		CompiledKey: file.CompiledKey(),
+		CompiledAt:  file.CompiledAt(),
 	})
 }
 
@@ -321,7 +330,7 @@ func solutionsFromDB(data []byte) ([]domainProblem.JudgingFile, error) {
 	}
 	solutions := make([]domainProblem.JudgingFile, len(dbSolutions))
 	for i, sol := range dbSolutions {
-		solutions[i] = domainProblem.RestoreJudgingFile(sol.Filename, sol.FileKey, sol.Language)
+		solutions[i] = domainProblem.RestoreJudgingFile(sol.Filename, sol.FileKey, sol.Language, nil, nil)
 	}
 	return solutions, nil
 }
@@ -334,12 +343,13 @@ func judgingFileFromDB(data []byte) (*domainProblem.JudgingFile, error) {
 	if err := json.Unmarshal(data, &dbFile); err != nil {
 		return nil, err
 	}
-	j := domainProblem.RestoreJudgingFile(dbFile.Filename, dbFile.FileKey, dbFile.Language)
+	j := domainProblem.RestoreJudgingFile(dbFile.Filename, dbFile.FileKey, dbFile.Language, dbFile.CompiledKey, dbFile.CompiledAt)
 	return &j, nil
 }
 
 func (r *Repository) Delete(ctx context.Context, id string) error {
-	tag, err := r.db.Exec(ctx, `DELETE FROM problems WHERE id = $1`, id)
+	q := infraPostgres.GetQuerier(ctx, r.db)
+	tag, err := q.Exec(ctx, `DELETE FROM problems WHERE id = $1`, id)
 	if err != nil {
 		slog.ErrorContext(ctx, "Database error in Delete", "error", err, "problem_id", id)
 		return apperror.NewInternal()
@@ -390,6 +400,10 @@ func (r *Repository) List(ctx context.Context, filters domainProblem.ListFilters
 		conds = append(conds, fmt.Sprintf("accessibility = %s", nextArg(filters.Accessibility.String())))
 	}
 
+	if filters.Search != "" {
+		conds = append(conds, fmt.Sprintf("title ILIKE %s", nextArg("%"+infraPostgres.EscapeILIKE(filters.Search)+"%")))
+	}
+
 	var where string
 	if len(conds) > 0 {
 		where = "WHERE " + strings.Join(conds, " AND ")
@@ -402,16 +416,14 @@ func (r *Repository) List(ctx context.Context, filters domainProblem.ListFilters
 	limitArg := nextArg(filters.Limit)
 	offsetArg := nextArg(offset)
 
+	// The list response carries no statement, so it is not read from the table.
 	selectQuery := fmt.Sprintf(`
-		SELECT id, slug, title, statement, time_limit, memory_limit,
-			tags, status, accessibility, author_id, modifiers_ids, lang_overrides,
-			test_cases_key, solutions, checker, validator, judging_updated_at,
-			created_at, updated_at
+		SELECT %s
 		FROM problems
 		%s
 		ORDER BY created_at DESC
 		LIMIT %s OFFSET %s
-	`, where, limitArg, offsetArg)
+	`, problemColumns("NULL::text"), where, limitArg, offsetArg)
 
 	countQuery := fmt.Sprintf("SELECT COUNT(*) FROM problems %s", where)
 

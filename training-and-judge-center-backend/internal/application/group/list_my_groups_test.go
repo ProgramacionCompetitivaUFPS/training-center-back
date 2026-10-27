@@ -101,3 +101,35 @@ func TestListMyGroups_EnrichesEachResult(t *testing.T) {
 		t.Error("expected joinedAt to be set")
 	}
 }
+
+// The total must be the count across all pages (what TotalPages is computed from), not the
+// number of groups on the current page.
+func TestListMyGroups_TotalCountIsAcrossPages(t *testing.T) {
+	g := mustGroup(t, "g1", "Club", domainGroup.VisibilityVisible, domainGroup.JoinPolicyOpen)
+	uid := shared.RestoreUserID("u1")
+	gm, _ := domainGroup.NewGroupMember("m1", "g1", uid, domainGroup.MemberRoleMember, domainGroup.JoinMethodDirectAdd, nil,
+		time.Date(2026, 2, 1, 10, 0, 0, 0, time.UTC))
+
+	// One group on this page, four in total.
+	repo := &mockGroupRepository{groups: []*domainGroup.Group{g}, total: 4}
+	memberRepo := &mockMemberRepository{
+		memberships:  map[string]*domainGroup.GroupMember{keyOf("g1", uid): gm},
+		memberCounts: map[string]int{"g1": 3},
+	}
+	uc := NewListMyGroupsUseCase(repo, memberRepo, &mockPreferencesReader{})
+
+	out, err := uc.Execute(context.Background(), ListMyGroupsInput{
+		CurrentUser: asContestant("u1"),
+		Page:        1,
+		Limit:       1,
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if out.TotalCount != 4 {
+		t.Errorf("expected TotalCount=4 (across pages), got %d", out.TotalCount)
+	}
+	if out.TotalPages != 4 {
+		t.Errorf("expected TotalPages=4, got %d", out.TotalPages)
+	}
+}

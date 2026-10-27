@@ -1,6 +1,7 @@
 package material
 
 import (
+	"fmt"
 	"regexp"
 	"strings"
 
@@ -8,6 +9,11 @@ import (
 )
 
 var tagRegex = regexp.MustCompile(`^[a-z0-9][a-z0-9_-]*[a-z0-9]$`)
+
+// maxTags bounds how many distinct tags a single material can carry. Tags are meant to
+// categorize, not to duplicate full-text search (title/content already cover that) — past
+// this many, they stop narrowing anything down and just add noise to DistinctTags.
+const maxTags = 20
 
 type Tags struct {
 	values []string
@@ -54,6 +60,12 @@ func NewTags(values []string) (Tags, error) {
 			})
 		}
 		return Tags{}, apperror.NewValidation(fieldErrs)
+	}
+
+	if len(deduped) > maxTags {
+		return Tags{}, apperror.NewValidation([]apperror.FieldError{
+			{Field: "tags", Message: fmt.Sprintf("too many tags: max %d, got %d", maxTags, len(deduped))},
+		})
 	}
 
 	return Tags{values: deduped}, nil

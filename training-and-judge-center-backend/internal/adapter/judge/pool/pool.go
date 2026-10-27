@@ -15,7 +15,6 @@ import (
 type Pool struct {
 	mu             sync.Mutex
 	cfg            PoolConfig
-	budget         int64
 	docker         dockerLifecycle
 	containers     []*Container
 	allocatedBytes int64
@@ -40,7 +39,6 @@ func NewPool(cfg PoolConfig, docker dockerLifecycle) *Pool {
 	ctx, cancel := context.WithCancel(context.Background())
 	return &Pool{
 		cfg:      cfg,
-		budget:   cfg.MemLimitBytes - cfg.OverheadBytes,
 		docker:   docker,
 		released: make(chan struct{}, 1),
 		stop:     make(chan struct{}),
@@ -54,13 +52,35 @@ func (p *Pool) Start() {
 	go p.reap()
 }
 
-// Safe to call multiple times.
+// drainTimeout bounds how long Stop spends removing the pool's containers.
+const drainTimeout = 15 * time.Second
+
+// Safe to call multiple times. After the reaper is down it removes every container
+// the pool still holds, busy or not: nothing is judging once the worker stops.
 func (p *Pool) Stop() {
 	p.stopOnce.Do(func() {
 		p.cancelFn()
 		close(p.stop)
+		<-p.done
+		p.drain()
 	})
-	<-p.done
+}
+
+func (p *Pool) drain() {
+	ctx, cancel := context.WithTimeout(context.Background(), drainTimeout)
+	defer cancel()
+
+	p.mu.Lock()
+	all := p.containers
+	p.containers = nil
+	p.allocatedBytes = 0
+	p.mu.Unlock()
+
+	for _, c := range all {
+		if _, err := p.docker.ContainerRemove(ctx, c.id, client.ContainerRemoveOptions{Force: true}); err != nil {
+			slog.Error("pool: failed to remove a container on shutdown", "container_id", c.id, "error", err)
+		}
+	}
 }
 
 // IsHealthy reports whether the Docker daemon backing the pool is reachable.
@@ -70,17 +90,36 @@ func (p *Pool) IsHealthy(ctx context.Context) bool {
 	return err == nil
 }
 
+// LanguageCeiling asks Claim for the language's own limit, which is what the
+// pool charged against its budget. It is what a caller running trusted work —
+// compiling, or executing an already-built artifact — wants.
+const LanguageCeiling int64 = 0
+
 // The caller must Release the returned container when done.
+//
+// memoryBytes is the ceiling the kernel will enforce on the returned container;
+// zero asks for the language's own. Larger values are capped to it, since that
+// is what the pool charged against its budget. Because every claim states its
+// ceiling, a container never carries the previous claimer's.
 //
 // Algorithm:
 //  1. Fast path: reuse an idle container of the same language.
 //  2. If budget allows, create a new container.
 //  3. Otherwise, LRU-evict idle containers until budget allows, then create.
 //  4. If no idle containers exist to evict, block until Release signals one.
-func (p *Pool) Claim(ctx context.Context, language string) (*Container, error) {
+func (p *Pool) Claim(ctx context.Context, language string, memoryBytes int64) (*Container, error) {
 	langCfg, ok := p.cfg.Languages[language]
 	if !ok {
 		return nil, fmt.Errorf("pool: unknown language %q", language)
+	}
+
+	limit := memoryBytes
+	if limit > langCfg.MemoryBytes {
+		slog.WarnContext(ctx, "pool: memory limit over the language ceiling, capping",
+			"language", language, "requested", limit, "ceiling", langCfg.MemoryBytes)
+	}
+	if limit <= 0 || limit > langCfg.MemoryBytes {
+		limit = langCfg.MemoryBytes
 	}
 
 retry:
@@ -90,6 +129,12 @@ retry:
 		if c.language == language && c.state == stateIdle {
 			c.state = stateBusy
 			p.mu.Unlock()
+			// Owned now, so limitBytes is ours to read and write without the lock.
+			if err := p.applyMemoryLimit(ctx, c, limit); err != nil {
+				// A wrong ceiling is a wrong verdict, so the container goes.
+				p.Discard(ctx, c)
+				return nil, err
+			}
 			return c, nil
 		}
 	}
@@ -125,7 +170,8 @@ retry:
 	}
 	p.mu.Unlock()
 
-	id, err := p.createContainer(ctx, langCfg)
+	// Created straight at the ceiling this claim asked for: no update needed.
+	id, err := p.createContainer(ctx, langCfg, limit)
 	if err != nil {
 		return nil, err
 	}
@@ -134,6 +180,7 @@ retry:
 		id:          id,
 		language:    language,
 		memoryBytes: langCfg.MemoryBytes,
+		limitBytes:  limit,
 		state:       stateBusy,
 		lastUsedAt:  time.Now(),
 	}
@@ -162,7 +209,7 @@ func (p *Pool) Release(c *Container) {
 
 // Caller must hold p.mu.
 func (p *Pool) canCreate(langCfg LanguageConfig) bool {
-	return p.allocatedBytes+langCfg.MemoryBytes <= p.budget
+	return p.allocatedBytes+langCfg.MemoryBytes <= p.cfg.BudgetBytes
 }
 
 // Caller must hold p.mu.
@@ -179,23 +226,39 @@ func (p *Pool) oldestIdleContainer() *Container {
 	return oldest
 }
 
+// sharedVolumeBind is the judging volume as the daemon expects it: the source
+// it resolves, the path every container sees, and read-only where it applies.
+func (p *Pool) sharedVolumeBind() string {
+	bind := p.cfg.SharedVolumeSource + ":" + SharedVolumePath
+	if p.cfg.SharedVolumeReadOnly {
+		bind += ":ro"
+	}
+	return bind
+}
+
 // Removes the dangling container if ContainerStart fails after ContainerCreate succeeds.
 // Caller must NOT hold p.mu.
-func (p *Pool) createContainer(ctx context.Context, langCfg LanguageConfig) (string, error) {
+func (p *Pool) createContainer(ctx context.Context, langCfg LanguageConfig, memoryBytes int64) (string, error) {
+	// tini as PID 1 reaps the zombies each exec'd timeout leaves behind.
+	init := true
 	result, err := p.docker.ContainerCreate(ctx, client.ContainerCreateOptions{
 		Config: &container.Config{
 			Image: langCfg.Image,
 			// sleep infinity keeps the container alive so the executor can
 			// issue docker exec calls without a running service inside.
-			Cmd: []string{"sleep", "infinity"},
+			Cmd:    []string{"sleep", "infinity"},
+			Labels: map[string]string{SandboxLabelKey: SandboxLabelValue},
 		},
 		HostConfig: &container.HostConfig{
+			// Every container of a pool mounts the judging volume the same way.
+			Binds: []string{p.sharedVolumeBind()},
+			Init:  &init,
 			Resources: container.Resources{
-				Memory: langCfg.MemoryBytes,
+				Memory: memoryBytes,
 				// MemorySwap == Memory disables swap entirely, making MLE
 				// deterministic: the kernel always sends SIGKILL (exit 137)
 				// when the process exceeds the memory limit.
-				MemorySwap: langCfg.MemoryBytes,
+				MemorySwap: memoryBytes,
 				NanoCPUs:   parseCPUNanos(langCfg.CPU),
 			},
 			NetworkMode: "none",
@@ -213,6 +276,26 @@ func (p *Pool) createContainer(ctx context.Context, langCfg LanguageConfig) (str
 		return "", fmt.Errorf("pool: start container %s: %w", result.ID, err)
 	}
 	return result.ID, nil
+}
+
+// applyMemoryLimit rewrites the cgroup ceiling of a container already running,
+// skipping the round trip when it already matches. Only the memory fields go in
+// the request: the zero-valued ones leave the CPU cap alone.
+// Caller must own the container (stateBusy) and must NOT hold p.mu.
+func (p *Pool) applyMemoryLimit(ctx context.Context, c *Container, memoryBytes int64) error {
+	if c.limitBytes == memoryBytes {
+		return nil
+	}
+	_, err := p.docker.ContainerUpdate(ctx, c.id, client.ContainerUpdateOptions{
+		Resources: &container.Resources{Memory: memoryBytes, MemorySwap: memoryBytes},
+	})
+	if err != nil {
+		slog.ErrorContext(ctx, "pool: ContainerUpdate failed",
+			"container_id", c.id, "memory_bytes", memoryBytes, "error", err)
+		return fmt.Errorf("pool: set memory limit on %s: %w", c.id, err)
+	}
+	c.limitBytes = memoryBytes
+	return nil
 }
 
 // Returns 0 (no CPU limit) if the value is empty or cannot be parsed.

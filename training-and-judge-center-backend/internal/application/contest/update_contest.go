@@ -31,6 +31,7 @@ type UpdateContestInput struct {
 	ParticipationMode *string // "INDIVIDUAL" | "TEAM" | "MIXED"
 	TeamSizeMin       *int
 	TeamSizeMax       *int
+	ShowTeamMembers   *bool
 }
 
 type ProblemOrderInput struct {
@@ -114,6 +115,12 @@ func (uc *UpdateContestUseCase) Execute(ctx context.Context, in UpdateContestInp
 		return nil, apperror.NewBadRequest(ErrCodeNoFieldsToUpdate, "at least one field must be provided for update")
 	}
 
+	// The standings of a finished contest are its official result: they count the problems the contest
+	// has, so once it has ended that list is closed (a lead can still edit everything else).
+	if in.Problems != nil && c.Status(time.Now()) == domainContest.StatusFinished {
+		return nil, apperror.NewConflict(domainContest.ErrCodeContestProblemsLocked, "the problems of a finished contest cannot be changed: its standings are the official result")
+	}
+
 	scalars, err := validateScalarFields(in, c)
 	if err != nil {
 		return nil, err
@@ -122,7 +129,7 @@ func (uc *UpdateContestUseCase) Execute(ctx context.Context, in UpdateContestInp
 	problemsChanged := in.Problems != nil
 	var newProblemEntries []problemEntry
 	if problemsChanged {
-		newProblemEntries, err = uc.resolveProblems(ctx, *in.Problems, in.CurrentUser.ID, in.CurrentUser.IsAdmin())
+		newProblemEntries, err = uc.resolveProblems(ctx, *in.Problems, in.CurrentUser.ID, in.CurrentUser.IsAdmin(), c.Problems())
 		if err != nil {
 			return nil, err
 		}
@@ -169,6 +176,10 @@ func (uc *UpdateContestUseCase) Execute(ctx context.Context, in UpdateContestInp
 
 	if in.Locked != nil {
 		c.SetLocked(*in.Locked, now)
+	}
+
+	if in.ShowTeamMembers != nil {
+		c.SetShowTeamMembers(*in.ShowTeamMembers, now)
 	}
 
 	if err := uc.txManager.WithTx(ctx, func(txCtx context.Context) error {
@@ -276,14 +287,22 @@ func validateScalarFields(in UpdateContestInput, existing *domainContest.Contest
 	return result, nil
 }
 
-func (uc *UpdateContestUseCase) resolveProblems(ctx context.Context, inputs []ProblemOrderInput, userID string, isAdmin bool) ([]problemEntry, error) {
-	return resolveContestProblems(ctx, uc.problemProvider, inputs, userID, isAdmin)
+func (uc *UpdateContestUseCase) resolveProblems(ctx context.Context, inputs []ProblemOrderInput, userID string, isAdmin bool, current []domainContest.ContestProblem) ([]problemEntry, error) {
+	already := make(map[string]bool, len(current))
+	for _, cp := range current {
+		already[cp.ProblemID()] = true
+	}
+	return resolveContestProblems(ctx, uc.problemProvider, inputs, userID, isAdmin, already)
 }
 
 // resolveContestProblems deduplicates slugs, fetches problem metadata, and
 // validates that each problem is published and accessible to the caller.
 // Shared by CreateContestUseCase and UpdateContestUseCase.
-func resolveContestProblems(ctx context.Context, provider ProblemProvider, inputs []ProblemOrderInput, userID string, isAdmin bool) ([]problemEntry, error) {
+//
+// alreadyInContest holds the IDs of the problems the contest already has: the "can add" rule
+// applies only to problems being added now. A problem someone else put there stays when this
+// lead saves the list, whoever is allowed to touch the problem itself.
+func resolveContestProblems(ctx context.Context, provider ProblemProvider, inputs []ProblemOrderInput, userID string, isAdmin bool, alreadyInContest map[string]bool) ([]problemEntry, error) {
 	deduped := deduplicateBySlug(inputs)
 	if len(deduped) == 0 {
 		return nil, nil
@@ -308,7 +327,7 @@ func resolveContestProblems(ctx context.Context, provider ProblemProvider, input
 		if !info.IsPublished {
 			return nil, apperror.NewBadRequest(ErrCodeProblemNotPublished, "problem '"+entry.Slug+"' is not published")
 		}
-		if !info.CanAdd {
+		if !info.CanAdd && !alreadyInContest[info.ID] {
 			return nil, apperror.NewForbidden(ErrCodeProblemAccessDenied,
 				"cannot add private problem '"+entry.Slug+"' — you are not a modifier")
 		}
@@ -347,7 +366,8 @@ func hasAnyField(in UpdateContestInput) bool {
 	return in.Name != nil || in.Description != nil || in.StartTime != nil ||
 		in.EndTime != nil || in.Penalty != nil || in.FreezeMinutes != nil ||
 		in.EnablePostContest != nil || in.Problems != nil || in.Locked != nil ||
-		in.ParticipationMode != nil || in.TeamSizeMin != nil || in.TeamSizeMax != nil
+		in.ParticipationMode != nil || in.TeamSizeMin != nil || in.TeamSizeMax != nil ||
+		in.ShowTeamMembers != nil
 }
 
 func deduplicateBySlug(entries []ProblemOrderInput) []ProblemOrderInput {

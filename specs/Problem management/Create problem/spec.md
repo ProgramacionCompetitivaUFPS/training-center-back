@@ -114,10 +114,12 @@ As a Coach or Admin, I want to create a new problem by uploading a complete ICPC
 
 2. **Scenario**: Import ZIP with missing required files
    - **Given** a Coach or Admin is authenticated
-   - **And** the ZIP is missing required files (e.g., problem.yaml, test cases)
+   - **And** the ZIP is missing `problem.yaml` or its `name` field
    - **When** they attempt to import
    - **Then** the system rejects with 400 Bad Request
    - **And** returns detailed logs of missing files
+
+   > **Note**: Test cases (`data/`) are not required to import. A ZIP without them creates a `DRAFT` with partial data, consistent with the manual flow; the test cases are required to **publish**.
 
 3. **Scenario**: Import ZIP with invalid structure
    - **Given** a Coach or Admin is authenticated
@@ -534,7 +536,7 @@ User does not have permission.
 - **FR-013**: The system MUST accept ICPC-format ZIP packages for problem import.
 - **FR-014**: The system MUST extract problem metadata from `problem.yaml`.
 - **FR-015**: The system MUST extract the problem statement from LaTeX files in `problem_statement/`.
-- **FR-016**: The system MUST import test cases from the `data/` directory structure.
+- **FR-016**: The system MUST import test cases from the `data/` directory structure when present. Their absence does not reject the import; publication requires them.
 - **FR-017**: The system MUST import solutions from `solutions/` if present.
 - **FR-018**: The system MUST import validators from appropriate directories if present.
 - **FR-019**: The system MUST return detailed logs of what was imported or what failed.

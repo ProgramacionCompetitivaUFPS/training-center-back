@@ -9,7 +9,7 @@ import (
 )
 
 func TestGetProblem_AuthorCanSeeDraft(t *testing.T) {
-	uc := NewGetProblemUseCase(repoWith(newDraftProblem()), &mockUserProvider{})
+	uc := NewGetProblemUseCase(repoWith(newDraftProblem()), &mockUserProvider{}, &mockFileStorage{})
 
 	out, err := uc.Execute(context.Background(), GetProblemInput{
 		Slug:        testSlug,
@@ -27,7 +27,7 @@ func TestGetProblem_AuthorCanSeeDraft(t *testing.T) {
 }
 
 func TestGetProblem_AdminCanSeeDraft(t *testing.T) {
-	uc := NewGetProblemUseCase(repoWith(newDraftProblem()), &mockUserProvider{})
+	uc := NewGetProblemUseCase(repoWith(newDraftProblem()), &mockUserProvider{}, &mockFileStorage{})
 
 	_, err := uc.Execute(context.Background(), GetProblemInput{
 		Slug:        testSlug,
@@ -39,7 +39,7 @@ func TestGetProblem_AdminCanSeeDraft(t *testing.T) {
 }
 
 func TestGetProblem_ModifierCanSeeDraft(t *testing.T) {
-	uc := NewGetProblemUseCase(repoWith(newDraftProblemWithModifier()), &mockUserProvider{})
+	uc := NewGetProblemUseCase(repoWith(newDraftProblemWithModifier()), &mockUserProvider{}, &mockFileStorage{})
 
 	_, err := uc.Execute(context.Background(), GetProblemInput{
 		Slug:        testSlug,
@@ -51,7 +51,7 @@ func TestGetProblem_ModifierCanSeeDraft(t *testing.T) {
 }
 
 func TestGetProblem_StrangerCannotSeeDraft(t *testing.T) {
-	uc := NewGetProblemUseCase(repoWith(newDraftProblem()), &mockUserProvider{})
+	uc := NewGetProblemUseCase(repoWith(newDraftProblem()), &mockUserProvider{}, &mockFileStorage{})
 
 	_, err := uc.Execute(context.Background(), GetProblemInput{
 		Slug:        testSlug,
@@ -71,7 +71,7 @@ func TestGetProblem_StrangerCannotSeeDraft(t *testing.T) {
 }
 
 func TestGetProblem_AnyoneCanSeePublished(t *testing.T) {
-	uc := NewGetProblemUseCase(repoWith(newPublishedProblem()), &mockUserProvider{})
+	uc := NewGetProblemUseCase(repoWith(newPublishedProblem()), &mockUserProvider{}, &mockFileStorage{})
 
 	_, err := uc.Execute(context.Background(), GetProblemInput{
 		Slug:        testSlug,
@@ -83,7 +83,7 @@ func TestGetProblem_AnyoneCanSeePublished(t *testing.T) {
 }
 
 func TestGetProblem_NonEditorDoesNotSeeModifiersOrFiles(t *testing.T) {
-	uc := NewGetProblemUseCase(repoWith(newPublishedProblem()), &mockUserProvider{})
+	uc := NewGetProblemUseCase(repoWith(newPublishedProblem()), &mockUserProvider{}, &mockFileStorage{})
 
 	out, err := uc.Execute(context.Background(), GetProblemInput{
 		Slug:        testSlug,
@@ -100,13 +100,54 @@ func TestGetProblem_NonEditorDoesNotSeeModifiersOrFiles(t *testing.T) {
 	}
 }
 
+func TestGetProblem_IncludesSamplesForAnyViewer(t *testing.T) {
+	storage := &mockFileStorage{
+		listFilesFn: func(_ context.Context, _ string) ([]string, error) {
+			return []string{
+				"problems/test-problem/testcases/xyz/data/sample/1.in",
+				"problems/test-problem/testcases/xyz/data/sample/1.ans",
+			}, nil
+		},
+		downloadFileFn: func(_ context.Context, path string) ([]byte, error) {
+			return []byte(path), nil
+		},
+	}
+	uc := NewGetProblemUseCase(repoWith(newPublishedProblemWithTestCases()), &mockUserProvider{}, storage)
+
+	out, err := uc.Execute(context.Background(), GetProblemInput{
+		Slug:        testSlug,
+		CurrentUser: asContestant(strangerID),
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(out.Samples) != 1 {
+		t.Fatalf("expected 1 sample for any viewer of a published problem, got %d", len(out.Samples))
+	}
+}
+
+func TestGetProblem_NoTestCasesReturnsEmptySamplesNotError(t *testing.T) {
+	uc := NewGetProblemUseCase(repoWith(newPublishedProblem()), &mockUserProvider{}, &mockFileStorage{})
+
+	out, err := uc.Execute(context.Background(), GetProblemInput{
+		Slug:        testSlug,
+		CurrentUser: asContestant(strangerID),
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if out.Samples == nil || len(out.Samples) != 0 {
+		t.Errorf("expected empty (non-nil) samples slice, got %v", out.Samples)
+	}
+}
+
 func TestGetProblem_NotFound(t *testing.T) {
 	repo := &mockProblemRepository{
 		findBySlugFn: func(_ context.Context, _ domainProblem.Slug) (*domainProblem.Problem, error) {
 			return nil, apperror.NewNotFound(apperror.ErrCodeNotFound, "problem not found")
 		},
 	}
-	uc := NewGetProblemUseCase(repo, &mockUserProvider{})
+	uc := NewGetProblemUseCase(repo, &mockUserProvider{}, &mockFileStorage{})
 
 	_, err := uc.Execute(context.Background(), GetProblemInput{
 		Slug:        testSlug,

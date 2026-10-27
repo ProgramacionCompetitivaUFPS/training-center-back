@@ -207,6 +207,7 @@ Submit a solution to a problem outside of a contest.
 | file | file | Yes | Source code file (.cpp, .java, .py) |
 | language | string | Yes | Language identifier (cpp20, java17, python310) |
 | compiler | string | Yes | Compiler identifier (g++, javac, py) |
+| workspaceXml | file | No | Block editor (Blockly) workspace. Only with `language=python310`; `file` is the Python generated from the blocks. Max 512 KB, a single well-formed `<xml>` document without DOCTYPE. |
 
 **Responses**:
 
@@ -225,7 +226,8 @@ Submission created successfully and queued for judging.
   "language": "cpp20",
   "compiler": "g++",
   "fileSize": 2048,
-  "fileHash": "a1b2c3d4e5f6..."
+  "fileHash": "a1b2c3d4e5f6...",
+  "isBlocklySubmission": false
 }
 ```
 
@@ -250,6 +252,13 @@ Validation error.
 {
   "error": "COMPILER_MISMATCH",
   "message": "Compiler does not match file extension"
+}
+```
+
+```json
+{
+  "error": "INVALID_BLOCKLY_WORKSPACE",
+  "message": "workspace must be a well-formed Blockly XML document"
 }
 ```
 
@@ -338,6 +347,7 @@ Submit a solution to a problem within a contest.
 | file | file | Yes | Source code file (.cpp, .java, .py) |
 | language | string | Yes | Language identifier (cpp20, java17, python310) |
 | compiler | string | Yes | Compiler identifier (g++, javac, py) |
+| workspaceXml | file | No | Block editor (Blockly) workspace. Only with `language=python310`; `file` is the Python generated from the blocks. Max 512 KB, a single well-formed `<xml>` document without DOCTYPE. |
 
 **Responses**:
 
@@ -360,7 +370,8 @@ Submission created successfully and queued for judging.
   "language": "cpp20",
   "compiler": "g++",
   "fileSize": 2048,
-  "fileHash": "a1b2c3d4e5f6..."
+  "fileHash": "a1b2c3d4e5f6...",
+  "isBlocklySubmission": false
 }
 ```
 
@@ -478,7 +489,7 @@ Contest, group, or problem not found.
 * **FR-SS-034.2**: The system MUST change submission status from RUNNING to final status when judging completes.
 * **FR-SS-035**: The system MUST update submission status from RUNNING to final status after judging completes.
 * **FR-SS-036**: The system MUST store processing time (duration in milliseconds) after judging completes.
-* **FR-SS-037**: The system MUST store result verdict: ACCEPTED, WRONG_ANSWER, RUNTIME_EXCEPTION, TIME_LIMIT_EXCEEDED, MEMORY_LIMIT_EXCEEDED, COMPILATION_ERROR, PRESENTATION_ERROR.
+* **FR-SS-037**: The system MUST store result verdict: ACCEPTED, WRONG_ANSWER, RUNTIME_ERROR, TIME_LIMIT_EXCEEDED, MEMORY_LIMIT_EXCEEDED, COMPILATION_ERROR, PRESENTATION_ERROR.
 * **FR-SS-038**: The system MUST store `judgedAt` timestamp when judging completes.
 * **FR-SS-038.1**: The system MUST NOT start judging PENDING submissions when problem status is DRAFT.
 * **FR-SS-038.2**: The system MUST allow RUNNING submissions to complete even if problem status becomes DRAFT.
@@ -498,6 +509,11 @@ Contest, group, or problem not found.
 * **FR-SS-046**: The system MUST NOT return source code in response.
 * **FR-SS-047**: The system MUST return appropriate error codes for all validation failures.
 
+**Block editor (Blockly)**
+* **FR-SS-048**: The system MUST accept an optional `workspaceXml` part with a submission. A submission that carries it is a block editor submission: it is judged exactly like a `python310` submission of the generated code (same limits, pool and verdicts).
+* **FR-SS-049**: The system MUST reject a `workspaceXml` sent with a language other than `python310`, larger than 512 KB, sent as a text field instead of a file part, or that is not a single well-formed `<xml>` document free of DOCTYPE/ENTITY declarations (`INVALID_BLOCKLY_WORKSPACE`), before storing anything.
+* **FR-SS-050**: The system MUST store the workspace next to the source (`<id>.workspace.xml`) and mark the submission as `isBlocklySubmission`. No rendered image (SVG) of the blocks is accepted or stored: clients render the blocks from the workspace.
+
 ### Key Entities
 
 * **Submission**: Represents a user's solution attempt for a problem.
@@ -507,7 +523,7 @@ Contest, group, or problem not found.
   * `contest_id` (string, UUID, FK to Contest, nullable)
   * `submittedBy` (string, UUID, FK to User) - **primary link to user who submitted**
   * `standingId` (string, UUID, nullable) - userId OR teamId, determines which standing document to update
-  * `status` (enum: PENDING | RUNNING | ACCEPTED | WRONG_ANSWER | RUNTIME_EXCEPTION | TIME_LIMIT_EXCEEDED | MEMORY_LIMIT_EXCEEDED | COMPILATION_ERROR | PRESENTATION_ERROR)
+  * `status` (enum: PENDING | RUNNING | ACCEPTED | WRONG_ANSWER | RUNTIME_ERROR | TIME_LIMIT_EXCEEDED | MEMORY_LIMIT_EXCEEDED | COMPILATION_ERROR | PRESENTATION_ERROR)
   * `language` (string: cpp20, java17, python310)
   * `compiler` (string: g++, javac, py - includes version info)
   * `filePath` (string, storage path/key)
@@ -525,7 +541,7 @@ Contest, group, or problem not found.
 > * `RUNNING`: Submission is currently being judged/executed
 > * `ACCEPTED`: Solution passed all test cases
 > * `WRONG_ANSWER`: Solution produced incorrect output
-> * `RUNTIME_EXCEPTION`: Solution crashed during execution
+> * `RUNTIME_ERROR`: Solution crashed during execution
 > * `TIME_LIMIT_EXCEEDED`: Solution exceeded time limit
 > * `MEMORY_LIMIT_EXCEEDED`: Solution exceeded memory limit
 > * `COMPILATION_ERROR`: Solution failed to compile
@@ -736,8 +752,8 @@ If problem status is PUBLISHED:
           status: MEMORY_LIMIT_EXCEEDED
           result: MEMORY_LIMIT_EXCEEDED
         Else if runtime error:
-          status: RUNTIME_EXCEPTION
-          result: RUNTIME_EXCEPTION
+          status: RUNTIME_ERROR
+          result: RUNTIME_ERROR
         Else if wrong answer:
           status: WRONG_ANSWER
           result: WRONG_ANSWER

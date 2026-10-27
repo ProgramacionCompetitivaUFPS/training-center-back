@@ -13,8 +13,9 @@ import (
 )
 
 type jwtCustomClaims struct {
-	Email string `json:"email"`
-	Role  string `json:"role"`
+	Email     string `json:"email"`
+	Role      string `json:"role"`
+	SessionID string `json:"sid"`
 	jwt.RegisteredClaims
 }
 
@@ -30,10 +31,11 @@ func NewJWTService(secret string, expirationHours int) *JWTService {
 	}
 }
 
-func (s *JWTService) GenerateToken(ctx context.Context, u *user.User) (string, error) {
+func (s *JWTService) GenerateToken(ctx context.Context, u *user.User, sessionID string) (string, error) {
 	claims := jwtCustomClaims{
-		Email: u.Email().String(),
-		Role:  u.Role().String(),
+		Email:     u.Email().String(),
+		Role:      u.Role().String(),
+		SessionID: sessionID,
 		RegisteredClaims: jwt.RegisteredClaims{
 			Subject:   u.ID(),
 			IssuedAt:  jwt.NewNumericDate(time.Now()),
@@ -85,9 +87,10 @@ func (s *JWTService) ValidateToken(tokenString string) (*user.TokenClaims, error
 	}
 
 	return &user.TokenClaims{
-		UserID:   claims.Subject,
-		Email:    parsedEmail,
-		Role:     parsedRole,
-		IssuedAt: claims.IssuedAt.Time,
+		UserID:    claims.Subject,
+		Email:     parsedEmail,
+		Role:      parsedRole,
+		IssuedAt:  claims.IssuedAt.Time,
+		SessionID: claims.SessionID,
 	}, nil
 }

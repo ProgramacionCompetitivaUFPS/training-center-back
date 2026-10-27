@@ -119,3 +119,62 @@ func TestRejudgeContestSubmissions_GroupMatch_Success(t *testing.T) {
 		t.Errorf("SubmissionsQueued = %d, want 1", out.SubmissionsQueued)
 	}
 }
+
+// HU-PRB-11: an admin who neither owns the contest nor leads its group can
+// rejudge, and only the submissions of that contest are handed to the rejudger.
+func TestRejudgeContestSubmissions_AdminWithoutOwnershipOrLead_Succeeds(t *testing.T) {
+	var listedContest string
+	provider := &mockContestRejudgeProvider{
+		contest:            contestInGroup(testGroupID),
+		isProblemInContest: true,
+		isLeadOfGroup:      false,
+	}
+	rejudger := &mockSubmissionRejudger{
+		listContestFn: func(_ context.Context, _, contestID string, _ time.Time) ([]SubmissionRejudgeInfo, error) {
+			listedContest = contestID
+			return []SubmissionRejudgeInfo{{ID: "s1"}, {ID: "s2"}}, nil
+		},
+	}
+	uc := NewRejudgeContestSubmissionsUseCase(repoWith(newProblemWithJudgingUpdated()), rejudger, provider)
+
+	out, err := uc.Execute(context.Background(), RejudgeContestSubmissionsInput{
+		ContestID: testContestID, Slug: testSlug, GroupID: testGroupID,
+		CurrentUser: asAdmin("admin-user-id-0000-000000000001"), Now: testNow,
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if out.SubmissionsQueued != 2 || listedContest != testContestID {
+		t.Errorf("queued = %d, listed contest = %q", out.SubmissionsQueued, listedContest)
+	}
+}
+
+func TestRejudgeContestSubmissions_StrangerContestant_IsForbidden(t *testing.T) {
+	provider := &mockContestRejudgeProvider{contest: contestInGroup(testGroupID), isProblemInContest: true}
+	uc := NewRejudgeContestSubmissionsUseCase(repoWith(newProblemWithJudgingUpdated()), &mockSubmissionRejudger{}, provider)
+
+	_, err := uc.Execute(context.Background(), RejudgeContestSubmissionsInput{
+		ContestID: testContestID, Slug: testSlug, GroupID: testGroupID,
+		CurrentUser: asContestant(strangerID), Now: testNow,
+	})
+
+	var ae *apperror.AppError
+	if !errors.As(err, &ae) || ae.Code != ErrCodeInsufficientPermissions {
+		t.Fatalf("expected %s, got %v", ErrCodeInsufficientPermissions, err)
+	}
+}
+
+func TestRejudgeContestSubmissions_AdminOnUnpublishedProblem_IsBadRequest(t *testing.T) {
+	provider := &mockContestRejudgeProvider{contest: contestInGroup(testGroupID), isProblemInContest: true}
+	uc := NewRejudgeContestSubmissionsUseCase(repoWith(newDraftProblemWithJudgingUpdated()), &mockSubmissionRejudger{}, provider)
+
+	_, err := uc.Execute(context.Background(), RejudgeContestSubmissionsInput{
+		ContestID: testContestID, Slug: testSlug, GroupID: testGroupID,
+		CurrentUser: asAdmin("admin-user-id-0000-000000000001"), Now: testNow,
+	})
+
+	var ae *apperror.AppError
+	if !errors.As(err, &ae) || ae.Code != ErrCodeProblemNotPublished {
+		t.Fatalf("expected %s, got %v", ErrCodeProblemNotPublished, err)
+	}
+}

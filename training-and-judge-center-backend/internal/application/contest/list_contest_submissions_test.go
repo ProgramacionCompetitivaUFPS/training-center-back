@@ -15,29 +15,15 @@ func newListSubmissionsUseCase(
 	contest *domainContest.Contest,
 	group *GroupInfo,
 	memberProvider *mockGroupMemberProvider,
-	participantProvider *mockContestParticipantProvider,
 	subsProvider *mockContestSubmissionsProvider,
 ) *ListContestSubmissionsUseCase {
 	return NewListContestSubmissionsUseCase(
 		repoWith(contest),
 		&mockGroupProvider{findByIDFn: func(_ context.Context, _ string) (*GroupInfo, error) { return group, nil }},
 		memberProvider,
-		participantProvider,
 		subsProvider,
 		&mockCallerStandingProvider{},
 	)
-}
-
-func registeredParticipant() *mockContestParticipantProvider {
-	return &mockContestParticipantProvider{
-		isRegisteredFn: func(_ context.Context, _, _ string) (bool, error) { return true, nil },
-	}
-}
-
-func notRegisteredParticipant() *mockContestParticipantProvider {
-	return &mockContestParticipantProvider{
-		isRegisteredFn: func(_ context.Context, _, _ string) (bool, error) { return false, nil },
-	}
 }
 
 func frozenActiveContest() *domainContest.Contest {
@@ -112,8 +98,19 @@ func teamSub(id, userID, teamID, teamName, status string, at time.Time, members 
 
 func subsProvider(subs []RichSubmissionData) *mockContestSubmissionsProvider {
 	return &mockContestSubmissionsProvider{
-		listByContestFn: func(_ context.Context, _ string, _ ContestSubmissionFilters) ([]RichSubmissionData, error) {
-			return subs, nil
+		listByContestFn: func(_ context.Context, _ string, _ ContestSubmissionFilters) ([]RichSubmissionData, int, error) {
+			return subs, len(subs), nil
+		},
+	}
+}
+
+// capturingSubsProvider records the filters the use case sends; filtering and
+// pagination happen in SQL, so these tests assert on the request, not the rows.
+func capturingSubsProvider(got *ContestSubmissionFilters) *mockContestSubmissionsProvider {
+	return &mockContestSubmissionsProvider{
+		listByContestFn: func(_ context.Context, _ string, f ContestSubmissionFilters) ([]RichSubmissionData, int, error) {
+			*got = f
+			return nil, 0, nil
 		},
 	}
 }
@@ -130,17 +127,59 @@ func baseInput() ListContestSubmissionsInput {
 
 // ── tests ─────────────────────────────────────────────────────────────────────
 
-func TestListContestSubmissions_NotRegistered_Returns403(t *testing.T) {
-	uc := newListSubmissionsUseCase(activeContest(), visibleGroup(), isMemberNotLead(), notRegisteredParticipant(), subsProvider(nil))
+func TestListContestSubmissions_VisibleGroupSpectator_CanList(t *testing.T) {
+	uc := newListSubmissionsUseCase(finishedContest(), visibleGroup(), notLead(), subsProvider([]RichSubmissionData{
+		richSub("s1", otherID, "ACCEPTED", 5),
+	}))
 
-	_, err := uc.Execute(context.Background(), baseInput())
-	if err == nil {
-		t.Fatal("expected 403 error, got nil")
+	out, err := uc.Execute(context.Background(), baseInput())
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(out.Submissions) != 1 {
+		t.Errorf("len(submissions)=%d, want 1", len(out.Submissions))
+	}
+}
+
+func TestListContestSubmissions_CanViewDetail(t *testing.T) {
+	publicSub := richSub("public", otherID, "ACCEPTED", 5)
+	publicSub.Visibility = "PUBLIC"
+	privateSub := richSub("private", otherID, "ACCEPTED", 6)
+	privateSub.Visibility = "PRIVATE"
+	ownSub := richSub("own", callerID, "ACCEPTED", 7)
+	ownSub.Visibility = "PRIVATE"
+	uc := newListSubmissionsUseCase(finishedContest(), visibleGroup(), notLead(), subsProvider([]RichSubmissionData{
+		publicSub, privateSub, ownSub,
+	}))
+
+	out, err := uc.Execute(context.Background(), baseInput())
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	want := map[string]bool{"public": true, "private": false, "own": true}
+	for _, s := range out.Submissions {
+		if s.CanViewDetail != want[s.ID] {
+			t.Errorf("%s: CanViewDetail=%v, want %v", s.ID, s.CanViewDetail, want[s.ID])
+		}
+	}
+}
+
+func TestListContestSubmissions_Lead_CanViewEveryDetail(t *testing.T) {
+	privateSub := richSub("private", otherID, "ACCEPTED", 5)
+	privateSub.Visibility = "PRIVATE"
+	uc := newListSubmissionsUseCase(finishedContest(), visibleGroup(), isLead(), subsProvider([]RichSubmissionData{privateSub}))
+
+	out, err := uc.Execute(context.Background(), baseInput())
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !out.Submissions[0].CanViewDetail {
+		t.Error("lead should be able to open any submission")
 	}
 }
 
 func TestListContestSubmissions_HiddenGroupNonMember_Returns404(t *testing.T) {
-	uc := newListSubmissionsUseCase(activeContest(), hiddenGroup(), notLead(), registeredParticipant(), subsProvider(nil))
+	uc := newListSubmissionsUseCase(activeContest(), hiddenGroup(), notLead(), subsProvider(nil))
 
 	_, err := uc.Execute(context.Background(), baseInput())
 	if err == nil {
@@ -157,7 +196,7 @@ func TestListContestSubmissions_ActiveContest_NoExecutionDetails(t *testing.T) {
 	sub.TimeMs = &timeMs
 	sub.MemoryKb = &memKb
 
-	uc := newListSubmissionsUseCase(activeContest(), visibleGroup(), isMemberNotLead(), registeredParticipant(), subsProvider([]RichSubmissionData{sub}))
+	uc := newListSubmissionsUseCase(activeContest(), visibleGroup(), isMemberNotLead(), subsProvider([]RichSubmissionData{sub}))
 
 	out, err := uc.Execute(context.Background(), baseInput())
 	if err != nil {
@@ -191,7 +230,7 @@ func TestListContestSubmissions_FinishedContest_ReturnsFullDetails(t *testing.T)
 	sub.TimeMs = &timeMs
 	sub.MemoryKb = &memKb
 
-	uc := newListSubmissionsUseCase(finishedContest(), visibleGroup(), isMemberNotLead(), registeredParticipant(), subsProvider([]RichSubmissionData{sub}))
+	uc := newListSubmissionsUseCase(finishedContest(), visibleGroup(), isMemberNotLead(), subsProvider([]RichSubmissionData{sub}))
 
 	out, err := uc.Execute(context.Background(), baseInput())
 	if err != nil {
@@ -209,98 +248,105 @@ func TestListContestSubmissions_FinishedContest_ReturnsFullDetails(t *testing.T)
 	}
 }
 
-func TestListContestSubmissions_FreezePeriod_OwnSubmissionsAlwaysVisible(t *testing.T) {
-	// frozen contest: freeze started 30 min ago
-	// own submission 20 min ago (after freeze) → must still appear
-	postFreeze := time.Now().Add(-20 * time.Minute)
-	ownSub := richSubWithTime("s1", callerID, "ACCEPTED", postFreeze)
+func TestListContestSubmissions_FreezePeriod_ParticipantGetsFreezeFilter(t *testing.T) {
+	// frozen contest: freeze started 30 min ago → others' post-freeze rows hidden, own standing kept
+	var got ContestSubmissionFilters
+	uc := newListSubmissionsUseCase(frozenActiveContest(), visibleGroup(), isMemberNotLead(), capturingSubsProvider(&got))
 
-	uc := newListSubmissionsUseCase(frozenActiveContest(), visibleGroup(), isMemberNotLead(), registeredParticipant(), subsProvider([]RichSubmissionData{ownSub}))
-
-	out, err := uc.Execute(context.Background(), baseInput())
-	if err != nil {
+	if _, err := uc.Execute(context.Background(), baseInput()); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if len(out.Submissions) != 1 {
-		t.Errorf("len(submissions)=%d, want 1 (own post-freeze submission must appear)", len(out.Submissions))
+	if got.FreezeAt == nil {
+		t.Fatal("FreezeAt should be set for a participant during freeze")
+	}
+	wantFreeze := frozenActiveContest().EndTime().Add(-60 * time.Minute)
+	if d := got.FreezeAt.Sub(wantFreeze); d > time.Second || d < -time.Second {
+		t.Errorf("FreezeAt=%v, want ≈%v", got.FreezeAt, wantFreeze)
+	}
+	if got.ExceptStandingID != callerID {
+		t.Errorf("ExceptStandingID=%q, want %q", got.ExceptStandingID, callerID)
 	}
 }
 
-func TestListContestSubmissions_FreezePeriod_OthersPostFreezeHidden(t *testing.T) {
-	// frozen contest: freeze started 30 min ago
-	// other's submission 20 min ago (after freeze) → must NOT appear
-	postFreeze := time.Now().Add(-20 * time.Minute)
-	otherSub := richSubWithTime("s2", otherID, "ACCEPTED", postFreeze)
-	preFreeze := time.Now().Add(-45 * time.Minute)
-	otherPreSub := richSubWithTime("s1", otherID, "WRONG_ANSWER", preFreeze)
+func TestListContestSubmissions_NotFrozen_NoFreezeFilter(t *testing.T) {
+	var got ContestSubmissionFilters
+	uc := newListSubmissionsUseCase(activeContest(), visibleGroup(), isMemberNotLead(), capturingSubsProvider(&got))
 
-	uc := newListSubmissionsUseCase(frozenActiveContest(), visibleGroup(), isMemberNotLead(), registeredParticipant(), subsProvider([]RichSubmissionData{otherSub, otherPreSub}))
-
-	out, err := uc.Execute(context.Background(), baseInput())
-	if err != nil {
+	if _, err := uc.Execute(context.Background(), baseInput()); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if len(out.Submissions) != 1 {
-		t.Errorf("len(submissions)=%d, want 1 (only pre-freeze other visible)", len(out.Submissions))
-	}
-	if out.Submissions[0].ID != "s1" {
-		t.Errorf("visible submission id=%q, want s1 (pre-freeze)", out.Submissions[0].ID)
+	if got.FreezeAt != nil {
+		t.Errorf("FreezeAt=%v, want nil outside the freeze window", got.FreezeAt)
 	}
 }
 
 func TestListContestSubmissions_Lead_SeesAllDuringFreeze(t *testing.T) {
-	postFreeze := time.Now().Add(-20 * time.Minute)
-	otherSub := richSubWithTime("s1", otherID, "ACCEPTED", postFreeze)
-
-	uc := newListSubmissionsUseCase(frozenActiveContest(), visibleGroup(), isLead(), registeredParticipant(), subsProvider([]RichSubmissionData{otherSub}))
+	var got ContestSubmissionFilters
+	uc := newListSubmissionsUseCase(frozenActiveContest(), visibleGroup(), isLead(), capturingSubsProvider(&got))
 
 	input := baseInput()
 	input.CurrentUser = asCoach(callerID)
 
-	out, err := uc.Execute(context.Background(), input)
-	if err != nil {
+	if _, err := uc.Execute(context.Background(), input); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if len(out.Submissions) != 1 {
-		t.Errorf("len(submissions)=%d, want 1 (lead sees all)", len(out.Submissions))
+	if got.FreezeAt != nil {
+		t.Errorf("FreezeAt=%v, want nil (lead sees all)", got.FreezeAt)
 	}
 }
 
-func TestListContestSubmissions_PhaseFilter_Competition(t *testing.T) {
-	// finishedContest() has endTime = Now-1h
-	// competition: 2h ago (before endTime); postCompetition: 30min ago (after endTime)
-	postCompetition := time.Now().Add(-30 * time.Minute)
-	competition := time.Now().Add(-2 * time.Hour)
-
-	subs := []RichSubmissionData{
-		richSubWithTime("s1", callerID, "ACCEPTED", competition),
-		richSubWithTime("s2", callerID, "WRONG_ANSWER", postCompetition),
+func TestListContestSubmissions_PhaseFilter(t *testing.T) {
+	// One instance, reused below: finishedContest() reads time.Now() internally, so calling
+	// it again per subtest drifted endTime from the boundary the use case actually derived,
+	// making the equality check below flaky by a few hundred microseconds.
+	contest := finishedContest()
+	endTime := contest.EndTime()
+	tests := []struct {
+		phase              string
+		wantAtMost, wantAf bool
+	}{
+		{"competition", true, false},
+		{"postcompetition", false, true},
+		{"", false, false},
 	}
+	for _, tt := range tests {
+		t.Run(tt.phase, func(t *testing.T) {
+			var got ContestSubmissionFilters
+			uc := newListSubmissionsUseCase(contest, visibleGroup(), isMemberNotLead(), capturingSubsProvider(&got))
 
-	uc := newListSubmissionsUseCase(finishedContest(), visibleGroup(), isMemberNotLead(), registeredParticipant(), subsProvider(subs))
-
-	input := baseInput()
-	input.Phase = "competition"
-
-	out, err := uc.Execute(context.Background(), input)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if len(out.Submissions) != 1 {
-		t.Fatalf("len(submissions)=%d, want 1 (only competition phase)", len(out.Submissions))
-	}
-	if out.Submissions[0].ID != "s1" {
-		t.Errorf("id=%q, want s1", out.Submissions[0].ID)
+			input := baseInput()
+			input.Phase = tt.phase
+			if _, err := uc.Execute(context.Background(), input); err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if (got.SubmittedAtMost != nil) != tt.wantAtMost {
+				t.Errorf("SubmittedAtMost=%v, want set=%v", got.SubmittedAtMost, tt.wantAtMost)
+			}
+			if (got.SubmittedAfter != nil) != tt.wantAf {
+				t.Errorf("SubmittedAfter=%v, want set=%v", got.SubmittedAfter, tt.wantAf)
+			}
+			for _, ts := range []*time.Time{got.SubmittedAtMost, got.SubmittedAfter} {
+				if ts != nil && !ts.Equal(endTime) {
+					t.Errorf("phase boundary=%v, want endTime %v", ts, endTime)
+				}
+			}
+		})
 	}
 }
 
 func TestListContestSubmissions_Pagination(t *testing.T) {
-	subs := make([]RichSubmissionData, 5)
-	for i := range subs {
-		subs[i] = richSub("s"+string(rune('1'+i)), callerID, "ACCEPTED", 10*(i+1))
+	var got ContestSubmissionFilters
+	page := []RichSubmissionData{
+		richSub("s3", callerID, "ACCEPTED", 30),
+		richSub("s4", callerID, "ACCEPTED", 40),
 	}
-
-	uc := newListSubmissionsUseCase(activeContest(), visibleGroup(), isMemberNotLead(), registeredParticipant(), subsProvider(subs))
+	provider := &mockContestSubmissionsProvider{
+		listByContestFn: func(_ context.Context, _ string, f ContestSubmissionFilters) ([]RichSubmissionData, int, error) {
+			got = f
+			return page, 5, nil
+		},
+	}
+	uc := newListSubmissionsUseCase(activeContest(), visibleGroup(), isMemberNotLead(), provider)
 
 	input := baseInput()
 	input.Page = 2
@@ -309,6 +355,9 @@ func TestListContestSubmissions_Pagination(t *testing.T) {
 	out, err := uc.Execute(context.Background(), input)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
+	}
+	if got.Limit != 2 || got.Offset != 2 {
+		t.Errorf("limit/offset=%d/%d, want 2/2", got.Limit, got.Offset)
 	}
 	if out.Total != 5 {
 		t.Errorf("total=%d, want 5", out.Total)
@@ -319,7 +368,7 @@ func TestListContestSubmissions_Pagination(t *testing.T) {
 }
 
 func TestListContestSubmissions_Meta_ContestContext(t *testing.T) {
-	uc := newListSubmissionsUseCase(frozenActiveContest(), visibleGroup(), isMemberNotLead(), registeredParticipant(), subsProvider(nil))
+	uc := newListSubmissionsUseCase(frozenActiveContest(), visibleGroup(), isMemberNotLead(), subsProvider(nil))
 
 	out, err := uc.Execute(context.Background(), baseInput())
 	if err != nil {
@@ -342,7 +391,7 @@ func TestListContestSubmissions_TeamSubmission_ShowsTeamInfo(t *testing.T) {
 	members := []string{"alice", "bob", "carol"}
 	sub := teamSub("s1", callerID, teamID, teamName, "ACCEPTED", time.Now().Add(-30*time.Minute), members)
 
-	uc := newListSubmissionsUseCase(activeContest(), visibleGroup(), isMemberNotLead(), registeredParticipant(), subsProvider([]RichSubmissionData{sub}))
+	uc := newListSubmissionsUseCase(activeContest(), visibleGroup(), isMemberNotLead(), subsProvider([]RichSubmissionData{sub}))
 
 	out, err := uc.Execute(context.Background(), baseInput())
 	if err != nil {
@@ -389,7 +438,7 @@ func TestListContestSubmissions_TeamSubmission_ShowsMembersWhenEnabled(t *testin
 		testNow, nil,
 	)
 
-	uc := newListSubmissionsUseCase(contest, visibleGroup(), isMemberNotLead(), registeredParticipant(), subsProvider([]RichSubmissionData{sub}))
+	uc := newListSubmissionsUseCase(contest, visibleGroup(), isMemberNotLead(), subsProvider([]RichSubmissionData{sub}))
 
 	out, err := uc.Execute(context.Background(), baseInput())
 	if err != nil {
@@ -404,32 +453,26 @@ func TestListContestSubmissions_TeamSubmission_ShowsMembersWhenEnabled(t *testin
 	}
 }
 
-func TestListContestSubmissions_FreezePeriod_TeamOwnSubmissionsAlwaysVisible(t *testing.T) {
+func TestListContestSubmissions_FreezePeriod_TeamStandingExcepted(t *testing.T) {
 	teamID := "team-001"
-	teamName := "Team Alpha"
-	// Team's post-freeze submission — caller is a member of this team
-	postFreeze := time.Now().Add(-20 * time.Minute)
-	sub := teamSub("s1", callerID, teamID, teamName, "ACCEPTED", postFreeze, nil)
-
 	// CallerStandingProvider returns teamID as the caller's standing
 	standingProvider := &mockCallerStandingProvider{
 		fn: func(_, _ string) (string, bool, error) { return teamID, true, nil },
 	}
 
+	var got ContestSubmissionFilters
 	uc := NewListContestSubmissionsUseCase(
 		repoWith(frozenActiveContest()),
 		&mockGroupProvider{findByIDFn: func(_ context.Context, _ string) (*GroupInfo, error) { return visibleGroup(), nil }},
 		isMemberNotLead(),
-		registeredParticipant(),
-		subsProvider([]RichSubmissionData{sub}),
+		capturingSubsProvider(&got),
 		standingProvider,
 	)
 
-	out, err := uc.Execute(context.Background(), baseInput())
-	if err != nil {
+	if _, err := uc.Execute(context.Background(), baseInput()); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if len(out.Submissions) != 1 {
-		t.Errorf("len(submissions)=%d, want 1 (own team's post-freeze submission must appear)", len(out.Submissions))
+	if got.ExceptStandingID != teamID {
+		t.Errorf("ExceptStandingID=%q, want %q (own team's post-freeze submissions must appear)", got.ExceptStandingID, teamID)
 	}
 }

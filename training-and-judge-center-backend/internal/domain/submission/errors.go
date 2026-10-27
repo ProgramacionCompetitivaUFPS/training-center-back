@@ -7,6 +7,7 @@ const (
 	ErrCodeAccessDenied       = "ACCESS_DENIED"
 
 	ErrCodeProblemNotPublished  = "PROBLEM_NOT_PUBLISHED"
+	ErrCodeProblemNotFound      = "PROBLEM_NOT_FOUND"
 	ErrCodeProblemNotAccessible = "PROBLEM_NOT_ACCESSIBLE"
 	ErrCodeDuplicateSubmission  = "DUPLICATE_SUBMISSION"
 	ErrCodeFileTooLarge         = "FILE_TOO_LARGE"

@@ -26,6 +26,7 @@ type ListMyContestsOutput struct {
 type ListMyContestsInput struct {
 	CurrentUser appshared.CurrentUser
 	Status      *string
+	Search      string
 	SortBy      string
 	Order       string
 	Page        int
@@ -61,6 +62,7 @@ func (uc *ListMyContestsUseCase) Execute(ctx context.Context, in ListMyContestsI
 	}
 
 	filters := buildContestFilters(in.Status, in.SortBy, in.Order, in.Page, in.Limit)
+	filters.Search = in.Search
 
 	contests, total, err := uc.repo.ListByGroupIDs(ctx, groupIDs, filters)
 	if err != nil {

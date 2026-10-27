@@ -87,7 +87,7 @@ SCHEDULED ──(startTime reached)──> ACTIVE ──(endTime reached)──>
 
 * Problems can be added at contest creation or later via updates
 * Problems can be removed from contests
-* When a problem is removed, submissions to that problem have `contest_id` set to `null` (no longer associated with the contest)
+* When a problem is removed, its submissions keep their `contest_id`; the standings count only the contest's current problems (they count again if the problem is put back)
 * Problems can be reordered within contests
 * Problems must be in `PUBLISHED` status
 * **Accessibility rules**:
@@ -214,7 +214,7 @@ Contests support different participation configurations:
 * Standings are **frozen** at `endTime` (when contest ends)
 * Standings remain visible but immutable during postcompetition phase
 * Standings are recalculated when:
-  * Problems are removed during ACTIVE contests (submissions to removed problems have `contest_id` set to `null`)
+  * Problems are removed during ACTIVE contests (their submissions stop counting; they keep their `contest_id`)
   * Penalty is changed during ACTIVE contests
 * When a problem is added to a contest, standings are NOT recalculated (no submissions exist yet)
 * Submissions during postcompetition do NOT affect standings (standing is frozen at endTime)

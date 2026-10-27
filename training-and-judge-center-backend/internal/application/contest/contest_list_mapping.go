@@ -62,6 +62,7 @@ func toContestListItem(c *domainContest.Contest, now time.Time, participantCount
 		Penalty:           c.Penalty().Value(),
 		FreezeMinutes:     c.FreezeMinutes(),
 		EnablePostContest: c.EnablePostContest(),
+		ParticipationMode: c.ParticipationMode().String(),
 		ParticipantCount:  participantCount,
 		IsRegistered:      isRegistered,
 		ProblemCount:      len(c.Problems()),

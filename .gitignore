@@ -33,8 +33,12 @@ Thumbs.db
 # Agent
 .agent/
 
-# Claude
-.claude/
+# Claude — settings/local config stay ignored; skills/ is shared, except the ones below,
+# which stay untracked until they're worth keeping.
+.claude/*
+!.claude/skills/
+.claude/skills/*
+!.claude/skills/recreate-environment/
 docs/
 
 # Git worktrees

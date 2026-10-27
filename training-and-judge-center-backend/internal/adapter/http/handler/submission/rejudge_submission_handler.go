@@ -22,7 +22,7 @@ type rejudgeSubmissionResponse struct {
 // @Security     BearerAuth
 // @Param        submissionId path string true "Submission ID"
 // @Success      200 {object} rejudgeSubmissionResponse
-// @Failure      400 {object} apperror.AppError
+// @Failure      400 {object} apperror.AppError "NO_REJUDGE_NEEDED, PROBLEM_NOT_PUBLISHED"
 // @Failure      401 {object} apperror.AppError
 // @Failure      403 {object} apperror.AppError
 // @Failure      404 {object} apperror.AppError

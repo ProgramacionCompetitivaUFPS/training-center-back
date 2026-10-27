@@ -9,6 +9,7 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
+	infraPostgres "github.com/training-judge-center/backend/internal/adapter/postgres"
 	"github.com/training-judge-center/backend/pkg/apperror"
 )
 
@@ -26,7 +27,7 @@ type userPreferences struct {
 
 func (p *PreferencesReader) HideGlobalGroup(ctx context.Context, userID string) (bool, error) {
 	var raw []byte
-	err := p.db.QueryRow(ctx, `SELECT preferences FROM users WHERE id = $1`, userID).Scan(&raw)
+	err := infraPostgres.GetQuerier(ctx, p.db).QueryRow(ctx, `SELECT preferences FROM users WHERE id = $1`, userID).Scan(&raw)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return false, nil

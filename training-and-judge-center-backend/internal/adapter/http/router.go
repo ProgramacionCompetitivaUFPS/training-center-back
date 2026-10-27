@@ -19,6 +19,9 @@ import (
 	"github.com/training-judge-center/backend/internal/domain/user"
 )
 
+// Largest legitimate JSON body is a 150,000-character statement (~600 KB in UTF-8).
+const maxJSONBodyBytes = 1 << 20
+
 type Handlers struct {
 	Problem    *problem.Handler
 	User       *handlerUser.Handler
@@ -48,6 +51,8 @@ func NewRouter(h *Handlers, s *Services, allowedOrigins []string) *chi.Mux {
 	r.Use(chimw.RequestID)
 	r.Use(chimw.Logger)
 	r.Use(chimw.Recoverer)
+	r.Use(middleware.LimitBody(maxJSONBodyBytes))
+	r.Use(middleware.ValidateText())
 
 	r.Get("/swagger/*", httpSwagger.WrapHandler)
 
@@ -60,6 +65,9 @@ func NewRouter(h *Handlers, s *Services, allowedOrigins []string) *chi.Mux {
 	r.Post("/password/reset", h.User.ResetPassword)
 	r.Route("/auth", func(r chi.Router) {
 		r.Post("/login", h.Auth.Login)
+		r.Post("/google", h.Auth.LoginWithGoogle)
+		r.Post("/refresh", h.Auth.Refresh)
+		r.Post("/logout", h.Auth.Logout)
 	})
 
 	// authenticated
@@ -72,6 +80,7 @@ func NewRouter(h *Handlers, s *Services, allowedOrigins []string) *chi.Mux {
 			r.Get("/{groupId}", h.Group.GetGroup)
 			r.Patch("/{groupId}", h.Group.UpdateGroup)
 			r.Delete("/{groupId}", h.Group.DeleteGroup)
+			r.Get("/{groupId}/deletion-impact", h.Group.GetDeletionImpact)
 			r.Post("/{groupId}/join", h.Group.Join)
 
 			r.Route("/{groupId}/invitations", func(r chi.Router) {
@@ -109,12 +118,14 @@ func NewRouter(h *Handlers, s *Services, allowedOrigins []string) *chi.Mux {
 				r.Get("/{contestId}/register/status", h.Contest.GetRegistrationStatus)
 				r.Get("/{contestId}/registrations", h.Contest.ListRegistrations)
 				r.Get("/{contestId}/standings", h.Contest.GetStandings)
+				r.Get("/{contestId}/standings/filters", h.Contest.GetStandingsFilterOptions)
 				r.Get("/{contestId}/submissions", h.Contest.ListContestSubmissions)
 				r.Route("/{contestId}/team-registrations", func(r chi.Router) {
 					r.Get("/", h.Team.ListTeamRegistrations)
 					r.Post("/{teamId}", h.Team.RegisterTeamToContest)
 					r.Put("/{teamId}", h.Team.UpdateTeamRegistration)
 					r.Delete("/{teamId}", h.Team.UnregisterTeamFromContest)
+					r.Get("/{teamId}/eligibility", h.Team.GetTeamRegistrationEligibility)
 				})
 
 				r.Post("/{contestId}/problems/{problemSlug}/submissions", h.Submission.SubmitContest)
@@ -124,6 +135,8 @@ func NewRouter(h *Handlers, s *Services, allowedOrigins []string) *chi.Mux {
 			r.Route("/{groupId}/materials", func(r chi.Router) {
 				r.Post("/", h.Material.Create)
 				r.Get("/", h.Material.List)
+				r.Get("/tags", h.Material.ListTags)
+				r.Get("/authors", h.Material.ListAuthors)
 				r.Get("/{materialId}", h.Material.Get)
 				r.Patch("/{materialId}", h.Material.Update)
 				r.Delete("/{materialId}", h.Material.Delete)
@@ -146,22 +159,34 @@ func NewRouter(h *Handlers, s *Services, allowedOrigins []string) *chi.Mux {
 			r.Get("/", h.Problem.ListProblems)
 			r.Post("/", h.Problem.Create)
 			r.Post("/import", h.Problem.Import)
+			r.Get("/tags", h.Problem.ListTags)
 
 			r.Route("/p/{slug}", func(r chi.Router) {
 				r.Get("/", h.Problem.GetProblem)
 				r.Put("/", h.Problem.Update)
 				r.Delete("/", h.Problem.DeleteProblem)
+				r.Post("/validate", h.Problem.Validate)
+				r.Post("/publish", h.Problem.Publish)
 				r.Post("/unpublish", h.Problem.Unpublish)
 				r.Post("/rejudge", h.Problem.Rejudge)
 				r.Patch("/accessibility", h.Problem.ChangeAccessibility)
 
 				r.Get("/statistics", h.Problem.GetStatistics)
+				r.Get("/validation", h.Problem.GetLatestValidation)
+
+				// Reading a problem's files: only its author, modifiers and Admin.
+				r.Get("/testcases", h.Problem.ListTestCases)
+				r.Get("/testcases/{kind}/{name}", h.Problem.GetTestCase)
+				r.Get("/testcases/{kind}/{name}/{part}", h.Problem.GetTestCasePart)
+				r.Get("/export", h.Problem.Export)
 
 				r.Get("/submissions", h.Submission.ListProblemSubmissions)
 				r.Post("/submissions", h.Submission.Submit)
 
 				r.Route("/files", func(r chi.Router) {
 					r.Post("/", h.Problem.UploadFiles)
+					r.Get("/testcases", h.Problem.DownloadTestCases)
+					r.Get("/{fileType}", h.Problem.GetSourceFile)
 					r.Delete("/{fileType}", h.Problem.DeleteFile)
 				})
 
@@ -191,16 +216,21 @@ func NewRouter(h *Handlers, s *Services, allowedOrigins []string) *chi.Mux {
 		r.Get("/users/me/dashboard", h.User.GetDashboard)
 		r.Get("/users/me/stats", h.User.GetStats)
 		r.Get("/users/me/groups", h.Group.ListMyGroups)
+		r.Get("/users/me/sole-lead-groups", h.Group.ListMySoleLeadGroups)
 		r.Get("/users/me/teams", h.Team.ListMyTeams)
 		r.Get("/users/me/team-invitations", h.Team.ListMyInvitations)
 		r.Get("/users/me/submissions", h.Submission.ListMySubmissions)
+		r.Get("/users/search", h.User.SearchUsers)
 		r.Get("/users/{nickname}", h.User.GetByNickname)
 		r.Put("/users", h.User.UpdateProfile)
 		r.Put("/users/password", h.User.UpdatePassword)
+		r.Post("/users/password", h.User.SetPassword)
 		r.Post("/users/email-change/request", h.User.RequestEmailChange)
 		r.Post("/users/email-change/confirm", h.User.ConfirmEmailChange)
 		r.Post("/users/deactivation", h.User.RequestDeactivation)
 		r.Post("/users/deactivation/confirm", h.User.ConfirmDeactivation)
+		r.Post("/users/google", h.User.LinkGoogle)
+		r.Delete("/users/google", h.User.UnlinkGoogle)
 	})
 
 	// Protected routes — admin only
@@ -209,8 +239,10 @@ func NewRouter(h *Handlers, s *Services, allowedOrigins []string) *chi.Mux {
 		r.Use(middleware.RequireRole(shared.RoleAdmin))
 
 		r.Get("/users", h.User.ListUsers)
+		r.Get("/users/filters", h.User.ListUserFilterOptions)
 		r.Put("/users/{id}", h.User.AdminUpdateUser)
 		r.Post("/users/{id}/deactivate", h.User.AdminDeactivateUser)
+		r.Get("/users/{id}/sole-lead-groups", h.Group.ListUserSoleLeadGroups)
 
 		r.Post("/problems/{slug}/rejudge", h.Problem.AdminRejudge)
 		r.Post("/submissions/{submissionId}/rejudge", h.Submission.AdminRejudgeSubmission)

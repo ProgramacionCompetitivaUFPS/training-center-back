@@ -2,9 +2,12 @@ package problem
 
 import (
 	"context"
+	"errors"
 	"log/slog"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
+	infraPostgres "github.com/training-judge-center/backend/internal/adapter/postgres"
 	appProblem "github.com/training-judge-center/backend/internal/application/problem"
 	"github.com/training-judge-center/backend/pkg/apperror"
 )
@@ -20,19 +23,20 @@ func NewStatisticsProvider(db *pgxpool.Pool) *StatisticsProvider {
 func (p *StatisticsProvider) GetByProblemID(ctx context.Context, problemID string) (*appProblem.ProblemStats, error) {
 	stats := &appProblem.ProblemStats{}
 
-	if err := p.db.QueryRow(ctx, `
+	// ErrNoRows only comes from a malformed id, which has no submissions: totals stay zero.
+	if err := infraPostgres.GetQuerier(ctx, p.db).QueryRow(ctx, `
 		SELECT
 			COUNT(*),
 			COUNT(DISTINCT user_id),
 			COUNT(DISTINCT CASE WHEN status = 'ACCEPTED' THEN user_id END)
 		FROM submissions
 		WHERE problem_id = $1`, problemID,
-	).Scan(&stats.TotalSubmissions, &stats.UniqueAttempted, &stats.UniqueSolved); err != nil {
+	).Scan(&stats.TotalSubmissions, &stats.UniqueAttempted, &stats.UniqueSolved); err != nil && !errors.Is(err, pgx.ErrNoRows) {
 		slog.ErrorContext(ctx, "failed to query problem submission totals", "error", err, "problem_id", problemID)
 		return nil, apperror.NewInternal()
 	}
 
-	rows, err := p.db.Query(ctx, `
+	rows, err := infraPostgres.GetQuerier(ctx, p.db).Query(ctx, `
 		SELECT
 			language,
 			COUNT(DISTINCT user_id) AS users_attempted,
@@ -62,7 +66,7 @@ func (p *StatisticsProvider) GetByProblemID(ctx context.Context, problemID strin
 		return nil, apperror.NewInternal()
 	}
 
-	vrows, err := p.db.Query(ctx, `
+	vrows, err := infraPostgres.GetQuerier(ctx, p.db).Query(ctx, `
 		SELECT status, COUNT(*) AS cnt
 		FROM submissions
 		WHERE problem_id = $1

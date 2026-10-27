@@ -23,7 +23,7 @@ As a system administrator, I want to deactivate a user's account so that I can b
      - Records `deactivatedAt` timestamp
      - Unlinks the email from the account (sets to NULL)
      - Anonymizes the nickname to `user_anonimo_{10-char-uuid}`
-     - Invalidates all active sessions and tokens for the target user
+     - Invalidates all active sessions and tokens for the target user, including every active refresh token (see [Refresh Session](../Refresh%20session/spec.md))
    - **And** responds with 204 No Content
 
 2. **Scenario**: Admin attempts to deactivate another admin
@@ -168,7 +168,7 @@ Target user not found.
 - **FR-005**: The system MUST record `deactivatedAt` timestamp.
 - **FR-006**: The system MUST unlink the email from the account (set to NULL).
 - **FR-007**: The system MUST anonymize the nickname to format `user_anonimo_{10-char-uuid}`.
-- **FR-008**: The system MUST invalidate all active sessions and tokens for the deactivated user.
+- **FR-008**: The system MUST invalidate all active sessions and tokens for the deactivated user — both by bumping the access-token revocation timestamp and by revoking every active refresh token row for the user (see [Refresh Session](../Refresh%20session/spec.md)). Additionally, `POST /auth/refresh` re-checks the user's status on every call, so even a refresh token not yet revoked cannot mint a new access token once the account is DEACTIVATED.
 - **FR-009**: The unlinked email MUST become available for new account registrations.
 - **FR-010**: The original nickname MUST become available for use by other accounts.
 
@@ -182,6 +182,7 @@ Target user not found.
 - **FR-015**: The system MUST update the user's `updatedAt` timestamp.
 - **FR-016**: The system MUST record an audit log of the deactivation (adminId, targetUserId, timestamp).
 - **FR-017**: The system MUST invalidate any pending email change or password recovery requests.
+- **FR-018**: The system MUST expose `GET /admin/users/{id}/sole-lead-groups` (Admin only) listing the groups where that user is the only **active** lead (a deactivated user keeps their group membership, so a deactivated co-lead does not count), and the interface MUST show that list before the Admin confirms, warning that those groups would be left without a lead (only an Admin could manage them). The deactivation itself is not blocked.
 
 ### Key Entities
 

@@ -1,4 +1,4 @@
-﻿package problem
+package problem
 
 import (
 	"context"
@@ -6,9 +6,9 @@ import (
 	"strings"
 	"time"
 
+	appshared "github.com/training-judge-center/backend/internal/application/shared"
 	"github.com/training-judge-center/backend/internal/domain/problem"
 	"github.com/training-judge-center/backend/internal/domain/shared"
-	appshared "github.com/training-judge-center/backend/internal/application/shared"
 	"github.com/training-judge-center/backend/pkg/apperror"
 )
 
@@ -20,17 +20,20 @@ type DeleteProblemFileInput struct {
 }
 
 type DeleteProblemFileUseCase struct {
-	repo        problem.Repository
-	fileStorage ProblemFileRepository
+	repo           problem.Repository
+	validationRepo problem.ProblemValidationRepository
+	fileStorage    ProblemFileRepository
 }
 
 func NewDeleteProblemFileUseCase(
 	repo problem.Repository,
+	validationRepo problem.ProblemValidationRepository,
 	fileStorage ProblemFileRepository,
 ) *DeleteProblemFileUseCase {
 	return &DeleteProblemFileUseCase{
-		repo:        repo,
-		fileStorage: fileStorage,
+		repo:           repo,
+		validationRepo: validationRepo,
+		fileStorage:    fileStorage,
 	}
 }
 
@@ -51,6 +54,10 @@ func (usecase *DeleteProblemFileUseCase) Execute(ctx context.Context, input Dele
 
 	if !foundProblem.CanBeEditedBy(shared.RestoreUserID(input.CurrentUser.ID), input.CurrentUser.IsAdmin()) {
 		return apperror.NewForbidden(ErrCodeInsufficientPermissions, "Only the problem author, Admin, or assigned modifiers can update this problem")
+	}
+
+	if err := ensureNoActiveValidation(ctx, usecase.validationRepo, foundProblem.ID()); err != nil {
+		return err
 	}
 
 	var storageKeyToDelete string

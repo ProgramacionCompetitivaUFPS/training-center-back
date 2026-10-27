@@ -80,10 +80,15 @@ type mockSubmissionRepo struct {
 	findByIDFn   func(id string) (*domainsubmission.Submission, error)
 	updateVisFn  func(s *domainsubmission.Submission) error
 	listFn       func(f domainsubmission.ListFilters) ([]*domainsubmission.Submission, int, error)
+	saved        *domainsubmission.Submission
 }
 
-func (m *mockSubmissionRepo) Save(_ context.Context, _ *domainsubmission.Submission) error {
-	return m.saveErr
+func (m *mockSubmissionRepo) Save(_ context.Context, s *domainsubmission.Submission) error {
+	if m.saveErr != nil {
+		return m.saveErr
+	}
+	m.saved = s
+	return nil
 }
 
 func (m *mockSubmissionRepo) FindByID(_ context.Context, id string) (*domainsubmission.Submission, error) {
@@ -128,13 +133,20 @@ func cleanRepo() *mockSubmissionRepo { return &mockSubmissionRepo{} }
 type mockSourceStorage struct {
 	uploadErr error
 	deleteErr error
+	uploaded  []string
+	deleted   []string
 }
 
-func (m *mockSourceStorage) Upload(_ context.Context, _ string, _ []byte) error {
-	return m.uploadErr
+func (m *mockSourceStorage) Upload(_ context.Context, path string, _ []byte) error {
+	if m.uploadErr != nil {
+		return m.uploadErr
+	}
+	m.uploaded = append(m.uploaded, path)
+	return nil
 }
 
-func (m *mockSourceStorage) Delete(_ context.Context, _ string) error {
+func (m *mockSourceStorage) Delete(_ context.Context, path string) error {
+	m.deleted = append(m.deleted, path)
 	return m.deleteErr
 }
 
@@ -236,7 +248,8 @@ func (m *mockSourceCodeReader) Read(_ context.Context, path string) ([]byte, err
 // ── mockProblemDisplayProvider ────────────────────────────────────────────────
 
 type mockProblemDisplayProvider struct {
-	fn func(problemID string) (*ProblemDisplay, error)
+	fn         func(problemID string) (*ProblemDisplay, error)
+	batchCalls int // how many times GetProblemsByIDs itself was invoked — 1 means batched, N means a regression back to per-row
 }
 
 func (m *mockProblemDisplayProvider) GetProblemByID(_ context.Context, id string) (*ProblemDisplay, error) {
@@ -246,10 +259,24 @@ func (m *mockProblemDisplayProvider) GetProblemByID(_ context.Context, id string
 	return &ProblemDisplay{Slug: "two-sum", Title: "Two Sum"}, nil
 }
 
+func (m *mockProblemDisplayProvider) GetProblemsByIDs(ctx context.Context, ids []string) (map[string]*ProblemDisplay, error) {
+	m.batchCalls++
+	result := make(map[string]*ProblemDisplay, len(ids))
+	for _, id := range ids {
+		d, err := m.GetProblemByID(ctx, id)
+		if err != nil {
+			continue // missing/deleted problem: absent from the map, not an error (see GetProblemsByIDs doc)
+		}
+		result[id] = d
+	}
+	return result, nil
+}
+
 // ── mockUserProvider ──────────────────────────────────────────────────────────
 
 type mockUserProvider struct {
-	fn func(userID string) (*UserDisplay, error)
+	fn         func(userID string) (*UserDisplay, error)
+	batchCalls int
 }
 
 func (m *mockUserProvider) GetUserByID(_ context.Context, id string) (*UserDisplay, error) {
@@ -259,10 +286,26 @@ func (m *mockUserProvider) GetUserByID(_ context.Context, id string) (*UserDispl
 	return &UserDisplay{ID: id, Nickname: "testuser"}, nil
 }
 
+// GetUsersByIDs mirrors the real adapter (WHERE id = ANY($1)): a single missing/failing ID is
+// simply absent from the result map, never an error on its own — same as GetProblemsByIDs.
+func (m *mockUserProvider) GetUsersByIDs(ctx context.Context, ids []string) (map[string]*UserDisplay, error) {
+	m.batchCalls++
+	result := make(map[string]*UserDisplay, len(ids))
+	for _, id := range ids {
+		d, err := m.GetUserByID(ctx, id)
+		if err != nil {
+			continue
+		}
+		result[id] = d
+	}
+	return result, nil
+}
+
 // ── mockContestProvider ───────────────────────────────────────────────────────
 
 type mockContestProvider struct {
-	fn func(contestID string) (*ContestDisplay, error)
+	fn         func(contestID string) (*ContestDisplay, error)
+	batchCalls int
 }
 
 func (m *mockContestProvider) GetContestByID(_ context.Context, id string) (*ContestDisplay, error) {
@@ -270,6 +313,21 @@ func (m *mockContestProvider) GetContestByID(_ context.Context, id string) (*Con
 		return m.fn(id)
 	}
 	return &ContestDisplay{ID: id, Name: "Test Contest"}, nil
+}
+
+// GetContestsByIDs mirrors the real adapter (WHERE id = ANY($1)): a single missing/failing
+// ID is simply absent from the result map, never an error on its own — same as GetProblemsByIDs.
+func (m *mockContestProvider) GetContestsByIDs(ctx context.Context, ids []string) (map[string]*ContestDisplay, error) {
+	m.batchCalls++
+	result := make(map[string]*ContestDisplay, len(ids))
+	for _, id := range ids {
+		d, err := m.GetContestByID(ctx, id)
+		if err != nil {
+			continue
+		}
+		result[id] = d
+	}
+	return result, nil
 }
 
 // ── mockTeamMembershipChecker ─────────────────────────────────────────────────

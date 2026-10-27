@@ -40,12 +40,16 @@ type SubmissionDisplay struct {
 	Problem     SubmissionProblemDisplay
 	SubmittedBy SubmissionSubmitterDisplay
 	Language    string
+	IsBlockly   bool
 	Status      string
 	SubmittedAt time.Time
 	JudgedAt    *time.Time // nil during ACTIVE for participants
 	TimeMs      *int       // nil during ACTIVE for participants
 	MemoryKb    *int       // nil during ACTIVE for participants
 	Phase       *string    // nil during ACTIVE for participants; "competition" or "postcompetition"
+	// CanViewDetail mirrors GetSubmission's access rule: own or team submission,
+	// Lead/Admin, or a submission its author made public.
+	CanViewDetail bool
 }
 
 type SubmissionsContestMeta struct {
@@ -68,7 +72,6 @@ type ListContestSubmissionsUseCase struct {
 	contestRepo         domainContest.Repository
 	groupProvider       GroupProvider
 	memberProvider      GroupMemberProvider
-	participantProvider ContestParticipantProvider
 	submissionsProvider ContestSubmissionProvider
 	standingProvider    CallerStandingProvider
 }
@@ -77,7 +80,6 @@ func NewListContestSubmissionsUseCase(
 	contestRepo domainContest.Repository,
 	groupProvider GroupProvider,
 	memberProvider GroupMemberProvider,
-	participantProvider ContestParticipantProvider,
 	submissionsProvider ContestSubmissionProvider,
 	standingProvider CallerStandingProvider,
 ) *ListContestSubmissionsUseCase {
@@ -85,7 +87,6 @@ func NewListContestSubmissionsUseCase(
 		contestRepo:         contestRepo,
 		groupProvider:       groupProvider,
 		memberProvider:      memberProvider,
-		participantProvider: participantProvider,
 		submissionsProvider: submissionsProvider,
 		standingProvider:    standingProvider,
 	}
@@ -120,17 +121,6 @@ func (uc *ListContestSubmissionsUseCase) Execute(ctx context.Context, in ListCon
 		return nil, apperror.NewNotFound(domainContest.ErrCodeContestNotFound, "contest not found")
 	}
 
-	// Leads and admins bypass the registration requirement.
-	if !isAdmin && !isLead {
-		registered, err := uc.participantProvider.IsRegistered(ctx, in.ContestID, in.CurrentUser.ID)
-		if err != nil {
-			return nil, err
-		}
-		if !registered {
-			return nil, apperror.NewForbidden(domainContest.ErrCodeNotRegistered, "you must be registered to view contest submissions")
-		}
-	}
-
 	if in.Page < 1 {
 		in.Page = 1
 	}
@@ -147,48 +137,52 @@ func (uc *ListContestSubmissionsUseCase) Execute(ctx context.Context, in ListCon
 		}
 	}
 
-	subs, err := uc.submissionsProvider.ListByContest(ctx, in.ContestID, ContestSubmissionFilters{
-		ProblemSlug: in.ProblemSlug,
-		Nickname:    in.Nickname,
-	})
-	if err != nil {
-		return nil, err
-	}
-
 	callerStandingID := in.CurrentUser.ID
-	if !isAdmin && !isLead && freezeTime != nil {
+	if !isAdmin && !isLead {
 		if sid, found, err := uc.standingProvider.GetCallerStandingID(ctx, in.ContestID, in.CurrentUser.ID); err == nil && found {
 			callerStandingID = sid
 		}
 	}
 
+	filters := ContestSubmissionFilters{
+		ProblemSlug: in.ProblemSlug,
+		Nickname:    in.Nickname,
+		Limit:       in.Limit,
+		Offset:      (in.Page - 1) * in.Limit,
+	}
+	switch in.Phase {
+	case "competition":
+		filters.SubmittedAtMost = &endTime
+	case "postcompetition":
+		filters.SubmittedAfter = &endTime
+	}
+	// Freeze: leads/admins see all; participants see own standing always + others pre-freeze only.
+	if !isAdmin && !isLead && freezeTime != nil {
+		filters.FreezeAt = freezeTime
+		filters.ExceptStandingID = callerStandingID
+	}
+
+	subs, total, err := uc.submissionsProvider.ListByContest(ctx, in.ContestID, filters)
+	if err != nil {
+		return nil, err
+	}
+
 	showFullDetails := status == domainContest.StatusFinished || isLead || isAdmin
 	showMembers := contest.ShowTeamMembers()
 
-	var result []SubmissionDisplay
+	result := make([]SubmissionDisplay, 0, len(subs))
 	for _, sub := range subs {
-		// Freeze: leads/admins see all; participants see own standing always + others pre-freeze only.
-		if !isAdmin && !isLead && freezeTime != nil && sub.StandingID != callerStandingID {
-			if !sub.SubmittedAt.Before(*freezeTime) {
-				continue
-			}
-		}
-
-		if in.Phase == "competition" && sub.SubmittedAt.After(endTime) {
-			continue
-		}
-		if in.Phase == "postcompetition" && !sub.SubmittedAt.After(endTime) {
-			continue
-		}
-
 		submitter := buildSubmitter(sub, showMembers)
 		d := SubmissionDisplay{
 			ID:          sub.ID,
 			Problem:     SubmissionProblemDisplay{Slug: sub.ProblemSlug, Title: sub.ProblemTitle, Order: sub.ProblemOrder},
 			SubmittedBy: submitter,
 			Language:    sub.Language,
+			IsBlockly:   sub.IsBlockly,
 			Status:      sub.Status,
 			SubmittedAt: sub.SubmittedAt,
+			CanViewDetail: isAdmin || isLead || sub.UserID == in.CurrentUser.ID ||
+				sub.StandingID == callerStandingID || sub.Visibility == "PUBLIC",
 		}
 
 		if showFullDetails {
@@ -205,16 +199,6 @@ func (uc *ListContestSubmissionsUseCase) Execute(ctx context.Context, in ListCon
 		result = append(result, d)
 	}
 
-	total := len(result)
-	start := (in.Page - 1) * in.Limit
-	if start > total {
-		start = total
-	}
-	end := start + in.Limit
-	if end > total {
-		end = total
-	}
-
 	meta := SubmissionsContestMeta{
 		ID:     contest.ID(),
 		Name:   contest.Name().Value(),
@@ -226,7 +210,7 @@ func (uc *ListContestSubmissionsUseCase) Execute(ctx context.Context, in ListCon
 	}
 
 	return &ListContestSubmissionsOutput{
-		Submissions: result[start:end],
+		Submissions: result,
 		Total:       total,
 		Page:        in.Page,
 		Limit:       in.Limit,

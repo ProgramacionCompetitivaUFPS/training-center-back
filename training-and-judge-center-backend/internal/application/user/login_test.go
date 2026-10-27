@@ -1,4 +1,4 @@
-﻿package user
+package user
 
 import (
 	"context"
@@ -12,12 +12,12 @@ import (
 )
 
 type mockTokenService struct {
-	generateTokenFn func(ctx context.Context, user *domain.User) (string, error)
+	generateTokenFn func(ctx context.Context, user *domain.User, sessionID string) (string, error)
 	validateTokenFn func(tokenString string) (*domain.TokenClaims, error)
 }
 
-func (m *mockTokenService) GenerateToken(ctx context.Context, user *domain.User) (string, error) {
-	return m.generateTokenFn(ctx, user)
+func (m *mockTokenService) GenerateToken(ctx context.Context, user *domain.User, sessionID string) (string, error) {
+	return m.generateTokenFn(ctx, user, sessionID)
 }
 
 func (m *mockTokenService) ValidateToken(tokenString string) (*domain.TokenClaims, error) {
@@ -47,7 +47,7 @@ func newActiveUser() *domain.User {
 func newLoginDeps() (*mockUserRepository, *mockTokenService) {
 	repo := newNoConflictRepo()
 	tokenService := &mockTokenService{
-		generateTokenFn: func(_ context.Context, _ *domain.User) (string, error) { return "mock-jwt-token", nil },
+		generateTokenFn: func(_ context.Context, _ *domain.User, _ string) (string, error) { return "mock-jwt-token", nil },
 		validateTokenFn: func(_ string) (*domain.TokenClaims, error) { return nil, nil },
 	}
 	return repo, tokenService
@@ -59,7 +59,7 @@ func TestLogin_Success(t *testing.T) {
 	repo.findByEmailFn = func(_ context.Context, _ domain.Email) (*domain.User, error) {
 		return activeUser, nil
 	}
-	uc := NewLoginUseCase(repo, tokenSvc, &mockRateLimiter{})
+	uc := NewLoginUseCase(repo, &mockRefreshTokenRepository{}, tokenSvc, &mockRefreshTokenCodec{}, &mockRateLimiter{})
 
 	result, err := uc.Execute(context.Background(), LoginInput{
 		Email:    "test@example.com",
@@ -78,7 +78,7 @@ func TestLogin_Success(t *testing.T) {
 
 func TestLogin_MissingFields(t *testing.T) {
 	repo, tokenSvc := newLoginDeps()
-	uc := NewLoginUseCase(repo, tokenSvc, &mockRateLimiter{})
+	uc := NewLoginUseCase(repo, &mockRefreshTokenRepository{}, tokenSvc, &mockRefreshTokenCodec{}, &mockRateLimiter{})
 
 	_, err := uc.Execute(context.Background(), LoginInput{
 		Email:    "",
@@ -102,7 +102,7 @@ func TestLogin_MissingFields(t *testing.T) {
 
 func TestLogin_InvalidEmailFormat(t *testing.T) {
 	repo, tokenSvc := newLoginDeps()
-	uc := NewLoginUseCase(repo, tokenSvc, &mockRateLimiter{})
+	uc := NewLoginUseCase(repo, &mockRefreshTokenRepository{}, tokenSvc, &mockRefreshTokenCodec{}, &mockRateLimiter{})
 
 	_, err := uc.Execute(context.Background(), LoginInput{
 		Email:    "not-an-email",
@@ -129,7 +129,7 @@ func TestLogin_UserNotFound(t *testing.T) {
 	repo.findByEmailFn = func(_ context.Context, _ domain.Email) (*domain.User, error) {
 		return nil, nil
 	}
-	uc := NewLoginUseCase(repo, tokenSvc, &mockRateLimiter{})
+	uc := NewLoginUseCase(repo, &mockRefreshTokenRepository{}, tokenSvc, &mockRefreshTokenCodec{}, &mockRateLimiter{})
 
 	_, err := uc.Execute(context.Background(), LoginInput{
 		Email:    "nobody@example.com",
@@ -155,7 +155,7 @@ func TestLogin_DeactivatedAccount(t *testing.T) {
 	repo.findByEmailFn = func(_ context.Context, _ domain.Email) (*domain.User, error) {
 		return deactivatedUser, nil
 	}
-	uc := NewLoginUseCase(repo, tokenSvc, &mockRateLimiter{})
+	uc := NewLoginUseCase(repo, &mockRefreshTokenRepository{}, tokenSvc, &mockRefreshTokenCodec{}, &mockRateLimiter{})
 
 	_, err := uc.Execute(context.Background(), LoginInput{
 		Email:    "test@example.com",
@@ -183,7 +183,7 @@ func TestLogin_WrongPassword(t *testing.T) {
 	repo.findByEmailFn = func(_ context.Context, _ domain.Email) (*domain.User, error) {
 		return activeUser, nil
 	}
-	uc := NewLoginUseCase(repo, tokenSvc, &mockRateLimiter{})
+	uc := NewLoginUseCase(repo, &mockRefreshTokenRepository{}, tokenSvc, &mockRefreshTokenCodec{}, &mockRateLimiter{})
 
 	_, err := uc.Execute(context.Background(), LoginInput{
 		Email:    "test@example.com",
@@ -209,7 +209,7 @@ func TestLogin_SameErrorForNotFoundAndWrongPassword(t *testing.T) {
 	repo.findByEmailFn = func(_ context.Context, _ domain.Email) (*domain.User, error) {
 		return nil, nil
 	}
-	uc := NewLoginUseCase(repo, tokenSvc, &mockRateLimiter{})
+	uc := NewLoginUseCase(repo, &mockRefreshTokenRepository{}, tokenSvc, &mockRefreshTokenCodec{}, &mockRateLimiter{})
 	_, errNotFound := uc.Execute(context.Background(), LoginInput{
 		Email: "nobody@example.com", Password: "Secret1!",
 	})
@@ -240,10 +240,10 @@ func TestLogin_TokenGenerationError(t *testing.T) {
 	repo.findByEmailFn = func(_ context.Context, _ domain.Email) (*domain.User, error) {
 		return activeUser, nil
 	}
-	tokenSvc.generateTokenFn = func(_ context.Context, _ *domain.User) (string, error) {
+	tokenSvc.generateTokenFn = func(_ context.Context, _ *domain.User, _ string) (string, error) {
 		return "", apperror.NewInternal()
 	}
-	uc := NewLoginUseCase(repo, tokenSvc, &mockRateLimiter{})
+	uc := NewLoginUseCase(repo, &mockRefreshTokenRepository{}, tokenSvc, &mockRefreshTokenCodec{}, &mockRateLimiter{})
 
 	_, err := uc.Execute(context.Background(), LoginInput{
 		Email:    "test@example.com",
@@ -262,12 +262,72 @@ func TestLogin_TokenGenerationError(t *testing.T) {
 	}
 }
 
+func TestLogin_TokenGenerationError_DoesNotSaveRefreshToken(t *testing.T) {
+	repo, tokenSvc := newLoginDeps()
+	activeUser := newActiveUser()
+	repo.findByEmailFn = func(_ context.Context, _ domain.Email) (*domain.User, error) {
+		return activeUser, nil
+	}
+	tokenSvc.generateTokenFn = func(_ context.Context, _ *domain.User, _ string) (string, error) {
+		return "", apperror.NewInternal()
+	}
+	saveCalled := false
+	refreshRepo := &mockRefreshTokenRepository{
+		saveFn: func(_ context.Context, _ *domain.RefreshToken) error {
+			saveCalled = true
+			return nil
+		},
+	}
+	uc := NewLoginUseCase(repo, refreshRepo, tokenSvc, &mockRefreshTokenCodec{}, &mockRateLimiter{})
+
+	_, err := uc.Execute(context.Background(), LoginInput{
+		Email:    "test@example.com",
+		Password: "Secret1!",
+	})
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+	if saveCalled {
+		t.Error("expected refreshTokenRepo.Save NOT to be called when GenerateToken fails — no orphaned refresh token")
+	}
+}
+
+func TestLogin_WrapFails_DoesNotSaveRefreshToken(t *testing.T) {
+	repo, tokenSvc := newLoginDeps()
+	activeUser := newActiveUser()
+	repo.findByEmailFn = func(_ context.Context, _ domain.Email) (*domain.User, error) {
+		return activeUser, nil
+	}
+	saveCalled := false
+	refreshRepo := &mockRefreshTokenRepository{
+		saveFn: func(_ context.Context, _ *domain.RefreshToken) error {
+			saveCalled = true
+			return nil
+		},
+	}
+	codec := &mockRefreshTokenCodec{
+		wrapFn: func(_ context.Context, _, _ string) (string, error) { return "", apperror.NewInternal() },
+	}
+	uc := NewLoginUseCase(repo, refreshRepo, tokenSvc, codec, &mockRateLimiter{})
+
+	_, err := uc.Execute(context.Background(), LoginInput{
+		Email:    "test@example.com",
+		Password: "Secret1!",
+	})
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+	if saveCalled {
+		t.Error("expected refreshTokenRepo.Save NOT to be called when Wrap fails — no orphaned refresh token the client never received")
+	}
+}
+
 func TestLogin_RepositoryFindByEmailError(t *testing.T) {
 	repo, tokenSvc := newLoginDeps()
 	repo.findByEmailFn = func(_ context.Context, _ domain.Email) (*domain.User, error) {
 		return nil, apperror.NewInternal()
 	}
-	uc := NewLoginUseCase(repo, tokenSvc, &mockRateLimiter{})
+	uc := NewLoginUseCase(repo, &mockRefreshTokenRepository{}, tokenSvc, &mockRefreshTokenCodec{}, &mockRateLimiter{})
 
 	_, err := uc.Execute(context.Background(), LoginInput{
 		Email:    "test@example.com",
@@ -313,7 +373,7 @@ func TestLogin_PasswordAtBcryptBoundary(t *testing.T) {
 	repo.findByEmailFn = func(_ context.Context, _ domain.Email) (*domain.User, error) {
 		return u, nil
 	}
-	uc := NewLoginUseCase(repo, tokenSvc, &mockRateLimiter{})
+	uc := NewLoginUseCase(repo, &mockRefreshTokenRepository{}, tokenSvc, &mockRefreshTokenCodec{}, &mockRateLimiter{})
 
 	_, err = uc.Execute(context.Background(), LoginInput{
 		Email:    "boundary@example.com",
@@ -331,7 +391,7 @@ func TestLogin_RateLimitExceeded(t *testing.T) {
 			return false, nil
 		},
 	}
-	uc := NewLoginUseCase(repo, tokenSvc, rl)
+	uc := NewLoginUseCase(repo, &mockRefreshTokenRepository{}, tokenSvc, &mockRefreshTokenCodec{}, rl)
 
 	_, err := uc.Execute(context.Background(), LoginInput{
 		Email:    "test@example.com",
@@ -360,7 +420,7 @@ func TestLogin_RateLimitError(t *testing.T) {
 			return false, apperror.NewInternal()
 		},
 	}
-	uc := NewLoginUseCase(repo, tokenSvc, rl)
+	uc := NewLoginUseCase(repo, &mockRefreshTokenRepository{}, tokenSvc, &mockRefreshTokenCodec{}, rl)
 
 	_, err := uc.Execute(context.Background(), LoginInput{
 		Email:    "test@example.com",
@@ -395,7 +455,7 @@ func TestLogin_Success_ResetsRateLimit(t *testing.T) {
 			return nil
 		},
 	}
-	uc := NewLoginUseCase(repo, tokenSvc, rl)
+	uc := NewLoginUseCase(repo, &mockRefreshTokenRepository{}, tokenSvc, &mockRefreshTokenCodec{}, rl)
 
 	_, err := uc.Execute(context.Background(), LoginInput{
 		Email:    "test@example.com",
@@ -426,7 +486,7 @@ func TestLogin_WrongPassword_DoesNotResetRateLimit(t *testing.T) {
 			return nil
 		},
 	}
-	uc := NewLoginUseCase(repo, tokenSvc, rl)
+	uc := NewLoginUseCase(repo, &mockRefreshTokenRepository{}, tokenSvc, &mockRefreshTokenCodec{}, rl)
 
 	_, err := uc.Execute(context.Background(), LoginInput{
 		Email:    "test@example.com",
@@ -437,5 +497,178 @@ func TestLogin_WrongPassword_DoesNotResetRateLimit(t *testing.T) {
 	}
 	if resetCalled {
 		t.Error("expected Reset not to be called on failed login")
+	}
+}
+
+func TestLogin_Success_IssuesRefreshToken(t *testing.T) {
+	repo, tokenSvc := newLoginDeps()
+	activeUser := newActiveUser()
+	repo.findByEmailFn = func(_ context.Context, _ domain.Email) (*domain.User, error) {
+		return activeUser, nil
+	}
+
+	var savedToken *domain.RefreshToken
+	refreshRepo := &mockRefreshTokenRepository{
+		saveFn: func(_ context.Context, token *domain.RefreshToken) error {
+			savedToken = token
+			return nil
+		},
+	}
+	uc := NewLoginUseCase(repo, refreshRepo, tokenSvc, &mockRefreshTokenCodec{}, &mockRateLimiter{})
+
+	result, err := uc.Execute(context.Background(), LoginInput{
+		Email:    "test@example.com",
+		Password: "Secret1!",
+	})
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+	if result.RefreshToken == "" {
+		t.Error("expected a non-empty refresh token")
+	}
+	if result.SessionExpiresAt.IsZero() {
+		t.Error("expected a non-zero sessionExpiresAt")
+	}
+	if savedToken == nil {
+		t.Fatal("expected refreshTokenRepo.Save to be called")
+	}
+	if savedToken.UserID() != activeUser.ID() {
+		t.Errorf("expected saved token userID %q, got %q", activeUser.ID(), savedToken.UserID())
+	}
+	if !savedToken.AbsoluteExpiresAt().Equal(result.SessionExpiresAt) {
+		t.Errorf("expected saved token ceiling to match output SessionExpiresAt")
+	}
+}
+
+func TestLogin_DefaultCeiling_UsesShortCeiling(t *testing.T) {
+	repo, tokenSvc := newLoginDeps()
+	activeUser := newActiveUser()
+	repo.findByEmailFn = func(_ context.Context, _ domain.Email) (*domain.User, error) {
+		return activeUser, nil
+	}
+
+	var savedToken *domain.RefreshToken
+	refreshRepo := &mockRefreshTokenRepository{
+		saveFn: func(_ context.Context, token *domain.RefreshToken) error {
+			savedToken = token
+			return nil
+		},
+	}
+	uc := NewLoginUseCase(repo, refreshRepo, tokenSvc, &mockRefreshTokenCodec{}, &mockRateLimiter{})
+
+	before := time.Now()
+	_, err := uc.Execute(context.Background(), LoginInput{
+		Email:    "test@example.com",
+		Password: "Secret1!",
+	})
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+
+	want := before.Add(domain.DefaultSessionCeiling)
+	diff := savedToken.AbsoluteExpiresAt().Sub(want)
+	if diff < -time.Second || diff > time.Second {
+		t.Errorf("expected ceiling near %v, got %v", want, savedToken.AbsoluteExpiresAt())
+	}
+}
+
+func TestLogin_RememberSession_UsesLongCeiling(t *testing.T) {
+	repo, tokenSvc := newLoginDeps()
+	activeUser := newActiveUser()
+	repo.findByEmailFn = func(_ context.Context, _ domain.Email) (*domain.User, error) {
+		return activeUser, nil
+	}
+
+	var savedToken *domain.RefreshToken
+	refreshRepo := &mockRefreshTokenRepository{
+		saveFn: func(_ context.Context, token *domain.RefreshToken) error {
+			savedToken = token
+			return nil
+		},
+	}
+	uc := NewLoginUseCase(repo, refreshRepo, tokenSvc, &mockRefreshTokenCodec{}, &mockRateLimiter{})
+
+	before := time.Now()
+	_, err := uc.Execute(context.Background(), LoginInput{
+		Email:           "test@example.com",
+		Password:        "Secret1!",
+		RememberSession: true,
+	})
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+
+	want := before.Add(domain.RememberSessionCeiling)
+	diff := savedToken.AbsoluteExpiresAt().Sub(want)
+	if diff < -time.Second || diff > time.Second {
+		t.Errorf("expected ceiling near %v, got %v", want, savedToken.AbsoluteExpiresAt())
+	}
+}
+
+func TestLogin_SessionIDMatchesRefreshTokenFamilyID(t *testing.T) {
+	repo, tokenSvc := newLoginDeps()
+	activeUser := newActiveUser()
+	repo.findByEmailFn = func(_ context.Context, _ domain.Email) (*domain.User, error) {
+		return activeUser, nil
+	}
+
+	var generatedSessionID string
+	tokenSvc.generateTokenFn = func(_ context.Context, _ *domain.User, sessionID string) (string, error) {
+		generatedSessionID = sessionID
+		return "mock-jwt-token", nil
+	}
+
+	var savedToken *domain.RefreshToken
+	refreshRepo := &mockRefreshTokenRepository{
+		saveFn: func(_ context.Context, token *domain.RefreshToken) error {
+			savedToken = token
+			return nil
+		},
+	}
+	uc := NewLoginUseCase(repo, refreshRepo, tokenSvc, &mockRefreshTokenCodec{}, &mockRateLimiter{})
+
+	_, err := uc.Execute(context.Background(), LoginInput{
+		Email:    "test@example.com",
+		Password: "Secret1!",
+	})
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+	if generatedSessionID == "" {
+		t.Fatal("expected a non-empty sessionID passed to GenerateToken")
+	}
+	if savedToken.FamilyID() != generatedSessionID {
+		t.Errorf("expected sessionID %q to match refresh token familyID %q", generatedSessionID, savedToken.FamilyID())
+	}
+}
+
+func TestLogin_RefreshTokenSaveError(t *testing.T) {
+	repo, tokenSvc := newLoginDeps()
+	activeUser := newActiveUser()
+	repo.findByEmailFn = func(_ context.Context, _ domain.Email) (*domain.User, error) {
+		return activeUser, nil
+	}
+
+	refreshRepo := &mockRefreshTokenRepository{
+		saveFn: func(_ context.Context, _ *domain.RefreshToken) error {
+			return apperror.NewInternal()
+		},
+	}
+	uc := NewLoginUseCase(repo, refreshRepo, tokenSvc, &mockRefreshTokenCodec{}, &mockRateLimiter{})
+
+	_, err := uc.Execute(context.Background(), LoginInput{
+		Email:    "test@example.com",
+		Password: "Secret1!",
+	})
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+
+	appErr, ok := err.(*apperror.AppError)
+	if !ok {
+		t.Fatalf("expected *apperror.AppError, got %T", err)
+	}
+	if appErr.Code != apperror.ErrCodeInternalError {
+		t.Errorf("expected code INTERNAL_ERROR, got %q", appErr.Code)
 	}
 }

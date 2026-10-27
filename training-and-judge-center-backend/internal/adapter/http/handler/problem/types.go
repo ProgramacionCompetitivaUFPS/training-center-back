@@ -40,6 +40,12 @@ type modifierResp struct {
 	Name     string `json:"name"`
 }
 
+type sampleResp struct {
+	Name   string `json:"name"`
+	Input  string `json:"input"`
+	Output string `json:"output"`
+}
+
 type getProblemResponse struct {
 	Slug                    string             `json:"slug"`
 	Title                   string             `json:"title"`
@@ -53,6 +59,7 @@ type getProblemResponse struct {
 	Author                  authorResp         `json:"author"`
 	Modifiers               []modifierResp     `json:"modifiers,omitempty"`
 	Files                   *filesResp         `json:"files,omitempty"`
+	Samples                 []sampleResp       `json:"samples"`
 	CreatedAt               string             `json:"createdAt"`
 	UpdatedAt               string             `json:"updatedAt"`
 	ProblemJudgingUpdatedAt *string            `json:"problemJudgingUpdatedAt"`
@@ -153,4 +160,109 @@ func buildResponse(p appProblem.ProblemDTO, display *appProblem.UserDisplay) get
 		CreatedAt:               p.CreatedAt.UTC().Format(time.RFC3339),
 		UpdatedAt:               p.UpdatedAt.UTC().Format(time.RFC3339),
 	}
+}
+
+// The validation report crosses the layer boundary as local types rather than
+// the application's own, like every other response in this package. Beyond the
+// convention it is what lets Swagger resolve them: this package and
+// application/problem are both named problem, and swag resolves a type by
+// package name, so it never finds one across that collision.
+
+type validationSummaryResp struct {
+	SampleCases     int  `json:"sampleCases"`
+	SecretCases     int  `json:"secretCases"`
+	SolutionsTested int  `json:"solutionsTested"`
+	AllPassed       bool `json:"allPassed"`
+}
+
+type failedTestCaseResp struct {
+	Case      string `json:"case"`
+	Verdict   string `json:"verdict,omitempty"`
+	Expected  string `json:"expected,omitempty"`
+	Actual    string `json:"actual,omitempty"`
+	Status    string `json:"status,omitempty"`
+	Details   string `json:"details,omitempty"`
+	TimeLimit *int   `json:"timeLimit,omitempty"`
+}
+
+type compilationErrorsResp struct {
+	File   string   `json:"file"`
+	Errors []string `json:"errors"`
+}
+
+type failedInputResp struct {
+	File   string `json:"file"`
+	Reason string `json:"reason"`
+}
+
+func toValidationSummaryResp(s *appProblem.ValidationSummary) *validationSummaryResp {
+	if s == nil {
+		return nil
+	}
+	return &validationSummaryResp{
+		SampleCases:     s.SampleCases,
+		SecretCases:     s.SecretCases,
+		SolutionsTested: s.SolutionsTested,
+		AllPassed:       s.AllPassed,
+	}
+}
+
+func toFailedTestCaseResps(cases []appProblem.FailedTestCase) []failedTestCaseResp {
+	if cases == nil {
+		return nil
+	}
+	out := make([]failedTestCaseResp, 0, len(cases))
+	for _, c := range cases {
+		out = append(out, failedTestCaseResp{
+			Case:      c.Case,
+			Verdict:   c.Verdict,
+			Expected:  c.Expected,
+			Actual:    c.Actual,
+			Status:    c.Status,
+			Details:   c.Details,
+			TimeLimit: c.TimeLimit,
+		})
+	}
+	return out
+}
+
+func toCompilationErrorsResp(e *appProblem.CompilationErrors) *compilationErrorsResp {
+	if e == nil {
+		return nil
+	}
+	return &compilationErrorsResp{File: e.File, Errors: e.Errors}
+}
+
+func toFailedInputResps(inputs []appProblem.FailedInput) []failedInputResp {
+	if inputs == nil {
+		return nil
+	}
+	out := make([]failedInputResp, 0, len(inputs))
+	for _, i := range inputs {
+		out = append(out, failedInputResp{File: i.File, Reason: i.Reason})
+	}
+	return out
+}
+
+type affectedContest struct {
+	ID        string    `json:"id"`
+	Name      string    `json:"name"`
+	GroupID   string    `json:"groupId"`
+	StartTime time.Time `json:"startTime"`
+	EndTime   time.Time `json:"endTime"`
+}
+
+func toAffectedContests(contests []appProblem.ContestRef) []affectedContest {
+	out := make([]affectedContest, 0, len(contests))
+	for _, c := range contests {
+		out = append(out, affectedContest{ID: c.ID, Name: c.Name, GroupID: c.GroupID, StartTime: c.StartTime, EndTime: c.EndTime})
+	}
+	return out
+}
+
+type judgingUpdateResponse struct {
+	Message          string             `json:"message"`
+	ValidationID     string             `json:"validationId"`
+	AffectedContests []affectedContest  `json:"affectedContests"`
+	Problem          getProblemResponse `json:"problem"`
 }

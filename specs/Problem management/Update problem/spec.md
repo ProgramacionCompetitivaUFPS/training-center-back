@@ -34,6 +34,19 @@ As a Coach or Admin who has created a problem, I want to update the problem's me
    - **Then** the system rejects with 400 Bad Request (PROBLEM_IS_PUBLISHED)
    - **And** suggests unpublishing first to make changes
 
+   > **Exception**: `testCases` and `checker` of a published problem that is in an active contest can be replaced by the author or an Admin; see Scenario 6b.
+
+6b. **Scenario**: Replace test cases or checker of a published problem in an active contest
+   - **Given** a problem exists with status `PUBLISHED` and is part of an active contest
+   - **And** the authenticated user is the author or an Admin
+   - **When** they upload `testCases` or `checker` with `confirmSlug` equal to the problem slug
+   - **Then** the system responds `202 Accepted` with a `validationId` and the open contests that include the problem
+   - **And** the new files are staged apart and validated against the existing solutions, with the new checker compiled aside
+   - **And** the problem keeps being judged with the current files until the validation passes
+   - **And** when it passes, the new files replace the current ones and `problemJudgingUpdatedAt` is updated, in one step
+   - **And** when it fails, the problem is left untouched and the staged files are removed; the result is available at `GET /problems/p/{slug}/validation`
+   - **And** submissions already judged are not rejudged automatically; whoever may rejudge each contest does it
+
 4. **Scenario**: Unauthorized update attempt
    - **Given** a problem exists with status `DRAFT`
    - **And** the authenticated user is neither the author, an Admin, nor a modifier
@@ -119,6 +132,8 @@ As a Coach or Admin who has created a problem, I want to upload test cases, solu
    - **Then** the system rejects with 400 Bad Request (PROBLEM_IS_PUBLISHED)
    - **And** suggests unpublishing first to make changes
 
+   > **Exception**: `testCases` and `checker` of a published problem that is in an active contest can be replaced by the author or an Admin; see Scenario 6b.
+
 7. **Scenario**: Unauthorized upload attempt
    - **Given** a problem exists with status `DRAFT`
    - **And** the authenticated user is neither the author, an Admin, nor a modifier
@@ -192,22 +207,24 @@ As a problem author or Admin, I want to assign other users as modifiers so that 
    - **When** they remove the modifier
    - **Then** the modifier no longer has edit permissions
 
-4. **Scenario**: Modifier cannot add other modifiers
+4. **Scenario**: Modifier adds another modifier
    - **Given** a problem exists
    - **And** the authenticated user is a modifier (not author/Admin)
-   - **When** they attempt to add another modifier
-   - **Then** the system rejects with 403 Forbidden (INSUFFICIENT_PERMISSIONS)
+   - **When** they add another user as a modifier
+   - **Then** the modifier is associated with the problem (a modifier can already read and export every file, so this hands out no new access)
+   - **And** a user who is neither author, modifier nor Admin is rejected with 403 Forbidden (INSUFFICIENT_PERMISSIONS)
+   - **And** removing modifiers stays with the author and Admin
 
 5. **Scenario**: Add non-existent user as modifier
    - **Given** a problem exists
    - **And** the authenticated user is the author
    - **When** they attempt to add a non-existent user as modifier
-   - **Then** the system rejects with 400 Bad Request (USER_NOT_FOUND)
+   - **Then** the system rejects with 404 Not Found (USER_NOT_FOUND)
 
 6. **Scenario**: Add already existing modifier
    - **Given** a problem already has user X as modifier
    - **When** the author attempts to add user X again
-   - **Then** the system rejects with 400 Bad Request (ALREADY_MODIFIER)
+   - **Then** the system rejects with 409 Conflict (MODIFIER_ALREADY_EXISTS)
 
 7. **Scenario**: List modifiers
    - **Given** a problem exists with modifiers assigned
@@ -381,7 +398,7 @@ Problem not found.
 
 Upload files for a problem (test cases, solution, checker, validator).
 
-> **Important**: Only the problem author, Admin, or modifier can upload files. Problem must be in `DRAFT` status. Files are uploaded directly to the backend. Use multipart/form-data.
+> **Important**: Only the problem author, Admin, or modifier can upload files. Problem must be in `DRAFT` status. The exception is `testCases` and `checker` of a published problem in an active contest, which only the author or an Admin can replace by sending `confirmSlug` (see Scenario 6b). Files are uploaded directly to the backend. Use multipart/form-data.
 
 **Headers**:
 
@@ -402,6 +419,7 @@ Upload files for a problem (test cases, solution, checker, validator).
 |-------|------|----------|-------------|
 | fileType | string | Yes | Type of file: `testCases`, `solution`, `checker`, `validator` |
 | file | file | Yes | The file to upload |
+| confirmSlug | string | Only for a live judging update | The problem slug; required to replace `testCases` or `checker` of a published problem in an active contest |
 
 **File Requirements**:
 
@@ -444,6 +462,20 @@ File uploaded successfully.
     "checker": false,
     "validator": false
   }
+}
+```
+
+#### 202 Accepted
+A judging update of a published problem in an active contest was accepted; it takes effect once it passes validation.
+
+```json
+{
+  "message": "Judging update accepted; it takes effect once it passes validation",
+  "validationId": "f4c1d2e0-1111-4a2b-9c3d-000000000000",
+  "affectedContests": [
+    {"id": "5403d49f-895f-43ba-88ce-adf37a76dfa4", "name": "Round 1", "groupId": "00000000-0000-0000-0000-000000000002", "startTime": "2026-10-12T03:04:21Z", "endTime": "2026-10-13T04:04:21Z"}
+  ],
+  "problem": {}
 }
 ```
 
@@ -548,7 +580,7 @@ Problem or file not found.
 
 Add a modifier to a problem.
 
-> **Important**: Only the problem author or Admin can add modifiers. Modifiers can edit the problem but cannot add other modifiers or delete the problem.
+> **Important**: The problem author, Admin or any existing modifier can add modifiers (like sharing a file with edit access). Only the author or Admin can remove modifiers or delete the problem.
 
 **Headers**:
 
@@ -592,15 +624,21 @@ Modifier added successfully.
 }
 ```
 
-#### 400 Bad Request
-User is already a modifier or user not found.
+#### 401 Unauthorized
+Authentication failed.
+
+#### 403 Forbidden
+Only the author, a modifier or Admin can add modifiers.
 
 ```json
 {
-  "error": "ALREADY_MODIFIER",
-  "message": "User is already a modifier for this problem"
+  "error": "INSUFFICIENT_PERMISSIONS",
+  "message": "Only the author, a modifier or Admin can add modifiers"
 }
 ```
+
+#### 404 Not Found
+Problem not found, or the user to add does not exist.
 
 ```json
 {
@@ -609,21 +647,15 @@ User is already a modifier or user not found.
 }
 ```
 
-#### 401 Unauthorized
-Authentication failed.
-
-#### 403 Forbidden
-Only author or Admin can add modifiers.
+#### 409 Conflict
+The user is already a modifier of the problem.
 
 ```json
 {
-  "error": "INSUFFICIENT_PERMISSIONS",
-  "message": "Only the problem author or Admin can add modifiers"
+  "error": "MODIFIER_ALREADY_EXISTS",
+  "message": "User is already a modifier for this problem"
 }
 ```
-
-#### 404 Not Found
-Problem not found.
 
 ---
 
@@ -740,7 +772,7 @@ Problem not found.
 - **FR-013**: The system MUST enforce file size limits (200 MB for test cases, 10 MB for others).
 - **FR-014**: The system MUST allow replacing existing files with new uploads.
 - **FR-015**: The system MUST allow multiple solution files to be uploaded.
-- **FR-016**: The system MUST only allow file uploads when problem status is `DRAFT`.
+- **FR-016**: The system MUST only allow file uploads when problem status is `DRAFT`, except for the replacement of `testCases` or `checker` of a `PUBLISHED` problem in an active contest; see FR-025a.
 - **FR-016b**: The system MUST update `problemJudgingUpdatedAt` timestamp when uploading judging components (testCases, checker, validator).
 - **FR-016c**: The system MUST NOT update `problemJudgingUpdatedAt` when uploading solution files.
 
@@ -750,12 +782,19 @@ Problem not found.
 - **FR-019**: For solutions, the system MUST allow specifying which solution to delete by filename.
 
 **Modifiers**
-- **FR-020**: The system MUST allow the problem author or Admin to assign other users as modifiers.
+- **FR-020**: The system MUST allow the problem author, Admin or an existing modifier to assign other users as modifiers.
 - **FR-021**: Modifiers MUST have permission to update metadata, upload/delete files.
-- **FR-022**: Modifiers MUST NOT be able to assign other modifiers (only author/Admin can).
+- **FR-022**: Modifiers MUST NOT be able to remove modifiers (only author/Admin can); they can add them.
 - **FR-023**: Modifiers MUST NOT be able to delete the problem (only author/Admin can).
 - **FR-024**: The system MUST allow listing all modifiers for a problem.
 - **FR-025**: The system MUST allow removing modifiers by the author or Admin.
+
+**Live judging update**
+- **FR-025a**: The system MUST allow only the author or an Admin to replace `testCases` or `checker` of a `PUBLISHED` problem, and only while it is in an active contest; modifiers MUST NOT.
+- **FR-025b**: The system MUST require `confirmSlug` equal to the problem slug for that replacement.
+- **FR-025c**: The system MUST NOT put the new files in effect until every solution passes with them (and the new checker compiles); until then the problem is judged with the current files.
+- **FR-025d**: The system MUST update `problemJudgingUpdatedAt` at the moment the new files take effect, not when they are uploaded.
+- **FR-025e**: Solutions and validators of a `PUBLISHED` problem MUST still require unpublishing first.
 
 **General**
 - **FR-026**: The system MUST NOT return internal IDs in any response.
@@ -785,7 +824,7 @@ For the canonical documentation of the `Problem` entity and its properties (incl
 | Update accessibility | ✅ | ✅ | ✅ | ❌ |
 | Upload files | ✅ | ✅ | ✅ | ❌ |
 | Delete files | ✅ | ✅ | ✅ | ❌ |
-| Add modifier | ✅ | ✅ | ❌ | ❌ |
+| Add modifier | ✅ | ✅ | ✅ | ❌ |
 | Remove modifier | ✅ | ✅ | ❌ | ❌ |
 | List modifiers | ✅ | ✅ | ✅ | ❌ |
 | Delete problem | ✅ | ✅ | ❌ | ❌ |
@@ -803,8 +842,8 @@ For the canonical documentation of the `Problem` entity and its properties (incl
 - **SC-005**: Files can be deleted via `DELETE /problems/p/{slug}/files/{fileType}` with HTTP 200.
 - **SC-006**: Test cases ZIP structure is validated against ICPC format on upload.
 - **SC-007**: Only problem author, Admin, or assigned modifiers can modify problems.
-- **SC-008**: Modifiers can be added/removed only by the author or Admin.
-- **SC-009**: Modifiers can edit but cannot add other modifiers or delete the problem.
+- **SC-008**: Modifiers can be added by the author, Admin or another modifier, and removed only by the author or Admin.
+- **SC-009**: Modifiers can edit and add other modifiers, but cannot remove modifiers or delete the problem.
 - **SC-010**: Contestant users attempting operations receive HTTP 403.
 - **SC-011**: No internal IDs are returned in any response.
 - **SC-012**: `updatedAt` is refreshed on every modification.

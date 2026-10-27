@@ -26,7 +26,7 @@ type adminRejudgeResponse struct {
 // @Param        slug      path  string true  "Problem slug"
 // @Param        contestId query string false "Filter by contest ID"
 // @Success      200 {object} adminRejudgeResponse
-// @Failure      400 {object} apperror.AppError
+// @Failure      400 {object} apperror.AppError "PROBLEM_NOT_PUBLISHED, NO_SUBMISSIONS_TO_REJUDGE, PROBLEM_NOT_IN_CONTEST"
 // @Failure      401 {object} apperror.AppError
 // @Failure      403 {object} apperror.AppError
 // @Failure      404 {object} apperror.AppError

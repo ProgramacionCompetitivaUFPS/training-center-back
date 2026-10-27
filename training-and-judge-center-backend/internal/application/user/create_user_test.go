@@ -22,7 +22,7 @@ func validInput() CreateUserInput {
 
 func TestCreateUser_Success(t *testing.T) {
 	repo := newNoConflictRepo()
-	uc := NewCreateUserUseCase(repo)
+	uc := NewCreateUserUseCase(repo, newNoopGlobalGroupJoiner(), &mockTransactionManager{})
 
 	result, err := uc.Execute(context.Background(), validInput())
 	if err != nil {
@@ -47,7 +47,7 @@ func TestCreateUser_Success(t *testing.T) {
 
 func TestCreateUser_ValidationErrors(t *testing.T) {
 	repo := newNoConflictRepo()
-	uc := NewCreateUserUseCase(repo)
+	uc := NewCreateUserUseCase(repo, newNoopGlobalGroupJoiner(), &mockTransactionManager{})
 
 	input := CreateUserInput{
 		Email:       "",
@@ -81,7 +81,7 @@ func TestCreateUser_EmailAlreadyExists(t *testing.T) {
 	repo.saveFn = func(_ context.Context, _ *domain.User) error {
 		return apperror.NewConflict(domain.ErrCodeEmailConflict, "email already in use")
 	}
-	uc := NewCreateUserUseCase(repo)
+	uc := NewCreateUserUseCase(repo, newNoopGlobalGroupJoiner(), &mockTransactionManager{})
 
 	_, err := uc.Execute(context.Background(), validInput())
 	if err == nil {
@@ -102,7 +102,7 @@ func TestCreateUser_NicknameAlreadyExists(t *testing.T) {
 	repo.saveFn = func(_ context.Context, _ *domain.User) error {
 		return apperror.NewConflict(domain.ErrCodeNicknameConflict, "nickname already in use")
 	}
-	uc := NewCreateUserUseCase(repo)
+	uc := NewCreateUserUseCase(repo, newNoopGlobalGroupJoiner(), &mockTransactionManager{})
 
 	_, err := uc.Execute(context.Background(), validInput())
 	if err == nil {
@@ -118,12 +118,51 @@ func TestCreateUser_NicknameAlreadyExists(t *testing.T) {
 	}
 }
 
+func TestCreateUser_JoinsGlobalGroup(t *testing.T) {
+	repo := newNoConflictRepo()
+	joiner := newNoopGlobalGroupJoiner()
+	var joinedUserID string
+	joiner.addToGlobalGroupFn = func(_ context.Context, userID string) error {
+		joinedUserID = userID
+		return nil
+	}
+	uc := NewCreateUserUseCase(repo, joiner, &mockTransactionManager{})
+
+	if _, err := uc.Execute(context.Background(), validInput()); err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+	if joinedUserID == "" {
+		t.Fatal("expected AddToGlobalGroup to be called with the new user's id")
+	}
+}
+
+func TestCreateUser_GlobalGroupJoinError(t *testing.T) {
+	repo := newNoConflictRepo()
+	joiner := newNoopGlobalGroupJoiner()
+	joiner.addToGlobalGroupFn = func(_ context.Context, _ string) error {
+		return apperror.NewInternal()
+	}
+	uc := NewCreateUserUseCase(repo, joiner, &mockTransactionManager{})
+
+	_, err := uc.Execute(context.Background(), validInput())
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+	appErr, ok := err.(*apperror.AppError)
+	if !ok {
+		t.Fatalf("expected *apperror.AppError, got %T", err)
+	}
+	if appErr.Code != apperror.ErrCodeInternalError {
+		t.Errorf("expected code INTERNAL_ERROR, got %q", appErr.Code)
+	}
+}
+
 func TestCreateUser_RepositorySaveError(t *testing.T) {
 	repo := newNoConflictRepo()
 	repo.saveFn = func(_ context.Context, _ *domain.User) error {
 		return apperror.NewInternal()
 	}
-	uc := NewCreateUserUseCase(repo)
+	uc := NewCreateUserUseCase(repo, newNoopGlobalGroupJoiner(), &mockTransactionManager{})
 
 	_, err := uc.Execute(context.Background(), validInput())
 	if err == nil {
@@ -138,4 +177,3 @@ func TestCreateUser_RepositorySaveError(t *testing.T) {
 		t.Errorf("expected code INTERNAL_ERROR, got %q", appErr.Code)
 	}
 }
-

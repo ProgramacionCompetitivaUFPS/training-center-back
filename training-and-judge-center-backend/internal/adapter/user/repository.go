@@ -92,7 +92,9 @@ func (r *Repository) Update(ctx context.Context, u *domainUser.User) error {
 		if errors.As(err, &pgErr) && pgErr.Code == infraPostgres.UniqueViolation {
 			switch pgErr.ConstraintName {
 			case "users_nickname_key":
-				return apperror.NewConflict(domainUser.ErrCodeNicknameConflict, "nickname already in use")
+				return apperror.NewConflictWithDetails(domainUser.ErrCodeNicknameConflict, "nickname already in use", []apperror.FieldError{
+					{Field: "nickname", Message: "nickname already in use"},
+				})
 			case "users_email_key":
 				return apperror.NewConflict(domainUser.ErrCodeEmailConflict, "email already in use")
 			}
@@ -185,13 +187,6 @@ func (r *Repository) FindByNickname(ctx context.Context, nickname domainUser.Nic
 	return u, nil
 }
 
-func escapeILIKE(s string) string {
-	s = strings.ReplaceAll(s, `\`, `\\`)
-	s = strings.ReplaceAll(s, `%`, `\%`)
-	s = strings.ReplaceAll(s, `_`, `\_`)
-	return s
-}
-
 var sortColumnMap = map[domainUser.SortField]string{
 	domainUser.SortByCreatedAt:     "created_at",
 	domainUser.SortByName:          "name",
@@ -246,7 +241,7 @@ func (r *Repository) FindAll(ctx context.Context, filter domainUser.UserFilter) 
 
 	// Text search
 	if filter.SearchTerm != "" {
-		searchPattern := "%" + escapeILIKE(filter.SearchTerm) + "%"
+		searchPattern := "%" + infraPostgres.EscapeILIKE(filter.SearchTerm) + "%"
 		switch filter.SearchField {
 		case domainUser.SearchByName:
 			conditions = append(conditions, fmt.Sprintf("name ILIKE $%d", n))
@@ -331,4 +326,94 @@ func (r *Repository) FindAll(ctx context.Context, filter domainUser.UserFilter) 
 	}
 
 	return users, totalCount, nil
+}
+
+// SearchActive matches only name/nickname (never email/institution, unlike
+// FindAll's SearchByAll) and skips the COUNT query — autocomplete callers
+// only need a capped result list, not pagination metadata.
+func (r *Repository) SearchActive(ctx context.Context, term string, limit int) ([]*domainUser.User, error) {
+	pattern := "%" + infraPostgres.EscapeILIKE(term) + "%"
+	query := fmt.Sprintf(
+		`SELECT %s FROM users WHERE status = $1 AND (name ILIKE $2 OR nickname ILIKE $2) ORDER BY name ASC LIMIT $3`,
+		userColumns,
+	)
+
+	rows, err := r.querier.Query(ctx, query, domainUser.StatusActive.String(), pattern, limit)
+	if err != nil {
+		slog.ErrorContext(ctx, "database error searching active users", "error", err)
+		return nil, apperror.NewInternal()
+	}
+	defer rows.Close()
+
+	var users []*domainUser.User
+	for rows.Next() {
+		u, err := scanUser(rows)
+		if err != nil {
+			slog.ErrorContext(ctx, "database error scanning user row", "error", err)
+			return nil, apperror.NewInternal()
+		}
+		if u != nil {
+			users = append(users, u)
+		}
+	}
+
+	if err := rows.Err(); err != nil {
+		slog.ErrorContext(ctx, "database error iterating user rows", "error", err)
+		return nil, apperror.NewInternal()
+	}
+
+	return users, nil
+}
+
+func (r *Repository) FindFilterOptions(ctx context.Context) (domainUser.FilterOptions, error) {
+	querier := infraPostgres.GetQuerier(ctx, r.querier)
+
+	countries, err := distinctNonEmptyColumn(ctx, querier, "country")
+	if err != nil {
+		return domainUser.FilterOptions{}, err
+	}
+	cities, err := distinctNonEmptyColumn(ctx, querier, "city")
+	if err != nil {
+		return domainUser.FilterOptions{}, err
+	}
+	institutions, err := distinctNonEmptyColumn(ctx, querier, "institution")
+	if err != nil {
+		return domainUser.FilterOptions{}, err
+	}
+
+	return domainUser.FilterOptions{
+		Countries:    countries,
+		Cities:       cities,
+		Institutions: institutions,
+	}, nil
+}
+
+// distinctNonEmptyColumn returns the distinct, non-empty values of one of
+// users.country/city/institution, sorted alphabetically. column is always one
+// of those three fixed literals passed by FindFilterOptions, never user input.
+func distinctNonEmptyColumn(ctx context.Context, querier infraPostgres.Querier, column string) ([]string, error) {
+	query := fmt.Sprintf(`SELECT DISTINCT %s FROM users WHERE %s <> '' ORDER BY %s ASC`, column, column, column)
+
+	rows, err := querier.Query(ctx, query)
+	if err != nil {
+		slog.ErrorContext(ctx, "database error listing distinct user column values", "column", column, "error", err)
+		return nil, apperror.NewInternal()
+	}
+	defer rows.Close()
+
+	values := []string{}
+	for rows.Next() {
+		var v string
+		if err := rows.Scan(&v); err != nil {
+			slog.ErrorContext(ctx, "database error scanning distinct column value", "column", column, "error", err)
+			return nil, apperror.NewInternal()
+		}
+		values = append(values, v)
+	}
+	if err := rows.Err(); err != nil {
+		slog.ErrorContext(ctx, "database error iterating distinct column values", "column", column, "error", err)
+		return nil, apperror.NewInternal()
+	}
+
+	return values, nil
 }

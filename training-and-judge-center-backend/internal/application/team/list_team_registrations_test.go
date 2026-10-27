@@ -42,7 +42,7 @@ func TestListTeamRegistrations_Success(t *testing.T) {
 	assert.Equal(t, testTeamID, out.Items[0].TeamID)
 }
 
-func TestListTeamRegistrations_NotGroupMember(t *testing.T) {
+func TestListTeamRegistrations_HiddenGroupNonMember_NotFound(t *testing.T) {
 	uc := newListRegistrationsUseCase(
 		&mockGroupChecker{fn: func(_ string, _ []string) (map[string]bool, error) {
 			return map[string]bool{memberA: false}, nil
@@ -60,5 +60,24 @@ func TestListTeamRegistrations_NotGroupMember(t *testing.T) {
 	})
 	require.Error(t, err)
 	ae := err.(*apperror.AppError)
-	assert.Equal(t, apperror.KindForbidden, ae.Kind)
+	assert.Equal(t, apperror.KindNotFound, ae.Kind)
+}
+
+func TestListTeamRegistrations_VisibleGroupNonMember_CanView(t *testing.T) {
+	visibleContest := &mockContestProvider{infoFn: func(contestID string) (*ContestInfo, error) {
+		return &ContestInfo{ID: contestID, GroupID: testGroupID, GroupIsVisible: true, ParticipationMode: "TEAM", Status: "FINISHED"}, nil
+	}}
+	notMember := &mockGroupChecker{fn: func(_ string, _ []string) (map[string]bool, error) {
+		return map[string]bool{memberA: false}, nil
+	}}
+	uc := NewListTeamRegistrationsUseCase(visibleContest, notMember, &mockTeamParticipRepo{}, teamRepoWithTeam(), &mockUserProvider{})
+
+	_, err := uc.Execute(ctx(), ListTeamRegistrationsInput{
+		CurrentUser: asContestant(memberA),
+		ContestID:   testContestID,
+		GroupID:     testGroupID,
+		Page:        1,
+		Limit:       10,
+	})
+	require.NoError(t, err)
 }

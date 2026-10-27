@@ -5,8 +5,10 @@ import (
 	"time"
 
 	appshared "github.com/training-judge-center/backend/internal/application/shared"
-	domainsubmission "github.com/training-judge-center/backend/internal/domain/submission"
+	domainContest "github.com/training-judge-center/backend/internal/domain/contest"
 	"github.com/training-judge-center/backend/internal/domain/shared"
+	domainsubmission "github.com/training-judge-center/backend/internal/domain/submission"
+	"github.com/training-judge-center/backend/pkg/apperror"
 )
 
 type ListMySubmissionsInput struct {
@@ -62,10 +64,9 @@ func (uc *ListMySubmissionsUseCase) Execute(ctx context.Context, in ListMySubmis
 		}
 	}
 
-	if in.Language != nil {
-		if _, err := domainsubmission.NewLanguage(*in.Language); err != nil {
-			return nil, err
-		}
+	language, blockly, err := languageFilter(in.Language)
+	if err != nil {
+		return nil, err
 	}
 
 	uid := shared.RestoreUserID(in.CurrentUser.ID)
@@ -73,7 +74,8 @@ func (uc *ListMySubmissionsUseCase) Execute(ctx context.Context, in ListMySubmis
 	f := domainsubmission.ListFilters{
 		UserID:          &uid,
 		Status:          in.Status,
-		Language:        in.Language,
+		Language:        language,
+		Blockly:         blockly,
 		SubmittedFrom:   in.SubmittedFrom,
 		SubmittedBefore: in.SubmittedBefore,
 		Page:            in.Page,
@@ -108,18 +110,43 @@ func (uc *ListMySubmissionsUseCase) Execute(ctx context.Context, in ListMySubmis
 		return nil, err
 	}
 
+	// Batch problem/contest lookups instead of one query per submission (was up to
+	// 2*maxPageLimit extra round trips per page).
+	problemIDs := make([]string, 0, len(subs))
+	seenProblem := make(map[string]bool, len(subs))
+	contestIDs := make([]string, 0, len(subs))
+	seenContest := make(map[string]bool, len(subs))
+	for _, s := range subs {
+		if pid := s.ProblemID(); pid != "" && !seenProblem[pid] {
+			problemIDs = append(problemIDs, pid)
+			seenProblem[pid] = true
+		}
+		if cid := s.ContestID(); cid != nil && !seenContest[*cid] {
+			contestIDs = append(contestIDs, *cid)
+			seenContest[*cid] = true
+		}
+	}
+
+	problemDisplays, err := uc.problemDisplay.GetProblemsByIDs(ctx, problemIDs)
+	if err != nil {
+		return nil, err
+	}
+	contestDisplays, err := uc.contestDisplay.GetContestsByIDs(ctx, contestIDs)
+	if err != nil {
+		return nil, err
+	}
+
 	summaries := make([]SubmissionSummary, 0, len(subs))
 	for _, s := range subs {
-		problem, err := resolveProblemDisplay(ctx, uc.problemDisplay, s)
-		if err != nil {
-			return nil, err
-		}
+		problem := resolveProblemDisplayFromMap(problemDisplays, s)
 
 		var contest *ContestDisplay
 		if cid := s.ContestID(); cid != nil {
-			cd, err := uc.contestDisplay.GetContestByID(ctx, *cid)
-			if err != nil {
-				return nil, err
+			cd, ok := contestDisplays[*cid]
+			if !ok {
+				// A contest_id on a submission is never stale the way problem_id can be
+				// after a deletion — same error the single-row GetContestByID would give.
+				return nil, apperror.NewNotFound(domainContest.ErrCodeContestNotFound, "contest not found")
 			}
 			contest = cd
 		}
@@ -134,6 +161,7 @@ func (uc *ListMySubmissionsUseCase) Execute(ctx context.Context, in ListMySubmis
 			Contest:       contest,
 			SubmittedBy:   *me,
 			Language:      s.Language().String(),
+			IsBlockly:     s.IsBlockly(),
 			ExecutionTime: s.TimeMs(),
 			MemoryKb:      s.MemoryKb(),
 		})

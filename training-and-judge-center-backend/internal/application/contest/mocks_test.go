@@ -394,14 +394,14 @@ func (m *mockStandingsCache) Invalidate(ctx context.Context, contestID string) e
 // ── ContestSubmissionsProvider mock ──────────────────────────────────────────
 
 type mockContestSubmissionsProvider struct {
-	listByContestFn func(ctx context.Context, contestID string, filters ContestSubmissionFilters) ([]RichSubmissionData, error)
+	listByContestFn func(ctx context.Context, contestID string, filters ContestSubmissionFilters) ([]RichSubmissionData, int, error)
 }
 
-func (m *mockContestSubmissionsProvider) ListByContest(ctx context.Context, contestID string, filters ContestSubmissionFilters) ([]RichSubmissionData, error) {
+func (m *mockContestSubmissionsProvider) ListByContest(ctx context.Context, contestID string, filters ContestSubmissionFilters) ([]RichSubmissionData, int, error) {
 	if m.listByContestFn != nil {
 		return m.listByContestFn(ctx, contestID, filters)
 	}
-	return nil, nil
+	return nil, 0, nil
 }
 
 // ── CallerStandingProvider mock ───────────────────────────────────────────────
@@ -469,6 +469,19 @@ func (m *mockParticipantProfileProvider) GetProfiles(ctx context.Context, userID
 		return m.getProfilesFn(ctx, userIDs)
 	}
 	return map[string]*ParticipantProfile{}, nil
+}
+
+// ── TeamDisplayProvider mock ─────────────────────────────────────────────────
+
+type mockTeamDisplayProvider struct {
+	getDisplaysFn func(ctx context.Context, teamIDs []string) (map[string]*TeamDisplay, error)
+}
+
+func (m *mockTeamDisplayProvider) GetDisplays(ctx context.Context, teamIDs []string) (map[string]*TeamDisplay, error) {
+	if m.getDisplaysFn != nil {
+		return m.getDisplaysFn(ctx, teamIDs)
+	}
+	return map[string]*TeamDisplay{}, nil
 }
 
 // ── TransactionManager mock ──────────────────────────────────────────────────

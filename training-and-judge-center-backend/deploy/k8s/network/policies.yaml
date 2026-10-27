@@ -1,0 +1,108 @@
+# NetworkPolicies de endurecimiento (pass 1: SOLO ingress). Requieren el enforcer nativo de
+# Dataplane V2 (cluster creado con ADVANCED_DATAPATH) — en un cluster sin DPv2 se crean pero
+# no se aplican.
+#
+# Modelo: default-deny de ingress en todo el namespace + allows explícitos de los flujos
+# reales. El origen de los datastores es "mismo namespace" (podSelector {}), que bloquea todo
+# lo externo y cross-namespace sin romper los jobs (migrate/seed/backup no tienen un label
+# estable propio). Egress se deja ABIERTO a propósito (DNS, GCS, SMTP, metadata, y el pull de
+# imágenes de lenguajes del judge); cerrarlo sería una fase 2 deliberada.
+#
+# OJO: la aislación de red del código NO confiable NO vive aquí, sino en el executor —
+# los contenedores de submission corren con NetworkMode "none" (adapter/judge/pool/pool.go).
+# Estas policies protegen al cluster de los pods; no al pod de sus propias submissions.
+
+# 1. Niega TODO ingress en el namespace. Los allows siguientes reabren solo lo necesario.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny-ingress
+  namespace: training-center
+spec:
+  podSelector: {}
+  policyTypes:
+    - Ingress
+---
+# 2. El api recibe SOLO del balanceador de Google: los health checks y el tráfico proxeado
+#    por los GFE llegan desde estos dos rangos. Nada interno le habla al api.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-api-from-lb
+  namespace: training-center
+spec:
+  podSelector:
+    matchLabels:
+      app: api
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - ipBlock:
+            cidr: 130.211.0.0/22
+        - ipBlock:
+            cidr: 35.191.0.0/16
+      ports:
+        - protocol: TCP
+          port: 8080
+---
+# 3. Postgres: solo desde el mismo namespace (api, worker, y los jobs migrate/seed/backup).
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-postgres
+  namespace: training-center
+spec:
+  podSelector:
+    matchLabels:
+      app: postgres
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - podSelector: {}
+      ports:
+        - protocol: TCP
+          port: 5432
+---
+# 4. Redis: solo desde el mismo namespace.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-redis
+  namespace: training-center
+spec:
+  podSelector:
+    matchLabels:
+      app: redis
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - podSelector: {}
+      ports:
+        - protocol: TCP
+          port: 6379
+---
+# 5. RabbitMQ: desde el mismo namespace (api, worker) y desde el namespace `keda` —
+#    KEDA lee la profundidad de la cola por AMQP (5672) para autoescalar el worker.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-rabbitmq
+  namespace: training-center
+spec:
+  podSelector:
+    matchLabels:
+      app: rabbitmq
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - podSelector: {}
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: keda
+      ports:
+        - protocol: TCP
+          port: 5672

@@ -10,8 +10,8 @@ import (
 
 	"github.com/google/uuid"
 	appshared "github.com/training-judge-center/backend/internal/application/shared"
-	domainSubmission "github.com/training-judge-center/backend/internal/domain/submission"
 	"github.com/training-judge-center/backend/internal/domain/shared"
+	domainSubmission "github.com/training-judge-center/backend/internal/domain/submission"
 	"github.com/training-judge-center/backend/pkg/apperror"
 )
 
@@ -22,7 +22,9 @@ type SubmitSolutionInput struct {
 	Compiler    string
 	FileName    string
 	FileData    []byte
-	SubmittedAt time.Time
+	// WorkspaceXML is the block editor workspace; nil for a regular submission.
+	WorkspaceXML []byte
+	SubmittedAt  time.Time
 }
 
 type SubmitSolutionOutput struct {
@@ -35,6 +37,7 @@ type SubmitSolutionOutput struct {
 	Compiler     string
 	FileSize     int
 	FileHash     string
+	IsBlockly    bool
 }
 
 type SubmitSolutionUseCase struct {
@@ -76,6 +79,11 @@ func (uc *SubmitSolutionUseCase) Execute(ctx context.Context, in SubmitSolutionI
 	if err != nil {
 		return nil, err
 	}
+	if in.WorkspaceXML != nil {
+		if err := validateBlocklyWorkspace(in.Language, in.WorkspaceXML); err != nil {
+			return nil, err
+		}
+	}
 
 	// 4. Get problem
 	problem, err := uc.problemProvider.GetProblemBySlug(ctx, in.ProblemSlug)
@@ -89,19 +97,10 @@ func (uc *SubmitSolutionUseCase) Execute(ctx context.Context, in SubmitSolutionI
 			"only PUBLISHED problems can receive submissions")
 	}
 
-	// 6. Accessibility check
-	if !problem.IsPublic {
-		isModifier := false
-		for _, mid := range problem.ModifierIDs {
-			if mid == in.CurrentUser.ID {
-				isModifier = true
-				break
-			}
-		}
-		if !isModifier {
-			return nil, apperror.NewForbidden(domainSubmission.ErrCodeProblemNotAccessible,
-				"only modifiers can submit to PRIVATE problems")
-		}
+	// 6. Accessibility check — mirrors Problem.CanBeEditedBy: author, admin, or modifier.
+	if !problem.IsPublic && !canSubmitToPrivate(problem, in.CurrentUser) {
+		return nil, apperror.NewForbidden(domainSubmission.ErrCodeProblemNotAccessible,
+			"only the author, an admin, or a modifier can submit to PRIVATE problems")
 	}
 
 	userID := in.CurrentUser.ID
@@ -141,7 +140,8 @@ func (uc *SubmitSolutionUseCase) Execute(ctx context.Context, in SubmitSolutionI
 	submissionID := uuid.New().String()
 	storagePath := fmt.Sprintf("%s/%s/general/%s%s", problem.ID, userID, submissionID, ext)
 
-	if err := uc.sourceStorage.Upload(ctx, storagePath, in.FileData); err != nil {
+	workspacePath, err := uploadSubmissionFiles(ctx, uc.sourceStorage, storagePath, in.FileData, in.WorkspaceXML)
+	if err != nil {
 		return nil, err
 	}
 
@@ -162,14 +162,15 @@ func (uc *SubmitSolutionUseCase) Execute(ctx context.Context, in SubmitSolutionI
 		in.SubmittedAt,
 	)
 	if err != nil {
+		deleteSubmissionFiles(ctx, uc.sourceStorage, storagePath, workspacePath)
 		return nil, err
+	}
+	if workspacePath != nil {
+		sub.AttachBlocklyWorkspace(*workspacePath)
 	}
 
 	if err := uc.submissionRepo.Save(ctx, sub); err != nil {
-		if delErr := uc.sourceStorage.Delete(ctx, storagePath); delErr != nil {
-			slog.ErrorContext(ctx, "submission: failed to delete orphaned file after save error",
-				"path", storagePath, "error", delErr)
-		}
+		deleteSubmissionFiles(ctx, uc.sourceStorage, storagePath, workspacePath)
 		return nil, err
 	}
 
@@ -198,5 +199,20 @@ func (uc *SubmitSolutionUseCase) Execute(ctx context.Context, in SubmitSolutionI
 		Compiler:     in.Compiler,
 		FileSize:     len(in.FileData),
 		FileHash:     fileHash,
+		IsBlockly:    sub.IsBlockly(),
 	}, nil
+}
+
+// canSubmitToPrivate mirrors Problem.CanBeEditedBy, which the problem domain
+// owns: a private problem is reachable by its author, an admin, or a modifier.
+func canSubmitToPrivate(p *ProblemInfo, u appshared.CurrentUser) bool {
+	if p.AuthorID == u.ID || u.IsAdmin() {
+		return true
+	}
+	for _, mid := range p.ModifierIDs {
+		if mid == u.ID {
+			return true
+		}
+	}
+	return false
 }

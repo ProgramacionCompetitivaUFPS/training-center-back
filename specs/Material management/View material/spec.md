@@ -83,7 +83,7 @@ As a group member, I want to view a list of materials in my group with filters a
     - **And** a user is authenticated and is a member
     - **When** the user requests GET /groups/{groupId}/materials?page=2&limit=10
     - **Then** the system returns materials 11-20
-    - **And** pagination metadata shows currentPage=2, totalPages=5, itemsPerPage=10
+    - **And** pagination metadata shows page=2, totalPages=5, limit=10
 
 12. **Scenario**: Invalid pagination parameters
     - **Given** a user is authenticated and is a member
@@ -173,10 +173,12 @@ Materials list retrieved successfully.
     }
   ],
   "pagination": {
-    "totalCount": 15,
-    "currentPage": 1,
+    "page": 1,
+    "limit": 20,
+    "total": 15,
     "totalPages": 1,
-    "itemsPerPage": 20
+    "hasNextPage": false,
+    "hasPrevPage": false
   }
 }
 ```
@@ -200,10 +202,12 @@ Materials list retrieved successfully.
 | materials[].updatedAt | string | Last update timestamp (ISO 8601) |
 | materials[].publishedAt | string \| null | First publication timestamp (ISO 8601 or null) |
 | pagination | object | Pagination metadata |
-| pagination.totalCount | integer | Total number of materials matching filters |
-| pagination.currentPage | integer | Current page number |
+| pagination.page | integer | Current page number |
+| pagination.limit | integer | Number of items per page |
+| pagination.total | integer | Total number of materials matching filters |
 | pagination.totalPages | integer | Total number of pages |
-| pagination.itemsPerPage | integer | Number of items per page |
+| pagination.hasNextPage | boolean | Whether a following page exists |
+| pagination.hasPrevPage | boolean | Whether a preceding page exists |
 
 #### 400 Bad Request
 Invalid query parameters.
@@ -284,7 +288,7 @@ Group with the specified ID does not exist.
 
 **Pagination**
 - **FR-016**: The system MUST support pagination with page and limit query parameters
-- **FR-017**: The system MUST return pagination metadata (totalCount, currentPage, totalPages, itemsPerPage)
+- **FR-017**: The system MUST return pagination metadata (page, limit, total, totalPages, hasNextPage, hasPrevPage)
 - **FR-018**: The system MUST default to page=1 and limit=20 if pagination parameters are not provided
 - **FR-019**: The system MUST validate that page is a positive integer (minimum 1)
 - **FR-020**: The system MUST validate that limit is between 1 and 100 (inclusive)

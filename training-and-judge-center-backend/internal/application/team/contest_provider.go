@@ -6,6 +6,7 @@ import "context"
 type ContestInfo struct {
 	ID                string
 	GroupID           string
+	GroupIsVisible    bool
 	ParticipationMode string // "INDIVIDUAL" | "TEAM" | "MIXED"
 	TeamSizeMin       int
 	TeamSizeMax       int

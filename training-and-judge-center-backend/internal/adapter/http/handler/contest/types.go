@@ -38,6 +38,7 @@ type createContestRequest struct {
 	Penalty           *int      `json:"penalty"`
 	FreezeMinutes     *int      `json:"freezeMinutes"`
 	EnablePostContest bool      `json:"enablePostContest"`
+	ShowTeamMembers   bool      `json:"showTeamMembers"`
 	ParticipationMode string    `json:"participationMode"`
 	TeamSizeMin       *int      `json:"teamSizeMin"`
 	TeamSizeMax       *int      `json:"teamSizeMax"`
@@ -62,6 +63,7 @@ type updateContestRequest struct {
 	ParticipationMode *string               `json:"participationMode"`
 	TeamSizeMin       *int                  `json:"teamSizeMin"`
 	TeamSizeMax       *int                  `json:"teamSizeMax"`
+	ShowTeamMembers   *bool                 `json:"showTeamMembers"`
 }
 
 // ── Response types ───────────────────────────────────────────────────────────
@@ -104,6 +106,10 @@ type getContestResponse struct {
 	FreezeMinutes     int                     `json:"freezeMinutes"`
 	EnablePostContest bool                    `json:"enablePostContest"`
 	Locked            *bool                   `json:"locked,omitempty"`
+	ShowTeamMembers   bool                    `json:"showTeamMembers"`
+	ParticipationMode string                  `json:"participationMode"`
+	TeamSizeMin       int                     `json:"teamSizeMin"`
+	TeamSizeMax       int                     `json:"teamSizeMax"`
 	ParticipantCount  int                     `json:"participantCount"`
 	IsRegistered      bool                    `json:"isRegistered"`
 	Group             groupDisplay            `json:"group"`
@@ -127,6 +133,7 @@ type contestListItem struct {
 	Penalty           int     `json:"penalty"`
 	FreezeMinutes     int     `json:"freezeMinutes"`
 	EnablePostContest bool    `json:"enablePostContest"`
+	ParticipationMode string  `json:"participationMode"`
 	ParticipantCount  int     `json:"participantCount"`
 	IsRegistered      bool    `json:"isRegistered"`
 	ProblemCount      int     `json:"problemCount"`
@@ -159,6 +166,7 @@ type myContestListItem struct {
 	Penalty           int          `json:"penalty"`
 	FreezeMinutes     int          `json:"freezeMinutes"`
 	EnablePostContest bool         `json:"enablePostContest"`
+	ParticipationMode string       `json:"participationMode"`
 	ParticipantCount  int          `json:"participantCount"`
 	IsRegistered      bool         `json:"isRegistered"`
 	ProblemCount      int          `json:"problemCount"`
@@ -180,8 +188,11 @@ type registrationStatusResponse struct {
 // ── List registrations response ───────────────────────────────────────────────
 
 type registrationItem struct {
-	Nickname     string `json:"nickname"`
-	RegisteredAt string `json:"registeredAt"`
+	Type         string   `json:"type"`
+	Nickname     string   `json:"nickname,omitempty"`
+	TeamName     string   `json:"teamName,omitempty"`
+	Members      []string `json:"members,omitempty"`
+	RegisteredAt string   `json:"registeredAt"`
 }
 
 type registrationsPagination struct {
@@ -200,30 +211,6 @@ type listRegistrationsResponse struct {
 
 // ── GET /contests/:id/standings response ─────────────────────────────────────
 
-type rankedProblem struct {
-	Attempts   int     `json:"attempts"`
-	Penalty    int     `json:"penalty"`
-	IsSolved   bool    `json:"isSolved"`
-	AcceptedAt *string `json:"acceptedAt,omitempty"`
-}
-
-type rankedEntry struct {
-	Rank            int                      `json:"rank"`
-	ContestantID    string                   `json:"contestantId"`
-	ParticipantType string                   `json:"participantType"`
-	ProblemsSolved  int                      `json:"problemsSolved"`
-	TotalPenalty    int                      `json:"totalPenalty"`
-	LastAcceptedAt  *string                  `json:"lastAcceptedAt,omitempty"`
-	Problems        map[string]rankedProblem `json:"problems"`
-}
-
-type standingsMeta struct {
-	LastUpdated   string  `json:"lastUpdated"`
-	IsFrozen      bool    `json:"isFrozen"`
-	FrozenAt      *string `json:"frozenAt,omitempty"`
-	ContestStatus string  `json:"contestStatus"`
-}
-
 type standingsPagination struct {
 	Page        int  `json:"page"`
 	Limit       int  `json:"limit"`
@@ -233,10 +220,65 @@ type standingsPagination struct {
 	HasPrevPage bool `json:"hasPrevPage"`
 }
 
+type standingsContestDisplay struct {
+	ID            string  `json:"id"`
+	Name          string  `json:"name"`
+	Status        string  `json:"status"`
+	StartTime     string  `json:"startTime"`
+	EndTime       string  `json:"endTime"`
+	Penalty       int     `json:"penalty"`
+	FreezeMinutes *int    `json:"freezeMinutes"`
+	IsFrozen      bool    `json:"isFrozen"`
+	FrozenAt      *string `json:"frozenAt"`
+}
+
+type standingsProblemHeader struct {
+	Position int    `json:"position"`
+	Slug     string `json:"slug"`
+	Title    string `json:"title"`
+}
+
+type standingParticipant struct {
+	ID          string   `json:"id"`
+	Type        string   `json:"type"`
+	DisplayName string   `json:"displayName"`
+	Nickname    string   `json:"nickname,omitempty"`
+	Name        string   `json:"name,omitempty"`
+	Members     []string `json:"members,omitempty"`
+	Country     *string  `json:"country,omitempty"`
+	City        *string  `json:"city,omitempty"`
+	Institution *string  `json:"institution,omitempty"`
+}
+
+type standingProblemResult struct {
+	Position int    `json:"position"`
+	Status   string `json:"status"`
+	Attempts int    `json:"attempts"`
+	Time     *int   `json:"time"`
+	Penalty  int    `json:"penalty"`
+}
+
+type standingEntry struct {
+	Rank           int                     `json:"rank"`
+	Participant    standingParticipant     `json:"participant"`
+	ProblemsSolved int                     `json:"problemsSolved"`
+	TotalPenalty   int                     `json:"totalPenalty"`
+	Problems       []standingProblemResult `json:"problems"`
+}
+
+type standingsFilters struct {
+	Country       *string `json:"country"`
+	City          *string `json:"city"`
+	Institution   *string `json:"institution"`
+	FilteredTotal int     `json:"filteredTotal"`
+}
+
 type getStandingsResponse struct {
-	Entries    []rankedEntry       `json:"entries"`
-	Pagination standingsPagination `json:"pagination"`
-	Meta       standingsMeta       `json:"meta"`
+	Contest    standingsContestDisplay  `json:"contest"`
+	Problems   []standingsProblemHeader `json:"problems"`
+	Standings  []standingEntry          `json:"standings"`
+	Pagination standingsPagination      `json:"pagination"`
+	Filters    standingsFilters         `json:"filters"`
 }
 
 // ── GET /contests/:id/submissions response ───────────────────────────────────
@@ -261,12 +303,16 @@ type submissionItem struct {
 	Problem     submissionProblem   `json:"problem"`
 	SubmittedBy submissionSubmitter `json:"submittedBy"`
 	Language    string              `json:"language"`
+	IsBlockly   bool                `json:"isBlocklySubmission"`
 	Status      string              `json:"status"`
 	SubmittedAt string              `json:"submittedAt"`
 	JudgedAt    *string             `json:"judgedAt,omitempty"`
 	TimeMs      *int                `json:"timeMs,omitempty"`
 	MemoryKb    *int                `json:"memoryKb,omitempty"`
 	Phase       *string             `json:"phase,omitempty"`
+
+	// CanViewDetail tells whether the caller may open this submission's detail.
+	CanViewDetail bool `json:"canViewDetail"`
 }
 
 type submissionsContestMeta struct {
@@ -296,6 +342,7 @@ type contestResponse struct {
 	FreezeMinutes     int              `json:"freezeMinutes"`
 	EnablePostContest bool             `json:"enablePostContest"`
 	Locked            bool             `json:"locked"`
+	ShowTeamMembers   bool             `json:"showTeamMembers"`
 	ParticipationMode string           `json:"participationMode"`
 	TeamSizeMin       int              `json:"teamSizeMin"`
 	TeamSizeMax       int              `json:"teamSizeMax"`

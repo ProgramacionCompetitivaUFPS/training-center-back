@@ -19,14 +19,20 @@ type CompileResult struct {
 type RunRequest struct {
 	Input       []byte
 	TimeLimitMs int
-	MemoryKb    int
 }
 
 type RunResult struct {
 	ExitCode int
 	TimeMs   int
-	MemoryKb int
-	Output   []byte
+	// MemoryKb is nil when the run produced no measurement. Reporting a zero
+	// instead would say the solution used no memory at all.
+	MemoryKb *int
+	// OutputPreview is the first few KB of what the contestant printed, enough
+	// for the wrong-answer report. The output itself never leaves the sandbox.
+	OutputPreview []byte
+	// OutputLimitExceeded means the run wrote more than the sandbox allows, so
+	// what is on disk was cut short and says nothing about the solution.
+	OutputLimitExceeded bool
 }
 
 type ExecutionSession interface {
@@ -36,5 +42,11 @@ type ExecutionSession interface {
 }
 
 type Executor interface {
-	BeginSession(ctx context.Context, language submission.Language) (ExecutionSession, error)
+	// memoryKb is the problem's limit. It belongs here and not in RunRequest
+	// because it is constant for the whole judging and applying it costs a
+	// container reconfiguration.
+	//
+	// judgingID names the directory this judging's files live in. Opaque here,
+	// and unguessable by contract: the name is what isolates one judging.
+	BeginSession(ctx context.Context, language submission.Language, memoryKb int, judgingID string) (ExecutionSession, error)
 }

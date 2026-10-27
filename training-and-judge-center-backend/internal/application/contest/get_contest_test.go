@@ -79,6 +79,20 @@ func TestGetContest_MemberDoesNotSeeProblemsInScheduled(t *testing.T) {
 	}
 }
 
+func TestGetContest_LeadSeesProblemsInScheduled(t *testing.T) {
+	contest := newTestContestWithProblems(callerID)
+	uc := newGetContestUseCase(repoWith(contest), groupFound(), isLead(), defaultProblemProvider(), mockParticipants())
+
+	out, err := uc.Execute(context.Background(), validGetInput())
+
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(out.Problems) == 0 {
+		t.Error("lead should see problems even in SCHEDULED status")
+	}
+}
+
 func TestGetContest_LeadSeesLockedField(t *testing.T) {
 	uc := newGetContestUseCase(repoWith(newTestContest(callerID)), groupFound(), isLead(), defaultProblemProvider(), mockParticipants())
 
@@ -170,6 +184,36 @@ func TestGetContest_NonMemberCanAccessVisibleGroup(t *testing.T) {
 	}
 	if out == nil {
 		t.Fatal("expected output")
+	}
+}
+
+func TestGetContest_NonMemberSeesProblemsOnceStarted(t *testing.T) {
+	started := domainContest.RestoreContest(
+		testContestID,
+		domainContest.RestoreContestName("Started Contest"),
+		nil,
+		time.Now().Add(-2*time.Hour),
+		time.Now().Add(-time.Hour),
+		domainContest.RestorePenalty(20),
+		0, false, false, false,
+		shared.RestoreGroupID(testGroupID),
+		shared.RestoreUserID(otherID),
+		domainContest.RestoreParticipationMode("INDIVIDUAL"), domainContest.RestoreTeamSize(2, 5),
+		[]domainContest.ContestProblem{
+			domainContest.RestoreContestProblem("cp-1", testProblemID, 1),
+		},
+		testNow.Add(-time.Hour),
+		nil,
+	)
+	uc := newGetContestUseCase(repoWith(started), groupFound(), notLead(), defaultProblemProvider(), mockParticipants())
+
+	out, err := uc.Execute(context.Background(), validGetInput())
+
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(out.Problems) != 1 {
+		t.Errorf("non-member of a visible group should see problems once started, got %d", len(out.Problems))
 	}
 }
 

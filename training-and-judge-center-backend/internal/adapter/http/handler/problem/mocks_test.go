@@ -19,7 +19,7 @@ import (
 
 type mockTokenSvc struct{}
 
-func (m *mockTokenSvc) GenerateToken(_ context.Context, _ *domainUser.User) (string, error) {
+func (m *mockTokenSvc) GenerateToken(_ context.Context, _ *domainUser.User, _ string) (string, error) {
 	return "tok", nil
 }
 func (m *mockTokenSvc) ValidateToken(_ string) (*domainUser.TokenClaims, error) {
@@ -41,7 +41,7 @@ func authedRequest(method, target string, body []byte) *http.Request {
 }
 
 func wrapAuth(h http.Handler) http.Handler {
-	return middleware.Auth(&mockTokenSvc{}, nil)(h)
+	return middleware.Auth(&mockTokenSvc{}, noopSessionInvalidator{})(h)
 }
 
 // ── Problem repository mock ──────────────────────────────────────────────────
@@ -78,21 +78,41 @@ func (m *mockStatsProvider) GetByProblemID(_ context.Context, _ string) (*appPro
 
 // ── FileStorage mock ─────────────────────────────────────────────────────────
 
-type mockFileStorageH struct{}
+type mockFileStorageH struct {
+	listFilesFn    func(ctx context.Context, prefix string) ([]string, error)
+	downloadFileFn func(ctx context.Context, path string) ([]byte, error)
+}
 
-func (m *mockFileStorageH) UploadFile(_ context.Context, _ string, _ []byte) error { return nil }
+func (m *mockFileStorageH) UploadFile(_ context.Context, _ string, _ []byte) error  { return nil }
 func (m *mockFileStorageH) DeleteFile(_ context.Context, _ string) error            { return nil }
 func (m *mockFileStorageH) DeleteFilesWithPrefix(_ context.Context, _ string) error { return nil }
+func (m *mockFileStorageH) ListFiles(ctx context.Context, prefix string) ([]string, error) {
+	if m.listFilesFn != nil {
+		return m.listFilesFn(ctx, prefix)
+	}
+	return nil, nil
+}
+func (m *mockFileStorageH) DownloadFile(ctx context.Context, path string) ([]byte, error) {
+	if m.downloadFileFn != nil {
+		return m.downloadFileFn(ctx, path)
+	}
+	return nil, nil
+}
 
 // ── ActiveContestChecker mock ────────────────────────────────────────────────
 
 type mockActiveContestCheckerH struct {
-	inActive bool
-	err      error
+	inActive          bool
+	hasContestHistory bool
+	err               error
 }
 
 func (m *mockActiveContestCheckerH) IsProblemInActiveContest(_ context.Context, _ string) (bool, error) {
 	return m.inActive, m.err
+}
+
+func (m *mockActiveContestCheckerH) HasContestSubmissions(_ context.Context, _ string) (bool, error) {
+	return m.hasContestHistory, m.err
 }
 
 // ── SubmissionRejudger mock ──────────────────────────────────────────────────
@@ -166,10 +186,67 @@ func (m *mockContestRejudgeProviderH) IsLeadOfGroup(_ context.Context, _, _ stri
 	return m.isLeadOfGroup, nil
 }
 
+// ── ProblemValidationRepository mock ─────────────────────────────────────────
+
+type mockValidationRepositoryH struct {
+	saveFn                  func(ctx context.Context, v *domainProblem.ProblemValidation) error
+	findByIDFn              func(ctx context.Context, id string) (*domainProblem.ProblemValidation, error)
+	findLatestByProblemIDFn func(ctx context.Context, problemID string) (*domainProblem.ProblemValidation, bool, error)
+}
+
+func (m *mockValidationRepositoryH) Save(ctx context.Context, v *domainProblem.ProblemValidation) error {
+	if m.saveFn != nil {
+		return m.saveFn(ctx, v)
+	}
+	return nil
+}
+func (m *mockValidationRepositoryH) FindByID(ctx context.Context, id string) (*domainProblem.ProblemValidation, error) {
+	if m.findByIDFn != nil {
+		return m.findByIDFn(ctx, id)
+	}
+	return nil, apperror.NewNotFound("VALIDATION_NOT_FOUND", "validation not found")
+}
+func (m *mockValidationRepositoryH) FindLatestByProblemID(ctx context.Context, problemID string) (*domainProblem.ProblemValidation, bool, error) {
+	if m.findLatestByProblemIDFn != nil {
+		return m.findLatestByProblemIDFn(ctx, problemID)
+	}
+	return nil, false, nil
+}
+
+// ── ValidationQueue mock ─────────────────────────────────────────────────────
+
+type mockValidationQueueH struct {
+	publishFn func(ctx context.Context, msg appProblem.ValidationQueueMessage) error
+}
+
+func (m *mockValidationQueueH) Publish(ctx context.Context, msg appProblem.ValidationQueueMessage) error {
+	if m.publishFn != nil {
+		return m.publishFn(ctx, msg)
+	}
+	return nil
+}
+
+// ── ProblemStatusProvider mock ───────────────────────────────────────────────
+
+type mockProblemStatusProviderH struct {
+	getStatusFn func(ctx context.Context, problemID string) (string, error)
+}
+
+func (m *mockProblemStatusProviderH) GetStatus(ctx context.Context, problemID string) (string, error) {
+	if m.getStatusFn != nil {
+		return m.getStatusFn(ctx, problemID)
+	}
+	return "PUBLISHED", nil
+}
+
 // ── Handler constructor helpers ──────────────────────────────────────────────
 
 func newHandlerWithStatistics(uc *appProblem.GetProblemStatisticsUseCase) *Handler {
 	return &Handler{getProblemStatistics: uc}
+}
+
+func newHandlerWithGetProblem(repo domainProblem.Repository, userProvider appProblem.UserProvider, storage appProblem.ProblemFileRepository) *Handler {
+	return &Handler{getProblem: appProblem.NewGetProblemUseCase(repo, userProvider, storage)}
 }
 
 func newHandlerWithUnpublish(repo domainProblem.Repository, checker appProblem.ActiveContestChecker) *Handler {
@@ -177,7 +254,7 @@ func newHandlerWithUnpublish(repo domainProblem.Repository, checker appProblem.A
 }
 
 func newHandlerWithDeleteProblem(repo domainProblem.Repository, checker appProblem.ActiveContestChecker) *Handler {
-	return &Handler{deleteProblem: appProblem.NewDeleteProblemUseCase(repo, &mockFileStorageH{}, checker)}
+	return &Handler{deleteProblem: appProblem.NewDeleteProblemUseCase(repo, &mockFileStorageH{}, checker, &mockContestAssociationRemoverH{}, &mockTxManagerH{})}
 }
 
 func newHandlerWithChangeAccessibility(repo domainProblem.Repository) *Handler {
@@ -204,6 +281,21 @@ func newHandlerWithRejudgeContest(repo domainProblem.Repository, rejudger appPro
 	return &Handler{rejudgeContestSubmissions: appProblem.NewRejudgeContestSubmissionsUseCase(repo, rejudger, contestProvider)}
 }
 
+func newHandlerWithPublish(repo domainProblem.Repository, validationRepo domainProblem.ProblemValidationRepository, queue appProblem.ValidationQueue, statusProvider appProblem.ProblemStatusProvider) *Handler {
+	statusCheck := appProblem.NewGetProblemValidationStatusUseCase(validationRepo, statusProvider)
+	return &Handler{
+		publishProblem:         appProblem.NewPublishProblemUseCase(repo, validationRepo, queue, &mockProblemPublisherH{}),
+		awaitProblemValidation: appProblem.NewAwaitProblemValidationUseCase(statusCheck),
+	}
+}
+
+func newHandlerWithGetLatestValidation(repo domainProblem.Repository, validationRepo domainProblem.ProblemValidationRepository, statusProvider appProblem.ProblemStatusProvider) *Handler {
+	statusCheck := appProblem.NewGetProblemValidationStatusUseCase(validationRepo, statusProvider)
+	return &Handler{
+		getLatestProblemValidation: appProblem.NewGetLatestProblemValidationUseCase(repo, validationRepo, statusCheck),
+	}
+}
+
 // ── Problem fixtures ─────────────────────────────────────────────────────────
 
 var testNow = time.Now()
@@ -217,6 +309,21 @@ func publishedProblem() *domainProblem.Problem {
 		[]shared.UserID{},
 		[]domainProblem.LanguageOverride{},
 		nil, []domainProblem.JudgingFile{},
+		nil, nil, nil,
+		testNow, testNow,
+	)
+}
+
+func publishedProblemWithTestCases() *domainProblem.Problem {
+	key := "problems/test-problem/testcases/xyz"
+	return domainProblem.RestoreProblem(
+		"p1", "test-problem", "Test Problem",
+		nil, nil, nil, []string{},
+		"PUBLISHED", "PUBLIC",
+		shared.RestoreUserID("u1"),
+		[]shared.UserID{},
+		[]domainProblem.LanguageOverride{},
+		&key, []domainProblem.JudgingFile{},
 		nil, nil, nil,
 		testNow, testNow,
 	)
@@ -264,10 +371,101 @@ func draftProblemWithModifier(modifierID string) *domainProblem.Problem {
 	)
 }
 
+func completeDraftProblem() *domainProblem.Problem {
+	statement := "Solve this problem"
+	timeLimit := 2000
+	memoryLimit := 256
+	testCasesKey := "problems/test-problem/testCases/abc"
+	solution, err := domainProblem.NewSolutionFile("sol.cpp", "key-1", "cpp20")
+	if err != nil {
+		panic(err)
+	}
+	return domainProblem.RestoreProblem(
+		"p1", "test-problem", "Test Problem",
+		&statement, &timeLimit, &memoryLimit, []string{},
+		"DRAFT", "PRIVATE",
+		shared.RestoreUserID("u1"),
+		[]shared.UserID{},
+		[]domainProblem.LanguageOverride{},
+		&testCasesKey, []domainProblem.JudgingFile{solution},
+		nil, nil, nil,
+		testNow, testNow,
+	)
+}
+
 func repoReturning(p *domainProblem.Problem) *mockProblemRepo {
 	return &mockProblemRepo{
 		findBySlugFn: func(_ context.Context, _ domainProblem.Slug) (*domainProblem.Problem, error) {
 			return p, nil
 		},
 	}
+}
+
+// noopSessionInvalidator is a package-local no-op user.SessionInvalidator so
+// handler tests do not depend on the sibling adapter/auth package.
+type noopSessionInvalidator struct{}
+
+func (noopSessionInvalidator) InvalidateAllUserSessions(context.Context, string, time.Time) error {
+	return nil
+}
+func (noopSessionInvalidator) IsAllUserSessionRevoked(context.Context, string, time.Time) (bool, error) {
+	return false, nil
+}
+func (noopSessionInvalidator) InvalidateSession(context.Context, string, time.Time) error {
+	return nil
+}
+func (noopSessionInvalidator) IsSessionInvalidated(context.Context, string) (bool, error) {
+	return false, nil
+}
+
+func newHandlerWithListProblems(repo domainProblem.Repository, userProvider appProblem.UserProvider) *Handler {
+	return &Handler{listProblems: appProblem.NewListProblemsUseCase(repo, userProvider)}
+}
+
+type mockContestAssociationRemoverH struct{}
+
+func (m *mockContestAssociationRemoverH) RemoveProblemFromContests(_ context.Context, _ string) error {
+	return nil
+}
+
+type mockTxManagerH struct{}
+
+func (m *mockTxManagerH) WithTx(ctx context.Context, fn func(context.Context) error) error {
+	return fn(ctx)
+}
+
+// ── PlatformSettings ─────────────────────────────────────────────────────────
+
+func newTestSettings() domainProblem.PlatformSettings {
+	s, err := domainProblem.NewPlatformSettings(
+		10000, 512,
+		map[string]domainProblem.LanguageLimit{},
+		map[string]struct{}{"cpp": {}},
+		map[string]string{".cpp": "cpp"},
+		map[string]struct{}{"dp": {}},
+		4, 10, 50, 100, 10,
+	)
+	if err != nil {
+		panic(err)
+	}
+	return s
+}
+
+// The rejections these tests exercise happen before any use case runs.
+func newHandlerWithImport() *Handler {
+	return &Handler{settings: newTestSettings()}
+}
+
+func newHandlerWithUploadFiles() *Handler {
+	return &Handler{settings: newTestSettings()}
+}
+
+type mockProblemPublisherH struct{}
+
+func (m *mockProblemPublisherH) MarkPublishedIfUnchanged(_ context.Context, _ string, _, _ time.Time) (bool, error) {
+	return true, nil
+}
+
+func (m *mockProblemPublisherH) MarkPublished(_ context.Context, _ string, _ time.Time) error {
+	return nil
 }

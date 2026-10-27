@@ -19,7 +19,7 @@ import (
 
 type mockTokenSvc struct{}
 
-func (m *mockTokenSvc) GenerateToken(_ context.Context, _ *domainUser.User) (string, error) {
+func (m *mockTokenSvc) GenerateToken(_ context.Context, _ *domainUser.User, _ string) (string, error) {
 	return "tok", nil
 }
 func (m *mockTokenSvc) ValidateToken(_ string) (*domainUser.TokenClaims, error) {
@@ -39,7 +39,7 @@ func authedRequest(method, target string, body []byte) *http.Request {
 }
 
 func wrapAuth(h http.Handler) http.Handler {
-	return middleware.Auth(&mockTokenSvc{}, nil)(h)
+	return middleware.Auth(&mockTokenSvc{}, noopSessionInvalidator{})(h)
 }
 
 // ── Mock dependencies ────────────────────────────────────────────────────────
@@ -174,6 +174,12 @@ func (m *mockParticipantProfileProvider) GetProfiles(_ context.Context, _ []stri
 	return map[string]*appcontest.ParticipantProfile{}, nil
 }
 
+type mockTeamDisplayProvider struct{}
+
+func (m *mockTeamDisplayProvider) GetDisplays(_ context.Context, _ []string) (map[string]*appcontest.TeamDisplay, error) {
+	return map[string]*appcontest.TeamDisplay{}, nil
+}
+
 type mockTeamParticipRepo struct{}
 
 func (s *mockTeamParticipRepo) Save(_ context.Context, _ *domainContest.ContestTeamParticipation) error {
@@ -280,8 +286,12 @@ type mockContestSubmissionsProvider struct {
 	subs []appcontest.RichSubmissionData
 }
 
-func (m *mockContestSubmissionsProvider) ListByContest(_ context.Context, _ string, _ appcontest.ContestSubmissionFilters) ([]appcontest.RichSubmissionData, error) {
-	return m.subs, nil
+// ListByContest pages like the SQL adapter does: Limit/Offset over the stored rows.
+func (m *mockContestSubmissionsProvider) ListByContest(_ context.Context, _ string, f appcontest.ContestSubmissionFilters) ([]appcontest.RichSubmissionData, int, error) {
+	total := len(m.subs)
+	start := min(f.Offset, total)
+	end := min(start+f.Limit, total)
+	return m.subs[start:end], total, nil
 }
 
 // ── TeamSelectionChecker no-op ───────────────────────────────────────────────
@@ -337,4 +347,21 @@ func finishedContest() *domainContest.Contest {
 		time.Now(),
 		nil,
 	)
+}
+
+// noopSessionInvalidator is a package-local no-op user.SessionInvalidator so
+// handler tests do not depend on the sibling adapter/auth package.
+type noopSessionInvalidator struct{}
+
+func (noopSessionInvalidator) InvalidateAllUserSessions(context.Context, string, time.Time) error {
+	return nil
+}
+func (noopSessionInvalidator) IsAllUserSessionRevoked(context.Context, string, time.Time) (bool, error) {
+	return false, nil
+}
+func (noopSessionInvalidator) InvalidateSession(context.Context, string, time.Time) error {
+	return nil
+}
+func (noopSessionInvalidator) IsSessionInvalidated(context.Context, string) (bool, error) {
+	return false, nil
 }

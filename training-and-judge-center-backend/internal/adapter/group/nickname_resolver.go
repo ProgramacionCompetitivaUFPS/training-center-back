@@ -8,6 +8,7 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
+	infraPostgres "github.com/training-judge-center/backend/internal/adapter/postgres"
 	appGroup "github.com/training-judge-center/backend/internal/application/group"
 	"github.com/training-judge-center/backend/pkg/apperror"
 )
@@ -23,8 +24,9 @@ func NewNicknameResolver(db *pgxpool.Pool) *NicknameResolver {
 // ResolveByNickname returns (nil, nil) when no user has that nickname.
 func (r *NicknameResolver) ResolveByNickname(ctx context.Context, nickname string) (*appGroup.UserDisplay, error) {
 	const q = `SELECT id, nickname, name, email, role FROM users WHERE nickname = LOWER($1) LIMIT 1`
-	var id, nick, name, email, role string
-	err := r.db.QueryRow(ctx, q, nickname).Scan(&id, &nick, &name, &email, &role)
+	var id, nick, name, role string
+	var email *string
+	err := infraPostgres.GetQuerier(ctx, r.db).QueryRow(ctx, q, nickname).Scan(&id, &nick, &name, &email, &role)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, nil
@@ -32,11 +34,17 @@ func (r *NicknameResolver) ResolveByNickname(ctx context.Context, nickname strin
 		slog.ErrorContext(ctx, "NicknameResolver.ResolveByNickname failed", "nickname", nickname, "error", err)
 		return nil, apperror.NewInternal()
 	}
+	// email es NULL para cuentas desactivadas; su nickname anonimizado
+	// ("user_anonimo_...") sigue siendo resoluble por este método.
+	var emailVal string
+	if email != nil {
+		emailVal = *email
+	}
 	return &appGroup.UserDisplay{
 		ID:         id,
 		Nickname:   nick,
 		Name:       name,
-		Email:      email,
+		Email:      emailVal,
 		SystemRole: role,
 	}, nil
 }

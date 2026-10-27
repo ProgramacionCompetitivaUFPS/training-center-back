@@ -51,6 +51,29 @@ func TestListContests_HappyPath(t *testing.T) {
 	}
 }
 
+func TestListContests_PassesSearchToRepository(t *testing.T) {
+	var capturedFilters domainContest.ListFilters
+	repo := &mockContestRepository{
+		listFn: func(_ context.Context, filters domainContest.ListFilters) ([]*domainContest.Contest, int, error) {
+			capturedFilters = filters
+			return nil, 0, nil
+		},
+	}
+	uc := newListContestsUseCase(repo, groupFound(), isMemberNotLead(), mockParticipants())
+
+	in := validListInput()
+	in.Search = "regional"
+
+	_, err := uc.Execute(context.Background(), in)
+
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if capturedFilters.Search != "regional" {
+		t.Errorf("expected search filter %q, got %q", "regional", capturedFilters.Search)
+	}
+}
+
 func TestListContests_EmptyResult(t *testing.T) {
 	uc := newListContestsUseCase(&mockContestRepository{}, groupFound(), isMemberNotLead(), mockParticipants())
 

@@ -4,8 +4,10 @@ import (
 	"context"
 
 	appshared "github.com/training-judge-center/backend/internal/application/shared"
-	domainsubmission "github.com/training-judge-center/backend/internal/domain/submission"
 	"github.com/training-judge-center/backend/internal/domain/shared"
+	domainsubmission "github.com/training-judge-center/backend/internal/domain/submission"
+	domainuser "github.com/training-judge-center/backend/internal/domain/user"
+	"github.com/training-judge-center/backend/pkg/apperror"
 )
 
 type ListProblemSubmissionsInput struct {
@@ -54,10 +56,9 @@ func (uc *ListProblemSubmissionsUseCase) Execute(ctx context.Context, in ListPro
 		}
 	}
 
-	if in.Language != nil {
-		if _, err := domainsubmission.NewLanguage(*in.Language); err != nil {
-			return nil, err
-		}
+	language, blockly, err := languageFilter(in.Language)
+	if err != nil {
+		return nil, err
 	}
 
 	problem, err := uc.problemBySlug.GetProblemBySlug(ctx, in.ProblemSlug)
@@ -72,7 +73,8 @@ func (uc *ListProblemSubmissionsUseCase) Execute(ctx context.Context, in ListPro
 		ProblemID:      &problem.ID,
 		ExcludeContest: true,
 		Status:         in.Status,
-		Language:       in.Language,
+		Language:       language,
+		Blockly:        blockly,
 		Page:           in.Page,
 		Limit:          in.Limit,
 	}
@@ -92,11 +94,30 @@ func (uc *ListProblemSubmissionsUseCase) Execute(ctx context.Context, in ListPro
 
 	problemDisplay := ProblemDisplay{Slug: problem.Slug, Title: problem.Title}
 
+	// Batch user lookups instead of one query per submission (was up to maxPageLimit extra
+	// round trips per page, with no reuse even when the same user appears on multiple rows —
+	// e.g. someone resubmitting repeatedly to a popular problem).
+	userIDs := make([]string, 0, len(subs))
+	seenUser := make(map[string]bool, len(subs))
+	for _, s := range subs {
+		id := s.UserID().String()
+		if !seenUser[id] {
+			userIDs = append(userIDs, id)
+			seenUser[id] = true
+		}
+	}
+	userDisplays, err := uc.userDisplay.GetUsersByIDs(ctx, userIDs)
+	if err != nil {
+		return nil, err
+	}
+
 	summaries := make([]SubmissionSummary, 0, len(subs))
 	for _, s := range subs {
-		user, err := uc.userDisplay.GetUserByID(ctx, s.UserID().String())
-		if err != nil {
-			return nil, err
+		user, ok := userDisplays[s.UserID().String()]
+		if !ok {
+			// Same error the single-row GetUserByID would give — user_id is NOT NULL and
+			// FK-backed, so this should never actually happen outside of a data bug.
+			return nil, apperror.NewNotFound(domainuser.ErrCodeUserNotFound, "user not found")
 		}
 
 		summaries = append(summaries, SubmissionSummary{
@@ -109,6 +130,7 @@ func (uc *ListProblemSubmissionsUseCase) Execute(ctx context.Context, in ListPro
 			Contest:       nil,
 			SubmittedBy:   *user,
 			Language:      s.Language().String(),
+			IsBlockly:     s.IsBlockly(),
 			ExecutionTime: s.TimeMs(),
 			MemoryKb:      s.MemoryKb(),
 		})

@@ -31,6 +31,7 @@ type ConfirmDeactivationUseCase struct {
 	emailSender        appshared.EmailSender
 	sessionInvalidator user.SessionInvalidator
 	txManager          appshared.TransactionManager
+	refreshTokenRepo   user.RefreshTokenRepository
 }
 
 func NewConfirmDeactivationUseCase(
@@ -40,6 +41,7 @@ func NewConfirmDeactivationUseCase(
 	emailSender appshared.EmailSender,
 	sessionInvalidator user.SessionInvalidator,
 	txManager appshared.TransactionManager,
+	refreshTokenRepo user.RefreshTokenRepository,
 ) *ConfirmDeactivationUseCase {
 	return &ConfirmDeactivationUseCase{
 		userRepo:           userRepo,
@@ -48,6 +50,7 @@ func NewConfirmDeactivationUseCase(
 		emailSender:        emailSender,
 		sessionInvalidator: sessionInvalidator,
 		txManager:          txManager,
+		refreshTokenRepo:   refreshTokenRepo,
 	}
 }
 
@@ -139,6 +142,10 @@ func (uc *ConfirmDeactivationUseCase) Execute(ctx context.Context, input Confirm
 	sessionsInvalidated := true
 	if err := uc.sessionInvalidator.InvalidateAllUserSessions(ctx, foundUser.ID(), now); err != nil {
 		sessionsInvalidated = false
+	}
+	if err := uc.refreshTokenRepo.RevokeAllByUserID(ctx, foundUser.ID(), now); err != nil {
+		// best-effort: account already deactivated, don't fail the operation.
+		slog.ErrorContext(ctx, "failed to revoke refresh tokens after account deactivation", "user_id", foundUser.ID(), "error", err)
 	}
 
 	auditLogID := uuid.New().String()

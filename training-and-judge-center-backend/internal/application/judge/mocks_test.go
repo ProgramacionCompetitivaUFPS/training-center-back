@@ -16,6 +16,8 @@ var testNow = time.Date(2025, 1, 15, 12, 0, 0, 0, time.UTC)
 type mockSubmissionUpdater struct {
 	getByIDFn func(ctx context.Context, id submission.SubmissionID) (*submission.Submission, error)
 	updateFn  func(ctx context.Context, s *submission.Submission) error
+	claimFn   func(ctx context.Context, id submission.SubmissionID) (bool, error)
+	claims    int
 }
 
 func (m *mockSubmissionUpdater) GetByID(ctx context.Context, id submission.SubmissionID) (*submission.Submission, error) {
@@ -23,6 +25,14 @@ func (m *mockSubmissionUpdater) GetByID(ctx context.Context, id submission.Submi
 		return m.getByIDFn(ctx, id)
 	}
 	return pendingSubmission(), nil
+}
+
+func (m *mockSubmissionUpdater) Claim(ctx context.Context, id submission.SubmissionID) (bool, error) {
+	m.claims++
+	if m.claimFn != nil {
+		return m.claimFn(ctx, id)
+	}
+	return true, nil
 }
 
 func (m *mockSubmissionUpdater) Update(ctx context.Context, s *submission.Submission) error {
@@ -62,6 +72,7 @@ func (m *mockProblemProvider) GetLimits(ctx context.Context, problemID string) (
 
 type mockTestCaseProvider struct {
 	getTestCasesFn func(ctx context.Context, problemID string) ([]TestCase, error)
+	readAtKeys     []string
 }
 
 func (m *mockTestCaseProvider) GetTestCases(ctx context.Context, problemID string) ([]TestCase, error) {
@@ -71,17 +82,22 @@ func (m *mockTestCaseProvider) GetTestCases(ctx context.Context, problemID strin
 	return []TestCase{{Input: []byte("1 2"), ExpectedOutput: []byte("3")}}, nil
 }
 
+func (m *mockTestCaseProvider) GetTestCasesAt(ctx context.Context, testCasesKey string) ([]TestCase, error) {
+	m.readAtKeys = append(m.readAtKeys, testCasesKey)
+	return m.GetTestCases(ctx, "")
+}
+
 // ── Executor mock ────────────────────────────────────────────────────────────
 
 type mockExecutor struct {
 	calls          int
-	beginSessionFn func(ctx context.Context, language submission.Language) (ExecutionSession, error)
+	beginSessionFn func(ctx context.Context, language submission.Language, memoryKb int, judgingID string) (ExecutionSession, error)
 }
 
-func (m *mockExecutor) BeginSession(ctx context.Context, language submission.Language) (ExecutionSession, error) {
+func (m *mockExecutor) BeginSession(ctx context.Context, language submission.Language, memoryKb int, judgingID string) (ExecutionSession, error) {
 	m.calls++
 	if m.beginSessionFn != nil {
-		return m.beginSessionFn(ctx, language)
+		return m.beginSessionFn(ctx, language, memoryKb, judgingID)
 	}
 	return &mockExecutionSession{}, nil
 }
@@ -89,9 +105,9 @@ func (m *mockExecutor) BeginSession(ctx context.Context, language submission.Lan
 // ── ExecutionSession mock ────────────────────────────────────────────────────
 
 type mockExecutionSession struct {
-	compileFn      func(ctx context.Context, req CompileRequest) (CompileResult, error)
-	runTestCaseFn  func(ctx context.Context, req RunRequest) (RunResult, error)
-	closeFn        func(ctx context.Context) error
+	compileFn     func(ctx context.Context, req CompileRequest) (CompileResult, error)
+	runTestCaseFn func(ctx context.Context, req RunRequest) (RunResult, error)
+	closeFn       func(ctx context.Context) error
 }
 
 func (m *mockExecutionSession) Compile(ctx context.Context, req CompileRequest) (CompileResult, error) {
@@ -105,7 +121,7 @@ func (m *mockExecutionSession) RunTestCase(ctx context.Context, req RunRequest) 
 	if m.runTestCaseFn != nil {
 		return m.runTestCaseFn(ctx, req)
 	}
-	return RunResult{ExitCode: 0, TimeMs: 50, MemoryKb: 1024, Output: []byte("3")}, nil
+	return RunResult{ExitCode: 0, TimeMs: 50, MemoryKb: kb(1024), OutputPreview: []byte("3")}, nil
 }
 
 func (m *mockExecutionSession) Close(ctx context.Context) error {
@@ -118,14 +134,143 @@ func (m *mockExecutionSession) Close(ctx context.Context) error {
 // ── OutputChecker mock ───────────────────────────────────────────────────────
 
 type mockOutputChecker struct {
-	checkFn func(ctx context.Context, req CheckRequest) (CheckResult, error)
+	beginCheckingFn func(ctx context.Context, checkerPath string, language submission.Language, judgingID string) (CheckerSession, error)
+	// checkFn is a shortcut for the common case: a session that always answers
+	// the same way, without having to build one.
+	checkFn func(ctx context.Context, expectedOutput []byte) (CheckResult, error)
+	session *mockCheckerSession
 }
 
-func (m *mockOutputChecker) Check(ctx context.Context, req CheckRequest) (CheckResult, error) {
+func (m *mockOutputChecker) BeginChecking(ctx context.Context, checkerPath string, language submission.Language, judgingID string) (CheckerSession, error) {
+	if m.beginCheckingFn != nil {
+		return m.beginCheckingFn(ctx, checkerPath, language, judgingID)
+	}
+	if m.session == nil {
+		m.session = &mockCheckerSession{checkFn: m.checkFn}
+	}
+	return m.session, nil
+}
+
+// ── CheckerSession mock ──────────────────────────────────────────────────────
+
+type mockCheckerSession struct {
+	checkFn    func(ctx context.Context, expectedOutput []byte) (CheckResult, error)
+	checkCalls int
+	closeCalls int
+}
+
+func (m *mockCheckerSession) Check(ctx context.Context, expectedOutput []byte) (CheckResult, error) {
+	m.checkCalls++
 	if m.checkFn != nil {
-		return m.checkFn(ctx, req)
+		return m.checkFn(ctx, expectedOutput)
 	}
 	return CheckResult{Accepted: true}, nil
+}
+
+func (m *mockCheckerSession) Close(context.Context) error {
+	m.closeCalls++
+	return nil
+}
+
+// ── JudgingSourceProvider mock ───────────────────────────────────────────────
+
+type mockJudgingSourceProvider struct {
+	getCheckerSourceFn   func(ctx context.Context, problemID string) (*JudgingSource, error)
+	getValidatorSourceFn func(ctx context.Context, problemID string) (*JudgingSource, error)
+}
+
+func (m *mockJudgingSourceProvider) GetCheckerSource(ctx context.Context, problemID string) (*JudgingSource, error) {
+	if m.getCheckerSourceFn != nil {
+		return m.getCheckerSourceFn(ctx, problemID)
+	}
+	return nil, nil
+}
+
+func (m *mockJudgingSourceProvider) GetValidatorSource(ctx context.Context, problemID string) (*JudgingSource, error) {
+	if m.getValidatorSourceFn != nil {
+		return m.getValidatorSourceFn(ctx, problemID)
+	}
+	return nil, nil
+}
+
+// ── ArtifactCompiler mock ──────────────────────────────────────────────────────
+
+type mockArtifactCompiler struct {
+	compileFn func(ctx context.Context, req CompileArtifactRequest) (CompileArtifactResult, error)
+}
+
+func (m *mockArtifactCompiler) Compile(ctx context.Context, req CompileArtifactRequest) (CompileArtifactResult, error) {
+	if m.compileFn != nil {
+		return m.compileFn(ctx, req)
+	}
+	return CompileArtifactResult{Success: true, Artifact: []byte("artifact")}, nil
+}
+
+// ── ArtifactUploader mock ────────────────────────────────────────────────────
+
+type mockArtifactUploader struct {
+	uploadFn func(ctx context.Context, path string, content []byte) error
+	uploaded map[string][]byte
+}
+
+func (m *mockArtifactUploader) Upload(ctx context.Context, path string, content []byte) error {
+	if m.uploaded == nil {
+		m.uploaded = map[string][]byte{}
+	}
+	m.uploaded[path] = content
+	if m.uploadFn != nil {
+		return m.uploadFn(ctx, path, content)
+	}
+	return nil
+}
+
+// ── ValidatorRunner mock ─────────────────────────────────────────────────────
+
+type mockValidatorRunner struct {
+	beginValidatingFn func(ctx context.Context, validatorPath string, language submission.Language) (ValidatorSession, error)
+	session           *mockValidatorSession
+}
+
+func (m *mockValidatorRunner) BeginValidating(ctx context.Context, validatorPath string, language submission.Language) (ValidatorSession, error) {
+	if m.beginValidatingFn != nil {
+		return m.beginValidatingFn(ctx, validatorPath, language)
+	}
+	if m.session == nil {
+		m.session = &mockValidatorSession{}
+	}
+	return m.session, nil
+}
+
+// ── ValidatorSession mock ────────────────────────────────────────────────────
+
+type mockValidatorSession struct {
+	validateFn func(ctx context.Context, input []byte) (ValidatorRunResult, error)
+	closeCalls int
+}
+
+func (m *mockValidatorSession) Validate(ctx context.Context, input []byte) (ValidatorRunResult, error) {
+	if m.validateFn != nil {
+		return m.validateFn(ctx, input)
+	}
+	return ValidatorRunResult{Accepted: true}, nil
+}
+
+func (m *mockValidatorSession) Close(ctx context.Context) error {
+	m.closeCalls++
+	return nil
+}
+
+// ── SolutionProvider mock ────────────────────────────────────────────────────
+
+type mockSolutionProvider struct {
+	getSolutionsFn func(ctx context.Context, problemID string) ([]Solution, error)
+}
+
+func (m *mockSolutionProvider) GetSolutions(ctx context.Context, problemID string) ([]Solution, error) {
+	if m.getSolutionsFn != nil {
+		return m.getSolutionsFn(ctx, problemID)
+	}
+	return []Solution{{FileKey: "solutions/sol.cpp", Language: submission.RestoreLanguage("cpp20")}}, nil
 }
 
 // ── TransactionManager mock ──────────────────────────────────────────────────
@@ -180,3 +325,7 @@ func pendingSubmission() *submission.Submission {
 }
 
 var errTransient = errors.New("transient error")
+
+// kb reads better than taking the address of a local at every call site.
+// RunResult carries a pointer because a run may produce no measurement.
+func kb(v int) *int { return &v }

@@ -191,6 +191,32 @@ func TestGetSubmission_SourceCodeReaderError_ReturnsError(t *testing.T) {
 	}
 }
 
+func TestGetSubmission_SourceCodeMissing_ReturnsDetailWithoutSource(t *testing.T) {
+	repo := &mockSubmissionRepo{
+		findByIDFn: func(_ string) (*domainSubmission.Submission, error) {
+			return aSubmission(testAuthorID, "PRIVATE", nil), nil
+		},
+	}
+	reader := &mockSourceCodeReader{fn: func(_ string) ([]byte, error) {
+		return nil, apperror.NewNotFound(ErrCodeSourceCodeNotFound, "source code not found")
+	}}
+	uc := newGetUseCase(repo, reader, nil, nil, nil, nil, nil)
+
+	out, err := uc.Execute(context.Background(), GetSubmissionInput{
+		CurrentUser:  testutil.AsContestant(testAuthorID),
+		SubmissionID: testSubmissionID,
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if out.SourceCode != nil {
+		t.Errorf("SourceCode = %q, want nil", *out.SourceCode)
+	}
+	if out.ID != testSubmissionID {
+		t.Errorf("ID = %q, want %q", out.ID, testSubmissionID)
+	}
+}
+
 func TestGetSubmission_OutputContainsContestWhenPresent(t *testing.T) {
 	cid := testContestID
 	repo := &mockSubmissionRepo{

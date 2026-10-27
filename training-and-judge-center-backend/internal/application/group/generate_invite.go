@@ -135,6 +135,18 @@ func (uc *GenerateInviteUseCase) Execute(ctx context.Context, input GenerateInvi
 		inviteeID = &id
 	}
 
+	// A targeted invitation to someone already in the group is useless (accepting it would
+	// fail with ALREADY_MEMBER anyway): say so instead of issuing it.
+	if inviteeID != nil {
+		existing, err := uc.memberRepo.FindByGroupAndUser(ctx, input.GroupID, *inviteeID)
+		if err != nil {
+			return nil, err
+		}
+		if existing != nil {
+			return nil, apperror.NewConflict(domainGroup.ErrCodeAlreadyMember, "user is already a member of this group")
+		}
+	}
+
 	var newInv *domainGroup.GroupInvitation
 	now := time.Now()
 

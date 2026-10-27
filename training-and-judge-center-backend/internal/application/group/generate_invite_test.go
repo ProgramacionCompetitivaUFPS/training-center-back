@@ -7,6 +7,7 @@ import (
 
 	appshared "github.com/training-judge-center/backend/internal/application/shared"
 	domainGroup "github.com/training-judge-center/backend/internal/domain/group"
+	"github.com/training-judge-center/backend/internal/domain/shared"
 	"github.com/training-judge-center/backend/pkg/apperror"
 )
 
@@ -578,5 +579,31 @@ func TestGenerateInvite_EmailSendFails_ReturnsServiceUnavailable(t *testing.T) {
 	// invitation should remain persisted despite the send failure.
 	if len(invRepo.savedInvitations) != 1 {
 		t.Errorf("expected the invitation to remain persisted despite the email failure, got %d saved", len(invRepo.savedInvitations))
+	}
+}
+
+// A targeted invitation to someone already in the group is rejected instead of issued.
+func TestGenerateInvite_InviteeAlreadyMemberReturnsConflict(t *testing.T) {
+	g := inviteGroup(t)
+	invRepo := &mockInvitationRepository{}
+	memberRepo := leadMemberRepo("g1", "u1")
+	bob := shared.RestoreUserID("invitee-1")
+	m, _ := domainGroup.NewGroupMember("m-bob", "g1", bob, domainGroup.MemberRoleMember, domainGroup.JoinMethodDirectAdd, nil, testNow)
+	memberRepo.memberships[keyOf("g1", bob)] = m
+	uc := newGenerateInviteUseCase(
+		&mockGroupRepository{groups: []*domainGroup.Group{g}},
+		memberRepo,
+		invRepo,
+		&mockNicknameResolver{user: &UserDisplay{ID: "invitee-1", Nickname: "bob"}},
+		&mockEmailResolver{},
+		&mockUserProvider{},
+		&mockEmailSender{},
+	)
+
+	_, err := uc.Execute(context.Background(), GenerateInviteInput{GroupID: "g1", UserNickname: "bob", CurrentUser: asContestant("u1")})
+
+	var appErr *apperror.AppError
+	if !errors.As(err, &appErr) || appErr.Code != domainGroup.ErrCodeAlreadyMember {
+		t.Fatalf("expected ALREADY_MEMBER, got %v", err)
 	}
 }

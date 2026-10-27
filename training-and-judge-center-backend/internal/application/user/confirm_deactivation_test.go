@@ -82,7 +82,7 @@ func TestConfirmDeactivation_Success(t *testing.T) {
 		},
 	}
 
-	uc := NewConfirmDeactivationUseCase(userRepo, deactRepo, auditRepo, mockEmail, invalidator, &mockTransactionManager{})
+	uc := NewConfirmDeactivationUseCase(userRepo, deactRepo, auditRepo, mockEmail, invalidator, &mockTransactionManager{}, &mockRefreshTokenRepository{})
 
 	_, err := uc.Execute(context.Background(), ConfirmDeactivationInput{
 		UserID:    "user-1",
@@ -100,6 +100,49 @@ func TestConfirmDeactivation_Success(t *testing.T) {
 	}
 	if !emailSent {
 		t.Error("expected confirmation email to be sent")
+	}
+}
+
+func TestConfirmDeactivation_RevokeRefreshTokensFails_StillSucceeds(t *testing.T) {
+	userRepo := newNoConflictRepo()
+	activeUser := newUserWithRole("user-1", domainShared.RoleContestant, domain.StatusActive)
+
+	userRepo.findByIDFn = func(_ context.Context, id string) (*domain.User, error) {
+		if id == "user-1" {
+			return activeUser, nil
+		}
+		return nil, nil
+	}
+	userRepo.updateFn = func(ctx context.Context, u *domain.User) error { return nil }
+
+	deactRepo := &mockDeactivationRepo{
+		findPendingByUserIDFn: func(ctx context.Context, userID string) (*domain.DeactivationRequest, error) {
+			return domain.RestoreDeactivationRequest("req-1", "user-1", "123456", time.Now().Add(10*time.Minute), 0, nil, domain.DeactivationStatusPending, time.Time{}, time.Time{}), nil
+		},
+		updateFn: func(ctx context.Context, req *domain.DeactivationRequest) error { return nil },
+	}
+
+	refreshTokenRepo := &mockRefreshTokenRepository{
+		revokeAllByUserIDFn: func(_ context.Context, _ string, _ time.Time) error {
+			return errors.New("postgres unavailable")
+		},
+	}
+
+	uc := NewConfirmDeactivationUseCase(userRepo, deactRepo, &mockAuditRepo{}, &mockEmailSender{}, &mockSessionInvalidator{}, &mockTransactionManager{}, refreshTokenRepo)
+
+	out, err := uc.Execute(context.Background(), ConfirmDeactivationInput{
+		UserID: "user-1",
+		Code:   "123456",
+	})
+
+	if err != nil {
+		t.Fatalf("expected nil, got %v", err)
+	}
+	if !out.SessionsInvalidated {
+		t.Error("expected sessions invalidated to still be true — that's tracked separately from refresh token revocation")
+	}
+	if activeUser.Status() != domain.StatusDeactivated {
+		t.Error("expected user to be deactivated despite the refresh token revocation failure")
 	}
 }
 
@@ -122,7 +165,7 @@ func TestConfirmDeactivation_InvalidCode(t *testing.T) {
 		},
 	}
 
-	uc := NewConfirmDeactivationUseCase(userRepo, deactRepo, &mockAuditRepo{}, &mockEmailSender{}, &mockSessionInvalidator{}, &mockTransactionManager{})
+	uc := NewConfirmDeactivationUseCase(userRepo, deactRepo, &mockAuditRepo{}, &mockEmailSender{}, &mockSessionInvalidator{}, &mockTransactionManager{}, &mockRefreshTokenRepository{})
 
 	_, err := uc.Execute(context.Background(), ConfirmDeactivationInput{
 		UserID: "user-1",
@@ -154,7 +197,7 @@ func TestConfirmDeactivation_ExpiredCode_UpdateFails_ReturnsInternal(t *testing.
 		},
 	}
 
-	uc := NewConfirmDeactivationUseCase(userRepo, deactRepo, &mockAuditRepo{}, &mockEmailSender{}, &mockSessionInvalidator{}, &mockTransactionManager{})
+	uc := NewConfirmDeactivationUseCase(userRepo, deactRepo, &mockAuditRepo{}, &mockEmailSender{}, &mockSessionInvalidator{}, &mockTransactionManager{}, &mockRefreshTokenRepository{})
 
 	_, err := uc.Execute(context.Background(), ConfirmDeactivationInput{UserID: "user-1", Code: "123456"})
 
@@ -183,7 +226,7 @@ func TestConfirmDeactivation_InvalidCode_UpdateFails_ReturnsInternal(t *testing.
 		},
 	}
 
-	uc := NewConfirmDeactivationUseCase(userRepo, deactRepo, &mockAuditRepo{}, &mockEmailSender{}, &mockSessionInvalidator{}, &mockTransactionManager{})
+	uc := NewConfirmDeactivationUseCase(userRepo, deactRepo, &mockAuditRepo{}, &mockEmailSender{}, &mockSessionInvalidator{}, &mockTransactionManager{}, &mockRefreshTokenRepository{})
 
 	_, err := uc.Execute(context.Background(), ConfirmDeactivationInput{UserID: "user-1", Code: "000000"})
 
@@ -212,7 +255,7 @@ func TestConfirmDeactivation_BlockedState_UpdateFails_ReturnsInternal(t *testing
 		},
 	}
 
-	uc := NewConfirmDeactivationUseCase(userRepo, deactRepo, &mockAuditRepo{}, &mockEmailSender{}, &mockSessionInvalidator{}, &mockTransactionManager{})
+	uc := NewConfirmDeactivationUseCase(userRepo, deactRepo, &mockAuditRepo{}, &mockEmailSender{}, &mockSessionInvalidator{}, &mockTransactionManager{}, &mockRefreshTokenRepository{})
 
 	_, err := uc.Execute(context.Background(), ConfirmDeactivationInput{UserID: "user-1", Code: "000000"})
 
@@ -246,7 +289,7 @@ func TestConfirmDeactivation_AuditLogSaveFails_ReturnsNil(t *testing.T) {
 		},
 	}
 
-	uc := NewConfirmDeactivationUseCase(userRepo, deactRepo, auditRepo, &mockEmailSender{}, &mockSessionInvalidator{}, &mockTransactionManager{})
+	uc := NewConfirmDeactivationUseCase(userRepo, deactRepo, auditRepo, &mockEmailSender{}, &mockSessionInvalidator{}, &mockTransactionManager{}, &mockRefreshTokenRepository{})
 
 	_, err := uc.Execute(context.Background(), ConfirmDeactivationInput{UserID: "user-1", Code: "123456"})
 
@@ -276,7 +319,7 @@ func TestConfirmDeactivation_EmailSendFails_ReturnsNil(t *testing.T) {
 		},
 	}
 
-	uc := NewConfirmDeactivationUseCase(userRepo, deactRepo, &mockAuditRepo{}, emailSender, &mockSessionInvalidator{}, &mockTransactionManager{})
+	uc := NewConfirmDeactivationUseCase(userRepo, deactRepo, &mockAuditRepo{}, emailSender, &mockSessionInvalidator{}, &mockTransactionManager{}, &mockRefreshTokenRepository{})
 
 	_, err := uc.Execute(context.Background(), ConfirmDeactivationInput{UserID: "user-1", Code: "123456"})
 
@@ -304,7 +347,7 @@ func TestConfirmDeactivation_BlockExpired_MarksExpiredAndReturnsError(t *testing
 		},
 	}
 
-	uc := NewConfirmDeactivationUseCase(userRepo, deactRepo, &mockAuditRepo{}, &mockEmailSender{}, &mockSessionInvalidator{}, &mockTransactionManager{})
+	uc := NewConfirmDeactivationUseCase(userRepo, deactRepo, &mockAuditRepo{}, &mockEmailSender{}, &mockSessionInvalidator{}, &mockTransactionManager{}, &mockRefreshTokenRepository{})
 
 	_, err := uc.Execute(context.Background(), ConfirmDeactivationInput{UserID: "user-1", Code: "123456"})
 
@@ -333,7 +376,7 @@ func TestConfirmDeactivation_BlockExpired_UpdateFails_ReturnsInternal(t *testing
 		},
 	}
 
-	uc := NewConfirmDeactivationUseCase(userRepo, deactRepo, &mockAuditRepo{}, &mockEmailSender{}, &mockSessionInvalidator{}, &mockTransactionManager{})
+	uc := NewConfirmDeactivationUseCase(userRepo, deactRepo, &mockAuditRepo{}, &mockEmailSender{}, &mockSessionInvalidator{}, &mockTransactionManager{}, &mockRefreshTokenRepository{})
 
 	_, err := uc.Execute(context.Background(), ConfirmDeactivationInput{UserID: "user-1", Code: "123456"})
 
@@ -359,7 +402,7 @@ func TestConfirmDeactivation_ActiveBlock(t *testing.T) {
 		},
 	}
 
-	uc := NewConfirmDeactivationUseCase(userRepo, deactRepo, &mockAuditRepo{}, &mockEmailSender{}, &mockSessionInvalidator{}, &mockTransactionManager{})
+	uc := NewConfirmDeactivationUseCase(userRepo, deactRepo, &mockAuditRepo{}, &mockEmailSender{}, &mockSessionInvalidator{}, &mockTransactionManager{}, &mockRefreshTokenRepository{})
 	_, err := uc.Execute(context.Background(), ConfirmDeactivationInput{UserID: "user-1", Code: "123456"})
 
 	if err == nil {
@@ -393,7 +436,7 @@ func TestConfirmDeactivation_ExceedAttemptsAndBlock(t *testing.T) {
 		},
 	}
 
-	uc := NewConfirmDeactivationUseCase(userRepo, deactRepo, &mockAuditRepo{}, &mockEmailSender{}, &mockSessionInvalidator{}, &mockTransactionManager{})
+	uc := NewConfirmDeactivationUseCase(userRepo, deactRepo, &mockAuditRepo{}, &mockEmailSender{}, &mockSessionInvalidator{}, &mockTransactionManager{}, &mockRefreshTokenRepository{})
 
 	_, err := uc.Execute(context.Background(), ConfirmDeactivationInput{
 		UserID: "user-1",

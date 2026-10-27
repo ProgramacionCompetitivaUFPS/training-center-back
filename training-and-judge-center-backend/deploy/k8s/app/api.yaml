@@ -49,6 +49,11 @@ spec:
                 secretKeyRef:
                   name: app-secrets
                   key: JWT_SECRET
+            - name: ROTATION_CACHE_ENCRYPTION_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: app-secrets
+                  key: ROTATION_CACHE_ENCRYPTION_KEY
             - name: SMTP_PASSWORD
               valueFrom:
                 secretKeyRef:

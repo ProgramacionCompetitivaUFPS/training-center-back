@@ -9,6 +9,11 @@ import (
 
 var validNicknameRe = regexp.MustCompile(`^[a-z0-9_-]+$`)
 
+const (
+	MinNicknameLength = 3
+	MaxNicknameLength = 30
+)
+
 type Nickname struct {
 	value string
 }
@@ -21,7 +26,7 @@ func NewNickname(value string) (Nickname, error) {
 		})
 	}
 
-	if len(trimmed) < 3 || len(trimmed) > 30 {
+	if len(trimmed) < MinNicknameLength || len(trimmed) > MaxNicknameLength {
 		return Nickname{}, apperror.NewValidation([]apperror.FieldError{
 			{Field: "nickname", Message: "nickname must be between 3 and 30 characters"},
 		})

@@ -4,6 +4,7 @@ import "context"
 
 type ProblemInfo struct {
 	ID           string
+	AuthorID     string
 	Slug         string
 	Title        string
 	IsPublished  bool

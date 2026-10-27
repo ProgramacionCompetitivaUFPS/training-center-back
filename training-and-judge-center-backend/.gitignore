@@ -31,6 +31,7 @@ Thumbs.db
 # Environment
 .env
 .env.local
+secrets.env        # plantilla de secrets que llena y consume bootstrap.ps1 (texto plano)
 
 # Local storage
 .local_storage

@@ -11,8 +11,8 @@ import (
 	"golang.org/x/sync/errgroup"
 
 	infraPostgres "github.com/training-judge-center/backend/internal/adapter/postgres"
-	domainSubmission "github.com/training-judge-center/backend/internal/domain/submission"
 	"github.com/training-judge-center/backend/internal/domain/shared"
+	domainSubmission "github.com/training-judge-center/backend/internal/domain/submission"
 	"github.com/training-judge-center/backend/pkg/apperror"
 )
 
@@ -31,8 +31,8 @@ func (r *Repository) Save(ctx context.Context, s *domainSubmission.Submission) e
 			id, problem_id, user_id, contest_id, standing_id,
 			language, compiler, status, visibility, source_code_path,
 			file_hash, file_size, submitted_at,
-			problem_title, problem_slug
-		) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)
+			problem_title, problem_slug, workspace_xml_path
+		) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16)
 		ON CONFLICT (id) DO UPDATE SET
 			status        = EXCLUDED.status,
 			visibility    = EXCLUDED.visibility,
@@ -58,6 +58,7 @@ func (r *Repository) Save(ctx context.Context, s *domainSubmission.Submission) e
 		s.SubmittedAt(),
 		nilIfEmpty(s.ProblemTitle()),
 		nilIfEmpty(s.ProblemSlug()),
+		s.WorkspaceXMLPath(),
 	)
 	if err != nil {
 		slog.ErrorContext(ctx, "submission: failed to save", "id", s.ID(), "error", err)
@@ -210,10 +211,11 @@ func (r *Repository) ExistsByHashAndUserAndProblem(ctx context.Context, fileHash
 
 const selectCols = `
 	SELECT id, problem_id, user_id, contest_id, standing_id,
-	       language, compiler, status, visibility, source_code_path,
+	       language, COALESCE(compiler, ''), status, visibility, source_code_path,
 	       file_hash, file_size, submitted_at,
 	       judged_at, time_ms, memory_kb, compile_log,
-	       COALESCE(problem_title, ''), COALESCE(problem_slug, '')
+	       COALESCE(problem_title, ''), COALESCE(problem_slug, ''),
+	       workspace_xml_path
 	FROM submissions`
 
 type rowScanner interface {
@@ -223,15 +225,16 @@ type rowScanner interface {
 func scanRow(ctx context.Context, row rowScanner) (*domainSubmission.Submission, error) {
 	var (
 		id, userID, language, compiler, status, visibility, path string
-		problemIDPtr                                              *string
-		contestID, standingID                                     *string
-		fileHash                                                  *string
-		fileSize                                                  *int
-		submittedAt                                               time.Time
-		judgedAt                                                  *time.Time
-		timeMs, memoryKb                                          *int
-		compileLog                                                *string
-		problemTitle, problemSlug                                 string
+		problemIDPtr                                             *string
+		contestID, standingID                                    *string
+		fileHash                                                 *string
+		fileSize                                                 *int
+		submittedAt                                              time.Time
+		judgedAt                                                 *time.Time
+		timeMs, memoryKb                                         *int
+		compileLog                                               *string
+		problemTitle, problemSlug                                string
+		workspaceXMLPath                                         *string
 	)
 	err := row.Scan(
 		&id, &problemIDPtr, &userID, &contestID, &standingID,
@@ -239,6 +242,7 @@ func scanRow(ctx context.Context, row rowScanner) (*domainSubmission.Submission,
 		&fileHash, &fileSize, &submittedAt,
 		&judgedAt, &timeMs, &memoryKb, &compileLog,
 		&problemTitle, &problemSlug,
+		&workspaceXMLPath,
 	)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
@@ -261,7 +265,7 @@ func scanRow(ctx context.Context, row rowScanner) (*domainSubmission.Submission,
 		size = *fileSize
 	}
 
-	return domainSubmission.RestoreSubmission(
+	sub := domainSubmission.RestoreSubmission(
 		id, problemID, shared.RestoreUserID(userID),
 		contestID, standingID,
 		domainSubmission.RestoreLanguage(language),
@@ -271,7 +275,11 @@ func scanRow(ctx context.Context, row rowScanner) (*domainSubmission.Submission,
 		path, hash, size,
 		submittedAt, judgedAt, timeMs, memoryKb, compileLog,
 		problemTitle, problemSlug,
-	), nil
+	)
+	if workspaceXMLPath != nil {
+		sub.AttachBlocklyWorkspace(*workspaceXMLPath)
+	}
+	return sub, nil
 }
 
 func (r *Repository) UpdateVisibility(ctx context.Context, s *domainSubmission.Submission) error {
@@ -318,6 +326,13 @@ func buildWhere(f domainSubmission.ListFilters) (string, []any) {
 		args = append(args, *f.Language)
 		i++
 	}
+	if f.Blockly != nil {
+		if *f.Blockly {
+			where += " AND workspace_xml_path IS NOT NULL"
+		} else {
+			where += " AND workspace_xml_path IS NULL"
+		}
+	}
 	if f.Visibility != nil {
 		where += fmt.Sprintf(" AND visibility = $%d", i)
 		args = append(args, *f.Visibility)
@@ -351,4 +366,19 @@ func nilIfZero(n int) *int {
 		return nil
 	}
 	return &n
+}
+
+// ClaimForJudging moves a PENDING submission to RUNNING in a single statement, so
+// of two workers holding a message for the same submission only one wins.
+func (r *Repository) ClaimForJudging(ctx context.Context, id domainSubmission.SubmissionID) (bool, error) {
+	q := infraPostgres.GetQuerier(ctx, r.db)
+	tag, err := q.Exec(ctx, `
+		UPDATE submissions SET status = 'RUNNING', updated_at = now()
+		WHERE id = $1 AND status = 'PENDING'
+	`, id)
+	if err != nil {
+		slog.ErrorContext(ctx, "submission: failed to claim for judging", "id", id, "error", err)
+		return false, apperror.NewInternal()
+	}
+	return tag.RowsAffected() == 1, nil
 }

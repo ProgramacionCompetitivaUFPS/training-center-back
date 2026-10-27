@@ -22,6 +22,7 @@ import (
 // @Success      201 {object} getProblemResponse
 // @Failure      400 {object} apperror.AppError
 // @Failure      401 {object} apperror.AppError
+// @Failure      413 {object} apperror.AppError
 // @Router       /problems/import [post]
 func (h *Handler) Import(w http.ResponseWriter, r *http.Request) {
 	cu, ok := middleware.GetCurrentUser(r.Context())
@@ -35,10 +36,7 @@ func (h *Handler) Import(w http.ResponseWriter, r *http.Request) {
 
 	maxUploadBytes := int64(h.settings.MaxFileSizeTestCaseMB()) << 20
 	if err := r.ParseMultipartForm(maxUploadBytes); err != nil {
-		handler.WriteJSON(r.Context(), w, http.StatusRequestEntityTooLarge, apperror.AppError{
-			Code:    apperror.ErrCodePayloadTooLarge,
-			Message: "File exceeds maximum allowed size",
-		})
+		handler.WriteError(r.Context(), w, multipartParseError(err))
 		return
 	}
 
@@ -68,16 +66,13 @@ func (h *Handler) Import(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if int64(len(zipData)) > maxUploadBytes {
-		handler.WriteJSON(r.Context(), w, http.StatusRequestEntityTooLarge, apperror.AppError{
-			Code:    apperror.ErrCodePayloadTooLarge,
-			Message: "File exceeds maximum allowed size",
-		})
+		handler.WriteError(r.Context(), w, apperror.NewPayloadTooLarge("File exceeds maximum allowed size"))
 		return
 	}
 
 	currentUser := shared.CurrentUser{ID: cu.ID, Role: cu.Role}
 
-	result, ucErr := h.importProblem.Execute(r.Context(), appProblem.ImportProblemInput{
+	out, ucErr := h.importProblem.Execute(r.Context(), appProblem.ImportProblemInput{
 		Slug:        slug,
 		ZipData:     zipData,
 		CurrentUser: currentUser,
@@ -87,7 +82,7 @@ func (h *Handler) Import(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	p := result.Problem
+	p := out.Problem
 	authorDisplay, err := h.userProvider.GetDisplay(r.Context(), p.AuthorID)
 	if err != nil {
 		slog.DebugContext(r.Context(), "failed to fetch author display", "error", err, "user_id", p.AuthorID)

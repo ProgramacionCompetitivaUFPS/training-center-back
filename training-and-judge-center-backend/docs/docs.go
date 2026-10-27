@@ -52,7 +52,7 @@ const docTemplate = `{
                         }
                     },
                     "400": {
-                        "description": "Bad Request",
+                        "description": "PROBLEM_NOT_PUBLISHED, NO_SUBMISSIONS_TO_REJUDGE, PROBLEM_NOT_IN_CONTEST",
                         "schema": {
                             "$ref": "#/definitions/apperror.AppError"
                         }
@@ -106,6 +106,12 @@ const docTemplate = `{
                         "description": "OK",
                         "schema": {
                             "$ref": "#/definitions/submission.rejudgeSubmissionResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "PROBLEM_NOT_PUBLISHED",
+                        "schema": {
+                            "$ref": "#/definitions/apperror.AppError"
                         }
                     },
                     "401": {
@@ -191,6 +197,42 @@ const docTemplate = `{
                 }
             }
         },
+        "/admin/users/filters": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "admin"
+                ],
+                "summary": "List distinct country/city/institution values in use (admin)",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/user.listUserFilterOptionsResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/apperror.AppError"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/apperror.AppError"
+                        }
+                    }
+                }
+            }
+        },
         "/admin/users/{id}": {
             "put": {
                 "security": [
@@ -230,7 +272,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/user.fullUserResponse"
+                            "$ref": "#/definitions/user.updatedUserResponse"
                         }
                     },
                     "400": {
@@ -296,6 +338,57 @@ const docTemplate = `{
                 }
             }
         },
+        "/auth/google": {
+            "post": {
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "auth"
+                ],
+                "summary": "Login with Google",
+                "parameters": [
+                    {
+                        "description": "Google ID token",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/handler.loginWithGoogleRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/handler.loginResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/apperror.AppError"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/apperror.AppError"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/apperror.AppError"
+                        }
+                    }
+                }
+            }
+        },
         "/auth/login": {
             "post": {
                 "consumes": [
@@ -341,6 +434,62 @@ const docTemplate = `{
                 }
             }
         },
+        "/auth/logout": {
+            "post": {
+                "tags": [
+                    "auth"
+                ],
+                "summary": "Logout",
+                "responses": {
+                    "204": {
+                        "description": "No Content"
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/apperror.AppError"
+                        }
+                    }
+                }
+            }
+        },
+        "/auth/refresh": {
+            "post": {
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "auth"
+                ],
+                "summary": "Refresh access token",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/handler.refreshResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/apperror.AppError"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/apperror.AppError"
+                        }
+                    },
+                    "429": {
+                        "description": "Too Many Requests",
+                        "schema": {
+                            "$ref": "#/definitions/apperror.AppError"
+                        }
+                    }
+                }
+            }
+        },
         "/contests": {
             "get": {
                 "security": [
@@ -360,6 +509,12 @@ const docTemplate = `{
                         "type": "string",
                         "description": "Filter by status (SCHEDULED, ACTIVE, FINISHED)",
                         "name": "status",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Filter by name (partial match)",
+                        "name": "search",
                         "in": "query"
                     },
                     {
@@ -734,6 +889,12 @@ const docTemplate = `{
                     },
                     {
                         "type": "string",
+                        "description": "Filter by name (partial match)",
+                        "name": "search",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
                         "description": "Sort field (name, startTime, createdAt)",
                         "name": "sortBy",
                         "in": "query"
@@ -1067,7 +1228,7 @@ const docTemplate = `{
                         }
                     },
                     "400": {
-                        "description": "Bad Request",
+                        "description": "CONTEST_NOT_ACTIVE, PROBLEM_NOT_IN_CONTEST, PROBLEM_NOT_PUBLISHED, NO_SUBMISSIONS_TO_REJUDGE",
                         "schema": {
                             "$ref": "#/definitions/apperror.AppError"
                         }
@@ -1399,6 +1560,12 @@ const docTemplate = `{
                         "type": "integer",
                         "description": "Limit (default 50, max 100)",
                         "name": "limit",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Filter by nickname, team name or team member nickname",
+                        "name": "search",
                         "in": "query"
                     }
                 ],
@@ -1919,6 +2086,71 @@ const docTemplate = `{
                     },
                     "409": {
                         "description": "Conflict",
+                        "schema": {
+                            "$ref": "#/definitions/apperror.AppError"
+                        }
+                    }
+                }
+            }
+        },
+        "/groups/{groupId}/contests/{contestId}/team-registrations/{teamId}/eligibility": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "teams"
+                ],
+                "summary": "Get which team members can be selected for a contest registration",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Group ID",
+                        "name": "groupId",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Contest ID",
+                        "name": "contestId",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Team ID",
+                        "name": "teamId",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/team.teamRegistrationEligibilityResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/apperror.AppError"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/apperror.AppError"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
                         "schema": {
                             "$ref": "#/definitions/apperror.AppError"
                         }
@@ -3611,6 +3843,12 @@ const docTemplate = `{
                         "description": "Filter by author nickname",
                         "name": "author",
                         "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Filter by title (partial match, max 200 characters)",
+                        "name": "search",
+                        "in": "query"
                     }
                 ],
                 "responses": {
@@ -3618,6 +3856,12 @@ const docTemplate = `{
                         "description": "OK",
                         "schema": {
                             "$ref": "#/definitions/problem.listProblemsResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/apperror.AppError"
                         }
                     },
                     "401": {
@@ -3725,6 +3969,12 @@ const docTemplate = `{
                     },
                     "401": {
                         "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/apperror.AppError"
+                        }
+                    },
+                    "413": {
+                        "description": "Request Entity Too Large",
                         "schema": {
                             "$ref": "#/definitions/apperror.AppError"
                         }
@@ -3991,6 +4241,12 @@ const docTemplate = `{
                         "name": "file",
                         "in": "formData",
                         "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "The problem slug; required to replace testCases or checker of a published problem that is in an active contest",
+                        "name": "confirmSlug",
+                        "in": "formData"
                     }
                 ],
                 "responses": {
@@ -3998,6 +4254,12 @@ const docTemplate = `{
                         "description": "OK",
                         "schema": {
                             "$ref": "#/definitions/problem.getProblemResponse"
+                        }
+                    },
+                    "202": {
+                        "description": "Live update of a published problem accepted; it takes effect once validated",
+                        "schema": {
+                            "$ref": "#/definitions/problem.judgingUpdateResponse"
                         }
                     },
                     "400": {
@@ -4008,6 +4270,12 @@ const docTemplate = `{
                     },
                     "401": {
                         "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/apperror.AppError"
+                        }
+                    },
+                    "413": {
+                        "description": "Request Entity Too Large",
                         "schema": {
                             "$ref": "#/definitions/apperror.AppError"
                         }
@@ -4216,6 +4484,63 @@ const docTemplate = `{
                 }
             }
         },
+        "/problems/p/{slug}/publish": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "problems"
+                ],
+                "summary": "Publish problem",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Problem slug",
+                        "name": "slug",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/problem.publishResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/problem.publishFailureResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/apperror.AppError"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/apperror.AppError"
+                        }
+                    },
+                    "503": {
+                        "description": "Service Unavailable",
+                        "schema": {
+                            "$ref": "#/definitions/apperror.AppError"
+                        }
+                    }
+                }
+            }
+        },
         "/problems/p/{slug}/rejudge": {
             "post": {
                 "security": [
@@ -4244,6 +4569,12 @@ const docTemplate = `{
                         "description": "OK",
                         "schema": {
                             "$ref": "#/definitions/problem.rejudgeResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "BAD_REQUEST (contestId is not supported here), PROBLEM_NOT_PUBLISHED, NO_SUBMISSIONS_TO_REJUDGE",
+                        "schema": {
+                            "$ref": "#/definitions/apperror.AppError"
                         }
                     },
                     "401": {
@@ -4535,6 +4866,57 @@ const docTemplate = `{
                 }
             }
         },
+        "/problems/p/{slug}/validation": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "problems"
+                ],
+                "summary": "Get the latest validation attempt for a problem",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Problem slug",
+                        "name": "slug",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/problem.latestValidationResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/apperror.AppError"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/apperror.AppError"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/apperror.AppError"
+                        }
+                    }
+                }
+            }
+        },
         "/submissions/{submissionId}": {
             "get": {
                 "security": [
@@ -4617,7 +4999,7 @@ const docTemplate = `{
                         }
                     },
                     "400": {
-                        "description": "Bad Request",
+                        "description": "NO_REJUDGE_NEEDED, PROBLEM_NOT_PUBLISHED",
                         "schema": {
                             "$ref": "#/definitions/apperror.AppError"
                         }
@@ -5064,7 +5446,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/user.fullUserResponse"
+                            "$ref": "#/definitions/user.updatedUserResponse"
                         }
                     },
                     "400": {
@@ -5304,6 +5686,96 @@ const docTemplate = `{
                     },
                     "401": {
                         "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/apperror.AppError"
+                        }
+                    }
+                }
+            }
+        },
+        "/users/google": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "users"
+                ],
+                "summary": "Link Google account",
+                "parameters": [
+                    {
+                        "description": "Google ID token",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/user.linkGoogleRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "No Content"
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/apperror.AppError"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/apperror.AppError"
+                        }
+                    },
+                    "409": {
+                        "description": "Conflict",
+                        "schema": {
+                            "$ref": "#/definitions/apperror.AppError"
+                        }
+                    }
+                }
+            },
+            "delete": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "users"
+                ],
+                "summary": "Unlink Google account",
+                "responses": {
+                    "204": {
+                        "description": "No Content"
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/apperror.AppError"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/apperror.AppError"
+                        }
+                    },
+                    "409": {
+                        "description": "Conflict",
                         "schema": {
                             "$ref": "#/definitions/apperror.AppError"
                         }
@@ -5652,6 +6124,114 @@ const docTemplate = `{
                         }
                     }
                 }
+            },
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "users"
+                ],
+                "summary": "Set initial password",
+                "parameters": [
+                    {
+                        "description": "New password",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/user.setPasswordRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "No Content"
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/apperror.AppError"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/apperror.AppError"
+                        }
+                    },
+                    "409": {
+                        "description": "Conflict",
+                        "schema": {
+                            "$ref": "#/definitions/apperror.AppError"
+                        }
+                    }
+                }
+            }
+        },
+        "/users/search": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "users"
+                ],
+                "summary": "Search users (autocomplete, Coach/Admin only)",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Search query (min 2 characters)",
+                        "name": "q",
+                        "in": "query",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Max results (default 10, max 20)",
+                        "name": "limit",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/user.searchUsersResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/apperror.AppError"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/apperror.AppError"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/apperror.AppError"
+                        }
+                    }
+                }
             }
         },
         "/users/{nickname}": {
@@ -5681,7 +6261,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/user.fullUserResponse"
+                            "$ref": "#/definitions/user.updatedUserResponse"
                         }
                     },
                     "401": {
@@ -5762,6 +6342,9 @@ const docTemplate = `{
                 "participantCount": {
                     "type": "integer"
                 },
+                "participationMode": {
+                    "type": "string"
+                },
                 "penalty": {
                     "type": "integer"
                 },
@@ -5826,6 +6409,9 @@ const docTemplate = `{
                     "items": {
                         "$ref": "#/definitions/contest.problemDisplay"
                     }
+                },
+                "showTeamMembers": {
+                    "type": "boolean"
                 },
                 "startTime": {
                     "type": "string"
@@ -5927,6 +6513,9 @@ const docTemplate = `{
                 "participantCount": {
                     "type": "integer"
                 },
+                "participationMode": {
+                    "type": "string"
+                },
                 "penalty": {
                     "type": "integer"
                 },
@@ -5936,11 +6525,20 @@ const docTemplate = `{
                         "$ref": "#/definitions/contest.problemDetail"
                     }
                 },
+                "showTeamMembers": {
+                    "type": "boolean"
+                },
                 "startTime": {
                     "type": "string"
                 },
                 "status": {
                     "type": "string"
+                },
+                "teamSizeMax": {
+                    "type": "integer"
+                },
+                "teamSizeMin": {
+                    "type": "integer"
                 },
                 "updatedAt": {
                     "type": "string"
@@ -5950,17 +6548,26 @@ const docTemplate = `{
         "contest.getStandingsResponse": {
             "type": "object",
             "properties": {
-                "entries": {
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/contest.rankedEntry"
-                    }
+                "contest": {
+                    "$ref": "#/definitions/contest.standingsContestDisplay"
                 },
-                "meta": {
-                    "$ref": "#/definitions/contest.standingsMeta"
+                "filters": {
+                    "$ref": "#/definitions/contest.standingsFilters"
                 },
                 "pagination": {
                     "$ref": "#/definitions/contest.standingsPagination"
+                },
+                "problems": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/contest.standingsProblemHeader"
+                    }
+                },
+                "standings": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/contest.standingEntry"
+                    }
                 }
             }
         },
@@ -6066,6 +6673,9 @@ const docTemplate = `{
                 },
                 "participantCount": {
                     "type": "integer"
+                },
+                "participationMode": {
+                    "type": "string"
                 },
                 "penalty": {
                     "type": "integer"
@@ -6174,59 +6784,25 @@ const docTemplate = `{
                 }
             }
         },
-        "contest.rankedEntry": {
-            "type": "object",
-            "properties": {
-                "contestantId": {
-                    "type": "string"
-                },
-                "lastAcceptedAt": {
-                    "type": "string"
-                },
-                "participantType": {
-                    "type": "string"
-                },
-                "problems": {
-                    "type": "object",
-                    "additionalProperties": {
-                        "$ref": "#/definitions/contest.rankedProblem"
-                    }
-                },
-                "problemsSolved": {
-                    "type": "integer"
-                },
-                "rank": {
-                    "type": "integer"
-                },
-                "totalPenalty": {
-                    "type": "integer"
-                }
-            }
-        },
-        "contest.rankedProblem": {
-            "type": "object",
-            "properties": {
-                "acceptedAt": {
-                    "type": "string"
-                },
-                "attempts": {
-                    "type": "integer"
-                },
-                "isSolved": {
-                    "type": "boolean"
-                },
-                "penalty": {
-                    "type": "integer"
-                }
-            }
-        },
         "contest.registrationItem": {
             "type": "object",
             "properties": {
+                "members": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
                 "nickname": {
                     "type": "string"
                 },
                 "registeredAt": {
+                    "type": "string"
+                },
+                "teamName": {
+                    "type": "string"
+                },
+                "type": {
                     "type": "string"
                 }
             }
@@ -6265,19 +6841,129 @@ const docTemplate = `{
                 }
             }
         },
-        "contest.standingsMeta": {
+        "contest.standingEntry": {
             "type": "object",
             "properties": {
-                "contestStatus": {
+                "participant": {
+                    "$ref": "#/definitions/contest.standingParticipant"
+                },
+                "problems": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/contest.standingProblemResult"
+                    }
+                },
+                "problemsSolved": {
+                    "type": "integer"
+                },
+                "rank": {
+                    "type": "integer"
+                },
+                "totalPenalty": {
+                    "type": "integer"
+                }
+            }
+        },
+        "contest.standingParticipant": {
+            "type": "object",
+            "properties": {
+                "city": {
                     "type": "string"
                 },
+                "country": {
+                    "type": "string"
+                },
+                "displayName": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "institution": {
+                    "type": "string"
+                },
+                "members": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "name": {
+                    "type": "string"
+                },
+                "nickname": {
+                    "type": "string"
+                },
+                "type": {
+                    "type": "string"
+                }
+            }
+        },
+        "contest.standingProblemResult": {
+            "type": "object",
+            "properties": {
+                "attempts": {
+                    "type": "integer"
+                },
+                "penalty": {
+                    "type": "integer"
+                },
+                "position": {
+                    "type": "integer"
+                },
+                "status": {
+                    "type": "string"
+                },
+                "time": {
+                    "type": "integer"
+                }
+            }
+        },
+        "contest.standingsContestDisplay": {
+            "type": "object",
+            "properties": {
+                "endTime": {
+                    "type": "string"
+                },
+                "freezeMinutes": {
+                    "type": "integer"
+                },
                 "frozenAt": {
+                    "type": "string"
+                },
+                "id": {
                     "type": "string"
                 },
                 "isFrozen": {
                     "type": "boolean"
                 },
-                "lastUpdated": {
+                "name": {
+                    "type": "string"
+                },
+                "penalty": {
+                    "type": "integer"
+                },
+                "startTime": {
+                    "type": "string"
+                },
+                "status": {
+                    "type": "string"
+                }
+            }
+        },
+        "contest.standingsFilters": {
+            "type": "object",
+            "properties": {
+                "city": {
+                    "type": "string"
+                },
+                "country": {
+                    "type": "string"
+                },
+                "filteredTotal": {
+                    "type": "integer"
+                },
+                "institution": {
                     "type": "string"
                 }
             }
@@ -6302,6 +6988,20 @@ const docTemplate = `{
                 },
                 "totalPages": {
                     "type": "integer"
+                }
+            }
+        },
+        "contest.standingsProblemHeader": {
+            "type": "object",
+            "properties": {
+                "position": {
+                    "type": "integer"
+                },
+                "slug": {
+                    "type": "string"
+                },
+                "title": {
+                    "type": "string"
                 }
             }
         },
@@ -6433,6 +7133,9 @@ const docTemplate = `{
                         "$ref": "#/definitions/contest.problemOrderRequest"
                     }
                 },
+                "showTeamMembers": {
+                    "type": "boolean"
+                },
                 "startTime": {
                     "type": "string"
                 },
@@ -6526,7 +7229,7 @@ const docTemplate = `{
                 "description": {
                     "type": "string"
                 },
-                "joinMode": {
+                "joinPolicy": {
                     "type": "string"
                 },
                 "leadNicknames": {
@@ -6971,6 +7674,9 @@ const docTemplate = `{
                 "role": {
                     "type": "string"
                 },
+                "systemRole": {
+                    "type": "string"
+                },
                 "userId": {
                     "type": "string"
                 }
@@ -7163,17 +7869,45 @@ const docTemplate = `{
                 },
                 "password": {
                     "type": "string"
+                },
+                "rememberSession": {
+                    "type": "boolean"
                 }
             }
         },
         "handler.loginResponse": {
             "type": "object",
             "properties": {
+                "sessionExpiresAt": {
+                    "type": "string"
+                },
                 "token": {
                     "type": "string"
                 },
                 "user": {
                     "$ref": "#/definitions/handler.userResponse"
+                }
+            }
+        },
+        "handler.loginWithGoogleRequest": {
+            "type": "object",
+            "properties": {
+                "id_token": {
+                    "type": "string"
+                },
+                "rememberSession": {
+                    "type": "boolean"
+                }
+            }
+        },
+        "handler.refreshResponse": {
+            "type": "object",
+            "properties": {
+                "sessionExpiresAt": {
+                    "type": "string"
+                },
+                "token": {
+                    "type": "string"
                 }
             }
         },
@@ -7360,6 +8094,26 @@ const docTemplate = `{
                 }
             }
         },
+        "problem.affectedContest": {
+            "type": "object",
+            "properties": {
+                "endTime": {
+                    "type": "string"
+                },
+                "groupId": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "startTime": {
+                    "type": "string"
+                }
+            }
+        },
         "problem.authorResp": {
             "type": "object",
             "properties": {
@@ -7392,6 +8146,20 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "status": {
+                    "type": "string"
+                }
+            }
+        },
+        "problem.compilationErrorsResp": {
+            "type": "object",
+            "properties": {
+                "errors": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "file": {
                     "type": "string"
                 }
             }
@@ -7432,6 +8200,43 @@ const docTemplate = `{
             "type": "object",
             "properties": {
                 "confirmSlug": {
+                    "type": "string"
+                }
+            }
+        },
+        "problem.failedInputResp": {
+            "type": "object",
+            "properties": {
+                "file": {
+                    "type": "string"
+                },
+                "reason": {
+                    "type": "string"
+                }
+            }
+        },
+        "problem.failedTestCaseResp": {
+            "type": "object",
+            "properties": {
+                "actual": {
+                    "type": "string"
+                },
+                "case": {
+                    "type": "string"
+                },
+                "details": {
+                    "type": "string"
+                },
+                "expected": {
+                    "type": "string"
+                },
+                "status": {
+                    "type": "string"
+                },
+                "timeLimit": {
+                    "type": "integer"
+                },
+                "verdict": {
                     "type": "string"
                 }
             }
@@ -7489,6 +8294,12 @@ const docTemplate = `{
                 "problemJudgingUpdatedAt": {
                     "type": "string"
                 },
+                "samples": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/problem.sampleResp"
+                    }
+                },
                 "slug": {
                     "type": "string"
                 },
@@ -7511,6 +8322,26 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "updatedAt": {
+                    "type": "string"
+                }
+            }
+        },
+        "problem.judgingUpdateResponse": {
+            "type": "object",
+            "properties": {
+                "affectedContests": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/problem.affectedContest"
+                    }
+                },
+                "message": {
+                    "type": "string"
+                },
+                "problem": {
+                    "$ref": "#/definitions/problem.getProblemResponse"
+                },
+                "validationId": {
                     "type": "string"
                 }
             }
@@ -7554,6 +8385,47 @@ const docTemplate = `{
                 },
                 "usersAttempted": {
                     "type": "integer"
+                }
+            }
+        },
+        "problem.latestValidationResponse": {
+            "type": "object",
+            "properties": {
+                "compilationErrors": {
+                    "$ref": "#/definitions/problem.compilationErrorsResp"
+                },
+                "failedInputs": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/problem.failedInputResp"
+                    }
+                },
+                "failedTestCases": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/problem.failedTestCaseResp"
+                    }
+                },
+                "found": {
+                    "type": "boolean"
+                },
+                "passed": {
+                    "type": "boolean"
+                },
+                "status": {
+                    "type": "string"
+                },
+                "terminal": {
+                    "type": "boolean"
+                },
+                "validationLogs": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "validationSummary": {
+                    "$ref": "#/definitions/problem.validationSummaryResp"
                 }
             }
         },
@@ -7648,6 +8520,67 @@ const docTemplate = `{
                 }
             }
         },
+        "problem.publishFailureResponse": {
+            "type": "object",
+            "properties": {
+                "compilationErrors": {
+                    "$ref": "#/definitions/problem.compilationErrorsResp"
+                },
+                "error": {
+                    "type": "string"
+                },
+                "failedInputs": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/problem.failedInputResp"
+                    }
+                },
+                "failedTestCases": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/problem.failedTestCaseResp"
+                    }
+                },
+                "message": {
+                    "type": "string"
+                },
+                "missingFields": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "validationLogs": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                }
+            }
+        },
+        "problem.publishResponse": {
+            "type": "object",
+            "properties": {
+                "message": {
+                    "type": "string"
+                },
+                "slug": {
+                    "type": "string"
+                },
+                "status": {
+                    "type": "string"
+                },
+                "validationLogs": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "validationSummary": {
+                    "$ref": "#/definitions/problem.validationSummaryResp"
+                }
+            }
+        },
         "problem.rejudgeContestResponse": {
             "type": "object",
             "properties": {
@@ -7682,6 +8615,20 @@ const docTemplate = `{
                 },
                 "submissionsQueued": {
                     "type": "integer"
+                }
+            }
+        },
+        "problem.sampleResp": {
+            "type": "object",
+            "properties": {
+                "input": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "output": {
+                    "type": "string"
                 }
             }
         },
@@ -7773,6 +8720,23 @@ const docTemplate = `{
                 },
                 "title": {
                     "type": "string"
+                }
+            }
+        },
+        "problem.validationSummaryResp": {
+            "type": "object",
+            "properties": {
+                "allPassed": {
+                    "type": "boolean"
+                },
+                "sampleCases": {
+                    "type": "integer"
+                },
+                "secretCases": {
+                    "type": "integer"
+                },
+                "solutionsTested": {
+                    "type": "integer"
                 }
             }
         },
@@ -8212,6 +9176,24 @@ const docTemplate = `{
                 }
             }
         },
+        "team.memberEligibilityResponse": {
+            "type": "object",
+            "properties": {
+                "eligible": {
+                    "type": "boolean"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "nickname": {
+                    "type": "string"
+                },
+                "reason": {
+                    "description": "Reason is the error code registration would fail with for this member:\nMEMBER_NOT_IN_GROUP, MEMBER_ALREADY_REGISTERED or MEMBER_IN_ANOTHER_TEAM.\nOmitted when the member is eligible.",
+                    "type": "string"
+                }
+            }
+        },
         "team.myTeamItem": {
             "type": "object",
             "properties": {
@@ -8327,6 +9309,20 @@ const docTemplate = `{
                 },
                 "name": {
                     "type": "string"
+                }
+            }
+        },
+        "team.teamRegistrationEligibilityResponse": {
+            "type": "object",
+            "properties": {
+                "members": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/team.memberEligibilityResponse"
+                    }
+                },
+                "teamAlreadyRegistered": {
+                    "type": "boolean"
                 }
             }
         },
@@ -8631,6 +9627,12 @@ const docTemplate = `{
                 "email": {
                     "type": "string"
                 },
+                "googleLinked": {
+                    "type": "boolean"
+                },
+                "hasPassword": {
+                    "type": "boolean"
+                },
                 "institution": {
                     "type": "string"
                 },
@@ -8645,6 +9647,37 @@ const docTemplate = `{
                 },
                 "updatedAt": {
                     "type": "string"
+                }
+            }
+        },
+        "user.linkGoogleRequest": {
+            "type": "object",
+            "properties": {
+                "id_token": {
+                    "type": "string"
+                }
+            }
+        },
+        "user.listUserFilterOptionsResponse": {
+            "type": "object",
+            "properties": {
+                "cities": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "countries": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "institutions": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
                 }
             }
         },
@@ -8770,6 +9803,25 @@ const docTemplate = `{
                 }
             }
         },
+        "user.searchUsersResponse": {
+            "type": "object",
+            "properties": {
+                "users": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/user.userSearchResultResp"
+                    }
+                }
+            }
+        },
+        "user.setPasswordRequest": {
+            "type": "object",
+            "properties": {
+                "newPassword": {
+                    "type": "string"
+                }
+            }
+        },
         "user.statsResponse": {
             "type": "object",
             "properties": {
@@ -8868,6 +9920,52 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "institution": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "nickname": {
+                    "type": "string"
+                }
+            }
+        },
+        "user.updatedUserResponse": {
+            "type": "object",
+            "properties": {
+                "city": {
+                    "type": "string"
+                },
+                "country": {
+                    "type": "string"
+                },
+                "createdAt": {
+                    "type": "string"
+                },
+                "email": {
+                    "type": "string"
+                },
+                "institution": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "nickname": {
+                    "type": "string"
+                },
+                "role": {
+                    "type": "string"
+                },
+                "updatedAt": {
+                    "type": "string"
+                }
+            }
+        },
+        "user.userSearchResultResp": {
+            "type": "object",
+            "properties": {
+                "id": {
                     "type": "string"
                 },
                 "name": {

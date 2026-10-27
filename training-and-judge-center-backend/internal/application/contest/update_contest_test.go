@@ -43,6 +43,22 @@ func TestUpdateContest_SuccessUpdateName(t *testing.T) {
 	}
 }
 
+// Same unit as GET/list: the frontend writes this response straight into the detail cache.
+func TestUpdateContest_DurationInSeconds(t *testing.T) {
+	uc := newUpdateContestUseCase(repoWith(newTestContest(callerID)), groupFound(), isLead(), defaultProblemProvider())
+
+	out, err := uc.Execute(context.Background(), validUpdateInput())
+
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	// testEnd - testStart = 5 hours = 18000 seconds
+	expected := 5 * 60 * 60
+	if out.Duration != expected {
+		t.Errorf("expected duration %d seconds, got %d", expected, out.Duration)
+	}
+}
+
 func TestUpdateContest_SuccessByAdmin(t *testing.T) {
 	contest := newTestContest(callerID)
 	uc := newUpdateContestUseCase(repoWith(contest), groupFound(), notLead(), defaultProblemProvider())
@@ -152,6 +168,26 @@ func TestUpdateContest_AdminCanUnlockAnyContest(t *testing.T) {
 	}
 	if out.Locked {
 		t.Error("expected contest to be unlocked after admin unlock")
+	}
+}
+
+func TestUpdateContest_SetShowTeamMembers(t *testing.T) {
+	contest := newTestContest(callerID)
+	uc := newUpdateContestUseCase(repoWith(contest), groupFound(), isLead(), defaultProblemProvider())
+
+	show := true
+	out, err := uc.Execute(context.Background(), UpdateContestInput{
+		CurrentUser:     asCoach(callerID),
+		GroupID:         testGroupID,
+		ContestID:       testContestID,
+		ShowTeamMembers: &show,
+	})
+
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !out.ShowTeamMembers {
+		t.Error("expected showTeamMembers to be true")
 	}
 }
 
@@ -273,6 +309,100 @@ func TestUpdateContest_ProblemAccessDeniedOnUpdate(t *testing.T) {
 	var appErr *apperror.AppError
 	if !errors.As(err, &appErr) || appErr.Code != ErrCodeProblemAccessDenied {
 		t.Errorf("expected PROBLEM_ACCESS_DENIED, got %v", err)
+	}
+}
+
+const otherProblemID = "dddddddd-0000-0000-0000-000000000002"
+
+// A private problem that a fellow lead put in the contest must not lock this lead out of the list:
+// only the problems being added now are checked against "can add".
+func TestUpdateContest_ProblemAlreadyInContestIsNotRecheckedWhenAnotherLeadSavesTheList(t *testing.T) {
+	contest := newTestContestWithProblems(callerID) // holds testProblemID, added earlier by someone else
+	pp := &mockProblemProvider{
+		findBySlugsFn: func(_ context.Context, slugs []string, _ string, _ bool) (map[string]*ProblemInfo, error) {
+			return map[string]*ProblemInfo{
+				"private-of-a": {ID: testProblemID, Slug: "private-of-a", Title: "A", IsPublished: true, CanAdd: false},
+				"public-new":   {ID: otherProblemID, Slug: "public-new", Title: "B", IsPublished: true, CanAdd: true},
+			}, nil
+		},
+	}
+	uc := newUpdateContestUseCase(repoWith(contest), groupFound(), isLead(), pp)
+
+	problems := []ProblemOrderInput{{Slug: "private-of-a", Order: 1}, {Slug: "public-new", Order: 2}}
+	out, err := uc.Execute(context.Background(), UpdateContestInput{
+		CurrentUser: asCoach(callerID),
+		GroupID:     testGroupID,
+		ContestID:   testContestID,
+		Problems:    &problems,
+	})
+	if err != nil {
+		t.Fatalf("keeping a problem that is already in the contest must not be refused, got: %v", err)
+	}
+	if len(out.Problems) != 2 {
+		t.Errorf("expected 2 problems, got %d", len(out.Problems))
+	}
+}
+
+func TestUpdateContest_NewPrivateProblemIsStillRefusedEvenIfAnotherOneIsAlreadyIn(t *testing.T) {
+	contest := newTestContestWithProblems(callerID)
+	pp := &mockProblemProvider{
+		findBySlugsFn: func(_ context.Context, slugs []string, _ string, _ bool) (map[string]*ProblemInfo, error) {
+			return map[string]*ProblemInfo{
+				"private-of-a": {ID: testProblemID, Slug: "private-of-a", Title: "A", IsPublished: true, CanAdd: false},
+				"private-of-c": {ID: otherProblemID, Slug: "private-of-c", Title: "C", IsPublished: true, CanAdd: false},
+			}, nil
+		},
+	}
+	uc := newUpdateContestUseCase(repoWith(contest), groupFound(), isLead(), pp)
+
+	problems := []ProblemOrderInput{{Slug: "private-of-a", Order: 1}, {Slug: "private-of-c", Order: 2}}
+	_, err := uc.Execute(context.Background(), UpdateContestInput{
+		CurrentUser: asCoach(callerID),
+		GroupID:     testGroupID,
+		ContestID:   testContestID,
+		Problems:    &problems,
+	})
+
+	var appErr *apperror.AppError
+	if !errors.As(err, &appErr) || appErr.Code != ErrCodeProblemAccessDenied {
+		t.Errorf("a new private problem the lead cannot add must still be refused, got %v", err)
+	}
+}
+
+// The standings of a finished contest are its official result and count the problems the contest has,
+// so once it ends its problem list is closed (everything else can still be edited).
+func TestUpdateContest_ProblemListOfAFinishedContestIsClosed(t *testing.T) {
+	uc := newUpdateContestUseCase(repoWith(finishedContest()), groupFound(), isLead(), defaultProblemProvider())
+
+	problems := []ProblemOrderInput{{Slug: "problem-a", Order: 1}}
+	_, err := uc.Execute(context.Background(), UpdateContestInput{
+		CurrentUser: asCoach(callerID),
+		GroupID:     testGroupID,
+		ContestID:   testContestID,
+		Problems:    &problems,
+	})
+
+	var appErr *apperror.AppError
+	if !errors.As(err, &appErr) || appErr.Code != domainContest.ErrCodeContestProblemsLocked {
+		t.Errorf("expected %s, got %v", domainContest.ErrCodeContestProblemsLocked, err)
+	}
+}
+
+func TestUpdateContest_ANameCanStillBeEditedOnAFinishedContest(t *testing.T) {
+	uc := newUpdateContestUseCase(repoWith(finishedContest()), groupFound(), isLead(), defaultProblemProvider())
+
+	name := "Renamed after the end"
+	out, err := uc.Execute(context.Background(), UpdateContestInput{
+		CurrentUser: asCoach(callerID),
+		GroupID:     testGroupID,
+		ContestID:   testContestID,
+		Name:        &name,
+	})
+	if err != nil {
+		t.Fatalf("editing the name of a finished contest should work, got: %v", err)
+	}
+	if out.Name != name {
+		t.Errorf("name = %q, want %q", out.Name, name)
 	}
 }
 

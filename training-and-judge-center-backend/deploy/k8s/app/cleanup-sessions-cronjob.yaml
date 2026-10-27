@@ -1,0 +1,50 @@
+# CronJob semanal: borra refresh tokens revocados o expirados hace más de CLEANUP_RETENTION_DAYS
+# días (default 15, ver cmd/cleanup-sessions/main.go). Corre después del backup (06:00 UTC) para
+# no competir por I/O de Postgres.
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: cleanup-sessions
+  namespace: training-center
+spec:
+  schedule: "0 7 * * 0"          # 07:00 UTC cada domingo (02:00 Colombia)
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      backoffLimit: 2
+      template:
+        spec:
+          restartPolicy: Never
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 65532
+            runAsGroup: 65532
+            seccompProfile:
+              type: RuntimeDefault
+          containers:
+            - name: cleanup-sessions
+              image: __IMAGE__
+              command: ["/bin/cleanup-sessions"]
+              securityContext:
+                allowPrivilegeEscalation: false
+                readOnlyRootFilesystem: true
+                capabilities:
+                  drop: ["ALL"]
+              envFrom:
+                - configMapRef:
+                    name: app-config
+              env:
+                - name: DB_PASSWORD
+                  valueFrom:
+                    secretKeyRef:
+                      name: app-secrets
+                      key: DB_PASSWORD
+              resources:
+                requests:
+                  cpu: 50m
+                  memory: 64Mi
+                limits:
+                  cpu: 200m
+                  memory: 128Mi

@@ -46,15 +46,9 @@ func kindToStatus(k apperror.Kind) int {
 		return http.StatusTooManyRequests
 	case apperror.KindServiceUnavailable:
 		return http.StatusServiceUnavailable
+	case apperror.KindPayloadTooLarge:
+		return http.StatusRequestEntityTooLarge
 	default:
 		return http.StatusInternalServerError
 	}
-}
-
-func respondJSON(ctx context.Context, w http.ResponseWriter, status int, data any) {
-	WriteJSON(ctx, w, status, data)
-}
-
-func respondError(ctx context.Context, w http.ResponseWriter, err error) {
-	WriteError(ctx, w, err)
 }

@@ -25,6 +25,7 @@ type ContestListItem struct {
 	Penalty           int
 	FreezeMinutes     int
 	EnablePostContest bool
+	ParticipationMode string
 	ParticipantCount  int
 	IsRegistered      bool
 	ProblemCount      int
@@ -59,6 +60,7 @@ type ListContestsInput struct {
 	CurrentUser appshared.CurrentUser
 	GroupID     string
 	Status      *string
+	Search      string
 	SortBy      string
 	Order       string
 	Page        int
@@ -118,6 +120,7 @@ func (uc *ListContestsUseCase) Execute(ctx context.Context, in ListContestsInput
 
 	filters := buildContestFilters(in.Status, in.SortBy, in.Order, page, limit)
 	filters.GroupID = shared.RestoreGroupID(in.GroupID)
+	filters.Search = in.Search
 
 	contests, total, err := uc.repo.List(ctx, filters)
 	if err != nil {

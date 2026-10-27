@@ -23,11 +23,12 @@ type ContestOutput struct {
 	Description       *string
 	StartTime         time.Time
 	EndTime           time.Time
-	Duration          int
+	Duration          int // seconds; domain Duration() returns minutes, multiplied here
 	Penalty           int
 	FreezeMinutes     int
 	EnablePostContest bool
 	Locked            bool
+	ShowTeamMembers   bool
 	ParticipationMode string
 	TeamSizeMin       int
 	TeamSizeMax       int
@@ -47,11 +48,12 @@ func buildOutput(c *domainContest.Contest, group *GroupInfo, owner *UserDisplay,
 		Description:       c.Description(),
 		StartTime:         c.StartTime(),
 		EndTime:           c.EndTime(),
-		Duration:          c.Duration(),
+		Duration:          c.Duration() * 60,
 		Penalty:           c.Penalty().Value(),
 		FreezeMinutes:     c.FreezeMinutes(),
 		EnablePostContest: c.EnablePostContest(),
 		Locked:            c.Locked(),
+		ShowTeamMembers:   c.ShowTeamMembers(),
 		ParticipationMode: c.ParticipationMode().String(),
 		TeamSizeMin:       c.TeamSize().Min(),
 		TeamSizeMax:       c.TeamSize().Max(),

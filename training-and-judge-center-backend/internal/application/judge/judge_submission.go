@@ -5,6 +5,8 @@ import (
 	"log/slog"
 	"time"
 
+	"github.com/google/uuid"
+
 	appshared "github.com/training-judge-center/backend/internal/application/shared"
 	"github.com/training-judge-center/backend/internal/domain/submission"
 	"github.com/training-judge-center/backend/pkg/apperror"
@@ -13,7 +15,11 @@ import (
 // Exit codes produced by the Linux timeout(1) command and the kernel OOM killer.
 const (
 	exitCodeTLE = 124 // timeout(1) killed the process after the time limit
-	exitCodeMLE = 137 // OOM killer sent SIGKILL (128 + 9) when cgroup memory limit was exceeded
+	// exitCodeMLE is the cgroup OOM killer's SIGKILL (128 + 9). Java never gets
+	// there on its own — the JVM enforces its own heap cap and exits 1 — so its
+	// runCmd in judge_config.yaml carries OnOutOfMemoryError to SIGKILL itself.
+	// Removing that flag silently turns every Java MLE back into a runtime error.
+	exitCodeMLE = 137
 )
 
 type JudgeSubmissionInput struct {
@@ -30,6 +36,7 @@ type JudgeSubmissionUseCase struct {
 	txManager            appshared.TransactionManager
 	retry                RetryConfig
 	sleep                func(time.Duration)
+	now                  func() time.Time
 }
 
 func NewJudgeSubmissionUseCase(
@@ -52,46 +59,52 @@ func NewJudgeSubmissionUseCase(
 		txManager:            txManager,
 		retry:                retry,
 		sleep:                time.Sleep,
+		now:                  time.Now,
 	}
 }
 
 func (uc *JudgeSubmissionUseCase) Execute(ctx context.Context, in JudgeSubmissionInput) error {
-	now := time.Now()
-
 	sub, err := uc.submissionUpdater.GetByID(ctx, in.SubmissionID)
 	if err != nil {
 		return err
 	}
 
 	if !sub.Status().IsPending() {
+		slog.WarnContext(ctx, "judge: skipping a submission that is not pending", "submission_id", sub.ID(), "status", sub.Status().String())
 		return nil
 	}
 
-	if err := sub.Start(now); err != nil {
+	if err := sub.Start(uc.now()); err != nil {
 		return err
 	}
-	if err := uc.submissionUpdater.Update(ctx, sub); err != nil {
+	// Atomic: a second message for the same submission loses here instead of judging it twice.
+	claimed, err := uc.submissionUpdater.Claim(ctx, sub.ID())
+	if err != nil {
 		return err
+	}
+	if !claimed {
+		slog.WarnContext(ctx, "judge: another worker already took the submission", "submission_id", sub.ID())
+		return nil
 	}
 
 	sourceCode, err := uc.sourceCodeDownloader.Download(ctx, sub.SourceCodePath())
 	if err != nil {
 		slog.ErrorContext(ctx, "failed to download source code", "error", err)
-		_ = sub.MarkSystemError(now)
+		_ = sub.MarkSystemError(uc.now())
 		return uc.persistVerdict(ctx, sub)
 	}
 
 	limits, err := uc.problemProvider.GetLimits(ctx, sub.ProblemID())
 	if err != nil {
 		slog.ErrorContext(ctx, "failed to get problem limits", "error", err)
-		_ = sub.MarkSystemError(now)
+		_ = sub.MarkSystemError(uc.now())
 		return uc.persistVerdict(ctx, sub)
 	}
 
 	testCases, err := uc.testCaseProvider.GetTestCases(ctx, sub.ProblemID())
 	if err != nil {
 		slog.ErrorContext(ctx, "failed to get test cases", "error", err)
-		_ = sub.MarkSystemError(now)
+		_ = sub.MarkSystemError(uc.now())
 		return uc.persistVerdict(ctx, sub)
 	}
 
@@ -100,7 +113,7 @@ func (uc *JudgeSubmissionUseCase) Execute(ctx context.Context, in JudgeSubmissio
 		if attempt > 0 {
 			uc.sleep(uc.retry.BackoffBase * time.Duration(1<<uint(attempt-1)))
 		}
-		shouldRetry, err := uc.judgeAttempt(ctx, sub, sourceCode, limits, testCases, now)
+		shouldRetry, err := uc.judgeAttempt(ctx, sub, sourceCode, limits, testCases)
 		if !shouldRetry {
 			judgeErr = err
 			break
@@ -113,23 +126,25 @@ func (uc *JudgeSubmissionUseCase) Execute(ctx context.Context, in JudgeSubmissio
 		)
 	}
 	if judgeErr != nil {
-		_ = sub.MarkSystemError(now)
+		_ = sub.MarkSystemError(uc.now())
 	}
 	return uc.persistVerdict(ctx, sub)
 }
 
-// judgeAttempt ejecuta un intento completo de evaluación.
-// Retorna (shouldRetry=true, err) cuando la infra falló y sub no tiene veredicto.
-// Retorna (shouldRetry=false, nil) cuando sub ya tiene un veredicto definitivo.
+// judgeAttempt runs one whole judging attempt. It returns (true, err) when infra
+// failed and sub carries no verdict, and (false, nil) once sub has a final one.
 func (uc *JudgeSubmissionUseCase) judgeAttempt(
 	ctx context.Context,
 	sub *submission.Submission,
 	sourceCode []byte,
 	limits ProblemLimits,
 	testCases []TestCase,
-	now time.Time,
 ) (bool, error) {
-	session, err := uc.executor.BeginSession(ctx, sub.Language())
+	// A fresh unguessable name per attempt. Never the submission id: that one is
+	// public over the API, and the name is what isolates one judging from another.
+	judgingID := uuid.NewString()
+
+	session, err := uc.executor.BeginSession(ctx, sub.Language(), limits.MemoryKb, judgingID)
 	if err != nil {
 		return true, err
 	}
@@ -143,59 +158,72 @@ func (uc *JudgeSubmissionUseCase) judgeAttempt(
 		return true, err
 	}
 	if !compileResult.Success {
-		_ = sub.MarkCompilationError(compileResult.Log, now)
+		_ = sub.MarkCompilationError(compileResult.Log, uc.now())
 		return false, nil
 	}
 
-	maxTimeMs, maxMemoryKb := 0, 0
+	// Opened after compiling: a submission that does not build produces no output
+	// to check, so no checker container is held during the compile.
+	checkerSession, err := uc.outputChecker.BeginChecking(ctx, limits.CheckerPath, limits.CheckerLanguage, judgingID)
+	if err != nil {
+		return true, err
+	}
+	defer checkerSession.Close(ctx)
+
+	maxTimeMs := 0
+	// nil until some test case reports one: the maximum of nothing is not zero.
+	var maxMemoryKb *int
 	for _, tc := range testCases {
 		runResult, err := session.RunTestCase(ctx, RunRequest{
 			Input:       tc.Input,
 			TimeLimitMs: limits.TimeLimitMs,
-			MemoryKb:    limits.MemoryKb,
 		})
 		if err != nil {
 			return true, err
 		}
 
+		// Ahead of the exit code, which cannot carry this: the three runtimes
+		// answer the signal that stops an oversized write with 153, 1 and 0, so
+		// reading it would report a runtime error, a wrong answer and a pass for
+		// the same behaviour.
+		if runResult.OutputLimitExceeded {
+			_ = sub.MarkOutputLimitExceeded(runResult.TimeMs, runResult.MemoryKb, uc.now())
+			return false, nil
+		}
+
 		switch runResult.ExitCode {
 		case exitCodeTLE:
-			_ = sub.MarkTimeLimitExceeded(runResult.TimeMs, now)
+			_ = sub.MarkTimeLimitExceeded(runResult.TimeMs, uc.now())
 			return false, nil
 		case exitCodeMLE:
-			_ = sub.MarkMemoryLimitExceeded(runResult.MemoryKb, now)
+			_ = sub.MarkMemoryLimitExceeded(runResult.MemoryKb, uc.now())
 			return false, nil
 		case 0:
 			if runResult.TimeMs > limits.TimeLimitMs {
-				_ = sub.MarkTimeLimitExceeded(runResult.TimeMs, now)
+				_ = sub.MarkTimeLimitExceeded(runResult.TimeMs, uc.now())
 				return false, nil
 			}
-			checkResult, err := uc.outputChecker.Check(ctx, CheckRequest{
-				Input:            tc.Input,
-				ExpectedOutput:   tc.ExpectedOutput,
-				ContestantOutput: runResult.Output,
-				CheckerPath:      limits.CheckerPath,
-			})
+			checkResult, err := checkerSession.Check(ctx, tc.ExpectedOutput)
 			if err != nil {
 				return true, err
 			}
 			if !checkResult.Accepted {
-				_ = sub.MarkWrongAnswer(runResult.TimeMs, runResult.MemoryKb, now)
+				_ = sub.MarkWrongAnswer(runResult.TimeMs, runResult.MemoryKb, uc.now())
 				return false, nil
 			}
 			if runResult.TimeMs > maxTimeMs {
 				maxTimeMs = runResult.TimeMs
 			}
-			if runResult.MemoryKb > maxMemoryKb {
+			if runResult.MemoryKb != nil && (maxMemoryKb == nil || *runResult.MemoryKb > *maxMemoryKb) {
 				maxMemoryKb = runResult.MemoryKb
 			}
 		default:
-			_ = sub.MarkRuntimeError(runResult.TimeMs, runResult.MemoryKb, now)
+			_ = sub.MarkRuntimeError(runResult.TimeMs, runResult.MemoryKb, uc.now())
 			return false, nil
 		}
 	}
 
-	_ = sub.MarkAccepted(maxTimeMs, maxMemoryKb, now)
+	_ = sub.MarkAccepted(maxTimeMs, maxMemoryKb, uc.now())
 	return false, nil
 }
 

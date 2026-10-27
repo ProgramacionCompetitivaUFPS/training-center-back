@@ -8,6 +8,15 @@ import (
 type ContestSubmissionFilters struct {
 	ProblemSlug *string
 	Nickname    *string
+	// phase: SubmittedAtMost keeps submitted_at <= t, SubmittedAfter keeps submitted_at > t
+	SubmittedAtMost *time.Time
+	SubmittedAfter  *time.Time
+	// freeze: when FreezeAt is set, rows submitted at or after it are kept only
+	// if they belong to ExceptStandingID
+	FreezeAt         *time.Time
+	ExceptStandingID string
+	Limit            int
+	Offset           int
 }
 
 type RichSubmissionData struct {
@@ -24,13 +33,16 @@ type RichSubmissionData struct {
 	TeamName            *string
 	TeamMemberNicknames []string
 	Language            string
+	IsBlockly           bool
 	Status              string
 	SubmittedAt         time.Time
 	JudgedAt            *time.Time
 	TimeMs              *int
 	MemoryKb            *int
+	Visibility          string // "PRIVATE" | "PUBLIC"
 }
 
 type ContestSubmissionProvider interface {
-	ListByContest(ctx context.Context, contestID string, filters ContestSubmissionFilters) ([]RichSubmissionData, error)
+	// ListByContest returns one page of matching submissions and the total match count.
+	ListByContest(ctx context.Context, contestID string, filters ContestSubmissionFilters) ([]RichSubmissionData, int, error)
 }

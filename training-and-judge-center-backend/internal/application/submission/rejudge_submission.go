@@ -54,6 +54,12 @@ func (uc *RejudgeSubmissionUseCase) Execute(ctx context.Context, in RejudgeSubmi
 		return nil, apperror.NewForbidden(domainsubmission.ErrCodeAccessDenied, "you can only rejudge your own submissions")
 	}
 
+	// A deleted problem leaves its submissions without a problem_id.
+	if sub.ProblemID() == "" {
+		return nil, apperror.NewNotFound(domainsubmission.ErrCodeProblemNotFound,
+			"the problem of this submission no longer exists, so it cannot be rejudged")
+	}
+
 	if !isAdmin && sub.ContestID() != nil {
 		startTime, endTime, err := uc.contestTimesProvider.GetContestTimes(ctx, *sub.ContestID())
 		if err != nil {
@@ -65,6 +71,15 @@ func (uc *RejudgeSubmissionUseCase) Execute(ctx context.Context, in RejudgeSubmi
 			return nil, apperror.NewForbidden(ErrCodeCannotRejudgeInActiveContest,
 				"cannot rejudge own submissions in active contests")
 		}
+	}
+
+	published, err := uc.judgingProvider.IsPublished(ctx, sub.ProblemID())
+	if err != nil {
+		return nil, err
+	}
+	if !published {
+		return nil, apperror.NewBadRequest(domainsubmission.ErrCodeProblemNotPublished,
+			"only submissions of PUBLISHED problems can be rejudged")
 	}
 
 	if !isAdmin {

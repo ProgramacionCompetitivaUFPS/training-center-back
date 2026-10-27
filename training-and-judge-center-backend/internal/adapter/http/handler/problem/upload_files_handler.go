@@ -28,9 +28,12 @@ const (
 // @Param        slug path string true "Problem slug"
 // @Param        fileType formData string true "File type (testCases, solution, checker, validator)"
 // @Param        file formData file true "File to upload"
+// @Param        confirmSlug formData string false "The problem slug; required to replace testCases or checker of a published problem that is in an active contest"
 // @Success      200 {object} getProblemResponse
+// @Success      202 {object} judgingUpdateResponse "Live update of a published problem accepted; it takes effect once validated"
 // @Failure      400 {object} apperror.AppError
 // @Failure      401 {object} apperror.AppError
+// @Failure      413 {object} apperror.AppError
 // @Router       /problems/p/{slug}/files [post]
 func (h *Handler) UploadFiles(w http.ResponseWriter, r *http.Request) {
 	cu, ok := middleware.GetCurrentUser(r.Context())
@@ -52,7 +55,7 @@ func (h *Handler) UploadFiles(w http.ResponseWriter, r *http.Request) {
 	maxMemory := maxTestCaseBytes + multipartMemoryPaddingBytes
 	err := r.ParseMultipartForm(maxMemory)
 	if err != nil {
-		handler.WriteJSON(r.Context(), w, http.StatusBadRequest, apperror.AppError{Code: apperror.ErrCodeBadRequest, Message: "Failed to parse multipart form"})
+		handler.WriteError(r.Context(), w, multipartParseError(err))
 		return
 	}
 
@@ -73,7 +76,7 @@ func (h *Handler) UploadFiles(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if fileHeader.Size > limitBytes {
-		handler.WriteJSON(r.Context(), w, http.StatusRequestEntityTooLarge, apperror.AppError{Code: apperror.ErrCodePayloadTooLarge, Message: "File size exceeds allowed limit"})
+		handler.WriteError(r.Context(), w, apperror.NewPayloadTooLarge("File size exceeds allowed limit"))
 		return
 	}
 
@@ -84,7 +87,7 @@ func (h *Handler) UploadFiles(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if int64(len(fileData)) > limitBytes {
-		handler.WriteJSON(r.Context(), w, http.StatusRequestEntityTooLarge, apperror.AppError{Code: apperror.ErrCodePayloadTooLarge, Message: "File size exceeds allowed limit"})
+		handler.WriteError(r.Context(), w, apperror.NewPayloadTooLarge("File size exceeds allowed limit"))
 		return
 	}
 
@@ -93,11 +96,12 @@ func (h *Handler) UploadFiles(w http.ResponseWriter, r *http.Request) {
 
 	currentUser := shared.CurrentUser{ID: cu.ID, Role: cu.Role}
 
-	res, ucErr := h.uploadProblemFiles.Execute(ctx, appProblem.UploadProblemFilesInput{
+	out, ucErr := h.uploadProblemFiles.Execute(ctx, appProblem.UploadProblemFilesInput{
 		Slug:        slug,
 		FileType:    fileType,
 		FileName:    fileHeader.Filename,
 		FileData:    fileData,
+		ConfirmSlug: r.FormValue("confirmSlug"),
 		CurrentUser: currentUser,
 	})
 
@@ -106,9 +110,18 @@ func (h *Handler) UploadFiles(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	authorDisplay, _ := h.userProvider.GetDisplay(r.Context(), res.Problem.AuthorID)
+	authorDisplay, _ := h.userProvider.GetDisplay(r.Context(), out.Problem.AuthorID)
+	if out.ValidationID != "" {
+		handler.WriteJSON(r.Context(), w, http.StatusAccepted, judgingUpdateResponse{
+			Message:          out.Message,
+			ValidationID:     out.ValidationID,
+			AffectedContests: toAffectedContests(out.AffectedContests),
+			Problem:          buildResponse(out.Problem, authorDisplay),
+		})
+		return
+	}
 	handler.WriteJSON(r.Context(), w, http.StatusOK, map[string]interface{}{
-		"message": res.Message,
-		"problem": buildResponse(res.Problem, authorDisplay),
+		"message": out.Message,
+		"problem": buildResponse(out.Problem, authorDisplay),
 	})
 }

@@ -13,6 +13,7 @@ type Handler struct {
 	adminUpdateUser         *appuser.AdminUpdateUserUseCase
 	adminDeactivateUser     *appuser.AdminDeactivateUserUseCase
 	listUsers               *appuser.ListUsersUseCase
+	listUserFilterOptions   *appuser.ListUserFilterOptionsUseCase
 	requestEmailChange      *appuser.RequestEmailChangeUseCase
 	confirmEmailChange      *appuser.ConfirmEmailChangeUseCase
 	requestPasswordRecovery *appuser.RequestPasswordRecoveryUseCase
@@ -21,6 +22,10 @@ type Handler struct {
 	confirmDeactivation     *appuser.ConfirmDeactivationUseCase
 	getDashboard            *appuser.GetDashboardUseCase
 	getProfileStats         *appuser.GetProfileStatsUseCase
+	searchUsers             *appuser.SearchUsersUseCase
+	linkGoogle              *appuser.LinkGoogleIdentityUseCase
+	unlinkGoogle            *appuser.UnlinkGoogleIdentityUseCase
+	setPassword             *appuser.SetPasswordUseCase
 }
 
 func NewHandler(
@@ -32,6 +37,7 @@ func NewHandler(
 	adminUpdateUser *appuser.AdminUpdateUserUseCase,
 	adminDeactivateUser *appuser.AdminDeactivateUserUseCase,
 	listUsers *appuser.ListUsersUseCase,
+	listUserFilterOptions *appuser.ListUserFilterOptionsUseCase,
 	requestEmailChange *appuser.RequestEmailChangeUseCase,
 	confirmEmailChange *appuser.ConfirmEmailChangeUseCase,
 	requestPasswordRecovery *appuser.RequestPasswordRecoveryUseCase,
@@ -40,6 +46,10 @@ func NewHandler(
 	confirmDeactivation *appuser.ConfirmDeactivationUseCase,
 	getDashboard *appuser.GetDashboardUseCase,
 	getProfileStats *appuser.GetProfileStatsUseCase,
+	searchUsers *appuser.SearchUsersUseCase,
+	linkGoogle *appuser.LinkGoogleIdentityUseCase,
+	unlinkGoogle *appuser.UnlinkGoogleIdentityUseCase,
+	setPassword *appuser.SetPasswordUseCase,
 ) *Handler {
 	return &Handler{
 		createUser:              createUser,
@@ -50,6 +60,7 @@ func NewHandler(
 		adminUpdateUser:         adminUpdateUser,
 		adminDeactivateUser:     adminDeactivateUser,
 		listUsers:               listUsers,
+		listUserFilterOptions:   listUserFilterOptions,
 		requestEmailChange:      requestEmailChange,
 		confirmEmailChange:      confirmEmailChange,
 		requestPasswordRecovery: requestPasswordRecovery,
@@ -58,5 +69,9 @@ func NewHandler(
 		confirmDeactivation:     confirmDeactivation,
 		getDashboard:            getDashboard,
 		getProfileStats:         getProfileStats,
+		searchUsers:             searchUsers,
+		linkGoogle:              linkGoogle,
+		unlinkGoogle:            unlinkGoogle,
+		setPassword:             setPassword,
 	}
 }

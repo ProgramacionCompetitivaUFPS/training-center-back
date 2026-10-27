@@ -27,6 +27,7 @@ func (p *StandingsSubmissionProvider) ListByContest(ctx context.Context, contest
 		SELECT user_id, problem_id, status, submitted_at
 		FROM submissions
 		WHERE contest_id = $1
+		  AND problem_id IS NOT NULL -- a deleted problem leaves NULL here; it has no column in the standings
 		  AND status NOT IN ('PENDING', 'RUNNING')
 		ORDER BY submitted_at ASC`,
 		contestID,

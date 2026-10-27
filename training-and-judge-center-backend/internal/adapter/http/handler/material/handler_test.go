@@ -5,6 +5,7 @@ import (
 	"context"
 	"net/http"
 	"net/http/httptest"
+	"time"
 
 	"github.com/training-judge-center/backend/internal/adapter/http/middleware"
 	appMaterial "github.com/training-judge-center/backend/internal/application/material"
@@ -29,6 +30,12 @@ func (s *stubMaterialRepo) FindByID(ctx context.Context, id string) (*domainMate
 }
 func (s *stubMaterialRepo) List(_ context.Context, _ string, _ domainMaterial.ListFilters) ([]*domainMaterial.Material, int, error) {
 	return nil, 0, nil
+}
+func (s *stubMaterialRepo) DistinctTags(_ context.Context, _ string, _ []domainMaterial.Status, _ int) ([]string, error) {
+	return nil, nil
+}
+func (s *stubMaterialRepo) DistinctAuthorIDs(_ context.Context, _ string, _ []domainMaterial.Status, _ int) ([]string, error) {
+	return nil, nil
 }
 func (s *stubMaterialRepo) Delete(_ context.Context, _ string) error { return nil }
 
@@ -97,7 +104,7 @@ func (s *stubAuthorIDProvider) FindIDByNickname(_ context.Context, _ string) (st
 
 type mockTokenSvc struct{}
 
-func (m *mockTokenSvc) GenerateToken(_ context.Context, _ *domainUser.User) (string, error) {
+func (m *mockTokenSvc) GenerateToken(_ context.Context, _ *domainUser.User, _ string) (string, error) {
 	return "tok", nil
 }
 func (m *mockTokenSvc) ValidateToken(_ string) (*domainUser.TokenClaims, error) {
@@ -117,5 +124,22 @@ func authedRequest(method, target string, body []byte) *http.Request {
 }
 
 func wrapAuth(h http.Handler) http.Handler {
-	return middleware.Auth(&mockTokenSvc{}, nil)(h)
+	return middleware.Auth(&mockTokenSvc{}, noopSessionInvalidator{})(h)
+}
+
+// noopSessionInvalidator is a package-local no-op user.SessionInvalidator so
+// handler tests do not depend on the sibling adapter/auth package.
+type noopSessionInvalidator struct{}
+
+func (noopSessionInvalidator) InvalidateAllUserSessions(context.Context, string, time.Time) error {
+	return nil
+}
+func (noopSessionInvalidator) IsAllUserSessionRevoked(context.Context, string, time.Time) (bool, error) {
+	return false, nil
+}
+func (noopSessionInvalidator) InvalidateSession(context.Context, string, time.Time) error {
+	return nil
+}
+func (noopSessionInvalidator) IsSessionInvalidated(context.Context, string) (bool, error) {
+	return false, nil
 }

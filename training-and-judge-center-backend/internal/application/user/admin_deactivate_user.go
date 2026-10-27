@@ -19,12 +19,14 @@ type AdminDeactivateUserInput struct {
 type AdminDeactivateUserUseCase struct {
 	repo               user.Repository
 	sessionInvalidator user.SessionInvalidator
+	refreshTokenRepo   user.RefreshTokenRepository
 }
 
-func NewAdminDeactivateUserUseCase(repo user.Repository, sessionInvalidator user.SessionInvalidator) *AdminDeactivateUserUseCase {
+func NewAdminDeactivateUserUseCase(repo user.Repository, sessionInvalidator user.SessionInvalidator, refreshTokenRepo user.RefreshTokenRepository) *AdminDeactivateUserUseCase {
 	return &AdminDeactivateUserUseCase{
 		repo:               repo,
 		sessionInvalidator: sessionInvalidator,
+		refreshTokenRepo:   refreshTokenRepo,
 	}
 }
 
@@ -57,11 +59,14 @@ func (uc *AdminDeactivateUserUseCase) Execute(ctx context.Context, input AdminDe
 		return apperror.NewInternal()
 	}
 
-	// Invalidate sessions BEFORE persisting to DB: if Redis fails, the DB
-	// write never happens and the caller receives an error with clean state.
+	// Invalidate sessions and revoke refresh tokens BEFORE persisting to DB: if either
+	// fails, the DB write never happens and the caller receives an error with clean state.
 	// If DB write fails after this point, the user loses their active session
 	// but is not officially deactivated — a minor inconsistency, not a security risk.
 	if err := uc.sessionInvalidator.InvalidateAllUserSessions(ctx, foundUser.ID(), now); err != nil {
+		return err
+	}
+	if err := uc.refreshTokenRepo.RevokeAllByUserID(ctx, foundUser.ID(), now); err != nil {
 		return err
 	}
 

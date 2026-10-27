@@ -3,7 +3,6 @@ package user
 import (
 	"encoding/json"
 	"net/http"
-	"time"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/training-judge-center/backend/internal/adapter/http/handler"
@@ -28,7 +27,7 @@ type adminUpdateUserRequest struct {
 // @Security     BearerAuth
 // @Param        id path string true "User ID"
 // @Param        body body adminUpdateUserRequest true "Fields to update"
-// @Success      200 {object} fullUserResponse
+// @Success      200 {object} updatedUserResponse
 // @Failure      400 {object} apperror.AppError
 // @Failure      401 {object} apperror.AppError
 // @Failure      403 {object} apperror.AppError
@@ -57,21 +56,5 @@ func (h *Handler) AdminUpdateUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	resp := fullUserResponse{
-		Name:        out.User.Name,
-		Nickname:    out.User.Nickname,
-		Institution: out.User.Institution,
-		City:        out.User.City,
-		Country:     out.User.Country,
-		Role:        out.User.Role,
-		CreatedAt:   out.User.CreatedAt.UTC().Format(time.RFC3339),
-	}
-	if out.User.Email != nil {
-		resp.Email = *out.User.Email
-	}
-	if out.User.UpdatedAt != nil {
-		resp.UpdatedAt = out.User.UpdatedAt.UTC().Format(time.RFC3339)
-	}
-
-	handler.WriteJSON(r.Context(), w, http.StatusOK, resp)
+	handler.WriteJSON(r.Context(), w, http.StatusOK, buildUpdatedResponse(out.User))
 }

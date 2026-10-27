@@ -1,11 +1,21 @@
 package material_test
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/training-judge-center/backend/internal/domain/material"
 	"github.com/training-judge-center/backend/pkg/apperror"
 )
+
+// manyTags returns n distinct valid tags ("tag0", "tag1", ...) for cap testing.
+func manyTags(n int) []string {
+	tags := make([]string, n)
+	for i := range tags {
+		tags[i] = fmt.Sprintf("tag%d", i)
+	}
+	return tags
+}
 
 func TestNewTags(t *testing.T) {
 	tests := []struct {
@@ -28,6 +38,8 @@ func TestNewTags(t *testing.T) {
 		{"consecutive underscores", []string{"bad__tag"}, true},
 		{"1 char", []string{"a"}, true},
 		{"51 chars", []string{"abcdefghijklmnopqrstuvwxyz0123456789abcdefghijklmno"}, true},
+		{"exactly 20 tags", manyTags(20), false},
+		{"21 tags", manyTags(21), true},
 	}
 
 	for _, tt := range tests {

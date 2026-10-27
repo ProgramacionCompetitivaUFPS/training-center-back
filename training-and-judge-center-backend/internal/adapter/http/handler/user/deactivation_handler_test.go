@@ -29,7 +29,7 @@ func wrapWithAuth(h http.Handler, claims *domainuser.TokenClaims) http.Handler {
 			return claims, nil
 		},
 	}
-	return middleware.Auth(tokenSvc, nil)(h)
+	return middleware.Auth(tokenSvc, noopSessionInvalidator{})(h)
 }
 
 // activeUserWithNoEmail returns a valid ACTIVE user without an email field.
@@ -83,7 +83,7 @@ func TestConfirmDeactivation_InvalidCodes_Return400(t *testing.T) {
 	}
 
 	// Arrange: use case with nil repos — it must never be called for these inputs.
-	uc := appuser.NewConfirmDeactivationUseCase(nil, nil, nil, nil, nil, nil)
+	uc := appuser.NewConfirmDeactivationUseCase(nil, nil, nil, nil, nil, nil, nil)
 	h := newHandlerWithConfirmDeactivation(uc)
 	wrapped := wrapWithAuth(
 		http.HandlerFunc(h.ConfirmDeactivation),
@@ -134,6 +134,7 @@ func TestConfirmDeactivation_ValidSixDigitCode_Returns204(t *testing.T) {
 		&mockHandlerEmailSender{},
 		&mockHandlerSessionInvalidator{},
 		&mockHandlerTxManager{},
+		&mockHandlerRefreshTokenRepo{},
 	)
 	h := newHandlerWithConfirmDeactivation(uc)
 	wrapped := wrapWithAuth(
@@ -152,5 +153,43 @@ func TestConfirmDeactivation_ValidSixDigitCode_Returns204(t *testing.T) {
 	// Assert
 	if rr.Code != http.StatusNoContent {
 		t.Errorf("expected 204, got %d — body: %s", rr.Code, rr.Body.String())
+	}
+}
+
+// noopSessionInvalidator is a package-local no-op user.SessionInvalidator so
+// handler tests do not depend on the sibling adapter/auth package.
+type noopSessionInvalidator struct{}
+
+func (noopSessionInvalidator) InvalidateAllUserSessions(context.Context, string, time.Time) error {
+	return nil
+}
+func (noopSessionInvalidator) IsAllUserSessionRevoked(context.Context, string, time.Time) (bool, error) {
+	return false, nil
+}
+func (noopSessionInvalidator) InvalidateSession(context.Context, string, time.Time) error {
+	return nil
+}
+func (noopSessionInvalidator) IsSessionInvalidated(context.Context, string) (bool, error) {
+	return false, nil
+}
+
+// middleware.LimitBody lets multipart-labelled requests through untouched, so the request
+// deactivation handler caps its own JSON body. An oversized body labelled multipart must be
+// rejected before reaching the use case (nil here: reaching it would panic).
+func TestRequestDeactivation_OversizedMultipartLabelledBody_Returns413(t *testing.T) {
+	h := wrapWithAuth(
+		http.HandlerFunc((&Handler{}).RequestDeactivation),
+		&domainuser.TokenClaims{UserID: "user-abc", Role: shared.RoleContestant},
+	)
+	big := `{"password":"` + strings.Repeat("a", 64<<10) + `"}`
+	req := httptest.NewRequest(http.MethodPost, "/users/deactivation", strings.NewReader(big))
+	req.Header.Set("Authorization", "Bearer test-token")
+	req.Header.Set("Content-Type", "multipart/form-data; boundary=x")
+	rec := httptest.NewRecorder()
+
+	h.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusRequestEntityTooLarge {
+		t.Fatalf("expected 413, got %d: %s", rec.Code, rec.Body.String())
 	}
 }

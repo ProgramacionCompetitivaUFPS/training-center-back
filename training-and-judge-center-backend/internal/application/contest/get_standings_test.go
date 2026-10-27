@@ -2,6 +2,7 @@ package contest
 
 import (
 	"context"
+	"errors"
 	"testing"
 	"time"
 
@@ -50,6 +51,8 @@ func newGetStandingsUseCase(
 		contestRepo, regRepo, subProvider,
 		&mockTeamParticipantProvider{},
 		&mockParticipantProfileProvider{},
+		&mockTeamDisplayProvider{},
+		defaultProblemProvider(),
 		groupProvider, memberProvider,
 		cache,
 		testStaleness,
@@ -72,6 +75,12 @@ func activeContest() *domainContest.Contest {
 		[]domainContest.ContestProblem{},
 		testNow, nil,
 	)
+}
+
+// withProblem puts a problem in the contest: standings count only the problems the contest has.
+func withProblem(c *domainContest.Contest, problemID string) *domainContest.Contest {
+	c.SetProblems([]domainContest.ContestProblem{domainContest.RestoreContestProblem("cp-"+problemID, problemID, 1)}, testNow)
+	return c
 }
 
 func finishedContest() *domainContest.Contest {
@@ -117,13 +126,23 @@ func reg(userID string) *domainContest.ContestRegistration {
 }
 
 func sub(userID, problemID, status string, minutesAgo int) ContestSubmissionData {
+	return subAgo(userID, problemID, status, time.Duration(minutesAgo)*time.Minute)
+}
+
+func subAgo(userID, problemID, status string, ago time.Duration) ContestSubmissionData {
 	return ContestSubmissionData{
 		UserID:      userID,
 		ProblemID:   problemID,
 		Status:      status,
-		SubmittedAt: time.Now().Add(-time.Duration(minutesAgo) * time.Minute),
+		SubmittedAt: time.Now().Add(-ago),
 	}
 }
+
+// acceptedMidMinute is when a test solve lands: an hour and half a minute after the fixture's clock.
+// The contest and the submission are built with separate time.Now() calls; at a whole number of
+// minutes, whether the second call reads the same clock tick as the first would flip the truncated
+// penalty by one. Half a minute away from the boundary the result cannot depend on the clock.
+const acceptedMidMinute = 60*time.Minute + 30*time.Second
 
 func visibleGroup() *GroupInfo {
 	return &GroupInfo{ID: testGroupID, Name: "Test Group", IsVisible: true}
@@ -194,7 +213,7 @@ func TestGetStandingsUseCase_CacheMissRebuild(t *testing.T) {
 			return nil
 		},
 	}
-	uc := newGetStandingsUseCase(activeContest(), regs, subs, cache, visibleGroup(), isMemberNotLead())
+	uc := newGetStandingsUseCase(withProblem(activeContest(), "A"), regs, subs, cache, visibleGroup(), isMemberNotLead())
 
 	out, err := uc.Execute(context.Background(), GetStandingsInput{
 		CurrentUser: asContestant(callerID),
@@ -218,6 +237,69 @@ func TestGetStandingsUseCase_CacheMissRebuild(t *testing.T) {
 	}
 	if !setCalled {
 		t.Error("expected cache Set to be called on rebuild")
+	}
+}
+
+func TestGetStandingsUseCase_CacheGetErrorFallsBackToRebuild(t *testing.T) {
+	regs := []*domainContest.ContestRegistration{reg(callerID), reg(otherID)}
+	subs := []ContestSubmissionData{
+		sub(callerID, "A", "ACCEPTED", 90),
+	}
+	var setCalled bool
+	cache := &mockStandingsCache{
+		getFn: func(_ context.Context, _ string) (*CachedStandings, error) {
+			return nil, errors.New("redis unreachable")
+		},
+		setFn: func(_ context.Context, _ string, _ *CachedStandings) error {
+			setCalled = true
+			return nil
+		},
+	}
+	uc := newGetStandingsUseCase(withProblem(activeContest(), "A"), regs, subs, cache, visibleGroup(), isMemberNotLead())
+
+	out, err := uc.Execute(context.Background(), GetStandingsInput{
+		CurrentUser: asContestant(callerID),
+		GroupID:     testGroupID,
+		ContestID:   testContestID,
+		Page:        1,
+		Limit:       50,
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v (a cache read failure should fall back to rebuild)", err)
+	}
+	if out.Total != 2 {
+		t.Errorf("total=%d, want 2", out.Total)
+	}
+	if !setCalled {
+		t.Error("expected the fallback rebuild to overwrite the cache entry")
+	}
+}
+
+func TestGetStandingsUseCase_PostCompetitionSubmissionsExcludedFromRebuild(t *testing.T) {
+	regs := []*domainContest.ContestRegistration{reg(callerID), reg(otherID)}
+	subs := []ContestSubmissionData{
+		sub(callerID, "A", "ACCEPTED", 90), // during the contest (ends 60m ago)
+		sub(otherID, "A", "ACCEPTED", 30),  // postcompetition (practice) — after endTime
+	}
+	uc := newGetStandingsUseCase(withProblem(finishedContest(), "A"), regs, subs, emptyCache(), visibleGroup(), isMemberNotLead())
+
+	out, err := uc.Execute(context.Background(), GetStandingsInput{
+		CurrentUser: asContestant(callerID),
+		GroupID:     testGroupID,
+		ContestID:   testContestID,
+		Page:        1,
+		Limit:       50,
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	for _, e := range out.Entries {
+		if e.ContestantID == otherID && e.ProblemsSolved != 0 {
+			t.Errorf("otherID's postcompetition ACCEPTED must not count: solved=%d, want 0", e.ProblemsSolved)
+		}
+		if e.ContestantID == callerID && e.ProblemsSolved != 1 {
+			t.Errorf("callerID's during-contest ACCEPTED must count: solved=%d, want 1", e.ProblemsSolved)
+		}
 	}
 }
 
@@ -248,6 +330,8 @@ func TestGetStandingsUseCase_FiltersByCountryEndToEnd(t *testing.T) {
 		&mockStandingsSubmissionProvider{listByContestFn: func(_ context.Context, _ string) ([]ContestSubmissionData, error) { return subs, nil }},
 		&mockTeamParticipantProvider{},
 		profileProvider,
+		&mockTeamDisplayProvider{},
+		defaultProblemProvider(),
 		&mockGroupProvider{findByIDFn: func(_ context.Context, _ string) (*GroupInfo, error) { return visibleGroup(), nil }},
 		isMemberNotLead(),
 		cache,
@@ -296,6 +380,8 @@ func TestGetStandingsUseCase_ProfileProviderCalledOnceAcrossDifferentFilters(t *
 		&mockStandingsSubmissionProvider{listByContestFn: func(_ context.Context, _ string) ([]ContestSubmissionData, error) { return subs, nil }},
 		&mockTeamParticipantProvider{},
 		profileProvider,
+		&mockTeamDisplayProvider{},
+		defaultProblemProvider(),
 		&mockGroupProvider{findByIDFn: func(_ context.Context, _ string) (*GroupInfo, error) { return visibleGroup(), nil }},
 		isMemberNotLead(),
 		cache,
@@ -436,13 +522,43 @@ func TestGetStandingsUseCase_Pagination(t *testing.T) {
 	}
 }
 
+// A problem taken out of the contest must stop counting: its column is gone, so leaving its solves in
+// the totals would show a score that no column explains (the submissions keep their contest, so
+// putting the problem back brings them back).
+func TestGetStandingsUseCase_ProblemTakenOutOfTheContestStopsCounting(t *testing.T) {
+	regs := []*domainContest.ContestRegistration{reg(callerID)}
+	subs := []ContestSubmissionData{
+		sub(callerID, "A", "ACCEPTED", 90),
+		sub(callerID, "B", "ACCEPTED", 80), // B is no longer in the contest
+		sub(callerID, "B", "WRONG_ANSWER", 70),
+	}
+	uc := newGetStandingsUseCase(withProblem(activeContest(), "A"), regs, subs, emptyCache(), visibleGroup(), isMemberNotLead())
+
+	out, err := uc.Execute(context.Background(), GetStandingsInput{
+		CurrentUser: asContestant(callerID),
+		GroupID:     testGroupID,
+		ContestID:   testContestID,
+		Page:        1, Limit: 50,
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	entry := out.Entries[0]
+	if entry.ProblemsSolved != 1 {
+		t.Errorf("solved=%d, want 1 (only A is in the contest)", entry.ProblemsSolved)
+	}
+	if _, counted := entry.Problems["B"]; counted {
+		t.Errorf("B is not in the contest and must not appear in the standings: %+v", entry.Problems["B"])
+	}
+}
+
 func TestGetStandingsUseCase_CompilationErrorNotCountedAsWrongAttempt(t *testing.T) {
 	regs := []*domainContest.ContestRegistration{reg(callerID)}
 	subs := []ContestSubmissionData{
 		sub(callerID, "A", "COMPILATION_ERROR", 90),
 		sub(callerID, "A", "ACCEPTED", 60),
 	}
-	uc := newGetStandingsUseCase(activeContest(), regs, subs, emptyCache(), visibleGroup(), isMemberNotLead())
+	uc := newGetStandingsUseCase(withProblem(activeContest(), "A"), regs, subs, emptyCache(), visibleGroup(), isMemberNotLead())
 
 	out, err := uc.Execute(context.Background(), GetStandingsInput{
 		CurrentUser: asContestant(callerID),
@@ -461,5 +577,208 @@ func TestGetStandingsUseCase_CompilationErrorNotCountedAsWrongAttempt(t *testing
 	prob := entry.Problems["A"]
 	if prob.Attempts != 0 {
 		t.Errorf("wrongAttempts=%d, want 0 (CE excluded)", prob.Attempts)
+	}
+}
+
+// The verdicts that penalise are literal strings here, not the domain type, so
+// one added to the domain does not reach this list on its own. Every verdict
+// that means "the contestant tried and failed" has to cost a penalty, or a
+// submission would be free.
+func TestGetStandingsUseCase_EveryFailedAttemptPenalises(t *testing.T) {
+	tests := []struct {
+		verdict   string
+		penalised bool
+	}{
+		{"WRONG_ANSWER", true},
+		{"TIME_LIMIT_EXCEEDED", true},
+		{"MEMORY_LIMIT_EXCEEDED", true},
+		{"OUTPUT_LIMIT_EXCEEDED", true},
+		{"RUNTIME_ERROR", true},
+		// Neither is the contestant's attempt failing on its merits: ICPC rules
+		// leave both out.
+		{"COMPILATION_ERROR", false},
+		{"SYSTEM_ERROR", false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.verdict, func(t *testing.T) {
+			regs := []*domainContest.ContestRegistration{reg(callerID)}
+			subs := []ContestSubmissionData{
+				sub(callerID, "A", tt.verdict, 30),
+				subAgo(callerID, "A", "ACCEPTED", acceptedMidMinute),
+			}
+			uc := newGetStandingsUseCase(withProblem(activeContest(), "A"), regs, subs, emptyCache(), visibleGroup(), isMemberNotLead())
+
+			out, err := uc.Execute(context.Background(), GetStandingsInput{
+				CurrentUser: asContestant(callerID),
+				GroupID:     testGroupID,
+				ContestID:   testContestID,
+				Page:        1,
+				Limit:       50,
+			})
+			if err != nil {
+				t.Fatalf("Execute: %v", err)
+			}
+
+			// The difference against a clean solve, not the absolute number.
+			got := out.Entries[0].TotalPenalty - cleanSolvePenalty(t)
+			want := 0
+			if tt.penalised {
+				want = 20
+			}
+			if got != want {
+				t.Errorf("%s cost %d minutes of penalty, want %d", tt.verdict, got, want)
+			}
+		})
+	}
+}
+
+// cleanSolvePenalty is what the same solve costs with no failed attempt before
+// it, so a test can measure what an attempt added.
+func cleanSolvePenalty(t *testing.T) int {
+	t.Helper()
+	regs := []*domainContest.ContestRegistration{reg(callerID)}
+	subs := []ContestSubmissionData{subAgo(callerID, "A", "ACCEPTED", acceptedMidMinute)}
+	uc := newGetStandingsUseCase(withProblem(activeContest(), "A"), regs, subs, emptyCache(), visibleGroup(), isMemberNotLead())
+
+	out, err := uc.Execute(context.Background(), GetStandingsInput{
+		CurrentUser: asContestant(callerID),
+		GroupID:     testGroupID,
+		ContestID:   testContestID,
+		Page:        1,
+		Limit:       50,
+	})
+	if err != nil {
+		t.Fatalf("baseline Execute: %v", err)
+	}
+	return out.Entries[0].TotalPenalty
+}
+
+func TestGetStandingsUseCase_ExecuteFilterOptions_CacheHitDerivesDistinctSortedValues(t *testing.T) {
+	cached := &CachedStandings{
+		Profiles: map[string]*ParticipantProfile{
+			callerID: {ID: callerID, Country: "Colombia", City: "Bogotá", Institution: "UFPS"},
+			otherID:  {ID: otherID, Country: "Argentina", City: "Bogotá", Institution: ""},
+		},
+		LastUpdated: time.Now(),
+	}
+	cache := &mockStandingsCache{
+		getFn: func(_ context.Context, _ string) (*CachedStandings, error) { return cached, nil },
+	}
+	uc := newGetStandingsUseCase(activeContest(), nil, nil, cache, visibleGroup(), isMemberNotLead())
+
+	out, err := uc.ExecuteFilterOptions(context.Background(), GetStandingsFilterOptionsInput{
+		CurrentUser: asContestant(callerID),
+		GroupID:     testGroupID,
+		ContestID:   testContestID,
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(out.Countries) != 2 || out.Countries[0] != "Argentina" || out.Countries[1] != "Colombia" {
+		t.Errorf("Countries = %v, want sorted [Argentina Colombia]", out.Countries)
+	}
+	if len(out.Cities) != 1 || out.Cities[0] != "Bogotá" {
+		t.Errorf("Cities = %v, want deduped [Bogotá]", out.Cities)
+	}
+	if len(out.Institutions) != 1 || out.Institutions[0] != "UFPS" {
+		t.Errorf("Institutions = %v, want [UFPS] (otherID's empty institution excluded)", out.Institutions)
+	}
+}
+
+func TestGetStandingsUseCase_ExecuteFilterOptions_StaleHitRefreshesInBackground(t *testing.T) {
+	cached := &CachedStandings{
+		Profiles: map[string]*ParticipantProfile{
+			callerID: {ID: callerID, Country: "Colombia"},
+		},
+		LastUpdated: time.Now().Add(-time.Hour), // long past testStaleness
+	}
+	refreshed := make(chan struct{}, 1)
+	cache := &mockStandingsCache{
+		getFn: func(_ context.Context, _ string) (*CachedStandings, error) { return cached, nil },
+		acquireRefreshLockFn: func(_ context.Context, _ string, _ time.Duration) (bool, error) {
+			refreshed <- struct{}{}
+			return false, nil // skip the rebuild itself; only the trigger matters here
+		},
+	}
+	uc := newGetStandingsUseCase(activeContest(), nil, nil, cache, visibleGroup(), isMemberNotLead())
+
+	out, err := uc.ExecuteFilterOptions(context.Background(), GetStandingsFilterOptionsInput{
+		CurrentUser: asContestant(callerID),
+		GroupID:     testGroupID,
+		ContestID:   testContestID,
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(out.Countries) != 1 || out.Countries[0] != "Colombia" {
+		t.Errorf("Countries = %v, want the stale [Colombia] (should not block on refresh)", out.Countries)
+	}
+
+	select {
+	case <-refreshed:
+	case <-time.After(2 * time.Second):
+		t.Fatal("expected a stale filter-options hit to start a background refresh within 2s")
+	}
+}
+
+func TestGetStandingsUseCase_ExecuteFilterOptions_CacheMissRebuildsFromSource(t *testing.T) {
+	regs := []*domainContest.ContestRegistration{reg(callerID), reg(otherID)}
+	profiles := map[string]*ParticipantProfile{
+		callerID: {ID: callerID, Country: "Colombia", City: "Bogotá", Institution: "UFPS"},
+		otherID:  {ID: otherID, Country: "Colombia", City: "Cali", Institution: "UFPS"},
+	}
+	var setCalled bool
+	cache := &mockStandingsCache{
+		setFn: func(_ context.Context, _ string, _ *CachedStandings) error { setCalled = true; return nil },
+	}
+	profileProvider := &mockParticipantProfileProvider{
+		getProfilesFn: func(_ context.Context, _ []string) (map[string]*ParticipantProfile, error) { return profiles, nil },
+	}
+	uc := NewGetStandingsUseCase(
+		&mockContestRepository{findByIDFn: func(_ context.Context, _ string) (*domainContest.Contest, error) { return activeContest(), nil }},
+		&mockRegistrationRepository{listByContestFn: func(_ context.Context, _ string, _, _ int) ([]*domainContest.ContestRegistration, int, error) {
+			return regs, len(regs), nil
+		}},
+		&mockStandingsSubmissionProvider{listByContestFn: func(_ context.Context, _ string) ([]ContestSubmissionData, error) { return nil, nil }},
+		&mockTeamParticipantProvider{},
+		profileProvider,
+		&mockTeamDisplayProvider{},
+		defaultProblemProvider(),
+		&mockGroupProvider{findByIDFn: func(_ context.Context, _ string) (*GroupInfo, error) { return visibleGroup(), nil }},
+		isMemberNotLead(),
+		cache,
+		testStaleness,
+	)
+
+	out, err := uc.ExecuteFilterOptions(context.Background(), GetStandingsFilterOptionsInput{
+		CurrentUser: asContestant(callerID),
+		GroupID:     testGroupID,
+		ContestID:   testContestID,
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !setCalled {
+		t.Error("expected the cache miss to trigger a rebuild that populates the cache")
+	}
+	if len(out.Countries) != 1 || out.Countries[0] != "Colombia" {
+		t.Errorf("Countries = %v, want deduped [Colombia]", out.Countries)
+	}
+	if len(out.Cities) != 2 {
+		t.Errorf("Cities = %v, want 2 distinct cities (Bogotá, Cali)", out.Cities)
+	}
+}
+
+func TestGetStandingsUseCase_ExecuteFilterOptions_NotFoundForNonMemberOfHiddenGroup(t *testing.T) {
+	uc := newGetStandingsUseCase(activeContest(), nil, nil, emptyCache(), hiddenGroup(), notLead())
+
+	_, err := uc.ExecuteFilterOptions(context.Background(), GetStandingsFilterOptionsInput{
+		CurrentUser: asContestant(callerID),
+		GroupID:     testGroupID,
+		ContestID:   testContestID,
+	})
+	if err == nil {
+		t.Fatal("expected not found error, got nil")
 	}
 }

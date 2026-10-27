@@ -58,7 +58,7 @@ func (uc *RejudgeContestSubmissionsUseCase) Execute(ctx context.Context, in Reju
 	}
 
 	userID := in.CurrentUser.ID
-	if contest.OwnerID != userID {
+	if contest.OwnerID != userID && !in.CurrentUser.IsAdmin() {
 		if contest.GroupID == nil {
 			return nil, apperror.NewForbidden(ErrCodeInsufficientPermissions,
 				"only the contest owner or Leads of the group can rejudge submissions")
@@ -89,6 +89,11 @@ func (uc *RejudgeContestSubmissionsUseCase) Execute(ctx context.Context, in Reju
 	}
 	if !inContest {
 		return nil, apperror.NewBadRequest(ErrCodeProblemNotInContest, "the specified problem is not part of this contest")
+	}
+
+	if !p.Status().IsPublished() {
+		return nil, apperror.NewBadRequest(ErrCodeProblemNotPublished,
+			"only PUBLISHED problems can be rejudged")
 	}
 
 	if p.JudgingUpdatedAt() == nil {

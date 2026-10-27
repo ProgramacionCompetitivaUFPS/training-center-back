@@ -54,7 +54,7 @@ func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
 	langOverrides := convertLangOverrides(body.LangOverrides)
 	currentUser := shared.CurrentUser{ID: cu.ID, Role: cu.Role}
 
-	result, ucErr := h.createProblem.Execute(r.Context(), appProblem.CreateProblemInput{
+	out, ucErr := h.createProblem.Execute(r.Context(), appProblem.CreateProblemInput{
 		Slug:          body.Slug,
 		Title:         body.Title,
 		Statement:     body.Statement,
@@ -70,7 +70,7 @@ func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	p := result.Problem
+	p := out.Problem
 	authorDisplay, err := h.userProvider.GetDisplay(r.Context(), p.AuthorID)
 	if err != nil {
 		slog.DebugContext(r.Context(), "failed to fetch author display", "error", err, "user_id", p.AuthorID)

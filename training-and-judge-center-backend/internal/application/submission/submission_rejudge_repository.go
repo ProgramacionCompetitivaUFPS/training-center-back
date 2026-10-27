@@ -7,6 +7,8 @@ import (
 
 type ProblemJudgingProvider interface {
 	GetJudgingUpdatedAt(ctx context.Context, problemID string) (*time.Time, error)
+	// IsPublished is false for a problem that no longer exists.
+	IsPublished(ctx context.Context, problemID string) (bool, error)
 }
 
 type ContestTimesProvider interface {

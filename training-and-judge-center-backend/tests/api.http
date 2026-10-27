@@ -1,7 +1,7 @@
 # API Tests for Update Problem & Upload Files
 
-### 1. Update Problem Metadata (PUT /problems/:slug)
-PUT http://localhost:8080/problems/my-cool-problem
+### 1. Update Problem Metadata (PUT /problems/p/{slug})
+PUT http://localhost:8080/problems/p/my-cool-problem
 Content-Type: application/json
 Authorization: Bearer mock-author-token
 
@@ -13,18 +13,19 @@ Authorization: Bearer mock-author-token
 }
 
 ### 2. Add Modifier
-POST http://localhost:8080/problems/my-cool-problem/modifiers
+POST http://localhost:8080/problems/p/my-cool-problem/modifiers
 Content-Type: application/json
 Authorization: Bearer mock-author-token
 
 {
-  "userId": "modifier_user_123"
+  "userNickname": "modifier_nickname"
 }
 
 ### 3. List Modifiers
-GET http://localhost:8080/problems/my-cool-problem/modifiers
+GET http://localhost:8080/problems/p/my-cool-problem/modifiers
+Authorization: Bearer mock-author-token
 
 ### 4. Remove Modifier
-DELETE http://localhost:8080/problems/my-cool-problem/modifiers/modifier_user_123
+DELETE http://localhost:8080/problems/p/my-cool-problem/modifiers/modifier_nickname
 Authorization: Bearer mock-author-token
 

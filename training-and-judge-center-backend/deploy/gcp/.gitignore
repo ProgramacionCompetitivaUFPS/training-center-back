@@ -1,0 +1,11 @@
+# Plugins descargados y estado local (el estado real vive en GCS)
+.terraform/
+*.tfstate
+*.tfstate.backup
+.terraform.tfstate.lock.info
+
+# Variables que puedan traer secretos
+*.tfvars
+*.auto.tfvars
+
+# NO ignorar .terraform.lock.hcl — SÍ se commitea (pinea las versiones exactas del provider)

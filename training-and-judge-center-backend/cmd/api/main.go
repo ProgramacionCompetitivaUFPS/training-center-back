@@ -9,6 +9,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"log/slog"
@@ -53,6 +54,9 @@ import (
 	"github.com/training-judge-center/backend/pkg/apperror"
 )
 
+// rabbitmqConnectTimeout covers the broker accepting AMQP after it reports healthy.
+const rabbitmqConnectTimeout = time.Minute
+
 func main() {
 	cfg := config.Load()
 
@@ -86,6 +90,9 @@ func main() {
 	defer redisClient.Close()
 	slog.Info("redis connected successfully")
 
+	// cross-cutting services
+	txManager := postgres.NewTransactionManager(dbPool)
+
 	// Problem repositories & settings
 	problemRepo := problem.NewRepository(dbPool)
 	settingsProvider, err := platformConfig.NewPlatformSettings(cfg.VirtualObject)
@@ -113,6 +120,10 @@ func main() {
 		capturedClient, capturedBucket := gcsClient, cfg.GCSBucket
 		sourceCodeReadFn = func(ctx context.Context, path string) ([]byte, error) {
 			rc, err := capturedClient.Bucket(capturedBucket).Object(path).NewReader(ctx)
+			if errors.Is(err, googleStorage.ErrObjectNotExist) {
+				slog.WarnContext(ctx, "gcs: source code not found", "path", path)
+				return nil, apperror.NewNotFound(appsubmission.ErrCodeSourceCodeNotFound, "source code not found")
+			}
 			if err != nil {
 				slog.ErrorContext(ctx, "gcs: failed to open source code reader", "path", path, "error", err)
 				return nil, apperror.NewInternal()
@@ -138,6 +149,10 @@ func main() {
 		sourceCodeReadFn = func(ctx context.Context, path string) ([]byte, error) {
 			fullPath := filepath.Join(capturedDir, path)
 			data, err := os.ReadFile(fullPath)
+			if errors.Is(err, os.ErrNotExist) {
+				slog.WarnContext(ctx, "local: source code not found", "path", fullPath)
+				return nil, apperror.NewNotFound(appsubmission.ErrCodeSourceCodeNotFound, "source code not found")
+			}
 			if err != nil {
 				slog.ErrorContext(ctx, "local: failed to read source code", "path", fullPath, "error", err)
 				return nil, apperror.NewInternal()
@@ -146,66 +161,93 @@ func main() {
 		}
 	}
 
-	icpcParser := problem.NewICPCParser(
-		settingsProvider.MaxFileSizeTestCaseMB(),
-		settingsProvider.MaxFileSizeDefaultMB(),
-		settingsProvider.MaxFileCountTestCase(),
-		settingsProvider.MaxFileCountSample(),
-		cfg.VirtualObject.LanguageExtensions,
-	)
+	icpcParser := problem.NewICPCParser(problem.ICPCParserConfig{
+		MaxUncompressedSizeMB: settingsProvider.MaxFileSizeTestCaseMB(),
+		MaxTestCaseInputMB:    cfg.VirtualObject.MaxFileSizeTestCaseInputMB,
+		MaxTestCaseAnswerMB:   cfg.VirtualObject.MaxFileSizeTestCaseAnswerMB,
+		MaxMetadataFileSizeMB: settingsProvider.MaxFileSizeDefaultMB(),
+		MaxFiles:              settingsProvider.MaxFileCountTestCase(),
+		MaxSampleFiles:        settingsProvider.MaxFileCountSample(),
+		LanguageExtensions:    cfg.VirtualObject.LanguageExtensions,
+	})
 	zipParser := problem.NewZipParser(icpcParser)
 	packageParser := problem.NewICPCPackageParser(icpcParser)
 
 	userProvider := problem.NewUserProvider(dbPool)
 	problemStatisticsProvider := problem.NewStatisticsProvider(dbPool)
 	problemActiveContestChecker := problem.NewActiveContestChecker(dbPool)
+	problemContestAssociationRemover := problem.NewContestAssociationRemover(dbPool)
+	problemAffectedContestsProvider := problem.NewAffectedContestsProvider(dbPool)
+	problemValidationRepo := problem.NewProblemValidationRepository(dbPool)
 
 	// Problem use cases
 	createProblemUseCase := appProblem.NewCreateProblemUseCase(problemRepo, settingsProvider)
 	importProblemUseCase := appProblem.NewImportProblemUseCase(problemRepo, fileStorage, packageParser, settingsProvider)
-	updateProblemUseCase := appProblem.NewUpdateProblemUseCase(problemRepo, settingsProvider)
-	uploadProblemFilesUseCase := appProblem.NewUploadProblemFilesUseCase(problemRepo, fileStorage, zipParser, settingsProvider)
-	deleteProblemFileUseCase := appProblem.NewDeleteProblemFileUseCase(problemRepo, fileStorage)
+	updateProblemUseCase := appProblem.NewUpdateProblemUseCase(problemRepo, problemValidationRepo, settingsProvider)
+	deleteProblemFileUseCase := appProblem.NewDeleteProblemFileUseCase(problemRepo, problemValidationRepo, fileStorage)
 	addModifierUseCase := appProblem.NewAddModifierUseCase(problemRepo, userProvider)
 	removeModifierUseCase := appProblem.NewRemoveModifierUseCase(problemRepo, userProvider)
 	listModifiersUseCase := appProblem.NewListModifiersUseCase(problemRepo, userProvider)
-	getProblemUseCase := appProblem.NewGetProblemUseCase(problemRepo, userProvider)
+	getProblemUseCase := appProblem.NewGetProblemUseCase(problemRepo, userProvider, fileStorage)
 	listProblemsUseCase := appProblem.NewListProblemsUseCase(problemRepo, userProvider)
 	unpublishProblemUseCase := appProblem.NewUnpublishProblemUseCase(problemRepo, problemActiveContestChecker)
 	changeAccessibilityUseCase := appProblem.NewChangeAccessibilityUseCase(problemRepo)
-	deleteProblemUseCase := appProblem.NewDeleteProblemUseCase(problemRepo, fileStorage, problemActiveContestChecker)
+	deleteProblemUseCase := appProblem.NewDeleteProblemUseCase(problemRepo, fileStorage, problemActiveContestChecker, problemContestAssociationRemover, txManager)
 	getProblemStatisticsUseCase := appProblem.NewGetProblemStatisticsUseCase(problemRepo, problemStatisticsProvider)
+	listTestCasesUseCase := appProblem.NewListTestCasesUseCase(problemRepo, fileStorage)
+	getTestCaseUseCase := appProblem.NewGetTestCaseUseCase(problemRepo, fileStorage)
+	downloadTestCasesUseCase := appProblem.NewDownloadTestCasesUseCase(problemRepo, fileStorage)
+	exportProblemUseCase := appProblem.NewExportProblemUseCase(problemRepo, fileStorage)
+	getSourceFileUseCase := appProblem.NewGetSourceFileUseCase(problemRepo, fileStorage)
+	getTestCasePartUseCase := appProblem.NewGetTestCasePartUseCase(problemRepo, fileStorage)
 
 	// User platform adapters
 	userRepo := user.NewRepository(dbPool)
+	refreshTokenRepo := user.NewRefreshTokenRepository(dbPool)
 	passwordRecoveryRepo := user.NewPasswordRecoveryRepository(dbPool)
 	emailChangeRepo := user.NewEmailChangeRepository(dbPool)
 	deactivationRequestRepo := user.NewDeactivationRequestRepository(dbPool)
 	deactivationAuditLogRepo := user.NewDeactivationAuditLogRepository(dbPool)
+	oauthIdentityRepo := user.NewOAuthIdentityRepository(dbPool)
+	globalGroupJoiner := user.NewGlobalGroupJoiner(dbPool)
 
 	// Infrastructure and cross-cutting services
-	txManager := postgres.NewTransactionManager(dbPool)
 	jwtService := auth.NewJWTService(cfg.JWTSecret, cfg.JWTExpirationHours)
 	emailSender := email.NewSMTPSender(cfg.SMTPHost, cfg.SMTPPort, cfg.SMTPUser, cfg.SMTPPassword, cfg.SMTPFrom)
 	redisRateLimiter := ratelimit.NewRedisRateLimiter(redisClient)
 	sessionInvalidator := auth.NewRedisSessionInvalidator(redisClient, time.Duration(cfg.JWTExpirationHours)*time.Hour)
+	rotationCache, err := auth.NewRedisRotationCache(redisClient, cfg.RotationCacheEncryptionKey)
+	if err != nil {
+		slog.Error("failed to initialize rotation cache", "error", err)
+		os.Exit(1)
+	}
+	refreshTokenCodec := auth.NewJWTRefreshTokenCodec(cfg.JWTSecret)
+	googleVerifier := auth.NewGoogleVerifier(cfg.GoogleClientID)
 
 	// User use cases
-	createUserUseCase := appuser.NewCreateUserUseCase(userRepo)
-	loginUseCase := appuser.NewLoginUseCase(userRepo, jwtService, redisRateLimiter)
-	getMyProfileUseCase := appuser.NewGetMyProfileUseCase(userRepo)
+	createUserUseCase := appuser.NewCreateUserUseCase(userRepo, globalGroupJoiner, txManager)
+	loginUseCase := appuser.NewLoginUseCase(userRepo, refreshTokenRepo, jwtService, refreshTokenCodec, redisRateLimiter)
+	loginWithGoogleUseCase := appuser.NewLoginWithGoogleUseCase(userRepo, oauthIdentityRepo, refreshTokenRepo, jwtService, refreshTokenCodec, googleVerifier, txManager)
+	linkGoogleIdentityUseCase := appuser.NewLinkGoogleIdentityUseCase(userRepo, oauthIdentityRepo, googleVerifier, emailSender)
+	unlinkGoogleIdentityUseCase := appuser.NewUnlinkGoogleIdentityUseCase(userRepo, oauthIdentityRepo, emailSender)
+	refreshUseCase := appuser.NewRefreshUseCase(refreshTokenRepo, userRepo, jwtService, refreshTokenCodec, redisRateLimiter, rotationCache)
+	logoutUseCase := appuser.NewLogoutUseCase(refreshTokenRepo, sessionInvalidator, refreshTokenCodec)
+	getMyProfileUseCase := appuser.NewGetMyProfileUseCase(userRepo, oauthIdentityRepo)
 	getUserByNicknameUseCase := appuser.NewGetUserByNicknameUseCase(userRepo)
 	updateUserUseCase := appuser.NewUpdateUserUseCase(userRepo)
-	updatePasswordUseCase := appuser.NewUpdatePasswordUseCase(userRepo, emailSender, sessionInvalidator, redisRateLimiter)
+	updatePasswordUseCase := appuser.NewUpdatePasswordUseCase(userRepo, emailSender, sessionInvalidator, redisRateLimiter, refreshTokenRepo)
+	setPasswordUseCase := appuser.NewSetPasswordUseCase(userRepo, emailSender)
 	adminUpdateUserUseCase := appuser.NewAdminUpdateUserUseCase(userRepo)
-	adminDeactivateUserUseCase := appuser.NewAdminDeactivateUserUseCase(userRepo, sessionInvalidator)
+	adminDeactivateUserUseCase := appuser.NewAdminDeactivateUserUseCase(userRepo, sessionInvalidator, refreshTokenRepo)
 	listUsersUseCase := appuser.NewListUsersUseCase(userRepo)
+	listUserFilterOptionsUseCase := appuser.NewListUserFilterOptionsUseCase(userRepo)
+	searchUsersUseCase := appuser.NewSearchUsersUseCase(userRepo)
 	requestEmailChangeUseCase := appuser.NewRequestEmailChangeUseCase(userRepo, emailChangeRepo, emailSender, redisRateLimiter)
 	confirmEmailChangeUseCase := appuser.NewConfirmEmailChangeUseCase(userRepo, emailChangeRepo, emailSender, txManager)
 	requestPasswordRecoveryUseCase := appuser.NewRequestPasswordRecoveryUseCase(userRepo, passwordRecoveryRepo, emailSender, redisRateLimiter)
-	resetPasswordUseCase := appuser.NewResetPasswordUseCase(userRepo, passwordRecoveryRepo, sessionInvalidator, txManager)
-	requestDeactivationUseCase := appuser.NewRequestDeactivationUseCase(userRepo, deactivationRequestRepo, emailSender)
-	confirmDeactivationUseCase := appuser.NewConfirmDeactivationUseCase(userRepo, deactivationRequestRepo, deactivationAuditLogRepo, emailSender, sessionInvalidator, txManager)
+	resetPasswordUseCase := appuser.NewResetPasswordUseCase(userRepo, passwordRecoveryRepo, sessionInvalidator, txManager, refreshTokenRepo)
+	requestDeactivationUseCase := appuser.NewRequestDeactivationUseCase(userRepo, deactivationRequestRepo, emailSender, redisRateLimiter)
+	confirmDeactivationUseCase := appuser.NewConfirmDeactivationUseCase(userRepo, deactivationRequestRepo, deactivationAuditLogRepo, emailSender, sessionInvalidator, txManager, refreshTokenRepo)
 
 	// user dashboard adapters
 	dashboardSubmissionProvider := adaptersubmission.NewDashboardProvider(dbPool)
@@ -217,17 +259,26 @@ func main() {
 	getDashboardUseCase := appuser.NewGetDashboardUseCase(dashboardSubmissionProvider, dashboardContestProvider, dashboardMaterialProvider, problemsSolvedProvider)
 
 	// user profile stats adapters
-	rankingProvider := user.NewRankingProvider(dbPool)
+	rankingSource := user.NewRankingProvider(dbPool)
+	rankingCache := user.NewRankingCache(redisClient)
+	// Same 30s staleness as standings — nothing in HU-USR-21 requires this to be
+	// real-time (it tracks "progreso a largo plazo", explicitly not the live Dashboard),
+	// but there is no reason for it to be staler than standings either, and 30s keeps a
+	// live demo (solve something, immediately check the profile) from ever showing a
+	// visibly outdated number. See Validacion/rendimiento/resultados.md (tesis repo) for
+	// why this needed a cache at all: GetRanking aggregates every ACCEPTED submission
+	// platform-wide, not just the caller's own, on every profile view.
+	cachedRankingProvider := user.NewCachedRankingProvider(rankingSource, rankingCache, 30*time.Second)
 	submissionStatsProvider := adaptersubmission.NewSubmissionStatsProvider(dbPool)
 	contestParticipationProvider := adaptercontest.NewContestParticipationProvider(dbPool)
 	topicStatsProvider := problem.NewTopicStatsProvider(dbPool)
 
 	// user profile stats use case
-	getProfileStatsUseCase := appuser.NewGetProfileStatsUseCase(rankingProvider, submissionStatsProvider, contestParticipationProvider, topicStatsProvider)
+	getProfileStatsUseCase := appuser.NewGetProfileStatsUseCase(cachedRankingProvider, submissionStatsProvider, contestParticipationProvider, topicStatsProvider)
 
 	// Handlers
-	userHandler := handlerUser.NewHandler(createUserUseCase, getMyProfileUseCase, getUserByNicknameUseCase, updateUserUseCase, updatePasswordUseCase, adminUpdateUserUseCase, adminDeactivateUserUseCase, listUsersUseCase, requestEmailChangeUseCase, confirmEmailChangeUseCase, requestPasswordRecoveryUseCase, resetPasswordUseCase, requestDeactivationUseCase, confirmDeactivationUseCase, getDashboardUseCase, getProfileStatsUseCase)
-	authHandler := handler.NewAuthHandler(loginUseCase)
+	userHandler := handlerUser.NewHandler(createUserUseCase, getMyProfileUseCase, getUserByNicknameUseCase, updateUserUseCase, updatePasswordUseCase, adminUpdateUserUseCase, adminDeactivateUserUseCase, listUsersUseCase, listUserFilterOptionsUseCase, requestEmailChangeUseCase, confirmEmailChangeUseCase, requestPasswordRecoveryUseCase, resetPasswordUseCase, requestDeactivationUseCase, confirmDeactivationUseCase, getDashboardUseCase, getProfileStatsUseCase, searchUsersUseCase, linkGoogleIdentityUseCase, unlinkGoogleIdentityUseCase, setPasswordUseCase)
+	authHandler := handler.NewAuthHandler(loginUseCase, loginWithGoogleUseCase, refreshUseCase, logoutUseCase)
 
 	// Group repositories & platform adapters
 	groupRepo := group.NewRepository(dbPool)
@@ -278,6 +329,7 @@ func main() {
 		addMemberUseCase, removeMemberUseCase, changeRoleUseCase, leaveGroupUseCase, listMembersUseCase,
 		deleteGroupUseCase,
 		updateGroupUseCase,
+		appGroup.NewListSoleLeadGroupsUseCase(groupDeletionProvider),
 	)
 
 	// Material platform adapters
@@ -292,6 +344,8 @@ func main() {
 	updateMaterialUseCase := appMaterial.NewUpdateMaterialUseCase(materialRepo, groupProvider, authorProvider)
 	getMaterialUseCase := appMaterial.NewGetMaterialUseCase(materialRepo, groupProvider, groupMemberProvider, authorProvider)
 	listMaterialsUseCase := appMaterial.NewListMaterialsUseCase(materialRepo, groupProvider, groupMemberProvider, authorProvider, authorIDProvider)
+	listMaterialTagsUseCase := appMaterial.NewListMaterialTagsUseCase(materialRepo, groupProvider, groupMemberProvider)
+	listMaterialAuthorsUseCase := appMaterial.NewListMaterialAuthorsUseCase(materialRepo, groupProvider, groupMemberProvider, authorProvider)
 	publishMaterialUseCase := appMaterial.NewPublishMaterialUseCase(materialRepo, groupProvider, authorProvider)
 	unpublishMaterialUseCase := appMaterial.NewUnpublishMaterialUseCase(materialRepo, groupProvider, authorProvider)
 	pinMaterialUseCase := appMaterial.NewPinMaterialUseCase(materialRepo, groupProvider, groupMemberProvider, authorProvider)
@@ -300,6 +354,7 @@ func main() {
 
 	materialHandler := handlerMaterial.NewHandler(
 		createMaterialUseCase, updateMaterialUseCase, getMaterialUseCase, listMaterialsUseCase,
+		listMaterialTagsUseCase, listMaterialAuthorsUseCase,
 		publishMaterialUseCase, unpublishMaterialUseCase, pinMaterialUseCase, unpinMaterialUseCase,
 		deleteMaterialUseCase,
 	)
@@ -318,6 +373,7 @@ func main() {
 	contestSubmissionProvider := adaptercontest.NewStandingsSubmissionProvider(dbPool)
 	contestSubmissionsProvider := adaptercontest.NewContestSubmissionProvider(dbPool)
 	contestTeamParticipationRepo := adaptercontest.NewTeamParticipationRepository(dbPool)
+	contestTeamDisplayProvider := adaptercontest.NewTeamDisplayProvider(dbPool)
 	contestCallerStandingProvider := adaptercontest.NewCallerStandingProvider(dbPool)
 
 	// contest use cases
@@ -350,19 +406,19 @@ func main() {
 		contestRepo, contestRegistrationRepo,
 	)
 	listContestRegistrationsUseCase := appcontest.NewListContestRegistrationsUseCase(
-		contestRepo, contestRegistrationRepo, contestMemberProvider, contestNicknameProvider,
+		contestRepo, contestRegistrationRepo, contestTeamParticipationRepo, contestGroupProvider, contestMemberProvider, contestNicknameProvider, contestTeamDisplayProvider,
 	)
 	getStandingsUseCase := appcontest.NewGetStandingsUseCase(
 		contestRepo, contestRegistrationRepo, contestSubmissionProvider,
 		contestTeamParticipationRepo, contestProfileProvider,
+		contestTeamDisplayProvider, contestProblemProvider,
 		contestGroupProvider, contestMemberProvider,
 		contestStandingsCache,
 		30*time.Second,
 	)
 	listContestSubmissionsUseCase := appcontest.NewListContestSubmissionsUseCase(
 		contestRepo, contestGroupProvider, contestMemberProvider,
-		contestParticipantProvider, contestSubmissionsProvider,
-		contestCallerStandingProvider,
+		contestSubmissionsProvider, contestCallerStandingProvider,
 	)
 	deleteContestUseCase := appcontest.NewDeleteContestUseCase(
 		contestRepo, contestMemberProvider, contestStandingsCache,
@@ -408,6 +464,10 @@ func main() {
 	listTeamRegistrationsUseCase := appteam.NewListTeamRegistrationsUseCase(
 		teamContestProvider, teamGroupMemberChecker, contestTeamParticipationRepo, teamRepo, teamUserProvider,
 	)
+	getTeamRegistrationEligibilityUseCase := appteam.NewGetTeamRegistrationEligibilityUseCase(
+		teamMemberRepo, teamContestProvider, contestTeamParticipationRepo,
+		teamIndivChecker, teamGroupMemberChecker, teamUserProvider,
+	)
 
 	teamHandler := handlerteam.NewHandler(
 		createTeamUseCase,
@@ -422,6 +482,7 @@ func main() {
 		updateTeamRegistrationUseCase,
 		unregisterTeamFromContestUseCase,
 		listTeamRegistrationsUseCase,
+		getTeamRegistrationEligibilityUseCase,
 	)
 
 	// submission adapters
@@ -439,25 +500,38 @@ func main() {
 
 	// submission queue — RabbitMQ when URL is set, no-op otherwise
 	var submissionQueue appsubmission.SubmissionQueue
+	var validationQueue appProblem.ValidationQueue
 	if cfg.RabbitMQURL != "" {
-		rmq, err := adapterqueue.NewRabbitMQQueue(cfg.RabbitMQURL)
+		rmq, err := adapterqueue.ConnectRabbitMQQueue(cfg.RabbitMQURL, rabbitmqConnectTimeout)
 		if err != nil {
 			slog.Error("failed to connect to RabbitMQ", "error", err)
 			os.Exit(1)
 		}
 		defer rmq.Close()
-		submissionQueue = rmq
+		submissionQueue = adaptersubmission.NewTrackedQueue(dbPool, adapterqueue.NewRabbitMQSubmissionQueue(rmq))
+		validationQueue = adapterqueue.NewRabbitMQValidationQueue(rmq)
 		slog.Info("using RabbitMQ submission queue")
 	} else {
 		submissionQueue = adaptersubmission.NoOpQueue{}
+		validationQueue = problem.NoOpValidationQueue{}
 		slog.Info("using no-op submission queue (RABBITMQ_URL not set)")
 	}
+
+	uploadProblemFilesUseCase := appProblem.NewUploadProblemFilesUseCase(problemRepo, problemValidationRepo, fileStorage, zipParser, settingsProvider, problemActiveContestChecker, problemAffectedContestsProvider, validationQueue)
 
 	submissionRejudger := adaptersubmission.NewRejudger(dbPool, submissionQueue)
 	contestRejudgeProvider := adaptercontest.NewContestRejudgeProvider(dbPool)
 	rejudgeSubmissionsUseCase := appProblem.NewRejudgeSubmissionsUseCase(problemRepo, submissionRejudger)
 	rejudgeContestSubmissionsUseCase := appProblem.NewRejudgeContestSubmissionsUseCase(problemRepo, submissionRejudger, contestRejudgeProvider)
 	adminRejudgeSubmissionsUseCase := appProblem.NewAdminRejudgeSubmissionsUseCase(problemRepo, submissionRejudger, contestRejudgeProvider)
+
+	problemPublisher := problem.NewProblemPublisher(dbPool)
+	publishProblemUseCase := appProblem.NewPublishProblemUseCase(problemRepo, problemValidationRepo, validationQueue, problemPublisher)
+	requestProblemValidationUseCase := appProblem.NewRequestProblemValidationUseCase(problemRepo, problemValidationRepo, validationQueue)
+	problemStatusProvider := problem.NewProblemStatusProvider(dbPool)
+	getProblemValidationStatusUseCase := appProblem.NewGetProblemValidationStatusUseCase(problemValidationRepo, problemStatusProvider)
+	awaitProblemValidationUseCase := appProblem.NewAwaitProblemValidationUseCase(getProblemValidationStatusUseCase)
+	getLatestProblemValidationUseCase := appProblem.NewGetLatestProblemValidationUseCase(problemRepo, problemValidationRepo, getProblemValidationStatusUseCase)
 
 	problemHandler := handlerProblem.NewHandler(
 		createProblemUseCase,
@@ -471,12 +545,22 @@ func main() {
 		getProblemUseCase,
 		listProblemsUseCase,
 		unpublishProblemUseCase,
+		publishProblemUseCase,
+		requestProblemValidationUseCase,
+		awaitProblemValidationUseCase,
+		getLatestProblemValidationUseCase,
 		changeAccessibilityUseCase,
 		deleteProblemUseCase,
 		getProblemStatisticsUseCase,
 		rejudgeSubmissionsUseCase,
 		rejudgeContestSubmissionsUseCase,
 		adminRejudgeSubmissionsUseCase,
+		listTestCasesUseCase,
+		getTestCaseUseCase,
+		downloadTestCasesUseCase,
+		exportProblemUseCase,
+		getSourceFileUseCase,
+		getTestCasePartUseCase,
 		userProvider,
 		settingsProvider,
 	)

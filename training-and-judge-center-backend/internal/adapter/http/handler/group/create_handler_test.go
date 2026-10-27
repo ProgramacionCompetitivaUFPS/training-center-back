@@ -30,7 +30,7 @@ func TestCreate_ContestantReturns403(t *testing.T) {
 	h := mockHandler()
 	w := httptest.NewRecorder()
 
-	r := authedPostRequest("/groups", `{"name":"Test","joinMode":"OPEN","visibility":"VISIBLE"}`)
+	r := authedPostRequest("/groups", `{"name":"Test","joinPolicy":"OPEN","visibility":"VISIBLE"}`)
 	wrapAuth(http.HandlerFunc(h.Create)).ServeHTTP(w, r)
 
 	if w.Code != http.StatusForbidden {
@@ -42,7 +42,7 @@ func TestCreate_ValidAdminRequestReturns201(t *testing.T) {
 	h := mockHandler()
 	w := httptest.NewRecorder()
 
-	r := authedPostRequest("/groups", `{"name":"Algorithms Club","joinMode":"OPEN","visibility":"VISIBLE"}`)
+	r := authedPostRequest("/groups", `{"name":"Algorithms Club","joinPolicy":"OPEN","visibility":"VISIBLE"}`)
 	wrapAuthAsAdmin(http.HandlerFunc(h.Create)).ServeHTTP(w, r)
 
 	if w.Code != http.StatusCreated {
@@ -67,7 +67,7 @@ func TestCreate_DuplicateNameReturns409(t *testing.T) {
 	h := newHandlerWithCreate(appGroup.NewCreateGroupUseCase(repo, &mockMemberRepo{}, &mockNicknameResolver{}, &mockTxManager{}))
 	w := httptest.NewRecorder()
 
-	r := authedPostRequest("/groups", `{"name":"Existing Group","joinMode":"OPEN","visibility":"VISIBLE"}`)
+	r := authedPostRequest("/groups", `{"name":"Existing Group","joinPolicy":"OPEN","visibility":"VISIBLE"}`)
 	wrapAuthAsAdmin(http.HandlerFunc(h.Create)).ServeHTTP(w, r)
 
 	if w.Code != http.StatusConflict {
@@ -85,7 +85,7 @@ func TestCreate_WithInitialMembersAndLeadsReturns201(t *testing.T) {
 	h := newHandlerWithCreate(appGroup.NewCreateGroupUseCase(repo, memberRepo, nicknameResolver, &mockTxManager{}))
 	w := httptest.NewRecorder()
 
-	r := authedPostRequest("/groups", `{"name":"Algorithms Club","joinMode":"OPEN","visibility":"VISIBLE","memberNicknames":["alice"],"leadNicknames":["coach2"]}`)
+	r := authedPostRequest("/groups", `{"name":"Algorithms Club","joinPolicy":"OPEN","visibility":"VISIBLE","memberNicknames":["alice"],"leadNicknames":["coach2"]}`)
 	wrapAuthAsAdmin(http.HandlerFunc(h.Create)).ServeHTTP(w, r)
 
 	if w.Code != http.StatusCreated {
@@ -107,7 +107,7 @@ func TestCreate_NicknameNotFoundReturns404(t *testing.T) {
 	h := newHandlerWithCreate(appGroup.NewCreateGroupUseCase(&mockGroupRepo{}, &mockMemberRepo{}, &mockNicknameResolver{users: map[string]*appGroup.UserDisplay{}}, &mockTxManager{}))
 	w := httptest.NewRecorder()
 
-	r := authedPostRequest("/groups", `{"name":"Algorithms Club","joinMode":"OPEN","visibility":"VISIBLE","memberNicknames":["ghost"]}`)
+	r := authedPostRequest("/groups", `{"name":"Algorithms Club","joinPolicy":"OPEN","visibility":"VISIBLE","memberNicknames":["ghost"]}`)
 	wrapAuthAsAdmin(http.HandlerFunc(h.Create)).ServeHTTP(w, r)
 
 	if w.Code != http.StatusNotFound {
@@ -122,7 +122,7 @@ func TestCreate_ContestantAsLeadReturns400(t *testing.T) {
 	h := newHandlerWithCreate(appGroup.NewCreateGroupUseCase(&mockGroupRepo{}, &mockMemberRepo{}, nicknameResolver, &mockTxManager{}))
 	w := httptest.NewRecorder()
 
-	r := authedPostRequest("/groups", `{"name":"Algorithms Club","joinMode":"OPEN","visibility":"VISIBLE","leadNicknames":["contestant1"]}`)
+	r := authedPostRequest("/groups", `{"name":"Algorithms Club","joinPolicy":"OPEN","visibility":"VISIBLE","leadNicknames":["contestant1"]}`)
 	wrapAuthAsAdmin(http.HandlerFunc(h.Create)).ServeHTTP(w, r)
 
 	if w.Code != http.StatusBadRequest {

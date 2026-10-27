@@ -126,7 +126,7 @@ As a contestant, I want to manually rejudge my submission when I notice the prob
    - **And** the authenticated user is NOT an admin
    - **And** the authenticated user is NOT a Lead
    - **When** they attempt to rejudge
-   - **Then** the system rejects with 403 Forbidden (INSUFFICIENT_PERMISSIONS)
+   - **Then** the system rejects with 403 Forbidden (ACCESS_DENIED)
 
 7. **Scenario**: Submission not found
    - **Given** the submissionId does not exist
@@ -250,7 +250,7 @@ As an Admin, I want to rejudge a specific submission regardless of judging compo
 - Submission code reference is invalid or missing (should fail gracefully).
 - Standing calculation fails during rejudge (should log error, not block rejudge).
 - Admin rejudges while contest owner simultaneously rejudges same submissions.
-- Rejudge request for a problem with status DRAFT (should be allowed - submissions exist from when problem was PUBLISHED).
+- Rejudge request for a problem with status DRAFT (rejected with 400 PROBLEM_NOT_PUBLISHED, see FR-009.1).
 - Network interruption during asynchronous rejudging.
 - Only checker updated (no test case changes) - submissions should still be rejudged.
 - Only validator updated (no test case changes) - submissions should still be rejudged.
@@ -401,6 +401,15 @@ Submission doesn't need rejudging.
 }
 ```
 
+The problem is not PUBLISHED. This applies to every rejudge endpoint: only submissions of published problems can be rejudged.
+
+```json
+{
+  "error": "PROBLEM_NOT_PUBLISHED",
+  "message": "only submissions of PUBLISHED problems can be rejudged"
+}
+```
+
 #### 401 Unauthorized
 Authentication failed.
 
@@ -416,7 +425,7 @@ User doesn't have permission or submission is in active contest.
 
 ```json
 {
-  "error": "INSUFFICIENT_PERMISSIONS",
+  "error": "ACCESS_DENIED",
   "message": "You can only rejudge your own submissions"
 }
 ```
@@ -435,6 +444,15 @@ Submission not found.
 {
   "error": "NOT_FOUND",
   "message": "Submission not found"
+}
+```
+
+The problem of the submission was deleted, so the submission has no problem to be rejudged against.
+
+```json
+{
+  "error": "PROBLEM_NOT_FOUND",
+  "message": "the problem of this submission no longer exists, so it cannot be rejudged"
 }
 ```
 
@@ -666,7 +684,10 @@ Submission not found.
 - **FR-006**: The system MUST change submission verdict to PENDING when rejudging is initiated.
 - **FR-007**: The system MUST process all rejudging asynchronously (non-blocking).
 - **FR-008**: The system MUST execute the submission code against all current test cases during rejudging.
-- **FR-009**: The system MUST update the submission status based on rejudging results (ACCEPTED, WRONG_ANSWER, TIME_LIMIT_EXCEEDED, MEMORY_LIMIT_EXCEEDED, RUNTIME_EXCEPTION, COMPILATION_ERROR, PRESENTATION_ERROR).
+- **FR-009**: The system MUST update the submission status based on rejudging results (ACCEPTED, WRONG_ANSWER, TIME_LIMIT_EXCEEDED, MEMORY_LIMIT_EXCEEDED, RUNTIME_ERROR, COMPILATION_ERROR, PRESENTATION_ERROR).
+- **FR-009.1**: The system MUST reject a rejudge (single, per problem, per contest or admin) with 400 PROBLEM_NOT_PUBLISHED unless the problem is PUBLISHED, and a single rejudge of a submission whose problem was deleted with 404 PROBLEM_NOT_FOUND. The PROBLEM_NOT_PUBLISHED check is evaluated before NO_REJUDGE_NEEDED, so a contestant rejudging a submission of an unpublished problem always receives PROBLEM_NOT_PUBLISHED.
+- **FR-009.2**: The system MUST reset a submission to PENDING before publishing its queue message, and MUST restore its previous verdict if the publish fails, so a rejudge never leaves a submission PENDING without a message.
+- **FR-009.3**: `POST /problems/p/{slug}/rejudge` MUST answer 400 BAD_REQUEST when called with a `contestId` query parameter instead of ignoring it, and the message MUST point to the contest-scoped routes: `POST /groups/{groupId}/contests/{contestId}/problems/{slug}/rejudge` (contest owner, group Lead or admin, during an active contest) and `POST /admin/problems/{slug}/rejudge?contestId={contestId}` (admin, any contest status).
 - **FR-010**: The system MUST NOT maintain a history of previous verdicts.
 
 **Standing Updates**
@@ -691,7 +712,7 @@ Submission not found.
 - **FR-022**: The system MUST validate that submissions belong to the authenticated user (for contestant manual rejudge).
 - **FR-023**: The system MUST reject contestant manual rejudge requests for their own submissions in active contests (submittedAt <= contest.endTime).
 - **FR-023.1**: The system MUST allow contestant manual rejudge requests for their own submissions in postcompetition (submittedAt > contest.endTime AND contest.enablePostContest = true).
-- **FR-024**: The system MUST allow rejudging submissions of problems with status DRAFT (submissions may exist from when problem was PUBLISHED).
+- **FR-024**: The system MUST NOT rejudge submissions of a problem with status DRAFT, even though they may exist from when the problem was PUBLISHED; see FR-009.1.
 
 **General**
 - **FR-025**: The system MUST NOT return internal IDs in responses (except where needed as identifiers).
@@ -723,7 +744,7 @@ Submission not found.
   - `contest_id` (string, UUID, FK to Contest, nullable - null for practice submissions)
   - `filePath` (string, storage path/key to solution file)
   - `fileHash` (string, SHA256 hash for duplicate detection)
-  - `status` (enum: `PENDING` | `RUNNING` | `ACCEPTED` | `WRONG_ANSWER` | `TIME_LIMIT_EXCEEDED` | `MEMORY_LIMIT_EXCEEDED` | `RUNTIME_EXCEPTION` | `COMPILATION_ERROR` | `PRESENTATION_ERROR`)
+  - `status` (enum: `PENDING` | `RUNNING` | `ACCEPTED` | `WRONG_ANSWER` | `TIME_LIMIT_EXCEEDED` | `MEMORY_LIMIT_EXCEEDED` | `RUNTIME_ERROR` | `COMPILATION_ERROR` | `PRESENTATION_ERROR`)
   - `submittedAt` (timestamp)
 
 - **Contest**: Represents a programming competition.  
@@ -758,7 +779,7 @@ Submission not found.
 | WRONG_ANSWER | Solution produced incorrect output |
 | TIME_LIMIT_EXCEEDED | Solution exceeded time limit |
 | MEMORY_LIMIT_EXCEEDED | Solution exceeded memory limit |
-| RUNTIME_EXCEPTION | Solution crashed during execution |
+| RUNTIME_ERROR | Solution crashed during execution |
 | COMPILATION_ERROR | Solution failed to compile |
 | PRESENTATION_ERROR | Solution output format is incorrect |
 | COMPILATION_ERROR | Solution failed to compile |
@@ -809,7 +830,7 @@ The `problemJudgingUpdatedAt` timestamp is updated when ANY of the following fil
 
 ### Measurable Outcomes
 
-- **SC-001**: Contest owners and Leads can rejudge all affected submissions in their active contests via `POST /contests/{contestId}/problems/{slug}/rejudge` with HTTP 200.
+- **SC-001**: Contest owners, Leads and admins can rejudge all affected submissions in their active contests via `POST /contests/{contestId}/problems/{slug}/rejudge` with HTTP 200.
 - **SC-002**: Contestants can manually rejudge their own submissions outside active contests or in postcompetition via `POST /submissions/{submissionId}/rejudge` with HTTP 200.
 - **SC-002.1**: Contestants cannot rejudge their own submissions in active contests (submittedAt <= contest.endTime) - HTTP 403.
 - **SC-002.2**: Contestants can rejudge their own submissions in postcompetition (submittedAt > contest.endTime AND contest.enablePostContest = true) - HTTP 200.

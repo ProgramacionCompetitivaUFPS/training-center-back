@@ -78,7 +78,7 @@ func (r *Repository) FindByID(ctx context.Context, id string) (*domainGroup.Grou
 
 func (r *Repository) ExistsByName(ctx context.Context, name domainGroup.GroupName) (bool, error) {
 	var exists bool
-	err := r.db.QueryRow(ctx,
+	err := infraPostgres.GetQuerier(ctx, r.db).QueryRow(ctx,
 		`SELECT EXISTS(SELECT 1 FROM groups WHERE LOWER(name) = LOWER($1))`,
 		name.Value(),
 	).Scan(&exists)
@@ -90,7 +90,7 @@ func (r *Repository) ExistsByName(ctx context.Context, name domainGroup.GroupNam
 }
 
 func (r *Repository) FindDefault(ctx context.Context) (*domainGroup.Group, error) {
-	row := r.db.QueryRow(ctx, `
+	row := infraPostgres.GetQuerier(ctx, r.db).QueryRow(ctx, `
 		SELECT id, name, description, visibility, join_policy,
 		       is_default, created_by, created_at, updated_at
 		FROM groups

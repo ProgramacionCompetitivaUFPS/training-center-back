@@ -1,4 +1,4 @@
-﻿package problem
+package problem
 
 import (
 	"context"
@@ -104,6 +104,8 @@ type mockFileStorage struct {
 	uploadFileFn            func(ctx context.Context, path string, content []byte) error
 	deleteFileFn            func(ctx context.Context, path string) error
 	deleteFilesWithPrefixFn func(ctx context.Context, prefix string) error
+	listFilesFn             func(ctx context.Context, prefix string) ([]string, error)
+	downloadFileFn          func(ctx context.Context, path string) ([]byte, error)
 }
 
 func (m *mockFileStorage) UploadFile(ctx context.Context, path string, content []byte) error {
@@ -124,16 +126,186 @@ func (m *mockFileStorage) DeleteFilesWithPrefix(ctx context.Context, prefix stri
 	}
 	return nil
 }
+func (m *mockFileStorage) ListFiles(ctx context.Context, prefix string) ([]string, error) {
+	if m.listFilesFn != nil {
+		return m.listFilesFn(ctx, prefix)
+	}
+	return nil, nil
+}
+func (m *mockFileStorage) DownloadFile(ctx context.Context, path string) ([]byte, error) {
+	if m.downloadFileFn != nil {
+		return m.downloadFileFn(ctx, path)
+	}
+	return nil, nil
+}
+
+// ── ZipParser mock ───────────────────────────────────────────────────────────
+
+type mockZipParser struct {
+	parseTestCasesZipFn func(ctx context.Context, zipData []byte) ([]ParsedFile, error)
+}
+
+func (m *mockZipParser) ParseTestCasesZip(ctx context.Context, zipData []byte) ([]ParsedFile, error) {
+	if m.parseTestCasesZipFn != nil {
+		return m.parseTestCasesZipFn(ctx, zipData)
+	}
+	return nil, nil
+}
+
+// ── ProblemValidationRepository mock ─────────────────────────────────────────
+
+type mockValidationRepository struct {
+	saveFn                  func(ctx context.Context, v *domainProblem.ProblemValidation) error
+	findByIDFn              func(ctx context.Context, id string) (*domainProblem.ProblemValidation, error)
+	findLatestByProblemIDFn func(ctx context.Context, problemID string) (*domainProblem.ProblemValidation, bool, error)
+}
+
+func (m *mockValidationRepository) Save(ctx context.Context, v *domainProblem.ProblemValidation) error {
+	if m.saveFn != nil {
+		return m.saveFn(ctx, v)
+	}
+	return nil
+}
+func (m *mockValidationRepository) FindByID(ctx context.Context, id string) (*domainProblem.ProblemValidation, error) {
+	if m.findByIDFn != nil {
+		return m.findByIDFn(ctx, id)
+	}
+	return nil, nil
+}
+func (m *mockValidationRepository) FindLatestByProblemID(ctx context.Context, problemID string) (*domainProblem.ProblemValidation, bool, error) {
+	if m.findLatestByProblemIDFn != nil {
+		return m.findLatestByProblemIDFn(ctx, problemID)
+	}
+	return nil, false, nil
+}
+
+// ── ValidationQueue mock ─────────────────────────────────────────────────────
+
+type mockValidationQueue struct {
+	publishFn func(ctx context.Context, msg ValidationQueueMessage) error
+	published []ValidationQueueMessage
+}
+
+func (m *mockValidationQueue) Publish(ctx context.Context, msg ValidationQueueMessage) error {
+	m.published = append(m.published, msg)
+	if m.publishFn != nil {
+		return m.publishFn(ctx, msg)
+	}
+	return nil
+}
+
+// ── JudgingPreparer mock ─────────────────────────────────────────────────────
+
+type mockJudgingPreparer struct {
+	prepareFn  func(ctx context.Context, problemID, slug string) (*JudgingPreparationResult, error)
+	candidates []*JudgingCandidate
+}
+
+func (m *mockJudgingPreparer) Prepare(ctx context.Context, problemID, slug string, candidate *JudgingCandidate) (*JudgingPreparationResult, error) {
+	m.candidates = append(m.candidates, candidate)
+	if m.prepareFn != nil {
+		return m.prepareFn(ctx, problemID, slug)
+	}
+	return &JudgingPreparationResult{}, nil
+}
+
+// ── JudgingArtifactWriter mock ───────────────────────────────────────────────
+
+type mockJudgingArtifactWriter struct {
+	setCheckerCompiledKeyFn   func(ctx context.Context, problemID, compiledKey string, now time.Time) error
+	setValidatorCompiledKeyFn func(ctx context.Context, problemID, compiledKey string, now time.Time) error
+	checkerCompiledKeys       []string
+	validatorCompiledKeys     []string
+}
+
+func (m *mockJudgingArtifactWriter) SetCheckerCompiledKey(ctx context.Context, problemID, compiledKey string, now time.Time) error {
+	m.checkerCompiledKeys = append(m.checkerCompiledKeys, compiledKey)
+	if m.setCheckerCompiledKeyFn != nil {
+		return m.setCheckerCompiledKeyFn(ctx, problemID, compiledKey, now)
+	}
+	return nil
+}
+
+func (m *mockJudgingArtifactWriter) SetValidatorCompiledKey(ctx context.Context, problemID, compiledKey string, now time.Time) error {
+	m.validatorCompiledKeys = append(m.validatorCompiledKeys, compiledKey)
+	if m.setValidatorCompiledKeyFn != nil {
+		return m.setValidatorCompiledKeyFn(ctx, problemID, compiledKey, now)
+	}
+	return nil
+}
+
+// ── SolutionValidator mock ───────────────────────────────────────────────────
+
+type mockSolutionValidator struct {
+	validateFn func(ctx context.Context, problemID string) (*SolutionValidationResult, error)
+	candidates []*JudgingCandidate
+}
+
+func (m *mockSolutionValidator) Validate(ctx context.Context, problemID string, candidate *JudgingCandidate) (*SolutionValidationResult, error) {
+	m.candidates = append(m.candidates, candidate)
+	if m.validateFn != nil {
+		return m.validateFn(ctx, problemID)
+	}
+	return &SolutionValidationResult{SolutionsTested: 1, Passed: true}, nil
+}
+
+// ── ProblemPublisher mock ────────────────────────────────────────────────────
+
+type mockProblemPublisher struct {
+	markPublishedFn func(ctx context.Context, problemID string, now time.Time) error
+	// changedSinceRead makes MarkPublishedIfUnchanged report that the problem was edited after it was read
+	changedSinceRead bool
+	calls            int
+}
+
+func (m *mockProblemPublisher) MarkPublishedIfUnchanged(_ context.Context, _ string, _, _ time.Time) (bool, error) {
+	m.calls++
+	return !m.changedSinceRead, nil
+}
+
+func (m *mockProblemPublisher) MarkPublished(ctx context.Context, problemID string, now time.Time) error {
+	m.calls++
+	if m.markPublishedFn != nil {
+		return m.markPublishedFn(ctx, problemID, now)
+	}
+	return nil
+}
+
+// ── TransactionManager mock ──────────────────────────────────────────────────
+
+type mockTransactionManager struct{}
+
+func (m *mockTransactionManager) WithTx(ctx context.Context, fn func(txCtx context.Context) error) error {
+	return fn(ctx)
+}
+
+// ── ProblemStatusProvider mock ───────────────────────────────────────────────
+
+type mockProblemStatusProvider struct {
+	getStatusFn func(ctx context.Context, problemID string) (string, error)
+}
+
+func (m *mockProblemStatusProvider) GetStatus(ctx context.Context, problemID string) (string, error) {
+	if m.getStatusFn != nil {
+		return m.getStatusFn(ctx, problemID)
+	}
+	return "PUBLISHED", nil
+}
 
 // ── ActiveContestChecker mock ────────────────────────────────────────────────
 
 type mockActiveContestChecker struct {
-	inActive bool
-	err      error
+	inActive          bool
+	hasContestHistory bool
+	err               error
 }
 
 func (m *mockActiveContestChecker) IsProblemInActiveContest(_ context.Context, _ string) (bool, error) {
 	return m.inActive, m.err
+}
+
+func (m *mockActiveContestChecker) HasContestSubmissions(_ context.Context, _ string) (bool, error) {
+	return m.hasContestHistory, m.err
 }
 
 // ── PlatformSettings default ─────────────────────────────────────────────────
@@ -169,11 +341,11 @@ var (
 // ── Problem fixtures ─────────────────────────────────────────────────────────
 
 const (
-	authorID    = "aaaaaaaa-0000-0000-0000-000000000001"
-	modifierID  = "aaaaaaaa-0000-0000-0000-000000000002"
-	strangerID  = "aaaaaaaa-0000-0000-0000-000000000003"
-	testSlug    = "test-problem"
-	testProbID  = "bbbbbbbb-0000-0000-0000-000000000001"
+	authorID   = "aaaaaaaa-0000-0000-0000-000000000001"
+	modifierID = "aaaaaaaa-0000-0000-0000-000000000002"
+	strangerID = "aaaaaaaa-0000-0000-0000-000000000003"
+	testSlug   = "test-problem"
+	testProbID = "bbbbbbbb-0000-0000-0000-000000000001"
 )
 
 func newDraftProblem() *domainProblem.Problem {
@@ -218,6 +390,21 @@ func newDraftProblemWithModifier() *domainProblem.Problem {
 	)
 }
 
+func newPublishedProblemWithTestCases() *domainProblem.Problem {
+	key := "problems/test-problem/testcases/xyz"
+	return domainProblem.RestoreProblem(
+		testProbID, testSlug, "Test Problem",
+		nil, nil, nil, []string{},
+		"PUBLISHED", "PUBLIC",
+		shared.RestoreUserID(authorID),
+		[]shared.UserID{},
+		[]domainProblem.LanguageOverride{},
+		&key, []domainProblem.JudgingFile{},
+		nil, nil, nil,
+		testNow, testNow,
+	)
+}
+
 func newPublishedProblemWithModifier() *domainProblem.Problem {
 	return domainProblem.RestoreProblem(
 		testProbID, testSlug, "Test Problem",
@@ -232,10 +419,112 @@ func newPublishedProblemWithModifier() *domainProblem.Problem {
 	)
 }
 
+func newPublishedProblemWithTestCasesAndModifier() *domainProblem.Problem {
+	key := "problems/test-problem/testcases/xyz"
+	return domainProblem.RestoreProblem(
+		testProbID, testSlug, "Test Problem",
+		nil, nil, nil, []string{},
+		"PUBLISHED", "PUBLIC",
+		shared.RestoreUserID(authorID),
+		[]shared.UserID{shared.RestoreUserID(modifierID)},
+		[]domainProblem.LanguageOverride{},
+		&key, []domainProblem.JudgingFile{},
+		nil, nil, nil,
+		testNow, testNow,
+	)
+}
+
+func newCompleteDraftProblem() *domainProblem.Problem {
+	statement := "Solve this problem"
+	timeLimit := 2000
+	memoryLimit := 256
+	testCasesKey := "problems/test-problem/testCases/abc"
+	solution, err := domainProblem.NewSolutionFile("sol.cpp", "key-1", "cpp20")
+	if err != nil {
+		panic(err)
+	}
+	return domainProblem.RestoreProblem(
+		testProbID, testSlug, "Test Problem",
+		&statement, &timeLimit, &memoryLimit, []string{},
+		"DRAFT", "PRIVATE",
+		shared.RestoreUserID(authorID),
+		[]shared.UserID{},
+		[]domainProblem.LanguageOverride{},
+		&testCasesKey, []domainProblem.JudgingFile{solution},
+		nil, nil, nil,
+		testNow, testNow,
+	)
+}
+
 func repoWith(p *domainProblem.Problem) *mockProblemRepository {
 	return &mockProblemRepository{
 		findBySlugFn: func(_ context.Context, _ domainProblem.Slug) (*domainProblem.Problem, error) {
 			return p, nil
 		},
 	}
+}
+
+// ── ContestAssociationRemover / TransactionManager mocks ─────────────────────
+
+type mockContestAssociationRemover struct {
+	removedIDs []string
+	err        error
+}
+
+func (m *mockContestAssociationRemover) RemoveProblemFromContests(_ context.Context, problemID string) error {
+	m.removedIDs = append(m.removedIDs, problemID)
+	return m.err
+}
+
+type mockTxManager struct {
+	calls int
+	err   error
+}
+
+func (m *mockTxManager) WithTx(ctx context.Context, fn func(context.Context) error) error {
+	m.calls++
+	if m.err != nil {
+		return m.err
+	}
+	return fn(ctx)
+}
+
+// ── AffectedContestsProvider / StagedFileCleaner mocks ───────────────────────
+
+type mockAffectedContestsProvider struct {
+	contests []ContestRef
+	err      error
+}
+
+func (m *mockAffectedContestsProvider) ListOpenContestsOfProblem(_ context.Context, _ string) ([]ContestRef, error) {
+	return m.contests, m.err
+}
+
+type mockStagedFileCleaner struct {
+	deletedPrefixes []string
+}
+
+func (m *mockStagedFileCleaner) DeleteFilesWithPrefix(_ context.Context, prefix string) error {
+	m.deletedPrefixes = append(m.deletedPrefixes, prefix)
+	return nil
+}
+
+func newCppPythonJavaSettings() domainProblem.PlatformSettings {
+	s, err := domainProblem.NewPlatformSettings(
+		10000,
+		512,
+		map[string]domainProblem.LanguageLimit{},
+		map[string]struct{}{"cpp": {}, "python": {}, "java": {}},
+		map[string]string{".cpp": "cpp", ".py": "python", ".java": "java"},
+		map[string]struct{}{"dp": {}},
+		4,
+		10,
+		50,
+		100,
+		10,
+	)
+	if err != nil {
+		panic(err)
+	}
+	return s
 }

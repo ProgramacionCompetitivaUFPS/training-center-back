@@ -28,7 +28,7 @@ type rejudgeContestResponse struct {
 // @Param        contestId   path string true "Contest ID"
 // @Param        problemSlug path string true "Problem slug"
 // @Success      200 {object} rejudgeContestResponse
-// @Failure      400 {object} apperror.AppError
+// @Failure      400 {object} apperror.AppError "CONTEST_NOT_ACTIVE, PROBLEM_NOT_IN_CONTEST, PROBLEM_NOT_PUBLISHED, NO_SUBMISSIONS_TO_REJUDGE"
 // @Failure      401 {object} apperror.AppError
 // @Failure      403 {object} apperror.AppError
 // @Failure      404 {object} apperror.AppError

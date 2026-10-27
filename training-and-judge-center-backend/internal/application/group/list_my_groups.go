@@ -124,7 +124,9 @@ func (uc *ListMyGroupsUseCase) Execute(ctx context.Context, in ListMyGroupsInput
 
 	return &ListMyGroupsOutput{
 		Groups:     items,
-		TotalCount: len(items),
+		// The repository's total across every page, not this page's length — TotalPages already
+		// used it, so with limit=1 and 4 groups the response said total:1, totalPages:4.
+		TotalCount: total,
 		TotalPages: appshared.CalcTotalPages(total, in.Limit),
 		Page:       in.Page,
 		Limit:      in.Limit,

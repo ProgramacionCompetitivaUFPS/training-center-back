@@ -162,7 +162,7 @@ Statistics retrieved successfully.
       "count": 65
     },
     {
-      "verdict": "RUNTIME_EXCEPTION",
+      "verdict": "RUNTIME_ERROR",
       "count": 35
     }
   ]
@@ -273,7 +273,7 @@ Problem with the specified slug does not exist.
 - **FR-023**: The system MUST include all verdict types that have at least one submission.
 - **FR-024**: The system MUST NOT include verdict types with zero submissions.
 - **FR-025**: The system MUST count all submissions regardless of user status (active or deactivated).
-- **FR-026**: Verdict types include but are not limited to: ACCEPTED, WRONG_ANSWER, TIME_LIMIT_EXCEEDED, MEMORY_LIMIT_EXCEEDED, RUNTIME_EXCEPTION, COMPILATION_ERROR, SYSTEM_ERROR.
+- **FR-026**: Verdict types include but are not limited to: ACCEPTED, WRONG_ANSWER, TIME_LIMIT_EXCEEDED, MEMORY_LIMIT_EXCEEDED, RUNTIME_ERROR, COMPILATION_ERROR, SYSTEM_ERROR.
 
 **No Submissions Case**
 - **FR-027**: When a problem has zero submissions, the system MUST return HTTP 200 with a message indicating no statistics are available.
