@@ -126,13 +126,23 @@ func reg(userID string) *domainContest.ContestRegistration {
 }
 
 func sub(userID, problemID, status string, minutesAgo int) ContestSubmissionData {
+	return subAgo(userID, problemID, status, time.Duration(minutesAgo)*time.Minute)
+}
+
+func subAgo(userID, problemID, status string, ago time.Duration) ContestSubmissionData {
 	return ContestSubmissionData{
 		UserID:      userID,
 		ProblemID:   problemID,
 		Status:      status,
-		SubmittedAt: time.Now().Add(-time.Duration(minutesAgo) * time.Minute),
+		SubmittedAt: time.Now().Add(-ago),
 	}
 }
+
+// acceptedMidMinute is when a test solve lands: an hour and half a minute after the fixture's clock.
+// The contest and the submission are built with separate time.Now() calls; at a whole number of
+// minutes, whether the second call reads the same clock tick as the first would flip the truncated
+// penalty by one. Half a minute away from the boundary the result cannot depend on the clock.
+const acceptedMidMinute = 60*time.Minute + 30*time.Second
 
 func visibleGroup() *GroupInfo {
 	return &GroupInfo{ID: testGroupID, Name: "Test Group", IsVisible: true}
@@ -203,7 +213,7 @@ func TestGetStandingsUseCase_CacheMissRebuild(t *testing.T) {
 			return nil
 		},
 	}
-	uc := newGetStandingsUseCase(activeContest(), regs, subs, cache, visibleGroup(), isMemberNotLead())
+	uc := newGetStandingsUseCase(withProblem(activeContest(), "A"), regs, subs, cache, visibleGroup(), isMemberNotLead())
 
 	out, err := uc.Execute(context.Background(), GetStandingsInput{
 		CurrentUser: asContestant(callerID),
@@ -245,7 +255,7 @@ func TestGetStandingsUseCase_CacheGetErrorFallsBackToRebuild(t *testing.T) {
 			return nil
 		},
 	}
-	uc := newGetStandingsUseCase(activeContest(), regs, subs, cache, visibleGroup(), isMemberNotLead())
+	uc := newGetStandingsUseCase(withProblem(activeContest(), "A"), regs, subs, cache, visibleGroup(), isMemberNotLead())
 
 	out, err := uc.Execute(context.Background(), GetStandingsInput{
 		CurrentUser: asContestant(callerID),
@@ -595,7 +605,7 @@ func TestGetStandingsUseCase_EveryFailedAttemptPenalises(t *testing.T) {
 			regs := []*domainContest.ContestRegistration{reg(callerID)}
 			subs := []ContestSubmissionData{
 				sub(callerID, "A", tt.verdict, 30),
-				sub(callerID, "A", "ACCEPTED", 60),
+				subAgo(callerID, "A", "ACCEPTED", acceptedMidMinute),
 			}
 			uc := newGetStandingsUseCase(withProblem(activeContest(), "A"), regs, subs, emptyCache(), visibleGroup(), isMemberNotLead())
 
@@ -610,8 +620,7 @@ func TestGetStandingsUseCase_EveryFailedAttemptPenalises(t *testing.T) {
 				t.Fatalf("Execute: %v", err)
 			}
 
-			// The difference against a clean solve, not the absolute number: the
-			// solve time itself is measured from time.Now() and truncates.
+			// The difference against a clean solve, not the absolute number.
 			got := out.Entries[0].TotalPenalty - cleanSolvePenalty(t)
 			want := 0
 			if tt.penalised {
@@ -629,7 +638,7 @@ func TestGetStandingsUseCase_EveryFailedAttemptPenalises(t *testing.T) {
 func cleanSolvePenalty(t *testing.T) int {
 	t.Helper()
 	regs := []*domainContest.ContestRegistration{reg(callerID)}
-	subs := []ContestSubmissionData{sub(callerID, "A", "ACCEPTED", 60)}
+	subs := []ContestSubmissionData{subAgo(callerID, "A", "ACCEPTED", acceptedMidMinute)}
 	uc := newGetStandingsUseCase(withProblem(activeContest(), "A"), regs, subs, emptyCache(), visibleGroup(), isMemberNotLead())
 
 	out, err := uc.Execute(context.Background(), GetStandingsInput{
