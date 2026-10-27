@@ -253,7 +253,14 @@ func (m *mockSolutionValidator) Validate(ctx context.Context, problemID string, 
 
 type mockProblemPublisher struct {
 	markPublishedFn func(ctx context.Context, problemID string, now time.Time) error
-	calls           int
+	// changedSinceRead makes MarkPublishedIfUnchanged report that the problem was edited after it was read
+	changedSinceRead bool
+	calls            int
+}
+
+func (m *mockProblemPublisher) MarkPublishedIfUnchanged(_ context.Context, _ string, _, _ time.Time) (bool, error) {
+	m.calls++
+	return !m.changedSinceRead, nil
 }
 
 func (m *mockProblemPublisher) MarkPublished(ctx context.Context, problemID string, now time.Time) error {

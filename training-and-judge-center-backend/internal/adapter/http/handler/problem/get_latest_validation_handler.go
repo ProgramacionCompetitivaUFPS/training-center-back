@@ -2,6 +2,7 @@ package problem
 
 import (
 	"net/http"
+	"time"
 
 	"github.com/training-judge-center/backend/internal/adapter/http/handler"
 	"github.com/training-judge-center/backend/internal/adapter/http/middleware"
@@ -15,6 +16,8 @@ type latestValidationResponse struct {
 	Terminal          bool                   `json:"terminal"`
 	Passed            bool                   `json:"passed"`
 	Status            string                 `json:"status,omitempty"`
+	Stale             bool                   `json:"stale"`
+	CompletedAt       *time.Time             `json:"completedAt,omitempty"`
 	ValidationLogs    []string               `json:"validationLogs,omitempty"`
 	ValidationSummary *validationSummaryResp `json:"validationSummary,omitempty"`
 	FailedTestCases   []failedTestCaseResp   `json:"failedTestCases,omitempty"`
@@ -56,6 +59,8 @@ func (h *Handler) GetLatestValidation(w http.ResponseWriter, r *http.Request) {
 		Terminal:          out.Terminal,
 		Passed:            out.Passed,
 		Status:            out.Status,
+		Stale:             out.Stale,
+		CompletedAt:       out.CompletedAt,
 		ValidationLogs:    out.Report.ValidationLogs,
 		ValidationSummary: toValidationSummaryResp(out.Report.ValidationSummary),
 		FailedTestCases:   toFailedTestCaseResps(out.Report.FailedTestCases),

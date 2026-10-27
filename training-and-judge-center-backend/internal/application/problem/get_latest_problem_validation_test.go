@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"testing"
+	"time"
 
 	domainProblem "github.com/training-judge-center/backend/internal/domain/problem"
 	"github.com/training-judge-center/backend/pkg/apperror"
@@ -111,5 +112,47 @@ func TestGetLatestProblemValidation_StillRunning_ReturnsNotTerminal(t *testing.T
 	}
 	if out.Terminal {
 		t.Error("expected Terminal=false while the ticket is still RUNNING")
+	}
+}
+
+func TestGetLatestProblemValidation_ProblemChangedAfterTheAttempt_IsStale(t *testing.T) {
+	check := passedCheckOnly("check-id", testNow.Add(-time.Hour)) // the problem was last updated at testNow, after it
+	uc := newGetLatestProblemValidationUseCase(repoWith(newDraftProblem()), latestIs(check), &mockProblemStatusProvider{})
+
+	out, err := uc.Execute(context.Background(), GetLatestProblemValidationInput{Slug: testSlug, CurrentUser: asAdmin(authorID)})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !out.Passed || !out.Stale {
+		t.Errorf("expected a passed but stale attempt, got Passed=%v Stale=%v", out.Passed, out.Stale)
+	}
+	if out.CompletedAt == nil {
+		t.Error("expected CompletedAt to be reported")
+	}
+}
+
+func TestGetLatestProblemValidation_ProblemUnchangedSinceTheAttempt_IsNotStale(t *testing.T) {
+	check := passedCheckOnly("check-id", testNow)
+	uc := newGetLatestProblemValidationUseCase(repoWith(newDraftProblem()), latestIs(check), &mockProblemStatusProvider{})
+
+	out, err := uc.Execute(context.Background(), GetLatestProblemValidationInput{Slug: testSlug, CurrentUser: asAdmin(authorID)})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if out.Stale {
+		t.Error("expected a validation requested after the last change not to be stale")
+	}
+}
+
+func TestGetLatestProblemValidation_PublishedProblem_IsNeverStale(t *testing.T) {
+	check := passedCheckOnly("check-id", testNow.Add(-time.Hour)) // publishing moved updated_at after it
+	uc := newGetLatestProblemValidationUseCase(repoWith(newPublishedProblem()), latestIs(check), &mockProblemStatusProvider{})
+
+	out, err := uc.Execute(context.Background(), GetLatestProblemValidationInput{Slug: testSlug, CurrentUser: asAdmin(authorID)})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if out.Stale {
+		t.Error("a published problem must not report its validation as stale: publishing itself moves updated_at")
 	}
 }

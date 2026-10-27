@@ -86,6 +86,71 @@ As a Coach or Admin with a complete problem, I want to publish it so that it bec
     - **When** a publish request is submitted
     - **Then** the system rejects with 401 Unauthorized
 
+11. **Scenario**: Publish after a passing validation that is still current
+    - **Given** a problem exists with status `DRAFT`
+    - **And** its latest validation was requested with `POST /validate`, passed, and the problem has not changed since it was requested
+    - **When** publish is triggered
+    - **Then** the system changes status to `PUBLISHED` without running the validation again
+    - **And** returns the report of that validation
+
+12. **Scenario**: Publish after a passing validation that is no longer current
+    - **Given** a problem exists with status `DRAFT`
+    - **And** its latest validation passed, but the problem was modified (any field, file or limit) after that validation was requested
+    - **When** publish is triggered
+    - **Then** the system validates the problem again, as in scenario 1
+
+13. **Scenario**: Publish while a validation without publication is running
+    - **Given** a problem exists with status `DRAFT`
+    - **And** a validation requested with `POST /validate` is still running
+    - **When** publish is triggered
+    - **Then** the system rejects with 409 Conflict (VALIDATION_IN_PROGRESS)
+
+---
+
+### User Story 1b – Validate a draft without publishing it (Priority: P1)
+
+As a Coach or Admin preparing a problem, I want to run the publication validation on my draft without publishing it, so that I find out whether the checker, the validator and the reference solutions work before deciding to publish.
+
+**Why this priority**: Without it, the only way to find out is to try to publish, and the cycle publish → fail → fix → publish is slow and confusing.
+
+**Independent Test**: Consume `POST /problems/p/{slug}/validate` for a complete draft, follow `GET /problems/p/{slug}/validation` until it is terminal, and verify the problem is still `DRAFT`.
+
+**Acceptance Scenarios**:
+
+1. **Scenario**: Validation passes
+   - **Given** a problem exists with status `DRAFT` and all required data
+   - **And** the authenticated user is the author, Admin, or a modifier
+   - **When** validate is triggered
+   - **Then** the system answers 202 Accepted right away
+   - **And** the validation runs in the background, as it does for publish
+   - **And** when it passes, the problem stays `DRAFT` and `GET /validation` reports `passed: true`
+
+2. **Scenario**: Validation fails
+   - **Given** the same draft, but a solution fails a test case
+   - **When** validate is triggered
+   - **Then** the problem stays `DRAFT`
+   - **And** `GET /validation` reports `passed: false` with the same details a failed publish returns
+
+3. **Scenario**: Missing required fields
+   - **Given** a problem exists with status `DRAFT` that lacks required fields
+   - **When** validate is triggered
+   - **Then** the system rejects with 400 Bad Request listing `missingFields`
+
+4. **Scenario**: A validation is already running
+   - **Given** a validation (of publish or of validate) is in progress for the problem
+   - **When** validate is triggered
+   - **Then** the system answers 202 Accepted with the id of the running validation, without starting another
+
+5. **Scenario**: Problem already published
+   - **Given** a problem exists with status `PUBLISHED`
+   - **When** validate is triggered
+   - **Then** the system rejects with 409 Conflict (ALREADY_PUBLISHED)
+
+6. **Scenario**: Unauthorized or unauthenticated
+   - **Given** the user is neither the author, an Admin, nor a modifier (or is not authenticated)
+   - **When** validate is triggered
+   - **Then** the system rejects with 403 Forbidden (INSUFFICIENT_PERMISSIONS) (or 401 Unauthorized)
+
 ---
 
 ### User Story 2 – Unpublish problem (Priority: P2)
@@ -488,6 +553,42 @@ Problem is already PUBLISHED.
 
 ---
 
+### POST /problems/p/{slug}/validate
+
+Starts the same validation that `POST /publish` runs on a draft, but does not publish the problem when it passes. It answers immediately; the result is read with `GET /problems/p/{slug}/validation`.
+
+**Headers**: `Authorization: Bearer <token>` (required).
+
+**Path Parameters**: `slug` (string, required).
+
+**Responses**:
+
+#### 202 Accepted
+```json
+{
+  "slug": "sum-two-numbers",
+  "validationId": "9f0c5c1e-7a52-4a43-8c2d-1b8f7c0d2a11",
+  "message": "Validation started"
+}
+```
+If a validation is already running for the problem, its id is returned instead.
+
+#### 400 Bad Request — missing required fields
+Same body as the missing-fields `400` of `POST /publish` (`missingFields` and `validationLogs`).
+
+#### 401 Unauthorized / 403 Forbidden (INSUFFICIENT_PERMISSIONS) / 404 Not Found
+As in `POST /publish`.
+
+#### 409 Conflict — already published
+```json
+{
+  "code": "ALREADY_PUBLISHED",
+  "message": "Problem is already published"
+}
+```
+
+---
+
 ### GET /problems/p/{slug}/validation
 
 Get the most recent validation attempt for a problem, so a client that lost track of an in-progress `POST /publish` call (e.g. the tab was closed while the request was waiting) can recover its status without holding onto a validation ID.
@@ -531,7 +632,10 @@ The latest attempt has not finished yet. `status` is omitted while the attempt i
 ```
 
 #### 200 OK — finished
-The latest attempt reached a terminal state (`PASSED`, `FAILED`, or `SYSTEM_ERROR`). Same report shape as the `200`/`400` bodies of `POST /publish`.
+The latest attempt reached a terminal state (`PASSED`, `FAILED`, or `SYSTEM_ERROR`). Same report shape as the `200`/`400` bodies of `POST /publish`, plus:
+
+- `completedAt`: when the attempt finished.
+- `stale`: `true` when the draft was modified after the attempt was requested, so a pass no longer says anything about what is stored now. `POST /publish` only skips the validation when the latest attempt passed and is not stale. It is always `false` once the problem is published, because publishing itself moves `updatedAt`.
 
 ```json
 {
@@ -539,6 +643,8 @@ The latest attempt reached a terminal state (`PASSED`, `FAILED`, or `SYSTEM_ERRO
   "terminal": true,
   "passed": true,
   "status": "PUBLISHED",
+  "stale": false,
+  "completedAt": "2026-10-27T14:03:11Z",
   "validationLogs": [
     "✓ Required fields validated",
     "✓ Test cases ZIP structure valid (5 sample, 20 secret cases)",
@@ -814,6 +920,15 @@ Problem not found.
 **General**
 - **FR-030**: The system MUST NOT return internal IDs in any response.
 - **FR-031**: The system MUST update the `updatedAt` timestamp on status or accessibility change.
+
+**Validating a draft without publishing it**
+- **FR-032**: The system MUST allow validating a `DRAFT` problem without publishing it (`POST /problems/p/{slug}/validate`), running the same pipeline as publish.
+- **FR-033**: A validation requested that way MUST NOT change the problem's status, whether it passes or fails.
+- **FR-034**: `POST /validate` MUST answer without waiting for the validation to finish.
+- **FR-035**: Only one validation per problem MAY be in progress; requesting another MUST return the one in progress.
+- **FR-036**: `POST /publish` MUST NOT run the validation again when the latest validation passed and the problem has not been modified since it was requested; otherwise it MUST validate as before. The check MUST be atomic with the publication: if the draft is edited between reading it and publishing it, the publish MUST validate again instead.
+- **FR-037**: `POST /publish` MUST reject with 409 (VALIDATION_IN_PROGRESS) while a validation requested with `POST /validate` is running, including when that run wins a concurrent request.
+- **FR-038**: `GET /validation` MUST report `stale: true` for an attempt requested before the problem's last modification, and `completedAt` for a finished attempt.
 
 ### Key Entities
 

@@ -525,7 +525,9 @@ func main() {
 	rejudgeContestSubmissionsUseCase := appProblem.NewRejudgeContestSubmissionsUseCase(problemRepo, submissionRejudger, contestRejudgeProvider)
 	adminRejudgeSubmissionsUseCase := appProblem.NewAdminRejudgeSubmissionsUseCase(problemRepo, submissionRejudger, contestRejudgeProvider)
 
-	publishProblemUseCase := appProblem.NewPublishProblemUseCase(problemRepo, problemValidationRepo, validationQueue)
+	problemPublisher := problem.NewProblemPublisher(dbPool)
+	publishProblemUseCase := appProblem.NewPublishProblemUseCase(problemRepo, problemValidationRepo, validationQueue, problemPublisher)
+	requestProblemValidationUseCase := appProblem.NewRequestProblemValidationUseCase(problemRepo, problemValidationRepo, validationQueue)
 	problemStatusProvider := problem.NewProblemStatusProvider(dbPool)
 	getProblemValidationStatusUseCase := appProblem.NewGetProblemValidationStatusUseCase(problemValidationRepo, problemStatusProvider)
 	awaitProblemValidationUseCase := appProblem.NewAwaitProblemValidationUseCase(getProblemValidationStatusUseCase)
@@ -544,6 +546,7 @@ func main() {
 		listProblemsUseCase,
 		unpublishProblemUseCase,
 		publishProblemUseCase,
+		requestProblemValidationUseCase,
 		awaitProblemValidationUseCase,
 		getLatestProblemValidationUseCase,
 		changeAccessibilityUseCase,

@@ -284,7 +284,7 @@ func newHandlerWithRejudgeContest(repo domainProblem.Repository, rejudger appPro
 func newHandlerWithPublish(repo domainProblem.Repository, validationRepo domainProblem.ProblemValidationRepository, queue appProblem.ValidationQueue, statusProvider appProblem.ProblemStatusProvider) *Handler {
 	statusCheck := appProblem.NewGetProblemValidationStatusUseCase(validationRepo, statusProvider)
 	return &Handler{
-		publishProblem:         appProblem.NewPublishProblemUseCase(repo, validationRepo, queue),
+		publishProblem:         appProblem.NewPublishProblemUseCase(repo, validationRepo, queue, &mockProblemPublisherH{}),
 		awaitProblemValidation: appProblem.NewAwaitProblemValidationUseCase(statusCheck),
 	}
 }
@@ -458,4 +458,14 @@ func newHandlerWithImport() *Handler {
 
 func newHandlerWithUploadFiles() *Handler {
 	return &Handler{settings: newTestSettings()}
+}
+
+type mockProblemPublisherH struct{}
+
+func (m *mockProblemPublisherH) MarkPublishedIfUnchanged(_ context.Context, _ string, _, _ time.Time) (bool, error) {
+	return true, nil
+}
+
+func (m *mockProblemPublisherH) MarkPublished(_ context.Context, _ string, _ time.Time) error {
+	return nil
 }

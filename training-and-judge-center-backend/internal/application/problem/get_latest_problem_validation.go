@@ -2,6 +2,7 @@ package problem
 
 import (
 	"context"
+	"time"
 
 	appshared "github.com/training-judge-center/backend/internal/application/shared"
 	"github.com/training-judge-center/backend/internal/domain/problem"
@@ -21,7 +22,12 @@ type GetLatestProblemValidationOutput struct {
 	Terminal bool
 	Passed   bool
 	Status   string
-	Report   ValidationReport
+	// Stale: the draft changed after this attempt was requested, so a pass no longer says anything
+	// about what is stored now. Only meaningful once Terminal, and only for a draft: publishing, or
+	// applying a judging update, moves updated_at too, and that is not an edit of the validated content.
+	Stale       bool
+	CompletedAt *time.Time
+	Report      ValidationReport
 }
 
 // GetLatestProblemValidationUseCase answers "what happened with the last
@@ -72,10 +78,12 @@ func (uc *GetLatestProblemValidationUseCase) Execute(ctx context.Context, in Get
 		return nil, err
 	}
 	return &GetLatestProblemValidationOutput{
-		Found:    true,
-		Terminal: status.Terminal,
-		Passed:   status.Passed,
-		Status:   status.Status,
-		Report:   status.Report,
+		Found:       true,
+		Terminal:    status.Terminal,
+		Passed:      status.Passed,
+		Status:      status.Status,
+		Stale:       !p.Status().IsPublished() && p.UpdatedAt().After(existing.RequestedAt()),
+		CompletedAt: existing.CompletedAt(),
+		Report:      status.Report,
 	}, nil
 }

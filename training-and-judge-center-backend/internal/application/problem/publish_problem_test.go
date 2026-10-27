@@ -11,7 +11,7 @@ import (
 )
 
 func newPublishUseCase(repo *mockProblemRepository, validationRepo *mockValidationRepository, queue *mockValidationQueue) *PublishProblemUseCase {
-	return NewPublishProblemUseCase(repo, validationRepo, queue)
+	return NewPublishProblemUseCase(repo, validationRepo, queue, &mockProblemPublisher{})
 }
 
 func TestExecute_MissingFields_ReturnsResolvedOutput(t *testing.T) {
