@@ -21,6 +21,10 @@ func NewScheduledParticipationCleaner(db infraPostgres.Querier) *ScheduledPartic
 // registration for SCHEDULED (not yet started) contests. A registration the removal would leave below
 // the contest's team_size_min is deleted instead: keeping it would leave the team enrolled with fewer
 // players than the contest allows, and nobody would be told. The cancelled ones are returned.
+//
+// The registrations are locked (FOR UPDATE) before the remaining members are counted: two members
+// leaving at the same moment would otherwise both count the same three, each decide that two remain,
+// and leave the registration with one player. The second one waits, and counts what the first left.
 func (s *ScheduledParticipationCleaner) RemoveUserFromScheduledParticipations(ctx context.Context, teamID, userID string) ([]appTeam.RegistrationAtRisk, error) {
 	rows, err := infraPostgres.GetQuerier(ctx, s.db).Query(ctx, `
 		WITH affected AS (
@@ -31,6 +35,7 @@ func (s *ScheduledParticipationCleaner) RemoveUserFromScheduledParticipations(ct
 			WHERE  ctp.team_id   = $1
 			  AND  $2::uuid = ANY(ctp.selected_members)
 			  AND  co.start_time > NOW()
+			FOR UPDATE OF ctp
 		), cancelled AS (
 			DELETE FROM contest_team_participants ctp
 			USING  affected a
