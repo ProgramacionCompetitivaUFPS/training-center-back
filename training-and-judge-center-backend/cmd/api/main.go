@@ -450,6 +450,7 @@ func main() {
 	rejectInvitationUseCase := appteam.NewRejectInvitationUseCase(teamInvitationRepo)
 	teamScheduledCleaner := adapterteam.NewScheduledParticipationCleaner(dbPool)
 	leaveTeamUseCase := appteam.NewLeaveTeamUseCase(teamMemberRepo, teamContestParticipationChecker, teamScheduledCleaner, txManager)
+	getLeaveImpactUseCase := appteam.NewGetLeaveImpactUseCase(teamMemberRepo, teamScheduledCleaner)
 	registerTeamToContestUseCase := appteam.NewRegisterTeamToContestUseCase(
 		teamMemberRepo, teamRepo, teamContestProvider, contestTeamParticipationRepo,
 		teamIndivChecker, teamGroupMemberChecker, teamUserProvider, txManager,
@@ -478,6 +479,7 @@ func main() {
 		acceptInvitationUseCase,
 		rejectInvitationUseCase,
 		leaveTeamUseCase,
+		getLeaveImpactUseCase,
 		registerTeamToContestUseCase,
 		updateTeamRegistrationUseCase,
 		unregisterTeamFromContestUseCase,

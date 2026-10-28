@@ -102,7 +102,19 @@ As a team member, I want to leave a team so that I can join other teams.
    * **Then** User A is removed from selectedMembers for that contest
    * **And** returns 204 No Content
 
-4. **Scenario**: Non-member tries to leave
+4. **Scenario**: Leave would leave a scheduled registration below the minimum team size
+   * **Given** User A is selected for Team X in a SCHEDULED contest
+   * **And** removing User A would leave fewer selected members than the contest's `teamSizeMin`
+   * **When** User A leaves Team X
+   * **Then** Team X's registration in that contest is cancelled (the registrations that stay valid just lose User A)
+   * **And** returns 204 No Content
+
+5. **Scenario**: Preview what leaving would cancel
+   * **Given** User A is a member of Team X
+   * **When** User A requests the leave impact of Team X
+   * **Then** the system lists the registrations in SCHEDULED contests that leaving would cancel (scenario 4), without changing anything
+
+6. **Scenario**: Non-member tries to leave
    * **Given** User A is NOT a member of Team X
    * **When** they try to leave
    * **Then** system rejects with 404 (`NOT_TEAM_MEMBER`)
@@ -131,6 +143,8 @@ As a user, I want to view my pending team invitations.
 * **FR-003**: Users CAN reject invitations.
 * **FR-004**: Users CAN leave teams at any time (except during ACTIVE contests).
 * **FR-005**: If user leaves while selected for SCHEDULED contest, MUST be removed from selection.
+* **FR-005a**: If removing the user would leave a SCHEDULED contest's registration with fewer selected members than the contest's `teamSizeMin`, the system MUST cancel that registration instead of keeping it below the minimum.
+* **FR-005b**: The system MUST let a member see, before leaving, which registrations leaving would cancel (`GET /teams/{teamId}/leave-impact`), without changing anything.
 * **FR-006**: System MUST prevent duplicate invitations.
 * **FR-007**: System MUST prevent inviting existing members.
 
@@ -256,6 +270,26 @@ Leave a team.
   }
 }
 ```
+
+---
+
+### GET /api/teams/{teamId}/leave-impact
+
+What leaving the team would cost it: the team's registrations in contests that have not started that would be cancelled because the team would be left with fewer players than the contest's minimum team size. Leaving does that cancellation itself; this only tells the member beforehand. It changes nothing.
+
+**Response 200 OK**:
+
+```json
+{
+  "registrationsToCancel": [
+    { "contestId": "contest-uuid", "contestName": "Taller ICPC", "groupId": "group-uuid" }
+  ]
+}
+```
+
+`registrationsToCancel` is an empty list when leaving would not cancel anything.
+
+**Response 401 Unauthorized** / **404 Not Found** (`NOT_TEAM_MEMBER`)
 
 ---
 

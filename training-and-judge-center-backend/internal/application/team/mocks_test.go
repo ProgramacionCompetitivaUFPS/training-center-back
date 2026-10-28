@@ -355,12 +355,16 @@ func validInput(cu appshared.CurrentUser) CreateTeamInput {
 // ── mockScheduledParticipationCleaner ─────────────────────────────────────────
 
 type mockScheduledParticipationCleaner struct {
-	removedCount int
-	err          error
-	called       bool
+	atRisk []RegistrationAtRisk
+	err    error
+	called bool
 }
 
-func (m *mockScheduledParticipationCleaner) RemoveUserFromScheduledParticipations(_ context.Context, _, _ string) (int, error) {
+func (m *mockScheduledParticipationCleaner) RemoveUserFromScheduledParticipations(_ context.Context, _, _ string) ([]RegistrationAtRisk, error) {
 	m.called = true
-	return m.removedCount, m.err
+	return m.atRisk, m.err
+}
+
+func (m *mockScheduledParticipationCleaner) RegistrationsLosingMinimum(_ context.Context, _, _ string) ([]RegistrationAtRisk, error) {
+	return m.atRisk, m.err
 }

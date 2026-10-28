@@ -179,8 +179,14 @@ func (m *mockGroupChecker) AreUsersGroupMembers(_ context.Context, groupID strin
 
 // ── mockScheduledParticipationCleanerHandler ──────────────────────────────────
 
-type mockScheduledParticipationCleanerHandler struct{}
+type mockScheduledParticipationCleanerHandler struct {
+	atRisk []appTeam.RegistrationAtRisk
+}
 
-func (m *mockScheduledParticipationCleanerHandler) RemoveUserFromScheduledParticipations(_ context.Context, _, _ string) (int, error) {
-	return 0, nil
+func (m *mockScheduledParticipationCleanerHandler) RemoveUserFromScheduledParticipations(_ context.Context, _, _ string) ([]appTeam.RegistrationAtRisk, error) {
+	return m.atRisk, nil
+}
+
+func (m *mockScheduledParticipationCleanerHandler) RegistrationsLosingMinimum(_ context.Context, _, _ string) ([]appTeam.RegistrationAtRisk, error) {
+	return m.atRisk, nil
 }

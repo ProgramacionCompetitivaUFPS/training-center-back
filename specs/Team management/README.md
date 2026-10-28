@@ -70,6 +70,7 @@ User A is automatically a member (no invitation needed)
 * Any member can leave at any time.
 * **Exception**: Cannot leave if currently selected for an **ACTIVE contest**.
 * If user leaves while selected for a **SCHEDULED contest** → automatically removed from selectedMembers.
+* If that would leave the registration with fewer selected members than the contest's `teamSizeMin`, the registration is **cancelled** instead: keeping it would leave the team enrolled with fewer players than the contest allows. The leave confirmation shows which registrations are affected (`GET /teams/{teamId}/leave-impact`).
 
 ---
 
