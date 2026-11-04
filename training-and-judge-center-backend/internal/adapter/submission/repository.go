@@ -338,6 +338,11 @@ func buildWhere(f domainSubmission.ListFilters) (string, []any) {
 		args = append(args, *f.Visibility)
 		i++
 	}
+	if f.OwnerID != nil {
+		where += fmt.Sprintf(" AND (visibility = 'PUBLIC' OR user_id = $%d)", i)
+		args = append(args, f.OwnerID.String())
+		i++
+	}
 	if f.ExcludeContest {
 		where += " AND contest_id IS NULL"
 	}

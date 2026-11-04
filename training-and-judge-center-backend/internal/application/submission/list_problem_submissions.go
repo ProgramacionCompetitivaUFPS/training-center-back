@@ -66,9 +66,6 @@ func (uc *ListProblemSubmissionsUseCase) Execute(ctx context.Context, in ListPro
 		return nil, err
 	}
 
-	isAdmin := in.CurrentUser.Role == shared.RoleAdmin
-
-	pub := domainsubmission.VisibilityPublic.String()
 	f := domainsubmission.ListFilters{
 		ProblemID:      &problem.ID,
 		ExcludeContest: true,
@@ -83,8 +80,11 @@ func (uc *ListProblemSubmissionsUseCase) Execute(ctx context.Context, in ListPro
 	case in.OnlyMine:
 		uid := shared.RestoreUserID(in.CurrentUser.ID)
 		f.UserID = &uid
-	case !isAdmin:
-		f.Visibility = &pub
+	case in.CurrentUser.IsAdmin():
+		// no filter — admin sees all
+	default:
+		uid := shared.RestoreUserID(in.CurrentUser.ID)
+		f.OwnerID = &uid
 	}
 
 	subs, total, err := uc.repo.List(ctx, f)

@@ -3,6 +3,7 @@ package submission
 import (
 	"context"
 	"errors"
+	"strings"
 	"testing"
 	"time"
 
@@ -383,5 +384,28 @@ func assertAppErrorCode(t *testing.T, err error, want string) {
 	}
 	if appErr.Code != want {
 		t.Errorf("expected code %q, got %q", want, appErr.Code)
+	}
+}
+
+// ── buildWhere ────────────────────────────────────────────────────────────────
+
+func TestBuildWhere_OwnerID_GeneratesPublicOrOwnFilter(t *testing.T) {
+	uid := shared.RestoreUserID(testUserID)
+	f := domainsubmission.ListFilters{OwnerID: &uid}
+	where, args := buildWhere(f)
+	if !strings.Contains(where, "(visibility = 'PUBLIC' OR user_id = $1)") {
+		t.Errorf("unexpected where clause: %q", where)
+	}
+	if len(args) != 1 || args[0] != testUserID {
+		t.Errorf("args = %v, want [%q]", args, testUserID)
+	}
+}
+
+func TestBuildWhere_OwnerID_ExcludesContest(t *testing.T) {
+	uid := shared.RestoreUserID(testUserID)
+	f := domainsubmission.ListFilters{OwnerID: &uid, ExcludeContest: true}
+	where, _ := buildWhere(f)
+	if !strings.Contains(where, "contest_id IS NULL") {
+		t.Errorf("expected contest_id IS NULL clause in %q", where)
 	}
 }
