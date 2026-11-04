@@ -9,7 +9,7 @@ import (
 	"github.com/training-judge-center/backend/pkg/apperror"
 )
 
-func TestListProblemSubmissions_NonAdmin_OnlyPublic(t *testing.T) {
+func TestListProblemSubmissions_NonAdmin_SetsOwnerID(t *testing.T) {
 	var capturedFilters domainsubmission.ListFilters
 	repo := &mockSubmissionRepo{
 		listFn: func(f domainsubmission.ListFilters) ([]*domainsubmission.Submission, int, error) {
@@ -27,11 +27,43 @@ func TestListProblemSubmissions_NonAdmin_OnlyPublic(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if capturedFilters.Visibility == nil || *capturedFilters.Visibility != "PUBLIC" {
-		t.Errorf("expected Visibility filter = PUBLIC, got %v", capturedFilters.Visibility)
+	if capturedFilters.OwnerID == nil {
+		t.Error("expected OwnerID to be set for non-admin")
+	}
+	if capturedFilters.Visibility != nil {
+		t.Errorf("expected no Visibility filter, got %v", capturedFilters.Visibility)
 	}
 	if !capturedFilters.ExcludeContest {
 		t.Error("expected ExcludeContest = true")
+	}
+}
+
+func TestListProblemSubmissions_AuthenticatedNonAdmin_SetsOwnerID(t *testing.T) {
+	var capturedFilters domainsubmission.ListFilters
+	repo := &mockSubmissionRepo{
+		listFn: func(f domainsubmission.ListFilters) ([]*domainsubmission.Submission, int, error) {
+			capturedFilters = f
+			return []*domainsubmission.Submission{}, 0, nil
+		},
+	}
+	uc := newListProblemSubmissionsUseCase(repo, publicProblem(), nil)
+	_, err := uc.Execute(context.Background(), ListProblemSubmissionsInput{
+		CurrentUser: asContestant(testUserID),
+		ProblemSlug: testProblemSlug,
+		Page:        1,
+		Limit:       20,
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if capturedFilters.OwnerID == nil {
+		t.Fatal("expected OwnerID to be set for authenticated non-admin")
+	}
+	if capturedFilters.OwnerID.String() != testUserID {
+		t.Errorf("OwnerID = %q, want %q", capturedFilters.OwnerID.String(), testUserID)
+	}
+	if capturedFilters.Visibility != nil {
+		t.Errorf("expected Visibility = nil for owner-inclusive, got %v", capturedFilters.Visibility)
 	}
 }
 
