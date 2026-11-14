@@ -260,3 +260,51 @@ func TestGetSubmission_OutputContestNilWhenNoContest(t *testing.T) {
 		t.Errorf("expected nil contest, got %+v", out.Contest)
 	}
 }
+
+func TestGetSubmission_OutputContainsCompileLog(t *testing.T) {
+	logText := "main.cpp:3:5: error: expected ';'"
+	repo := &mockSubmissionRepo{
+		findByIDFn: func(_ string) (*domainSubmission.Submission, error) {
+			sub := aSubmission(testAuthorID, "PUBLIC", nil)
+			if err := sub.Start(testNow); err != nil {
+				t.Fatalf("setup: %v", err)
+			}
+			if err := sub.MarkCompilationError(logText, testNow); err != nil {
+				t.Fatalf("setup: %v", err)
+			}
+			return sub, nil
+		},
+	}
+	uc := newGetUseCase(repo, nil, nil, nil, nil, nil, nil)
+
+	out, err := uc.Execute(context.Background(), GetSubmissionInput{
+		CurrentUser:  testutil.AsContestant(testAuthorID),
+		SubmissionID: testSubmissionID,
+	})
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+	if out.CompileLog == nil || *out.CompileLog != logText {
+		t.Errorf("CompileLog = %v, want %q", out.CompileLog, logText)
+	}
+}
+
+func TestGetSubmission_CompileLogNilWhenNotCompilationError(t *testing.T) {
+	repo := &mockSubmissionRepo{
+		findByIDFn: func(_ string) (*domainSubmission.Submission, error) {
+			return aSubmission(testAuthorID, "PUBLIC", nil), nil
+		},
+	}
+	uc := newGetUseCase(repo, nil, nil, nil, nil, nil, nil)
+
+	out, err := uc.Execute(context.Background(), GetSubmissionInput{
+		CurrentUser:  testutil.AsContestant(testAuthorID),
+		SubmissionID: testSubmissionID,
+	})
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+	if out.CompileLog != nil {
+		t.Errorf("CompileLog = %q, want nil", *out.CompileLog)
+	}
+}

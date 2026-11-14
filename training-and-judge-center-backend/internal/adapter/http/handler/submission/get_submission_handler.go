@@ -22,6 +22,7 @@ type getSubmissionResponse struct {
 	Compiler      string          `json:"compiler"`
 	ExecutionTime *int            `json:"executionTime"`
 	MemoryKb      *int            `json:"memoryKb"`
+	CompileLog    *string         `json:"compileLog"` // compiler output; null unless the submission failed to compile
 	SourceCode    *string         `json:"sourceCode"` // null when the stored source file no longer exists
 	IsBlockly     bool            `json:"isBlocklySubmission"`
 	WorkspaceXML  *string         `json:"workspaceXml"` // block editor workspace; null for regular submissions
@@ -71,6 +72,7 @@ func (h *Handler) GetSubmission(w http.ResponseWriter, r *http.Request) {
 		Compiler:      out.Compiler,
 		ExecutionTime: out.ExecutionTime,
 		MemoryKb:      out.MemoryKb,
+		CompileLog:    out.CompileLog,
 		SourceCode:    out.SourceCode,
 		IsBlockly:     out.IsBlockly,
 		WorkspaceXML:  out.WorkspaceXML,
