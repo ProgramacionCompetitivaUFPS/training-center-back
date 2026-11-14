@@ -95,6 +95,15 @@ func (uc *GetSubmissionUseCase) Execute(ctx context.Context, in GetSubmissionInp
 				}
 			}
 		}
+		// A group lead may review the submissions of the members of their groups,
+		// also outside a contest (e.g. to help with a problem they assigned).
+		if !allowed {
+			isLeadOfAuthor, err := uc.leadChecker.IsLeadOfMember(ctx, viewerID, authorID)
+			if err != nil {
+				return nil, err
+			}
+			allowed = isLeadOfAuthor
+		}
 		if !allowed {
 			return nil, apperror.NewForbidden(domainSubmission.ErrCodeAccessDenied, "access denied")
 		}
