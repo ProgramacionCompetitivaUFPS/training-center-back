@@ -28,6 +28,7 @@ type GetSubmissionOutput struct {
 	Compiler      string
 	ExecutionTime *int
 	MemoryKb      *int
+	CompileLog    *string // compiler output; only set when the submission failed to compile
 	SourceCode    *string // nil when the stored source file no longer exists
 	IsBlockly     bool
 	WorkspaceXML  *string // block editor workspace; nil for regular submissions or when the file is gone
@@ -153,6 +154,7 @@ func (uc *GetSubmissionUseCase) Execute(ctx context.Context, in GetSubmissionInp
 		Compiler:      sub.Compiler(),
 		ExecutionTime: sub.TimeMs(),
 		MemoryKb:      sub.MemoryKb(),
+		CompileLog:    sub.CompileLog(),
 		SourceCode:    sourceCode,
 		IsBlockly:     sub.IsBlockly(),
 		WorkspaceXML:  workspaceXML,
