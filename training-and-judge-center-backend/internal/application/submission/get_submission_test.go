@@ -308,3 +308,81 @@ func TestGetSubmission_CompileLogNilWhenNotCompilationError(t *testing.T) {
 		t.Errorf("CompileLog = %q, want nil", *out.CompileLog)
 	}
 }
+
+func TestGetSubmission_NonAuthor_Private_NoContest_LeadOfAuthor_Allowed(t *testing.T) {
+	repo := &mockSubmissionRepo{
+		findByIDFn: func(_ string) (*domainSubmission.Submission, error) {
+			return aSubmission(testAuthorID, "PRIVATE", nil), nil
+		},
+	}
+	lead := &mockLeadChecker{memberFn: func(leadID, memberID string) (bool, error) {
+		return leadID == testOtherUserID && memberID == testAuthorID, nil
+	}}
+	uc := newGetUseCase(repo, nil, nil, nil, nil, nil, lead)
+
+	_, err := uc.Execute(context.Background(), GetSubmissionInput{
+		CurrentUser:  testutil.AsContestant(testOtherUserID),
+		SubmissionID: testSubmissionID,
+	})
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+}
+
+func TestGetSubmission_NonAuthor_Private_NotLeadOfAuthor_Forbidden(t *testing.T) {
+	repo := &mockSubmissionRepo{
+		findByIDFn: func(_ string) (*domainSubmission.Submission, error) {
+			return aSubmission(testAuthorID, "PRIVATE", nil), nil
+		},
+	}
+	lead := &mockLeadChecker{memberFn: func(_, _ string) (bool, error) { return false, nil }}
+	uc := newGetUseCase(repo, nil, nil, nil, nil, nil, lead)
+
+	_, err := uc.Execute(context.Background(), GetSubmissionInput{
+		CurrentUser:  testutil.AsContestant(testOtherUserID),
+		SubmissionID: testSubmissionID,
+	})
+
+	var appErr *apperror.AppError
+	if !errors.As(err, &appErr) || appErr.Kind != apperror.KindForbidden {
+		t.Fatalf("expected forbidden error, got %v", err)
+	}
+}
+
+func TestGetSubmission_LeadOfMemberCheckError_ReturnsError(t *testing.T) {
+	repo := &mockSubmissionRepo{
+		findByIDFn: func(_ string) (*domainSubmission.Submission, error) {
+			return aSubmission(testAuthorID, "PRIVATE", nil), nil
+		},
+	}
+	lead := &mockLeadChecker{memberFn: func(_, _ string) (bool, error) { return false, errors.New("db down") }}
+	uc := newGetUseCase(repo, nil, nil, nil, nil, nil, lead)
+
+	_, err := uc.Execute(context.Background(), GetSubmissionInput{
+		CurrentUser:  testutil.AsContestant(testOtherUserID),
+		SubmissionID: testSubmissionID,
+	})
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+}
+
+func TestGetSubmission_LeadOfMemberNotConsultedForAuthor(t *testing.T) {
+	repo := &mockSubmissionRepo{
+		findByIDFn: func(_ string) (*domainSubmission.Submission, error) {
+			return aSubmission(testAuthorID, "PRIVATE", nil), nil
+		},
+	}
+	lead := &mockLeadChecker{memberFn: func(_, _ string) (bool, error) {
+		t.Error("lead check must not run for the author")
+		return false, nil
+	}}
+	uc := newGetUseCase(repo, nil, nil, nil, nil, nil, lead)
+
+	if _, err := uc.Execute(context.Background(), GetSubmissionInput{
+		CurrentUser:  testutil.AsContestant(testAuthorID),
+		SubmissionID: testSubmissionID,
+	}); err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+}

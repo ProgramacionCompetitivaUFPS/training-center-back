@@ -346,7 +346,15 @@ func (m *mockTeamMembershipChecker) IsTeammate(_ context.Context, contestID, vie
 // ── mockLeadChecker ───────────────────────────────────────────────────────────
 
 type mockLeadChecker struct {
-	fn func(contestID, userID string) (bool, error)
+	fn       func(contestID, userID string) (bool, error)
+	memberFn func(leadID, memberID string) (bool, error)
+}
+
+func (m *mockLeadChecker) IsLeadOfMember(_ context.Context, leadID, memberID string) (bool, error) {
+	if m.memberFn != nil {
+		return m.memberFn(leadID, memberID)
+	}
+	return false, nil
 }
 
 func (m *mockLeadChecker) IsLeadOfContestGroup(_ context.Context, contestID, userID string) (bool, error) {
