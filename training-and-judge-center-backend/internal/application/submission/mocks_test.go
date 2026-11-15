@@ -305,6 +305,7 @@ func (m *mockUserProvider) GetUsersByIDs(ctx context.Context, ids []string) (map
 
 type mockContestProvider struct {
 	fn         func(contestID string) (*ContestDisplay, error)
+	positionFn func(contestID, problemID string) (*int, error)
 	batchCalls int
 }
 
@@ -312,7 +313,15 @@ func (m *mockContestProvider) GetContestByID(_ context.Context, id string) (*Con
 	if m.fn != nil {
 		return m.fn(id)
 	}
-	return &ContestDisplay{ID: id, Name: "Test Contest"}, nil
+	return &ContestDisplay{ID: id, Name: "Test Contest", GroupID: "group-1"}, nil
+}
+
+func (m *mockContestProvider) GetProblemPosition(_ context.Context, contestID, problemID string) (*int, error) {
+	if m.positionFn != nil {
+		return m.positionFn(contestID, problemID)
+	}
+	position := 1
+	return &position, nil
 }
 
 // GetContestsByIDs mirrors the real adapter (WHERE id = ANY($1)): a single missing/failing
