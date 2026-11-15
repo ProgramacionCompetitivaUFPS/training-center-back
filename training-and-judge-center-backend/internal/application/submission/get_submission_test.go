@@ -241,6 +241,111 @@ func TestGetSubmission_OutputContainsContestWhenPresent(t *testing.T) {
 	}
 }
 
+func TestGetSubmission_OutputContainsContestGroupAndProblemPosition(t *testing.T) {
+	cid := testContestID
+	repo := &mockSubmissionRepo{
+		findByIDFn: func(_ string) (*domainSubmission.Submission, error) {
+			return aSubmission(testAuthorID, "PUBLIC", &cid), nil
+		},
+	}
+	cont := &mockContestProvider{
+		positionFn: func(contestID, _ string) (*int, error) {
+			if contestID != testContestID {
+				t.Errorf("position looked up in contest %s, want %s", contestID, testContestID)
+			}
+			position := 3
+			return &position, nil
+		},
+	}
+	uc := newGetUseCase(repo, nil, nil, nil, cont, nil, nil)
+
+	out, err := uc.Execute(context.Background(), GetSubmissionInput{
+		CurrentUser:  testutil.AsContestant(testAuthorID),
+		SubmissionID: testSubmissionID,
+	})
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+	if out.Contest.GroupID != "group-1" {
+		t.Errorf("contest group ID = %q, want group-1", out.Contest.GroupID)
+	}
+	if out.ProblemPosition == nil || *out.ProblemPosition != 3 {
+		t.Errorf("problem position = %v, want 3", out.ProblemPosition)
+	}
+}
+
+func TestGetSubmission_ProblemPositionNilWhenProblemDroppedFromContest(t *testing.T) {
+	cid := testContestID
+	repo := &mockSubmissionRepo{
+		findByIDFn: func(_ string) (*domainSubmission.Submission, error) {
+			return aSubmission(testAuthorID, "PUBLIC", &cid), nil
+		},
+	}
+	cont := &mockContestProvider{
+		positionFn: func(_, _ string) (*int, error) { return nil, nil },
+	}
+	uc := newGetUseCase(repo, nil, nil, nil, cont, nil, nil)
+
+	out, err := uc.Execute(context.Background(), GetSubmissionInput{
+		CurrentUser:  testutil.AsContestant(testAuthorID),
+		SubmissionID: testSubmissionID,
+	})
+	if err != nil {
+		t.Fatalf("a problem dropped from the contest must not fail the detail, got %v", err)
+	}
+	if out.ProblemPosition != nil {
+		t.Errorf("problem position = %d, want nil", *out.ProblemPosition)
+	}
+}
+
+func TestGetSubmission_ProblemPositionNilOutsideContest(t *testing.T) {
+	repo := &mockSubmissionRepo{
+		findByIDFn: func(_ string) (*domainSubmission.Submission, error) {
+			return aSubmission(testAuthorID, "PUBLIC", nil), nil
+		},
+	}
+	cont := &mockContestProvider{
+		positionFn: func(_, _ string) (*int, error) {
+			t.Error("position must not be looked up for a submission outside a contest")
+			return nil, nil
+		},
+	}
+	uc := newGetUseCase(repo, nil, nil, nil, cont, nil, nil)
+
+	out, err := uc.Execute(context.Background(), GetSubmissionInput{
+		CurrentUser:  testutil.AsContestant(testAuthorID),
+		SubmissionID: testSubmissionID,
+	})
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+	if out.ProblemPosition != nil {
+		t.Errorf("problem position = %d, want nil", *out.ProblemPosition)
+	}
+}
+
+func TestGetSubmission_ProblemPositionErrorPropagates(t *testing.T) {
+	cid := testContestID
+	repo := &mockSubmissionRepo{
+		findByIDFn: func(_ string) (*domainSubmission.Submission, error) {
+			return aSubmission(testAuthorID, "PUBLIC", &cid), nil
+		},
+	}
+	boom := errors.New("db down")
+	cont := &mockContestProvider{
+		positionFn: func(_, _ string) (*int, error) { return nil, boom },
+	}
+	uc := newGetUseCase(repo, nil, nil, nil, cont, nil, nil)
+
+	_, err := uc.Execute(context.Background(), GetSubmissionInput{
+		CurrentUser:  testutil.AsContestant(testAuthorID),
+		SubmissionID: testSubmissionID,
+	})
+	if !errors.Is(err, boom) {
+		t.Fatalf("expected the provider error, got %v", err)
+	}
+}
+
 func TestGetSubmission_OutputContestNilWhenNoContest(t *testing.T) {
 	repo := &mockSubmissionRepo{
 		findByIDFn: func(_ string) (*domainSubmission.Submission, error) {

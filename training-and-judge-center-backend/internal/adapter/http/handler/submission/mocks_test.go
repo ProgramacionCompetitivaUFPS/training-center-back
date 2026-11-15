@@ -187,14 +187,23 @@ func (m *mockUserDisplayProvider) GetUsersByIDs(ctx context.Context, ids []strin
 }
 
 type mockContestDisplayProvider struct {
-	fn func(id string) (*appsubmission.ContestDisplay, error)
+	fn         func(id string) (*appsubmission.ContestDisplay, error)
+	positionFn func(contestID, problemID string) (*int, error)
 }
 
 func (m *mockContestDisplayProvider) GetContestByID(_ context.Context, id string) (*appsubmission.ContestDisplay, error) {
 	if m.fn != nil {
 		return m.fn(id)
 	}
-	return &appsubmission.ContestDisplay{ID: id, Name: "Test Contest"}, nil
+	return &appsubmission.ContestDisplay{ID: id, Name: "Test Contest", GroupID: "group-1"}, nil
+}
+
+func (m *mockContestDisplayProvider) GetProblemPosition(_ context.Context, contestID, problemID string) (*int, error) {
+	if m.positionFn != nil {
+		return m.positionFn(contestID, problemID)
+	}
+	position := 1
+	return &position, nil
 }
 
 func (m *mockContestDisplayProvider) GetContestsByIDs(ctx context.Context, ids []string) (map[string]*appsubmission.ContestDisplay, error) {

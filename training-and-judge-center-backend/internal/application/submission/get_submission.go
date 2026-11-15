@@ -32,6 +32,10 @@ type GetSubmissionOutput struct {
 	SourceCode    *string // nil when the stored source file no longer exists
 	IsBlockly     bool
 	WorkspaceXML  *string // block editor workspace; nil for regular submissions or when the file is gone
+
+	// ProblemPosition is the slot (1 = A, 2 = B…) the problem occupies in Contest; nil outside a
+	// contest, or when the problem was later dropped from it.
+	ProblemPosition *int
 }
 
 type GetSubmissionUseCase struct {
@@ -142,12 +146,20 @@ func (uc *GetSubmissionUseCase) Execute(ctx context.Context, in GetSubmissionInp
 	}
 
 	var contest *ContestDisplay
+	var problemPosition *int
 	if cid := sub.ContestID(); cid != nil {
 		cd, err := uc.contestDisplay.GetContestByID(ctx, *cid)
 		if err != nil {
 			return nil, err
 		}
 		contest = cd
+
+		if pid := sub.ProblemID(); pid != "" {
+			problemPosition, err = uc.contestDisplay.GetProblemPosition(ctx, *cid, pid)
+			if err != nil {
+				return nil, err
+			}
+		}
 	}
 
 	return &GetSubmissionOutput{
@@ -167,5 +179,7 @@ func (uc *GetSubmissionUseCase) Execute(ctx context.Context, in GetSubmissionInp
 		SourceCode:    sourceCode,
 		IsBlockly:     sub.IsBlockly(),
 		WorkspaceXML:  workspaceXML,
+
+		ProblemPosition: problemPosition,
 	}, nil
 }
