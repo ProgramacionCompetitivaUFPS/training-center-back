@@ -42,7 +42,8 @@ func (e *Executor) BeginSession(ctx context.Context, lang submission.Language, m
 	// says and not at the pool's ceiling. The factor buys back what the runtime
 	// reserves for itself, so the same limit means the same usable memory in
 	// every language.
-	c, err := e.pool.Claim(ctx, lang.String(), int64(float64(memoryKb)*1024*lc.MemoryFactor))
+	containerBytes := int64(float64(memoryKb) * 1024 * lc.MemoryFactor)
+	c, err := e.pool.Claim(ctx, lang.String(), containerBytes)
 	if err != nil {
 		_ = removeJudgingDir(judgingDir)
 		slog.ErrorContext(ctx, "executor: claim container failed", "language", lang.String(), "error", err)
@@ -50,10 +51,11 @@ func (e *Executor) BeginSession(ctx context.Context, lang submission.Language, m
 	}
 
 	return &Session{
-		container:  c,
-		pool:       e.pool,
-		docker:     e.docker,
-		langCfg:    lc,
-		judgingDir: judgingDir,
+		container:    c,
+		pool:         e.pool,
+		docker:       e.docker,
+		langCfg:      lc,
+		judgingDir:   judgingDir,
+		stackLimitKb: containerBytes / 1024,
 	}, nil
 }

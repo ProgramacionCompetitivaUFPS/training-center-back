@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"strings"
 	"testing"
 	"time"
 
@@ -36,11 +37,12 @@ func newTestSession(t *testing.T, docker *mockDockerExecClient) (*Session, *judg
 		t.Fatalf("pool.Claim: %v", err)
 	}
 	s := &Session{
-		container:  c,
-		pool:       p,
-		docker:     docker,
-		langCfg:    testExecCfg().Languages[testLang],
-		judgingDir: newTestJudgingDir(t),
+		container:    c,
+		pool:         p,
+		docker:       docker,
+		langCfg:      testExecCfg().Languages[testLang],
+		judgingDir:   newTestJudgingDir(t),
+		stackLimitKb: testProblemMemoryKb,
 	}
 	return s, p
 }
@@ -423,7 +425,7 @@ func TestSession_RunTestCase_WrapsTheCommandInTheInContainerTimeout(t *testing.T
 	// The write limit comes first so it reaches everything below it; time wraps
 	// timeout and not the other way round; and -q keeps the diagnostic line GNU
 	// time prints on a non-zero exit out of the measurement file.
-	want := fmt.Sprintf("ulimit -c 0; ulimit -f %d; ", outputLimitBlocks) +
+	want := fmt.Sprintf("ulimit -c 0; ulimit -f %d; ulimit -s %d; ", outputLimitBlocks, testProblemMemoryKb) +
 		"/usr/bin/time -q -f %M -o " + judgingMemPath(s.judgingDir) +
 		" timeout --kill-after=1s 2s " + testExecCfg().Languages[testLang].RunCmd +
 		" < " + judgingInputPath(s.judgingDir) + " > " + judgingOutputPath(s.judgingDir) + " 2>/dev/null"
@@ -455,6 +457,51 @@ func TestExecutor_BeginSession_MemoryFactorBuysBackTheRuntimeReserve(t *testing.
 	if got := poolMock.lastCreateMemory.Load(); got != want {
 		t.Errorf("container created with Memory = %d, want %d (the problem's %d KB times 1.5)",
 			got, want, testProblemMemoryKb)
+	}
+}
+
+// The stack counts against the container's memory, so letting it grow up to that
+// memory lets a deep recursion run while a runaway one still ends as MLE, not RTE.
+func TestExecutor_BeginSession_StackLimitFollowsTheContainerLimit(t *testing.T) {
+	p, _ := newTestPool(t)
+	cfg := testExecCfg()
+	lc := cfg.Languages[testLang]
+	lc.MemoryFactor = 1.5
+	cfg.Languages[testLang] = lc
+	e := NewExecutor(p, &mockDockerExecClient{}, cfg, t.TempDir())
+
+	sess, err := e.BeginSession(context.Background(), submission.RestoreLanguage(testLang), testProblemMemoryKb, "judging-1")
+	if err != nil {
+		t.Fatalf("BeginSession: %v", err)
+	}
+	defer sess.Close(context.Background())
+
+	// the stack is sized from the same bytes the container is created with, in KB
+	const want = int64(float64(testProblemMemoryKb) * 1024 * 1.5 / 1024)
+	if got := sess.(*Session).stackLimitKb; got != want {
+		t.Errorf("stackLimitKb = %d, want %d (the problem's %d KB times 1.5)", got, want, testProblemMemoryKb)
+	}
+}
+
+// ulimit -s 0 would leave the solution without a stack, so an unknown limit has to stay open.
+func TestSession_RunTestCase_UnknownStackLimitIsUnlimitedNotZero(t *testing.T) {
+	var cmds [][]string
+	mock := &mockDockerExecClient{}
+	recordExecs(mock, &cmds)
+	s, _ := newTestSession(t, mock)
+	s.stackLimitKb = 0
+
+	if _, err := s.RunTestCase(context.Background(), appjudge.RunRequest{
+		Input: []byte("1\n"), TimeLimitMs: 1000,
+	}); err != nil {
+		t.Fatalf("RunTestCase: %v", err)
+	}
+
+	if len(cmds) != 1 || !strings.Contains(cmds[0][2], "ulimit -s unlimited; ") {
+		t.Errorf("command must set ulimit -s unlimited, got: %v", cmds)
+	}
+	if strings.Contains(cmds[0][2], "ulimit -s 0") {
+		t.Errorf("command must never set a zero stack: %v", cmds[0][2])
 	}
 }
 
