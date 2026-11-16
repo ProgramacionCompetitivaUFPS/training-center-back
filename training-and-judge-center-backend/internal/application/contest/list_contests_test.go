@@ -242,6 +242,63 @@ func TestListContests_PaginationOutput(t *testing.T) {
 	}
 }
 
+func TestListContests_UserGroupRole_Lead(t *testing.T) {
+	repo := &mockContestRepository{
+		listFn: func(_ context.Context, _ domainContest.ListFilters) ([]*domainContest.Contest, int, error) {
+			return []*domainContest.Contest{newTestContest(callerID)}, 1, nil
+		},
+	}
+	uc := newListContestsUseCase(repo, groupFound(), isLead(), mockParticipants())
+
+	out, err := uc.Execute(context.Background(), validListInput())
+
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if out.Items[0].UserGroupRole == nil || *out.Items[0].UserGroupRole != "LEAD" {
+		t.Errorf("expected UserGroupRole LEAD, got %v", out.Items[0].UserGroupRole)
+	}
+}
+
+func TestListContests_UserGroupRole_Member(t *testing.T) {
+	repo := &mockContestRepository{
+		listFn: func(_ context.Context, _ domainContest.ListFilters) ([]*domainContest.Contest, int, error) {
+			return []*domainContest.Contest{newTestContest(callerID)}, 1, nil
+		},
+	}
+	uc := newListContestsUseCase(repo, groupFound(), isMemberNotLead(), mockParticipants())
+
+	out, err := uc.Execute(context.Background(), validListInput())
+
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if out.Items[0].UserGroupRole == nil || *out.Items[0].UserGroupRole != "MEMBER" {
+		t.Errorf("expected UserGroupRole MEMBER, got %v", out.Items[0].UserGroupRole)
+	}
+}
+
+func TestListContests_UserGroupRole_Admin(t *testing.T) {
+	repo := &mockContestRepository{
+		listFn: func(_ context.Context, _ domainContest.ListFilters) ([]*domainContest.Contest, int, error) {
+			return []*domainContest.Contest{newTestContest(callerID)}, 1, nil
+		},
+	}
+	uc := newListContestsUseCase(repo, groupFoundNotVisible(), notLead(), mockParticipants())
+
+	in := validListInput()
+	in.CurrentUser = asAdmin(callerID)
+
+	out, err := uc.Execute(context.Background(), in)
+
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if out.Items[0].UserGroupRole != nil {
+		t.Errorf("expected UserGroupRole nil for admin, got %v", out.Items[0].UserGroupRole)
+	}
+}
+
 func TestListContests_DurationInSeconds(t *testing.T) {
 	repo := &mockContestRepository{
 		listFn: func(_ context.Context, _ domainContest.ListFilters) ([]*domainContest.Contest, int, error) {
