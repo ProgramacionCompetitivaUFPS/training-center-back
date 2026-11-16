@@ -98,7 +98,7 @@ func (uc *ListMyContestsUseCase) Execute(ctx context.Context, in ListMyContestsI
 	items := make([]MyContestListItem, 0, len(contests))
 	for _, c := range contests {
 		item := MyContestListItem{
-			ContestListItem: toContestListItem(c, now, participantCounts[c.ID()], registeredMap[c.ID()]),
+			ContestListItem: toContestListItem(c, now, participantCounts[c.ID()], registeredMap[c.ID()], nil),
 			Group:           GroupSummary{ID: c.GroupID().Value()},
 		}
 		if info, ok := groupInfos[c.GroupID().Value()]; ok {

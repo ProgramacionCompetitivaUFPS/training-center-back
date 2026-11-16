@@ -137,6 +137,7 @@ type contestListItem struct {
 	ParticipantCount  int     `json:"participantCount"`
 	IsRegistered      bool    `json:"isRegistered"`
 	ProblemCount      int     `json:"problemCount"`
+	UserGroupRole     *string `json:"userGroupRole"`
 }
 
 type pagination struct {

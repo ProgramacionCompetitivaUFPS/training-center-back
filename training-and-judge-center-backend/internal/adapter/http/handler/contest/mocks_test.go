@@ -46,6 +46,7 @@ func wrapAuth(h http.Handler) http.Handler {
 
 type mockContestRepo struct {
 	createFn func(ctx context.Context, c *domainContest.Contest) error
+	listFn   func(ctx context.Context, f domainContest.ListFilters) ([]*domainContest.Contest, int, error)
 }
 
 func (s *mockContestRepo) Create(ctx context.Context, c *domainContest.Contest) error {
@@ -59,7 +60,10 @@ func (s *mockContestRepo) FindByID(_ context.Context, _ string) (*domainContest.
 	return nil, apperror.NewNotFound(domainContest.ErrCodeContestNotFound, "not found")
 }
 func (s *mockContestRepo) Delete(_ context.Context, _ string) error { return nil }
-func (s *mockContestRepo) List(_ context.Context, _ domainContest.ListFilters) ([]*domainContest.Contest, int, error) {
+func (s *mockContestRepo) List(ctx context.Context, f domainContest.ListFilters) ([]*domainContest.Contest, int, error) {
+	if s.listFn != nil {
+		return s.listFn(ctx, f)
+	}
 	return nil, 0, nil
 }
 func (s *mockContestRepo) ListByGroupIDs(_ context.Context, _ []string, _ domainContest.ListFilters) ([]*domainContest.Contest, int, error) {
