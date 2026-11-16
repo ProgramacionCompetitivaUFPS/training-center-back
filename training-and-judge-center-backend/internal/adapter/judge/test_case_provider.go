@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"path"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -90,7 +91,7 @@ func parseTestCasesZip(data []byte, maxFileBytes int) ([]appJudge.TestCase, erro
 	answers := make(map[string][]byte)
 
 	for _, f := range r.File {
-		cleanPath := filepath.ToSlash(filepath.Clean(f.Name))
+		cleanPath := path.Clean(strings.ReplaceAll(f.Name, "\\", "/"))
 
 		// strings.Index handles optional root-prefix dirs (e.g. "problem-abc/data/secret/001.in").
 		// Stripping only "data/" (not "data/sample/"/"data/secret/") keeps the

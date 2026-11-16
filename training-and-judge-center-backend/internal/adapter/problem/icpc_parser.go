@@ -9,6 +9,7 @@ import (
 	"log/slog"
 	"math"
 	"os"
+	"path"
 	"path/filepath"
 	"strings"
 
@@ -286,7 +287,7 @@ func (p *ICPCParser) parseTestCases(
 	}
 
 	for _, f := range sampleZipFiles {
-		cleanPath := filepath.ToSlash(filepath.Clean(f.Name))
+		cleanPath := path.Clean(strings.ReplaceAll(f.Name, "\\", "/"))
 		content, extractErr := p.extractFileContent(f)
 		if extractErr != nil {
 			slog.ErrorContext(ctx, "failed to extract file from ZIP", "error", extractErr, "file", cleanPath)
@@ -445,7 +446,9 @@ func (p *ICPCParser) prepareZip(zipData []byte) (*ParsedZip, error) {
 	}
 
 	for _, f := range reader.File {
-		cleanPath := filepath.ToSlash(filepath.Clean(f.Name))
+		// Normalize backslashes: ZIP entries from Windows tooling use \ as separator,
+		// but filepath.Clean on Linux treats \ as a literal character, not a separator.
+		cleanPath := path.Clean(strings.ReplaceAll(f.Name, "\\", "/"))
 		if strings.HasPrefix(cleanPath, "../") || filepath.IsAbs(cleanPath) {
 			return nil, apperror.NewValidation([]apperror.FieldError{{Field: "file", Message: "Invalid malicious path detected in ZIP"}})
 		}
