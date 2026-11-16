@@ -344,3 +344,25 @@ func TestICPCParser_FileTooLarge_HasCode(t *testing.T) {
 		t.Errorf("code: got %q, want %q", code, "FILE_TOO_LARGE")
 	}
 }
+
+func TestICPCParser_WindowsBackslashPaths(t *testing.T) {
+	p := problem.NewICPCParser(testParserConfig())
+
+	// ZIP entries using backslashes as produced by Windows zip tooling.
+	// On Linux, filepath.Clean leaves \ unchanged, so without explicit
+	// normalization these paths are misclassified as auxiliary files.
+	zipData := createZipBuffer(t, map[string][]byte{
+		`data\sample\1.in`:  []byte("1 2"),
+		`data\sample\1.ans`: []byte("3"),
+		`data\secret\2.in`:  []byte("10 20"),
+		`data\secret\2.ans`: []byte("30"),
+	})
+
+	extracted, err := p.ParseTestCasesZip(context.Background(), zipData)
+	if err != nil {
+		t.Fatalf("expected no error for Windows-style paths, got: %v", err)
+	}
+	if len(extracted) != 2 {
+		t.Errorf("expected 2 sample files, got %d", len(extracted))
+	}
+}
