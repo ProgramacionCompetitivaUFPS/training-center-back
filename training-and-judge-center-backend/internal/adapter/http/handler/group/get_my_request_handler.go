@@ -13,9 +13,8 @@ import (
 // @Produce      json
 // @Security     BearerAuth
 // @Param        groupId path string true "Group ID"
-// @Success      200 {object} joinRequestResp
+// @Success      200 {object} getMyRequestResponse
 // @Failure      401 {object} apperror.AppError
-// @Failure      404 {object} apperror.AppError
 // @Router       /groups/{groupId}/requests/me [get]
 func (h *Handler) GetMyRequest(w http.ResponseWriter, r *http.Request) {
 	caller, ok := handler.RequireCurrentUser(w, r)
@@ -34,5 +33,10 @@ func (h *Handler) GetMyRequest(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	handler.WriteJSON(r.Context(), w, http.StatusOK, buildJoinRequestResp(out.Request, nil))
+	resp := getMyRequestResponse{}
+	if out.Request != nil {
+		r := buildJoinRequestResp(*out.Request, nil)
+		resp.Request = &r
+	}
+	handler.WriteJSON(r.Context(), w, http.StatusOK, resp)
 }

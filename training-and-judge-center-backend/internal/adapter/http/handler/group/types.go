@@ -96,6 +96,10 @@ type listRequestsResponse struct {
 	Pagination paginationResp    `json:"pagination"`
 }
 
+type getMyRequestResponse struct {
+	Request *joinRequestResp `json:"request"`
+}
+
 func buildPagination(total, page, totalPages, limit int) paginationResp {
 	return paginationResp{
 		TotalCount:   total,
