@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 	"path/filepath"
 	"strings"
 	"time"
@@ -116,8 +117,14 @@ func (uc *ImportProblemUseCase) Execute(ctx context.Context, input ImportProblem
 
 	var uploadedKeys []string
 	cleanup := func() {
+		var left []string
 		for _, key := range uploadedKeys {
-			_ = uc.storage.DeleteFile(ctx, key)
+			if err := uc.storage.DeleteFile(ctx, key); err != nil {
+				left = append(left, key)
+			}
+		}
+		if len(left) > 0 {
+			slog.ErrorContext(ctx, "import_problem: import failed and the files it had uploaded were left in storage", "slug", slug.String(), "keys", left)
 		}
 	}
 
