@@ -172,6 +172,7 @@ type myContestListItem struct {
 	IsRegistered      bool         `json:"isRegistered"`
 	ProblemCount      int          `json:"problemCount"`
 	Group             groupDisplay `json:"group"`
+	UserGroupRole     *string      `json:"userGroupRole"`
 }
 
 type listMyContestsResponse struct {

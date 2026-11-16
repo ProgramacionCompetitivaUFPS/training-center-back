@@ -393,7 +393,7 @@ func main() {
 		contestRepo, contestGroupProvider, contestMemberProvider, contestParticipantProvider,
 	)
 	listMyContestsUseCase := appcontest.NewListMyContestsUseCase(
-		contestRepo, contestGroupProvider, contestParticipantProvider,
+		contestRepo, contestGroupProvider, contestMemberProvider, contestParticipantProvider,
 	)
 	contestTeamSelectionChecker := adaptercontest.NewTeamSelectionChecker(dbPool)
 	registerToContestUseCase := appcontest.NewRegisterToContestUseCase(

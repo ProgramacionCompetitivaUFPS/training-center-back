@@ -119,7 +119,8 @@ func groupNotFound() *mockGroupProvider {
 // ── GroupMemberProvider mock ─────────────────────────────────────────────────
 
 type mockGroupMemberProvider struct {
-	getRoleFn func(ctx context.Context, userID, groupID string) (*string, error)
+	getRoleFn     func(ctx context.Context, userID, groupID string) (*string, error)
+	getRoleBulkFn func(ctx context.Context, userID string, groupIDs []string) (map[string]*string, error)
 }
 
 func (m *mockGroupMemberProvider) GetMemberRole(ctx context.Context, userID, groupID string) (*string, error) {
@@ -127,6 +128,21 @@ func (m *mockGroupMemberProvider) GetMemberRole(ctx context.Context, userID, gro
 		return m.getRoleFn(ctx, userID, groupID)
 	}
 	return nil, nil
+}
+
+func (m *mockGroupMemberProvider) GetMemberRoleBulk(ctx context.Context, userID string, groupIDs []string) (map[string]*string, error) {
+	if m.getRoleBulkFn != nil {
+		return m.getRoleBulkFn(ctx, userID, groupIDs)
+	}
+	return map[string]*string{}, nil
+}
+
+func bulkRoles(roles map[string]*string) *mockGroupMemberProvider {
+	return &mockGroupMemberProvider{
+		getRoleBulkFn: func(_ context.Context, _ string, _ []string) (map[string]*string, error) {
+			return roles, nil
+		},
+	}
 }
 
 func isLead() *mockGroupMemberProvider {
