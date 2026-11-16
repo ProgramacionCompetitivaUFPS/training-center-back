@@ -36,8 +36,8 @@ Checklist of manual steps to verify the PR works and nothing is broken.
 -->
 
 - [ ] 
-- [ ] `go build ./...` passes with no errors.
-- [ ] `go test ./...` passes with no failures.
+- [ ] `cd training-and-judge-center-backend && go build ./...` passes with no errors.
+- [ ] `cd training-and-judge-center-backend && go test ./...` passes with no failures.
 
 ## Screenshots
 

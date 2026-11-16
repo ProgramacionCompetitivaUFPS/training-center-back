@@ -2,13 +2,13 @@
 
 ## Pull requests
 
-Always target `develop` (never `main`) when creating PRs. Use the template at `.github/PULL_REQUEST_TEMPLATE.md` — pass its content as the PR body. Example:
+Always target `develop` (never `main`) when creating PRs. Use the template at `.github/PULL_REQUEST_TEMPLATE.md`: copy it, fill every section, delete optional sections only if they genuinely do not apply, then pass it via `--body-file`:
 
 ```bash
-gh pr create --base develop --title "..." --body "$(cat .github/PULL_REQUEST_TEMPLATE.md)"
+cp .github/PULL_REQUEST_TEMPLATE.md /tmp/pr-body.md
+# edit /tmp/pr-body.md to fill in all sections
+gh pr create --base develop --title "..." --body-file /tmp/pr-body.md
 ```
-
-Fill every section before opening; delete optional sections only if they genuinely do not apply.
 
 ## Commands
 
