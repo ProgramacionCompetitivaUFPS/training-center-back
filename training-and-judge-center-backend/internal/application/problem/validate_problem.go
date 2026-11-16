@@ -243,6 +243,7 @@ func (uc *ValidateProblemUseCase) executeJudgingUpdate(ctx context.Context, v *p
 	report := buildValidationReport(result)
 	report.ValidationLogs = append(report.ValidationLogs, "✓ Applied: "+describeChange(*change))
 
+	var replaced replacedJudgingFiles
 	err = uc.txManager.WithTx(ctx, func(txCtx context.Context) error {
 		parsedSlug, err := problem.NewSlug(slug)
 		if err != nil {
@@ -254,6 +255,7 @@ func (uc *ValidateProblemUseCase) executeJudgingUpdate(ctx context.Context, v *p
 		}
 		logPreviousJudging(ctx, p, v.ID())
 
+		replaced = replacedByJudgingUpdate(p, *change, stagedCheckerCompiledKey(slug, v.ID()))
 		if key := change.TestCasesKey(); key != nil {
 			p.SetTestCases(*key, now)
 		}
@@ -273,6 +275,7 @@ func (uc *ValidateProblemUseCase) executeJudgingUpdate(ctx context.Context, v *p
 		slog.ErrorContext(ctx, "validate_problem: applying judging update failed", "error", err, "validation_id", v.ID())
 		return uc.failJudgingUpdate(ctx, v, slug, nil, now)
 	}
+	uc.dropReplacedFiles(ctx, v.ID(), replaced)
 	return nil
 }
 
@@ -326,7 +329,6 @@ func describeChange(change problem.PendingJudgingChange) string {
 	}
 }
 
-// The replaced files stay in storage: a judging already in flight may still be reading them.
 func logPreviousJudging(ctx context.Context, p *problem.Problem, validationID string) {
 	previousTestCases, previousChecker := "", ""
 	if p.TestCasesKey() != nil {

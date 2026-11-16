@@ -482,6 +482,125 @@ func TestJudgeSubmission_RunTestCaseInfraError_Retries(t *testing.T) {
 	}
 }
 
+func TestJudgeSubmission_RetryReadsTheLimitsAgain_SoItUsesTheCheckerThatReplacedTheOldOne(t *testing.T) {
+	var updatedStatus string
+	limitsCalls := 0
+	problems := &mockProblemProvider{
+		getLimitsFn: func(context.Context, string) (ProblemLimits, error) {
+			limitsCalls++
+			path := "problems/p/checker/old/compiled"
+			if limitsCalls > 1 {
+				path = "problems/p/checker/new/compiled"
+			}
+			return ProblemLimits{TimeLimitMs: 1000, MemoryKb: 262144, CheckerPath: path}, nil
+		},
+	}
+	var openedPaths []string
+	checker := &mockOutputChecker{
+		beginCheckingFn: func(_ context.Context, path string, _ submission.Language, _ string) (CheckerSession, error) {
+			openedPaths = append(openedPaths, path)
+			if path == "problems/p/checker/old/compiled" {
+				return nil, errors.New("object deleted by the judging update")
+			}
+			return &mockCheckerSession{}, nil
+		},
+	}
+	uc := newJudgeSubmissionUseCase(
+		&mockSubmissionUpdater{
+			updateFn: func(_ context.Context, s *submission.Submission) error {
+				updatedStatus = s.Status().String()
+				return nil
+			},
+		},
+		&mockSourceCodeDownloader{}, problems, &mockTestCaseProvider{}, &mockExecutor{}, checker,
+	)
+	uc.retry = RetryConfig{MaxAttempts: 3, BackoffBase: 0}
+
+	if err := uc.Execute(context.Background(), JudgeSubmissionInput{SubmissionID: submissionID}); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if updatedStatus != "ACCEPTED" {
+		t.Errorf("status: got %s, want ACCEPTED", updatedStatus)
+	}
+	want := []string{"problems/p/checker/old/compiled", "problems/p/checker/new/compiled"}
+	if len(openedPaths) != 2 || openedPaths[0] != want[0] || openedPaths[1] != want[1] {
+		t.Errorf("checker paths opened: got %v, want %v", openedPaths, want)
+	}
+}
+
+func TestJudgeSubmission_TestCasesUnreadableOnce_RetriesAndSucceeds(t *testing.T) {
+	var updatedStatus string
+	reads := 0
+	testCases := &mockTestCaseProvider{
+		getTestCasesFn: func(context.Context, string) ([]TestCase, error) {
+			reads++
+			if reads == 1 {
+				return nil, errors.New("test cases not found")
+			}
+			return []TestCase{{Input: []byte("1 2"), ExpectedOutput: []byte("3")}}, nil
+		},
+	}
+	uc := newJudgeSubmissionUseCase(
+		&mockSubmissionUpdater{
+			updateFn: func(_ context.Context, s *submission.Submission) error {
+				updatedStatus = s.Status().String()
+				return nil
+			},
+		},
+		&mockSourceCodeDownloader{}, &mockProblemProvider{}, testCases, &mockExecutor{}, &mockOutputChecker{},
+	)
+	uc.retry = RetryConfig{MaxAttempts: 3, BackoffBase: 0}
+
+	if err := uc.Execute(context.Background(), JudgeSubmissionInput{SubmissionID: submissionID}); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if updatedStatus != "ACCEPTED" {
+		t.Errorf("status: got %s, want ACCEPTED", updatedStatus)
+	}
+	if reads != 2 {
+		t.Errorf("test cases read: got %d times, want 2 (one failed attempt, one good)", reads)
+	}
+}
+
+func TestJudgeSubmission_LimitsUnreadableOnEveryAttempt_MarksSystemError(t *testing.T) {
+	var updatedStatus string
+	limitsCalls := 0
+	executor := &mockExecutor{}
+	uc := newJudgeSubmissionUseCase(
+		&mockSubmissionUpdater{
+			updateFn: func(_ context.Context, s *submission.Submission) error {
+				updatedStatus = s.Status().String()
+				return nil
+			},
+		},
+		&mockSourceCodeDownloader{},
+		&mockProblemProvider{
+			getLimitsFn: func(context.Context, string) (ProblemLimits, error) {
+				limitsCalls++
+				return ProblemLimits{}, errTransient
+			},
+		},
+		&mockTestCaseProvider{}, executor, &mockOutputChecker{},
+	)
+	uc.retry = RetryConfig{MaxAttempts: 3, BackoffBase: 0}
+
+	if err := uc.Execute(context.Background(), JudgeSubmissionInput{SubmissionID: submissionID}); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if updatedStatus != "SYSTEM_ERROR" {
+		t.Errorf("status: got %s, want SYSTEM_ERROR", updatedStatus)
+	}
+	if limitsCalls != 3 {
+		t.Errorf("limits read: got %d times, want one per attempt", limitsCalls)
+	}
+	if executor.calls != 0 {
+		t.Errorf("no sandbox should open when the problem cannot be read, got %d", executor.calls)
+	}
+}
+
 func TestJudgeSubmission_CompilationError_DoesNotRetry(t *testing.T) {
 	var updatedStatus string
 	executor := &mockExecutor{
