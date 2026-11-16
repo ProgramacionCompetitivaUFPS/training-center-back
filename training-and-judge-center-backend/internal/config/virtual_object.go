@@ -18,8 +18,17 @@ type VirtualObject struct {
 	LanguageExtensions   map[string]string `json:"languageExtensions"`
 	UploadMaxConcurrency int               `json:"uploadMaxConcurrency"`
 	MaxFileCountSample   int               `json:"maxFileCountSample"`
-	MaxZipUploadSizeMB   int               `json:"maxZipUploadSizeMB"`
-	MaxExtractedSizeMB   int               `json:"maxExtractedSizeMB"`
+	MaxZipUploadSizeMB int `json:"maxZipUploadSizeMB"`
+	// MaxExtractedSizeMB caps the total uncompressed content of an imported ZIP.
+	// The worker loads all test-case files into memory at once (parseTestCasesZip),
+	// so this value directly determines peak worker memory usage:
+	//   peak ≈ MaxExtractedSizeMB × maxConcurrent × 1.5  (GC overhead factor)
+	//   maxConcurrent = floor(pod_cpu_cores) - docker_daemon_reserve_cores (min 1)
+	// Current pod: 2 Gi memory, 1 CPU, 1 reserve core → maxConcurrent = 1.
+	// Raise this value only after verifying the new math fits within the worker
+	// pod's memory limit (deploy/k8s/judge/worker.yaml). If the pod is also
+	// scaled up in CPU, re-derive maxConcurrent before raising this limit.
+	MaxExtractedSizeMB int `json:"maxExtractedSizeMB"`
 	// Per-file caps. The answer's also bounds the largest token cmd/compare can meet.
 	MaxFileSizeTestCaseInputMB  int `json:"maxFileSizeTestCaseInputMB"`
 	MaxFileSizeTestCaseAnswerMB int `json:"maxFileSizeTestCaseAnswerMB"`

@@ -10,7 +10,7 @@ import (
 func validVirtualObject() VirtualObject {
 	return VirtualObject{
 		MaxZipUploadSizeMB:          200,
-		MaxExtractedSizeMB:          500,
+		MaxExtractedSizeMB:          150,
 		MaxFileSizeTestCaseInputMB:  64,
 		MaxFileSizeTestCaseAnswerMB: 8,
 	}
