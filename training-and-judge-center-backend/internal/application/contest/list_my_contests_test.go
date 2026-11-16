@@ -10,9 +10,10 @@ import (
 func newListMyContestsUseCase(
 	repo *mockContestRepository,
 	group *mockGroupProvider,
+	member *mockGroupMemberProvider,
 	participant *mockContestParticipantProvider,
 ) *ListMyContestsUseCase {
-	return NewListMyContestsUseCase(repo, group, participant)
+	return NewListMyContestsUseCase(repo, group, member, participant)
 }
 
 func validMyContestsInput() ListMyContestsInput {
@@ -34,7 +35,7 @@ func TestListMyContests_Admin_NoGroupRestriction(t *testing.T) {
 			return []*domainContest.Contest{newTestContest(callerID)}, 1, nil
 		},
 	}
-	uc := newListMyContestsUseCase(repo, groupFound(), mockParticipants())
+	uc := newListMyContestsUseCase(repo, groupFound(), &mockGroupMemberProvider{}, mockParticipants())
 
 	in := validMyContestsInput()
 	in.CurrentUser = asAdmin(callerID)
@@ -64,7 +65,7 @@ func TestListMyContests_Member_ScopedToAccessibleGroups(t *testing.T) {
 			return []string{testGroupID}, nil
 		},
 	}
-	uc := newListMyContestsUseCase(repo, group, mockParticipants())
+	uc := newListMyContestsUseCase(repo, group, &mockGroupMemberProvider{}, mockParticipants())
 
 	out, err := uc.Execute(context.Background(), validMyContestsInput())
 	if err != nil {
@@ -92,7 +93,7 @@ func TestListMyContests_NoAccessibleGroups_ReturnsEmpty(t *testing.T) {
 			return []string{}, nil
 		},
 	}
-	uc := newListMyContestsUseCase(repo, group, mockParticipants())
+	uc := newListMyContestsUseCase(repo, group, &mockGroupMemberProvider{}, mockParticipants())
 
 	out, err := uc.Execute(context.Background(), validMyContestsInput())
 	if err != nil {
@@ -121,7 +122,7 @@ func TestListMyContests_GroupNameResolved(t *testing.T) {
 			return out, nil
 		},
 	}
-	uc := newListMyContestsUseCase(repo, group, mockParticipants())
+	uc := newListMyContestsUseCase(repo, group, &mockGroupMemberProvider{}, mockParticipants())
 
 	out, err := uc.Execute(context.Background(), validMyContestsInput())
 	if err != nil {
@@ -136,7 +137,7 @@ func TestListMyContests_GroupNameResolved(t *testing.T) {
 }
 
 func TestListMyContests_InvalidPageReturnsError(t *testing.T) {
-	uc := newListMyContestsUseCase(&mockContestRepository{}, groupFound(), mockParticipants())
+	uc := newListMyContestsUseCase(&mockContestRepository{}, groupFound(), &mockGroupMemberProvider{}, mockParticipants())
 
 	in := validMyContestsInput()
 	in.Page = 0
@@ -148,7 +149,7 @@ func TestListMyContests_InvalidPageReturnsError(t *testing.T) {
 }
 
 func TestListMyContests_InvalidLimitReturnsError(t *testing.T) {
-	uc := newListMyContestsUseCase(&mockContestRepository{}, groupFound(), mockParticipants())
+	uc := newListMyContestsUseCase(&mockContestRepository{}, groupFound(), &mockGroupMemberProvider{}, mockParticipants())
 
 	in := validMyContestsInput()
 	in.Limit = 999
@@ -165,7 +166,7 @@ func TestListMyContests_PaginationOutput(t *testing.T) {
 			return []*domainContest.Contest{}, 55, nil
 		},
 	}
-	uc := newListMyContestsUseCase(repo, groupFound(), mockParticipants())
+	uc := newListMyContestsUseCase(repo, groupFound(), &mockGroupMemberProvider{}, mockParticipants())
 
 	in := validMyContestsInput()
 	in.Page = 2
@@ -191,7 +192,7 @@ func TestListMyContests_StatusFilterParsed(t *testing.T) {
 			return []*domainContest.Contest{}, 0, nil
 		},
 	}
-	uc := newListMyContestsUseCase(repo, groupFound(), mockParticipants())
+	uc := newListMyContestsUseCase(repo, groupFound(), &mockGroupMemberProvider{}, mockParticipants())
 
 	in := validMyContestsInput()
 	s := "ACTIVE"
@@ -203,5 +204,61 @@ func TestListMyContests_StatusFilterParsed(t *testing.T) {
 	}
 	if capturedFilters.Status == nil || *capturedFilters.Status != domainContest.StatusActive {
 		t.Errorf("expected ACTIVE status filter, got %v", capturedFilters.Status)
+	}
+}
+
+func TestListMyContests_UserGroupRole_Lead(t *testing.T) {
+	lead := "LEAD"
+	repo := &mockContestRepository{
+		listByGroupIDsFn: func(_ context.Context, _ []string, _ domainContest.ListFilters) ([]*domainContest.Contest, int, error) {
+			return []*domainContest.Contest{newTestContest(callerID)}, 1, nil
+		},
+	}
+	uc := newListMyContestsUseCase(repo, groupFound(), bulkRoles(map[string]*string{testGroupID: &lead}), mockParticipants())
+
+	out, err := uc.Execute(context.Background(), validMyContestsInput())
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if out.Items[0].UserGroupRole == nil || *out.Items[0].UserGroupRole != "LEAD" {
+		t.Errorf("expected UserGroupRole LEAD, got %v", out.Items[0].UserGroupRole)
+	}
+}
+
+func TestListMyContests_UserGroupRole_Member(t *testing.T) {
+	member := "MEMBER"
+	repo := &mockContestRepository{
+		listByGroupIDsFn: func(_ context.Context, _ []string, _ domainContest.ListFilters) ([]*domainContest.Contest, int, error) {
+			return []*domainContest.Contest{newTestContest(callerID)}, 1, nil
+		},
+	}
+	uc := newListMyContestsUseCase(repo, groupFound(), bulkRoles(map[string]*string{testGroupID: &member}), mockParticipants())
+
+	out, err := uc.Execute(context.Background(), validMyContestsInput())
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if out.Items[0].UserGroupRole == nil || *out.Items[0].UserGroupRole != "MEMBER" {
+		t.Errorf("expected UserGroupRole MEMBER, got %v", out.Items[0].UserGroupRole)
+	}
+}
+
+func TestListMyContests_UserGroupRole_Admin(t *testing.T) {
+	repo := &mockContestRepository{
+		listByGroupIDsFn: func(_ context.Context, _ []string, _ domainContest.ListFilters) ([]*domainContest.Contest, int, error) {
+			return []*domainContest.Contest{newTestContest(callerID)}, 1, nil
+		},
+	}
+	uc := newListMyContestsUseCase(repo, groupFound(), &mockGroupMemberProvider{}, mockParticipants())
+
+	in := validMyContestsInput()
+	in.CurrentUser = asAdmin(callerID)
+
+	out, err := uc.Execute(context.Background(), in)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if out.Items[0].UserGroupRole != nil {
+		t.Errorf("expected UserGroupRole nil for admin, got %v", out.Items[0].UserGroupRole)
 	}
 }

@@ -21,6 +21,7 @@ func defaultListMyContestsUC() *appcontest.ListMyContestsUseCase {
 	return appcontest.NewListMyContestsUseCase(
 		&mockContestRepo{},
 		&mockGroupProvider{},
+		&mockMemberProvider{},
 		&mockContestParticipantProvider{},
 	)
 }
@@ -101,7 +102,7 @@ func TestListMyContests_PaginationDefaults(t *testing.T) {
 }
 
 func TestListMyContests_GroupFieldPresent(t *testing.T) {
-	uc := appcontest.NewListMyContestsUseCase(&mockListMyContestsRepo{}, &mockGroupProvider{}, &mockContestParticipantProvider{})
+	uc := appcontest.NewListMyContestsUseCase(&mockListMyContestsRepo{}, &mockGroupProvider{}, &mockMemberProvider{isLead: true}, &mockContestParticipantProvider{})
 	h := newHandlerWithListMyContests(uc)
 
 	r := authedRequest(http.MethodGet, "/contests", nil)
@@ -121,5 +122,34 @@ func TestListMyContests_GroupFieldPresent(t *testing.T) {
 	}
 	if resp.Items[0].Group.ID != "g1" || resp.Items[0].Group.Name != "Test Group" {
 		t.Errorf("expected group {g1, Test Group}, got %+v", resp.Items[0].Group)
+	}
+}
+
+func TestListMyContests_UserGroupRole_InResponse(t *testing.T) {
+	uc := appcontest.NewListMyContestsUseCase(
+		&mockListMyContestsRepo{},
+		&mockGroupProvider{},
+		&mockMemberProvider{isLead: true},
+		&mockContestParticipantProvider{},
+	)
+	h := newHandlerWithListMyContests(uc)
+
+	r := authedRequest(http.MethodGet, "/contests", nil)
+	w := httptest.NewRecorder()
+
+	wrapAuth(http.HandlerFunc(h.ListMyContests)).ServeHTTP(w, r)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+	var resp listMyContestsResponse
+	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
+		t.Fatalf("could not decode response: %v", err)
+	}
+	if len(resp.Items) != 1 {
+		t.Fatalf("expected 1 item, got %d", len(resp.Items))
+	}
+	if resp.Items[0].UserGroupRole == nil || *resp.Items[0].UserGroupRole != "LEAD" {
+		t.Errorf("expected userGroupRole LEAD, got %v", resp.Items[0].UserGroupRole)
 	}
 }

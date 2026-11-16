@@ -106,6 +106,20 @@ func (s *mockMemberProvider) GetMemberRole(_ context.Context, _, _ string) (*str
 	return nil, nil
 }
 
+func (s *mockMemberProvider) GetMemberRoleBulk(_ context.Context, _ string, groupIDs []string) (map[string]*string, error) {
+	result := make(map[string]*string, len(groupIDs))
+	for _, id := range groupIDs {
+		if s.isLead {
+			role := "LEAD"
+			result[id] = &role
+		} else if s.isMember {
+			role := "MEMBER"
+			result[id] = &role
+		}
+	}
+	return result, nil
+}
+
 type mockProblemProvider struct{}
 
 func (s *mockProblemProvider) FindBySlugs(_ context.Context, slugs []string, _ string, _ bool) (map[string]*appcontest.ProblemInfo, error) {
