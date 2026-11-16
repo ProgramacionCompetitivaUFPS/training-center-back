@@ -12,6 +12,8 @@ import (
 	"github.com/training-judge-center/backend/pkg/apperror"
 )
 
+const zipTooLargeCode = "ZIP_TOO_LARGE"
+
 // @Summary      Import problem from ZIP
 // @Tags         problems
 // @Accept       multipart/form-data
@@ -66,7 +68,9 @@ func (h *Handler) Import(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if int64(len(zipData)) > maxUploadBytes {
-		handler.WriteError(r.Context(), w, apperror.NewPayloadTooLarge("File exceeds maximum allowed size"))
+		handler.WriteError(r.Context(), w, apperror.NewValidation([]apperror.FieldError{
+			{Field: "file", Code: zipTooLargeCode, Message: "ZIP file exceeds the maximum upload size"},
+		}))
 		return
 	}
 

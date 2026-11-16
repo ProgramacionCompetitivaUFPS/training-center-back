@@ -456,6 +456,21 @@ func newHandlerWithImport() *Handler {
 	return &Handler{settings: newTestSettings()}
 }
 
+func newHandlerWithImportCap(capMB int) *Handler {
+	s, err := domainProblem.NewPlatformSettings(
+		10000, 512,
+		map[string]domainProblem.LanguageLimit{},
+		map[string]struct{}{"cpp": {}},
+		map[string]string{".cpp": "cpp"},
+		map[string]struct{}{"dp": {}},
+		4, 10, capMB, 100, capMB,
+	)
+	if err != nil {
+		panic(err)
+	}
+	return &Handler{settings: s}
+}
+
 func newHandlerWithUploadFiles() *Handler {
 	return &Handler{settings: newTestSettings()}
 }

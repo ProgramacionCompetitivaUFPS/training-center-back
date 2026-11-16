@@ -732,7 +732,7 @@ Dato que explica por qué `500m` frena tanto: **Go 1.25 nunca baja `GOMAXPROCS` 
 
 #### El tope de datos de prueba baja de 200 a 100 MB
 
-`maxZipUploadSizeMB` en `config/virtual_object.json`, que acota el total descomprimido del ZIP. **Con 200 MB el worker no aguantaba ni un solo judging** (ver la sección de bugs). Los 100 MB dejan 3.5× de aire sobre el problema real más pesado, que son 28.8 MB.
+`maxZipUploadSizeMB` en `config/virtual_object.json` (en ese momento actuaba como tope descomprimido; hoy ese rol lo tiene `maxExtractedSizeMB` — ver sección de bugs D14). **Con 200 MB el worker no aguantaba ni un solo judging** (ver la sección de bugs). Los 100 MB dejaban 3.5× de aire sobre el problema real más pesado, que son 28.8 MB. Esta decisión fue revisada posteriormente: `maxZipUploadSizeMB` subió a 200 MB (solo ZIP comprimido) y se introdujo `maxExtractedSizeMB: 500` para el contenido descomprimido, desacoplando ambos límites.
 
 #### Alternativas descartadas, todas medidas
 
@@ -1112,7 +1112,7 @@ Un checker o validator escrito con testlib —que es el caso normal en programac
 
 Encontrado al dimensionar el worker para el Paso 6. **Estaba activo hoy**, con `maxConcurrent = 2`, sin necesidad de ningún cambio de este rediseño.
 
-`config/virtual_object.json` declaraba `maxZipUploadSizeMB: 200`, que `icpc_parser.go` aplica como **total descomprimido** del ZIP de casos de prueba, y también como tope por archivo individual. O sea que un problema legal podía traer 200 MB de datos.
+`config/virtual_object.json` declaraba `maxZipUploadSizeMB: 200`, que `icpc_parser.go` aplicaba como **total descomprimido** del ZIP de casos de prueba y como tope por archivo individual — los dos roles los tenía una sola variable. O sea que un problema legal podía traer 200 MB de datos. (Hoy estos roles están separados: `maxZipUploadSizeMB` limita el ZIP comprimido que llega por HTTP, y `maxExtractedSizeMB` limita el contenido descomprimido; ambos son configurables sin tocar código.)
 
 El worker, por judging, sostiene:
 
