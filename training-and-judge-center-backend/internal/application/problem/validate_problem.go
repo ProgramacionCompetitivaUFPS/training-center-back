@@ -243,7 +243,7 @@ func (uc *ValidateProblemUseCase) executeJudgingUpdate(ctx context.Context, v *p
 	report := buildValidationReport(result)
 	report.ValidationLogs = append(report.ValidationLogs, "✓ Applied: "+describeChange(*change))
 
-	var replaced replacedJudgingFiles
+	var replaced problem.StorageKeys
 	err = uc.txManager.WithTx(ctx, func(txCtx context.Context) error {
 		parsedSlug, err := problem.NewSlug(slug)
 		if err != nil {
@@ -255,7 +255,7 @@ func (uc *ValidateProblemUseCase) executeJudgingUpdate(ctx context.Context, v *p
 		}
 		logPreviousJudging(ctx, p, v.ID())
 
-		replaced = replacedByJudgingUpdate(p, *change, stagedCheckerCompiledKey(slug, v.ID()))
+		before := p.StorageKeys()
 		if key := change.TestCasesKey(); key != nil {
 			p.SetTestCases(*key, now)
 		}
@@ -263,6 +263,7 @@ func (uc *ValidateProblemUseCase) executeJudgingUpdate(ctx context.Context, v *p
 			compiledKey := stagedCheckerCompiledKey(slug, v.ID())
 			p.SetChecker(problem.RestoreJudgingFile(c.Filename(), c.FileKey(), c.Language(), &compiledKey, &now), now)
 		}
+		replaced = before.NoLongerIn(p.StorageKeys())
 		if err := uc.problemRepo.Save(txCtx, p); err != nil {
 			return err
 		}
@@ -275,7 +276,9 @@ func (uc *ValidateProblemUseCase) executeJudgingUpdate(ctx context.Context, v *p
 		slog.ErrorContext(ctx, "validate_problem: applying judging update failed", "error", err, "validation_id", v.ID())
 		return uc.failJudgingUpdate(ctx, v, slug, nil, now)
 	}
-	uc.dropReplacedFiles(ctx, v.ID(), replaced)
+	if failed := dropStorageKeys(ctx, uc.stagedFiles, replaced); len(failed) > 0 {
+		slog.ErrorContext(ctx, "validate_problem: judging update applied but the files it replaced were left in storage", "keys", failed, "validation_id", v.ID())
+	}
 	return nil
 }
 
