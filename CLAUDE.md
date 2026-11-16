@@ -1,5 +1,15 @@
 # CLAUDE.md
 
+## Pull requests
+
+Always target `develop` (never `main`) when creating PRs. Use the template at `.github/PULL_REQUEST_TEMPLATE.md` — pass its content as the PR body. Example:
+
+```bash
+gh pr create --base develop --title "..." --body "$(cat .github/PULL_REQUEST_TEMPLATE.md)"
+```
+
+Fill every section before opening; delete optional sections only if they genuinely do not apply.
+
 ## Commands
 
 ```bash
