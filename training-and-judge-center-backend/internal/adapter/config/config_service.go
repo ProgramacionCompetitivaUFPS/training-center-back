@@ -39,7 +39,7 @@ func NewPlatformSettings(cfg *config.VirtualObject) (problem.PlatformSettings, e
 		tagsMap,
 		defaultIfZero(cfg.UploadMaxConcurrency, 10),
 		defaultIfZero(cfg.MaxFileCountSample, 10),
-		defaultIfZero(cfg.MaxFileSizeTestCaseMB, 200),
+		defaultIfZero(cfg.MaxZipUploadSizeMB, 200),
 		defaultIfZero(cfg.MaxFileCountTestCase, 10000),
 		defaultIfZero(cfg.MaxFileSizeDefaultMB, 10),
 	)

@@ -12,6 +12,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	domainproblem "github.com/training-judge-center/backend/internal/domain/problem"
 	"github.com/training-judge-center/backend/pkg/apperror"
 	"gopkg.in/yaml.v3"
 )
@@ -152,13 +153,17 @@ func (p *ICPCParser) ParsePackageZip(ctx context.Context, zipData []byte) (*Pars
 	}
 	var meta problemYAML
 	if err := yaml.Unmarshal(yamlContent, &meta); err != nil {
-		return nil, apperror.NewBadRequest(apperror.ErrCodeInvalidPackage, "Failed to parse problem.yaml: "+err.Error())
+		return nil, apperror.NewValidation([]apperror.FieldError{
+			{Field: "file", Code: domainproblem.ErrCodeInvalidProblemYAML, Message: "Failed to parse problem.yaml: " + err.Error()},
+		})
 	}
 	if meta.Title == "" {
 		errorLogs = append(errorLogs, "problem.yaml is missing required field: name")
 	}
 	if len(errorLogs) > 0 {
-		return nil, invalidPackage(errorLogs)
+		return nil, apperror.NewValidation([]apperror.FieldError{
+			{Field: "file", Code: domainproblem.ErrCodeInvalidProblemYAML, Message: "problem.yaml is missing required field: name"},
+		})
 	}
 
 	pkg := &ParsedPackage{
@@ -377,11 +382,10 @@ func (p *ICPCParser) detectRootPrefix(pz *ParsedZip, anchor AnchorType) (string,
 	}
 
 	if len(candidates) == 0 {
-		msg := "problem.yaml not found (required)"
 		if anchor == AnchorData {
-			msg = "Valid test case files (.in/.ans) in data/sample/ or data/secret/ not found"
+			return "", nil, apperror.NewValidation([]apperror.FieldError{{Field: "file", Message: "Valid test case files (.in/.ans) in data/sample/ or data/secret/ not found"}})
 		}
-		return "", nil, apperror.NewValidation([]apperror.FieldError{{Field: "file", Message: msg}})
+		return "", nil, apperror.NewValidation([]apperror.FieldError{{Field: "file", Code: domainproblem.ErrCodeMissingProblemYAML, Message: "problem.yaml not found (required)"}})
 	}
 
 	if len(candidates) > 1 {
@@ -417,15 +421,11 @@ func (p *ICPCParser) validateFileSizes(pz *ParsedZip, prefix string) error {
 
 		if czf.File.UncompressedSize64 > uint64(limit) {
 			return apperror.NewValidation([]apperror.FieldError{
-				{Field: "file", Message: fmt.Sprintf("%s '%s' exceeds the allowed limit of %d bytes.", kind, czf.CleanPath, limit)},
+				{Field: "file", Code: domainproblem.ErrCodeFileTooLarge, Message: fmt.Sprintf("%s '%s' exceeds the allowed limit of %d bytes.", kind, czf.CleanPath, limit)},
 			})
 		}
 	}
 	return nil
-}
-
-func invalidPackage(logs []string) error {
-	return apperror.NewBadRequest(apperror.ErrCodeInvalidPackage, fmt.Sprintf("Invalid ICPC problem package: %s", strings.Join(logs, "; ")))
 }
 
 func (p *ICPCParser) prepareZip(zipData []byte) (*ParsedZip, error) {
@@ -465,7 +465,7 @@ func (p *ICPCParser) prepareZip(zipData []byte) (*ParsedZip, error) {
 				return nil, apperror.NewValidation([]apperror.FieldError{{Field: "file", Message: "ZIP contains too many files"}})
 			}
 			if f.UncompressedSize64 > maxLimit || totalSize > maxLimit-f.UncompressedSize64 {
-				return nil, apperror.NewValidation([]apperror.FieldError{{Field: "file", Message: "Extracted ZIP size exceeds safe limit"}})
+				return nil, apperror.NewValidation([]apperror.FieldError{{Field: "file", Code: domainproblem.ErrCodeExtractedSizeTooLarge, Message: "Extracted ZIP size exceeds safe limit"}})
 			}
 			totalSize += f.UncompressedSize64
 		}

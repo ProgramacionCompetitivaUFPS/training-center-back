@@ -17,6 +17,7 @@ const (
 
 type FieldError struct {
 	Field   string `json:"field"`
+	Code    string `json:"code,omitempty"`
 	Message string `json:"message"`
 }
 

@@ -48,7 +48,7 @@ func (h *Handler) UploadFiles(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	maxTestCaseBytes := int64(h.settings.MaxFileSizeTestCaseMB()) << 20
+	maxTestCaseBytes := int64(h.settings.MaxZipUploadSizeMB()) << 20
 	maxDefaultBytes := int64(h.settings.MaxFileSizeDefaultMB()) << 20
 
 	// Parse form with dynamic memory logic (TestCase limit + 50MB padding)

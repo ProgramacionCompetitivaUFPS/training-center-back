@@ -14,11 +14,21 @@ type LanguageLimit struct {
 }
 
 type VirtualObject struct {
-	SupportedLanguages    []string          `json:"supportedLanguages"`
-	LanguageExtensions    map[string]string `json:"languageExtensions"`
-	UploadMaxConcurrency  int               `json:"uploadMaxConcurrency"`
-	MaxFileCountSample    int               `json:"maxFileCountSample"`
-	MaxFileSizeTestCaseMB int               `json:"maxFileSizeTestCaseMB"`
+	SupportedLanguages   []string          `json:"supportedLanguages"`
+	LanguageExtensions   map[string]string `json:"languageExtensions"`
+	UploadMaxConcurrency int               `json:"uploadMaxConcurrency"`
+	MaxFileCountSample   int               `json:"maxFileCountSample"`
+	MaxZipUploadSizeMB int `json:"maxZipUploadSizeMB"`
+	// MaxExtractedSizeMB caps the total uncompressed content of an imported ZIP.
+	// The worker loads all test-case files into memory at once (parseTestCasesZip),
+	// so this value directly determines peak worker memory usage:
+	//   peak ≈ MaxExtractedSizeMB × maxConcurrent × 1.5  (GC overhead factor)
+	//   maxConcurrent = floor(pod_cpu_cores) - docker_daemon_reserve_cores (min 1)
+	// Current pod: 2 Gi memory, 1 CPU, 1 reserve core → maxConcurrent = 1.
+	// Raise this value only after verifying the new math fits within the worker
+	// pod's memory limit (deploy/k8s/judge/worker.yaml). If the pod is also
+	// scaled up in CPU, re-derive maxConcurrent before raising this limit.
+	MaxExtractedSizeMB int `json:"maxExtractedSizeMB"`
 	// Per-file caps. The answer's also bounds the largest token cmd/compare can meet.
 	MaxFileSizeTestCaseInputMB  int `json:"maxFileSizeTestCaseInputMB"`
 	MaxFileSizeTestCaseAnswerMB int `json:"maxFileSizeTestCaseAnswerMB"`
@@ -60,7 +70,7 @@ func loadVirtualObject() *VirtualObject {
 
 // validateVirtualObject checks the test case file limits against each other. A
 // missing cap is a broken config and not something to fill in: defaulting one
-// is how maxFileSizeTestCaseMB kept the 200 MB that was deliberately lowered.
+// is how maxZipUploadSizeMB kept the 200 MB that was deliberately lowered.
 // The remaining fields are still defaulted in adapter/config.
 func validateVirtualObject(vo *VirtualObject) error {
 	if vo.MaxFileSizeTestCaseInputMB <= 0 {
@@ -69,9 +79,12 @@ func validateVirtualObject(vo *VirtualObject) error {
 	if vo.MaxFileSizeTestCaseAnswerMB <= 0 {
 		return fmt.Errorf("maxFileSizeTestCaseAnswerMB must be positive, got %d", vo.MaxFileSizeTestCaseAnswerMB)
 	}
-	if vo.MaxFileSizeTestCaseInputMB > vo.MaxFileSizeTestCaseMB {
-		return fmt.Errorf("maxFileSizeTestCaseInputMB (%d) exceeds maxFileSizeTestCaseMB (%d)",
-			vo.MaxFileSizeTestCaseInputMB, vo.MaxFileSizeTestCaseMB)
+	if vo.MaxExtractedSizeMB <= 0 {
+		return fmt.Errorf("maxExtractedSizeMB must be positive, got %d", vo.MaxExtractedSizeMB)
+	}
+	if vo.MaxFileSizeTestCaseInputMB > vo.MaxExtractedSizeMB {
+		return fmt.Errorf("maxFileSizeTestCaseInputMB (%d) exceeds maxExtractedSizeMB (%d)",
+			vo.MaxFileSizeTestCaseInputMB, vo.MaxExtractedSizeMB)
 	}
 	if vo.MaxFileSizeTestCaseAnswerMB > vo.MaxFileSizeTestCaseInputMB {
 		return fmt.Errorf("maxFileSizeTestCaseAnswerMB (%d) exceeds maxFileSizeTestCaseInputMB (%d)",
