@@ -25,7 +25,7 @@ func newGoogleLoginUseCaseForHandlerTest(
 	googleVerifier *mockGoogleVerifier,
 ) *appuser.LoginWithGoogleUseCase {
 	return appuser.NewLoginWithGoogleUseCase(
-		userRepo, oauthRepo, &mockRefreshTokenRepo{}, tokenSvc, &mockRefreshTokenCodec{}, googleVerifier, &mockTransactionManager{},
+		userRepo, oauthRepo, &mockRefreshTokenRepo{}, tokenSvc, &mockRefreshTokenCodec{}, googleVerifier, &mockGlobalGroupJoiner{}, &mockTransactionManager{},
 	)
 }
 

@@ -23,7 +23,7 @@ func newGoogleLoginUseCase(
 	tokenSvc *mockTokenService,
 	googleVerifier *mockGoogleIDTokenVerifier,
 ) *LoginWithGoogleUseCase {
-	return NewLoginWithGoogleUseCase(repo, oauthRepo, &mockRefreshTokenRepository{}, tokenSvc, &mockRefreshTokenCodec{}, googleVerifier, &mockTransactionManager{})
+	return NewLoginWithGoogleUseCase(repo, oauthRepo, &mockRefreshTokenRepository{}, tokenSvc, &mockRefreshTokenCodec{}, googleVerifier, newNoopGlobalGroupJoiner(), &mockTransactionManager{})
 }
 
 func TestLoginWithGoogle_ExistingIdentity_IssuesSession(t *testing.T) {
@@ -159,6 +159,71 @@ func TestLoginWithGoogle_NewEmail_CreatesUserAsContestant(t *testing.T) {
 	}
 	if result.User.ID != savedUser.ID() {
 		t.Errorf("expected output user ID %q, got %q", savedUser.ID(), result.User.ID)
+	}
+}
+
+func TestLoginWithGoogle_NewEmail_JoinsGlobalGroupInSameTransaction(t *testing.T) {
+	repo, oauthRepo, tokenSvc, googleVerifier := newGoogleLoginDeps()
+	oauthRepo.findByProviderFn = func(_ context.Context, _ domain.OAuthProvider, _ string) (*domain.OAuthIdentity, error) {
+		return nil, nil
+	}
+	repo.findByEmailFn = func(_ context.Context, _ domain.Email) (*domain.User, error) { return nil, nil }
+
+	var savedUser *domain.User
+	repo.saveFn = func(_ context.Context, u *domain.User) error { savedUser = u; return nil }
+	oauthRepo.saveFn = func(_ context.Context, _ *domain.OAuthIdentity) error { return nil }
+	googleVerifier.verifyFn = func(_ context.Context, _ string) (*GoogleClaims, error) {
+		return &GoogleClaims{Sub: "google-sub-new", Email: "brandnew@example.com", EmailVerified: true, Name: "Brand New"}, nil
+	}
+
+	var joinedUserID string
+	inTx := false
+	txManager := &mockTransactionManager{
+		withTxFn: func(ctx context.Context, fn func(txCtx context.Context) error) error {
+			inTx = true
+			defer func() { inTx = false }()
+			return fn(ctx)
+		},
+	}
+	joiner := &mockGlobalGroupJoiner{addToGlobalGroupFn: func(_ context.Context, userID string) error {
+		if !inTx {
+			t.Error("expected AddToGlobalGroup to run inside the signup transaction")
+		}
+		joinedUserID = userID
+		return nil
+	}}
+	uc := NewLoginWithGoogleUseCase(repo, oauthRepo, &mockRefreshTokenRepository{}, tokenSvc, &mockRefreshTokenCodec{}, googleVerifier, joiner, txManager)
+
+	if _, err := uc.Execute(context.Background(), LoginWithGoogleInput{IDToken: "valid-token"}); err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+	if savedUser == nil || joinedUserID != savedUser.ID() {
+		t.Errorf("expected the new user %v to join the global group, joined %q", savedUser, joinedUserID)
+	}
+}
+
+func TestLoginWithGoogle_NewEmail_GlobalGroupJoinFails_ReturnsError(t *testing.T) {
+	repo, oauthRepo, tokenSvc, googleVerifier := newGoogleLoginDeps()
+	oauthRepo.findByProviderFn = func(_ context.Context, _ domain.OAuthProvider, _ string) (*domain.OAuthIdentity, error) {
+		return nil, nil
+	}
+	repo.findByEmailFn = func(_ context.Context, _ domain.Email) (*domain.User, error) { return nil, nil }
+	repo.saveFn = func(_ context.Context, _ *domain.User) error { return nil }
+	identitySaved := false
+	oauthRepo.saveFn = func(_ context.Context, _ *domain.OAuthIdentity) error { identitySaved = true; return nil }
+	googleVerifier.verifyFn = func(_ context.Context, _ string) (*GoogleClaims, error) {
+		return &GoogleClaims{Sub: "google-sub-new", Email: "brandnew@example.com", EmailVerified: true, Name: "Brand New"}, nil
+	}
+	joiner := &mockGlobalGroupJoiner{addToGlobalGroupFn: func(_ context.Context, _ string) error {
+		return apperror.NewInternal()
+	}}
+	uc := NewLoginWithGoogleUseCase(repo, oauthRepo, &mockRefreshTokenRepository{}, tokenSvc, &mockRefreshTokenCodec{}, googleVerifier, joiner, &mockTransactionManager{})
+
+	if _, err := uc.Execute(context.Background(), LoginWithGoogleInput{IDToken: "valid-token"}); err == nil {
+		t.Fatal("expected the signup to fail when the global group join fails")
+	}
+	if identitySaved {
+		t.Error("expected the identity not to be saved once the global group join failed")
 	}
 }
 
@@ -344,7 +409,7 @@ func TestLoginWithGoogle_ConcurrentSignup_LosesRaceAndRecovers(t *testing.T) {
 		return &GoogleClaims{Sub: "google-sub-123", Email: "test@example.com", EmailVerified: true, Name: "Test User"}, nil
 	}
 
-	uc := NewLoginWithGoogleUseCase(repo, oauthRepo, &mockRefreshTokenRepository{}, tokenSvc, &mockRefreshTokenCodec{}, googleVerifier, txManager)
+	uc := NewLoginWithGoogleUseCase(repo, oauthRepo, &mockRefreshTokenRepository{}, tokenSvc, &mockRefreshTokenCodec{}, googleVerifier, newNoopGlobalGroupJoiner(), txManager)
 
 	result, err := uc.Execute(context.Background(), LoginWithGoogleInput{IDToken: "valid-token"})
 	if err != nil {

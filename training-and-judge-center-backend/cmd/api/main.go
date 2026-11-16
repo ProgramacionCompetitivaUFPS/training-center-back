@@ -227,7 +227,7 @@ func main() {
 	// User use cases
 	createUserUseCase := appuser.NewCreateUserUseCase(userRepo, globalGroupJoiner, txManager)
 	loginUseCase := appuser.NewLoginUseCase(userRepo, refreshTokenRepo, jwtService, refreshTokenCodec, redisRateLimiter)
-	loginWithGoogleUseCase := appuser.NewLoginWithGoogleUseCase(userRepo, oauthIdentityRepo, refreshTokenRepo, jwtService, refreshTokenCodec, googleVerifier, txManager)
+	loginWithGoogleUseCase := appuser.NewLoginWithGoogleUseCase(userRepo, oauthIdentityRepo, refreshTokenRepo, jwtService, refreshTokenCodec, googleVerifier, globalGroupJoiner, txManager)
 	linkGoogleIdentityUseCase := appuser.NewLinkGoogleIdentityUseCase(userRepo, oauthIdentityRepo, googleVerifier, emailSender)
 	unlinkGoogleIdentityUseCase := appuser.NewUnlinkGoogleIdentityUseCase(userRepo, oauthIdentityRepo, emailSender)
 	refreshUseCase := appuser.NewRefreshUseCase(refreshTokenRepo, userRepo, jwtService, refreshTokenCodec, redisRateLimiter, rotationCache)
