@@ -23,6 +23,7 @@ type LoginWithGoogleUseCase struct {
 	tokenService      user.TokenService
 	refreshTokenCodec RefreshTokenCodec
 	googleVerifier    GoogleIDTokenVerifier
+	globalGroupJoiner GlobalGroupJoiner
 	txManager         appshared.TransactionManager
 }
 
@@ -33,6 +34,7 @@ func NewLoginWithGoogleUseCase(
 	tokenService user.TokenService,
 	refreshTokenCodec RefreshTokenCodec,
 	googleVerifier GoogleIDTokenVerifier,
+	globalGroupJoiner GlobalGroupJoiner,
 	txManager appshared.TransactionManager,
 ) *LoginWithGoogleUseCase {
 	return &LoginWithGoogleUseCase{
@@ -42,6 +44,7 @@ func NewLoginWithGoogleUseCase(
 		tokenService:      tokenService,
 		refreshTokenCodec: refreshTokenCodec,
 		googleVerifier:    googleVerifier,
+		globalGroupJoiner: globalGroupJoiner,
 		txManager:         txManager,
 	}
 }
@@ -128,6 +131,10 @@ func (uc *LoginWithGoogleUseCase) findOrCreateUser(ctx context.Context, claims *
 
 	err = uc.txManager.WithTx(ctx, func(txCtx context.Context) error {
 		if err := uc.userRepo.Save(txCtx, newUser); err != nil {
+			return err
+		}
+		// Same as password signup (CreateUserUseCase): every account belongs to the global group.
+		if err := uc.globalGroupJoiner.AddToGlobalGroup(txCtx, newUser.ID()); err != nil {
 			return err
 		}
 		return uc.oauthIdentityRepo.Save(txCtx, identity)
