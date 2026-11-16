@@ -254,7 +254,7 @@ func newHandlerWithUnpublish(repo domainProblem.Repository, checker appProblem.A
 }
 
 func newHandlerWithDeleteProblem(repo domainProblem.Repository, checker appProblem.ActiveContestChecker) *Handler {
-	return &Handler{deleteProblem: appProblem.NewDeleteProblemUseCase(repo, &mockFileStorageH{}, checker, &mockContestAssociationRemoverH{}, &mockTxManagerH{})}
+	return &Handler{deleteProblem: appProblem.NewDeleteProblemUseCase(repo, &mockValidationRepositoryH{}, &mockFileStorageH{}, checker, &mockContestAssociationRemoverH{}, &mockTxManagerH{})}
 }
 
 func newHandlerWithChangeAccessibility(repo domainProblem.Repository) *Handler {

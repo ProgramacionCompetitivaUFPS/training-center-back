@@ -52,8 +52,6 @@ type UploadProblemFilesOutput struct {
 
 type fileAction struct {
 	rollbackFiles []string
-	cleanupFiles  []string
-	cleanupPrefix string
 }
 
 type UploadProblemFilesUseCase struct {
@@ -115,6 +113,7 @@ func (uc *UploadProblemFilesUseCase) Execute(ctx context.Context, input UploadPr
 	now := time.Now()
 	var action fileAction
 	var handleErr error
+	before := p.StorageKeys()
 
 	fileType := strings.ToLower(input.FileType)
 	switch fileType {
@@ -141,8 +140,9 @@ func (uc *UploadProblemFilesUseCase) Execute(ctx context.Context, input UploadPr
 		return nil, err
 	}
 
-	uc.cleanupFiles(ctx, action.cleanupFiles)
-	uc.cleanupPrefix(ctx, action.cleanupPrefix)
+	if failed := dropStorageKeys(ctx, uc.storage, before.NoLongerIn(p.StorageKeys())); len(failed) > 0 {
+		slog.ErrorContext(ctx, "upload_files: file saved but the files it replaced were left in storage", "slug", p.Slug().String(), "keys", failed)
+	}
 
 	return &UploadProblemFilesOutput{
 		Message:  "File uploaded successfully",
@@ -156,13 +156,6 @@ func (uc *UploadProblemFilesUseCase) cleanupFiles(ctx context.Context, keys []st
 	for _, key := range keys {
 		_ = uc.storage.DeleteFile(ctx, key)
 	}
-}
-
-func (uc *UploadProblemFilesUseCase) cleanupPrefix(ctx context.Context, prefix string) {
-	if prefix == "" {
-		return
-	}
-	_ = uc.storage.DeleteFilesWithPrefix(ctx, prefix)
 }
 
 func (uc *UploadProblemFilesUseCase) handleTestCases(ctx context.Context, p *problem.Problem, input UploadProblemFilesInput, now time.Time) (fileAction, error) {
@@ -203,13 +196,8 @@ func (uc *UploadProblemFilesUseCase) handleTestCases(ctx context.Context, p *pro
 		return fileAction{rollbackFiles: allNewKeys}, err
 	}
 
-	action := fileAction{rollbackFiles: allNewKeys}
-	if p.TestCasesKey() != nil {
-		action.cleanupPrefix = *p.TestCasesKey()
-	}
-
 	p.SetTestCases(basePath, now)
-	return action, nil
+	return fileAction{rollbackFiles: allNewKeys}, nil
 }
 
 func (uc *UploadProblemFilesUseCase) handleSolution(ctx context.Context, p *problem.Problem, input UploadProblemFilesInput, now time.Time) (fileAction, error) {
@@ -235,13 +223,8 @@ func (uc *UploadProblemFilesUseCase) handleSolution(ctx context.Context, p *prob
 		return fileAction{}, err
 	}
 
-	action := fileAction{rollbackFiles: []string{fileKey}}
-
-	if old := p.AddSolution(solutionObj, now); old != nil && old.FileKey() != fileKey {
-		action.cleanupFiles = []string{old.FileKey()}
-	}
-
-	return action, nil
+	p.AddSolution(solutionObj, now)
+	return fileAction{rollbackFiles: []string{fileKey}}, nil
 }
 
 func (uc *UploadProblemFilesUseCase) handleChecker(ctx context.Context, p *problem.Problem, input UploadProblemFilesInput, now time.Time) (fileAction, error) {
@@ -289,9 +272,6 @@ func (uc *UploadProblemFilesUseCase) handleVerifier(
 	action := fileAction{}
 	if current == nil || current.FileKey() != fileKey {
 		action.rollbackFiles = []string{fileKey}
-	}
-	if current != nil && current.FileKey() != fileKey {
-		action.cleanupFiles = []string{current.FileKey()}
 	}
 
 	if err := uc.storage.UploadFile(ctx, fileKey, input.FileData); err != nil {

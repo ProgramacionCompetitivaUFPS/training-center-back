@@ -192,7 +192,7 @@ func main() {
 	listProblemsUseCase := appProblem.NewListProblemsUseCase(problemRepo, userProvider)
 	unpublishProblemUseCase := appProblem.NewUnpublishProblemUseCase(problemRepo, problemActiveContestChecker)
 	changeAccessibilityUseCase := appProblem.NewChangeAccessibilityUseCase(problemRepo)
-	deleteProblemUseCase := appProblem.NewDeleteProblemUseCase(problemRepo, fileStorage, problemActiveContestChecker, problemContestAssociationRemover, txManager)
+	deleteProblemUseCase := appProblem.NewDeleteProblemUseCase(problemRepo, problemValidationRepo, fileStorage, problemActiveContestChecker, problemContestAssociationRemover, txManager)
 	getProblemStatisticsUseCase := appProblem.NewGetProblemStatisticsUseCase(problemRepo, problemStatisticsProvider)
 	listTestCasesUseCase := appProblem.NewListTestCasesUseCase(problemRepo, fileStorage)
 	getTestCaseUseCase := appProblem.NewGetTestCaseUseCase(problemRepo, fileStorage)

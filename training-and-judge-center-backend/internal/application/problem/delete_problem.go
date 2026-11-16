@@ -1,12 +1,12 @@
-﻿package problem
+package problem
 
 import (
 	"context"
 	"log/slog"
 
+	appshared "github.com/training-judge-center/backend/internal/application/shared"
 	"github.com/training-judge-center/backend/internal/domain/problem"
 	"github.com/training-judge-center/backend/internal/domain/shared"
-	appshared "github.com/training-judge-center/backend/internal/application/shared"
 	"github.com/training-judge-center/backend/pkg/apperror"
 )
 
@@ -18,19 +18,16 @@ type DeleteProblemInput struct {
 
 type DeleteProblemUseCase struct {
 	repo           problem.Repository
+	validationRepo problem.ProblemValidationRepository
 	fileStorage    ProblemFileRepository
 	contestChecker ActiveContestChecker
 	contestRemover ContestAssociationRemover
 	txManager      appshared.TransactionManager
 }
 
-// maxRetries is the number of retry attempts for storage cleanup operations after
-// a problem is deleted from the database. Chosen to tolerate transient failures
-// without blocking the response indefinitely.
-const maxRetries = 3
-
 func NewDeleteProblemUseCase(
 	repo problem.Repository,
+	validationRepo problem.ProblemValidationRepository,
 	fileStorage ProblemFileRepository,
 	contestChecker ActiveContestChecker,
 	contestRemover ContestAssociationRemover,
@@ -38,6 +35,7 @@ func NewDeleteProblemUseCase(
 ) *DeleteProblemUseCase {
 	return &DeleteProblemUseCase{
 		repo:           repo,
+		validationRepo: validationRepo,
 		fileStorage:    fileStorage,
 		contestChecker: contestChecker,
 		contestRemover: contestRemover,
@@ -88,6 +86,11 @@ func (uc *DeleteProblemUseCase) Execute(ctx context.Context, in DeleteProblemInp
 			return apperror.NewConflict(problem.ErrCodeProblemInActiveContest, "Cannot delete a problem that is currently being used in an active contest")
 		}
 
+		// A running validation keeps writing files for this problem until it ends.
+		if err := ensureNoActiveValidation(txCtx, uc.validationRepo, p.ID()); err != nil {
+			return err
+		}
+
 		if err := uc.contestRemover.RemoveProblemFromContests(txCtx, p.ID()); err != nil {
 			return err
 		}
@@ -97,65 +100,8 @@ func (uc *DeleteProblemUseCase) Execute(ctx context.Context, in DeleteProblemInp
 		return err
 	}
 
-	var cleanupFailed bool
-
-	if p.TestCasesKey() != nil {
-		var err error
-		for i := 0; i < maxRetries; i++ {
-			err = uc.fileStorage.DeleteFilesWithPrefix(ctx, *p.TestCasesKey())
-			if err == nil {
-				break
-			}
-		}
-		if err != nil {
-			slog.ErrorContext(ctx, "problem deleted from DB but test cases storage cleanup failed", "prefix", *p.TestCasesKey(), "error", err)
-			cleanupFailed = true
-		}
-	}
-
-	for _, sol := range p.Solutions() {
-		var err error
-		for i := 0; i < maxRetries; i++ {
-			err = uc.fileStorage.DeleteFile(ctx, sol.FileKey())
-			if err == nil {
-				break
-			}
-		}
-		if err != nil {
-			slog.ErrorContext(ctx, "problem deleted from DB but solution storage cleanup failed", "key", sol.FileKey(), "error", err)
-			cleanupFailed = true
-		}
-	}
-
-	if p.Checker() != nil {
-		var err error
-		for i := 0; i < maxRetries; i++ {
-			err = uc.fileStorage.DeleteFile(ctx, p.Checker().FileKey())
-			if err == nil {
-				break
-			}
-		}
-		if err != nil {
-			slog.ErrorContext(ctx, "problem deleted from DB but checker storage cleanup failed", "key", p.Checker().FileKey(), "error", err)
-			cleanupFailed = true
-		}
-	}
-
-	if p.Validator() != nil {
-		var err error
-		for i := 0; i < maxRetries; i++ {
-			err = uc.fileStorage.DeleteFile(ctx, p.Validator().FileKey())
-			if err == nil {
-				break
-			}
-		}
-		if err != nil {
-			slog.ErrorContext(ctx, "problem deleted from DB but validator storage cleanup failed", "key", p.Validator().FileKey(), "error", err)
-			cleanupFailed = true
-		}
-	}
-
-	if cleanupFailed {
+	if failed := dropStorageKeys(ctx, uc.fileStorage, p.StorageKeys()); len(failed) > 0 {
+		slog.ErrorContext(ctx, "problem deleted from DB but its storage cleanup failed", "slug", p.Slug().String(), "keys", failed)
 		return apperror.NewInternal()
 	}
 
