@@ -502,10 +502,33 @@ func (m *mockAffectedContestsProvider) ListOpenContestsOfProblem(_ context.Conte
 
 type mockStagedFileCleaner struct {
 	deletedPrefixes []string
+	deletedFiles    []string
+	deleteErr       error
+	deleteAttempts  int
+	onDelete        func()
 }
 
 func (m *mockStagedFileCleaner) DeleteFilesWithPrefix(_ context.Context, prefix string) error {
+	m.deleteAttempts++
+	if m.onDelete != nil {
+		m.onDelete()
+	}
+	if m.deleteErr != nil {
+		return m.deleteErr
+	}
 	m.deletedPrefixes = append(m.deletedPrefixes, prefix)
+	return nil
+}
+
+func (m *mockStagedFileCleaner) DeleteFile(_ context.Context, path string) error {
+	m.deleteAttempts++
+	if m.onDelete != nil {
+		m.onDelete()
+	}
+	if m.deleteErr != nil {
+		return m.deleteErr
+	}
+	m.deletedFiles = append(m.deletedFiles, path)
 	return nil
 }
 

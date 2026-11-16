@@ -94,26 +94,12 @@ func (uc *JudgeSubmissionUseCase) Execute(ctx context.Context, in JudgeSubmissio
 		return uc.persistVerdict(ctx, sub)
 	}
 
-	limits, err := uc.problemProvider.GetLimits(ctx, sub.ProblemID())
-	if err != nil {
-		slog.ErrorContext(ctx, "failed to get problem limits", "error", err)
-		_ = sub.MarkSystemError(uc.now())
-		return uc.persistVerdict(ctx, sub)
-	}
-
-	testCases, err := uc.testCaseProvider.GetTestCases(ctx, sub.ProblemID())
-	if err != nil {
-		slog.ErrorContext(ctx, "failed to get test cases", "error", err)
-		_ = sub.MarkSystemError(uc.now())
-		return uc.persistVerdict(ctx, sub)
-	}
-
 	var judgeErr error
 	for attempt := 0; attempt < uc.retry.MaxAttempts; attempt++ {
 		if attempt > 0 {
 			uc.sleep(uc.retry.BackoffBase * time.Duration(1<<uint(attempt-1)))
 		}
-		shouldRetry, err := uc.judgeAttempt(ctx, sub, sourceCode, limits, testCases)
+		shouldRetry, err := uc.judgeAttempt(ctx, sub, sourceCode)
 		if !shouldRetry {
 			judgeErr = err
 			break
@@ -137,9 +123,17 @@ func (uc *JudgeSubmissionUseCase) judgeAttempt(
 	ctx context.Context,
 	sub *submission.Submission,
 	sourceCode []byte,
-	limits ProblemLimits,
-	testCases []TestCase,
 ) (bool, error) {
+	// Read on every attempt: a judging update may replace these files between attempts.
+	limits, err := uc.problemProvider.GetLimits(ctx, sub.ProblemID())
+	if err != nil {
+		return true, err
+	}
+	testCases, err := uc.testCaseProvider.GetTestCases(ctx, sub.ProblemID())
+	if err != nil {
+		return true, err
+	}
+
 	// A fresh unguessable name per attempt. Never the submission id: that one is
 	// public over the API, and the name is what isolates one judging from another.
 	judgingID := uuid.NewString()
