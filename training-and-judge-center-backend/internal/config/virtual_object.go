@@ -14,11 +14,12 @@ type LanguageLimit struct {
 }
 
 type VirtualObject struct {
-	SupportedLanguages    []string          `json:"supportedLanguages"`
-	LanguageExtensions    map[string]string `json:"languageExtensions"`
-	UploadMaxConcurrency  int               `json:"uploadMaxConcurrency"`
-	MaxFileCountSample    int               `json:"maxFileCountSample"`
-	MaxZipUploadSizeMB int               `json:"maxZipUploadSizeMB"`
+	SupportedLanguages   []string          `json:"supportedLanguages"`
+	LanguageExtensions   map[string]string `json:"languageExtensions"`
+	UploadMaxConcurrency int               `json:"uploadMaxConcurrency"`
+	MaxFileCountSample   int               `json:"maxFileCountSample"`
+	MaxZipUploadSizeMB   int               `json:"maxZipUploadSizeMB"`
+	MaxExtractedSizeMB   int               `json:"maxExtractedSizeMB"`
 	// Per-file caps. The answer's also bounds the largest token cmd/compare can meet.
 	MaxFileSizeTestCaseInputMB  int `json:"maxFileSizeTestCaseInputMB"`
 	MaxFileSizeTestCaseAnswerMB int `json:"maxFileSizeTestCaseAnswerMB"`
@@ -69,9 +70,12 @@ func validateVirtualObject(vo *VirtualObject) error {
 	if vo.MaxFileSizeTestCaseAnswerMB <= 0 {
 		return fmt.Errorf("maxFileSizeTestCaseAnswerMB must be positive, got %d", vo.MaxFileSizeTestCaseAnswerMB)
 	}
-	if vo.MaxFileSizeTestCaseInputMB > vo.MaxZipUploadSizeMB {
-		return fmt.Errorf("maxFileSizeTestCaseInputMB (%d) exceeds maxZipUploadSizeMB (%d)",
-			vo.MaxFileSizeTestCaseInputMB, vo.MaxZipUploadSizeMB)
+	if vo.MaxExtractedSizeMB <= 0 {
+		return fmt.Errorf("maxExtractedSizeMB must be positive, got %d", vo.MaxExtractedSizeMB)
+	}
+	if vo.MaxFileSizeTestCaseInputMB > vo.MaxExtractedSizeMB {
+		return fmt.Errorf("maxFileSizeTestCaseInputMB (%d) exceeds maxExtractedSizeMB (%d)",
+			vo.MaxFileSizeTestCaseInputMB, vo.MaxExtractedSizeMB)
 	}
 	if vo.MaxFileSizeTestCaseAnswerMB > vo.MaxFileSizeTestCaseInputMB {
 		return fmt.Errorf("maxFileSizeTestCaseAnswerMB (%d) exceeds maxFileSizeTestCaseInputMB (%d)",

@@ -162,7 +162,7 @@ func main() {
 	}
 
 	icpcParser := problem.NewICPCParser(problem.ICPCParserConfig{
-		MaxUncompressedSizeMB: settingsProvider.MaxZipUploadSizeMB(),
+		MaxUncompressedSizeMB: cfg.VirtualObject.MaxExtractedSizeMB,
 		MaxTestCaseInputMB:    cfg.VirtualObject.MaxFileSizeTestCaseInputMB,
 		MaxTestCaseAnswerMB:   cfg.VirtualObject.MaxFileSizeTestCaseAnswerMB,
 		MaxMetadataFileSizeMB: settingsProvider.MaxFileSizeDefaultMB(),
