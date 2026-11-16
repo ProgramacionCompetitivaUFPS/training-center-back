@@ -253,3 +253,94 @@ func mustFailParse(t *testing.T, p *problem.ICPCParser, zipData []byte) error {
 	_, err := p.ParseTestCasesZip(context.Background(), zipData)
 	return err
 }
+
+func rejectionCode(t *testing.T, err error) string {
+	t.Helper()
+	appErr, ok := err.(*apperror.AppError)
+	if !ok || len(appErr.Details) == 0 {
+		t.Fatalf("expected apperror.AppError with Details, got: %v", err)
+	}
+	return appErr.Details[0].Code
+}
+
+func TestICPCParser_ExtractedSizeTooLarge_HasCode(t *testing.T) {
+	cfg := testParserConfig()
+	cfg.MaxUncompressedSizeMB = 1
+	p := problem.NewICPCParser(cfg)
+	zipData := createZipBuffer(t, map[string][]byte{
+		"data/sample/1.in":  mb(0.6),
+		"data/sample/1.ans": mb(0.6),
+	})
+	code := rejectionCode(t, mustFailParse(t, p, zipData))
+	if code != "EXTRACTED_SIZE_TOO_LARGE" {
+		t.Errorf("code: got %q, want %q", code, "EXTRACTED_SIZE_TOO_LARGE")
+	}
+}
+
+func TestICPCParser_MissingYAML_HasCode(t *testing.T) {
+	p := problem.NewICPCParser(testParserConfig())
+	zipData := createZipBuffer(t, map[string][]byte{
+		"data/sample/1.in":  []byte("1 2"),
+		"data/sample/1.ans": []byte("3"),
+	})
+	_, err := p.ParsePackageZip(context.Background(), zipData)
+	code := rejectionCode(t, err)
+	if code != "MISSING_PROBLEM_YAML" {
+		t.Errorf("code: got %q, want %q", code, "MISSING_PROBLEM_YAML")
+	}
+}
+
+func TestICPCParser_MissingDataDir_HasNoCode(t *testing.T) {
+	p := problem.NewICPCParser(testParserConfig())
+	zipData := createZipBuffer(t, map[string][]byte{
+		"some_other_dir/file.txt": []byte("x"),
+	})
+	_, err := p.ParseTestCasesZip(context.Background(), zipData)
+	appErr, ok := err.(*apperror.AppError)
+	if !ok || len(appErr.Details) == 0 {
+		t.Fatalf("expected AppError with Details, got: %v", err)
+	}
+	if appErr.Details[0].Code != "" {
+		t.Errorf("AnchorData rejection must carry no code, got %q", appErr.Details[0].Code)
+	}
+}
+
+func TestICPCParser_InvalidYAMLSyntax_HasCode(t *testing.T) {
+	p := problem.NewICPCParser(testParserConfig())
+	zipData := createZipBuffer(t, map[string][]byte{
+		"problem.yaml":      []byte(": not valid yaml {{{"),
+		"data/sample/1.in":  []byte("1 2"),
+		"data/sample/1.ans": []byte("3"),
+	})
+	_, err := p.ParsePackageZip(context.Background(), zipData)
+	code := rejectionCode(t, err)
+	if code != "INVALID_PROBLEM_YAML" {
+		t.Errorf("code: got %q, want %q", code, "INVALID_PROBLEM_YAML")
+	}
+}
+
+func TestICPCParser_YAMLMissingName_HasCode(t *testing.T) {
+	p := problem.NewICPCParser(testParserConfig())
+	zipData := createZipBuffer(t, map[string][]byte{
+		"problem.yaml":      []byte("time_limit: 1.0\nmemory_limit: 256\n"),
+		"data/sample/1.in":  []byte("1 2"),
+		"data/sample/1.ans": []byte("3"),
+	})
+	_, err := p.ParsePackageZip(context.Background(), zipData)
+	code := rejectionCode(t, err)
+	if code != "INVALID_PROBLEM_YAML" {
+		t.Errorf("code: got %q, want %q", code, "INVALID_PROBLEM_YAML")
+	}
+}
+
+func TestICPCParser_FileTooLarge_HasCode(t *testing.T) {
+	p := problem.NewICPCParser(testParserConfig())
+	zipData := createZipBuffer(t, map[string][]byte{
+		"data/sample/1.in":  []byte("1 2"),
+		"data/sample/1.ans": mb(1.5),
+	})
+	code := rejectionCode(t, mustFailParse(t, p, zipData))
+	if code != "FILE_TOO_LARGE" {
+		t.Errorf("code: got %q, want %q", code, "FILE_TOO_LARGE")
+	}
+}
