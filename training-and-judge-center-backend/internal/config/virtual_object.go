@@ -18,7 +18,7 @@ type VirtualObject struct {
 	LanguageExtensions    map[string]string `json:"languageExtensions"`
 	UploadMaxConcurrency  int               `json:"uploadMaxConcurrency"`
 	MaxFileCountSample    int               `json:"maxFileCountSample"`
-	MaxFileSizeTestCaseMB int               `json:"maxFileSizeTestCaseMB"`
+	MaxZipUploadSizeMB int               `json:"maxZipUploadSizeMB"`
 	// Per-file caps. The answer's also bounds the largest token cmd/compare can meet.
 	MaxFileSizeTestCaseInputMB  int `json:"maxFileSizeTestCaseInputMB"`
 	MaxFileSizeTestCaseAnswerMB int `json:"maxFileSizeTestCaseAnswerMB"`
@@ -60,7 +60,7 @@ func loadVirtualObject() *VirtualObject {
 
 // validateVirtualObject checks the test case file limits against each other. A
 // missing cap is a broken config and not something to fill in: defaulting one
-// is how maxFileSizeTestCaseMB kept the 200 MB that was deliberately lowered.
+// is how maxZipUploadSizeMB kept the 200 MB that was deliberately lowered.
 // The remaining fields are still defaulted in adapter/config.
 func validateVirtualObject(vo *VirtualObject) error {
 	if vo.MaxFileSizeTestCaseInputMB <= 0 {
@@ -69,9 +69,9 @@ func validateVirtualObject(vo *VirtualObject) error {
 	if vo.MaxFileSizeTestCaseAnswerMB <= 0 {
 		return fmt.Errorf("maxFileSizeTestCaseAnswerMB must be positive, got %d", vo.MaxFileSizeTestCaseAnswerMB)
 	}
-	if vo.MaxFileSizeTestCaseInputMB > vo.MaxFileSizeTestCaseMB {
-		return fmt.Errorf("maxFileSizeTestCaseInputMB (%d) exceeds maxFileSizeTestCaseMB (%d)",
-			vo.MaxFileSizeTestCaseInputMB, vo.MaxFileSizeTestCaseMB)
+	if vo.MaxFileSizeTestCaseInputMB > vo.MaxZipUploadSizeMB {
+		return fmt.Errorf("maxFileSizeTestCaseInputMB (%d) exceeds maxZipUploadSizeMB (%d)",
+			vo.MaxFileSizeTestCaseInputMB, vo.MaxZipUploadSizeMB)
 	}
 	if vo.MaxFileSizeTestCaseAnswerMB > vo.MaxFileSizeTestCaseInputMB {
 		return fmt.Errorf("maxFileSizeTestCaseAnswerMB (%d) exceeds maxFileSizeTestCaseInputMB (%d)",

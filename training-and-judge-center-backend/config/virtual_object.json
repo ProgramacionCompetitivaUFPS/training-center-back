@@ -11,7 +11,7 @@
     ".java": "java17"
   },
   "maxFileCountSample": 10,
-  "maxFileSizeTestCaseMB": 100,
+  "maxZipUploadSizeMB": 100,
   "maxFileSizeTestCaseInputMB": 64,
   "maxFileSizeTestCaseAnswerMB": 8,
   "maxFileCountTestCase": 10000,

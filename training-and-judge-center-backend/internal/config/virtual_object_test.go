@@ -9,7 +9,7 @@ import (
 
 func validVirtualObject() VirtualObject {
 	return VirtualObject{
-		MaxFileSizeTestCaseMB:       100,
+		MaxZipUploadSizeMB:       100,
 		MaxFileSizeTestCaseInputMB:  64,
 		MaxFileSizeTestCaseAnswerMB: 8,
 	}
@@ -35,7 +35,7 @@ func TestValidateVirtualObject_Rules(t *testing.T) {
 		{
 			"a single input may not exceed the whole package",
 			func(vo *VirtualObject) { vo.MaxFileSizeTestCaseInputMB = 200 },
-			"exceeds maxFileSizeTestCaseMB",
+			"exceeds maxZipUploadSizeMB",
 		},
 		{
 			"an answer may not exceed an input",
