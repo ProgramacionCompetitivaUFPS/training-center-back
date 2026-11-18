@@ -9,7 +9,7 @@ import (
 	"github.com/training-judge-center/backend/pkg/apperror"
 )
 
-// @Summary      Delete a contest
+// @Summary      Delete a contest (403 CONTEST_LOCKED if it is locked, 409 CONTEST_IS_ACTIVE if it is running)
 // @Tags         contests
 // @Security     BearerAuth
 // @Param        groupId    path  string true "Group ID"
@@ -18,6 +18,7 @@ import (
 // @Failure      401 {object} apperror.AppError
 // @Failure      403 {object} apperror.AppError
 // @Failure      404 {object} apperror.AppError
+// @Failure      409 {object} apperror.AppError
 // @Router       /groups/{groupId}/contests/{contestId} [delete]
 func (h *Handler) Delete(w http.ResponseWriter, r *http.Request) {
 	caller, ok := handler.RequireCurrentUser(w, r)

@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	appshared "github.com/training-judge-center/backend/internal/application/shared"
 	domainContest "github.com/training-judge-center/backend/internal/domain/contest"
 	"github.com/training-judge-center/backend/internal/domain/shared"
 	"github.com/training-judge-center/backend/pkg/apperror"
@@ -36,18 +37,34 @@ func scheduledContestFixture() *domainContest.Contest {
 	)
 }
 
-func TestDeleteContest_NotLead_Returns403(t *testing.T) {
-	uc := newDeleteContestUseCase(activeContest(), isMemberNotLead())
+func lockedContestFixture(c *domainContest.Contest) *domainContest.Contest {
+	c.SetLocked(true, testNow)
+	return c
+}
 
-	err := uc.Execute(context.Background(), DeleteContestInput{
-		CurrentUser: asContestant(callerID),
+func deleteInputFor(user appshared.CurrentUser) DeleteContestInput {
+	return DeleteContestInput{
+		CurrentUser: user,
 		GroupID:     testGroupID,
 		ContestID:   testContestID,
-	})
-	var appErr *apperror.AppError
-	if !errors.As(err, &appErr) || appErr.Code != ErrCodeInsufficientPermissions {
-		t.Fatalf("expected ErrCodeInsufficientPermissions, got %v", err)
+		Now:         time.Now(),
 	}
+}
+
+func assertDeleteRejected(t *testing.T, err error, wantCode string) {
+	t.Helper()
+	var appErr *apperror.AppError
+	if !errors.As(err, &appErr) || appErr.Code != wantCode {
+		t.Fatalf("expected %s, got %v", wantCode, err)
+	}
+}
+
+func TestDeleteContest_NotLead_Returns403(t *testing.T) {
+	uc := newDeleteContestUseCase(scheduledContestFixture(), isMemberNotLead())
+
+	err := uc.Execute(context.Background(), deleteInputFor(asContestant(callerID)))
+
+	assertDeleteRejected(t, err, ErrCodeInsufficientPermissions)
 }
 
 func TestDeleteContest_ContestNotFound_Returns404(t *testing.T) {
@@ -59,53 +76,129 @@ func TestDeleteContest_ContestNotFound_Returns404(t *testing.T) {
 		&mockStandingsCache{},
 	)
 
-	err := uc.Execute(context.Background(), DeleteContestInput{
-		CurrentUser: asCoach(callerID),
-		GroupID:     testGroupID,
-		ContestID:   testContestID,
-	})
-	if err == nil {
-		t.Fatal("expected 404 error, got nil")
-	}
+	err := uc.Execute(context.Background(), deleteInputFor(asCoach(callerID)))
+
+	assertDeleteRejected(t, err, domainContest.ErrCodeContestNotFound)
 }
 
 func TestDeleteContest_Lead_Succeeds(t *testing.T) {
 	uc := newDeleteContestUseCase(scheduledContestFixture(), isLead())
 
-	err := uc.Execute(context.Background(), DeleteContestInput{
-		CurrentUser: asCoach(callerID),
-		GroupID:     testGroupID,
-		ContestID:   testContestID,
-	})
+	err := uc.Execute(context.Background(), deleteInputFor(asCoach(callerID)))
+
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 }
 
 func TestDeleteContest_Admin_Succeeds(t *testing.T) {
-	uc := newDeleteContestUseCase(activeContest(), notLead())
+	uc := newDeleteContestUseCase(scheduledContestFixture(), notLead())
 
-	err := uc.Execute(context.Background(), DeleteContestInput{
-		CurrentUser: asAdmin(callerID),
-		GroupID:     testGroupID,
-		ContestID:   testContestID,
-	})
+	err := uc.Execute(context.Background(), deleteInputFor(asAdmin(callerID)))
+
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 }
 
-func TestDeleteContest_AnyStatus_Succeeds(t *testing.T) {
-	for _, c := range []*domainContest.Contest{scheduledContestFixture(), activeContest(), finishedContest()} {
+func TestDeleteContest_ScheduledOrFinished_Succeeds(t *testing.T) {
+	for _, c := range []*domainContest.Contest{scheduledContestFixture(), finishedContest()} {
 		uc := newDeleteContestUseCase(c, isLead())
-		err := uc.Execute(context.Background(), DeleteContestInput{
-			CurrentUser: asCoach(callerID),
-			GroupID:     testGroupID,
-			ContestID:   testContestID,
-		})
+
+		err := uc.Execute(context.Background(), deleteInputFor(asCoach(callerID)))
+
 		if err != nil {
 			t.Errorf("expected nil error for status %s, got: %v", c.Status(time.Now()), err)
 		}
+	}
+}
+
+func TestDeleteContest_ActiveContest_Returns409(t *testing.T) {
+	cases := map[string]struct {
+		user     appshared.CurrentUser
+		provider *mockGroupMemberProvider
+	}{
+		"lead":  {asCoach(callerID), isLead()},
+		"admin": {asAdmin(callerID), notLead()},
+	}
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			deleted := false
+			repo := repoWith(activeContest())
+			repo.deleteFn = func(_ context.Context, _ string) error {
+				deleted = true
+				return nil
+			}
+			uc := NewDeleteContestUseCase(repo, tc.provider, &mockStandingsCache{})
+
+			err := uc.Execute(context.Background(), deleteInputFor(tc.user))
+
+			assertDeleteRejected(t, err, domainContest.ErrCodeContestIsActive)
+			if deleted {
+				t.Error("an active contest must not reach the repository's Delete")
+			}
+		})
+	}
+}
+
+func TestDeleteContest_LockedContest_Returns403ForEveryone(t *testing.T) {
+	cases := map[string]struct {
+		user     appshared.CurrentUser
+		provider *mockGroupMemberProvider
+	}{
+		"owner who is lead":     {asCoach(callerID), isLead()},
+		"lead who is not owner": {asCoach(otherID), isLead()},
+		"admin":                 {asAdmin(otherID), notLead()},
+	}
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			deleted, invalidated := false, false
+			repo := repoWith(lockedContestFixture(scheduledContestFixture()))
+			repo.deleteFn = func(_ context.Context, _ string) error {
+				deleted = true
+				return nil
+			}
+			cache := &mockStandingsCache{invalidateFn: func(_ context.Context, _ string) error {
+				invalidated = true
+				return nil
+			}}
+			uc := NewDeleteContestUseCase(repo, tc.provider, cache)
+
+			err := uc.Execute(context.Background(), deleteInputFor(tc.user))
+
+			assertDeleteRejected(t, err, domainContest.ErrCodeContestLocked)
+			if deleted || invalidated {
+				t.Errorf("a locked contest must be left untouched (deleted=%v, cacheInvalidated=%v)", deleted, invalidated)
+			}
+		})
+	}
+}
+
+func TestDeleteContest_LockedContest_NonLeadStillGetsInsufficientPermissions(t *testing.T) {
+	uc := newDeleteContestUseCase(lockedContestFixture(scheduledContestFixture()), isMemberNotLead())
+
+	err := uc.Execute(context.Background(), deleteInputFor(asContestant(callerID)))
+
+	assertDeleteRejected(t, err, ErrCodeInsufficientPermissions)
+}
+
+func TestDeleteContest_LockedAndActive_ReportsTheLockFirst(t *testing.T) {
+	uc := newDeleteContestUseCase(lockedContestFixture(activeContest()), isLead())
+
+	err := uc.Execute(context.Background(), deleteInputFor(asCoach(callerID)))
+
+	assertDeleteRejected(t, err, domainContest.ErrCodeContestLocked)
+}
+
+func TestDeleteContest_UnlockedAgain_Succeeds(t *testing.T) {
+	c := lockedContestFixture(scheduledContestFixture())
+	c.SetLocked(false, testNow)
+	uc := newDeleteContestUseCase(c, isLead())
+
+	err := uc.Execute(context.Background(), deleteInputFor(asCoach(callerID)))
+
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
 	}
 }
 
@@ -118,16 +211,13 @@ func TestDeleteContest_InvalidatesStandingsCache(t *testing.T) {
 		},
 	}
 	uc := NewDeleteContestUseCase(
-		repoWith(activeContest()),
+		repoWith(scheduledContestFixture()),
 		isLead(),
 		cache,
 	)
 
-	_ = uc.Execute(context.Background(), DeleteContestInput{
-		CurrentUser: asCoach(callerID),
-		GroupID:     testGroupID,
-		ContestID:   testContestID,
-	})
+	_ = uc.Execute(context.Background(), deleteInputFor(asCoach(callerID)))
+
 	if !invalidated {
 		t.Error("expected standings cache to be invalidated after delete")
 	}
