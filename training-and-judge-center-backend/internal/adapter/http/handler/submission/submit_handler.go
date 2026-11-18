@@ -62,8 +62,8 @@ func (h *Handler) Submit(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := r.ParseMultipartForm(maxMultipartMemory); err != nil {
-		handler.WriteError(r.Context(), w, apperror.NewBadRequest(apperror.ErrCodeBadRequest, "failed to parse multipart form"))
+	if appErr := parseSubmissionForm(w, r); appErr != nil {
+		handler.WriteError(r.Context(), w, appErr)
 		return
 	}
 
