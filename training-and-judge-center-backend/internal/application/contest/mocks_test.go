@@ -2,6 +2,7 @@ package contest
 
 import (
 	"context"
+	"testing"
 	"time"
 
 	domainContest "github.com/training-judge-center/backend/internal/domain/contest"
@@ -563,6 +564,9 @@ const (
 	testGroupID   = "bbbbbbbb-0000-0000-0000-000000000001"
 	testContestID = "cccccccc-0000-0000-0000-000000000001"
 	testProblemID = "dddddddd-0000-0000-0000-000000000001"
+
+	colorProblemA = "dddddddd-0000-0000-0000-00000000000a"
+	colorProblemB = "dddddddd-0000-0000-0000-00000000000b"
 )
 
 // ── Contest fixture ──────────────────────────────────────────────────────────
@@ -586,6 +590,30 @@ func newTestContest(ownerID string) *domainContest.Contest {
 		testNow.Add(-time.Hour),
 		nil,
 	)
+}
+
+func problemWithColor(id, problemID string, order int, color string) domainContest.ContestProblem {
+	return domainContest.RestoreContestProblem(id, problemID, order, &color)
+}
+
+func contestHolding(problems ...domainContest.ContestProblem) *domainContest.Contest {
+	c := newTestContest(callerID)
+	c.SetProblems(problems, testNow)
+	return c
+}
+
+func assertColor(t *testing.T, label string, got *string, want string) {
+	t.Helper()
+	if got == nil || *got != want {
+		t.Errorf("%s: color = %v, want %q", label, got, want)
+	}
+}
+
+func assertNoColor(t *testing.T, label string, got *string) {
+	t.Helper()
+	if got != nil {
+		t.Errorf("%s: color = %q, want none", label, *got)
+	}
 }
 
 func newFinishedContest(ownerID string) *domainContest.Contest {

@@ -9,7 +9,7 @@ import (
 	"github.com/training-judge-center/backend/pkg/apperror"
 )
 
-// @Summary      Delete a contest (403 CONTEST_LOCKED if it is locked, 409 CONTEST_IS_ACTIVE if it is running)
+// @Summary      Delete a contest
 // @Tags         contests
 // @Security     BearerAuth
 // @Param        groupId    path  string true "Group ID"

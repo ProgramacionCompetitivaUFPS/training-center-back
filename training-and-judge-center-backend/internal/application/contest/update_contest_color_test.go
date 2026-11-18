@@ -9,24 +9,9 @@ import (
 	"github.com/training-judge-center/backend/pkg/apperror"
 )
 
-const (
-	colorProblemA = "dddddddd-0000-0000-0000-00000000000a"
-	colorProblemB = "dddddddd-0000-0000-0000-00000000000b"
-)
-
 func ptr[T any](v T) *T { return &v }
 
 func colorChange(c *string) **string { return &c }
-
-func problemWithColor(id, problemID string, order int, color string) domainContest.ContestProblem {
-	return domainContest.RestoreContestProblem(id, problemID, order, &color)
-}
-
-func contestHolding(problems ...domainContest.ContestProblem) *domainContest.Contest {
-	c := newTestContest(callerID)
-	c.SetProblems(problems, testNow)
-	return c
-}
 
 func slugProblemProvider() *mockProblemProvider {
 	ids := map[string]string{"problem-a": colorProblemA, "problem-b": colorProblemB}
@@ -72,20 +57,6 @@ func colorOf(t *testing.T, c *domainContest.Contest, problemID string) *string {
 	}
 	t.Fatalf("problem %s not found in saved contest", problemID)
 	return nil
-}
-
-func assertColor(t *testing.T, label string, got *string, want string) {
-	t.Helper()
-	if got == nil || *got != want {
-		t.Errorf("%s: color = %v, want %q", label, got, want)
-	}
-}
-
-func assertNoColor(t *testing.T, label string, got *string) {
-	t.Helper()
-	if got != nil {
-		t.Errorf("%s: color = %q, want none", label, *got)
-	}
 }
 
 func TestUpdateContest_OmittedColorKeepsTheCurrentOne(t *testing.T) {

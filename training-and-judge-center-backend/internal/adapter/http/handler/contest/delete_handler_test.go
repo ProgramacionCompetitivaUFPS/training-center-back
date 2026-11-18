@@ -1,7 +1,6 @@
 package contest
 
 import (
-	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -10,7 +9,6 @@ import (
 	appcontest "github.com/training-judge-center/backend/internal/application/contest"
 	domainContest "github.com/training-judge-center/backend/internal/domain/contest"
 	"github.com/training-judge-center/backend/internal/domain/shared"
-	"github.com/training-judge-center/backend/pkg/apperror"
 )
 
 func contestToDelete() *domainContest.Contest {
@@ -124,17 +122,6 @@ func TestDeleteContest_LockedContest_Returns403(t *testing.T) {
 		t.Fatalf("expected 403, got %d: %s", w.Code, w.Body.String())
 	}
 	assertErrorCode(t, w.Body.Bytes(), domainContest.ErrCodeContestLocked)
-}
-
-func assertErrorCode(t *testing.T, body []byte, want string) {
-	t.Helper()
-	var resp apperror.AppError
-	if err := json.Unmarshal(body, &resp); err != nil {
-		t.Fatalf("could not decode error body %s: %v", body, err)
-	}
-	if resp.Code != want {
-		t.Errorf("error = %q, want %q", resp.Code, want)
-	}
 }
 
 func TestDeleteContest_ContestNotFound_Returns404(t *testing.T) {

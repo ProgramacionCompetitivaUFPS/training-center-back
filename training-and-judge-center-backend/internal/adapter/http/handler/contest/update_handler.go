@@ -17,7 +17,7 @@ import (
 // @Security     BearerAuth
 // @Param        groupId path string true "Group ID"
 // @Param        contestId path string true "Contest ID"
-// @Param        body body updateContestRequest true "Fields to update; problems[].color is #RRGGBB, null to clear, omitted to keep (INVALID_PROBLEM_COLOR if malformed)"
+// @Param        body body updateContestRequest true "Fields to update"
 // @Success      200 {object} contestResponse
 // @Failure      400 {object} apperror.AppError
 // @Failure      401 {object} apperror.AppError

@@ -123,9 +123,9 @@ func TestGetContest_NotFound_Returns404(t *testing.T) {
 	}
 }
 
-type coloredGetRepo struct{ mockGetRepo }
+type mockColoredGetRepo struct{ mockGetRepo }
 
-func (s *coloredGetRepo) FindByID(ctx context.Context, id string) (*domainContest.Contest, error) {
+func (s *mockColoredGetRepo) FindByID(ctx context.Context, id string) (*domainContest.Contest, error) {
 	c, err := s.mockGetRepo.FindByID(ctx, id)
 	if err != nil {
 		return nil, err
@@ -140,7 +140,7 @@ func (s *coloredGetRepo) FindByID(ctx context.Context, id string) (*domainContes
 
 func TestGetContest_ProblemsIncludeColorOrNull(t *testing.T) {
 	uc := appcontest.NewGetContestUseCase(
-		&coloredGetRepo{},
+		&mockColoredGetRepo{},
 		&mockGroupProvider{},
 		&mockMemberProvider{isLead: true, isMember: true},
 		&mockProblemProvider{},
