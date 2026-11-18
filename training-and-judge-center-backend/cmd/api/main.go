@@ -238,7 +238,8 @@ func main() {
 	updatePasswordUseCase := appuser.NewUpdatePasswordUseCase(userRepo, emailSender, sessionInvalidator, redisRateLimiter, refreshTokenRepo)
 	setPasswordUseCase := appuser.NewSetPasswordUseCase(userRepo, emailSender)
 	adminUpdateUserUseCase := appuser.NewAdminUpdateUserUseCase(userRepo)
-	adminDeactivateUserUseCase := appuser.NewAdminDeactivateUserUseCase(userRepo, sessionInvalidator, refreshTokenRepo)
+	teamMembershipCleaner := adapterteam.NewMembershipCleaner(dbPool)
+	adminDeactivateUserUseCase := appuser.NewAdminDeactivateUserUseCase(userRepo, sessionInvalidator, refreshTokenRepo, txManager, teamMembershipCleaner)
 	listUsersUseCase := appuser.NewListUsersUseCase(userRepo)
 	listUserFilterOptionsUseCase := appuser.NewListUserFilterOptionsUseCase(userRepo)
 	searchUsersUseCase := appuser.NewSearchUsersUseCase(userRepo)
@@ -247,7 +248,7 @@ func main() {
 	requestPasswordRecoveryUseCase := appuser.NewRequestPasswordRecoveryUseCase(userRepo, passwordRecoveryRepo, emailSender, redisRateLimiter)
 	resetPasswordUseCase := appuser.NewResetPasswordUseCase(userRepo, passwordRecoveryRepo, sessionInvalidator, txManager, refreshTokenRepo)
 	requestDeactivationUseCase := appuser.NewRequestDeactivationUseCase(userRepo, deactivationRequestRepo, emailSender, redisRateLimiter)
-	confirmDeactivationUseCase := appuser.NewConfirmDeactivationUseCase(userRepo, deactivationRequestRepo, deactivationAuditLogRepo, emailSender, sessionInvalidator, txManager, refreshTokenRepo)
+	confirmDeactivationUseCase := appuser.NewConfirmDeactivationUseCase(userRepo, deactivationRequestRepo, deactivationAuditLogRepo, emailSender, sessionInvalidator, txManager, refreshTokenRepo, teamMembershipCleaner)
 
 	// user dashboard adapters
 	dashboardSubmissionProvider := adaptersubmission.NewDashboardProvider(dbPool)

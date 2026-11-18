@@ -226,6 +226,18 @@ func (m *mockTransactionManager) WithTx(ctx context.Context, fn func(txCtx conte
 	return fn(ctx)
 }
 
+// ── mockTeamMembershipCleaner ────────────────────────────────────────────────
+
+type mockTeamMembershipCleaner struct {
+	removedUserIDs []string
+	err            error
+}
+
+func (m *mockTeamMembershipCleaner) RemoveUserFromAllTeams(_ context.Context, userID string) error {
+	m.removedUserIDs = append(m.removedUserIDs, userID)
+	return m.err
+}
+
 // ── mockGlobalGroupJoiner ────────────────────────────────────────────────────
 
 type mockGlobalGroupJoiner struct {
