@@ -34,7 +34,7 @@ type ListFilters struct {
 type Repository interface {
 	// Create inserts a new contest. Returns an error if the id already exists.
 	Create(ctx context.Context, c *Contest) error
-	// Update persists changes to an existing contest using c.UpdatedAt() as an
+	// Update persists changes to an existing contest using c.ConcurrencyToken() as an
 	// optimistic lock token. Returns ErrCodeContestConflict if another write
 	// landed between the read and this call.
 	Update(ctx context.Context, c *Contest) error

@@ -59,19 +59,19 @@ func (r *Repository) Update(ctx context.Context, c *domainContest.Contest) error
 			penalty=$6, freeze_minutes=$7, enable_post_contest=$8, locked=$9,
 			show_team_members=$10, participation_mode=$11, team_size_min=$12, team_size_max=$13,
 			updated_at=$14
-		WHERE id=$1`,
+		WHERE id=$1 AND updated_at IS NOT DISTINCT FROM $15::timestamptz`,
 		c.ID(), c.Name().Value(), c.Description(),
 		c.StartTime(), c.EndTime(),
 		c.Penalty().Value(), c.FreezeMinutes(), c.EnablePostContest(), c.Locked(),
 		c.ShowTeamMembers(), c.ParticipationMode().String(), c.TeamSize().Min(), c.TeamSize().Max(),
-		c.UpdatedAt(),
+		c.UpdatedAt(), c.ConcurrencyToken(),
 	)
 	if err != nil {
 		slog.ErrorContext(ctx, "failed to update contest", "error", err, "contest_id", c.ID())
 		return apperror.NewInternal()
 	}
 	if tag.RowsAffected() == 0 {
-		return apperror.NewNotFound(domainContest.ErrCodeContestNotFound, "contest not found")
+		return r.explainRefusedUpdate(ctx, q, c.ID())
 	}
 
 	// Replace contest_problems: delete all then reinsert.
@@ -153,22 +153,6 @@ func (r *Repository) Delete(ctx context.Context, id string) error {
 		return nil
 	}
 	return r.explainRefusedDelete(ctx, q, id)
-}
-
-func (r *Repository) explainRefusedDelete(ctx context.Context, q infraPostgres.Querier, id string) error {
-	var locked bool
-	err := q.QueryRow(ctx, `SELECT locked FROM contests WHERE id=$1`, id).Scan(&locked)
-	if errors.Is(err, pgx.ErrNoRows) {
-		return apperror.NewNotFound(domainContest.ErrCodeContestNotFound, "contest not found")
-	}
-	if err != nil {
-		slog.ErrorContext(ctx, "failed to read the lock of a contest that was not deleted", "error", err, "contest_id", id)
-		return apperror.NewInternal()
-	}
-	if locked {
-		return apperror.NewForbidden(domainContest.ErrCodeContestLocked, "contest is locked and cannot be deleted; unlock it first")
-	}
-	return apperror.NewConflict(domainContest.ErrCodeContestConflict, "the contest changed while it was being deleted; try again")
 }
 
 // sortColumn maps domain SortField values to safe SQL column names.
@@ -421,4 +405,32 @@ func (r *Repository) loadProblemsByContestIDs(ctx context.Context, q infraPostgr
 		return nil, apperror.NewInternal()
 	}
 	return result, nil
+}
+
+func (r *Repository) explainRefusedUpdate(ctx context.Context, q infraPostgres.Querier, id string) error {
+	var exists bool
+	if err := q.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM contests WHERE id=$1)`, id).Scan(&exists); err != nil {
+		slog.ErrorContext(ctx, "failed to check a contest whose update was not applied", "error", err, "contest_id", id)
+		return apperror.NewInternal()
+	}
+	if !exists {
+		return apperror.NewNotFound(domainContest.ErrCodeContestNotFound, "contest not found")
+	}
+	return apperror.NewConflict(domainContest.ErrCodeContestConflict, "the contest was modified by someone else; reload it and try again")
+}
+
+func (r *Repository) explainRefusedDelete(ctx context.Context, q infraPostgres.Querier, id string) error {
+	var locked bool
+	err := q.QueryRow(ctx, `SELECT locked FROM contests WHERE id=$1`, id).Scan(&locked)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return apperror.NewNotFound(domainContest.ErrCodeContestNotFound, "contest not found")
+	}
+	if err != nil {
+		slog.ErrorContext(ctx, "failed to read the lock of a contest that was not deleted", "error", err, "contest_id", id)
+		return apperror.NewInternal()
+	}
+	if locked {
+		return apperror.NewForbidden(domainContest.ErrCodeContestLocked, "contest is locked and cannot be deleted; unlock it first")
+	}
+	return apperror.NewConflict(domainContest.ErrCodeContestConflict, "the contest changed while it was being deleted; try again")
 }

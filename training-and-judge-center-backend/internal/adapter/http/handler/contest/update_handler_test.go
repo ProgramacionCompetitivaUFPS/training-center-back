@@ -156,9 +156,9 @@ func TestUpdateContest_ContestNotFound_Returns404(t *testing.T) {
 	}
 }
 
-type coloredUpdateRepo struct{ stubUpdateRepo }
+type mockColoredUpdateRepo struct{ stubUpdateRepo }
 
-func (s *coloredUpdateRepo) FindByID(ctx context.Context, id string) (*domainContest.Contest, error) {
+func (s *mockColoredUpdateRepo) FindByID(ctx context.Context, id string) (*domainContest.Contest, error) {
 	c, err := s.stubUpdateRepo.FindByID(ctx, id)
 	if err != nil {
 		return nil, err
@@ -170,7 +170,7 @@ func (s *coloredUpdateRepo) FindByID(ctx context.Context, id string) (*domainCon
 
 func updateWithColoredProblem() *appcontest.UpdateContestUseCase {
 	return appcontest.NewUpdateContestUseCase(
-		&coloredUpdateRepo{},
+		&mockColoredUpdateRepo{},
 		&mockGroupProvider{},
 		&mockMemberProvider{isLead: true, isMember: true},
 		&mockProblemProvider{},
@@ -257,4 +257,34 @@ func TestUpdateContest_NonStringColor_Returns400(t *testing.T) {
 	if w.Code != http.StatusBadRequest {
 		t.Fatalf("expected 400, got %d: %s", w.Code, w.Body.String())
 	}
+}
+
+type mockConflictingUpdateRepo struct{ stubUpdateRepo }
+
+func (s *mockConflictingUpdateRepo) Update(_ context.Context, _ *domainContest.Contest) error {
+	return apperror.NewConflict(domainContest.ErrCodeContestConflict, "the contest was modified by someone else")
+}
+
+func TestUpdateContest_ModifiedByAnotherRequest_Returns409(t *testing.T) {
+	uc := appcontest.NewUpdateContestUseCase(
+		&mockConflictingUpdateRepo{},
+		&mockGroupProvider{},
+		&mockMemberProvider{isLead: true, isMember: true},
+		&mockProblemProvider{},
+		&mockOwnerProvider{},
+		&mockTeamParticipRepo{},
+		&mockTransactionManager{},
+	)
+	body, _ := json.Marshal(map[string]interface{}{"name": "Another name"})
+	r := authedRequest(http.MethodPut, "/groups/g1/contests/c1", body)
+	r.SetPathValue("groupId", "g1")
+	r.SetPathValue("contestId", "c1")
+	w := httptest.NewRecorder()
+
+	wrapAuth(http.HandlerFunc(newHandlerWithUpdate(uc).Update)).ServeHTTP(w, r)
+
+	if w.Code != http.StatusConflict {
+		t.Fatalf("expected 409, got %d: %s", w.Code, w.Body.String())
+	}
+	assertErrorCode(t, w.Body.Bytes(), domainContest.ErrCodeContestConflict)
 }

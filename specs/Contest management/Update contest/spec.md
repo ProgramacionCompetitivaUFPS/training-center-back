@@ -380,7 +380,7 @@ As an Admin, I want to update contests in any group so that I can assist with ad
 ### Edge Cases
 
 * Contest update with all fields provided (partial updates should be supported).
-* Contest update during high-traffic period (concurrent updates).
+* Contest update during high-traffic period (concurrent updates): the first one to be saved wins and the other returns 409 `CONTEST_CONFLICT` without saving anything.
 * Adding duplicate problem slugs in the same update request (should deduplicate silently).
 * Reordering problems with invalid order positions (should validate and reject).
 * Adding problem at order position beyond current problem count (should append to end).
@@ -766,6 +766,30 @@ Group or contest not found.
 }
 ```
 
+#### 409 Conflict
+The update cannot be applied in the current state.
+
+```json
+{
+  "error": "CONTEST_PROBLEMS_LOCKED",
+  "message": "the problems of a finished contest cannot be changed: its standings are the official result"
+}
+```
+
+```json
+{
+  "error": "CONTEST_HAS_TEAM_REGISTRATIONS",
+  "message": "cannot change participation settings while team registrations exist"
+}
+```
+
+```json
+{
+  "error": "CONTEST_CONFLICT",
+  "message": "the contest was modified by someone else; reload it and try again"
+}
+```
+
 ---
 
 ## Requirements *(mandatory)*
@@ -779,6 +803,7 @@ Group or contest not found.
 * **FR-UC-004**: The system MUST support partial updates (only provided fields are updated).
 * **FR-UC-005**: The system MUST require at least one field in the update request.
 * **FR-UC-006**: The system MUST update the `updatedAt` timestamp on every successful modification.
+* **FR-UC-006.1**: The system MUST apply an update only if the contest was not modified by another request since it was read (optimistic concurrency, using the contest's `updatedAt` as the token). Otherwise it MUST reject the request with 409 `CONTEST_CONFLICT` and save nothing, problems included, so a stale copy never overwrites newer data. The client reloads the contest and retries. A contest that was never updated counts as unmodified.
 
 **Locking Mechanism**
 * **FR-UC-007**: The system MUST allow contest owner or Admin to lock the contest (set `locked = true`).
@@ -967,7 +992,7 @@ When problems are removed from ACTIVE contests:
 ## Optional Notes
 
 * **Idempotency**: Consider making update requests idempotent - submitting the same update twice should have the same effect.
-* **Concurrent Updates**: Consider implementing optimistic locking to handle concurrent update requests.
+* **Concurrent Updates**: Updates use optimistic concurrency (FR-UC-006.1). The check covers the time between reading the contest and saving it; it does not detect an edit form that was opened earlier. Removing a problem from the system also changes the contest's problem list without touching its `updatedAt`, so that path is not covered by the token.
 * **Problem List Management**: The `problems` array replaces the entire list. To add problems, include all existing problems plus new ones. To remove, include only problems you want to keep.
 * **Future enhancements**:
   * Bulk problem operations (add/remove multiple problems in separate endpoints)

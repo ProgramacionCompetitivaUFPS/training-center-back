@@ -27,6 +27,7 @@ type Contest struct {
 	problems          []ContestProblem
 	createdAt         time.Time
 	updatedAt         *time.Time
+	loadedUpdatedAt   *time.Time
 }
 
 func NewContest(
@@ -102,6 +103,11 @@ func RestoreContest(
 	if problems == nil {
 		problems = []ContestProblem{}
 	}
+	var loadedUpdatedAt *time.Time
+	if updatedAt != nil {
+		t := *updatedAt
+		loadedUpdatedAt = &t
+	}
 	return &Contest{
 		id:                id,
 		name:              name,
@@ -120,6 +126,7 @@ func RestoreContest(
 		problems:          problems,
 		createdAt:         createdAt,
 		updatedAt:         updatedAt,
+		loadedUpdatedAt:   loadedUpdatedAt,
 	}
 }
 
@@ -302,6 +309,14 @@ func (c *Contest) TeamSize() TeamSize                   { return c.teamSize }
 func (c *Contest) Problems() []ContestProblem           { return c.problems }
 func (c *Contest) CreatedAt() time.Time                 { return c.createdAt }
 func (c *Contest) UpdatedAt() *time.Time                { return c.updatedAt }
+
+func (c *Contest) ConcurrencyToken() *time.Time {
+	if c.loadedUpdatedAt == nil {
+		return nil
+	}
+	t := *c.loadedUpdatedAt
+	return &t
+}
 
 func validateDescription(d *string) error {
 	if d == nil {
