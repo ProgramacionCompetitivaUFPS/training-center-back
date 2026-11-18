@@ -454,7 +454,7 @@ func main() {
 	leaveTeamUseCase := appteam.NewLeaveTeamUseCase(teamMemberRepo, teamContestParticipationChecker, teamScheduledCleaner, txManager)
 	getLeaveImpactUseCase := appteam.NewGetLeaveImpactUseCase(teamMemberRepo, teamScheduledCleaner)
 	renameTeamUseCase := appteam.NewRenameTeamUseCase(teamRepo, teamMemberRepo)
-	removeTeamMemberUseCase := appteam.NewRemoveTeamMemberUseCase(teamMemberRepo, teamContestParticipationChecker, teamScheduledCleaner, txManager)
+	removeTeamMemberUseCase := appteam.NewRemoveTeamMemberUseCase(teamRepo, teamMemberRepo, teamContestParticipationChecker, teamScheduledCleaner, txManager)
 	registerTeamToContestUseCase := appteam.NewRegisterTeamToContestUseCase(
 		teamMemberRepo, teamRepo, teamContestProvider, contestTeamParticipationRepo,
 		teamIndivChecker, teamGroupMemberChecker, teamUserProvider, contestRegistrationLocker, txManager,

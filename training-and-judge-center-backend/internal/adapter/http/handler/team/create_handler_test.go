@@ -35,6 +35,8 @@ func (m *mockTeamRepo) FindByID(_ context.Context, id string) (*domainTeam.Team,
 	}
 	return nil, apperror.NewNotFound(domainTeam.ErrCodeTeamNotFound, "team not found")
 }
+func (m *mockTeamRepo) LockByID(_ context.Context, _ string) error { return nil }
+
 func (m *mockTeamRepo) UpdateName(_ context.Context, t *domainTeam.Team) error {
 	if m.updateNameFn != nil {
 		return m.updateNameFn(t)

@@ -55,6 +55,19 @@ func (r *Repository) UpdateName(ctx context.Context, t *domainTeam.Team) error {
 	return nil
 }
 
+func (r *Repository) LockByID(ctx context.Context, id string) error {
+	const q = `SELECT 1 FROM teams WHERE id = $1 FOR UPDATE`
+	var one int
+	if err := infraPostgres.GetQuerier(ctx, r.db).QueryRow(ctx, q, id).Scan(&one); err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return apperror.NewNotFound(domainTeam.ErrCodeTeamNotFound, "team not found")
+		}
+		slog.ErrorContext(ctx, "failed to lock team", "error", err, "team_id", id)
+		return apperror.NewInternal()
+	}
+	return nil
+}
+
 func (r *Repository) FindByID(ctx context.Context, id string) (*domainTeam.Team, error) {
 	const q = `SELECT id, name, created_by, created_at FROM teams WHERE id = $1`
 	var tid, name, createdBy string

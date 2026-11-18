@@ -16,7 +16,7 @@ import (
 )
 
 func newHandlerWithRemoveMember(memberRepo domainTeam.MemberRepository, checker appTeam.ContestParticipationChecker) *Handler {
-	return &Handler{removeTeamMember: appTeam.NewRemoveTeamMemberUseCase(memberRepo, checker, &mockScheduledParticipationCleanerHandler{}, &mockTxManager{})}
+	return &Handler{removeTeamMember: appTeam.NewRemoveTeamMemberUseCase(&mockTeamRepo{}, memberRepo, checker, &mockScheduledParticipationCleanerHandler{}, &mockTxManager{})}
 }
 
 func removeRequest(teamID, userID string) *http.Request {
@@ -28,11 +28,14 @@ func removeRequest(teamID, userID string) *http.Request {
 	return r.WithContext(context.WithValue(r.Context(), chi.RouteCtxKey, chiCtx))
 }
 
-// u1 (the authenticated user) and "u2" are both on the team.
+// u1 (the authenticated user) and u2 are both on the team; u2 is a real UUID because the use case parses it.
+const u2ID = "aaaaaaaa-0000-0000-0000-000000000002"
+const u9ID = "aaaaaaaa-0000-0000-0000-000000000009"
+
 func u1AndU2OnTheTeam() *mockMemberRepo {
 	return &mockMemberRepo{
 		findByTeamAndUserFn: func(teamID string, userID domainShared.UserID) (*domainTeam.TeamMember, error) {
-			if userID.Value() == "u1" || userID.Value() == "u2" {
+			if userID.Value() == "u1" || userID.Value() == u2ID {
 				return makeHandlerMember("m-"+userID.Value(), teamID, userID.Value(), time.Now()), nil
 			}
 			return nil, apperror.NewNotFound(domainTeam.ErrCodeNotTeamMember, "not a member")
@@ -43,7 +46,7 @@ func u1AndU2OnTheTeam() *mockMemberRepo {
 func TestRemoveTeamMember_UnauthenticatedReturns401(t *testing.T) {
 	h := newHandlerWithRemoveMember(&mockMemberRepo{}, &mockContestCheckerHandler{})
 	w := httptest.NewRecorder()
-	r := httptest.NewRequest(http.MethodDelete, "/teams/t1/members/u2", nil)
+	r := httptest.NewRequest(http.MethodDelete, "/teams/t1/members/aaaaaaaa-0000-0000-0000-000000000002", nil)
 	wrapAuth(http.HandlerFunc(h.RemoveTeamMember)).ServeHTTP(w, r)
 	if w.Code != http.StatusUnauthorized {
 		t.Fatalf("expected 401, got %d", w.Code)
@@ -60,12 +63,12 @@ func TestRemoveTeamMember_RemovesTheOtherMemberAndReturns204(t *testing.T) {
 	h := newHandlerWithRemoveMember(memberRepo, &mockContestCheckerHandler{})
 	w := httptest.NewRecorder()
 
-	wrapAuth(http.HandlerFunc(h.RemoveTeamMember)).ServeHTTP(w, removeRequest("t1", "u2"))
+	wrapAuth(http.HandlerFunc(h.RemoveTeamMember)).ServeHTTP(w, removeRequest("t1", u2ID))
 
 	if w.Code != http.StatusNoContent {
 		t.Fatalf("expected 204, got %d\nbody: %s", w.Code, w.Body.String())
 	}
-	if deleted != "u2" {
+	if deleted != u2ID {
 		t.Errorf("expected u2 to be removed, got %q", deleted)
 	}
 }
@@ -85,7 +88,7 @@ func TestRemoveTeamMember_UnknownTargetReturns404(t *testing.T) {
 	h := newHandlerWithRemoveMember(u1AndU2OnTheTeam(), &mockContestCheckerHandler{})
 	w := httptest.NewRecorder()
 
-	wrapAuth(http.HandlerFunc(h.RemoveTeamMember)).ServeHTTP(w, removeRequest("t1", "u9"))
+	wrapAuth(http.HandlerFunc(h.RemoveTeamMember)).ServeHTTP(w, removeRequest("t1", u9ID))
 
 	if w.Code != http.StatusNotFound {
 		t.Fatalf("expected 404, got %d", w.Code)
@@ -93,11 +96,11 @@ func TestRemoveTeamMember_UnknownTargetReturns404(t *testing.T) {
 }
 
 func TestRemoveTeamMember_TargetInActiveContestReturns409(t *testing.T) {
-	checker := &mockContestCheckerHandler{inActiveFn: func(userID, _ string) (bool, error) { return userID == "u2", nil }}
+	checker := &mockContestCheckerHandler{inActiveFn: func(userID, _ string) (bool, error) { return userID == u2ID, nil }}
 	h := newHandlerWithRemoveMember(u1AndU2OnTheTeam(), checker)
 	w := httptest.NewRecorder()
 
-	wrapAuth(http.HandlerFunc(h.RemoveTeamMember)).ServeHTTP(w, removeRequest("t1", "u2"))
+	wrapAuth(http.HandlerFunc(h.RemoveTeamMember)).ServeHTTP(w, removeRequest("t1", u2ID))
 
 	if w.Code != http.StatusConflict {
 		t.Fatalf("expected 409, got %d", w.Code)
