@@ -12,6 +12,8 @@ import (
 type GetLeaveImpactInput struct {
 	CurrentUser appShared.CurrentUser
 	TeamID      string
+	// TargetUserID is the member whose removal is being previewed; empty means the caller leaving.
+	TargetUserID string
 }
 
 type GetLeaveImpactOutput struct {
@@ -41,7 +43,18 @@ func (uc *GetLeaveImpactUseCase) Execute(ctx context.Context, in GetLeaveImpactI
 		return nil, err
 	}
 
-	atRisk, err := uc.cleaner.RegistrationsLosingMinimum(ctx, in.TeamID, in.CurrentUser.ID)
+	leaving := in.CurrentUser.ID
+	if in.TargetUserID != "" && in.TargetUserID != in.CurrentUser.ID {
+		leaving = in.TargetUserID
+		if _, err := uc.memberRepo.FindByTeamAndUser(ctx, in.TeamID, domainShared.RestoreUserID(leaving)); err != nil {
+			if ae, ok := err.(*apperror.AppError); ok && ae.Kind == apperror.KindNotFound {
+				return nil, apperror.NewNotFound(domainTeam.ErrCodeNotTeamMember, "That user is not a member of this team")
+			}
+			return nil, err
+		}
+	}
+
+	atRisk, err := uc.cleaner.RegistrationsLosingMinimum(ctx, in.TeamID, leaving)
 	if err != nil {
 		return nil, err
 	}

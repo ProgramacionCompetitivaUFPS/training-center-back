@@ -10,6 +10,7 @@ import (
 	appTeam "github.com/training-judge-center/backend/internal/application/team"
 	domainShared "github.com/training-judge-center/backend/internal/domain/shared"
 	domainTeam "github.com/training-judge-center/backend/internal/domain/team"
+	"github.com/training-judge-center/backend/pkg/apperror"
 )
 
 func newHandlerWithLeaveImpact(memberRepo domainTeam.MemberRepository, atRisk []appTeam.RegistrationAtRisk) *Handler {
@@ -77,5 +78,26 @@ func TestGetLeaveImpact_NothingAtRiskReturnsAnEmptyList(t *testing.T) {
 	var raw map[string]json.RawMessage
 	if err := json.Unmarshal(w.Body.Bytes(), &raw); err != nil || string(raw["registrationsToCancel"]) != "[]" {
 		t.Errorf("expected registrationsToCancel to be [], got %s", w.Body.String())
+	}
+}
+
+func TestGetLeaveImpact_UserIdQueryPreviewsRemovingThatMember(t *testing.T) {
+	// u1 is on the team, "u9" is not: previewing u9's removal must be a 404, which proves the
+	// query parameter reaches the use case.
+	memberRepo := &mockMemberRepo{
+		findByTeamAndUserFn: func(teamID string, userID domainShared.UserID) (*domainTeam.TeamMember, error) {
+			if userID.Value() == "u1" {
+				return makeHandlerMember("m1", teamID, "u1", time.Now()), nil
+			}
+			return nil, apperror.NewNotFound(domainTeam.ErrCodeNotTeamMember, "not a member")
+		},
+	}
+	h := newHandlerWithLeaveImpact(memberRepo, nil)
+	w := httptest.NewRecorder()
+
+	wrapAuth(http.HandlerFunc(h.GetLeaveImpact)).ServeHTTP(w, authedGetRequest("/teams/t1/leave-impact?userId=u9"))
+
+	if w.Code != http.StatusNotFound {
+		t.Fatalf("expected 404, got %d", w.Code)
 	}
 }

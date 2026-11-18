@@ -38,6 +38,23 @@ func (r *Repository) Save(ctx context.Context, t *domainTeam.Team) error {
 	return nil
 }
 
+func (r *Repository) UpdateName(ctx context.Context, t *domainTeam.Team) error {
+	const q = `UPDATE teams SET name = $2 WHERE id = $1`
+	tag, err := infraPostgres.GetQuerier(ctx, r.db).Exec(ctx, q, t.ID(), t.Name().Value())
+	if err != nil {
+		var pgErr *pgconn.PgError
+		if errors.As(err, &pgErr) && pgErr.Code == infraPostgres.UniqueViolation && pgErr.ConstraintName == "teams_name_lower_idx" {
+			return apperror.NewConflict(domainTeam.ErrCodeTeamNameExists, "A team with this name already exists")
+		}
+		slog.ErrorContext(ctx, "failed to rename team", "error", err, "team_id", t.ID())
+		return apperror.NewInternal()
+	}
+	if tag.RowsAffected() == 0 {
+		return apperror.NewNotFound(domainTeam.ErrCodeTeamNotFound, "team not found")
+	}
+	return nil
+}
+
 func (r *Repository) FindByID(ctx context.Context, id string) (*domainTeam.Team, error) {
 	const q = `SELECT id, name, created_by, created_at FROM teams WHERE id = $1`
 	var tid, name, createdBy string

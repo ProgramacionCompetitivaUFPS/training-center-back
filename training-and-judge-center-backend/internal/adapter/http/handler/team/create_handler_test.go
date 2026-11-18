@@ -25,6 +25,7 @@ type mockTeamRepo struct {
 	existsByNameFn func(name domainTeam.TeamName) (bool, error)
 	findByIDFn     func(id string) (*domainTeam.Team, error)
 	findByIDsFn    func(ids []string) ([]*domainTeam.Team, error)
+	updateNameFn   func(t *domainTeam.Team) error
 }
 
 func (m *mockTeamRepo) Save(_ context.Context, _ *domainTeam.Team) error { return m.saveErr }
@@ -34,6 +35,13 @@ func (m *mockTeamRepo) FindByID(_ context.Context, id string) (*domainTeam.Team,
 	}
 	return nil, apperror.NewNotFound(domainTeam.ErrCodeTeamNotFound, "team not found")
 }
+func (m *mockTeamRepo) UpdateName(_ context.Context, t *domainTeam.Team) error {
+	if m.updateNameFn != nil {
+		return m.updateNameFn(t)
+	}
+	return nil
+}
+
 func (m *mockTeamRepo) FindByIDs(_ context.Context, ids []string) ([]*domainTeam.Team, error) {
 	if m.findByIDsFn != nil {
 		return m.findByIDsFn(ids)

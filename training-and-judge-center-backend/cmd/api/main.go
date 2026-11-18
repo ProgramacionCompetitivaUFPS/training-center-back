@@ -453,6 +453,8 @@ func main() {
 	teamScheduledCleaner := adapterteam.NewScheduledParticipationCleaner(dbPool)
 	leaveTeamUseCase := appteam.NewLeaveTeamUseCase(teamMemberRepo, teamContestParticipationChecker, teamScheduledCleaner, txManager)
 	getLeaveImpactUseCase := appteam.NewGetLeaveImpactUseCase(teamMemberRepo, teamScheduledCleaner)
+	renameTeamUseCase := appteam.NewRenameTeamUseCase(teamRepo, teamMemberRepo)
+	removeTeamMemberUseCase := appteam.NewRemoveTeamMemberUseCase(teamMemberRepo, teamContestParticipationChecker, teamScheduledCleaner, txManager)
 	registerTeamToContestUseCase := appteam.NewRegisterTeamToContestUseCase(
 		teamMemberRepo, teamRepo, teamContestProvider, contestTeamParticipationRepo,
 		teamIndivChecker, teamGroupMemberChecker, teamUserProvider, contestRegistrationLocker, txManager,
@@ -487,6 +489,8 @@ func main() {
 		unregisterTeamFromContestUseCase,
 		listTeamRegistrationsUseCase,
 		getTeamRegistrationEligibilityUseCase,
+		renameTeamUseCase,
+		removeTeamMemberUseCase,
 	)
 
 	// submission adapters

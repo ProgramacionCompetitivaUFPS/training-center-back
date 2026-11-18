@@ -7,4 +7,6 @@ type Repository interface {
 	FindByID(ctx context.Context, id string) (*Team, error)
 	FindByIDs(ctx context.Context, ids []string) ([]*Team, error)
 	ExistsByName(ctx context.Context, name TeamName) (bool, error)
+	// UpdateName saves the team's current name. It fails with TEAM_NAME_EXISTS when another team has it.
+	UpdateName(ctx context.Context, t *Team) error
 }

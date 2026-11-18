@@ -24,6 +24,7 @@ type leaveImpactResponse struct {
 // @Produce      json
 // @Security     BearerAuth
 // @Param        teamId path string true "Team ID"
+// @Param        userId query string false "Preview removing this member instead of the caller"
 // @Success      200 {object} leaveImpactResponse
 // @Failure      401 {object} apperror.AppError
 // @Failure      404 {object} apperror.AppError
@@ -35,8 +36,9 @@ func (h *Handler) GetLeaveImpact(w http.ResponseWriter, r *http.Request) {
 	}
 
 	out, err := h.getLeaveImpact.Execute(r.Context(), appTeam.GetLeaveImpactInput{
-		CurrentUser: *currentUser,
-		TeamID:      chi.URLParam(r, "teamId"),
+		CurrentUser:  *currentUser,
+		TeamID:       chi.URLParam(r, "teamId"),
+		TargetUserID: r.URL.Query().Get("userId"),
 	})
 	if err != nil {
 		handler.WriteError(r.Context(), w, err)
