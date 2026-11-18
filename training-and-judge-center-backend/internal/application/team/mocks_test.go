@@ -42,6 +42,8 @@ func ctx() context.Context { return context.Background() }
 
 type mockTeamRepository struct {
 	saveErr          error
+	updateNameFn     func(t *domainTeam.Team) error
+	lockFn           func(id string) error
 	existsByNameFn   func(name domainTeam.TeamName) (bool, error)
 	findByIDFn       func(id string) (*domainTeam.Team, error)
 	findByIDsFn      func(ids []string) ([]*domainTeam.Team, error)
@@ -49,6 +51,20 @@ type mockTeamRepository struct {
 
 func (m *mockTeamRepository) Save(_ context.Context, _ *domainTeam.Team) error {
 	return m.saveErr
+}
+
+func (m *mockTeamRepository) LockByID(_ context.Context, id string) error {
+	if m.lockFn != nil {
+		return m.lockFn(id)
+	}
+	return nil
+}
+
+func (m *mockTeamRepository) UpdateName(_ context.Context, t *domainTeam.Team) error {
+	if m.updateNameFn != nil {
+		return m.updateNameFn(t)
+	}
+	return nil
 }
 
 func (m *mockTeamRepository) FindByID(_ context.Context, id string) (*domainTeam.Team, error) {
@@ -358,14 +374,19 @@ type mockScheduledParticipationCleaner struct {
 	atRisk []RegistrationAtRisk
 	err    error
 	called bool
+	// userID each call was made for
+	removedUserID string
+	impactUserID  string
 }
 
-func (m *mockScheduledParticipationCleaner) RemoveUserFromScheduledParticipations(_ context.Context, _, _ string) ([]RegistrationAtRisk, error) {
+func (m *mockScheduledParticipationCleaner) RemoveUserFromScheduledParticipations(_ context.Context, _, userID string) ([]RegistrationAtRisk, error) {
 	m.called = true
+	m.removedUserID = userID
 	return m.atRisk, m.err
 }
 
-func (m *mockScheduledParticipationCleaner) RegistrationsLosingMinimum(_ context.Context, _, _ string) ([]RegistrationAtRisk, error) {
+func (m *mockScheduledParticipationCleaner) RegistrationsLosingMinimum(_ context.Context, _, userID string) ([]RegistrationAtRisk, error) {
+	m.impactUserID = userID
 	return m.atRisk, m.err
 }
 

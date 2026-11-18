@@ -19,6 +19,8 @@ type Handler struct {
 	unregisterTeamFromContest      *appTeam.UnregisterTeamFromContestUseCase
 	listTeamRegistrations          *appTeam.ListTeamRegistrationsUseCase
 	getTeamRegistrationEligibility *appTeam.GetTeamRegistrationEligibilityUseCase
+	renameTeam                     *appTeam.RenameTeamUseCase
+	removeTeamMember               *appTeam.RemoveTeamMemberUseCase
 }
 
 func NewHandler(
@@ -36,6 +38,8 @@ func NewHandler(
 	unregisterTeamFromContest *appTeam.UnregisterTeamFromContestUseCase,
 	listTeamRegistrations *appTeam.ListTeamRegistrationsUseCase,
 	getTeamRegistrationEligibility *appTeam.GetTeamRegistrationEligibilityUseCase,
+	renameTeam *appTeam.RenameTeamUseCase,
+	removeTeamMember *appTeam.RemoveTeamMemberUseCase,
 ) *Handler {
 	return &Handler{
 		createTeam:                     createTeam,
@@ -52,5 +56,7 @@ func NewHandler(
 		unregisterTeamFromContest:      unregisterTeamFromContest,
 		listTeamRegistrations:          listTeamRegistrations,
 		getTeamRegistrationEligibility: getTeamRegistrationEligibility,
+		renameTeam:                     renameTeam,
+		removeTeamMember:               removeTeamMember,
 	}
 }

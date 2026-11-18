@@ -211,10 +211,12 @@ func NewRouter(h *Handlers, s *Services, allowedOrigins []string) *chi.Mux {
 		r.Route("/teams", func(r chi.Router) {
 			r.Post("/", h.Team.Create)
 			r.Get("/{teamId}", h.Team.GetTeam)
+			r.Patch("/{teamId}", h.Team.RenameTeam)
 			r.Route("/{teamId}/invitations", func(r chi.Router) {
 				r.Post("/", h.Team.InviteToTeam)
 			})
 			r.Delete("/{teamId}/members/me", h.Team.LeaveTeam)
+			r.Delete("/{teamId}/members/{userId}", h.Team.RemoveTeamMember)
 			r.Get("/{teamId}/leave-impact", h.Team.GetLeaveImpact)
 		})
 
