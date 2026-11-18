@@ -447,7 +447,8 @@ Update an existing contest within a group.
   "problems": [
     {
       "slug": "sum-of-two-numbers",
-      "order": 1
+      "order": 1,
+      "color": "#e53935"
     },
     {
       "slug": "new-problem",
@@ -541,6 +542,7 @@ Update an existing contest within a group.
 |-------|------|----------|-------------|
 | slug | string | Yes | Problem slug |
 | order | integer | Yes | Order position (1-based, sequential) |
+| color | string or null | No | Balloon color of the problem as `#RRGGBB` (stored lowercase). Omitted: a problem already in the contest keeps its current color and a new problem has none. `null`: removes the color. A malformed value is rejected with `INVALID_PROBLEM_COLOR`. |
 
 **Responses**:
 
@@ -570,12 +572,14 @@ Contest updated successfully.
     {
       "slug": "sum-of-two-numbers",
       "title": "Sum of Two Numbers",
-      "order": 1
+      "order": 1,
+      "color": "#e53935"
     },
     {
       "slug": "new-problem",
       "title": "New Problem",
-      "order": 2
+      "order": 2,
+      "color": null
     }
   ],
   "problemCount": 2,
@@ -639,6 +643,13 @@ Validation errors.
   "error": "PROBLEM_NOT_PUBLISHED",
   "message": "Cannot add problem 'draft-problem' - problem is not published",
   "problemSlug": "draft-problem"
+}
+```
+
+```json
+{
+  "error": "INVALID_PROBLEM_COLOR",
+  "message": "problem color must be a hex color in the form #RRGGBB"
 }
 ```
 
@@ -811,7 +822,11 @@ Group or contest not found.
 * **FR-UC-027**: When problems array is provided, it MUST replace the entire problem list (not merge).
 * **FR-UC-028**: The system MUST allow removing problems that have submissions.
 * **FR-UC-028.1**: When a problem is removed from a contest, its submissions MUST keep their `contest_id`; the standings MUST count only the problems the contest has now.
-* **FR-UC-028.2**: The problem list of a FINISHED contest MUST NOT be changed: the request MUST be rejected with HTTP 409 (CONTEST_PROBLEMS_LOCKED), because the final standings are the official result and count only the problems the contest has. Every other field can still be edited.
+* **FR-UC-028.2**: The problem list of a FINISHED contest MUST NOT be changed: the request MUST be rejected with HTTP 409 (CONTEST_PROBLEMS_LOCKED), because the final standings are the official result and count only the problems the contest has. Every other field can still be edited. A request that only changes colors is also rejected, since it includes `problems`.
+* **FR-UC-028.3**: Each element of `problems` MAY carry a `color` (balloon color) in the form `#RRGGBB`. The system MUST store it in lowercase.
+* **FR-UC-028.4**: When `color` is omitted for a slug that was already in the contest, the system MUST keep its current color; for a new slug the problem has no color. When `color` is `null`, the system MUST remove the color.
+* **FR-UC-028.5**: A `color` that is not `#RRGGBB` MUST be rejected with HTTP 400 (INVALID_PROBLEM_COLOR) and nothing is saved. When the same slug appears more than once, the first occurrence (including its color) is the one that counts.
+* **FR-UC-028.6**: The color is presentation only: it MUST NOT affect submissions, standings or rejudging. A problem that is removed from the contest loses its color, and adding it again later starts without one.
 
 **Standing Recalculation**
 * **FR-UC-029**: When a problem is added to a contest, the system MUST NOT recalculate Standing (no submissions exist yet).
@@ -863,6 +878,7 @@ Group or contest not found.
   * `contest_id` (string, UUID, FK to Contest)
   * `problem_id` (string, UUID, FK to Problem)
   * `order` (integer, sequential starting from 1, **mutable**)
+  * `color` (string, nullable, `#rrggbb` in lowercase, **mutable**) - balloon color shown in the standings
 
 > **Contest Status** (computed, not stored):
 > * `SCHEDULED`: current time < startTime

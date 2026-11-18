@@ -49,7 +49,7 @@ SCHEDULED ──(startTime reached)──> ACTIVE ──(endTime reached)──>
 * **Contest Owner**: Can lock/unlock their contest
 * **Group Lead**: Can manage contests in their group (all Leads can update and delete, including in global group)
 * **Admin**: Can manage any contest (can lock/unlock and delete any contest, has implicit Lead permissions)
-* **Locked Contests**: Cannot be modified except by owner or admin (who can lock/unlock). Deletion is not blocked by the lock (see Delete contest spec, "Not Enforced")
+* **Locked Contests**: Cannot be modified except by owner or admin (who can lock/unlock). Nobody can delete a locked contest, not even an Admin: it must be unlocked first
 
 ---
 
@@ -256,7 +256,7 @@ Contests support different participation configurations:
 
 ### When a Contest is Deleted
 
-An `ACTIVE` contest cannot be deleted (409 `CONTEST_IS_ACTIVE`); `SCHEDULED` and `FINISHED` contests can.
+A locked contest cannot be deleted (403 `CONTEST_LOCKED`) and neither can an `ACTIVE` one (409 `CONTEST_IS_ACTIVE`); `SCHEDULED` and `FINISHED` contests that are not locked can.
 
 | Entity | Action |
 |--------|--------|
@@ -402,6 +402,11 @@ Export Standings (P2) ← (CSV, PDF, Excel export)
 * **Analytics**: Orphaned submissions can still be analyzed for problem statistics
 * **User history**: Users can see their submission history even if contest is deleted
 * **Problem statistics**: Problems maintain their submission statistics across contests
+
+### Why can't locked contests be deleted?
+
+* **Safety**: Prevents accidental deletion of important contests
+* **Explicit action**: Requires intentional unlock before deletion
 
 ### Why can't active contests be deleted?
 
