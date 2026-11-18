@@ -19,8 +19,7 @@ func ptr[T any](v T) *T { return &v }
 func colorChange(c *string) **string { return &c }
 
 func problemWithColor(id, problemID string, order int, color string) domainContest.ContestProblem {
-	c := domainContest.RestoreProblemColor(color)
-	return domainContest.RestoreContestProblem(id, problemID, order, &c)
+	return domainContest.RestoreContestProblem(id, problemID, order, &color)
 }
 
 func contestHolding(problems ...domainContest.ContestProblem) *domainContest.Contest {

@@ -116,7 +116,7 @@ func TestContestProblemColor(t *testing.T) {
 	})
 
 	t.Run("with color", func(t *testing.T) {
-		color := contest.RestoreProblemColor("#aabbcc")
+		color := "#aabbcc"
 		cp := contest.RestoreContestProblem("id", "pid", 1, &color)
 		if cp.Color() == nil || cp.Color().Value() != "#aabbcc" {
 			t.Errorf("Color() = %v, want #aabbcc", cp.Color())

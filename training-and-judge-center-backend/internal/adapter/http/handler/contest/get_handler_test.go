@@ -130,7 +130,7 @@ func (s *coloredGetRepo) FindByID(ctx context.Context, id string) (*domainContes
 	if err != nil {
 		return nil, err
 	}
-	red := domainContest.RestoreProblemColor("#aabbcc")
+	red := "#aabbcc"
 	c.SetProblems([]domainContest.ContestProblem{
 		domainContest.RestoreContestProblem("cp1", "p1", 1, &red),
 		domainContest.RestoreContestProblem("cp2", "p2", 2, nil),

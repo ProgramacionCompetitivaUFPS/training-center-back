@@ -181,7 +181,7 @@ func (uc *UpdateContestUseCase) Execute(ctx context.Context, in UpdateContestInp
 			if change, ok := colorChanges[pe.slug]; ok {
 				color = change
 			}
-			newProblems = append(newProblems, domainContest.RestoreContestProblem(id, pe.id, pe.order, color))
+			newProblems = append(newProblems, domainContest.RestoreContestProblem(id, pe.id, pe.order, colorString(color)))
 			problemDisplays = append(problemDisplays, ProblemDisplay{Slug: pe.slug, Title: pe.title, Order: pe.order, Color: colorString(color)})
 		}
 		c.SetProblems(newProblems, now)

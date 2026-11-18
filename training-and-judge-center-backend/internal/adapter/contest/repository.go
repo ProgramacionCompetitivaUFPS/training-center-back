@@ -363,7 +363,7 @@ func (r *Repository) loadProblems(ctx context.Context, q infraPostgres.Querier, 
 			slog.ErrorContext(ctx, "failed to scan contest problem", "error", err)
 			return nil, apperror.NewInternal()
 		}
-		problems = append(problems, restoreContestProblem(id, problemID, order, color))
+		problems = append(problems, domainContest.RestoreContestProblem(id, problemID, order, color))
 	}
 	if err := rows.Err(); err != nil {
 		slog.ErrorContext(ctx, "contest problems rows error", "error", err)
@@ -398,20 +398,11 @@ func (r *Repository) loadProblemsByContestIDs(ctx context.Context, q infraPostgr
 			slog.ErrorContext(ctx, "failed to scan contest problem", "error", err)
 			return nil, apperror.NewInternal()
 		}
-		result[contestID] = append(result[contestID], restoreContestProblem(id, problemID, order, color))
+		result[contestID] = append(result[contestID], domainContest.RestoreContestProblem(id, problemID, order, color))
 	}
 	if err := rows.Err(); err != nil {
 		slog.ErrorContext(ctx, "contest problems rows error", "error", err)
 		return nil, apperror.NewInternal()
 	}
 	return result, nil
-}
-
-func restoreContestProblem(id, problemID string, order int, color *string) domainContest.ContestProblem {
-	var restored *domainContest.ProblemColor
-	if color != nil {
-		c := domainContest.RestoreProblemColor(*color)
-		restored = &c
-	}
-	return domainContest.RestoreContestProblem(id, problemID, order, restored)
 }

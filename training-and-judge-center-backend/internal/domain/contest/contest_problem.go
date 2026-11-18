@@ -15,8 +15,13 @@ func newContestProblem(id, problemID string, order int) ContestProblem {
 	return ContestProblem{id: id, problemID: problemID, order: order}
 }
 
-func RestoreContestProblem(id, problemID string, order int, color *ProblemColor) ContestProblem {
-	return ContestProblem{id: id, problemID: problemID, order: order, color: color}
+func RestoreContestProblem(id, problemID string, order int, color *string) ContestProblem {
+	var restored *ProblemColor
+	if color != nil {
+		c := RestoreProblemColor(*color)
+		restored = &c
+	}
+	return ContestProblem{id: id, problemID: problemID, order: order, color: restored}
 }
 
 func (cp ContestProblem) ID() string        { return cp.id }
