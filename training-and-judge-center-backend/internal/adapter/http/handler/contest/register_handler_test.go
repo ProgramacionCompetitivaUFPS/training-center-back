@@ -23,6 +23,8 @@ func defaultRegisterUC() *appcontest.RegisterToContestUseCase {
 		&mockRegistrationRepository{},
 		&mockMemberProvider{isLead: false, isMember: true},
 		&noopTeamSelectionChecker{},
+		&noopRegistrationLocker{},
+		&mockTransactionManager{},
 	)
 }
 
@@ -84,6 +86,8 @@ func TestRegister_ContestNotFound_Returns404(t *testing.T) {
 		&mockRegistrationRepository{},
 		&mockMemberProvider{isMember: true},
 		&noopTeamSelectionChecker{},
+		&noopRegistrationLocker{},
+		&mockTransactionManager{},
 	)
 	h := newHandlerWithRegister(uc)
 	r := authedRequest(http.MethodPost, "/groups/g1/contests/missing/register", nil)
@@ -104,6 +108,8 @@ func TestRegister_NonMember_Returns403(t *testing.T) {
 		&mockRegistrationRepository{},
 		&mockMemberProvider{isLead: false, isMember: false},
 		&noopTeamSelectionChecker{},
+		&noopRegistrationLocker{},
+		&mockTransactionManager{},
 	)
 	h := newHandlerWithRegister(uc)
 	r := authedRequest(http.MethodPost, "/groups/g1/contests/c1/register", nil)
@@ -126,6 +132,8 @@ func TestRegister_AlreadyRegistered_Returns204(t *testing.T) {
 		},
 		&mockMemberProvider{isMember: true},
 		&noopTeamSelectionChecker{},
+		&noopRegistrationLocker{},
+		&mockTransactionManager{},
 	)
 	h := newHandlerWithRegister(uc)
 	r := authedRequest(http.MethodPost, "/groups/g1/contests/c1/register", nil)
@@ -146,6 +154,8 @@ func TestRegister_ContestAlreadyStarted_Returns400(t *testing.T) {
 		&mockRegistrationRepository{},
 		&mockMemberProvider{isMember: true},
 		&noopTeamSelectionChecker{},
+		&noopRegistrationLocker{},
+		&mockTransactionManager{},
 	)
 	h := newHandlerWithRegister(uc)
 	r := authedRequest(http.MethodPost, "/groups/g1/contests/c1/register", nil)

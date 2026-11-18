@@ -616,3 +616,15 @@ func repoWith(c *domainContest.Contest) *mockContestRepository {
 		},
 	}
 }
+
+// ── RegistrationLocker mock ──────────────────────────────────────────────────
+
+type mockRegistrationLocker struct {
+	lockedContests []string
+	err            error
+}
+
+func (m *mockRegistrationLocker) Lock(_ context.Context, contestID string) error {
+	m.lockedContests = append(m.lockedContests, contestID)
+	return m.err
+}

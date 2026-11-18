@@ -28,7 +28,7 @@ func newHandlerWithUpdateTeamRegistration(
 ) *Handler {
 	return &Handler{
 		updateTeamRegistration: appTeam.NewUpdateTeamRegistrationUseCase(
-			memberRepo, teamRepo, contestProvider, participRepo, indivChecker, groupChecker, userProvider, tx,
+			memberRepo, teamRepo, contestProvider, participRepo, indivChecker, groupChecker, userProvider, &noopRegistrationLocker{}, tx,
 		),
 	}
 }

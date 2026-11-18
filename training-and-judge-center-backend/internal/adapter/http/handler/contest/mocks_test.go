@@ -383,3 +383,7 @@ func (noopSessionInvalidator) InvalidateSession(context.Context, string, time.Ti
 func (noopSessionInvalidator) IsSessionInvalidated(context.Context, string) (bool, error) {
 	return false, nil
 }
+
+type noopRegistrationLocker struct{}
+
+func (n *noopRegistrationLocker) Lock(_ context.Context, _ string) error { return nil }

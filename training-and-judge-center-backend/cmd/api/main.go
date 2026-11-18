@@ -396,8 +396,10 @@ func main() {
 		contestRepo, contestGroupProvider, contestMemberProvider, contestParticipantProvider,
 	)
 	contestTeamSelectionChecker := adaptercontest.NewTeamSelectionChecker(dbPool)
+	contestRegistrationLocker := adaptercontest.NewRegistrationLocker(dbPool)
 	registerToContestUseCase := appcontest.NewRegisterToContestUseCase(
 		contestRepo, contestRegistrationRepo, contestMemberProvider, contestTeamSelectionChecker,
+		contestRegistrationLocker, txManager,
 	)
 	unregisterFromContestUseCase := appcontest.NewUnregisterFromContestUseCase(
 		contestRepo, contestRegistrationRepo, contestMemberProvider,
@@ -453,11 +455,11 @@ func main() {
 	getLeaveImpactUseCase := appteam.NewGetLeaveImpactUseCase(teamMemberRepo, teamScheduledCleaner)
 	registerTeamToContestUseCase := appteam.NewRegisterTeamToContestUseCase(
 		teamMemberRepo, teamRepo, teamContestProvider, contestTeamParticipationRepo,
-		teamIndivChecker, teamGroupMemberChecker, teamUserProvider, txManager,
+		teamIndivChecker, teamGroupMemberChecker, teamUserProvider, contestRegistrationLocker, txManager,
 	)
 	updateTeamRegistrationUseCase := appteam.NewUpdateTeamRegistrationUseCase(
 		teamMemberRepo, teamRepo, teamContestProvider, contestTeamParticipationRepo,
-		teamIndivChecker, teamGroupMemberChecker, teamUserProvider, txManager,
+		teamIndivChecker, teamGroupMemberChecker, teamUserProvider, contestRegistrationLocker, txManager,
 	)
 	unregisterTeamFromContestUseCase := appteam.NewUnregisterTeamFromContestUseCase(
 		teamMemberRepo, teamContestProvider, contestTeamParticipationRepo,
