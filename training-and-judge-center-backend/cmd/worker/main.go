@@ -57,7 +57,7 @@ const (
 	defaultStalePendingAfterMinutes    = 2
 	defaultStaleValidationAfterMinutes = 20
 	defaultTestDataDir                 = "/test-data"
-	defaultTestDataBudgetBytes         = 2048 << 20 // 2 GiB: eight problems like the largest one in use
+	defaultTestDataBudgetBytes         = 3072 << 20 // 3 GiB: twelve problems like the largest one in use
 )
 
 func main() {

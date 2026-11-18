@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"sync"
@@ -123,6 +124,7 @@ func (c *testDataCache) acquire(ctx context.Context, key string) (*cacheEntry, e
 	defer deadline.Stop()
 
 	size := int64(-1)
+	parked := &roomWait{cache: c, what: "an archive", key: key}
 	for {
 		c.mu.Lock()
 		if e, ok := c.entries[key]; ok {
@@ -138,22 +140,27 @@ func (c *testDataCache) acquire(ctx context.Context, key string) (*cacheEntry, e
 			if size, err = c.source.objectSize(ctx, key); err != nil {
 				return nil, err
 			}
+			parked.need = size
 			if size > c.limits.MaxZipBytes {
 				return nil, fmt.Errorf("%w: archive is %d bytes, over the %d byte limit", errInvalidTestData, size, c.limits.MaxZipBytes)
 			}
 			continue
 		}
 
-		reserved, wait := c.reserveLocked(key, size)
+		reserved, wait := c.reserveLocked(ctx, key, size)
+		used := c.used
 		c.mu.Unlock()
 		if reserved != nil {
+			parked.end(ctx)
 			return c.fill(ctx, key, reserved)
 		}
+		parked.begin(ctx, used)
 		select {
 		case <-wait:
 		case <-ctx.Done():
 			return nil, ctx.Err()
 		case <-deadline.C:
+			parked.giveUp(ctx)
 			return nil, errTestDataBusy
 		}
 	}
@@ -162,8 +169,8 @@ func (c *testDataCache) acquire(ctx context.Context, key string) (*cacheEntry, e
 // reserveLocked takes the archive's size of the budget for a new entry, evicting problems nobody
 // holds, least recently used first. When every problem is held it returns the channel to wait on
 // instead. Caller holds c.mu.
-func (c *testDataCache) reserveLocked(key string, size int64) (*cacheEntry, <-chan struct{}) {
-	if wait := c.makeRoomLocked(size); wait != nil {
+func (c *testDataCache) reserveLocked(ctx context.Context, key string, size int64) (*cacheEntry, <-chan struct{}) {
+	if wait := c.makeRoomLocked(ctx, size); wait != nil {
 		return nil, wait
 	}
 	sum := sha256.Sum256([]byte(key))
@@ -183,13 +190,13 @@ func (c *testDataCache) reserveLocked(key string, size int64) (*cacheEntry, <-ch
 
 // makeRoomLocked evicts until need more bytes fit, or returns the channel to wait on when what
 // is left is held. Caller holds c.mu.
-func (c *testDataCache) makeRoomLocked(need int64) <-chan struct{} {
+func (c *testDataCache) makeRoomLocked(ctx context.Context, need int64) <-chan struct{} {
 	for c.used+need > c.budget {
 		victim := c.oldestIdleLocked()
 		if victim == nil {
 			return c.changed
 		}
-		c.dropLocked(victim)
+		c.dropLocked(ctx, victim)
 	}
 	return nil
 }
@@ -207,10 +214,14 @@ func (c *testDataCache) oldestIdleLocked() *cacheEntry {
 	return oldest
 }
 
-func (c *testDataCache) dropLocked(e *cacheEntry) {
+// dropLocked evicts a problem nobody holds. It is logged because a problem that is evicted and then asked
+// for again costs a download and an extraction: repeated evictions are how an undersized budget shows.
+func (c *testDataCache) dropLocked(ctx context.Context, e *cacheEntry) {
 	delete(c.entries, e.key)
 	_ = os.RemoveAll(e.dir)
 	c.used -= e.reserved
+	slog.InfoContext(ctx, "test_data_cache: evicted an idle problem to make room",
+		"key", e.key, "freed_bytes", e.reserved, "idle_for", c.now().Sub(e.lastUsed).Round(time.Second), "used_bytes", c.used, "budget_bytes", c.budget)
 }
 
 // await waits for the download another caller started.
@@ -255,6 +266,7 @@ func (c *testDataCache) fill(ctx context.Context, key string, e *cacheEntry) (*c
 // the archive. The extraction is built in a scratch directory and renamed into place, so what
 // a judging can see is whole or absent.
 func (c *testDataCache) populate(ctx context.Context, e *cacheEntry) error {
+	started := time.Now()
 	dctx, cancel := context.WithTimeout(ctx, downloadTimeout)
 	defer cancel()
 
@@ -295,6 +307,9 @@ func (c *testDataCache) populate(ctx context.Context, e *cacheEntry) error {
 	c.used -= e.size
 	e.reserved -= e.size
 	c.mu.Unlock()
+
+	slog.InfoContext(ctx, "test_data_cache: problem cached",
+		"key", e.key, "archive_bytes", e.size, "extracted_bytes", plan.bytes, "cases", len(cases), "took", time.Since(started).Round(time.Millisecond))
 	return nil
 }
 
@@ -331,25 +346,62 @@ func (c *testDataCache) extend(ctx context.Context, e *cacheEntry, extra int64) 
 	deadline := time.NewTimer(c.maxWait)
 	defer deadline.Stop()
 
+	parked := &roomWait{cache: c, what: "the extraction of a problem", key: e.key, need: extra}
 	for {
 		c.mu.Lock()
-		wait := c.makeRoomLocked(extra)
+		wait := c.makeRoomLocked(ctx, extra)
 		if wait == nil {
 			c.used += extra
 			e.reserved += extra
 			c.mu.Unlock()
+			parked.end(ctx)
 			return nil
 		}
+		used := c.used
 		c.mu.Unlock()
+		parked.begin(ctx, used)
 
 		select {
 		case <-wait:
 		case <-ctx.Done():
 			return ctx.Err()
 		case <-deadline.C:
+			parked.giveUp(ctx)
 			return errTestDataBusy
 		}
 	}
+}
+
+// roomWait logs a judging's wait for disk: once when it starts, and once when it ends or is given up.
+// With the budget right a wait is rare, so each one is worth a line: it is how an undersized budget shows.
+type roomWait struct {
+	cache *testDataCache
+	what  string
+	key   string
+	need  int64
+	since time.Time
+}
+
+func (w *roomWait) begin(ctx context.Context, used int64) {
+	if !w.since.IsZero() {
+		return
+	}
+	w.since = w.cache.now()
+	slog.WarnContext(ctx, "test_data_cache: waiting for disk",
+		"for", w.what, "key", w.key, "need_bytes", w.need, "used_bytes", used, "budget_bytes", w.cache.budget)
+}
+
+func (w *roomWait) end(ctx context.Context) {
+	if w.since.IsZero() {
+		return
+	}
+	slog.InfoContext(ctx, "test_data_cache: got the disk it waited for",
+		"for", w.what, "key", w.key, "waited", w.cache.now().Sub(w.since).Round(time.Millisecond))
+}
+
+func (w *roomWait) giveUp(ctx context.Context) {
+	slog.ErrorContext(ctx, "test_data_cache: gave up waiting for disk",
+		"for", w.what, "key", w.key, "need_bytes", w.need, "waited", w.cache.now().Sub(w.since).Round(time.Millisecond))
 }
 
 // release drops one reference. A problem nobody holds stays on disk until the space is needed,

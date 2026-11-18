@@ -45,12 +45,12 @@ spec:
             sizeLimit: 2Gi
         # Test cases, extracted and cached so a judging copies them from local files and never holds a
         # problem's data in memory. Only the worker mounts it: the sandboxes cannot reach it. The code
-        # keeps it under testDataBudgetBytes (2Gi, judge_config.yaml), counting an archive while it is
+        # keeps it under testDataBudgetBytes (3Gi, judge_config.yaml), counting an archive while it is
         # being extracted; the sizeLimit is above that for the filesystem's own overhead. Together with
-        # the other two it is 14.5Gi, under the 17.53Gi the node allocates.
+        # the other two it is 15.5Gi, under the 17.53Gi the node allocates.
         - name: test-data
           emptyDir:
-            sizeLimit: 2560Mi
+            sizeLimit: 3584Mi
       initContainers:
         - name: dind
           image: docker:27-dind
