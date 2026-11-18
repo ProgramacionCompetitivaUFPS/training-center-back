@@ -196,7 +196,7 @@ Contests support different participation configurations:
 
 * **Redis projection**: Each contest has a cached projection `standings:{contestId}` with the raw attempt timestamps per participant and problem, plus team members, team names and profiles
 * **Computed on request**: Ranking, penalty, freeze and filters are applied in memory on every request from that projection
-* **Rebuild**: The projection is rebuilt from registrations, selected team members and judged submissions when it is missing; a projection older than 30 seconds is still served while a background refresh runs
+* **Rebuild**: The projection is rebuilt from registrations, selected team members and judged submissions when it is missing; a projection older than 5 seconds is still served while a background refresh runs
 * **No snapshot**: There is no final snapshot collection; standings of a finished contest stay stable because later submissions are ignored and the problem list is locked (a submission made before `endTime` and judged afterwards can still change them)
 
 ### Calculation

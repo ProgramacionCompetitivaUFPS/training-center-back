@@ -261,9 +261,9 @@ func main() {
 	// user profile stats adapters
 	rankingSource := user.NewRankingProvider(dbPool)
 	rankingCache := user.NewRankingCache(redisClient)
-	// Same 30s staleness as standings — nothing in HU-USR-21 requires this to be
+	// 30s staleness — nothing in HU-USR-21 requires this to be
 	// real-time (it tracks "progreso a largo plazo", explicitly not the live Dashboard),
-	// but there is no reason for it to be staler than standings either, and 30s keeps a
+	// but 30s keeps a
 	// live demo (solve something, immediately check the profile) from ever showing a
 	// visibly outdated number. See Validacion/rendimiento/resultados.md (tesis repo) for
 	// why this needed a cache at all: GetRanking aggregates every ACCEPTED submission
@@ -416,7 +416,7 @@ func main() {
 		contestTeamDisplayProvider, contestProblemProvider,
 		contestGroupProvider, contestMemberProvider,
 		contestStandingsCache,
-		30*time.Second,
+		5*time.Second,
 	)
 	listContestSubmissionsUseCase := appcontest.NewListContestSubmissionsUseCase(
 		contestRepo, contestGroupProvider, contestMemberProvider,
