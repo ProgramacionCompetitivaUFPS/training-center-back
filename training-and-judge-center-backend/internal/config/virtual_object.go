@@ -19,15 +19,11 @@ type VirtualObject struct {
 	UploadMaxConcurrency int               `json:"uploadMaxConcurrency"`
 	MaxFileCountSample   int               `json:"maxFileCountSample"`
 	MaxZipUploadSizeMB int `json:"maxZipUploadSizeMB"`
-	// MaxExtractedSizeMB caps the total uncompressed content of an imported ZIP.
-	// The worker loads all test-case files into memory at once (parseTestCasesZip),
-	// so this value directly determines peak worker memory usage:
-	//   peak ≈ MaxExtractedSizeMB × maxConcurrent × 1.5  (GC overhead factor)
-	//   maxConcurrent = floor(pod_cpu_cores) - docker_daemon_reserve_cores (min 1)
-	// Current pod: 2 Gi memory, 1 CPU, 1 reserve core → maxConcurrent = 1.
-	// Raise this value only after verifying the new math fits within the worker
-	// pod's memory limit (deploy/k8s/judge/worker.yaml). If the pod is also
-	// scaled up in CPU, re-derive maxConcurrent before raising this limit.
+	// MaxExtractedSizeMB caps the total uncompressed content of an uploaded ZIP. It bounds the
+	// CPU of checking one (every entry is decompressed once at upload and again when the worker
+	// caches it), not memory: the worker streams test cases from a cached file one at a time, so
+	// a larger value costs time, never worker memory. Disk is bounded by MaxZipUploadSizeMB, since
+	// only the archive is kept, and a single case by the per-file caps below.
 	MaxExtractedSizeMB int `json:"maxExtractedSizeMB"`
 	// Per-file caps. The answer's also bounds the largest token cmd/compare can meet.
 	MaxFileSizeTestCaseInputMB  int `json:"maxFileSizeTestCaseInputMB"`
@@ -91,4 +87,11 @@ func validateVirtualObject(vo *VirtualObject) error {
 			vo.MaxFileSizeTestCaseAnswerMB, vo.MaxFileSizeTestCaseInputMB)
 	}
 	return nil
+}
+
+// LoadVirtualObject reads the platform limits for a process that does not load the full
+// Config, like the judge worker, which must hold test data to the same limits the API
+// enforces at upload.
+func LoadVirtualObject() *VirtualObject {
+	return loadVirtualObject()
 }
