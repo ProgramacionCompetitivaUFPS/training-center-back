@@ -6,18 +6,17 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"math"
+	"os"
 	"path"
 	"path/filepath"
 	"sort"
 	"strings"
-	"sync"
-
-	appJudge "github.com/training-judge-center/backend/internal/application/judge"
 )
 
 // TestDataLimits bound what a test case archive may hold. They come from the same
 // virtual_object.json the API enforces at upload, so what the API let in is what the
-// worker accepts, and anything past them is refused before any case is read.
+// worker accepts, and anything past them is refused before any case is extracted.
 type TestDataLimits struct {
 	MaxZipBytes       int64
 	MaxExtractedBytes int64
@@ -46,98 +45,43 @@ func caseEntryPath(entryName string) (string, bool) {
 	return "", false
 }
 
-// verifyTestCaseZip is the worker's own check of an archive, run once when it is cached
-// and not per judging: the sizes it declares are within the limits, and every entry
-// really decompresses to what it declares. The standard library enforces the declared
-// size and the CRC as an entry is read, so reading each one to the end settles both.
-func verifyTestCaseZip(ctx context.Context, zipPath string, limits TestDataLimits) error {
-	zr, err := zip.OpenReader(zipPath)
-	if err != nil {
-		return fmt.Errorf("%w: %v", errInvalidTestData, err)
-	}
-	defer zr.Close()
+type plannedCase struct {
+	name   string
+	input  *zip.File
+	answer *zip.File
+}
 
+// extractionPlan is what an archive will put on disk: only the cases that have both files,
+// since nothing else in a package (statement, solutions) is ever read by a judging.
+type extractionPlan struct {
+	cases []plannedCase
+	// bytes is the disk the extracted cases take, by their declared sizes.
+	bytes int64
+}
+
+// planExtraction checks the archive's directory against the limits and lists the cases to
+// extract, in the order they are judged. It reads headers only, so a package past a limit is
+// refused before a single byte is decompressed.
+func planExtraction(zr *zip.Reader, limits TestDataLimits) (extractionPlan, error) {
 	var total uint64
 	files := 0
+	inputs := make(map[string]*zip.File)
+	answers := make(map[string]*zip.File)
+
 	for _, f := range zr.File {
 		if f.FileInfo().IsDir() {
 			continue
 		}
 		files++
 		if files > limits.MaxFiles {
-			return fmt.Errorf("%w: more than %d files", errInvalidTestData, limits.MaxFiles)
+			return extractionPlan{}, fmt.Errorf("%w: more than %d files", errInvalidTestData, limits.MaxFiles)
 		}
+		// Everything a package carries counts against the total, not only the test data.
 		if f.UncompressedSize64 > uint64(limits.MaxExtractedBytes) || total > uint64(limits.MaxExtractedBytes)-f.UncompressedSize64 {
-			return fmt.Errorf("%w: extracts to more than %d bytes", errInvalidTestData, limits.MaxExtractedBytes)
+			return extractionPlan{}, fmt.Errorf("%w: extracts to more than %d bytes", errInvalidTestData, limits.MaxExtractedBytes)
 		}
 		total += f.UncompressedSize64
 
-		if rel, ok := caseEntryPath(f.Name); ok {
-			switch strings.ToLower(filepath.Ext(rel)) {
-			case ".in":
-				if f.UncompressedSize64 > uint64(limits.MaxInputBytes) {
-					return fmt.Errorf("%w: %s declares %d bytes, over the %d byte input limit", errInvalidTestData, f.Name, f.UncompressedSize64, limits.MaxInputBytes)
-				}
-			case ".ans":
-				if f.UncompressedSize64 > uint64(limits.MaxAnswerBytes) {
-					return fmt.Errorf("%w: %s declares %d bytes, over the %d byte answer limit", errInvalidTestData, f.Name, f.UncompressedSize64, limits.MaxAnswerBytes)
-				}
-			}
-		}
-	}
-
-	for _, f := range zr.File {
-		if f.FileInfo().IsDir() {
-			continue
-		}
-		if err := ctx.Err(); err != nil {
-			return err
-		}
-		rc, err := f.Open()
-		if err != nil {
-			return fmt.Errorf("%w: %s: %v", errInvalidTestData, f.Name, err)
-		}
-		_, copyErr := io.Copy(io.Discard, rc)
-		rc.Close()
-		if copyErr != nil {
-			return fmt.Errorf("%w: %s: %v", errInvalidTestData, f.Name, copyErr)
-		}
-	}
-	return nil
-}
-
-type caseFiles struct {
-	input  *zip.File
-	answer *zip.File
-}
-
-// zipTestCaseSet serves the cases of one cached archive. It owns its own handle on the
-// file, so judgings sharing an archive share nothing but the bytes on disk.
-type zipTestCaseSet struct {
-	zr      *zip.ReadCloser
-	release func()
-	refs    []appJudge.TestCaseRef
-	files   map[string]caseFiles
-	once    sync.Once
-}
-
-var _ appJudge.TestCaseSet = (*zipTestCaseSet)(nil)
-
-// openZipTestCaseSet indexes the archive's directory, which is all it reads up front.
-// release runs when the set is closed, or at once if the archive cannot be opened.
-func openZipTestCaseSet(zipPath string, release func()) (*zipTestCaseSet, error) {
-	zr, err := zip.OpenReader(zipPath)
-	if err != nil {
-		release()
-		return nil, fmt.Errorf("%w: %v", errInvalidTestData, err)
-	}
-
-	inputs := make(map[string]*zip.File)
-	answers := make(map[string]*zip.File)
-	for _, f := range zr.File {
-		if f.FileInfo().IsDir() {
-			continue
-		}
 		rel, ok := caseEntryPath(f.Name)
 		if !ok || rel == "" {
 			continue
@@ -145,8 +89,14 @@ func openZipTestCaseSet(zipPath string, release func()) (*zipTestCaseSet, error)
 		name := strings.TrimSuffix(rel, filepath.Ext(rel))
 		switch strings.ToLower(filepath.Ext(rel)) {
 		case ".in":
+			if f.UncompressedSize64 > uint64(limits.MaxInputBytes) {
+				return extractionPlan{}, fmt.Errorf("%w: %s declares %d bytes, over the %d byte input limit", errInvalidTestData, f.Name, f.UncompressedSize64, limits.MaxInputBytes)
+			}
 			inputs[name] = f
 		case ".ans":
+			if f.UncompressedSize64 > uint64(limits.MaxAnswerBytes) {
+				return extractionPlan{}, fmt.Errorf("%w: %s declares %d bytes, over the %d byte answer limit", errInvalidTestData, f.Name, f.UncompressedSize64, limits.MaxAnswerBytes)
+			}
 			answers[name] = f
 		}
 	}
@@ -159,47 +109,102 @@ func openZipTestCaseSet(zipPath string, release func()) (*zipTestCaseSet, error)
 	}
 	sort.Strings(names)
 
-	set := &zipTestCaseSet{
-		zr:      zr,
-		release: release,
-		refs:    make([]appJudge.TestCaseRef, 0, len(names)),
-		files:   make(map[string]caseFiles, len(names)),
-	}
+	plan := extractionPlan{cases: make([]plannedCase, 0, len(names))}
 	for _, name := range names {
 		in, ans := inputs[name], answers[name]
-		set.refs = append(set.refs, appJudge.TestCaseRef{
-			Name:       name,
-			InputSize:  int64(in.UncompressedSize64),
-			AnswerSize: int64(ans.UncompressedSize64),
-		})
-		set.files[name] = caseFiles{input: in, answer: ans}
+		plan.cases = append(plan.cases, plannedCase{name: name, input: in, answer: ans})
+		plan.bytes += int64(in.UncompressedSize64) + int64(ans.UncompressedSize64)
 	}
-	return set, nil
+	return plan, nil
 }
 
-func (s *zipTestCaseSet) Cases() []appJudge.TestCaseRef { return s.refs }
-
-func (s *zipTestCaseSet) OpenInput(name string) (io.ReadCloser, error) {
-	cf, ok := s.files[name]
-	if !ok {
-		return nil, fmt.Errorf("test case %q not found", name)
-	}
-	return cf.input.Open()
+// cachedCase is one extracted case: where its two files are and how big they are.
+type cachedCase struct {
+	name       string
+	inputPath  string
+	answerPath string
+	inputSize  int64
+	answerSize int64
 }
 
-func (s *zipTestCaseSet) OpenAnswer(name string) (io.ReadCloser, error) {
-	cf, ok := s.files[name]
-	if !ok {
-		return nil, fmt.Errorf("test case %q not found", name)
+// writeFailure marks an error of our own disk, as opposed to one of the archive's data.
+type writeFailure struct{ err error }
+
+func (w *writeFailure) Error() string { return w.err.Error() }
+func (w *writeFailure) Unwrap() error { return w.err }
+
+type failureWriter struct{ w io.Writer }
+
+func (f failureWriter) Write(p []byte) (int, error) {
+	n, err := f.w.Write(p)
+	if err != nil {
+		return n, &writeFailure{err}
 	}
-	return cf.answer.Open()
+	return n, nil
 }
 
-func (s *zipTestCaseSet) Close() error {
-	var err error
-	s.once.Do(func() {
-		err = s.zr.Close()
-		s.release()
-	})
-	return err
+// extractTestCases writes the planned cases into writeDir, which must not exist yet, and reads
+// every one of them to the end: the standard library enforces the declared size and the CRC
+// as an entry is read, so extracting is also what verifies the archive.
+//
+// writeDir is a scratch directory that is renamed to finalDir afterwards, so the paths it returns
+// are the final ones: they must stay valid after the rename.
+//
+// Files are named by position and never by the entry's name, so nothing an archive says
+// can choose where a byte lands.
+func extractTestCases(ctx context.Context, plan extractionPlan, writeDir, finalDir string) ([]cachedCase, error) {
+	if err := os.MkdirAll(writeDir, 0o755); err != nil {
+		return nil, err
+	}
+
+	cases := make([]cachedCase, 0, len(plan.cases))
+	for i, pc := range plan.cases {
+		if err := ctx.Err(); err != nil {
+			return nil, err
+		}
+		base := fmt.Sprintf("%05d", i)
+		cc := cachedCase{
+			name:       pc.name,
+			inputPath:  filepath.Join(finalDir, base+".in"),
+			answerPath: filepath.Join(finalDir, base+".ans"),
+		}
+		var err error
+		if cc.inputSize, err = extractEntry(pc.input, filepath.Join(writeDir, base+".in")); err != nil {
+			return nil, err
+		}
+		if cc.answerSize, err = extractEntry(pc.answer, filepath.Join(writeDir, base+".ans")); err != nil {
+			return nil, err
+		}
+		cases = append(cases, cc)
+	}
+	return cases, nil
+}
+
+func extractEntry(f *zip.File, dst string) (int64, error) {
+	rc, err := f.Open()
+	if err != nil {
+		return 0, fmt.Errorf("%w: %s: %v", errInvalidTestData, f.Name, err)
+	}
+	defer rc.Close()
+
+	out, err := os.OpenFile(dst, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o600)
+	if err != nil {
+		return 0, err
+	}
+	n, copyErr := io.Copy(failureWriter{out}, rc)
+	closeErr := out.Close()
+
+	var wf *writeFailure
+	switch {
+	case errors.As(copyErr, &wf):
+		return 0, copyErr
+	case copyErr != nil:
+		return 0, fmt.Errorf("%w: %s: %v", errInvalidTestData, f.Name, copyErr)
+	case closeErr != nil:
+		return 0, closeErr
+	}
+	if n != int64(f.UncompressedSize64) || f.UncompressedSize64 > math.MaxInt64 {
+		return 0, fmt.Errorf("%w: %s has %d bytes, declared %d", errInvalidTestData, f.Name, n, f.UncompressedSize64)
+	}
+	return n, nil
 }

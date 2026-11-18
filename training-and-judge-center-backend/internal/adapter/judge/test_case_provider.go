@@ -61,10 +61,5 @@ func (p *TestCaseProvider) OpenAt(ctx context.Context, testCasesKey string) (app
 		return nil, apperror.NewInternal()
 	}
 
-	set, err := openZipTestCaseSet(entry.path, func() { p.cache.release(entry) })
-	if err != nil {
-		slog.ErrorContext(ctx, "test_case_provider: could not open the cached ZIP", "key", zipKey, "error", err)
-		return nil, apperror.NewInternal()
-	}
-	return set, nil
+	return newFileTestCaseSet(entry.cases, func() { p.cache.release(entry) }), nil
 }
