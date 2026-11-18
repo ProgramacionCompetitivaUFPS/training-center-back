@@ -1,6 +1,7 @@
 # Feature Specification: Delete Contest
 
 **Created**: 2026-01-03
+**Synced with the implementation**: 2026-11-18
 
 ## User Scenarios & Testing *(mandatory)*
 
@@ -10,98 +11,75 @@ As a Lead of a group, I want to delete a contest from my group so that I can rem
 
 **Why this priority**: Contest deletion is essential for managing contests and cleaning up unwanted competitions. Leads need the ability to remove contests from their groups.
 
-**Independent Test**: This user story can be tested independently by consuming the `DELETE /api/groups/{groupId}/contests/{contestId}` endpoint with valid Lead authentication, validating that the contest and related data are deleted correctly.
+**Independent Test**: This user story can be tested independently by consuming the `DELETE /groups/{groupId}/contests/{contestId}` endpoint with valid Lead authentication, validating that the contest and related data are deleted correctly.
 
 **Acceptance Scenarios**:
 
 1. **Scenario**: Successful contest deletion - SCHEDULED contest
    * **Given** a contest exists in a group with status SCHEDULED
    * **And** the authenticated user is a Lead of the group
-   * **And** the contest is not locked
    * **When** they submit a delete request
    * **Then** the system deletes the contest
    * **And** deletes all Contest_Problem associations
-   * **And** deletes the NoSQL collection `contest_{contestId}_standings`
-   * **And** deletes the final snapshot collection `contest_{contestId}_standings_final` (if exists)
-   * **And** sets `contest_id` to `null` for all submissions to problems in this contest
+   * **And** deletes the contest's registrations and team participations
+   * **And** removes the cached standings of the contest
+   * **And** sets `contest_id` to `null` for all submissions of the contest
    * **And** returns 204 No Content
 
-2. **Scenario**: Successful contest deletion - ACTIVE contest
+2. **Scenario**: Delete fails - contest is ACTIVE
    * **Given** a contest exists in a group with status ACTIVE
-   * **And** the authenticated user is a Lead of the group
-   * **And** the contest is not locked
-   * **And** the contest has submissions (some may be PENDING)
-   * **When** they submit a delete request
-   * **Then** the system deletes the contest
-   * **And** deletes all Contest_Problem associations
-   * **And** deletes the NoSQL collection `contest_{contestId}_standings`
-   * **And** deletes the final snapshot collection `contest_{contestId}_standings_final` (if exists)
-   * **And** sets `contest_id` to `null` for all submissions (including PENDING ones)
-   * **And** returns 204 No Content
+   * **And** the authenticated user is a Lead of the group (or an Admin)
+   * **When** they attempt to delete the contest
+   * **Then** the system rejects with 409 Conflict (`CONTEST_IS_ACTIVE`)
+   * **And** the contest and all its data are left untouched
 
 3. **Scenario**: Successful contest deletion - FINISHED contest
    * **Given** a contest exists in a group with status FINISHED
    * **And** the authenticated user is a Lead of the group
-   * **And** the contest is not locked
    * **When** they submit a delete request
    * **Then** the system deletes the contest
-   * **And** deletes all Contest_Problem associations
-   * **And** deletes the NoSQL collection `contest_{contestId}_standings`
-   * **And** deletes the final snapshot collection `contest_{contestId}_standings_final` (if exists)
-   * **And** sets `contest_id` to `null` for all submissions
+   * **And** deletes all Contest_Problem associations, registrations and team participations
+   * **And** removes the cached standings of the contest
+   * **And** sets `contest_id` to `null` for all submissions (including postcompetition ones)
    * **And** returns 204 No Content
 
 4. **Scenario**: Successful contest deletion - contest with problems and submissions
    * **Given** a contest exists with problems P1, P2, P3
    * **And** the contest has submissions to P1 and P2
    * **And** the authenticated user is a Lead of the group
-   * **And** the contest is not locked
    * **When** they submit a delete request
    * **Then** the system deletes the contest
    * **And** deletes all Contest_Problem associations (P1, P2, P3)
    * **And** problems P1, P2, P3 remain in the system (not deleted)
-   * **And** deletes the NoSQL collection `contest_{contestId}_standings`
-   * **And** deletes the final snapshot collection `contest_{contestId}_standings_final` (if exists)
    * **And** sets `contest_id` to `null` for all submissions to P1 and P2
    * **And** submissions remain in the system (orphaned, no contest association)
    * **And** returns 204 No Content
 
-5. **Scenario**: Delete fails - contest is locked
-   * **Given** a contest exists and is locked (`locked = true`)
-   * **And** the authenticated user is a Lead of the group
-   * **When** they attempt to delete the contest
-   * **Then** the system rejects with 403 Forbidden (CONTEST_LOCKED)
-   * **And** the contest is not deleted
-   * **And** indicates that the contest must be unlocked first
-
-6. **Scenario**: Delete fails - non-Lead attempts deletion
+5. **Scenario**: Delete fails - non-Lead attempts deletion
    * **Given** a contest exists in a group
    * **And** the authenticated user is a Member (not Lead) of the group
    * **When** they attempt to delete the contest
-   * **Then** the system rejects with 403 Forbidden (INSUFFICIENT_PERMISSIONS)
+   * **Then** the system rejects with 403 Forbidden (`INSUFFICIENT_PERMISSIONS`)
    * **And** the contest is not deleted
 
-7. **Scenario**: Delete fails - non-member attempts deletion
+6. **Scenario**: Delete fails - non-member attempts deletion
    * **Given** a contest exists in a group
    * **And** the authenticated user is not a member of the group
    * **And** the authenticated user is not an Admin
    * **When** they attempt to delete the contest
-   * **Then** the system rejects with 403 Forbidden (INSUFFICIENT_PERMISSIONS)
+   * **Then** the system rejects with 403 Forbidden (`INSUFFICIENT_PERMISSIONS`)
    * **And** the contest is not deleted
 
-8. **Scenario**: Delete fails - contest not found
+7. **Scenario**: Delete fails - contest not found
    * **Given** no contest exists with the provided contestId
-   * **And** the authenticated user is a Lead of the group
    * **When** they attempt to delete the contest
-   * **Then** the system rejects with 404 Not Found
-   * **And** indicates that the contest does not exist
+   * **Then** the system rejects with 404 Not Found (`CONTEST_NOT_FOUND`)
 
-9. **Scenario**: Delete fails - group not found
-   * **Given** no group exists with the provided groupId
-   * **And** the authenticated user is authenticated
-   * **When** they attempt to delete a contest
-   * **Then** the system rejects with 404 Not Found
-   * **And** indicates that the group does not exist
+8. **Scenario**: Delete fails - contest belongs to another group
+   * **Given** the contest exists but in a group different from `groupId` in the path
+   * **When** they attempt to delete the contest
+   * **Then** the system rejects with 404 Not Found (`CONTEST_NOT_FOUND`)
+   * **And** the same response is returned when the group does not exist
 
 ---
 
@@ -109,28 +87,25 @@ As a Lead of a group, I want to delete a contest from my group so that I can rem
 
 As an Admin, I want to delete contests in any group so that I can assist with administrative tasks and cleanup across the platform.
 
-**Why this priority**: Admin override capability is essential for platform management and support. Admins need the ability to delete contests when necessary.
+**Why this priority**: Admin override capability is essential for platform management and support.
 
-**Independent Test**: This user story can be tested independently by consuming the `DELETE /api/groups/{groupId}/contests/{contestId}` endpoint with Admin authentication on a group where they are not a member.
+**Independent Test**: Consume the `DELETE /groups/{groupId}/contests/{contestId}` endpoint with Admin authentication on a group where they are not a member.
 
 **Acceptance Scenarios**:
 
 1. **Scenario**: Admin deletes contest in group they don't belong to
    * **Given** a contest exists in a group
    * **And** the authenticated user has Admin role (not a member of the group)
-   * **And** the contest is not locked
    * **When** they submit a delete request
    * **Then** the system deletes the contest
-   * **And** performs all deletion operations (Contest_Problem, NoSQL collection, submissions `contest_id = null`)
+   * **And** performs all deletion operations (Contest_Problem, registrations, team participations, cached standings, submissions `contest_id = null`)
    * **And** returns 204 No Content
 
-2. **Scenario**: Admin cannot delete locked contest
-   * **Given** a contest exists and is locked (`locked = true`)
+2. **Scenario**: Admin cannot delete an ACTIVE contest
+   * **Given** a contest exists with status ACTIVE
    * **And** the authenticated user has Admin role
    * **When** they attempt to delete the contest
-   * **Then** the system rejects with 403 Forbidden (CONTEST_LOCKED)
-   * **And** the contest is not deleted
-   * **Note**: Even Admins cannot delete locked contests - must be unlocked first
+   * **Then** the system rejects with 409 Conflict (`CONTEST_IS_ACTIVE`)
 
 ---
 
@@ -140,75 +115,65 @@ As a Lead of the global group (Admin or assigned Coach), I want to delete contes
 
 **Why this priority**: Global contests need deletion capabilities. Leads of the global group should have full management permissions including deletion.
 
-**Independent Test**: This user story can be tested independently by consuming the `DELETE /api/groups/{globalGroupId}/contests/{contestId}` endpoint with Lead authentication (Admin or Coach who is Lead of global group).
+**Independent Test**: Consume the `DELETE /groups/{globalGroupId}/contests/{contestId}` endpoint with Lead authentication (Admin or Coach who is Lead of global group).
 
 **Acceptance Scenarios**:
 
 1. **Scenario**: Lead (Coach) deletes contest in global group
    * **Given** a contest exists in the global group (`is_default = true`)
    * **And** the authenticated user has Coach role and is a Lead of the global group
-   * **And** the contest is not locked
    * **When** they submit a delete request
    * **Then** the system deletes the contest
-   * **And** performs all deletion operations
    * **And** returns 204 No Content
 
-2. **Scenario**: Admin (Lead) deletes contest in global group
+2. **Scenario**: Admin deletes contest in global group
    * **Given** a contest exists in the global group (`is_default = true`)
-   * **And** the authenticated user has Admin role (automatically Lead of global group)
-   * **And** the contest is not locked
+   * **And** the authenticated user has Admin role
    * **When** they submit a delete request
    * **Then** the system deletes the contest
-   * **And** performs all deletion operations
    * **And** returns 204 No Content
 
 3. **Scenario**: Coach (non-Lead) attempts to delete contest in global group
    * **Given** a contest exists in the global group (`is_default = true`)
    * **And** the authenticated user has Coach role but is NOT a Lead of the global group
    * **When** they attempt to delete the contest
-   * **Then** the system rejects with 403 Forbidden (INSUFFICIENT_PERMISSIONS)
+   * **Then** the system rejects with 403 Forbidden (`INSUFFICIENT_PERMISSIONS`)
    * **And** the contest is not deleted
 
 4. **Scenario**: Contestant attempts to delete contest in global group
    * **Given** a contest exists in the global group (`is_default = true`)
    * **And** the authenticated user has Contestant role
    * **When** they attempt to delete the contest
-   * **Then** the system rejects with 403 Forbidden (INSUFFICIENT_PERMISSIONS)
+   * **Then** the system rejects with 403 Forbidden (`INSUFFICIENT_PERMISSIONS`)
    * **And** the contest is not deleted
 
 ---
 
 ### Edge Cases
 
-* Deleting contest with no problems (should succeed).
-* Deleting contest with no submissions (should succeed).
-* Deleting contest with no registrations (should succeed).
-* Deleting contest with no standings (should succeed).
-* Deleting contest while submissions are being processed (submissions become orphaned).
-* Deleting contest while standings are being calculated (should handle gracefully).
-* Concurrent delete requests for the same contest (should be idempotent or handle race conditions).
-* Deleting contest when group is being deleted simultaneously.
-* Deleting contest that was just created (no data yet).
-* Deleting contest with very large number of submissions (performance consideration).
+* Deleting contest with no problems, submissions or registrations (should succeed).
+* Deleting a contest whose standings were never requested (nothing cached; should succeed).
+* Deleting a contest that has submissions still being judged (their `contest_id` becomes `null`).
+* Concurrent delete requests for the same contest (the second one returns 404).
+* Deleting a contest that was just created (no data yet).
+* Deleting a contest with a very large number of submissions (performance consideration).
+* A `locked` contest is **not** protected from deletion (see Not Enforced below).
 
 ---
 
 ## API Contract
 
-### DELETE /api/groups/{groupId}/contests/{contestId}
+### DELETE /groups/{groupId}/contests/{contestId}
 
-Delete an existing contest and all associated data.
+Delete an existing contest and its associated data.
 
-> **Important**: 
-> - For regular groups: only Leads and Admin can delete contests
-> - For global group: only Leads of the global group (Admin and assigned Coaches) can delete contests
-> - Locked contests cannot be deleted (must be unlocked first)
-> - Contest can be deleted in any status (SCHEDULED, ACTIVE, FINISHED)
+> **Important**:
+> - For regular groups and the global group: only Leads of the group and Admins can delete contests (an Admin needs no membership)
+> - Contest can be deleted when SCHEDULED or FINISHED; an ACTIVE contest cannot be deleted
 > - Problems are NOT deleted (they are global entities)
 > - Submissions are NOT deleted, but `contest_id` is set to `null` (become orphaned)
-> - Contest_Problem associations are deleted
-> - NoSQL collection `contest_{contestId}_standings` is deleted
-> - Final snapshot `contest_{contestId}_standings_final` is deleted if it exists
+> - Contest_Problem associations, registrations and team participations are deleted (cascade)
+> - The cached standings (`standings:{contestId}`) are removed on a best-effort basis
 
 **Headers**:
 
@@ -241,43 +206,32 @@ Authentication failed.
 ```
 
 #### 403 Forbidden
-User doesn't have permission or contest is locked.
+User is not a Lead of the group and is not an Admin.
 
 ```json
 {
   "error": "INSUFFICIENT_PERMISSIONS",
-  "message": "Only group Leads and Admin can delete contests in this group"
-}
-```
-
-```json
-{
-  "error": "INSUFFICIENT_PERMISSIONS",
-  "message": "Only Leads of the global group can delete contests"
-}
-```
-
-```json
-{
-  "error": "CONTEST_LOCKED",
-  "message": "Contest is locked and cannot be deleted. Please unlock the contest first."
+  "message": "only leads and admins can delete contests"
 }
 ```
 
 #### 404 Not Found
-Group or contest not found.
+Contest not found, or it does not belong to the group in the path.
 
 ```json
 {
-  "error": "NOT_FOUND",
-  "message": "Group not found"
+  "error": "CONTEST_NOT_FOUND",
+  "message": "contest not found"
 }
 ```
 
+#### 409 Conflict
+The contest is ACTIVE.
+
 ```json
 {
-  "error": "NOT_FOUND",
-  "message": "Contest not found"
+  "error": "CONTEST_IS_ACTIVE",
+  "message": "cannot delete an active contest"
 }
 ```
 
@@ -291,18 +245,17 @@ Group or contest not found.
 * **FR-DC-001**: The system MUST allow Leads to delete contests in their groups.
 * **FR-DC-002**: The system MUST allow Admin to delete contests in any group (has implicit Lead permissions).
 * **FR-DC-003**: The system MUST allow only Leads of the global group to delete contests in the global group (Admin is automatically Lead, and Admin can assign other Coaches as Leads).
-* **FR-DC-005**: The system MUST allow deletion of contests in any status (SCHEDULED, ACTIVE, FINISHED).
-* **FR-DC-006**: The system MUST prevent deletion of locked contests (must be unlocked first).
+* **FR-DC-005**: The system MUST allow deletion of contests in status SCHEDULED or FINISHED.
+* **FR-DC-006**: The system MUST reject the deletion of an ACTIVE contest with 409 `CONTEST_IS_ACTIVE`.
 
 **Data Deletion**
 * **FR-DC-007**: The system MUST delete the Contest record when deletion is requested.
-* **FR-DC-008**: The system MUST delete all Contest_Problem associations (cascade delete).
-* **FR-DC-009**: The system MUST delete the NoSQL collection `contest_{contestId}_standings` when contest is deleted.
-* **FR-DC-010**: The system MUST delete the final snapshot collection `contest_{contestId}_standings_final` when contest is deleted (if it exists).
+* **FR-DC-008**: The system MUST delete all Contest_Problem associations, registrations and team participations (cascade delete).
+* **FR-DC-009**: The system MUST remove the cached standings projection (`standings:{contestId}`) of the contest. A failure to remove it MUST NOT fail the request.
 
 **Submissions Handling**
 * **FR-DC-011**: The system MUST NOT delete submissions when a contest is deleted.
-* **FR-DC-012**: The system MUST set `contest_id` to `null` for all submissions to problems in the deleted contest.
+* **FR-DC-012**: The system MUST set `contest_id` to `null` for all submissions of the deleted contest.
 * **FR-DC-013**: The system MUST handle submissions in PENDING state (set `contest_id` to `null` even if still being judged).
 
 **Problems Handling**
@@ -310,16 +263,13 @@ Group or contest not found.
 * **FR-DC-015**: Problems remain available for use in other contests.
 
 **Permissions**
-* **FR-DC-016**: For regular groups, only Leads and Admin can delete contests.
-* **FR-DC-017**: For the global group, only Leads of the global group can delete contests.
+* **FR-DC-016**: Only Leads of the contest's group and Admin can delete contests.
 * **FR-DC-018**: Members who are not Leads MUST NOT be able to delete contests in any group.
 * **FR-DC-019**: Contestants MUST NOT be able to delete contests in any group.
 * **FR-DC-020**: Coaches who are not Leads of the global group MUST NOT be able to delete contests in the global group.
 
 **Validation**
-* **FR-DC-021**: The system MUST validate that the contest exists before attempting deletion.
-* **FR-DC-022**: The system MUST validate that the group exists before attempting deletion.
-* **FR-DC-023**: The system MUST validate that the contest is not locked before allowing deletion.
+* **FR-DC-021**: The system MUST validate that the contest exists and belongs to the group in the path before attempting deletion; otherwise it returns 404 `CONTEST_NOT_FOUND`.
 * **FR-DC-024**: The system MUST validate user permissions before allowing deletion.
 
 **Response**
@@ -334,34 +284,25 @@ Group or contest not found.
   * **Deletion**: Hard delete - record is permanently removed
 
 * **Contest_Problem**: Links problems to contests with ordering.
-  * `id` (string, UUID, PK)
-  * `contest_id` (string, UUID, FK to Contest)
-  * `problem_id` (string, UUID, FK to Problem)
-  * `order` (integer)
+  * `contest_id` (FK to Contest, `ON DELETE CASCADE`)
   * **Deletion**: Cascade delete when contest is deleted
 
-* **Standing/Register Collection**: NoSQL collection containing registration and standing data.
-  * Collection name: `contest_{contestId}_standings`
-  * Document structure: See Register to Contest spec for full document schema
-  * **Deletion**: Entire collection deleted when contest is deleted
-  * **Snapshot**: Final snapshot created in `contest_{contestId}_standings_final` when contest ends (deleted when contest is deleted)
+* **Contest registrations and team participations**: Who is registered to the contest (individually or as a team).
+  * `contest_id` (FK to Contest, `ON DELETE CASCADE`)
+  * **Deletion**: Cascade delete when contest is deleted
+
+* **Standings cache**: Redis key `standings:{contestId}` (see View contest standings spec).
+  * **Deletion**: Removed best-effort; a stale entry would never be served for a deleted contest
 
 * **Submission**: Represents a contestant's solution attempt.
-  * `id` (string, UUID, PK)
-  * `contest_id` (string, UUID, FK to Contest, nullable)
-  * `problem_id` (string, UUID, FK to Problem)
-  * `contestant_id` (string, UUID, FK to User)
-  * Other attributes as defined in Submission spec
+  * `contest_id` (FK to Contest, nullable, `ON DELETE SET NULL`)
   * **Deletion**: NOT deleted, but `contest_id` is set to `null` when contest is deleted
 
 * **Problem**: Represents a programming problem.
-  * `id` (string, UUID, PK)
-  * Other attributes as defined in Problem spec
   * **Deletion**: NOT deleted (problems are global entities)
 
 > **Deletion Behavior Summary**:
-> * **Deleted**: Contest, Contest_Problem, NoSQL collection `contest_{contestId}_standings`
-> * **Deleted**: Final snapshot `contest_{contestId}_standings_final` (if exists)
+> * **Deleted**: Contest, Contest_Problem, contest registrations, team participations, cached standings
 > * **Not Deleted**: Problem, Submission
 > * **Updated**: Submission.`contest_id` → `null` (orphaned submissions)
 
@@ -376,21 +317,19 @@ Group or contest not found.
 ### Deletion Flow
 
 ```
-DELETE /api/groups/{groupId}/contests/{contestId}
+DELETE /groups/{groupId}/contests/{contestId}
     ↓
-Validate permissions (Lead/Admin)
+Load contest (404 CONTEST_NOT_FOUND if missing or in another group)
     ↓
-Validate contest exists and is not locked
+Validate permissions (Lead of the group, or Admin) → 403
+    ↓
+Reject if the contest is ACTIVE → 409 CONTEST_IS_ACTIVE
     ↓
 Delete Contest record
+(cascade: Contest_Problem, registrations, team participations;
+ submissions.contest_id → NULL)
     ↓
-Cascade delete Contest_Problem records
-    ↓
-Delete NoSQL collection contest_{contestId}_standings
-    ↓
-Delete final snapshot collection contest_{contestId}_standings_final (if exists)
-    ↓
-Update Submission records (SET contest_id = NULL WHERE contest_id = contestId)
+Remove cached standings (best effort)
     ↓
 Return 204 No Content
 ```
@@ -401,31 +340,35 @@ Return 204 No Content
 
 ### Measurable Outcomes
 
-* **SC-DC-001**: Leads can delete contests in their groups via `DELETE /api/groups/{groupId}/contests/{contestId}` with HTTP 204.
+* **SC-DC-001**: Leads can delete contests in their groups via `DELETE /groups/{groupId}/contests/{contestId}` with HTTP 204.
 * **SC-DC-002**: Admin can delete contests in any group with HTTP 204.
 * **SC-DC-003**: Leads of the global group can delete contests in global group with HTTP 204.
-* **SC-DC-004**: Locked contests cannot be deleted - HTTP 403.
+* **SC-DC-004**: ACTIVE contests cannot be deleted - HTTP 409 `CONTEST_IS_ACTIVE`.
 * **SC-DC-005**: Non-Lead non-admin users cannot delete contests in regular groups - HTTP 403.
 * **SC-DC-006**: Non-Lead users cannot delete contests in global group - HTTP 403.
-* **SC-DC-007**: Contest can be deleted in any status (SCHEDULED, ACTIVE, FINISHED).
+* **SC-DC-007**: A SCHEDULED or FINISHED contest can be deleted.
 * **SC-DC-008**: Contest record is permanently deleted from database.
-* **SC-DC-009**: All Contest_Problem associations are deleted.
-* **SC-DC-010**: NoSQL collection `contest_{contestId}_standings` is deleted.
-* **SC-DC-011**: Final snapshot collection `contest_{contestId}_standings_final` is deleted (if exists).
+* **SC-DC-009**: All Contest_Problem associations, registrations and team participations are deleted.
+* **SC-DC-010**: The cached standings of the contest are removed.
 * **SC-DC-012**: Problems are NOT deleted (remain in system).
-* **SC-DC-013**: Submissions are NOT deleted but have `contest_id` set to `null`.
-* **SC-DC-014**: Submissions in PENDING state are handled correctly (`contest_id` set to `null`).
-* **SC-DC-015**: Non-existent contests return HTTP 404.
-* **SC-DC-016**: Non-existent groups return HTTP 404.
+* **SC-DC-013**: Submissions are NOT deleted but have `contest_id` set to `null`, including those still PENDING.
+* **SC-DC-015**: Non-existent contests, or contests of another group, return HTTP 404.
 * **SC-DC-017**: Unauthorized requests return HTTP 401.
-* **SC-DC-018**: Deletion is idempotent (deleting already-deleted contest returns 404).
+* **SC-DC-018**: Deletion is idempotent in outcome (deleting an already-deleted contest returns 404).
+
+---
+
+## Not Enforced
+
+* **Locked contests**: an earlier draft required rejecting deletion of a contest with `locked = true` (403 `CONTEST_LOCKED`, even for Admin). The current implementation does **not** check `locked` when deleting, so a locked contest can be deleted by its Leads and Admins.
+* **Distinct "group not found"**: the response for a missing group is the same 404 `CONTEST_NOT_FOUND` as for a missing contest.
 
 ---
 
 ## Optional Notes
 
-* **Idempotency**: Deleting a non-existent contest returns 404, making the operation idempotent.
-* **Cascade Deletion**: Database-level cascade constraints may be used for Contest_Problem deletion.
+* **Idempotency**: Deleting a non-existent contest returns 404.
+* **Cascade Deletion**: Contest_Problem, registrations and team participations are removed by database-level `ON DELETE CASCADE`; submissions are detached by `ON DELETE SET NULL`.
 * **Performance**: For contests with many submissions, consider batch updates for setting `contest_id` to `null`.
 * **Audit Trail**: Consider logging contest deletions for administrative purposes (future enhancement).
 * **Soft Delete**: Current implementation uses hard delete. Soft delete could be considered for future versions to allow recovery.
@@ -433,5 +376,4 @@ Return 204 No Content
   * Create Contest: Initial contest creation
   * Update Contest: Modifying contest details
   * View Contest: Contest details and problem list
-  * Contest Standings: Standing calculation details
-
+  * View Contest Standings: Standing calculation details

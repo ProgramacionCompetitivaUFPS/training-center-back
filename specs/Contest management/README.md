@@ -49,7 +49,7 @@ SCHEDULED ──(startTime reached)──> ACTIVE ──(endTime reached)──>
 * **Contest Owner**: Can lock/unlock their contest
 * **Group Lead**: Can manage contests in their group (all Leads can update and delete, including in global group)
 * **Admin**: Can manage any contest (can lock/unlock and delete any contest, has implicit Lead permissions)
-* **Locked Contests**: Cannot be modified or deleted except by owner or admin (who can lock/unlock)
+* **Locked Contests**: Cannot be modified except by owner or admin (who can lock/unlock). Deletion is not blocked by the lock (see Delete contest spec, "Not Enforced")
 
 ---
 
@@ -256,10 +256,12 @@ Contests support different participation configurations:
 
 ### When a Contest is Deleted
 
+An `ACTIVE` contest cannot be deleted (409 `CONTEST_IS_ACTIVE`); `SCHEDULED` and `FINISHED` contests can.
+
 | Entity | Action |
 |--------|--------|
 | Contest | Hard delete |
-| Contest_Problem | Hard delete (cascade) |
+| Contest_Problem, registrations, team participations | Hard delete (cascade) |
 | Standings cache | Removed (Redis key `standings:{contestId}`) |
 | Submission | Preserved with `contest_id = NULL` (orphaned) |
 | Problem | NOT deleted (global entities) |
@@ -401,11 +403,10 @@ Export Standings (P2) ← (CSV, PDF, Excel export)
 * **User history**: Users can see their submission history even if contest is deleted
 * **Problem statistics**: Problems maintain their submission statistics across contests
 
-### Why can't locked contests be deleted?
+### Why can't active contests be deleted?
 
-* **Safety**: Prevents accidental deletion of important contests
-* **Explicit action**: Requires intentional unlock before deletion
-* **Audit trail**: Ensures deletion is a deliberate action, not accidental
+* **Safety**: Participants are submitting and standings are live; deleting would orphan work in progress
+* **Explicit action**: Wait for the contest to end before deleting it
 
 ### Why postcompetition phase?
 
