@@ -79,7 +79,7 @@ func activeContest() *domainContest.Contest {
 
 // withProblem puts a problem in the contest: standings count only the problems the contest has.
 func withProblem(c *domainContest.Contest, problemID string) *domainContest.Contest {
-	c.SetProblems([]domainContest.ContestProblem{domainContest.RestoreContestProblem("cp-"+problemID, problemID, 1)}, testNow)
+	c.SetProblems([]domainContest.ContestProblem{domainContest.RestoreContestProblem("cp-"+problemID, problemID, 1, nil)}, testNow)
 	return c
 }
 

@@ -100,9 +100,26 @@ func TestContestProblemLetter(t *testing.T) {
 		{703, "AAA"},
 	}
 	for _, tc := range cases {
-		cp := contest.RestoreContestProblem("id", "pid", tc.order)
+		cp := contest.RestoreContestProblem("id", "pid", tc.order, nil)
 		if got := cp.Letter(); got != tc.letter {
 			t.Errorf("order %d: expected letter %q, got %q", tc.order, tc.letter, got)
 		}
 	}
+}
+
+func TestContestProblemColor(t *testing.T) {
+	t.Run("without color", func(t *testing.T) {
+		cp := contest.RestoreContestProblem("id", "pid", 1, nil)
+		if cp.Color() != nil {
+			t.Errorf("Color() = %v, want nil", cp.Color())
+		}
+	})
+
+	t.Run("with color", func(t *testing.T) {
+		color := contest.RestoreProblemColor("#aabbcc")
+		cp := contest.RestoreContestProblem("id", "pid", 1, &color)
+		if cp.Color() == nil || cp.Color().Value() != "#aabbcc" {
+			t.Errorf("Color() = %v, want #aabbcc", cp.Color())
+		}
+	})
 }

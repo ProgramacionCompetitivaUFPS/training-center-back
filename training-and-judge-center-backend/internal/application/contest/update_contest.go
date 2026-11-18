@@ -166,9 +166,9 @@ func (uc *UpdateContestUseCase) Execute(ctx context.Context, in UpdateContestInp
 		newProblems := make([]domainContest.ContestProblem, 0, len(newProblemEntries))
 		for _, pe := range newProblemEntries {
 			if existing, ok := existingByProblemID[pe.id]; ok {
-				newProblems = append(newProblems, domainContest.RestoreContestProblem(existing.ID(), pe.id, pe.order))
+				newProblems = append(newProblems, domainContest.RestoreContestProblem(existing.ID(), pe.id, pe.order, nil))
 			} else {
-				newProblems = append(newProblems, domainContest.RestoreContestProblem(uuid.New().String(), pe.id, pe.order))
+				newProblems = append(newProblems, domainContest.RestoreContestProblem(uuid.New().String(), pe.id, pe.order, nil))
 			}
 		}
 		c.SetProblems(newProblems, now)

@@ -200,7 +200,7 @@ func TestGetContest_NonMemberSeesProblemsOnceStarted(t *testing.T) {
 		shared.RestoreUserID(otherID),
 		domainContest.RestoreParticipationMode("INDIVIDUAL"), domainContest.RestoreTeamSize(2, 5),
 		[]domainContest.ContestProblem{
-			domainContest.RestoreContestProblem("cp-1", testProblemID, 1),
+			domainContest.RestoreContestProblem("cp-1", testProblemID, 1, nil),
 		},
 		testNow.Add(-time.Hour),
 		nil,
@@ -270,7 +270,7 @@ func newTestContestWithProblems(ownerID string) *domainContest.Contest {
 		shared.RestoreUserID(ownerID),
 		domainContest.RestoreParticipationMode("INDIVIDUAL"), domainContest.RestoreTeamSize(2, 5),
 		[]domainContest.ContestProblem{
-			domainContest.RestoreContestProblem("cp-1", testProblemID, 1),
+			domainContest.RestoreContestProblem("cp-1", testProblemID, 1, nil),
 		},
 		testNow.Add(-time.Hour),
 		nil,
