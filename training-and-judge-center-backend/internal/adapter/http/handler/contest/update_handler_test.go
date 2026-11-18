@@ -155,3 +155,109 @@ func TestUpdateContest_ContestNotFound_Returns404(t *testing.T) {
 		t.Fatalf("expected 404, got %d: %s", w.Code, w.Body.String())
 	}
 }
+
+// coloredUpdateRepo holds a contest whose problem "p1" (the one mockProblemProvider resolves every slug to) is red.
+type coloredUpdateRepo struct{ stubUpdateRepo }
+
+func (s *coloredUpdateRepo) FindByID(ctx context.Context, id string) (*domainContest.Contest, error) {
+	c, err := s.stubUpdateRepo.FindByID(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+	red := domainContest.RestoreProblemColor("#aabbcc")
+	c.SetProblems([]domainContest.ContestProblem{domainContest.RestoreContestProblem("cp1", "p1", 1, &red)}, time.Now())
+	return c, nil
+}
+
+func updateWithColoredProblem() *appcontest.UpdateContestUseCase {
+	return appcontest.NewUpdateContestUseCase(
+		&coloredUpdateRepo{},
+		&mockGroupProvider{},
+		&mockMemberProvider{isLead: true, isMember: true},
+		&mockProblemProvider{},
+		&mockOwnerProvider{},
+		&mockTeamParticipRepo{},
+		&mockTransactionManager{},
+	)
+}
+
+func putProblems(t *testing.T, uc *appcontest.UpdateContestUseCase, problemsJSON string) *httptest.ResponseRecorder {
+	t.Helper()
+	r := authedRequest(http.MethodPut, "/groups/g1/contests/c1", []byte(`{"problems":`+problemsJSON+`}`))
+	r.SetPathValue("groupId", "g1")
+	r.SetPathValue("contestId", "c1")
+	w := httptest.NewRecorder()
+	wrapAuth(http.HandlerFunc(newHandlerWithUpdate(uc).Update)).ServeHTTP(w, r)
+	return w
+}
+
+// colorKeyOf returns the raw "color" key of the first problem of an update response, so a missing key
+// and an explicit null can be told apart.
+func colorKeyOf(t *testing.T, body []byte) (value interface{}, present bool) {
+	t.Helper()
+	var raw struct {
+		Problems []map[string]interface{} `json:"problems"`
+	}
+	if err := json.Unmarshal(body, &raw); err != nil || len(raw.Problems) == 0 {
+		t.Fatalf("could not decode problems from %s: %v", body, err)
+	}
+	value, present = raw.Problems[0]["color"]
+	return value, present
+}
+
+func TestUpdateContest_ColorInBodyIsAnsweredLowercased(t *testing.T) {
+	w := putProblems(t, updateWithColoredProblem(), `[{"slug":"a","order":1,"color":"#112233"},{"slug":"b","order":2}]`)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+	if got, _ := colorKeyOf(t, w.Body.Bytes()); got != "#112233" {
+		t.Errorf("color = %v, want #112233", got)
+	}
+}
+
+func TestUpdateContest_OmittedColorKeepsTheCurrentOne(t *testing.T) {
+	w := putProblems(t, updateWithColoredProblem(), `[{"slug":"a","order":1}]`)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+	if got, _ := colorKeyOf(t, w.Body.Bytes()); got != "#aabbcc" {
+		t.Errorf("color = %v, want #aabbcc", got)
+	}
+}
+
+func TestUpdateContest_NullColorClearsTheCurrentOneAndIsAnsweredAsNull(t *testing.T) {
+	w := putProblems(t, updateWithColoredProblem(), `[{"slug":"a","order":1,"color":null}]`)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+	got, present := colorKeyOf(t, w.Body.Bytes())
+	if !present || got != nil {
+		t.Errorf("color = %v (present=%v), want an explicit null", got, present)
+	}
+}
+
+func TestUpdateContest_InvalidColor_Returns400WithItsCode(t *testing.T) {
+	w := putProblems(t, updateWithColoredProblem(), `[{"slug":"a","order":1,"color":"red"}]`)
+
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400, got %d: %s", w.Code, w.Body.String())
+	}
+	var resp apperror.AppError
+	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
+		t.Fatalf("could not decode error: %v", err)
+	}
+	if resp.Code != domainContest.ErrCodeInvalidProblemColor {
+		t.Errorf("error = %q, want %q", resp.Code, domainContest.ErrCodeInvalidProblemColor)
+	}
+}
+
+func TestUpdateContest_NonStringColor_Returns400(t *testing.T) {
+	w := putProblems(t, updateWithColoredProblem(), `[{"slug":"a","order":1,"color":123}]`)
+
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400, got %d: %s", w.Code, w.Body.String())
+	}
+}
