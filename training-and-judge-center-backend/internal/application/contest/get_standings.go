@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"golang.org/x/sync/errgroup"
+	"golang.org/x/sync/singleflight"
 
 	appshared "github.com/training-judge-center/backend/internal/application/shared"
 	domainContest "github.com/training-judge-center/backend/internal/domain/contest"
@@ -14,6 +15,11 @@ import (
 )
 
 const maxStandingsParticipants = 10_000
+
+const (
+	standingsRebuildTimeout = 30 * time.Second
+	standingsRefreshLockTTL = 45 * time.Second
+)
 
 // RankedProblem is the per-problem view returned in a RankedEntry.
 type RankedProblem struct {
@@ -113,7 +119,7 @@ type GetStandingsUseCase struct {
 	memberProvider       GroupMemberProvider
 	standingsCache       StandingsCache
 	staleness            time.Duration
-	lockTTL              time.Duration
+	rebuilds             singleflight.Group
 }
 
 func NewGetStandingsUseCase(
@@ -141,7 +147,6 @@ func NewGetStandingsUseCase(
 		memberProvider:       memberProvider,
 		standingsCache:       standingsCache,
 		staleness:            staleness,
-		lockTTL:              staleness * 2,
 	}
 }
 
@@ -216,7 +221,7 @@ func (uc *GetStandingsUseCase) Execute(ctx context.Context, in GetStandingsInput
 
 	// Cache miss or cache error (already logged by the cache adapter): rebuild from the
 	// source. rebuild's Set also overwrites an entry that failed to unmarshal.
-	rebuilt, err := uc.rebuild(ctx, contest)
+	rebuilt, err := uc.rebuildOnce(ctx, contest)
 	if err != nil {
 		return nil, err
 	}
@@ -256,7 +261,7 @@ func (uc *GetStandingsUseCase) ExecuteFilterOptions(ctx context.Context, in GetS
 			go uc.backgroundRefresh(in.ContestID)
 		}
 	} else {
-		cached, err = uc.rebuild(ctx, contest)
+		cached, err = uc.rebuildOnce(ctx, contest)
 		if err != nil {
 			return nil, err
 		}
@@ -287,6 +292,20 @@ func distinctProfileField(profiles map[string]*ParticipantProfile, field func(*P
 	}
 	sort.Strings(values)
 	return values
+}
+
+// rebuildOnce makes concurrent rebuilds of one contest share a single run, bounded by
+// standingsRebuildTimeout and detached from any caller's cancellation.
+func (uc *GetStandingsUseCase) rebuildOnce(ctx context.Context, contest *domainContest.Contest) (*CachedStandings, error) {
+	v, err, _ := uc.rebuilds.Do(contest.ID(), func() (any, error) {
+		rebuildCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), standingsRebuildTimeout)
+		defer cancel()
+		return uc.rebuild(rebuildCtx, contest)
+	})
+	if err != nil {
+		return nil, err
+	}
+	return v.(*CachedStandings), nil
 }
 
 // rebuild counts only the submissions of the problems the contest has right now: a problem taken out
@@ -432,7 +451,7 @@ func (uc *GetStandingsUseCase) rebuild(ctx context.Context, contest *domainConte
 
 func (uc *GetStandingsUseCase) backgroundRefresh(contestID string) {
 	ctx := context.Background()
-	acquired, err := uc.standingsCache.AcquireRefreshLock(ctx, contestID, uc.lockTTL)
+	acquired, err := uc.standingsCache.AcquireRefreshLock(ctx, contestID, standingsRefreshLockTTL)
 	if err != nil || !acquired {
 		return
 	}
@@ -444,7 +463,7 @@ func (uc *GetStandingsUseCase) backgroundRefresh(contestID string) {
 		return
 	}
 
-	if _, err := uc.rebuild(ctx, contest); err != nil {
+	if _, err := uc.rebuildOnce(ctx, contest); err != nil {
 		slog.ErrorContext(ctx, "standings background refresh failed", "contest_id", contestID, "error", err)
 	}
 }

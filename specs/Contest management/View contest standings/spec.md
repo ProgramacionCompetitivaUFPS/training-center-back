@@ -427,7 +427,7 @@ List the distinct values available for the standings filters. Same authenticatio
 
 - **FR-011**: When there is no cached projection, the system MUST rebuild it from the registrations, selected team members and judged submissions of the contest (at most 10,000 participants).
 
-- **FR-012**: A projection older than 5 seconds is still served, and a background refresh is triggered (guarded by the lock `lock:standings:{contestId}`). The refresh is triggered by a request and the stale data is what that request receives, so a later request is needed to see the refreshed data; changes to the contest's problems are reflected only after such a refresh, and a failed refresh delays them further.
+- **FR-012**: A projection older than 5 seconds is still served, and a background refresh is triggered (guarded by the lock `lock:standings:{contestId}`). The refresh is triggered by a request and the stale data is what that request receives, so a later request is needed to see the refreshed data; changes to the contest's problems are reflected only after such a refresh, and a failed refresh delays them further. A rebuild is limited to 30 seconds and the refresh lock lasts 45 seconds, so a second refresh cannot start while one is running. When there is no projection, concurrent requests for the same contest in one instance share a single rebuild and wait for it.
 
 - **FR-013**: The projection is removed when the contest is deleted or when its group is deleted. There is no final snapshot of the standings.
 
