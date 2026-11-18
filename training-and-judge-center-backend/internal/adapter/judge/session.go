@@ -108,7 +108,7 @@ func (s *Session) Compile(ctx context.Context, req appjudge.CompileRequest) (app
 func (s *Session) RunTestCase(ctx context.Context, req appjudge.RunRequest) (appjudge.RunResult, error) {
 	// Straight to the shared volume: the sandbox reads it from there, and so
 	// does the checker, instead of each getting its own copy through the API.
-	if err := os.WriteFile(judgingInputPath(s.judgingDir), req.Input, judgingFileMode); err != nil {
+	if err := writeJudgingInput(judgingInputPath(s.judgingDir), req.Input); err != nil {
 		slog.ErrorContext(ctx, "executor: write input failed", "error", err)
 		return appjudge.RunResult{}, apperror.NewInternal()
 	}

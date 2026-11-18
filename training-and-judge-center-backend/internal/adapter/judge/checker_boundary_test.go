@@ -70,14 +70,14 @@ func (m *boundaryProblemProvider) GetLimits(context.Context, string) (appjudge.P
 
 type boundaryTestCaseProvider struct{}
 
-func (boundaryTestCaseProvider) GetTestCases(context.Context, string) ([]appjudge.TestCase, error) {
-	return []appjudge.TestCase{
+func (boundaryTestCaseProvider) Open(context.Context, string) (appjudge.TestCaseSet, error) {
+	return appjudge.NewMemoryTestCaseSet([]appjudge.TestCase{
 		{Name: "secret/001", Input: []byte("1 2"), ExpectedOutput: []byte("3")},
-	}, nil
+	}), nil
 }
 
-func (p boundaryTestCaseProvider) GetTestCasesAt(ctx context.Context, _ string) ([]appjudge.TestCase, error) {
-	return p.GetTestCases(ctx, "")
+func (p boundaryTestCaseProvider) OpenAt(ctx context.Context, _ string) (appjudge.TestCaseSet, error) {
+	return p.Open(ctx, "")
 }
 
 // boundaryExecutor stands for the heavy pool. It leaves the contestant's output

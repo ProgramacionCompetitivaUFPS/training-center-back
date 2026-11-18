@@ -24,12 +24,46 @@ const tarRecordSize = 512
 // buildTar streams a one-file tar without copying the content: archive/tar
 // writes the header, and the payload travels straight from the caller's slice.
 func buildTar(filename string, content []byte, mode int64) io.Reader {
+	return buildTarFrom(filename, bytes.NewReader(content), int64(len(content)), mode)
+}
+
+// buildTarFrom is buildTar for content that is read as the tar is consumed, so a large
+// file never sits in memory. size must be exact: a tar header states it up front, so a
+// source that ends early fails the stream instead of producing a corrupt archive.
+func buildTarFrom(filename string, content io.Reader, size int64, mode int64) io.Reader {
 	var hdr bytes.Buffer
 	tw := tar.NewWriter(&hdr)
-	_ = tw.WriteHeader(&tar.Header{Name: filename, Mode: mode, Size: int64(len(content))})
+	_ = tw.WriteHeader(&tar.Header{Name: filename, Mode: mode, Size: size})
 	// Padding for the last record, plus the two zero records that end a tar.
-	tail := make([]byte, (tarRecordSize-len(content)%tarRecordSize)%tarRecordSize+2*tarRecordSize)
-	return io.MultiReader(&hdr, bytes.NewReader(content), bytes.NewReader(tail))
+	tail := make([]byte, (tarRecordSize-size%tarRecordSize)%tarRecordSize+2*tarRecordSize)
+	return io.MultiReader(&hdr, &exactReader{r: content, remaining: size}, bytes.NewReader(tail))
+}
+
+// exactReader yields exactly remaining bytes of r: no more, and io.ErrUnexpectedEOF if r ends first.
+type exactReader struct {
+	r         io.Reader
+	remaining int64
+}
+
+func (e *exactReader) Read(p []byte) (int, error) {
+	if e.remaining <= 0 {
+		return 0, io.EOF
+	}
+	if int64(len(p)) > e.remaining {
+		p = p[:e.remaining]
+	}
+	n, err := e.r.Read(p)
+	e.remaining -= int64(n)
+	if err == io.EOF {
+		if e.remaining > 0 {
+			return n, io.ErrUnexpectedEOF
+		}
+		return n, io.EOF
+	}
+	if err == nil && e.remaining == 0 {
+		return n, io.EOF
+	}
+	return n, err
 }
 
 func extractFirstFile(r io.Reader, maxBytes int64) []byte {

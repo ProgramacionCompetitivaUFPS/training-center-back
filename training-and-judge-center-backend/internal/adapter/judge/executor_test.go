@@ -179,7 +179,7 @@ func TestSession_RunTestCase_Accepted(t *testing.T) {
 	writeContestantOutput(t, s.judgingDir, expected)
 
 	result, err := s.RunTestCase(context.Background(), appjudge.RunRequest{
-		Input: []byte("1\n"), TimeLimitMs: 1000,
+		Input: strings.NewReader("1\n"), TimeLimitMs: 1000,
 	})
 	if err != nil {
 		t.Fatalf("RunTestCase: %v", err)
@@ -203,7 +203,7 @@ func TestSession_RunTestCase_TLE(t *testing.T) {
 	defer s.Close(context.Background())
 
 	result, err := s.RunTestCase(context.Background(), appjudge.RunRequest{
-		Input: []byte("1\n"), TimeLimitMs: 1000,
+		Input: strings.NewReader("1\n"), TimeLimitMs: 1000,
 	})
 	if err != nil {
 		t.Fatalf("RunTestCase: %v", err)
@@ -224,7 +224,7 @@ func TestSession_RunTestCase_MLE(t *testing.T) {
 	defer s.Close(context.Background())
 
 	result, err := s.RunTestCase(context.Background(), appjudge.RunRequest{
-		Input: []byte("1\n"), TimeLimitMs: 1000,
+		Input: strings.NewReader("1\n"), TimeLimitMs: 1000,
 	})
 	if err != nil {
 		t.Fatalf("RunTestCase: %v", err)
@@ -243,7 +243,7 @@ func TestSession_RunTestCase_MemoryComesFromTheRunsOwnMeasurement(t *testing.T) 
 	writeMemoryMeasurement(t, s.judgingDir, "262144\n")
 
 	result, err := s.RunTestCase(context.Background(), appjudge.RunRequest{
-		Input: []byte("1\n"), TimeLimitMs: 1000,
+		Input: strings.NewReader("1\n"), TimeLimitMs: 1000,
 	})
 	if err != nil {
 		t.Fatalf("RunTestCase: %v", err)
@@ -275,7 +275,7 @@ func TestSession_RunTestCase_UnreadableMeasurementIsNilNotZero(t *testing.T) {
 			writeMemoryMeasurement(t, s.judgingDir, tt.content)
 
 			result, err := s.RunTestCase(context.Background(), appjudge.RunRequest{
-				Input: []byte("1\n"), TimeLimitMs: 1000,
+				Input: strings.NewReader("1\n"), TimeLimitMs: 1000,
 			})
 			if err != nil {
 				t.Fatalf("RunTestCase: %v", err)
@@ -299,7 +299,7 @@ func TestSession_RunTestCase_SafetyNet_Discards(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
 	defer cancel()
 	_, err := s.RunTestCase(ctx, appjudge.RunRequest{
-		Input: []byte("1\n"), TimeLimitMs: 1000,
+		Input: strings.NewReader("1\n"), TimeLimitMs: 1000,
 	})
 	if err == nil {
 		t.Fatal("expected error from safety net, got nil")
@@ -389,7 +389,7 @@ func TestSession_RunTestCase_SafetyNetOutlivesTheInContainerKill(t *testing.T) {
 
 	start := time.Now()
 	if _, err := s.RunTestCase(context.Background(), appjudge.RunRequest{
-		Input: []byte("1\n"), TimeLimitMs: timeLimitMs,
+		Input: strings.NewReader("1\n"), TimeLimitMs: timeLimitMs,
 	}); err != nil {
 		t.Fatalf("RunTestCase: %v", err)
 	}
@@ -414,7 +414,7 @@ func TestSession_RunTestCase_WrapsTheCommandInTheInContainerTimeout(t *testing.T
 	s, _ := newTestSession(t, mock)
 
 	if _, err := s.RunTestCase(context.Background(), appjudge.RunRequest{
-		Input: []byte("1\n"), TimeLimitMs: 1000,
+		Input: strings.NewReader("1\n"), TimeLimitMs: 1000,
 	}); err != nil {
 		t.Fatalf("RunTestCase: %v", err)
 	}
@@ -492,7 +492,7 @@ func TestSession_RunTestCase_UnknownStackLimitIsUnlimitedNotZero(t *testing.T) {
 	s.stackLimitKb = 0
 
 	if _, err := s.RunTestCase(context.Background(), appjudge.RunRequest{
-		Input: []byte("1\n"), TimeLimitMs: 1000,
+		Input: strings.NewReader("1\n"), TimeLimitMs: 1000,
 	}); err != nil {
 		t.Fatalf("RunTestCase: %v", err)
 	}
@@ -519,7 +519,7 @@ func TestSession_RunTestCase_WritesTheInputToTheVolume(t *testing.T) {
 	defer s.Close(context.Background())
 
 	if _, err := s.RunTestCase(context.Background(), appjudge.RunRequest{
-		Input: []byte("1 2\n"), TimeLimitMs: 1000,
+		Input: strings.NewReader("1 2\n"), TimeLimitMs: 1000,
 	}); err != nil {
 		t.Fatalf("RunTestCase: %v", err)
 	}
@@ -572,7 +572,7 @@ func TestSession_RunTestCase_OutputLimitIsDecidedByTheFileSize(t *testing.T) {
 			writeContestantOutput(t, s.judgingDir, make([]byte, tt.outputBytes))
 
 			result, err := s.RunTestCase(context.Background(), appjudge.RunRequest{
-				Input: []byte("1\n"), TimeLimitMs: 1000,
+				Input: strings.NewReader("1\n"), TimeLimitMs: 1000,
 			})
 			if err != nil {
 				t.Fatalf("RunTestCase: %v", err)
@@ -606,7 +606,7 @@ func TestSession_RunTestCase_AttachesTheStreamsSoTheExecBlocks(t *testing.T) {
 	s, _ := newTestSession(t, mock)
 
 	if _, err := s.RunTestCase(context.Background(), appjudge.RunRequest{
-		Input: []byte("1\n"), TimeLimitMs: 1000,
+		Input: strings.NewReader("1\n"), TimeLimitMs: 1000,
 	}); err != nil {
 		t.Fatalf("RunTestCase: %v", err)
 	}
@@ -643,7 +643,7 @@ func TestSession_RunTestCase_ExecStillRunningAfterAttachIsAnError(t *testing.T) 
 	defer s.Close(context.Background())
 
 	_, err := s.RunTestCase(context.Background(), appjudge.RunRequest{
-		Input: []byte("1\n"), TimeLimitMs: 1000,
+		Input: strings.NewReader("1\n"), TimeLimitMs: 1000,
 	})
 	assertAppErrorKind(t, err, apperror.KindInternal)
 }

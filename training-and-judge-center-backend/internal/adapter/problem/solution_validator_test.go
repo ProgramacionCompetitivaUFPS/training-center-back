@@ -3,6 +3,7 @@ package problem
 import (
 	"context"
 	"errors"
+	"io"
 	"testing"
 
 	appJudge "github.com/training-judge-center/backend/internal/application/judge"
@@ -36,12 +37,12 @@ func (m *mockJudgeProblemProvider) GetLimits(_ context.Context, _ string) (appJu
 
 type mockJudgeTestCaseProvider struct{}
 
-func (m *mockJudgeTestCaseProvider) GetTestCases(_ context.Context, _ string) ([]appJudge.TestCase, error) {
-	return []appJudge.TestCase{{Name: "sample/001", Input: []byte("1"), ExpectedOutput: []byte("1")}}, nil
+func (m *mockJudgeTestCaseProvider) Open(_ context.Context, _ string) (appJudge.TestCaseSet, error) {
+	return appJudge.NewMemoryTestCaseSet([]appJudge.TestCase{{Name: "sample/001", Input: []byte("1"), ExpectedOutput: []byte("1")}}), nil
 }
 
-func (m *mockJudgeTestCaseProvider) GetTestCasesAt(ctx context.Context, _ string) ([]appJudge.TestCase, error) {
-	return m.GetTestCases(ctx, "")
+func (m *mockJudgeTestCaseProvider) OpenAt(ctx context.Context, _ string) (appJudge.TestCaseSet, error) {
+	return m.Open(ctx, "")
 }
 
 type mockJudgeExecutionSession struct {
@@ -80,7 +81,7 @@ func (m *mockJudgeOutputChecker) BeginChecking(_ context.Context, _ string, _ su
 
 type mockJudgeCheckerSession struct{}
 
-func (m *mockJudgeCheckerSession) Check(_ context.Context, _ []byte) (appJudge.CheckResult, error) {
+func (m *mockJudgeCheckerSession) Check(_ context.Context, _ io.Reader, _ int64) (appJudge.CheckResult, error) {
 	return appJudge.CheckResult{Accepted: true}, nil
 }
 

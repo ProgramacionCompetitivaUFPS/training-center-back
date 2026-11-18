@@ -112,7 +112,7 @@ func TestOutputChecker_BeginChecking_NoCheckerPathClaimsTheCompareLanguage(t *te
 	}
 	defer session.Close(context.Background())
 
-	if _, err := session.Check(context.Background(), []byte("42\n")); err != nil {
+	if _, err := session.Check(context.Background(), strings.NewReader("42\n"), int64(len("42\n"))); err != nil {
 		t.Fatalf("Check: %v", err)
 	}
 
@@ -158,7 +158,7 @@ func TestCheckerSession_Check_ReadsTheVolumeAndPassesTestlibOrder(t *testing.T) 
 	dir := layOutJudgingDir(t, root, "3 ")
 	s := beginTestChecking(t, c)
 
-	result, err := s.Check(context.Background(), []byte("3"))
+	result, err := s.Check(context.Background(), strings.NewReader("3"), int64(len("3")))
 	if err != nil {
 		t.Fatalf("Check: %v", err)
 	}
@@ -199,7 +199,7 @@ func TestCheckerSession_Check_RejectionIsAResultNotAnError(t *testing.T) {
 	c, _ := newTestOutputChecker(t, docker, storedArtifact("ELF binary"), t.TempDir())
 	s := beginTestChecking(t, c)
 
-	result, err := s.Check(context.Background(), []byte("3"))
+	result, err := s.Check(context.Background(), strings.NewReader("3"), int64(len("3")))
 
 	if err != nil {
 		t.Fatalf("expected no error, got: %v", err)
@@ -226,7 +226,7 @@ func TestCheckerSession_Check_ReusesOneContainerForEveryTestCase(t *testing.T) {
 	s := beginTestChecking(t, c)
 
 	for range 3 {
-		if _, err := s.Check(context.Background(), []byte("3")); err != nil {
+		if _, err := s.Check(context.Background(), strings.NewReader("3"), int64(len("3"))); err != nil {
 			t.Fatalf("Check: %v", err)
 		}
 	}
@@ -289,7 +289,7 @@ func TestCheckerSession_Check_KilledCheckerIsNotAWrongAnswer(t *testing.T) {
 	c, _ := newTestOutputChecker(t, docker, storedArtifact("ELF binary"), t.TempDir())
 	s := beginTestChecking(t, c)
 
-	result, err := s.Check(context.Background(), []byte("3"))
+	result, err := s.Check(context.Background(), strings.NewReader("3"), int64(len("3")))
 	if err == nil {
 		t.Fatal("expected an error for a killed checker, got a verdict")
 	}

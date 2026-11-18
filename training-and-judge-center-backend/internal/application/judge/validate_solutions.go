@@ -115,12 +115,13 @@ func (uc *ValidateSolutionsUseCase) Execute(ctx context.Context, in ValidateSolu
 		return nil, err
 	}
 
-	testCases, err := uc.loadTestCases(ctx, in)
+	testCases, err := uc.openTestCases(ctx, in)
 	if err != nil {
 		return nil, err
 	}
+	defer testCases.Close()
 	limits = applyCandidateChecker(limits, in.Candidate)
-	sampleCases, secretCases := countByGroup(testCases)
+	sampleCases, secretCases := countByGroup(testCases.Cases())
 
 	for i, sol := range solutions {
 		failure, err := uc.checkSolutionWithRetry(ctx, sol, limits, testCases)
@@ -151,7 +152,7 @@ func (uc *ValidateSolutionsUseCase) Execute(ctx context.Context, in ValidateSolu
 // submissions. A nil error with a nil failure means the solution passed
 // everything; a nil error with a non-nil failure is a definitive verdict,
 // not retried.
-func (uc *ValidateSolutionsUseCase) checkSolutionWithRetry(ctx context.Context, sol Solution, limits ProblemLimits, testCases []TestCase) (*SolutionFailure, error) {
+func (uc *ValidateSolutionsUseCase) checkSolutionWithRetry(ctx context.Context, sol Solution, limits ProblemLimits, testCases TestCaseSet) (*SolutionFailure, error) {
 	var lastErr error
 	for attempt := 0; attempt < uc.retry.MaxAttempts; attempt++ {
 		if attempt > 0 {
@@ -176,7 +177,7 @@ func (uc *ValidateSolutionsUseCase) checkSolutionWithRetry(ctx context.Context, 
 // stopping at the first problem it finds. A nil, nil return means it passed
 // everything. A non-nil error means infra failed (retryable); it is never
 // combined with a non-nil failure.
-func (uc *ValidateSolutionsUseCase) checkSolution(ctx context.Context, sol Solution, limits ProblemLimits, testCases []TestCase) (*SolutionFailure, error) {
+func (uc *ValidateSolutionsUseCase) checkSolution(ctx context.Context, sol Solution, limits ProblemLimits, testCases TestCaseSet) (*SolutionFailure, error) {
 	sourceCode, err := uc.sourceCodeDownloader.Download(ctx, sol.FileKey)
 	if err != nil {
 		return nil, err
@@ -208,11 +209,8 @@ func (uc *ValidateSolutionsUseCase) checkSolution(ctx context.Context, sol Solut
 	}
 	defer checkerSession.Close(ctx)
 
-	for _, tc := range testCases {
-		runResult, err := session.RunTestCase(ctx, RunRequest{
-			Input:       tc.Input,
-			TimeLimitMs: limits.TimeLimitMs,
-		})
+	for _, tc := range testCases.Cases() {
+		runResult, err := runCase(ctx, session, testCases, tc, limits.TimeLimitMs)
 		if err != nil {
 			return nil, err
 		}
@@ -231,7 +229,7 @@ func (uc *ValidateSolutionsUseCase) checkSolution(ctx context.Context, sol Solut
 			if runResult.TimeMs > limits.TimeLimitMs {
 				return &SolutionFailure{FileKey: sol.FileKey, Kind: FailureTimeLimitExceeded, TestCase: tc.Name, TimeMs: runResult.TimeMs, TimeLimitMs: limits.TimeLimitMs}, nil
 			}
-			checkResult, err := checkerSession.Check(ctx, tc.ExpectedOutput)
+			checkResult, err := checkCase(ctx, checkerSession, testCases, tc)
 			if err != nil {
 				return nil, err
 			}
@@ -240,7 +238,7 @@ func (uc *ValidateSolutionsUseCase) checkSolution(ctx context.Context, sol Solut
 					FileKey:        sol.FileKey,
 					Kind:           FailureWrongAnswer,
 					TestCase:       tc.Name,
-					Expected:       truncatePreview(tc.ExpectedOutput),
+					Expected:       answerPreview(testCases, tc.Name),
 					Actual:         truncatePreview(runResult.OutputPreview),
 					CheckerMessage: checkResult.Message,
 				}, nil
@@ -253,8 +251,8 @@ func (uc *ValidateSolutionsUseCase) checkSolution(ctx context.Context, sol Solut
 	return nil, nil
 }
 
-func countByGroup(testCases []TestCase) (sample, secret int) {
-	for _, tc := range testCases {
+func countByGroup(cases []TestCaseRef) (sample, secret int) {
+	for _, tc := range cases {
 		switch {
 		case strings.HasPrefix(tc.Name, "sample/"):
 			sample++
@@ -265,11 +263,11 @@ func countByGroup(testCases []TestCase) (sample, secret int) {
 	return sample, secret
 }
 
-func (uc *ValidateSolutionsUseCase) loadTestCases(ctx context.Context, in ValidateSolutionsInput) ([]TestCase, error) {
+func (uc *ValidateSolutionsUseCase) openTestCases(ctx context.Context, in ValidateSolutionsInput) (TestCaseSet, error) {
 	if in.Candidate != nil && in.Candidate.TestCasesKey != "" {
-		return uc.testCaseProvider.GetTestCasesAt(ctx, in.Candidate.TestCasesKey)
+		return uc.testCaseProvider.OpenAt(ctx, in.Candidate.TestCasesKey)
 	}
-	return uc.testCaseProvider.GetTestCases(ctx, in.ProblemID)
+	return uc.testCaseProvider.Open(ctx, in.ProblemID)
 }
 
 func applyCandidateChecker(limits ProblemLimits, candidate *JudgingCandidate) ProblemLimits {
