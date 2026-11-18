@@ -126,6 +126,7 @@ func TestSubmitContestSolution_Blockly_StoresWorkspace(t *testing.T) {
 			return activeContestInfo(), nil
 		}},
 		&mockStandingIDResolver{},
+		&mockGroupMembershipChecker{},
 		publicProblem(),
 		repo,
 		storage,

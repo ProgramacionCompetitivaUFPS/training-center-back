@@ -470,3 +470,16 @@ func (m *mockStandingIDResolver) ResolveStandingID(_ context.Context, contestID,
 	}
 	return "standing-001", true, nil
 }
+
+// ── mockGroupMembershipChecker ────────────────────────────────────────────────
+
+type mockGroupMembershipChecker struct {
+	fn func(groupID, userID string) (bool, error)
+}
+
+func (m *mockGroupMembershipChecker) IsGroupMember(_ context.Context, groupID, userID string) (bool, error) {
+	if m.fn != nil {
+		return m.fn(groupID, userID)
+	}
+	return true, nil
+}
