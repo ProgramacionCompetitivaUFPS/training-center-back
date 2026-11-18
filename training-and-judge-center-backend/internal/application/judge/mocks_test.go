@@ -3,6 +3,8 @@ package judge
 import (
 	"context"
 	"errors"
+	"fmt"
+	"io"
 	"time"
 
 	"github.com/training-judge-center/backend/internal/domain/shared"
@@ -75,16 +77,26 @@ type mockTestCaseProvider struct {
 	readAtKeys     []string
 }
 
-func (m *mockTestCaseProvider) GetTestCases(ctx context.Context, problemID string) ([]TestCase, error) {
+func (m *mockTestCaseProvider) Open(ctx context.Context, problemID string) (TestCaseSet, error) {
+	cases := []TestCase{{Name: "secret/1", Input: []byte("1 2"), ExpectedOutput: []byte("3")}}
 	if m.getTestCasesFn != nil {
-		return m.getTestCasesFn(ctx, problemID)
+		var err error
+		if cases, err = m.getTestCasesFn(ctx, problemID); err != nil {
+			return nil, err
+		}
 	}
-	return []TestCase{{Input: []byte("1 2"), ExpectedOutput: []byte("3")}}, nil
+	// Unnamed cases get one, since a set looks them up by name.
+	for i := range cases {
+		if cases[i].Name == "" {
+			cases[i].Name = fmt.Sprintf("case-%d", i)
+		}
+	}
+	return NewMemoryTestCaseSet(cases), nil
 }
 
-func (m *mockTestCaseProvider) GetTestCasesAt(ctx context.Context, testCasesKey string) ([]TestCase, error) {
+func (m *mockTestCaseProvider) OpenAt(ctx context.Context, testCasesKey string) (TestCaseSet, error) {
 	m.readAtKeys = append(m.readAtKeys, testCasesKey)
-	return m.GetTestCases(ctx, "")
+	return m.Open(ctx, "")
 }
 
 // ── Executor mock ────────────────────────────────────────────────────────────
@@ -159,9 +171,13 @@ type mockCheckerSession struct {
 	closeCalls int
 }
 
-func (m *mockCheckerSession) Check(ctx context.Context, expectedOutput []byte) (CheckResult, error) {
+func (m *mockCheckerSession) Check(ctx context.Context, expected io.Reader, size int64) (CheckResult, error) {
 	m.checkCalls++
 	if m.checkFn != nil {
+		expectedOutput, err := io.ReadAll(expected)
+		if err != nil {
+			return CheckResult{}, err
+		}
 		return m.checkFn(ctx, expectedOutput)
 	}
 	return CheckResult{Accepted: true}, nil
@@ -248,9 +264,13 @@ type mockValidatorSession struct {
 	closeCalls int
 }
 
-func (m *mockValidatorSession) Validate(ctx context.Context, input []byte) (ValidatorRunResult, error) {
+func (m *mockValidatorSession) Validate(ctx context.Context, input io.Reader, size int64) (ValidatorRunResult, error) {
 	if m.validateFn != nil {
-		return m.validateFn(ctx, input)
+		data, err := io.ReadAll(input)
+		if err != nil {
+			return ValidatorRunResult{}, err
+		}
+		return m.validateFn(ctx, data)
 	}
 	return ValidatorRunResult{Accepted: true}, nil
 }

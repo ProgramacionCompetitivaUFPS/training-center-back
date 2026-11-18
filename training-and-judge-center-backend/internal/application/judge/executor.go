@@ -2,6 +2,7 @@ package judge
 
 import (
 	"context"
+	"io"
 
 	"github.com/training-judge-center/backend/internal/domain/submission"
 )
@@ -17,7 +18,7 @@ type CompileResult struct {
 }
 
 type RunRequest struct {
-	Input       []byte
+	Input       io.Reader
 	TimeLimitMs int
 }
 

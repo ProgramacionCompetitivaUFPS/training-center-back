@@ -2,6 +2,7 @@ package judge
 
 import (
 	"context"
+	"io"
 
 	"github.com/training-judge-center/backend/internal/domain/submission"
 )
@@ -24,8 +25,8 @@ type OutputChecker interface {
 // not an error.
 type CheckerSession interface {
 	// Check reads whatever the paired session's last RunTestCase left behind.
-	// The jury's answer travels as bytes because it is the one file the
+	// The jury's answer is streamed through the worker because it is the one file the
 	// contestant's container must never be able to reach.
-	Check(ctx context.Context, expectedOutput []byte) (CheckResult, error)
+	Check(ctx context.Context, expected io.Reader, size int64) (CheckResult, error)
 	Close(ctx context.Context) error
 }

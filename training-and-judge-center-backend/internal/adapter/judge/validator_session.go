@@ -3,6 +3,7 @@ package judge
 import (
 	"context"
 	"fmt"
+	"io"
 	"log/slog"
 
 	appjudge "github.com/training-judge-center/backend/internal/application/judge"
@@ -17,13 +18,13 @@ type ValidatorSession struct {
 
 // Validate feeds one input to the validator on stdin. A non-zero exit is the
 // validator rejecting the test case, which is a result, not a failure of ours.
-func (s *ValidatorSession) Validate(ctx context.Context, input []byte) (appjudge.ValidatorRunResult, error) {
+func (s *ValidatorSession) Validate(ctx context.Context, input io.Reader, size int64) (appjudge.ValidatorRunResult, error) {
 	if s.container == nil {
 		slog.ErrorContext(ctx, "validator_session: validate called on a discarded session")
 		return appjudge.ValidatorRunResult{}, apperror.NewInternal()
 	}
 
-	if err := s.writeFile(ctx, sandboxInputPath, input); err != nil {
+	if err := s.writeStream(ctx, sandboxInputPath, input, size); err != nil {
 		return appjudge.ValidatorRunResult{}, err
 	}
 

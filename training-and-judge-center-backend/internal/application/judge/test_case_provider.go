@@ -2,15 +2,9 @@ package judge
 
 import "context"
 
-type TestCase struct {
-	// Name is e.g. "sample/001" or "secret/002" — JudgeSubmissionUseCase
-	// never reads it; ValidateSolutionsUseCase does.
-	Name           string
-	Input          []byte
-	ExpectedOutput []byte
-}
-
+// TestCaseProvider opens a problem's test cases. The set must be closed: it holds
+// what backs the cases (a cached archive) until then.
 type TestCaseProvider interface {
-	GetTestCases(ctx context.Context, problemID string) ([]TestCase, error)
-	GetTestCasesAt(ctx context.Context, testCasesKey string) ([]TestCase, error)
+	Open(ctx context.Context, problemID string) (TestCaseSet, error)
+	OpenAt(ctx context.Context, testCasesKey string) (TestCaseSet, error)
 }

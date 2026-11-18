@@ -129,10 +129,11 @@ func (uc *JudgeSubmissionUseCase) judgeAttempt(
 	if err != nil {
 		return true, err
 	}
-	testCases, err := uc.testCaseProvider.GetTestCases(ctx, sub.ProblemID())
+	testCases, err := uc.testCaseProvider.Open(ctx, sub.ProblemID())
 	if err != nil {
 		return true, err
 	}
+	defer testCases.Close()
 
 	// A fresh unguessable name per attempt. Never the submission id: that one is
 	// public over the API, and the name is what isolates one judging from another.
@@ -167,11 +168,8 @@ func (uc *JudgeSubmissionUseCase) judgeAttempt(
 	maxTimeMs := 0
 	// nil until some test case reports one: the maximum of nothing is not zero.
 	var maxMemoryKb *int
-	for _, tc := range testCases {
-		runResult, err := session.RunTestCase(ctx, RunRequest{
-			Input:       tc.Input,
-			TimeLimitMs: limits.TimeLimitMs,
-		})
+	for _, tc := range testCases.Cases() {
+		runResult, err := runCase(ctx, session, testCases, tc, limits.TimeLimitMs)
 		if err != nil {
 			return true, err
 		}
@@ -197,7 +195,7 @@ func (uc *JudgeSubmissionUseCase) judgeAttempt(
 				_ = sub.MarkTimeLimitExceeded(runResult.TimeMs, uc.now())
 				return false, nil
 			}
-			checkResult, err := checkerSession.Check(ctx, tc.ExpectedOutput)
+			checkResult, err := checkCase(ctx, checkerSession, testCases, tc)
 			if err != nil {
 				return true, err
 			}

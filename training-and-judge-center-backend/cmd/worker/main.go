@@ -29,6 +29,7 @@ import (
 	appjudge "github.com/training-judge-center/backend/internal/application/judge"
 	appproblem "github.com/training-judge-center/backend/internal/application/problem"
 	appsubmission "github.com/training-judge-center/backend/internal/application/submission"
+	"github.com/training-judge-center/backend/internal/config"
 )
 
 // Pool names, which are also the keys of judge.pools. They are map keys, so a
@@ -55,6 +56,8 @@ const (
 	defaultStaleRunningAfterMinutes    = 10
 	defaultStalePendingAfterMinutes    = 2
 	defaultStaleValidationAfterMinutes = 20
+	defaultTestDataDir                 = "/test-data"
+	defaultTestDataBudgetBytes         = 1536 << 20 // 1.5 GiB: ten archives of the largest allowed size
 )
 
 func main() {
@@ -122,6 +125,12 @@ func main() {
 
 	if err := validatePoolBudgets(judgeCfg, poolMemLimit, maxConcurrent); err != nil {
 		slog.Error("worker: judge config does not fit this machine", "error", err)
+		os.Exit(1)
+	}
+
+	testData := testDataConfig(judgeCfg, config.LoadVirtualObject())
+	if err := validateTestDataBudget(testData, maxConcurrent); err != nil {
+		slog.Error("worker: test data budget does not fit the limits", "error", err)
 		os.Exit(1)
 	}
 
@@ -206,7 +215,11 @@ func main() {
 		}
 		defer gcsClient.Close()
 		sourceCodeDownloader = adapterjudge.NewSourceCodeDownloader(gcsClient, gcsBucket)
-		testCaseProvider = adapterjudge.NewTestCaseProvider(gcsClient, gcsBucket, dbPool)
+		testCaseProvider, err = adapterjudge.NewTestCaseProvider(gcsClient, gcsBucket, dbPool, testData)
+		if err != nil {
+			slog.Error("worker: failed to prepare the test data cache", "error", err)
+			os.Exit(1)
+		}
 		outputChecker = adapterjudge.NewOutputChecker(lightPool, dockerClient, artifactCfg, gcsClient, gcsBucket, judgepool.SharedVolumePath)
 		artifactUploader = adapterjudge.NewArtifactUploader(gcsClient, gcsBucket)
 		validatorRunner = adapterjudge.NewValidatorRunner(lightPool, dockerClient, artifactCfg, gcsClient, gcsBucket)
@@ -214,7 +227,11 @@ func main() {
 		slog.Info("worker: using GCS storage backend", "bucket", gcsBucket)
 	default:
 		sourceCodeDownloader = adapterjudge.NewSourceCodeDownloaderLocal(storageLocalDir)
-		testCaseProvider = adapterjudge.NewTestCaseProviderLocal(storageLocalDir, dbPool)
+		testCaseProvider, err = adapterjudge.NewTestCaseProviderLocal(storageLocalDir, dbPool, testData)
+		if err != nil {
+			slog.Error("worker: failed to prepare the test data cache", "error", err)
+			os.Exit(1)
+		}
 		outputChecker = adapterjudge.NewOutputCheckerLocal(lightPool, dockerClient, artifactCfg, storageLocalDir, judgepool.SharedVolumePath)
 		artifactUploader = adapterjudge.NewArtifactUploaderLocal(storageLocalDir)
 		validatorRunner = adapterjudge.NewValidatorRunnerLocal(lightPool, dockerClient, artifactCfg, storageLocalDir)
@@ -444,13 +461,17 @@ type judgeSection struct {
 	// Docker daemon and the containers it spawns live. Neither has anything to
 	// do with the worker process, which runs in a separate container with its
 	// own cgroup and its own limits.
-	DockerDaemonReserveBytes    int64                          `yaml:"dockerDaemonReserveBytes"`
-	DockerDaemonReserveCores    int                            `yaml:"dockerDaemonReserveCores"`
-	StaleRunningAfterMinutes    int                            `yaml:"staleRunningAfterMinutes"`
-	StalePendingAfterMinutes    int                            `yaml:"stalePendingAfterMinutes"`
-	StaleValidationAfterMinutes int                            `yaml:"staleValidationAfterMinutes"`
-	Languages                   map[string]judgeLanguageConfig `yaml:"languages"`
-	Pools                       map[string]judgePoolConfig     `yaml:"pools"`
+	DockerDaemonReserveBytes    int64 `yaml:"dockerDaemonReserveBytes"`
+	DockerDaemonReserveCores    int   `yaml:"dockerDaemonReserveCores"`
+	StaleRunningAfterMinutes    int   `yaml:"staleRunningAfterMinutes"`
+	StalePendingAfterMinutes    int   `yaml:"stalePendingAfterMinutes"`
+	StaleValidationAfterMinutes int   `yaml:"staleValidationAfterMinutes"`
+	// TestDataDir is where test case archives are cached, on a volume of the worker pod and not
+	// in the dind container. TestDataBudgetBytes is the most disk they may take.
+	TestDataDir         string                         `yaml:"testDataDir"`
+	TestDataBudgetBytes int64                          `yaml:"testDataBudgetBytes"`
+	Languages           map[string]judgeLanguageConfig `yaml:"languages"`
+	Pools               map[string]judgePoolConfig     `yaml:"pools"`
 }
 
 type judgeConfigFile struct {
@@ -644,6 +665,12 @@ func applyJudgeConfigDefaults(cfg *judgeConfigFile) {
 	if cfg.Judge.StaleValidationAfterMinutes <= 0 {
 		cfg.Judge.StaleValidationAfterMinutes = defaultStaleValidationAfterMinutes
 	}
+	if cfg.Judge.TestDataDir == "" {
+		cfg.Judge.TestDataDir = defaultTestDataDir
+	}
+	if cfg.Judge.TestDataBudgetBytes <= 0 {
+		cfg.Judge.TestDataBudgetBytes = defaultTestDataBudgetBytes
+	}
 }
 
 func getEnv(key, fallback string) string {
@@ -687,6 +714,34 @@ func ensureSharedVolume(path string) error {
 	// while leaving it unable to list the root and discover anyone else's.
 	if err := os.Chmod(path, 0o711); err != nil {
 		return fmt.Errorf("%s: %w", path, err)
+	}
+	return nil
+}
+
+// testDataConfig turns the shared platform limits and the worker's own sizing into what
+// the test data cache enforces.
+func testDataConfig(cfg judgeConfigFile, vo *config.VirtualObject) adapterjudge.TestDataConfig {
+	return adapterjudge.TestDataConfig{
+		Dir:         cfg.Judge.TestDataDir,
+		BudgetBytes: cfg.Judge.TestDataBudgetBytes,
+		Limits: adapterjudge.TestDataLimits{
+			MaxZipBytes:       int64(vo.MaxZipUploadSizeMB) << 20,
+			MaxExtractedBytes: int64(vo.MaxExtractedSizeMB) << 20,
+			MaxFiles:          vo.MaxFileCountTestCase,
+			MaxInputBytes:     int64(vo.MaxFileSizeTestCaseInputMB) << 20,
+			MaxAnswerBytes:    int64(vo.MaxFileSizeTestCaseAnswerMB) << 20,
+		},
+	}
+}
+
+// validateTestDataBudget checks the invariant that keeps a judging from waiting for disk
+// forever: every running judging holds one archive, so the budget must cover maxConcurrent
+// of the largest allowed one. Judgings that wait then always do so for one that is about to end.
+func validateTestDataBudget(cfg adapterjudge.TestDataConfig, maxConcurrent int) error {
+	need := int64(maxConcurrent) * cfg.Limits.MaxZipBytes
+	if cfg.BudgetBytes < need {
+		return fmt.Errorf("test data budget %d is under the %d needed for %d concurrent judgings of the largest archive (%d bytes)",
+			cfg.BudgetBytes, need, maxConcurrent, cfg.Limits.MaxZipBytes)
 	}
 	return nil
 }

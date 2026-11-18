@@ -9,8 +9,12 @@ func NewSourceCodeDownloaderLocal(dir string) *SourceCodeDownloader {
 	return &SourceCodeDownloader{reader: newLocalReader(dir)}
 }
 
-func NewTestCaseProviderLocal(dir string, db infraPostgres.Querier) *TestCaseProvider {
-	return &TestCaseProvider{reader: newLocalReader(dir), db: db}
+func NewTestCaseProviderLocal(dir string, db infraPostgres.Querier, cfg TestDataConfig) (*TestCaseProvider, error) {
+	cache, err := newTestDataCache(cfg, newSizedLocalReader(dir))
+	if err != nil {
+		return nil, err
+	}
+	return &TestCaseProvider{cache: cache, db: db}, nil
 }
 
 func NewOutputCheckerLocal(p *pool.Pool, docker dockerExecClient, cfg ArtifactConfig, dir string, judgingRoot string) *OutputChecker {
