@@ -174,6 +174,33 @@ func TestDeleteContest_LockedContest_Returns403ForEveryone(t *testing.T) {
 	}
 }
 
+func TestDeleteContest_RepositoryRefusesAfterTheCheck_ReturnsItsErrorAndKeepsTheCache(t *testing.T) {
+	cases := map[string]*apperror.AppError{
+		"locked after it was loaded":    apperror.NewForbidden(domainContest.ErrCodeContestLocked, "contest is locked"),
+		"changed while being deleted":   apperror.NewConflict(domainContest.ErrCodeContestConflict, "contest changed"),
+		"deleted by someone else first": apperror.NewNotFound(domainContest.ErrCodeContestNotFound, "contest not found"),
+	}
+	for name, refusal := range cases {
+		t.Run(name, func(t *testing.T) {
+			invalidated := false
+			repo := repoWith(scheduledContestFixture())
+			repo.deleteFn = func(_ context.Context, _ string) error { return refusal }
+			cache := &mockStandingsCache{invalidateFn: func(_ context.Context, _ string) error {
+				invalidated = true
+				return nil
+			}}
+			uc := NewDeleteContestUseCase(repo, isLead(), cache)
+
+			err := uc.Execute(context.Background(), deleteInputFor(asCoach(callerID)))
+
+			assertDeleteRejected(t, err, refusal.Code)
+			if invalidated {
+				t.Error("the standings cache must not be invalidated when nothing was deleted")
+			}
+		})
+	}
+}
+
 func TestDeleteContest_LockedContest_NonLeadStillGetsInsufficientPermissions(t *testing.T) {
 	uc := newDeleteContestUseCase(lockedContestFixture(scheduledContestFixture()), isMemberNotLead())
 

@@ -176,6 +176,8 @@ As a Lead of the global group (Admin or assigned Coach), I want to delete contes
 * Deleting a contest whose standings were never requested (nothing cached; should succeed).
 * Deleting a contest that has submissions still being judged (their `contest_id` becomes `null`).
 * Concurrent delete requests for the same contest (the second one returns 404).
+* The contest is locked after it was loaded but before it is deleted: it is not deleted and the request returns 403 `CONTEST_LOCKED`.
+* The contest is locked and then unlocked again within the same instant the delete is refused: nothing is deleted and the request returns 409 `CONTEST_CONFLICT`; the client can retry.
 * Deleting a contest that was just created (no data yet).
 * Deleting a contest with a very large number of submissions (performance consideration).
 * A locked contest that is also ACTIVE is rejected as locked (403) before the active check (409).
@@ -255,12 +257,19 @@ Contest not found, or it does not belong to the group in the path.
 ```
 
 #### 409 Conflict
-The contest is ACTIVE.
+The contest is ACTIVE, or it changed while the delete was being refused (retry the request).
 
 ```json
 {
   "error": "CONTEST_IS_ACTIVE",
   "message": "cannot delete an active contest"
+}
+```
+
+```json
+{
+  "error": "CONTEST_CONFLICT",
+  "message": "the contest changed while it was being deleted; try again"
 }
 ```
 
@@ -277,6 +286,7 @@ The contest is ACTIVE.
 * **FR-DC-005**: The system MUST allow deletion of contests in status SCHEDULED or FINISHED.
 * **FR-DC-006**: The system MUST reject the deletion of an ACTIVE contest with 409 `CONTEST_IS_ACTIVE`.
 * **FR-DC-006.1**: The system MUST reject the deletion of a locked contest with 403 `CONTEST_LOCKED`, for every user including Admins and the owner. Permissions are checked first, and the lock before the contest status.
+* **FR-DC-006.2**: The deletion MUST be atomic with the lock check: the contest is removed only if it is unlocked at the moment of the delete, so a lock set after the contest was loaded still prevents it (403 `CONTEST_LOCKED`). If the delete is refused but the contest turns out to be unlocked, nothing is deleted and the system MUST answer 409 `CONTEST_CONFLICT`.
 
 **Data Deletion**
 * **FR-DC-007**: The system MUST delete the Contest record when deletion is requested.
@@ -359,7 +369,8 @@ Reject if the contest is locked → 403 CONTEST_LOCKED
     ↓
 Reject if the contest is ACTIVE → 409 CONTEST_IS_ACTIVE
     ↓
-Delete Contest record
+Delete Contest record only if it is still unlocked (one atomic statement)
+(refused: 404 missing, 403 CONTEST_LOCKED, 409 CONTEST_CONFLICT)
 (cascade: Contest_Problem, registrations, team participations;
  submissions.contest_id → NULL)
     ↓
@@ -379,6 +390,7 @@ Return 204 No Content
 * **SC-DC-003**: Leads of the global group can delete contests in global group with HTTP 204.
 * **SC-DC-004**: Locked contests cannot be deleted - HTTP 403 `CONTEST_LOCKED`.
 * **SC-DC-004.1**: ACTIVE contests cannot be deleted - HTTP 409 `CONTEST_IS_ACTIVE`.
+* **SC-DC-004.2**: A contest locked while a delete is in flight is not deleted.
 * **SC-DC-005**: Non-Lead non-admin users cannot delete contests in regular groups - HTTP 403.
 * **SC-DC-006**: Non-Lead users cannot delete contests in global group - HTTP 403.
 * **SC-DC-007**: A SCHEDULED or FINISHED contest can be deleted.
