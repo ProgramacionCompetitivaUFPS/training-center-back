@@ -499,6 +499,7 @@ func main() {
 	submissionTeamChecker := adaptersubmission.NewTeamMembershipChecker(dbPool)
 	submissionContestSubmissionProvider := adaptersubmission.NewContestSubmissionProvider(dbPool)
 	submissionStandingIDResolver := adaptersubmission.NewStandingIDResolver(dbPool)
+	submissionGroupMembershipChecker := adaptersubmission.NewGroupMembershipChecker(dbPool)
 
 	// submission queue — RabbitMQ when URL is set, no-op otherwise
 	var submissionQueue appsubmission.SubmissionQueue
@@ -579,6 +580,7 @@ func main() {
 	submitContestSolutionUseCase := appsubmission.NewSubmitContestSolutionUseCase(
 		submissionContestSubmissionProvider,
 		submissionStandingIDResolver,
+		submissionGroupMembershipChecker,
 		submissionProblemProvider,
 		submissionRepo,
 		submissionStorage,

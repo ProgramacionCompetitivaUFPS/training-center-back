@@ -288,7 +288,7 @@ func newHandlerWithSubmitContest(
 	repo domainsubmission.Repository,
 ) *Handler {
 	uc := appsubmission.NewSubmitContestSolutionUseCase(
-		contestProvider, standingResolver, problemProvider, repo,
+		contestProvider, standingResolver, &mockGroupMembershipChecker{}, problemProvider, repo,
 		&mockStorage{}, &mockQueue{}, 1<<20, 1,
 	)
 	return NewHandler(nil, uc, nil, nil, nil, nil, nil)
@@ -411,4 +411,10 @@ func (noopSessionInvalidator) InvalidateSession(context.Context, string, time.Ti
 }
 func (noopSessionInvalidator) IsSessionInvalidated(context.Context, string) (bool, error) {
 	return false, nil
+}
+
+type mockGroupMembershipChecker struct{}
+
+func (m *mockGroupMembershipChecker) IsGroupMember(_ context.Context, _, _ string) (bool, error) {
+	return true, nil
 }
