@@ -472,6 +472,7 @@ func (p *ICPCParser) prepareZip(src io.ReaderAt, size int64) (*ParsedZip, error)
 
 	var totalSize uint64
 	var fileCount int
+	var tooLarge bool
 	maxLimit := uint64(p.maxUncompressedSizeMB) * 1024 * 1024
 
 	parsed := &ParsedZip{
@@ -500,12 +501,17 @@ func (p *ICPCParser) prepareZip(src io.ReaderAt, size int64) (*ParsedZip, error)
 		if !isDir {
 			fileCount++
 			if fileCount > p.maxFiles {
-				return nil, apperror.NewValidation([]apperror.FieldError{{Field: "file", Message: "ZIP contains too many files"}})
+				return nil, apperror.NewValidation([]apperror.FieldError{{Field: "file", Message: fmt.Sprintf("ZIP contains too many files (the limit is %d)", p.maxFiles)}})
 			}
 			if f.UncompressedSize64 > maxLimit || totalSize > maxLimit-f.UncompressedSize64 {
-				return nil, apperror.NewValidation([]apperror.FieldError{{Field: "file", Code: domainproblem.ErrCodeExtractedSizeTooLarge, Message: "Extracted ZIP size exceeds safe limit"}})
+				tooLarge = true
 			}
-			totalSize += f.UncompressedSize64
+			// Kept adding past the limit so the message can say how far over the package is.
+			if totalSize > math.MaxUint64-f.UncompressedSize64 {
+				totalSize = math.MaxUint64
+			} else {
+				totalSize += f.UncompressedSize64
+			}
 		}
 
 		czf := &CleanZipFile{
@@ -517,5 +523,20 @@ func (p *ICPCParser) prepareZip(src io.ReaderAt, size int64) (*ParsedZip, error)
 		parsed.FileIndex[cleanPath] = czf
 		parsed.Files = append(parsed.Files, czf)
 	}
+	if tooLarge {
+		return nil, apperror.NewValidation([]apperror.FieldError{{
+			Field:   "file",
+			Code:    domainproblem.ErrCodeExtractedSizeTooLarge,
+			Message: fmt.Sprintf("Extracted ZIP size (%s) exceeds the limit (%d MiB)", describeMiB(totalSize), p.maxUncompressedSizeMB),
+		}})
+	}
 	return parsed, nil
+}
+
+// describeMiB rounds up to a tenth, so a package a few bytes over its limit never reads as equal to it.
+func describeMiB(bytes uint64) string {
+	if bytes == math.MaxUint64 {
+		return "more than 16 EiB"
+	}
+	return fmt.Sprintf("%.1f MiB", math.Ceil(float64(bytes)/(1<<20)*10)/10)
 }

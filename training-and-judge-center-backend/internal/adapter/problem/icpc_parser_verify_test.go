@@ -4,6 +4,7 @@ import (
 	"archive/zip"
 	"bytes"
 	"context"
+	"strings"
 	"testing"
 
 	"github.com/training-judge-center/backend/internal/adapter/problem"
@@ -90,5 +91,46 @@ func TestICPCParser_DeclaredSizeSmallerThanReal_IsRefused(t *testing.T) {
 	}
 	if err := parseTestCases(p, lie); err == nil {
 		t.Fatal("expected an error when the data outgrows its declared size")
+	}
+}
+
+func TestICPCParser_ExtractedSizeTooLarge_MessageSaysHowFarOverTheLimitItIs(t *testing.T) {
+	cfg := testParserConfig()
+	cfg.MaxUncompressedSizeMB = 1
+	p := problem.NewICPCParser(cfg)
+	data := createZipBuffer(t, map[string][]byte{
+		"data/sample/1.in":  mb(0.6),
+		"data/sample/1.ans": mb(0.6),
+	})
+
+	err := parseTestCases(p, data)
+
+	appErr, ok := err.(*apperror.AppError)
+	if !ok || len(appErr.Details) == 0 {
+		t.Fatalf("expected a validation error with details, got %v", err)
+	}
+	msg := appErr.Details[0].Message
+	if !strings.Contains(msg, "1.2 MiB") || !strings.Contains(msg, "1 MiB") {
+		t.Errorf("the message must give the real size and the limit, got %q", msg)
+	}
+}
+
+// The package is still read to the end of its directory when it is over the limit, so a ZIP
+// that is both too big and has a bad path still reports the path, which is the more serious one.
+func TestICPCParser_ExtractedSizeTooLarge_StillRefusesAMaliciousPath(t *testing.T) {
+	cfg := testParserConfig()
+	cfg.MaxUncompressedSizeMB = 1
+	p := problem.NewICPCParser(cfg)
+	data := createZipBuffer(t, map[string][]byte{
+		"data/sample/1.in":  mb(2),
+		"../escape.txt":     []byte("x"),
+		"data/sample/1.ans": []byte("1"),
+	})
+
+	err := parseTestCases(p, data)
+
+	appErr, ok := err.(*apperror.AppError)
+	if !ok || len(appErr.Details) == 0 || !strings.Contains(appErr.Details[0].Message, "malicious") {
+		t.Fatalf("expected the malicious path to be reported, got %v", err)
 	}
 }
