@@ -16,4 +16,5 @@ const (
 	ErrCodeContestIsActive                = "CONTEST_IS_ACTIVE"
 	ErrCodeContestProblemsLocked          = "CONTEST_PROBLEMS_LOCKED"
 	ErrCodeFreezeTooLong                  = "FREEZE_TOO_LONG"
+	ErrCodeRegistrationBusy               = "REGISTRATION_BUSY"
 )

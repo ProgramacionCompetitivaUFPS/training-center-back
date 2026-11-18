@@ -44,7 +44,7 @@ func (p *CallerStandingProvider) GetCallerStandingID(ctx context.Context, contes
 		FROM contest_team_participants ctp
 		JOIN team_members tm ON tm.team_id = ctp.team_id AND tm.user_id = $2
 		WHERE ctp.contest_id = $1
-		  AND ($2::uuid = ANY(ctp.selected_members) OR array_length(ctp.selected_members, 1) IS NULL)
+		  AND $2::uuid = ANY(ctp.selected_members)
 		LIMIT 1`,
 		contestID, userID,
 	).Scan(&teamID)

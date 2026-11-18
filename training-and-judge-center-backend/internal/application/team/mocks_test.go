@@ -368,3 +368,15 @@ func (m *mockScheduledParticipationCleaner) RemoveUserFromScheduledParticipation
 func (m *mockScheduledParticipationCleaner) RegistrationsLosingMinimum(_ context.Context, _, _ string) ([]RegistrationAtRisk, error) {
 	return m.atRisk, m.err
 }
+
+// ── mockRegistrationLocker ───────────────────────────────────────────────────
+
+type mockRegistrationLocker struct {
+	lockedContests []string
+	err            error
+}
+
+func (m *mockRegistrationLocker) Lock(_ context.Context, contestID string) error {
+	m.lockedContests = append(m.lockedContests, contestID)
+	return m.err
+}

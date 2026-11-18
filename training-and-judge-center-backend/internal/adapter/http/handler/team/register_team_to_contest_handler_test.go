@@ -27,7 +27,7 @@ func newHandlerWithRegisterTeamToContest(
 ) *Handler {
 	return &Handler{
 		registerTeamToContest: appTeam.NewRegisterTeamToContestUseCase(
-			memberRepo, teamRepo, contestProvider, participRepo, indivChecker, groupChecker, userProvider, tx,
+			memberRepo, teamRepo, contestProvider, participRepo, indivChecker, groupChecker, userProvider, &noopRegistrationLocker{}, tx,
 		),
 	}
 }

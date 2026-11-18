@@ -165,7 +165,7 @@ func (r *RegistrationRepository) ExistsByContestAndUserOrTeam(ctx context.Contex
 			SELECT 1 FROM contest_team_participants ctp
 			JOIN team_members tm ON tm.team_id = ctp.team_id AND tm.user_id = $2
 			WHERE ctp.contest_id = $1
-			  AND ($2::uuid = ANY(ctp.selected_members) OR array_length(ctp.selected_members, 1) IS NULL)
+			  AND $2::uuid = ANY(ctp.selected_members)
 		)`,
 		contestID, userID,
 	).Scan(&exists)
@@ -254,7 +254,7 @@ func (r *RegistrationRepository) ExistsByUserBulk(ctx context.Context, contestID
 		SELECT ctp.contest_id FROM contest_team_participants ctp
 		JOIN team_members tm ON tm.team_id = ctp.team_id AND tm.user_id = $2
 		WHERE ctp.contest_id = ANY($1)
-		  AND ($2::uuid = ANY(ctp.selected_members) OR array_length(ctp.selected_members, 1) IS NULL)`,
+		  AND $2::uuid = ANY(ctp.selected_members)`,
 		contestIDs, userID,
 	)
 	if err != nil {

@@ -45,7 +45,7 @@ func (p *ContestSubmissionProvider) ListByContest(
 					JOIN team_members tm ON tm.team_id = ctp2.team_id
 					JOIN users u2 ON u2.id = tm.user_id AND u2.nickname = $%d
 					WHERE ctp2.contest_id = s.contest_id AND ctp2.team_id::text = s.standing_id::text
-					  AND (u2.id = ANY(ctp2.selected_members) OR array_length(ctp2.selected_members, 1) IS NULL)
+					  AND u2.id = ANY(ctp2.selected_members)
 				)
 			)`, n, n)
 		args = append(args, *filters.Nickname)

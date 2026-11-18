@@ -21,6 +21,8 @@ type RegisterToContestUseCase struct {
 	registrationRepo     domainContest.RegistrationRepository
 	memberProvider       GroupMemberProvider
 	teamSelectionChecker TeamSelectionChecker
+	registrationLocker   RegistrationLocker
+	txManager            appshared.TransactionManager
 }
 
 func NewRegisterToContestUseCase(
@@ -28,12 +30,16 @@ func NewRegisterToContestUseCase(
 	registrationRepo domainContest.RegistrationRepository,
 	memberProvider GroupMemberProvider,
 	teamSelectionChecker TeamSelectionChecker,
+	registrationLocker RegistrationLocker,
+	txManager appshared.TransactionManager,
 ) *RegisterToContestUseCase {
 	return &RegisterToContestUseCase{
 		repo:                 repo,
 		registrationRepo:     registrationRepo,
 		memberProvider:       memberProvider,
 		teamSelectionChecker: teamSelectionChecker,
+		registrationLocker:   registrationLocker,
+		txManager:            txManager,
 	}
 }
 
@@ -66,25 +72,33 @@ func (uc *RegisterToContestUseCase) Execute(ctx context.Context, in RegisterToCo
 		return apperror.NewForbidden(ErrCodeNotGroupMember, "only group members can register to this contest")
 	}
 
-	exists, err := uc.registrationRepo.ExistsByContestAndUser(ctx, in.ContestID, in.CurrentUser.ID)
-	if err != nil {
-		return err
-	}
-	if exists {
-		return nil
-	}
+	// The team-registration use cases take the same lock, so a user cannot end up both
+	// registered individually and selected in a team.
+	return uc.txManager.WithTx(ctx, func(txCtx context.Context) error {
+		if err := uc.registrationLocker.Lock(txCtx, in.ContestID); err != nil {
+			return err
+		}
 
-	inTeam, err := uc.teamSelectionChecker.IsUserSelectedInAnyTeam(ctx, in.ContestID, in.CurrentUser.ID)
-	if err != nil {
-		return err
-	}
-	if inTeam {
-		return apperror.NewConflict(ErrCodeAlreadyInTeam, "you are already registered to this contest as a selected team member")
-	}
+		exists, err := uc.registrationRepo.ExistsByContestAndUser(txCtx, in.ContestID, in.CurrentUser.ID)
+		if err != nil {
+			return err
+		}
+		if exists {
+			return nil
+		}
 
-	reg, err := domainContest.NewContestRegistration(uuid.New().String(), in.ContestID, in.CurrentUser.ID, now)
-	if err != nil {
-		return err
-	}
-	return uc.registrationRepo.Save(ctx, reg)
+		inTeam, err := uc.teamSelectionChecker.IsUserSelectedInAnyTeam(txCtx, in.ContestID, in.CurrentUser.ID)
+		if err != nil {
+			return err
+		}
+		if inTeam {
+			return apperror.NewConflict(ErrCodeAlreadyInTeam, "you are already registered to this contest as a selected team member")
+		}
+
+		reg, err := domainContest.NewContestRegistration(uuid.New().String(), in.ContestID, in.CurrentUser.ID, now)
+		if err != nil {
+			return err
+		}
+		return uc.registrationRepo.Save(txCtx, reg)
+	})
 }

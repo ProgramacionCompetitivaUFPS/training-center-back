@@ -28,13 +28,8 @@ func (c *TeamMembershipChecker) IsTeammate(ctx context.Context, contestID, viewe
 			JOIN team_members tm1 ON tm1.team_id = ctp.team_id AND tm1.user_id = $2
 			JOIN team_members tm2 ON tm2.team_id = ctp.team_id AND tm2.user_id = $3
 			WHERE ctp.contest_id = $1
-			  AND (
-			    array_length(ctp.selected_members, 1) IS NULL
-			    OR (
-			      ctp.selected_members @> ARRAY[$2::uuid]
-			      AND ctp.selected_members @> ARRAY[$3::uuid]
-			    )
-			  )
+			  AND ctp.selected_members @> ARRAY[$2::uuid]
+			  AND ctp.selected_members @> ARRAY[$3::uuid]
 		)
 	`, contestID, viewerID, authorID).Scan(&exists)
 	if err != nil {
