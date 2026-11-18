@@ -7,9 +7,10 @@ import (
 	"github.com/training-judge-center/backend/pkg/apperror"
 )
 
-// maxSubmissionBodyBytes caps the whole multipart body at the parse budget, so a
-// submission can never spill to a temporary file on disk.
-const maxSubmissionBodyBytes = maxMultipartMemory
+// maxSubmissionBodyBytes caps the whole multipart body: the source is limited to 1 MiB and the
+// Blockly workspace to 512 KiB, so 2 MiB leaves room for framing and means a
+// submission is never spilled to a temporary file on disk.
+const maxSubmissionBodyBytes = 2 << 20
 
 func parseSubmissionForm(w http.ResponseWriter, r *http.Request) *apperror.AppError {
 	r.Body = http.MaxBytesReader(w, r.Body, maxSubmissionBodyBytes)
