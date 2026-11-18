@@ -217,6 +217,25 @@ func TestGetContest_NonMemberSeesProblemsOnceStarted(t *testing.T) {
 	}
 }
 
+func TestGetContest_ProblemsCarryTheirColor(t *testing.T) {
+	c := contestHolding(
+		problemWithColor("cp-a", colorProblemA, 1, "#aabbcc"),
+		domainContest.RestoreContestProblem("cp-b", colorProblemB, 2, nil),
+	)
+	uc := newGetContestUseCase(repoWith(c), groupFound(), isLead(), defaultProblemProvider(), mockParticipants())
+
+	out, err := uc.Execute(context.Background(), validGetInput())
+
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(out.Problems) != 2 {
+		t.Fatalf("expected 2 problems, got %d", len(out.Problems))
+	}
+	assertColor(t, "problem a", out.Problems[0].Color, "#aabbcc")
+	assertNoColor(t, "problem b", out.Problems[1].Color)
+}
+
 func TestGetContest_DurationInSeconds(t *testing.T) {
 	uc := newGetContestUseCase(repoWith(newTestContest(callerID)), groupFound(), isMemberNotLead(), defaultProblemProvider(), mockParticipants())
 

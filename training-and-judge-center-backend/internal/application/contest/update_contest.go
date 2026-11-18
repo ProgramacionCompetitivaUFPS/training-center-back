@@ -25,7 +25,7 @@ type UpdateContestInput struct {
 	FreezeMinutes     *int
 	EnablePostContest *bool
 	// Problems, when non-nil, replaces the entire problem list.
-	// Each entry is (slug, order).
+	// Each entry is (slug, order, color).
 	Problems          *[]ProblemOrderInput
 	Locked            *bool
 	ParticipationMode *string // "INDIVIDUAL" | "TEAM" | "MIXED"
@@ -37,6 +37,7 @@ type UpdateContestInput struct {
 type ProblemOrderInput struct {
 	Slug  string
 	Order int
+	Color **string // nil = keep the problem's current color; non-nil pointer-to-nil = clear it
 }
 
 type problemEntry struct {
@@ -128,7 +129,12 @@ func (uc *UpdateContestUseCase) Execute(ctx context.Context, in UpdateContestInp
 
 	problemsChanged := in.Problems != nil
 	var newProblemEntries []problemEntry
+	var colorChanges map[string]*domainContest.ProblemColor
 	if problemsChanged {
+		colorChanges, err = parseProblemColors(*in.Problems)
+		if err != nil {
+			return nil, err
+		}
 		newProblemEntries, err = uc.resolveProblems(ctx, *in.Problems, in.CurrentUser.ID, in.CurrentUser.IsAdmin(), c.Problems())
 		if err != nil {
 			return nil, err
@@ -165,11 +171,15 @@ func (uc *UpdateContestUseCase) Execute(ctx context.Context, in UpdateContestInp
 		}
 		newProblems := make([]domainContest.ContestProblem, 0, len(newProblemEntries))
 		for _, pe := range newProblemEntries {
+			id := uuid.New().String()
+			var color *domainContest.ProblemColor
 			if existing, ok := existingByProblemID[pe.id]; ok {
-				newProblems = append(newProblems, domainContest.RestoreContestProblem(existing.ID(), pe.id, pe.order, nil))
-			} else {
-				newProblems = append(newProblems, domainContest.RestoreContestProblem(uuid.New().String(), pe.id, pe.order, nil))
+				id, color = existing.ID(), existing.Color()
 			}
+			if change, ok := colorChanges[pe.slug]; ok {
+				color = change
+			}
+			newProblems = append(newProblems, domainContest.RestoreContestProblem(id, pe.id, pe.order, color))
 		}
 		c.SetProblems(newProblems, now)
 	}
@@ -207,8 +217,9 @@ func (uc *UpdateContestUseCase) Execute(ctx context.Context, in UpdateContestInp
 	var problemDisplays []ProblemDisplay
 	if problemsChanged {
 		problemDisplays = make([]ProblemDisplay, 0, len(newProblemEntries))
-		for _, pe := range newProblemEntries {
-			problemDisplays = append(problemDisplays, ProblemDisplay{Slug: pe.slug, Title: pe.title, Order: pe.order})
+		for i, cp := range c.Problems() {
+			pe := newProblemEntries[i]
+			problemDisplays = append(problemDisplays, ProblemDisplay{Slug: pe.slug, Title: pe.title, Order: pe.order, Color: colorString(cp.Color())})
 		}
 	} else {
 		problemDisplays, err = uc.enrichProblems(ctx, c.Problems())
@@ -356,7 +367,7 @@ func (uc *UpdateContestUseCase) enrichProblems(ctx context.Context, cps []domain
 	displays := make([]ProblemDisplay, 0, len(cps))
 	for _, cp := range cps {
 		if b, ok := basics[cp.ProblemID()]; ok {
-			displays = append(displays, ProblemDisplay{Slug: b.Slug, Title: b.Title, Order: cp.Order()})
+			displays = append(displays, ProblemDisplay{Slug: b.Slug, Title: b.Title, Order: cp.Order(), Color: colorString(cp.Color())})
 		}
 	}
 	return displays, nil
