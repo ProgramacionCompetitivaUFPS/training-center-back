@@ -1,6 +1,7 @@
 package judge
 
 import (
+	"archive/zip"
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
@@ -18,8 +19,8 @@ const (
 	// retryable error. With the budget invariant it only ever waits for another judging
 	// to finish, which is far shorter.
 	defaultReserveWait = 2 * time.Minute
-	// downloadTimeout bounds one archive's download, so a stalled transfer cannot hold
-	// its slot (and the disk it reserved) for good.
+	// downloadTimeout bounds getting one archive in (download and extraction), so a stalled
+	// transfer cannot hold its slot, and the disk it reserved, for good.
 	downloadTimeout = 5 * time.Minute
 )
 
@@ -28,11 +29,10 @@ var errTestDataBusy = errors.New("no disk available for the test case archive")
 
 // TestDataConfig sizes the test data cache.
 type TestDataConfig struct {
-	// Dir holds the cached archives. Its contents are wiped at startup.
+	// Dir holds the cached problems. Its contents are wiped at startup.
 	Dir string
-	// BudgetBytes is the most disk the cached archives may take. It must cover
-	// maxConcurrent archives of the largest allowed size, or a judging could wait on one
-	// that never frees: the worker checks that at startup.
+	// BudgetBytes is the most disk the cache may take, counting an archive while it is being
+	// extracted. See validateTestDataBudget for what it has to cover.
 	BudgetBytes int64
 	Limits      TestDataLimits
 	// ReserveWait defaults to defaultReserveWait.
@@ -40,20 +40,24 @@ type TestDataConfig struct {
 }
 
 type cacheEntry struct {
-	key      string
-	path     string
-	size     int64
+	key  string
+	dir  string
+	size int64 // the archive, held on disk only while the problem is being extracted
+	// reserved is what this entry counts against the budget: the archive and the extraction while
+	// loading, and the extracted cases alone once it is ready.
+	reserved int64
+	cases    []cachedCase
 	refs     int
 	lastUsed time.Time
 	ready    chan struct{}
 	err      error
 }
 
-// testDataCache keeps test case archives on disk, so a judging reads its cases from a
-// local file and never holds a problem's data in memory.
+// testDataCache keeps test cases on disk, extracted, so a judging copies its cases from local
+// files and neither decompresses anything nor holds a problem's data in memory.
 //
-// The key is the archive's object key. An upload writes under a fresh UUID and the old
-// key is deleted, so a key never changes content: there is nothing to invalidate.
+// The key is the archive's object key. An upload writes under a fresh UUID and the old key is
+// deleted, so a key never changes content: there is nothing to invalidate.
 type testDataCache struct {
 	dir     string
 	budget  int64
@@ -70,8 +74,9 @@ type testDataCache struct {
 }
 
 func newTestDataCache(cfg TestDataConfig, source sizedObjectReader) (*testDataCache, error) {
-	if cfg.BudgetBytes < cfg.Limits.MaxZipBytes {
-		return nil, fmt.Errorf("test data budget %d is under the largest allowed archive (%d)", cfg.BudgetBytes, cfg.Limits.MaxZipBytes)
+	if cfg.BudgetBytes < cfg.Limits.MaxZipBytes+cfg.Limits.MaxExtractedBytes {
+		return nil, fmt.Errorf("test data budget %d cannot hold one archive (%d) and its extraction (%d)",
+			cfg.BudgetBytes, cfg.Limits.MaxZipBytes, cfg.Limits.MaxExtractedBytes)
 	}
 	if err := resetDir(cfg.Dir); err != nil {
 		return nil, fmt.Errorf("prepare test data dir %s: %w", cfg.Dir, err)
@@ -110,9 +115,9 @@ func resetDir(dir string) error {
 	return nil
 }
 
-// acquire returns the archive for key with its reference count raised; the caller must
-// release it. Concurrent callers for one key share a single download, and a download
-// that fails fails every caller waiting on it and is never kept.
+// acquire returns the problem for key with its reference count raised; the caller must
+// release it. Concurrent callers for one key share a single download, and a download that
+// fails fails every caller waiting on it and is never kept.
 func (c *testDataCache) acquire(ctx context.Context, key string) (*cacheEntry, error) {
 	deadline := time.NewTimer(c.maxWait)
 	defer deadline.Stop()
@@ -154,22 +159,19 @@ func (c *testDataCache) acquire(ctx context.Context, key string) (*cacheEntry, e
 	}
 }
 
-// reserveLocked takes size bytes of the budget for a new entry, evicting archives nobody
-// holds, least recently used first. When every archive is held it returns the channel to
-// wait on instead. Caller holds c.mu.
+// reserveLocked takes the archive's size of the budget for a new entry, evicting problems nobody
+// holds, least recently used first. When every problem is held it returns the channel to wait on
+// instead. Caller holds c.mu.
 func (c *testDataCache) reserveLocked(key string, size int64) (*cacheEntry, <-chan struct{}) {
-	for c.used+size > c.budget {
-		victim := c.oldestIdleLocked()
-		if victim == nil {
-			return nil, c.changed
-		}
-		c.dropLocked(victim)
+	if wait := c.makeRoomLocked(size); wait != nil {
+		return nil, wait
 	}
 	sum := sha256.Sum256([]byte(key))
 	e := &cacheEntry{
 		key:      key,
-		path:     filepath.Join(c.dir, hex.EncodeToString(sum[:])+".zip"),
+		dir:      filepath.Join(c.dir, hex.EncodeToString(sum[:])),
 		size:     size,
+		reserved: size,
 		refs:     1,
 		lastUsed: c.now(),
 		ready:    make(chan struct{}),
@@ -177,6 +179,19 @@ func (c *testDataCache) reserveLocked(key string, size int64) (*cacheEntry, <-ch
 	c.entries[key] = e
 	c.used += size
 	return e, nil
+}
+
+// makeRoomLocked evicts until need more bytes fit, or returns the channel to wait on when what
+// is left is held. Caller holds c.mu.
+func (c *testDataCache) makeRoomLocked(need int64) <-chan struct{} {
+	for c.used+need > c.budget {
+		victim := c.oldestIdleLocked()
+		if victim == nil {
+			return c.changed
+		}
+		c.dropLocked(victim)
+	}
+	return nil
 }
 
 func (c *testDataCache) oldestIdleLocked() *cacheEntry {
@@ -194,8 +209,8 @@ func (c *testDataCache) oldestIdleLocked() *cacheEntry {
 
 func (c *testDataCache) dropLocked(e *cacheEntry) {
 	delete(c.entries, e.key)
-	_ = os.Remove(e.path)
-	c.used -= e.size
+	_ = os.RemoveAll(e.dir)
+	c.used -= e.reserved
 }
 
 // await waits for the download another caller started.
@@ -213,17 +228,17 @@ func (c *testDataCache) await(ctx context.Context, e *cacheEntry) (*cacheEntry, 
 	return e, nil
 }
 
-// fill downloads and verifies the archive this caller reserved disk for, then publishes
+// fill gets the problem in on behalf of this caller, which reserved disk for it, then publishes
 // the outcome to whoever is waiting on it.
 func (c *testDataCache) fill(ctx context.Context, key string, e *cacheEntry) (*cacheEntry, error) {
-	err := c.download(ctx, key, e)
+	err := c.populate(ctx, e)
 
 	c.mu.Lock()
 	if err != nil {
 		e.err = err
 		if c.entries[key] == e {
 			delete(c.entries, key)
-			c.used -= e.size
+			c.used -= e.reserved
 		}
 	}
 	close(e.ready)
@@ -236,20 +251,61 @@ func (c *testDataCache) fill(ctx context.Context, key string, e *cacheEntry) (*c
 	return e, nil
 }
 
-func (c *testDataCache) download(ctx context.Context, key string, e *cacheEntry) error {
+// populate downloads the archive, checks it against the limits, extracts its cases, and drops
+// the archive. The extraction is built in a scratch directory and renamed into place, so what
+// a judging can see is whole or absent.
+func (c *testDataCache) populate(ctx context.Context, e *cacheEntry) error {
 	dctx, cancel := context.WithTimeout(ctx, downloadTimeout)
 	defer cancel()
 
-	tmp := e.path + ".tmp"
-	defer os.Remove(tmp)
+	archivePath := e.dir + ".zip.tmp"
+	scratch := e.dir + ".tmp"
+	defer os.Remove(archivePath)
+	defer os.RemoveAll(scratch)
 
-	rc, err := c.source.readObject(dctx, key)
+	if err := c.download(dctx, e, archivePath); err != nil {
+		return err
+	}
+
+	zr, err := zip.OpenReader(archivePath)
+	if err != nil {
+		return fmt.Errorf("%w: %v", errInvalidTestData, err)
+	}
+	defer zr.Close()
+
+	plan, err := planExtraction(&zr.Reader, c.limits)
+	if err != nil {
+		return err
+	}
+	if err := c.extend(dctx, e, plan.bytes); err != nil {
+		return err
+	}
+
+	cases, err := extractTestCases(dctx, plan, scratch, e.dir)
+	if err != nil {
+		return err
+	}
+	if err := os.Rename(scratch, e.dir); err != nil {
+		return err
+	}
+	e.cases = cases
+
+	// Only the extracted cases stay: the archive goes with the deferred remove.
+	c.mu.Lock()
+	c.used -= e.size
+	e.reserved -= e.size
+	c.mu.Unlock()
+	return nil
+}
+
+func (c *testDataCache) download(ctx context.Context, e *cacheEntry, dst string) error {
+	rc, err := c.source.readObject(ctx, e.key)
 	if err != nil {
 		return err
 	}
 	defer rc.Close()
 
-	f, err := os.OpenFile(tmp, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0o600)
+	f, err := os.OpenFile(dst, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0o600)
 	if err != nil {
 		return err
 	}
@@ -261,15 +317,43 @@ func (c *testDataCache) download(ctx context.Context, key string, e *cacheEntry)
 	if n != e.size {
 		return fmt.Errorf("%w: object has %d bytes, storage reported %d", errInvalidTestData, n, e.size)
 	}
-
-	if err := verifyTestCaseZip(dctx, tmp, c.limits); err != nil {
-		return err
-	}
-	return os.Rename(tmp, e.path)
+	return nil
 }
 
-// release drops one reference. An archive nobody holds stays on disk until the space is
-// needed, so the next judging of the same problem finds it there.
+// extend reserves the disk for the extraction, once the archive's directory says how much it is.
+// The archive's own share is held meanwhile, so waiting here is the one place a fill holds disk
+// while it waits for more: the budget invariant (validateTestDataBudget) is what guarantees that
+// some fill can always go on.
+func (c *testDataCache) extend(ctx context.Context, e *cacheEntry, extra int64) error {
+	if e.size+extra > c.budget {
+		return fmt.Errorf("%w: the archive and its extraction need %d bytes, over the %d byte budget", errInvalidTestData, e.size+extra, c.budget)
+	}
+	deadline := time.NewTimer(c.maxWait)
+	defer deadline.Stop()
+
+	for {
+		c.mu.Lock()
+		wait := c.makeRoomLocked(extra)
+		if wait == nil {
+			c.used += extra
+			e.reserved += extra
+			c.mu.Unlock()
+			return nil
+		}
+		c.mu.Unlock()
+
+		select {
+		case <-wait:
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-deadline.C:
+			return errTestDataBusy
+		}
+	}
+}
+
+// release drops one reference. A problem nobody holds stays on disk until the space is needed,
+// so the next judging of the same problem finds it there.
 func (c *testDataCache) release(e *cacheEntry) {
 	c.mu.Lock()
 	e.refs--
@@ -278,8 +362,8 @@ func (c *testDataCache) release(e *cacheEntry) {
 	c.mu.Unlock()
 }
 
-// notifyLocked wakes every judging waiting for disk. Closing and replacing a channel
-// wakes all of them and loses no wake-up, which a single-slot signal would.
+// notifyLocked wakes every judging waiting for disk. Closing and replacing a channel wakes all
+// of them and loses no wake-up, which a single-slot signal would.
 func (c *testDataCache) notifyLocked() {
 	close(c.changed)
 	c.changed = make(chan struct{})

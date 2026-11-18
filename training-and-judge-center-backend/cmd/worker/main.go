@@ -57,7 +57,7 @@ const (
 	defaultStalePendingAfterMinutes    = 2
 	defaultStaleValidationAfterMinutes = 20
 	defaultTestDataDir                 = "/test-data"
-	defaultTestDataBudgetBytes         = 1536 << 20 // 1.5 GiB: ten archives of the largest allowed size
+	defaultTestDataBudgetBytes         = 2048 << 20 // 2 GiB: eight problems like the largest one in use
 )
 
 func main() {
@@ -734,14 +734,16 @@ func testDataConfig(cfg judgeConfigFile, vo *config.VirtualObject) adapterjudge.
 	}
 }
 
-// validateTestDataBudget checks the invariant that keeps a judging from waiting for disk
-// forever: every running judging holds one archive, so the budget must cover maxConcurrent
-// of the largest allowed one. Judgings that wait then always do so for one that is about to end.
+// validateTestDataBudget checks the invariant that keeps a judging from waiting for disk forever.
+// A problem being cached holds its archive while it waits for room to extract it, so in the worst
+// case every one of the maxConcurrent judgings is in that state; for one of them to always be able
+// to go on, the budget must cover all those archives plus the extraction of the largest package.
+// Judgings that wait beyond that always do so for one that is about to end.
 func validateTestDataBudget(cfg adapterjudge.TestDataConfig, maxConcurrent int) error {
-	need := int64(maxConcurrent) * cfg.Limits.MaxZipBytes
+	need := int64(maxConcurrent)*cfg.Limits.MaxZipBytes + cfg.Limits.MaxExtractedBytes
 	if cfg.BudgetBytes < need {
-		return fmt.Errorf("test data budget %d is under the %d needed for %d concurrent judgings of the largest archive (%d bytes)",
-			cfg.BudgetBytes, need, maxConcurrent, cfg.Limits.MaxZipBytes)
+		return fmt.Errorf("test data budget %d is under the %d needed for %d concurrent archives (%d bytes each) and the extraction of the largest package (%d bytes)",
+			cfg.BudgetBytes, need, maxConcurrent, cfg.Limits.MaxZipBytes, cfg.Limits.MaxExtractedBytes)
 	}
 	return nil
 }

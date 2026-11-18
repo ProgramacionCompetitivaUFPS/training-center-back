@@ -79,15 +79,15 @@ func TestTestDataConfig_TakesItsLimitsFromThePlatformLimits(t *testing.T) {
 
 func TestValidateTestDataBudget(t *testing.T) {
 	cfg := adapterjudge.TestDataConfig{
-		BudgetBytes: 750,
-		Limits:      adapterjudge.TestDataLimits{MaxZipBytes: 150},
+		BudgetBytes: 1250, // five archives of 150 and the extraction of 500
+		Limits:      adapterjudge.TestDataLimits{MaxZipBytes: 150, MaxExtractedBytes: 500},
 	}
 
 	if err := validateTestDataBudget(cfg, 5); err != nil {
-		t.Errorf("a budget of exactly maxConcurrent archives must pass, got: %v", err)
+		t.Errorf("a budget of exactly maxConcurrent archives plus one extraction must pass, got: %v", err)
 	}
 	if err := validateTestDataBudget(cfg, 6); err == nil {
-		t.Error("a budget under maxConcurrent archives of the largest size must be refused: a judging could wait for disk forever")
+		t.Error("a budget that cannot cover every archive and still extract one must be refused: a judging could wait for disk forever")
 	}
 }
 
@@ -110,7 +110,7 @@ func TestShippedConfig_TestDataBudgetFitsTheClusterAndTheLimits(t *testing.T) {
 	}
 	limit := emptyDirLimit(t, string(manifest), "test-data")
 	if cfg.Judge.TestDataBudgetBytes >= limit {
-		t.Errorf("the budget (%d) must stay under the test-data volume's sizeLimit (%d): a download in flight needs room beyond it",
+		t.Errorf("the budget (%d) must stay under the test-data volume's sizeLimit (%d): the filesystem's own overhead needs room beyond it",
 			cfg.Judge.TestDataBudgetBytes, limit)
 	}
 }
@@ -130,14 +130,17 @@ func TestWorkerManifest_VolumesFitTheNode(t *testing.T) {
 	}
 }
 
-// emptyDirLimit reads the sizeLimit (in Gi) of a named emptyDir from the manifest.
+// emptyDirLimit reads the sizeLimit (in Gi or Mi) of a named emptyDir from the manifest.
 func emptyDirLimit(t *testing.T, manifest, name string) int64 {
 	t.Helper()
-	re := regexp.MustCompile(`- name: ` + regexp.QuoteMeta(name) + `\n(?:\s*#[^\n]*\n)*\s*emptyDir:\n\s*sizeLimit: (\d+)Gi`)
+	re := regexp.MustCompile(`- name: ` + regexp.QuoteMeta(name) + `\n(?:\s*#[^\n]*\n)*\s*emptyDir:\n\s*sizeLimit: (\d+)(Gi|Mi)`)
 	m := re.FindStringSubmatch(manifest)
 	if m == nil {
-		t.Fatalf("no emptyDir named %q with a sizeLimit in Gi in %s", name, workerManifestPath)
+		t.Fatalf("no emptyDir named %q with a sizeLimit in Gi or Mi in %s", name, workerManifestPath)
 	}
-	gi, _ := strconv.ParseInt(m[1], 10, 64)
-	return gi << 30
+	n, _ := strconv.ParseInt(m[1], 10, 64)
+	if m[2] == "Mi" {
+		return n << 20
+	}
+	return n << 30
 }
