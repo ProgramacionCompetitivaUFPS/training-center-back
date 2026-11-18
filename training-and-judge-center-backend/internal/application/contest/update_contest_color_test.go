@@ -16,8 +16,6 @@ const (
 
 func ptr[T any](v T) *T { return &v }
 
-// colorChange builds the "color" of a ProblemOrderInput: a nil argument asks to clear it, and leaving
-// the field unset omits it.
 func colorChange(c *string) **string { return &c }
 
 func problemWithColor(id, problemID string, order int, color string) domainContest.ContestProblem {
@@ -31,7 +29,6 @@ func contestHolding(problems ...domainContest.ContestProblem) *domainContest.Con
 	return c
 }
 
-// slugProblemProvider resolves "problem-a" and "problem-b" to two distinct problems.
 func slugProblemProvider() *mockProblemProvider {
 	ids := map[string]string{"problem-a": colorProblemA, "problem-b": colorProblemB}
 	return &mockProblemProvider{
@@ -45,7 +42,6 @@ func slugProblemProvider() *mockProblemProvider {
 	}
 }
 
-// updateProblems runs a PUT with the given problems and returns what was saved and answered.
 func updateProblems(t *testing.T, c *domainContest.Contest, problems []ProblemOrderInput) (*domainContest.Contest, *ContestOutput, error) {
 	t.Helper()
 	var saved *domainContest.Contest

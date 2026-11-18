@@ -2,8 +2,7 @@ package contest
 
 import domainContest "github.com/training-judge-center/backend/internal/domain/contest"
 
-// parseProblemColors reads the color each (deduplicated) input asks for, keyed by slug. A slug whose
-// color was omitted is absent from the result, so its current color is kept; a nil value clears it.
+// parseProblemColors maps slug to the color asked for; a slug without an entry keeps its color and a nil value clears it.
 func parseProblemColors(inputs []ProblemOrderInput) (map[string]*domainContest.ProblemColor, error) {
 	changes := make(map[string]*domainContest.ProblemColor)
 	for _, in := range deduplicateBySlug(inputs) {

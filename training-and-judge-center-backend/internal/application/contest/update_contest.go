@@ -37,7 +37,7 @@ type UpdateContestInput struct {
 type ProblemOrderInput struct {
 	Slug  string
 	Order int
-	Color **string // nil = keep the problem's current color; non-nil pointer-to-nil = clear it
+	Color **string // nil = keep; pointer to nil = clear
 }
 
 type problemEntry struct {
@@ -164,12 +164,14 @@ func (uc *UpdateContestUseCase) Execute(ctx context.Context, in UpdateContestInp
 		c.SetTeamSize(*scalars.teamSize, now)
 	}
 
+	var problemDisplays []ProblemDisplay
 	if problemsChanged {
 		existingByProblemID := make(map[string]domainContest.ContestProblem, len(c.Problems()))
 		for _, cp := range c.Problems() {
 			existingByProblemID[cp.ProblemID()] = cp
 		}
 		newProblems := make([]domainContest.ContestProblem, 0, len(newProblemEntries))
+		problemDisplays = make([]ProblemDisplay, 0, len(newProblemEntries))
 		for _, pe := range newProblemEntries {
 			id := uuid.New().String()
 			var color *domainContest.ProblemColor
@@ -180,6 +182,7 @@ func (uc *UpdateContestUseCase) Execute(ctx context.Context, in UpdateContestInp
 				color = change
 			}
 			newProblems = append(newProblems, domainContest.RestoreContestProblem(id, pe.id, pe.order, color))
+			problemDisplays = append(problemDisplays, ProblemDisplay{Slug: pe.slug, Title: pe.title, Order: pe.order, Color: colorString(color)})
 		}
 		c.SetProblems(newProblems, now)
 	}
@@ -214,14 +217,7 @@ func (uc *UpdateContestUseCase) Execute(ctx context.Context, in UpdateContestInp
 		owner = &UserDisplay{}
 	}
 
-	var problemDisplays []ProblemDisplay
-	if problemsChanged {
-		problemDisplays = make([]ProblemDisplay, 0, len(newProblemEntries))
-		for i, cp := range c.Problems() {
-			pe := newProblemEntries[i]
-			problemDisplays = append(problemDisplays, ProblemDisplay{Slug: pe.slug, Title: pe.title, Order: pe.order, Color: colorString(cp.Color())})
-		}
-	} else {
+	if !problemsChanged {
 		problemDisplays, err = uc.enrichProblems(ctx, c.Problems())
 		if err != nil {
 			return nil, err

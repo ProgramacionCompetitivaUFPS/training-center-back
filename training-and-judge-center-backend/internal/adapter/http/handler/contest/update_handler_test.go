@@ -156,7 +156,6 @@ func TestUpdateContest_ContestNotFound_Returns404(t *testing.T) {
 	}
 }
 
-// coloredUpdateRepo holds a contest whose problem "p1" (the one mockProblemProvider resolves every slug to) is red.
 type coloredUpdateRepo struct{ stubUpdateRepo }
 
 func (s *coloredUpdateRepo) FindByID(ctx context.Context, id string) (*domainContest.Contest, error) {
@@ -191,8 +190,6 @@ func putProblems(t *testing.T, uc *appcontest.UpdateContestUseCase, problemsJSON
 	return w
 }
 
-// colorKeyOf returns the raw "color" key of the first problem of an update response, so a missing key
-// and an explicit null can be told apart.
 func colorKeyOf(t *testing.T, body []byte) (value interface{}, present bool) {
 	t.Helper()
 	var raw struct {

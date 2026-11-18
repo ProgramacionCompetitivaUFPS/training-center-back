@@ -72,7 +72,6 @@ func (h *Handler) Update(w http.ResponseWriter, r *http.Request) {
 		problems := make([]appContest.ProblemOrderInput, len(*body.Problems))
 		for i, p := range *body.Problems {
 			problems[i] = appContest.ProblemOrderInput{Slug: p.Slug, Order: p.Order}
-			// color: three-state like description — omitted=keep, null=clear, string=set.
 			if p.Color.Present {
 				problems[i].Color = &p.Color.Value
 			}

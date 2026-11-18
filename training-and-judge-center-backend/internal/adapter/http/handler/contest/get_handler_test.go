@@ -123,7 +123,6 @@ func TestGetContest_NotFound_Returns404(t *testing.T) {
 	}
 }
 
-// coloredGetRepo holds a contest whose problem "p1" is colored and whose problem "p2" is not.
 type coloredGetRepo struct{ mockGetRepo }
 
 func (s *coloredGetRepo) FindByID(ctx context.Context, id string) (*domainContest.Contest, error) {

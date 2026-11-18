@@ -23,7 +23,6 @@ func (cp ContestProblem) ID() string        { return cp.id }
 func (cp ContestProblem) ProblemID() string { return cp.problemID }
 func (cp ContestProblem) Order() int        { return cp.order }
 
-// Color is nil when no balloon color was chosen.
 func (cp ContestProblem) Color() *ProblemColor { return cp.color }
 
 // Letter returns the display alias for this problem slot using base-26
