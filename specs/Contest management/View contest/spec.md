@@ -222,6 +222,7 @@ View details of a specific contest.
       "position": 1,
       "slug": "sum-two-numbers",
       "title": "Sum of Two Numbers",
+      "color": "#e53935",
       "timeLimit": 2000,
       "memoryLimit": 256
     },
@@ -229,6 +230,7 @@ View details of a specific contest.
       "position": 2,
       "slug": "binary-search",
       "title": "Binary Search Implementation",
+      "color": null,
       "timeLimit": 1000,
       "memoryLimit": 128
     }
@@ -257,7 +259,7 @@ View details of a specific contest.
 | isRegistered | boolean | Whether current user is registered | All |
 | group | object | Group info (id, name) | All |
 | owner | object | Owner info (id, nickname) | All |
-| problems | array | List of problems | See visibility rules |
+| problems | array | List of problems; each has `color`, the balloon color as `#rrggbb` or `null` when none was chosen | See visibility rules |
 | createdAt | timestamp | Creation timestamp | All |
 | updatedAt | timestamp | Last update timestamp | All |
 
@@ -506,7 +508,7 @@ List contests in a group with optional filters and pagination.
 
 - **Contest_Problem**: Problems in the contest.
   Key attributes:
-  - `contest_id`, `problem_id`, `position`
+  - `contest_id`, `problem_id`, `position`, `color` (optional balloon color, `#rrggbb`)
 
 - **Problem**: Problem details.
   Key attributes:

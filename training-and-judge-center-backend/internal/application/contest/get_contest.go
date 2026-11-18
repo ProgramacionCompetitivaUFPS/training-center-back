@@ -20,6 +20,7 @@ type ProblemDetailDisplay struct {
 	Position    int // maps to the domain's Order field
 	Slug        string
 	Title       string
+	Color       *string
 	TimeLimit   int
 	MemoryLimit int
 }
@@ -146,6 +147,7 @@ func (uc *GetContestUseCase) Execute(ctx context.Context, in GetContestInput) (*
 				Position:    cp.Order(),
 				Slug:        info.Slug,
 				Title:       info.Title,
+				Color:       colorString(cp.Color()),
 				TimeLimit:   info.TimeLimit,
 				MemoryLimit: info.MemoryLimit,
 			})

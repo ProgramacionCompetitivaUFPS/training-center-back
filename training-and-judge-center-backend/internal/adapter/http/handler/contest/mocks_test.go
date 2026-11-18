@@ -3,8 +3,10 @@ package contest
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"testing"
 	"time"
 
 	"github.com/training-judge-center/backend/internal/adapter/http/middleware"
@@ -40,6 +42,17 @@ func authedRequest(method, target string, body []byte) *http.Request {
 
 func wrapAuth(h http.Handler) http.Handler {
 	return middleware.Auth(&mockTokenSvc{}, noopSessionInvalidator{})(h)
+}
+
+func assertErrorCode(t *testing.T, body []byte, want string) {
+	t.Helper()
+	var resp apperror.AppError
+	if err := json.Unmarshal(body, &resp); err != nil {
+		t.Fatalf("could not decode error body %s: %v", body, err)
+	}
+	if resp.Code != want {
+		t.Errorf("error = %q, want %q", resp.Code, want)
+	}
 }
 
 // ── Mock dependencies ────────────────────────────────────────────────────────

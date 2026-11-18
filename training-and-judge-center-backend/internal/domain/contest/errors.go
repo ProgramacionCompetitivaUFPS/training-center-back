@@ -17,4 +17,5 @@ const (
 	ErrCodeContestProblemsLocked          = "CONTEST_PROBLEMS_LOCKED"
 	ErrCodeFreezeTooLong                  = "FREEZE_TOO_LONG"
 	ErrCodeRegistrationBusy               = "REGISTRATION_BUSY"
+	ErrCodeInvalidProblemColor            = "INVALID_PROBLEM_COLOR"
 )

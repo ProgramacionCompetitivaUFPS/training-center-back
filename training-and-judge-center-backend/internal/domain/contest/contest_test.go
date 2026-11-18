@@ -410,3 +410,70 @@ func TestProblemsNeverNil(t *testing.T) {
 		t.Error("RestoreContest: Problems() must not be nil when passed nil")
 	}
 }
+
+func restoredContestUpdatedAt(t *testing.T, updatedAt *time.Time) *contest.Contest {
+	t.Helper()
+	base := time.Date(2026, 5, 4, 14, 0, 0, 0, time.UTC)
+	return contest.RestoreContest(
+		"id",
+		mustName(t, "Test"),
+		nil,
+		base.Add(time.Hour),
+		base.Add(4*time.Hour),
+		mustPenalty(t, 20),
+		0,
+		false,
+		false,
+		false,
+		shared.RestoreGroupID("g"),
+		shared.RestoreUserID("o"),
+		contest.RestoreParticipationMode("INDIVIDUAL"), contest.RestoreTeamSize(2, 5),
+		nil,
+		base,
+		updatedAt,
+	)
+}
+
+func TestConcurrencyToken_IsTheUpdatedAtTheContestWasLoadedWith(t *testing.T) {
+	loaded := time.Date(2026, 5, 4, 15, 0, 0, 0, time.UTC)
+
+	c := restoredContestUpdatedAt(t, &loaded)
+
+	if got := c.ConcurrencyToken(); got == nil || !got.Equal(loaded) {
+		t.Errorf("ConcurrencyToken() = %v, want %v", got, loaded)
+	}
+}
+
+func TestConcurrencyToken_IsNilForAContestNeverUpdated(t *testing.T) {
+	c := restoredContestUpdatedAt(t, nil)
+
+	if got := c.ConcurrencyToken(); got != nil {
+		t.Errorf("ConcurrencyToken() = %v, want nil", got)
+	}
+}
+
+func TestConcurrencyToken_DoesNotMoveWhenTheContestIsModified(t *testing.T) {
+	loaded := time.Date(2026, 5, 4, 15, 0, 0, 0, time.UTC)
+	c := restoredContestUpdatedAt(t, &loaded)
+
+	c.SetLocked(true, loaded.Add(time.Minute))
+	c.SetProblems(nil, loaded.Add(2*time.Minute))
+
+	if got := c.UpdatedAt(); got == nil || !got.Equal(loaded.Add(2*time.Minute)) {
+		t.Fatalf("UpdatedAt() = %v, want it to move to the last modification", got)
+	}
+	if got := c.ConcurrencyToken(); got == nil || !got.Equal(loaded) {
+		t.Errorf("ConcurrencyToken() = %v, want it to stay at %v", got, loaded)
+	}
+}
+
+func TestConcurrencyToken_IsNotSharedWithTheCallerThroughTheReturnedPointer(t *testing.T) {
+	loaded := time.Date(2026, 5, 4, 15, 0, 0, 0, time.UTC)
+	c := restoredContestUpdatedAt(t, &loaded)
+
+	*c.ConcurrencyToken() = loaded.Add(time.Hour)
+
+	if got := c.ConcurrencyToken(); !got.Equal(loaded) {
+		t.Errorf("ConcurrencyToken() = %v after the caller changed the returned value, want %v", got, loaded)
+	}
+}

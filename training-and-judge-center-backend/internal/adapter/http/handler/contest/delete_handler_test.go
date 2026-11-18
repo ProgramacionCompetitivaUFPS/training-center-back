@@ -99,6 +99,29 @@ func TestDeleteContest_ActiveContest_Returns409(t *testing.T) {
 	if w.Code != http.StatusConflict {
 		t.Fatalf("expected 409, got %d: %s", w.Code, w.Body.String())
 	}
+	assertErrorCode(t, w.Body.Bytes(), domainContest.ErrCodeContestIsActive)
+}
+
+func TestDeleteContest_LockedContest_Returns403(t *testing.T) {
+	locked := contestToDelete()
+	locked.SetLocked(true, time.Now())
+	uc := appcontest.NewDeleteContestUseCase(
+		&mockRepoReturning{contest: locked},
+		&mockMemberProvider{isLead: true, isMember: true},
+		&mockStandingsCache{},
+	)
+	h := newHandlerWithDelete(uc)
+	r := authedRequest(http.MethodDelete, "/groups/g1/contests/c1", nil)
+	r.SetPathValue("groupId", "g1")
+	r.SetPathValue("contestId", "c1")
+	w := httptest.NewRecorder()
+
+	wrapAuth(http.HandlerFunc(h.Delete)).ServeHTTP(w, r)
+
+	if w.Code != http.StatusForbidden {
+		t.Fatalf("expected 403, got %d: %s", w.Code, w.Body.String())
+	}
+	assertErrorCode(t, w.Body.Bytes(), domainContest.ErrCodeContestLocked)
 }
 
 func TestDeleteContest_ContestNotFound_Returns404(t *testing.T) {

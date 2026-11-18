@@ -23,6 +23,7 @@ import (
 // @Failure      401 {object} apperror.AppError
 // @Failure      403 {object} apperror.AppError
 // @Failure      404 {object} apperror.AppError
+// @Failure      409 {object} apperror.AppError
 // @Router       /groups/{groupId}/contests/{contestId} [put]
 func (h *Handler) Update(w http.ResponseWriter, r *http.Request) {
 	caller, ok := handler.RequireCurrentUser(w, r)
@@ -71,6 +72,9 @@ func (h *Handler) Update(w http.ResponseWriter, r *http.Request) {
 		problems := make([]appContest.ProblemOrderInput, len(*body.Problems))
 		for i, p := range *body.Problems {
 			problems[i] = appContest.ProblemOrderInput{Slug: p.Slug, Order: p.Order}
+			if p.Color.Present {
+				problems[i].Color = &p.Color.Value
+			}
 		}
 		in.Problems = &problems
 	}
@@ -87,7 +91,7 @@ func (h *Handler) Update(w http.ResponseWriter, r *http.Request) {
 func toContestResponse(out *appContest.ContestOutput) contestResponse {
 	probs := make([]problemDisplay, len(out.Problems))
 	for i, p := range out.Problems {
-		probs[i] = problemDisplay{Slug: p.Slug, Title: p.Title, Order: p.Order}
+		probs[i] = problemDisplay{Slug: p.Slug, Title: p.Title, Order: p.Order, Color: p.Color}
 	}
 
 	resp := contestResponse{

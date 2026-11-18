@@ -52,6 +52,7 @@ func toGetContestResponse(out *appContest.GetContestOutput) getContestResponse {
 			Position:    p.Position,
 			Slug:        p.Slug,
 			Title:       p.Title,
+			Color:       p.Color,
 			TimeLimit:   p.TimeLimit,
 			MemoryLimit: p.MemoryLimit,
 		}

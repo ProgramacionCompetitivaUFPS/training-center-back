@@ -269,8 +269,8 @@ func TestGetStandings_FullContractShape_Returns200(t *testing.T) {
 		shared.RestoreUserID("u1"),
 		domainContest.RestoreParticipationMode("MIXED"), domainContest.RestoreTeamSize(2, 5),
 		[]domainContest.ContestProblem{
-			domainContest.RestoreContestProblem("cp1", "prob-A", 1),
-			domainContest.RestoreContestProblem("cp2", "prob-B", 2),
+			domainContest.RestoreContestProblem("cp1", "prob-A", 1, nil),
+			domainContest.RestoreContestProblem("cp2", "prob-B", 2, nil),
 		},
 		time.Now(),
 		nil,

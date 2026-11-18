@@ -15,6 +15,7 @@ type ProblemDisplay struct {
 	Slug  string
 	Title string
 	Order int
+	Color *string
 }
 
 type ContestOutput struct {

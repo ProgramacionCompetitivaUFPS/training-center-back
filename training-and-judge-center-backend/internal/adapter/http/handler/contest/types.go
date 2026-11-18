@@ -46,8 +46,9 @@ type createContestRequest struct {
 }
 
 type problemOrderRequest struct {
-	Slug  string `json:"slug"`
-	Order int    `json:"order"`
+	Slug  string         `json:"slug"`
+	Order int            `json:"order"`
+	Color nullableString `json:"color"`
 }
 
 type updateContestRequest struct {
@@ -80,19 +81,21 @@ type ownerDisplay struct {
 }
 
 type problemDisplay struct {
-	Slug  string `json:"slug"`
-	Title string `json:"title"`
-	Order int    `json:"order"`
+	Slug  string  `json:"slug"`
+	Title string  `json:"title"`
+	Order int     `json:"order"`
+	Color *string `json:"color"`
 }
 
 // ── GET /contests/:id response ───────────────────────────────────────────────
 
 type problemDetail struct {
-	Position    int    `json:"position"`
-	Slug        string `json:"slug"`
-	Title       string `json:"title"`
-	TimeLimit   int    `json:"timeLimit"`
-	MemoryLimit int    `json:"memoryLimit"`
+	Position    int     `json:"position"`
+	Slug        string  `json:"slug"`
+	Title       string  `json:"title"`
+	Color       *string `json:"color"`
+	TimeLimit   int     `json:"timeLimit"`
+	MemoryLimit int     `json:"memoryLimit"`
 }
 
 type getContestResponse struct {
