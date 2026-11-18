@@ -138,16 +138,20 @@ func TestUploadGate_CancelledContext_ReturnsTheContextError(t *testing.T) {
 func TestRemoveStaleUploads_RemovesOnlySpoolFiles(t *testing.T) {
 	dir := t.TempDir()
 	stale := filepath.Join(dir, "upload-123")
+	spill := filepath.Join(dir, "multipart-456")
 	other := filepath.Join(dir, "keep.txt")
-	for _, p := range []string{stale, other} {
+	for _, p := range []string{stale, spill, other} {
 		if err := os.WriteFile(p, []byte("x"), 0o600); err != nil {
 			t.Fatal(err)
 		}
 	}
 
 	removed, err := RemoveStaleUploads(dir)
-	if err != nil || removed != 1 {
-		t.Fatalf("removed = %d, err = %v; want 1, nil", removed, err)
+	if err != nil || removed != 2 {
+		t.Fatalf("removed = %d, err = %v; want 2, nil", removed, err)
+	}
+	if _, err := os.Stat(spill); !os.IsNotExist(err) {
+		t.Errorf("the multipart spill file must be gone, stat err = %v", err)
 	}
 	if _, err := os.Stat(stale); !os.IsNotExist(err) {
 		t.Errorf("the spool file must be gone, stat err = %v", err)

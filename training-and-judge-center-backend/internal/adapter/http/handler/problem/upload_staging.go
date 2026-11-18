@@ -23,6 +23,8 @@ const (
 	uploadQueueWait         = 30 * time.Second
 	uploadRetryAfterSeconds = "30"
 	stagedUploadPattern     = "upload-*"
+	// What net/http spills to when a multipart form outgrows its memory budget.
+	multipartSpillPattern = "multipart-*"
 )
 
 var (
@@ -166,14 +168,16 @@ func uploadFailure(w http.ResponseWriter, err error) *apperror.AppError {
 // RemoveStaleUploads deletes spool files a killed process left behind: an emptyDir
 // outlives its container, so without this they would pile up across restarts.
 func RemoveStaleUploads(dir string) (int, error) {
-	matches, err := filepath.Glob(filepath.Join(dir, stagedUploadPattern))
-	if err != nil {
-		return 0, err
-	}
 	removed := 0
-	for _, path := range matches {
-		if err := os.Remove(path); err == nil {
-			removed++
+	for _, pattern := range []string{stagedUploadPattern, multipartSpillPattern} {
+		matches, err := filepath.Glob(filepath.Join(dir, pattern))
+		if err != nil {
+			return removed, err
+		}
+		for _, path := range matches {
+			if err := os.Remove(path); err == nil {
+				removed++
+			}
 		}
 	}
 	return removed, nil
