@@ -98,7 +98,7 @@ As a user, I want to view the final standings of a finished contest so that I ca
 * **And** the authenticated user has view access (member, participant, or non-member of VISIBLE group)
 * **When** they request the standings
 * **Then** the system returns the full standings (the freeze no longer applies)
-* **And** the result is stable across requests: only submissions with `submittedAt <= endTime` count, and the problem list of a finished contest cannot be changed
+* **And** the result is stable across requests unless a submission with `submittedAt <= endTime` is judged after `endTime`; its verdict then changes the standings the next time the projection is rebuilt. The problem list of a finished contest cannot be changed
 
 2. **Scenario**: View standings during postcompetition
 
@@ -289,7 +289,7 @@ Retrieve the standings of a contest.
 | Field | Type | Description |
 |-------|------|-------------|
 | contest | object | Contest metadata with freeze info |
-| contest.freezeMinutes | integer | Freeze length in minutes (`null` when the contest has no freeze) |
+| contest.freezeMinutes | integer | Freeze length in minutes. A contest without freeze stores `0`, and this response returns `null` in that case |
 | contest.isFrozen | boolean | Whether standings are currently frozen for this response |
 | contest.frozenAt | timestamp | When the freeze started (`null` if not frozen) |
 | problems | array | The contest's current problems in position order |
@@ -427,7 +427,7 @@ List the distinct values available for the standings filters. Same authenticatio
 
 - **FR-011**: When there is no cached projection, the system MUST rebuild it from the registrations, selected team members and judged submissions of the contest (at most 10,000 participants).
 
-- **FR-012**: A projection older than 30 seconds is still served, and a background refresh is triggered (guarded by the lock `lock:standings:{contestId}`). Changes to the contest's problems are therefore reflected within that window.
+- **FR-012**: A projection older than 30 seconds is still served, and a background refresh is triggered (guarded by the lock `lock:standings:{contestId}`). The refresh is triggered by a request and the stale data is what that request receives, so a later request is needed to see the refreshed data; changes to the contest's problems are reflected only after such a refresh, and a failed refresh delays them further.
 
 - **FR-013**: The projection is removed when the contest is deleted or when its group is deleted. There is no final snapshot of the standings.
 
@@ -457,11 +457,11 @@ List the distinct values available for the standings filters. Same authenticatio
 
 - **FR-023**: Group members MUST have access to standings.
 
-- **FR-024**: Registered participants MUST have access to standings.
+- **FR-024**: Registered participants MUST have access to standings as long as they are members of the group. Access is decided by group membership (or Lead/Admin role), not by contest registration: a registered user who has left a NOT_VISIBLE group receives 404.
 
 - **FR-025**: Non-members of VISIBLE groups MUST have read-only access.
 
-- **FR-026**: Non-members of NOT_VISIBLE groups MUST receive 404.
+- **FR-026**: Non-members of NOT_VISIBLE groups MUST receive 404, except Admins, who can access every group (FR-027).
 
 - **FR-027**: Admin MUST have access to all standings with `realtime` capability.
 
@@ -471,7 +471,7 @@ List the distinct values available for the standings filters. Same authenticatio
 
 - **NFR-001**: Standings retrieval SHOULD complete within 500ms for up to 100 participants.
 - **NFR-002**: Standing calculations MUST be accurate to ICPC rules.
-- **NFR-003**: Standings of a FINISHED contest MUST be stable: postcompetition submissions are ignored and the contest's problem list cannot be changed once it has finished.
+- **NFR-003**: Standings of a FINISHED contest are stable: postcompetition submissions are ignored and the contest's problem list cannot be changed once it has finished. The only way they change after `endTime` is a submission made before `endTime` that is judged afterwards (submissions still `PENDING` or `RUNNING` are not part of the projection until judged).
 
 ---
 
@@ -480,7 +480,7 @@ List the distinct values available for the standings filters. Same authenticatio
 ### Key Entities
 
 - **Contest**: Competition with freeze configuration.
-  - `freezeMinutes` (integer, default: 60, `0` = no freeze) - Minutes before end to freeze standings
+  - `freezeMinutes` (integer, default: 60, `0` = no freeze) - Minutes before end to freeze standings; the standings response returns `null` when it is `0`
   - `penalty` (integer) - Minutes added per wrong attempt on a solved problem
   - `showTeamMembers` (boolean) - Whether team member nicknames are returned
 

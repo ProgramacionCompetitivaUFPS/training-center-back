@@ -197,7 +197,7 @@ Contests support different participation configurations:
 * **Redis projection**: Each contest has a cached projection `standings:{contestId}` with the raw attempt timestamps per participant and problem, plus team members, team names and profiles
 * **Computed on request**: Ranking, penalty, freeze and filters are applied in memory on every request from that projection
 * **Rebuild**: The projection is rebuilt from registrations, selected team members and judged submissions when it is missing; a projection older than 30 seconds is still served while a background refresh runs
-* **No snapshot**: There is no final snapshot collection; standings of a finished contest stay stable because later submissions are ignored and the problem list is locked
+* **No snapshot**: There is no final snapshot collection; standings of a finished contest stay stable because later submissions are ignored and the problem list is locked (a submission made before `endTime` and judged afterwards can still change them)
 
 ### Calculation
 
@@ -211,12 +211,12 @@ Contests support different participation configurations:
 
 ### Updates
 
-* Standings reflect judged submissions made at or before `endTime`; a refreshed projection is picked up within the cache window
+* Standings reflect judged submissions made at or before `endTime`; a stale projection is served while a background refresh runs, so a later request is needed to see refreshed data (and a failed refresh delays it further)
 * Standings are **frozen** at `endTime - freezeMinutes` while the contest is `ACTIVE`; the freeze is lifted when the contest ends
 * Submissions during postcompetition do NOT affect standings
 * Only the contest's current problems count: a removed problem stops counting (its submissions keep their `contest_id`) and counts again if put back
 * Penalty changes apply on the next request (no recalculation needed)
-* If a contest is deleted, its cached projection is removed (submissions preserved)
+* If a contest is deleted, removal of its cached projection is attempted on a best-effort basis (submissions preserved)
 
 ### Freeze (Optional)
 
@@ -262,11 +262,11 @@ An `ACTIVE` contest cannot be deleted (409 `CONTEST_IS_ACTIVE`); `SCHEDULED` and
 |--------|--------|
 | Contest | Hard delete |
 | Contest_Problem, registrations, team participations | Hard delete (cascade) |
-| Standings cache | Removed (Redis key `standings:{contestId}`) |
+| Standings cache | Removal attempted, best effort (Redis key `standings:{contestId}`); a failure does not fail the request and the key may remain |
 | Submission | Preserved with `contest_id = NULL` (orphaned) |
 | Problem | NOT deleted (global entities) |
 
-> **Note**: The cached standings projection is removed when the contest is deleted.
+> **Note**: Removal of the cached standings projection is attempted when the contest is deleted; if Redis fails the contest is still deleted and the key may remain.
 
 ### When the Parent Group is Deleted
 

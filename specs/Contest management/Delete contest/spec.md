@@ -22,7 +22,7 @@ As a Lead of a group, I want to delete a contest from my group so that I can rem
    * **Then** the system deletes the contest
    * **And** deletes all Contest_Problem associations
    * **And** deletes the contest's registrations and team participations
-   * **And** removes the cached standings of the contest
+   * **And** attempts to remove the cached standings of the contest (a failure to remove them does not fail the request)
    * **And** sets `contest_id` to `null` for all submissions of the contest
    * **And** returns 204 No Content
 
@@ -39,12 +39,12 @@ As a Lead of a group, I want to delete a contest from my group so that I can rem
    * **When** they submit a delete request
    * **Then** the system deletes the contest
    * **And** deletes all Contest_Problem associations, registrations and team participations
-   * **And** removes the cached standings of the contest
+   * **And** attempts to remove the cached standings of the contest (a failure to remove them does not fail the request)
    * **And** sets `contest_id` to `null` for all submissions (including postcompetition ones)
    * **And** returns 204 No Content
 
 4. **Scenario**: Successful contest deletion - contest with problems and submissions
-   * **Given** a contest exists with problems P1, P2, P3
+   * **Given** a contest with status SCHEDULED or FINISHED exists with problems P1, P2, P3
    * **And** the contest has submissions to P1 and P2
    * **And** the authenticated user is a Lead of the group
    * **When** they submit a delete request
@@ -94,11 +94,11 @@ As an Admin, I want to delete contests in any group so that I can assist with ad
 **Acceptance Scenarios**:
 
 1. **Scenario**: Admin deletes contest in group they don't belong to
-   * **Given** a contest exists in a group
+   * **Given** a contest with status SCHEDULED or FINISHED exists in a group
    * **And** the authenticated user has Admin role (not a member of the group)
    * **When** they submit a delete request
    * **Then** the system deletes the contest
-   * **And** performs all deletion operations (Contest_Problem, registrations, team participations, cached standings, submissions `contest_id = null`)
+   * **And** performs all deletion operations (Contest_Problem, registrations, team participations, attempted cached-standings removal, submissions `contest_id = null`)
    * **And** returns 204 No Content
 
 2. **Scenario**: Admin cannot delete an ACTIVE contest
@@ -120,14 +120,14 @@ As a Lead of the global group (Admin or assigned Coach), I want to delete contes
 **Acceptance Scenarios**:
 
 1. **Scenario**: Lead (Coach) deletes contest in global group
-   * **Given** a contest exists in the global group (`is_default = true`)
+   * **Given** a contest with status SCHEDULED or FINISHED exists in the global group (`is_default = true`)
    * **And** the authenticated user has Coach role and is a Lead of the global group
    * **When** they submit a delete request
    * **Then** the system deletes the contest
    * **And** returns 204 No Content
 
 2. **Scenario**: Admin deletes contest in global group
-   * **Given** a contest exists in the global group (`is_default = true`)
+   * **Given** a contest with status SCHEDULED or FINISHED exists in the global group (`is_default = true`)
    * **And** the authenticated user has Admin role
    * **When** they submit a delete request
    * **Then** the system deletes the contest
@@ -173,7 +173,7 @@ Delete an existing contest and its associated data.
 > - Problems are NOT deleted (they are global entities)
 > - Submissions are NOT deleted, but `contest_id` is set to `null` (become orphaned)
 > - Contest_Problem associations, registrations and team participations are deleted (cascade)
-> - The cached standings (`standings:{contestId}`) are removed on a best-effort basis
+> - Removal of the cached standings (`standings:{contestId}`) is attempted on a best-effort basis: if Redis fails the contest is still deleted, the request returns 204 and the cache entry may remain
 
 **Headers**:
 
@@ -251,7 +251,7 @@ The contest is ACTIVE.
 **Data Deletion**
 * **FR-DC-007**: The system MUST delete the Contest record when deletion is requested.
 * **FR-DC-008**: The system MUST delete all Contest_Problem associations, registrations and team participations (cascade delete).
-* **FR-DC-009**: The system MUST remove the cached standings projection (`standings:{contestId}`) of the contest. A failure to remove it MUST NOT fail the request.
+* **FR-DC-009**: The system MUST attempt to remove the cached standings projection (`standings:{contestId}`) of the contest. A failure to remove it MUST NOT fail the request, so the request may return 204 while the cache entry remains.
 
 **Submissions Handling**
 * **FR-DC-011**: The system MUST NOT delete submissions when a contest is deleted.
@@ -292,7 +292,7 @@ The contest is ACTIVE.
   * **Deletion**: Cascade delete when contest is deleted
 
 * **Standings cache**: Redis key `standings:{contestId}` (see View contest standings spec).
-  * **Deletion**: Removed best-effort; a stale entry would never be served for a deleted contest
+  * **Deletion**: Removal is attempted best-effort and can fail silently, leaving the key behind; the key is then harmless because standings are never served for a deleted contest
 
 * **Submission**: Represents a contestant's solution attempt.
   * `contest_id` (FK to Contest, nullable, `ON DELETE SET NULL`)
@@ -302,7 +302,8 @@ The contest is ACTIVE.
   * **Deletion**: NOT deleted (problems are global entities)
 
 > **Deletion Behavior Summary**:
-> * **Deleted**: Contest, Contest_Problem, contest registrations, team participations, cached standings
+> * **Deleted**: Contest, Contest_Problem, contest registrations, team participations
+> * **Removal attempted (best effort)**: cached standings
 > * **Not Deleted**: Problem, Submission
 > * **Updated**: Submission.`contest_id` → `null` (orphaned submissions)
 
@@ -329,7 +330,7 @@ Delete Contest record
 (cascade: Contest_Problem, registrations, team participations;
  submissions.contest_id → NULL)
     ↓
-Remove cached standings (best effort)
+Attempt to remove cached standings (best effort; a failure is ignored)
     ↓
 Return 204 No Content
 ```
@@ -349,7 +350,7 @@ Return 204 No Content
 * **SC-DC-007**: A SCHEDULED or FINISHED contest can be deleted.
 * **SC-DC-008**: Contest record is permanently deleted from database.
 * **SC-DC-009**: All Contest_Problem associations, registrations and team participations are deleted.
-* **SC-DC-010**: The cached standings of the contest are removed.
+* **SC-DC-010**: Removal of the cached standings of the contest is attempted; if it fails the request still returns HTTP 204.
 * **SC-DC-012**: Problems are NOT deleted (remain in system).
 * **SC-DC-013**: Submissions are NOT deleted but have `contest_id` set to `null`, including those still PENDING.
 * **SC-DC-015**: Non-existent contests, or contests of another group, return HTTP 404.
