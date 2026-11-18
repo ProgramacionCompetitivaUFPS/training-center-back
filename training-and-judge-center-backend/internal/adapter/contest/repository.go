@@ -319,16 +319,21 @@ func (r *Repository) upsertProblems(ctx context.Context, q infraPostgres.Querier
 	ids := make([]string, len(problems))
 	problemIDs := make([]string, len(problems))
 	orders := make([]int32, len(problems))
+	colors := make([]*string, len(problems))
 	for i, cp := range problems {
 		ids[i] = cp.ID()
 		problemIDs[i] = cp.ProblemID()
 		orders[i] = int32(cp.Order())
+		if color := cp.Color(); color != nil {
+			v := color.Value()
+			colors[i] = &v
+		}
 	}
 	_, err := q.Exec(ctx, `
-		INSERT INTO contest_problems (id, contest_id, problem_id, "order")
-		SELECT unnest($1::uuid[]), $2, unnest($3::uuid[]), unnest($4::int[])
-		ON CONFLICT (contest_id, problem_id) DO UPDATE SET "order"=EXCLUDED."order"`,
-		ids, contestID, problemIDs, orders,
+		INSERT INTO contest_problems (id, contest_id, problem_id, "order", color)
+		SELECT unnest($1::uuid[]), $2, unnest($3::uuid[]), unnest($4::int[]), unnest($5::text[])
+		ON CONFLICT (contest_id, problem_id) DO UPDATE SET "order"=EXCLUDED."order", color=EXCLUDED.color`,
+		ids, contestID, problemIDs, orders, colors,
 	)
 	if err != nil {
 		slog.ErrorContext(ctx, "failed to upsert contest problems", "error", err, "contest_id", contestID, "count", len(problems))
@@ -339,7 +344,7 @@ func (r *Repository) upsertProblems(ctx context.Context, q infraPostgres.Querier
 
 func (r *Repository) loadProblems(ctx context.Context, q infraPostgres.Querier, contestID string) ([]domainContest.ContestProblem, error) {
 	rows, err := q.Query(ctx, `
-		SELECT id, problem_id, "order"
+		SELECT id, problem_id, "order", color
 		FROM contest_problems
 		WHERE contest_id=$1
 		ORDER BY "order"`, contestID)
@@ -353,11 +358,12 @@ func (r *Repository) loadProblems(ctx context.Context, q infraPostgres.Querier, 
 	for rows.Next() {
 		var id, problemID string
 		var order int
-		if err := rows.Scan(&id, &problemID, &order); err != nil {
+		var color *string
+		if err := rows.Scan(&id, &problemID, &order, &color); err != nil {
 			slog.ErrorContext(ctx, "failed to scan contest problem", "error", err)
 			return nil, apperror.NewInternal()
 		}
-		problems = append(problems, domainContest.RestoreContestProblem(id, problemID, order, nil))
+		problems = append(problems, restoreContestProblem(id, problemID, order, color))
 	}
 	if err := rows.Err(); err != nil {
 		slog.ErrorContext(ctx, "contest problems rows error", "error", err)
@@ -374,7 +380,7 @@ func (r *Repository) loadProblemsByContestIDs(ctx context.Context, q infraPostgr
 		return result, nil
 	}
 	rows, err := q.Query(ctx, `
-		SELECT id, contest_id, problem_id, "order"
+		SELECT id, contest_id, problem_id, "order", color
 		FROM contest_problems
 		WHERE contest_id = ANY($1)
 		ORDER BY contest_id, "order"`, contestIDs)
@@ -387,15 +393,25 @@ func (r *Repository) loadProblemsByContestIDs(ctx context.Context, q infraPostgr
 	for rows.Next() {
 		var id, contestID, problemID string
 		var order int
-		if err := rows.Scan(&id, &contestID, &problemID, &order); err != nil {
+		var color *string
+		if err := rows.Scan(&id, &contestID, &problemID, &order, &color); err != nil {
 			slog.ErrorContext(ctx, "failed to scan contest problem", "error", err)
 			return nil, apperror.NewInternal()
 		}
-		result[contestID] = append(result[contestID], domainContest.RestoreContestProblem(id, problemID, order, nil))
+		result[contestID] = append(result[contestID], restoreContestProblem(id, problemID, order, color))
 	}
 	if err := rows.Err(); err != nil {
 		slog.ErrorContext(ctx, "contest problems rows error", "error", err)
 		return nil, apperror.NewInternal()
 	}
 	return result, nil
+}
+
+func restoreContestProblem(id, problemID string, order int, color *string) domainContest.ContestProblem {
+	var restored *domainContest.ProblemColor
+	if color != nil {
+		c := domainContest.RestoreProblemColor(*color)
+		restored = &c
+	}
+	return domainContest.RestoreContestProblem(id, problemID, order, restored)
 }
