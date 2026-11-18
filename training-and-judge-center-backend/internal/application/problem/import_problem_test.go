@@ -16,7 +16,7 @@ type mockPackageParser struct {
 	pkg *ParsedPackage
 }
 
-func (m *mockPackageParser) ParsePackageZip(context.Context, []byte) (*ParsedPackage, error) {
+func (m *mockPackageParser) ParsePackageZip(context.Context, StagedFile) (*ParsedPackage, error) {
 	return m.pkg, nil
 }
 
@@ -34,7 +34,7 @@ func importFixture(storage ProblemFileRepository, saveErr error) *ImportProblemU
 }
 
 func importInput() ImportProblemInput {
-	return ImportProblemInput{Slug: testSlug, ZipData: []byte("zip"), CurrentUser: asCoach(authorID)}
+	return ImportProblemInput{Slug: testSlug, Zip: bytes.NewReader([]byte("zip")), CurrentUser: asCoach(authorID)}
 }
 
 func captureLogs(t *testing.T) *bytes.Buffer {

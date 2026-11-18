@@ -8,12 +8,13 @@ type ParsedPackage struct {
 	MemoryLimit *int
 	Statement   *string
 	SampleFiles []ParsedFile
-	ZipData     []byte
-	Solutions   []ParsedFile
-	Checker     *ParsedFile
-	Validator   *ParsedFile
+	// Zip is the uploaded package itself, kept as the test case archive; nil when it holds no test cases.
+	Zip       StagedFile
+	Solutions []ParsedFile
+	Checker   *ParsedFile
+	Validator *ParsedFile
 }
 
 type ICPCPackageParser interface {
-	ParsePackageZip(ctx context.Context, zipData []byte) (*ParsedPackage, error)
+	ParsePackageZip(ctx context.Context, zip StagedFile) (*ParsedPackage, error)
 }

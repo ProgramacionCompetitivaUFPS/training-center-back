@@ -1,7 +1,9 @@
 package problem_test
 
 import (
+	"bytes"
 	"context"
+	"io"
 	"sort"
 	"testing"
 	"time"
@@ -16,8 +18,9 @@ import (
 // memoryStorage is the slice of ProblemFileRepository the export reads.
 type memoryStorage struct{ files map[string][]byte }
 
-func (m *memoryStorage) UploadFile(context.Context, string, []byte) error { return nil }
-func (m *memoryStorage) DeleteFile(context.Context, string) error         { return nil }
+func (m *memoryStorage) UploadFile(context.Context, string, []byte) error          { return nil }
+func (m *memoryStorage) UploadFileStream(context.Context, string, io.Reader) error { return nil }
+func (m *memoryStorage) DeleteFile(context.Context, string) error                  { return nil }
 func (m *memoryStorage) DeleteFilesWithPrefix(context.Context, string) error {
 	return nil
 }
@@ -69,7 +72,7 @@ func TestExportedPackageImportsBackToTheSameProblem(t *testing.T) {
 
 	cfg := testParserConfig()
 	cfg.LanguageExtensions = map[string]string{".cpp": "cpp20", ".py": "python310", ".java": "java17"}
-	pkg, err := problem.NewICPCParser(cfg).ParsePackageZip(context.Background(), exported)
+	pkg, err := problem.NewICPCParser(cfg).ParsePackageZip(context.Background(), bytes.NewReader(exported), int64(len(exported)))
 	if err != nil {
 		t.Fatalf("the import rejects what the export wrote: %v", err)
 	}
@@ -89,7 +92,7 @@ func TestExportedPackageImportsBackToTheSameProblem(t *testing.T) {
 	if len(pkg.SampleFiles) != 2 {
 		t.Errorf("SampleFiles = %d, want the sample .in/.ans pair", len(pkg.SampleFiles))
 	}
-	if len(pkg.ZipData) == 0 {
+	if !pkg.HasTestCases {
 		t.Error("the import found no test cases in the exported package")
 	}
 

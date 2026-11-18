@@ -14,8 +14,8 @@ func NewZipParser(inner *ICPCParser) *ZipParser {
 	return &ZipParser{inner: inner}
 }
 
-func (a *ZipParser) ParseTestCasesZip(ctx context.Context, zipData []byte) ([]appProblem.ParsedFile, error) {
-	extracted, err := a.inner.ParseTestCasesZip(ctx, zipData)
+func (a *ZipParser) ParseTestCasesZip(ctx context.Context, zip appProblem.StagedFile) ([]appProblem.ParsedFile, error) {
+	extracted, err := a.inner.ParseTestCasesZip(ctx, zip, zip.Size())
 	if err != nil {
 		return nil, err
 	}
@@ -34,8 +34,8 @@ func NewICPCPackageParser(inner *ICPCParser) *ICPCPackageParser {
 	return &ICPCPackageParser{inner: inner}
 }
 
-func (a *ICPCPackageParser) ParsePackageZip(ctx context.Context, zipData []byte) (*appProblem.ParsedPackage, error) {
-	pkg, err := a.inner.ParsePackageZip(ctx, zipData)
+func (a *ICPCPackageParser) ParsePackageZip(ctx context.Context, zip appProblem.StagedFile) (*appProblem.ParsedPackage, error) {
+	pkg, err := a.inner.ParsePackageZip(ctx, zip, zip.Size())
 	if err != nil {
 		return nil, err
 	}
@@ -55,15 +55,18 @@ func (a *ICPCPackageParser) ParsePackageZip(ctx context.Context, zipData []byte)
 		return &appProblem.ParsedFile{Path: src.Path, Content: src.Content}
 	}
 
-	return &appProblem.ParsedPackage{
+	parsed := &appProblem.ParsedPackage{
 		Title:       pkg.Title,
 		TimeLimitMs: pkg.TimeLimitMs,
 		MemoryLimit: pkg.MemoryLimit,
 		Statement:   pkg.Statement,
 		SampleFiles: toAppFiles(pkg.SampleFiles),
-		ZipData:     pkg.ZipData,
 		Solutions:   toAppFiles(pkg.Solutions),
 		Checker:     toAppFilePtr(pkg.Checker),
 		Validator:   toAppFilePtr(pkg.Validator),
-	}, nil
+	}
+	if pkg.HasTestCases {
+		parsed.Zip = zip
+	}
+	return parsed, nil
 }
