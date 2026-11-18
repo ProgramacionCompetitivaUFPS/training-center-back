@@ -53,7 +53,7 @@ func TestICPCParser_ValidArchive(t *testing.T) {
 		"data/secret/2.ans": []byte("30"),
 	})
 
-	extracted, err := p.ParseTestCasesZip(context.Background(), zipData)
+	extracted, err := p.ParseTestCasesZip(context.Background(), bytes.NewReader(zipData), int64(len(zipData)))
 	if err != nil {
 		if appErr, ok := err.(*apperror.AppError); ok && len(appErr.Details) > 0 {
 			t.Fatalf("expected no error, got detail: %s", appErr.Details[0].Message)
@@ -74,7 +74,7 @@ func TestICPCParser_InvalidExtension(t *testing.T) {
 		"data/sample/1.txt": []byte("3"),
 	})
 
-	_, err := p.ParseTestCasesZip(context.Background(), zipData)
+	_, err := p.ParseTestCasesZip(context.Background(), bytes.NewReader(zipData), int64(len(zipData)))
 	if err == nil {
 		t.Fatal("expected error for invalid extension, got nil")
 	}
@@ -97,7 +97,7 @@ func TestICPCParser_PathTraversal(t *testing.T) {
 		"data/sample/../../etc/hosts": []byte("malicious"),
 	})
 
-	_, err := p.ParseTestCasesZip(context.Background(), zipData)
+	_, err := p.ParseTestCasesZip(context.Background(), bytes.NewReader(zipData), int64(len(zipData)))
 	if err == nil {
 		t.Fatal("expected error for malicious path, got nil")
 	}
@@ -110,7 +110,7 @@ func TestICPCParser_MissingContentDir(t *testing.T) {
 		"some_other_dir/1.in": []byte("1 2"),
 	})
 
-	_, err := p.ParseTestCasesZip(context.Background(), zipData)
+	_, err := p.ParseTestCasesZip(context.Background(), bytes.NewReader(zipData), int64(len(zipData)))
 	if err == nil {
 		t.Fatal("expected error for files outside testcases dirs")
 	}
@@ -126,7 +126,7 @@ func TestICPCParser_TooManySamples(t *testing.T) {
 		"data/sample/2.in": []byte("3"),
 	})
 
-	_, err := p.ParseTestCasesZip(context.Background(), zipData)
+	_, err := p.ParseTestCasesZip(context.Background(), bytes.NewReader(zipData), int64(len(zipData)))
 	if err == nil {
 		t.Fatal("expected error for too many samples, got nil")
 	}
@@ -198,7 +198,7 @@ func TestICPCParser_TheTwoTestCaseCapsAreNotInterchangeable(t *testing.T) {
 			"data/sample/1.in":  mb(1.5),
 			"data/sample/1.ans": []byte("3"),
 		})
-		if _, err := p.ParseTestCasesZip(context.Background(), zipData); err != nil {
+		if _, err := p.ParseTestCasesZip(context.Background(), bytes.NewReader(zipData), int64(len(zipData))); err != nil {
 			t.Fatalf("expected the input to fit under its own cap, got: %v", err)
 		}
 	})
@@ -230,7 +230,7 @@ func TestICPCParser_AFileExactlyAtItsCapIsAccepted(t *testing.T) {
 			"data/sample/1.in":  []byte("1 2"),
 			"data/sample/1.ans": bytes.Repeat([]byte("x"), oneMB),
 		})
-		if _, err := p.ParseTestCasesZip(context.Background(), zipData); err != nil {
+		if _, err := p.ParseTestCasesZip(context.Background(), bytes.NewReader(zipData), int64(len(zipData))); err != nil {
 			t.Fatalf("expected a file exactly at its cap to be accepted, got: %v", err)
 		}
 	})
@@ -250,7 +250,7 @@ func TestICPCParser_AFileExactlyAtItsCapIsAccepted(t *testing.T) {
 
 func mustFailParse(t *testing.T, p *problem.ICPCParser, zipData []byte) error {
 	t.Helper()
-	_, err := p.ParseTestCasesZip(context.Background(), zipData)
+	_, err := p.ParseTestCasesZip(context.Background(), bytes.NewReader(zipData), int64(len(zipData)))
 	return err
 }
 
@@ -283,7 +283,7 @@ func TestICPCParser_MissingYAML_HasCode(t *testing.T) {
 		"data/sample/1.in":  []byte("1 2"),
 		"data/sample/1.ans": []byte("3"),
 	})
-	_, err := p.ParsePackageZip(context.Background(), zipData)
+	_, err := p.ParsePackageZip(context.Background(), bytes.NewReader(zipData), int64(len(zipData)))
 	code := rejectionCode(t, err)
 	if code != "MISSING_PROBLEM_YAML" {
 		t.Errorf("code: got %q, want %q", code, "MISSING_PROBLEM_YAML")
@@ -295,7 +295,7 @@ func TestICPCParser_MissingDataDir_HasNoCode(t *testing.T) {
 	zipData := createZipBuffer(t, map[string][]byte{
 		"some_other_dir/file.txt": []byte("x"),
 	})
-	_, err := p.ParseTestCasesZip(context.Background(), zipData)
+	_, err := p.ParseTestCasesZip(context.Background(), bytes.NewReader(zipData), int64(len(zipData)))
 	appErr, ok := err.(*apperror.AppError)
 	if !ok || len(appErr.Details) == 0 {
 		t.Fatalf("expected AppError with Details, got: %v", err)
@@ -312,7 +312,7 @@ func TestICPCParser_InvalidYAMLSyntax_HasCode(t *testing.T) {
 		"data/sample/1.in":  []byte("1 2"),
 		"data/sample/1.ans": []byte("3"),
 	})
-	_, err := p.ParsePackageZip(context.Background(), zipData)
+	_, err := p.ParsePackageZip(context.Background(), bytes.NewReader(zipData), int64(len(zipData)))
 	code := rejectionCode(t, err)
 	if code != "INVALID_PROBLEM_YAML" {
 		t.Errorf("code: got %q, want %q", code, "INVALID_PROBLEM_YAML")
@@ -326,7 +326,7 @@ func TestICPCParser_YAMLMissingName_HasCode(t *testing.T) {
 		"data/sample/1.in":  []byte("1 2"),
 		"data/sample/1.ans": []byte("3"),
 	})
-	_, err := p.ParsePackageZip(context.Background(), zipData)
+	_, err := p.ParsePackageZip(context.Background(), bytes.NewReader(zipData), int64(len(zipData)))
 	code := rejectionCode(t, err)
 	if code != "INVALID_PROBLEM_YAML" {
 		t.Errorf("code: got %q, want %q", code, "INVALID_PROBLEM_YAML")
@@ -358,7 +358,7 @@ func TestICPCParser_WindowsBackslashPaths(t *testing.T) {
 		`data\secret\2.ans`: []byte("30"),
 	})
 
-	extracted, err := p.ParseTestCasesZip(context.Background(), zipData)
+	extracted, err := p.ParseTestCasesZip(context.Background(), bytes.NewReader(zipData), int64(len(zipData)))
 	if err != nil {
 		t.Fatalf("expected no error for Windows-style paths, got: %v", err)
 	}

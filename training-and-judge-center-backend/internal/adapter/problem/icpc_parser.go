@@ -2,7 +2,6 @@ package problem
 
 import (
 	"archive/zip"
-	"bytes"
 	"context"
 	"fmt"
 	"io"
@@ -75,15 +74,15 @@ type ExtractedFile struct {
 }
 
 type ParsedPackage struct {
-	Title       string
-	TimeLimitMs *int
-	MemoryLimit *int
-	Statement   *string
-	SampleFiles []ExtractedFile
-	ZipData     []byte
-	Solutions   []ExtractedFile
-	Checker     *ExtractedFile
-	Validator   *ExtractedFile
+	Title        string
+	TimeLimitMs  *int
+	MemoryLimit  *int
+	Statement    *string
+	SampleFiles  []ExtractedFile
+	HasTestCases bool
+	Solutions    []ExtractedFile
+	Checker      *ExtractedFile
+	Validator    *ExtractedFile
 }
 
 type problemYAML struct {
@@ -92,8 +91,8 @@ type problemYAML struct {
 	MemoryLimit int     `yaml:"memory_limit"`
 }
 
-func (p *ICPCParser) ParseTestCasesZip(ctx context.Context, zipData []byte) ([]ExtractedFile, error) {
-	pz, err := p.prepareZip(zipData)
+func (p *ICPCParser) ParseTestCasesZip(ctx context.Context, src io.ReaderAt, size int64) ([]ExtractedFile, error) {
+	pz, err := p.prepareZip(src, size)
 	if err != nil {
 		return nil, err
 	}
@@ -123,11 +122,15 @@ func (p *ICPCParser) ParseTestCasesZip(ctx context.Context, zipData []byte) ([]E
 		})
 	}
 
+	if err := p.verifyContents(ctx, pz); err != nil {
+		return nil, err
+	}
+
 	return sampleFiles, nil
 }
 
-func (p *ICPCParser) ParsePackageZip(ctx context.Context, zipData []byte) (*ParsedPackage, error) {
-	pz, err := p.prepareZip(zipData)
+func (p *ICPCParser) ParsePackageZip(ctx context.Context, src io.ReaderAt, size int64) (*ParsedPackage, error) {
+	pz, err := p.prepareZip(src, size)
 	if err != nil {
 		return nil, err
 	}
@@ -195,7 +198,7 @@ func (p *ICPCParser) ParsePackageZip(ctx context.Context, zipData []byte) (*Pars
 	}
 	if validCount > 0 {
 		pkg.SampleFiles = sampleFiles
-		pkg.ZipData = zipData
+		pkg.HasTestCases = true
 	}
 
 	var solutions []ExtractedFile
@@ -228,7 +231,39 @@ func (p *ICPCParser) ParsePackageZip(ctx context.Context, zipData []byte) (*Pars
 	}
 	pkg.Validator = validator
 
+	if err := p.verifyContents(ctx, pz); err != nil {
+		return nil, err
+	}
+
 	return pkg, nil
+}
+
+// verifyContents decompresses every entry once, so a ZIP whose data disagrees with its
+// directory (declared size, CRC, truncated stream) is refused here and not mid-judging.
+func (p *ICPCParser) verifyContents(ctx context.Context, pz *ParsedZip) error {
+	corrupt := func(name string) error {
+		return apperror.NewValidation([]apperror.FieldError{
+			{Field: "file", Message: fmt.Sprintf("ZIP entry '%s' is corrupt or does not match its declared size", name)},
+		})
+	}
+	for _, czf := range pz.Files {
+		if czf.IsDir {
+			continue
+		}
+		if err := ctx.Err(); err != nil {
+			return err
+		}
+		rc, err := czf.File.Open()
+		if err != nil {
+			return corrupt(czf.CleanPath)
+		}
+		_, copyErr := io.Copy(io.Discard, rc)
+		rc.Close()
+		if copyErr != nil {
+			return corrupt(czf.CleanPath)
+		}
+	}
+	return nil
 }
 
 func (p *ICPCParser) parseTestCases(
@@ -429,8 +464,8 @@ func (p *ICPCParser) validateFileSizes(pz *ParsedZip, prefix string) error {
 	return nil
 }
 
-func (p *ICPCParser) prepareZip(zipData []byte) (*ParsedZip, error) {
-	reader, err := zip.NewReader(bytes.NewReader(zipData), int64(len(zipData)))
+func (p *ICPCParser) prepareZip(src io.ReaderAt, size int64) (*ParsedZip, error) {
+	reader, err := zip.NewReader(src, size)
 	if err != nil {
 		return nil, apperror.NewValidation([]apperror.FieldError{{Field: "file", Message: "Invalid ZIP file format"}})
 	}

@@ -34,7 +34,7 @@ type UploadProblemFilesInput struct {
 	Slug     string
 	FileType string
 	FileName string
-	FileData []byte
+	File     StagedFile
 	// ConfirmSlug is required to replace testCases or checker of a published problem in an active contest.
 	ConfirmSlug string
 	CurrentUser appshared.CurrentUser
@@ -159,7 +159,7 @@ func (uc *UploadProblemFilesUseCase) cleanupFiles(ctx context.Context, keys []st
 }
 
 func (uc *UploadProblemFilesUseCase) handleTestCases(ctx context.Context, p *problem.Problem, input UploadProblemFilesInput, now time.Time) (fileAction, error) {
-	sampleFiles, err := uc.zipParser.ParseTestCasesZip(ctx, input.FileData)
+	sampleFiles, err := uc.zipParser.ParseTestCasesZip(ctx, input.File)
 	if err != nil {
 		return fileAction{}, err
 	}
@@ -174,7 +174,7 @@ func (uc *UploadProblemFilesUseCase) handleTestCases(ctx context.Context, p *pro
 		allNewKeys = append(allNewKeys, fmt.Sprintf("%s/%s", basePath, file.Path))
 	}
 
-	if err := uc.storage.UploadFile(ctx, zipKey, input.FileData); err != nil {
+	if err := uc.storage.UploadFileStream(ctx, zipKey, stagedReader(input.File)); err != nil {
 		return fileAction{rollbackFiles: allNewKeys}, err
 	}
 
@@ -219,7 +219,11 @@ func (uc *UploadProblemFilesUseCase) handleSolution(ctx context.Context, p *prob
 		return fileAction{}, err
 	}
 
-	if err := uc.storage.UploadFile(ctx, fileKey, input.FileData); err != nil {
+	content, err := readStaged(ctx, input.File, uc.smallFileLimit())
+	if err != nil {
+		return fileAction{}, err
+	}
+	if err := uc.storage.UploadFile(ctx, fileKey, content); err != nil {
 		return fileAction{}, err
 	}
 
@@ -274,12 +278,20 @@ func (uc *UploadProblemFilesUseCase) handleVerifier(
 		action.rollbackFiles = []string{fileKey}
 	}
 
-	if err := uc.storage.UploadFile(ctx, fileKey, input.FileData); err != nil {
+	content, err := readStaged(ctx, input.File, uc.smallFileLimit())
+	if err != nil {
+		return fileAction{rollbackFiles: action.rollbackFiles}, err
+	}
+	if err := uc.storage.UploadFile(ctx, fileKey, content); err != nil {
 		return fileAction{rollbackFiles: action.rollbackFiles}, err
 	}
 
 	setVerifier(verifierObj)
 	return action, nil
+}
+
+func (uc *UploadProblemFilesUseCase) smallFileLimit() int64 {
+	return int64(uc.settings.MaxFileSizeDefaultMB()) << 20
 }
 
 func (uc *UploadProblemFilesUseCase) getLanguageForFile(cleanName, fileType string) (string, error) {

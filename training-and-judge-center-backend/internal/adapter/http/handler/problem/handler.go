@@ -35,6 +35,7 @@ type Handler struct {
 	getTestCasePart            *appProblem.GetTestCasePartUseCase
 	userProvider               appProblem.UserProvider
 	settings                   domainProblem.PlatformSettings
+	uploads                    *uploadGate
 }
 
 func NewHandler(
@@ -98,5 +99,6 @@ func NewHandler(
 		getTestCasePart:            getTestCasePart,
 		userProvider:               userProvider,
 		settings:                   settings,
+		uploads:                    newUploadGate(maxConcurrentZipUploads),
 	}
 }

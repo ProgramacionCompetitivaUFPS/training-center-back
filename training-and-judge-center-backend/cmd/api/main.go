@@ -647,7 +647,20 @@ func main() {
 	}, cfg.AllowedOrigins)
 
 	slog.Info("http starting", "port", cfg.Port)
-	if err := http.ListenAndServe(fmt.Sprintf(":%s", cfg.Port), router); err != nil {
+	if removed, err := handlerProblem.RemoveStaleUploads(os.TempDir()); err != nil {
+		slog.Warn("api: could not clean up leftover uploads", "error", err)
+	} else if removed > 0 {
+		slog.Info("api: leftover uploads removed", "count", removed)
+	}
+
+	// No overall Read/WriteTimeout: uploads set their own read deadline and a publish answers only after its validation.
+	server := &http.Server{
+		Addr:              fmt.Sprintf(":%s", cfg.Port),
+		Handler:           router,
+		ReadHeaderTimeout: 10 * time.Second,
+		IdleTimeout:       2 * time.Minute,
+	}
+	if err := server.ListenAndServe(); err != nil {
 		slog.Error("http failed to start", "error", err)
 		os.Exit(1)
 	}

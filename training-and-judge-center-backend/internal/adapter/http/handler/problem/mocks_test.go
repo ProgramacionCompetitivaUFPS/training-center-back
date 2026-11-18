@@ -3,6 +3,7 @@ package problem
 import (
 	"bytes"
 	"context"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"time"
@@ -83,7 +84,10 @@ type mockFileStorageH struct {
 	downloadFileFn func(ctx context.Context, path string) ([]byte, error)
 }
 
-func (m *mockFileStorageH) UploadFile(_ context.Context, _ string, _ []byte) error  { return nil }
+func (m *mockFileStorageH) UploadFile(_ context.Context, _ string, _ []byte) error { return nil }
+func (m *mockFileStorageH) UploadFileStream(_ context.Context, _ string, _ io.Reader) error {
+	return nil
+}
 func (m *mockFileStorageH) DeleteFile(_ context.Context, _ string) error            { return nil }
 func (m *mockFileStorageH) DeleteFilesWithPrefix(_ context.Context, _ string) error { return nil }
 func (m *mockFileStorageH) ListFiles(ctx context.Context, prefix string) ([]string, error) {

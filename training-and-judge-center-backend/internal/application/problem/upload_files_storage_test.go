@@ -1,6 +1,7 @@
 package problem
 
 import (
+	"bytes"
 	"context"
 	"testing"
 
@@ -12,7 +13,7 @@ import (
 func draftUploadFixture(p *domainProblem.Problem) (*UploadProblemFilesUseCase, *recordingStorage) {
 	storage := newRecordingStorage()
 	parser := &mockZipParser{
-		parseTestCasesZipFn: func(context.Context, []byte) ([]ParsedFile, error) {
+		parseTestCasesZipFn: func(context.Context, StagedFile) ([]ParsedFile, error) {
 			return []ParsedFile{{Path: "data/sample/01.in", Content: []byte("1 2")}}, nil
 		},
 	}
@@ -21,7 +22,7 @@ func draftUploadFixture(p *domainProblem.Problem) (*UploadProblemFilesUseCase, *
 }
 
 func draftUploadInput(fileType, fileName string) UploadProblemFilesInput {
-	return UploadProblemFilesInput{Slug: testSlug, FileType: fileType, FileName: fileName, FileData: []byte("data"), CurrentUser: asCoach(authorID)}
+	return UploadProblemFilesInput{Slug: testSlug, FileType: fileType, FileName: fileName, File: bytes.NewReader([]byte("data")), CurrentUser: asCoach(authorID)}
 }
 
 func TestUploadProblemFiles_ReplacingTestCases_DropsTheOldOnesAndKeepsTheNew(t *testing.T) {

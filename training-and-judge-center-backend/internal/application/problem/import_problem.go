@@ -19,7 +19,7 @@ import (
 
 type ImportProblemInput struct {
 	Slug        string
-	ZipData     []byte
+	Zip         StagedFile
 	CurrentUser appshared.CurrentUser
 }
 
@@ -66,7 +66,7 @@ func (uc *ImportProblemUseCase) Execute(ctx context.Context, input ImportProblem
 		return nil, apperror.NewConflict(problem.ErrCodeSlugAlreadyExists, "A problem with slug '"+slug.String()+"' already exists")
 	}
 
-	pkg, err := uc.packageParser.ParsePackageZip(ctx, input.ZipData)
+	pkg, err := uc.packageParser.ParsePackageZip(ctx, input.Zip)
 	if err != nil {
 		return nil, err
 	}
@@ -146,12 +146,12 @@ func (uc *ImportProblemUseCase) Execute(ctx context.Context, input ImportProblem
 		return nil, err
 	}
 
-	if pkg.ZipData != nil {
+	if pkg.Zip != nil {
 		uploadInstanceID := uuid.New().String()
 		basePath := fmt.Sprintf("problems/%s/%s/%s", slug.String(), FileTypeTestCases, uploadInstanceID)
 		zipKey := TestCasesZipKey(basePath)
 
-		if err := uc.storage.UploadFile(ctx, zipKey, pkg.ZipData); err != nil {
+		if err := uc.storage.UploadFileStream(ctx, zipKey, stagedReader(pkg.Zip)); err != nil {
 			cleanup()
 			return nil, err
 		}

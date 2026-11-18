@@ -2,6 +2,7 @@ package problem
 
 import (
 	"context"
+	"io"
 	"time"
 
 	domainProblem "github.com/training-judge-center/backend/internal/domain/problem"
@@ -143,12 +144,12 @@ func (m *mockFileStorage) DownloadFile(ctx context.Context, path string) ([]byte
 // ── ZipParser mock ───────────────────────────────────────────────────────────
 
 type mockZipParser struct {
-	parseTestCasesZipFn func(ctx context.Context, zipData []byte) ([]ParsedFile, error)
+	parseTestCasesZipFn func(ctx context.Context, zip StagedFile) ([]ParsedFile, error)
 }
 
-func (m *mockZipParser) ParseTestCasesZip(ctx context.Context, zipData []byte) ([]ParsedFile, error) {
+func (m *mockZipParser) ParseTestCasesZip(ctx context.Context, zip StagedFile) ([]ParsedFile, error) {
 	if m.parseTestCasesZipFn != nil {
-		return m.parseTestCasesZipFn(ctx, zipData)
+		return m.parseTestCasesZipFn(ctx, zip)
 	}
 	return nil, nil
 }
@@ -606,4 +607,12 @@ func newRecordingStorage() *recordingStorage {
 func (r *recordingStorage) failEveryDeletion() {
 	r.deleteFileFn = func(context.Context, string) error { r.attempts++; return apperror.NewInternal() }
 	r.deleteFilesWithPrefixFn = func(context.Context, string) error { r.attempts++; return apperror.NewInternal() }
+}
+
+func (m *mockFileStorage) UploadFileStream(ctx context.Context, path string, content io.Reader) error {
+	data, err := io.ReadAll(content)
+	if err != nil {
+		return err
+	}
+	return m.UploadFile(ctx, path, data)
 }

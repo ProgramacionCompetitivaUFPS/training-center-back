@@ -1,7 +1,7 @@
 ﻿package problem
 
 import (
-	"io"
+	"errors"
 	"log/slog"
 	"net/http"
 
@@ -36,13 +36,29 @@ func (h *Handler) Import(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	maxUploadBytes := int64(h.settings.MaxZipUploadSizeMB()) << 20
-	if err := r.ParseMultipartForm(maxUploadBytes); err != nil {
-		handler.WriteError(r.Context(), w, multipartParseError(err))
+	release, err := h.uploads.acquire(r.Context())
+	if err != nil {
+		handler.WriteError(r.Context(), w, uploadFailure(w, err))
 		return
 	}
+	defer release()
 
-	slug := r.FormValue("slug")
+	maxUploadBytes := int64(h.settings.MaxZipUploadSizeMB()) << 20
+	upload, err := receiveUpload(w, r, maxUploadBytes)
+	if err != nil {
+		if errors.Is(err, errFileTooLarge) {
+			handler.WriteError(r.Context(), w, apperror.NewValidation([]apperror.FieldError{
+				{Field: "file", Code: zipTooLargeCode, Message: "ZIP file exceeds the maximum upload size"},
+			}))
+			return
+		}
+		slog.WarnContext(r.Context(), "import: upload rejected", "error", err)
+		handler.WriteError(r.Context(), w, uploadFailure(w, err))
+		return
+	}
+	defer upload.Close()
+
+	slug := upload.fields["slug"]
 	if slug == "" {
 		handler.WriteJSON(r.Context(), w, http.StatusBadRequest, apperror.AppError{
 			Code:    apperror.ErrCodeValidationError,
@@ -50,27 +66,11 @@ func (h *Handler) Import(w http.ResponseWriter, r *http.Request) {
 		})
 		return
 	}
-
-	file, _, err := r.FormFile("file")
-	if err != nil {
+	if upload.file == nil {
 		handler.WriteJSON(r.Context(), w, http.StatusBadRequest, apperror.AppError{
 			Code:    apperror.ErrCodeValidationError,
 			Message: "Missing required form field 'file'",
 		})
-		return
-	}
-	defer file.Close()
-
-	zipData, err := io.ReadAll(io.LimitReader(file, maxUploadBytes+1))
-	if err != nil {
-		slog.ErrorContext(r.Context(), "import: failed to read uploaded file", "error", err)
-		handler.WriteJSON(r.Context(), w, http.StatusInternalServerError, apperror.NewInternal())
-		return
-	}
-	if int64(len(zipData)) > maxUploadBytes {
-		handler.WriteError(r.Context(), w, apperror.NewValidation([]apperror.FieldError{
-			{Field: "file", Code: zipTooLargeCode, Message: "ZIP file exceeds the maximum upload size"},
-		}))
 		return
 	}
 
@@ -78,7 +78,7 @@ func (h *Handler) Import(w http.ResponseWriter, r *http.Request) {
 
 	out, ucErr := h.importProblem.Execute(r.Context(), appProblem.ImportProblemInput{
 		Slug:        slug,
-		ZipData:     zipData,
+		Zip:         upload.file,
 		CurrentUser: currentUser,
 	})
 	if ucErr != nil {
