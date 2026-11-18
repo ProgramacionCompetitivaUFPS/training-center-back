@@ -16,7 +16,7 @@ judge:
   # maxConcurrent archives plus the extraction of the largest package (the worker refuses to start
   # otherwise), and stay under the emptyDir's sizeLimit.
   testDataDir: /test-data
-  testDataBudgetBytes: 2147483648 # 2 GiB: eight problems like the largest one in use, four at the extracted size limit
+  testDataBudgetBytes: 3221225472 # 3 GiB: twelve problems like the largest one in use, six at the extracted size limit
 
   # Language properties: true no matter which pool runs the container.
   # In the artifact* fields, {name} is replaced with Checker or Validator.

@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"strings"
@@ -539,5 +540,128 @@ func TestTestDataCache_OnceCachedTheArchiveItselfIsGone(t *testing.T) {
 			names[i] = it.Name()
 		}
 		t.Errorf("only the extracted problem should remain on disk, found %v", names)
+	}
+}
+
+// captureLogs swaps the default logger for one that writes to a buffer.
+func captureLogs(t *testing.T) *bytes.Buffer {
+	t.Helper()
+	var buf bytes.Buffer
+	previous := slog.Default()
+	slog.SetDefault(slog.New(slog.NewTextHandler(&buf, &slog.HandlerOptions{Level: slog.LevelDebug})))
+	t.Cleanup(func() { slog.SetDefault(previous) })
+	return &buf
+}
+
+func TestTestDataCache_LogsEachProblemItCaches(t *testing.T) {
+	logs := captureLogs(t)
+	src := newFakeSource()
+	src.objects["a.zip"] = archive(t, "a")
+	cache := newCache(t, src, 1<<20)
+
+	e, err := cache.acquire(context.Background(), "a.zip")
+	if err != nil {
+		t.Fatal(err)
+	}
+	cache.release(e)
+	e, _ = cache.acquire(context.Background(), "a.zip") // a hit: nothing to cache
+	cache.release(e)
+
+	if got := strings.Count(logs.String(), "problem cached"); got != 1 {
+		t.Errorf("logged %d times that a problem was cached, want 1 (a hit caches nothing):\n%s", got, logs)
+	}
+	for _, field := range []string{"key=a.zip", "archive_bytes=", "extracted_bytes=3020", "cases=1", "took="} {
+		if !strings.Contains(logs.String(), field) {
+			t.Errorf("the line must carry %q:\n%s", field, logs)
+		}
+	}
+}
+
+// Evictions are how an undersized budget shows: a problem evicted and then asked for again costs a
+// download and an extraction.
+func TestTestDataCache_LogsWhatItEvictsToMakeRoom(t *testing.T) {
+	logs := captureLogs(t)
+	src := newFakeSource()
+	for _, k := range []string{"a", "b", "c"} {
+		src.objects[k+".zip"] = archive(t, k)
+	}
+	size := int64(len(src.objects["a.zip"]))
+	cache := newCache(t, src, 2*extractedOf+size+10) // room for two extracted problems
+
+	for _, k := range []string{"a.zip", "b.zip", "c.zip"} {
+		e, err := cache.acquire(context.Background(), k)
+		if err != nil {
+			t.Fatalf("acquire %s: %v", k, err)
+		}
+		cache.release(e)
+		time.Sleep(5 * time.Millisecond)
+	}
+
+	out := logs.String()
+	if got := strings.Count(out, "evicted an idle problem"); got != 1 {
+		t.Fatalf("logged %d evictions, want 1:\n%s", got, out)
+	}
+	if !strings.Contains(out, "key=a.zip") || !strings.Contains(out, "freed_bytes=3020") {
+		t.Errorf("the eviction line must say which problem and how much it freed:\n%s", out)
+	}
+}
+
+func TestTestDataCache_LogsOnceWhenAJudgingWaitsForDiskAndOnceWhenItGetsIt(t *testing.T) {
+	logs := captureLogs(t)
+	src := newFakeSource()
+	src.objects["a.zip"] = archive(t, "a")
+	src.objects["b.zip"] = archive(t, "b")
+	cache := newCache(t, src, 8192) // the floor, so b has to wait for a
+	cache.maxWait = 5 * time.Second
+
+	held, err := cache.acquire(context.Background(), "a.zip")
+	if err != nil {
+		t.Fatal(err)
+	}
+	done := make(chan error, 1)
+	go func() {
+		e, err := cache.acquire(context.Background(), "b.zip")
+		if err == nil {
+			cache.release(e)
+		}
+		done <- err
+	}()
+	time.Sleep(200 * time.Millisecond)
+	cache.release(held)
+	if err := <-done; err != nil {
+		t.Fatalf("b.zip should proceed once a.zip is released, got %v", err)
+	}
+
+	out := logs.String()
+	if got := strings.Count(out, "waiting for disk"); got != 1 {
+		t.Errorf("logged %d times that it was waiting, want exactly 1 however many times it woke up:\n%s", got, out)
+	}
+	if got := strings.Count(out, "got the disk it waited for"); got != 1 {
+		t.Errorf("logged %d times that the wait ended, want 1:\n%s", got, out)
+	}
+	if !strings.Contains(out, "key=b.zip") || !strings.Contains(out, "budget_bytes=8192") {
+		t.Errorf("the wait line must say which problem and the budget:\n%s", out)
+	}
+}
+
+func TestTestDataCache_LogsWhenItGivesUpWaitingForDisk(t *testing.T) {
+	logs := captureLogs(t)
+	src := newFakeSource()
+	src.objects["a.zip"] = archive(t, "a")
+	src.objects["b.zip"] = archive(t, "b")
+	cache := newCache(t, src, 8192) // maxWait is 300ms
+
+	held, err := cache.acquire(context.Background(), "a.zip")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer cache.release(held)
+
+	if _, err := cache.acquire(context.Background(), "b.zip"); !errors.Is(err, errTestDataBusy) {
+		t.Fatalf("expected errTestDataBusy, got %v", err)
+	}
+
+	if !strings.Contains(logs.String(), "gave up waiting for disk") {
+		t.Errorf("giving up must be logged, or the SYSTEM_ERROR that follows has no explanation:\n%s", logs)
 	}
 }
