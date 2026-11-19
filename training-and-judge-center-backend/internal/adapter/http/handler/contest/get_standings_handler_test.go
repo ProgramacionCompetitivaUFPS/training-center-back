@@ -399,3 +399,98 @@ func TestGetStandings_FullContractShape_Returns200(t *testing.T) {
 		t.Errorf("filteredTotal=%d, want %d (mirrors pagination.total)", resp.Filters.FilteredTotal, resp.Pagination.Total)
 	}
 }
+
+func TestGetStandings_BoardFields_ColorCountsAndFirstSolve(t *testing.T) {
+	color := "#aabbcc"
+	contest := domainContest.RestoreContest(
+		"c1",
+		domainContest.RestoreContestName("Test Contest"),
+		nil,
+		time.Now().Add(-2*time.Hour),
+		time.Now().Add(2*time.Hour),
+		domainContest.RestorePenalty(20),
+		0, false, false, false,
+		shared.RestoreGroupID("g1"),
+		shared.RestoreUserID("u1"),
+		domainContest.RestoreParticipationMode("INDIVIDUAL"), domainContest.RestoreTeamSize(2, 5),
+		[]domainContest.ContestProblem{
+			domainContest.RestoreContestProblem("cp1", "prob-A", 1, &color),
+			domainContest.RestoreContestProblem("cp2", "prob-B", 2, nil),
+		},
+		time.Now(),
+		nil,
+	)
+	early, late := time.Now().Add(-100*time.Minute), time.Now().Add(-60*time.Minute)
+	cached := &appcontest.CachedStandings{
+		Participants: []domainContest.ParticipantStanding{
+			{ContestantID: "u1", ParticipantType: "INDIVIDUAL", Problems: map[string]domainContest.ProblemAttempt{
+				"prob-A": {AcceptedAt: &late},
+			}},
+			{ContestantID: "u2", ParticipantType: "INDIVIDUAL", Problems: map[string]domainContest.ProblemAttempt{
+				"prob-A": {AcceptedAt: &early},
+				"prob-B": {WrongAttemptTimes: []time.Time{late}},
+			}},
+		},
+		LastUpdated: time.Now(),
+	}
+	uc := appcontest.NewGetStandingsUseCase(
+		&mockStandingsContestRepo{contest: contest},
+		&mockRegistrationRepository{},
+		&mockSubmissionProvider{},
+		&mockTeamParticipantProvider{},
+		&mockParticipantProfileProvider{},
+		&mockTeamDisplayProvider{},
+		&mockProblemProvider{},
+		&mockGroupProvider{},
+		&mockMemberProvider{isLead: true, isMember: true},
+		&mockStandingsCache{data: cached},
+		30*time.Second,
+	)
+	h := newHandlerWithGetStandings(uc)
+	r := authedRequest(http.MethodGet, "/groups/g1/contests/c1/standings", nil)
+	r.SetPathValue("groupId", "g1")
+	r.SetPathValue("contestId", "c1")
+	w := httptest.NewRecorder()
+
+	wrapAuth(http.HandlerFunc(h.GetStandings)).ServeHTTP(w, r)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+	var raw struct {
+		Problems  []map[string]any `json:"problems"`
+		Standings []struct {
+			Participant struct {
+				ID string `json:"id"`
+			} `json:"participant"`
+			Problems []map[string]any `json:"problems"`
+		} `json:"standings"`
+	}
+	if err := json.NewDecoder(w.Body).Decode(&raw); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+
+	if got := raw.Problems[0]["color"]; got != "#aabbcc" {
+		t.Errorf("header A color = %v, want #aabbcc", got)
+	}
+	if got, present := raw.Problems[1]["color"]; !present || got != nil {
+		t.Errorf("header B color = %v (present=%v), want an explicit null", got, present)
+	}
+	if raw.Problems[0]["accepted"] != float64(2) || raw.Problems[0]["tried"] != float64(2) {
+		t.Errorf("header A accepted/tried = %v/%v, want 2/2", raw.Problems[0]["accepted"], raw.Problems[0]["tried"])
+	}
+	if raw.Problems[1]["accepted"] != float64(0) || raw.Problems[1]["tried"] != float64(1) {
+		t.Errorf("header B accepted/tried = %v/%v, want 0/1", raw.Problems[1]["accepted"], raw.Problems[1]["tried"])
+	}
+
+	firstSolve := map[string]any{}
+	for _, e := range raw.Standings {
+		firstSolve[e.Participant.ID] = e.Problems[0]["isFirstSolve"]
+		if _, present := e.Problems[1]["isFirstSolve"]; !present {
+			t.Errorf("%s: isFirstSolve must be present on every cell, including unsolved ones", e.Participant.ID)
+		}
+	}
+	if firstSolve["u2"] != true || firstSolve["u1"] != false {
+		t.Errorf("isFirstSolve on A = %v, want u2 true and u1 false", firstSolve)
+	}
+}

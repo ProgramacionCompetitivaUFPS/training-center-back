@@ -238,9 +238,12 @@ type standingsContestDisplay struct {
 }
 
 type standingsProblemHeader struct {
-	Position int    `json:"position"`
-	Slug     string `json:"slug"`
-	Title    string `json:"title"`
+	Position int     `json:"position"`
+	Slug     string  `json:"slug"`
+	Title    string  `json:"title"`
+	Color    *string `json:"color"`
+	Accepted int     `json:"accepted"`
+	Tried    int     `json:"tried"`
 }
 
 type standingParticipant struct {
@@ -256,11 +259,12 @@ type standingParticipant struct {
 }
 
 type standingProblemResult struct {
-	Position int    `json:"position"`
-	Status   string `json:"status"`
-	Attempts int    `json:"attempts"`
-	Time     *int   `json:"time"`
-	Penalty  int    `json:"penalty"`
+	Position     int    `json:"position"`
+	Status       string `json:"status"`
+	Attempts     int    `json:"attempts"`
+	Time         *int   `json:"time"`
+	Penalty      int    `json:"penalty"`
+	IsFirstSolve bool   `json:"isFirstSolve"`
 }
 
 type standingEntry struct {
