@@ -1300,6 +1300,25 @@ func TestGetStandingsUseCase_PendingCellsDoNotCountInTheHeadersNorFirstSolve(t *
 	}
 }
 
+func TestGetStandingsUseCase_PendingCellsApplyToTeamRows(t *testing.T) {
+	team := domainContest.ParticipantStanding{
+		ContestantID:    "t1",
+		ParticipantType: "TEAM",
+		Problems:        map[string]domainContest.ProblemAttempt{boardProblemA: hiddenSolveAttempt()},
+	}
+	cache := boardCache(nil, team)
+
+	out := executeBoard(t, boardContest(frozenContest()), cache, nil)
+
+	e := entryFor(t, out, "t1")
+	if e.Participant.Type != "TEAM" {
+		t.Fatalf("participant type = %q, want TEAM", e.Participant.Type)
+	}
+	if rp := e.Problems[boardProblemA]; rp.Pending != 3 || rp.AcceptedAt != nil {
+		t.Errorf("team cell = %+v, want pending 3 (two failures and the accept) and no visible solve", rp)
+	}
+}
+
 func TestGetStandingsUseCase_RealtimeShowsNoPendingCells(t *testing.T) {
 	cache := boardCache(nil, boardParticipant("u1", map[string]domainContest.ProblemAttempt{boardProblemA: hiddenSolveAttempt()}))
 	uc := newGetStandingsUseCase(boardContest(frozenContest()), nil, nil, cache, visibleGroup(), isLead())

@@ -208,6 +208,16 @@ func TestPendingSubmissions(t *testing.T) {
 			want:    0,
 		},
 		{
+			name:    "a failure exactly at the freeze is still visible",
+			attempt: domainContest.ProblemAttempt{WrongAttemptTimes: []time.Time{*tp(12, 0)}},
+			want:    0,
+		},
+		{
+			name:    "a failure exactly at the freeze stays visible while a later one is pending",
+			attempt: domainContest.ProblemAttempt{WrongAttemptTimes: []time.Time{*tp(12, 0), *tp(12, 10)}},
+			want:    1,
+		},
+		{
 			name:    "empty attempt counts nothing",
 			attempt: domainContest.ProblemAttempt{},
 			want:    0,
