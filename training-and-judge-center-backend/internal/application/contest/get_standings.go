@@ -34,6 +34,7 @@ type RankedEntry struct {
 	Rank            int
 	ContestantID    string
 	ParticipantType string // "INDIVIDUAL" or "TEAM"
+	IsOfficial      bool
 	ProblemsSolved  int
 	TotalPenalty    int
 	LastAcceptedAt  *time.Time
