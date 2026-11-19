@@ -105,7 +105,7 @@ As a user, I want to view the final standings of a finished contest so that I ca
 * **Given** a contest is FINISHED with `enablePostContest = true`
 * **And** users are submitting in postcompetition
 * **When** they request the standings
-* **Then** the system returns the same standings as before (postcompetition submissions do NOT affect them)
+* **Then** the official rows are the same as before (postcompetition submissions do NOT affect them). With `phase=postcompetition` or `all` the post-competition rows are listed as well (FR-032)
 
 ---
 
@@ -207,6 +207,7 @@ Retrieve the standings of a contest.
 | country | string | No | - | Filter by country (case-insensitive exact match) |
 | city | string | No | - | Filter by city (case-insensitive exact match) |
 | institution | string | No | - | Filter by institution (case-insensitive exact match) |
+| phase | string | No | all | `competition` (official rows only), `postcompetition` (post-competition rows only, FR-032) or `all` (official rows, then post-competition rows). Any other value returns 400 |
 | realtime | boolean | No | false | Bypass freeze (Leads/Admin only; only the value `true` enables it) |
 
 **Success Response (200 OK)**:
@@ -232,6 +233,7 @@ Retrieve the standings of a contest.
   "standings": [
     {
       "rank": 1,
+      "isOfficial": true,
       "participant": {
         "id": "team-123",
         "type": "TEAM",
@@ -248,6 +250,7 @@ Retrieve the standings of a contest.
     },
     {
       "rank": 2,
+      "isOfficial": true,
       "participant": {
         "id": "user-789",
         "type": "INDIVIDUAL",
@@ -284,6 +287,29 @@ Retrieve the standings of a contest.
 }
 ```
 
+**Post-competition rows** (`phase=postcompetition` or `all`; only when the contest is FINISHED with `enablePostContest = true`) look like this:
+
+```json
+{
+  "rank": null,
+  "isOfficial": false,
+  "participant": {
+    "id": "user-900",
+    "type": "INDIVIDUAL",
+    "displayName": "late_coder",
+    "nickname": "late_coder",
+    "name": "Late Coder"
+  },
+  "problemsSolved": 1,
+  "totalPenalty": 0,
+  "problems": [
+    { "position": 1, "status": "ACCEPTED", "attempts": 2, "time": null, "penalty": 0, "isFirstSolve": false },
+    { "position": 2, "status": "NOT_ATTEMPTED", "attempts": 0, "time": null, "penalty": 0, "isFirstSolve": false },
+    { "position": 3, "status": "WRONG_ANSWER", "attempts": 1, "time": null, "penalty": 0, "isFirstSolve": false }
+  ]
+}
+```
+
 **Response Fields**:
 
 | Field | Type | Description |
@@ -298,7 +324,8 @@ Retrieve the standings of a contest.
 | problems[].accepted | integer | Participants who solved the problem, over every participant (not only the filtered ones), as visible at the freeze |
 | problems[].tried | integer | Participants with at least one visible counted attempt or solve on the problem, over every participant (solvers included) |
 | standings | array | Ranked list of participants (current page) |
-| standings[].rank | integer | Rank within the filtered set (1-indexed; ties share a rank) |
+| standings[].rank | integer or null | Rank within the filtered official set (1-indexed; ties share a rank). `null` on post-competition rows, which are not ranked |
+| standings[].isOfficial | boolean | `true` for official rows; `false` for post-competition rows (FR-035). Always present |
 | standings[].participant | object | Participant info (team or individual) |
 | standings[].participant.id | string | User ID or Team ID |
 | standings[].participant.type | enum | `TEAM` or `INDIVIDUAL` |
@@ -312,7 +339,7 @@ Retrieve the standings of a contest.
 | standings[].problems | array | One element per contest problem, in position order |
 | standings[].problems[].status | enum | `ACCEPTED`, `WRONG_ANSWER`, `NOT_ATTEMPTED` |
 | standings[].problems[].attempts | integer | Wrong attempts before the first accepted submission (the accepted submission itself is not counted); all wrong attempts if unsolved |
-| standings[].problems[].time | integer | Minutes from contest start to the accepted submission (`null` if not solved) |
+| standings[].problems[].time | integer | Minutes from contest start to the accepted submission (`null` if not solved, and always `null` on post-competition rows) |
 | standings[].problems[].penalty | integer | `time + attempts × contest penalty` for solved problems, `0` otherwise |
 | standings[].problems[].isFirstSolve | boolean | `true` on the cell of the participant who solved the problem first among every participant (not only the filtered ones); `false` on every other cell. Always present |
 | pagination | object | Pagination metadata |
@@ -336,6 +363,17 @@ Retrieve the standings of a contest.
 > **Note**: Teams have no country, city or institution of their own. When filtering, a team is kept if at least one of its members matches.
 
 **Error Responses**:
+
+#### 400 Bad Request
+
+Returned when `phase` is not `competition`, `postcompetition` or `all`.
+
+```json
+{
+  "error": "BAD_REQUEST",
+  "message": "phase must be 'competition', 'postcompetition' or 'all'"
+}
+```
 
 #### 401 Unauthorized
 
@@ -403,7 +441,7 @@ List the distinct values available for the standings filters. Same authenticatio
 
 - **FR-003**: Only the first `ACCEPTED` submission of a problem, made at or before `endTime`, counts as a solve.
 
-- **FR-004**: Postcompetition submissions (`submittedAt > endTime`) MUST NOT affect standings.
+- **FR-004**: Postcompetition submissions (`submittedAt > endTime`) MUST NOT affect the official standings: official rows, ranks and official headers are the same as if they did not exist. They are listed as post-competition rows (FR-032 to FR-039).
 
 - **FR-004.1**: A submission counts as a wrong attempt only if its verdict is `WRONG_ANSWER`, `TIME_LIMIT_EXCEEDED`, `MEMORY_LIMIT_EXCEEDED`, `OUTPUT_LIMIT_EXCEEDED` or `RUNTIME_ERROR`. `COMPILATION_ERROR` and `SYSTEM_ERROR` never count. Submissions not yet judged (`PENDING`, `RUNNING`) are not considered.
 
@@ -444,6 +482,17 @@ List the distinct values available for the standings filters. Same authenticatio
 - **FR-030**: `isFirstSolve` MUST be `true` only on the cell of the participant with the earliest visible `ACCEPTED` time on that problem, among every participant. A tie on that time goes to the smaller participant ID. A problem nobody has solved has no first solve, and a solve hidden by the freeze cannot be one.
 
 - **FR-031**: When the filters leave out the first solver, no cell of the response carries `isFirstSolve = true` for that problem.
+
+### Post-competition Phase
+
+- **FR-032**: `phase` selects the rows listed: `competition` lists only official rows; `postcompetition` lists only post-competition rows; `all` lists the official rows followed by the post-competition rows in one paginated list, and `total` counts both. An omitted `phase` is `all`. Any other value is rejected with 400.
+- **FR-033**: Post-competition rows exist only when the contest is FINISHED and `enablePostContest` is true. Otherwise `postcompetition` returns an empty list and `all` returns exactly the official rows.
+- **FR-034**: A post-competition row is built per participant with at least one post-competition submission that counts (FR-004.1). Registered individuals and selected team members keep the attribution of FR-004.3 (a team member's submission goes to the team); any other user who submitted gets an `INDIVIDUAL` row with their own ID. A participant may have both an official row and a post-competition row.
+- **FR-035**: Post-competition rows are unofficial: `isOfficial` is `false`, `rank` is `null`, `totalPenalty` is `0`, each problem's `penalty` is `0`, `time` is `null` and `isFirstSolve` is `false`.
+- **FR-036**: Post-competition rows are ordered by problems solved (descending), then by last accepted submission (ascending; rows with no accepted submission go last), then by name (case-insensitive), then by ID.
+- **FR-037**: On a post-competition row, `attempts` counts the counted wrong attempts before the first accepted submission, not the accepted one, as on official rows. After a problem's first accepted submission, later submissions of that problem do not count. Problems the contest no longer has are ignored.
+- **FR-038**: The problem headers `accepted` and `tried` follow the phase. With `competition` or `all` they are the official ones (FR-029). With `postcompetition` they are computed over the post-competition rows of every participant, regardless of the profile filters. Only official cells can carry `isFirstSolve` (FR-030, FR-031), so none does under `postcompetition`.
+- **FR-039**: The profile filters (FR-014 to FR-018) apply to both sections with the same rule.
 
 ### Filtering
 

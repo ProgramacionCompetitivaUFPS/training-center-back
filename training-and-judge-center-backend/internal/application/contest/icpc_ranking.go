@@ -25,6 +25,7 @@ func RankStandings(
 		entry := RankedEntry{
 			ContestantID:    p.ContestantID,
 			ParticipantType: p.ParticipantType,
+			IsOfficial:      true,
 			Problems:        make(map[string]RankedProblem, len(p.Problems)),
 		}
 

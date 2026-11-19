@@ -5,18 +5,18 @@ import (
 )
 
 type Handler struct {
-	createContest             *appContest.CreateContestUseCase
-	updateContest             *appContest.UpdateContestUseCase
-	deleteContest             *appContest.DeleteContestUseCase
-	getContest                *appContest.GetContestUseCase
-	listContests              *appContest.ListContestsUseCase
-	listMyContests            *appContest.ListMyContestsUseCase
-	registerToContest         *appContest.RegisterToContestUseCase
-	unregisterFromContest     *appContest.UnregisterFromContestUseCase
-	getRegistrationStatus     *appContest.GetRegistrationStatusUseCase
-	listContestRegistrations  *appContest.ListContestRegistrationsUseCase
-	getStandings              *appContest.GetStandingsUseCase
-	listContestSubmissions    *appContest.ListContestSubmissionsUseCase
+	createContest            *appContest.CreateContestUseCase
+	updateContest            *appContest.UpdateContestUseCase
+	deleteContest            *appContest.DeleteContestUseCase
+	getContest               *appContest.GetContestUseCase
+	listContests             *appContest.ListContestsUseCase
+	listMyContests           *appContest.ListMyContestsUseCase
+	registerToContest        *appContest.RegisterToContestUseCase
+	unregisterFromContest    *appContest.UnregisterFromContestUseCase
+	getRegistrationStatus    *appContest.GetRegistrationStatusUseCase
+	listContestRegistrations *appContest.ListContestRegistrationsUseCase
+	getStandings             *appContest.GetStandingsUseCase
+	listContestSubmissions   *appContest.ListContestSubmissionsUseCase
 }
 
 func NewHandler(

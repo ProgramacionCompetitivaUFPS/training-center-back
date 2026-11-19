@@ -97,7 +97,7 @@ func TestRankStandings(t *testing.T) {
 			participants: []domainContest.ParticipantStanding{
 				participant("u1", map[string]domainContest.ProblemAttempt{
 					"A": attempt(0, tp(10, 30)), // solved
-					"B": attempt(5, nil),         // not solved — 5 wrong attempts, no penalty
+					"B": attempt(5, nil),        // not solved — 5 wrong attempts, no penalty
 				}),
 			},
 			wantOrder:   []string{"u1"},
@@ -246,5 +246,15 @@ func TestRankStandings_FreezeHidesPostFreezeAttempts(t *testing.T) {
 	}
 	if got[0].ProblemsSolved != 0 {
 		t.Errorf("problemsSolved=%d, want 0", got[0].ProblemsSolved)
+	}
+}
+
+func TestRankStandings_RowsAreOfficial(t *testing.T) {
+	participants := []domainContest.ParticipantStanding{
+		participant("u1", map[string]domainContest.ProblemAttempt{"A": attempt(0, tp(10, 5))}),
+	}
+	got := RankStandings(participants, contestStart, contestPenalty, nil)
+	if !got[0].IsOfficial {
+		t.Error("IsOfficial = false, want true")
 	}
 }

@@ -54,6 +54,9 @@ func computeProblemStats(participants []domainContest.ParticipantStanding, freez
 
 func markFirstSolves(entries []RankedEntry, stats map[string]problemStats) {
 	for _, e := range entries {
+		if !e.IsOfficial {
+			continue
+		}
 		for problemID, rp := range e.Problems {
 			if rp.AcceptedAt != nil && stats[problemID].FirstSolverID == e.ContestantID {
 				rp.IsFirstSolve = true
