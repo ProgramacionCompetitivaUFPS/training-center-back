@@ -69,6 +69,9 @@ type StandingsProblemDisplay struct {
 	Color    *string
 	Accepted int
 	Tried    int
+	// PostAccepted and PostTried count the postcompetition rows; zero when there is no postcompetition phase.
+	PostAccepted int
+	PostTried    int
 }
 
 // ContestSummaryDisplay is the standings-facing summary of the contest itself.
@@ -485,13 +488,15 @@ func (uc *GetStandingsUseCase) buildOutput(
 	showTeamMembers := contest.ShowTeamMembers()
 	postAvailable := status == domainContest.StatusFinished && contest.EnablePostContest()
 
+	var postRows []domainContest.ParticipantStanding
+	if postAvailable {
+		postRows = cached.PostParticipants
+	}
+	postStats := computeProblemStats(postRows, nil)
+
 	stats := computeProblemStats(cached.Participants, effectiveFreezeTime)
 	if !in.Phase.withCompetition() {
-		var postRows []domainContest.ParticipantStanding
-		if postAvailable {
-			postRows = cached.PostParticipants
-		}
-		stats = computeProblemStats(postRows, nil)
+		stats = postStats
 	}
 
 	var entries []RankedEntry
@@ -528,7 +533,7 @@ func (uc *GetStandingsUseCase) buildOutput(
 		meta.FrozenAt = freezeTime
 	}
 
-	problems, err := uc.buildProblemsDisplay(ctx, contest, stats)
+	problems, err := uc.buildProblemsDisplay(ctx, contest, stats, postStats)
 	if err != nil {
 		return nil, err
 	}
@@ -606,7 +611,7 @@ func nilIfEmpty(s string) *string {
 
 // buildProblemsDisplay resolves the contest's problem list into the
 // slug/title pairs the standings header needs, in contest position order.
-func (uc *GetStandingsUseCase) buildProblemsDisplay(ctx context.Context, contest *domainContest.Contest, stats map[string]problemStats) ([]StandingsProblemDisplay, error) {
+func (uc *GetStandingsUseCase) buildProblemsDisplay(ctx context.Context, contest *domainContest.Contest, stats, postStats map[string]problemStats) ([]StandingsProblemDisplay, error) {
 	cps := contest.Problems()
 	if len(cps) == 0 {
 		return []StandingsProblemDisplay{}, nil
@@ -630,13 +635,15 @@ func (uc *GetStandingsUseCase) buildProblemsDisplay(ctx context.Context, contest
 			continue
 		}
 		displays = append(displays, StandingsProblemDisplay{
-			ID:       cp.ProblemID(),
-			Position: cp.Order(),
-			Slug:     info.Slug,
-			Title:    info.Title,
-			Color:    colorString(cp.Color()),
-			Accepted: stats[cp.ProblemID()].Accepted,
-			Tried:    stats[cp.ProblemID()].Tried,
+			ID:           cp.ProblemID(),
+			Position:     cp.Order(),
+			Slug:         info.Slug,
+			Title:        info.Title,
+			Color:        colorString(cp.Color()),
+			Accepted:     stats[cp.ProblemID()].Accepted,
+			Tried:        stats[cp.ProblemID()].Tried,
+			PostAccepted: postStats[cp.ProblemID()].Accepted,
+			PostTried:    postStats[cp.ProblemID()].Tried,
 		})
 	}
 	return displays, nil
