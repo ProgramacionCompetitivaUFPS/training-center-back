@@ -13,7 +13,6 @@ import (
 
 const maxPageLimit = 100
 
-
 type ContestListItem struct {
 	ID                string
 	Name              string

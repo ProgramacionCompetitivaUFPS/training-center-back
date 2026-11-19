@@ -97,7 +97,7 @@ func TestRankStandings(t *testing.T) {
 			participants: []domainContest.ParticipantStanding{
 				participant("u1", map[string]domainContest.ProblemAttempt{
 					"A": attempt(0, tp(10, 30)), // solved
-					"B": attempt(5, nil),         // not solved — 5 wrong attempts, no penalty
+					"B": attempt(5, nil),        // not solved — 5 wrong attempts, no penalty
 				}),
 			},
 			wantOrder:   []string{"u1"},

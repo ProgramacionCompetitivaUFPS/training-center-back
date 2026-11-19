@@ -22,9 +22,9 @@ type CreateContestInput struct {
 	FreezeMinutes     *int
 	EnablePostContest bool
 	ShowTeamMembers   bool
-	ParticipationMode string // "INDIVIDUAL" | "TEAM" | "MIXED"; defaults to "INDIVIDUAL"
-	TeamSizeMin       *int   // defaults to 2 when mode allows teams
-	TeamSizeMax       *int   // defaults to 5 when mode allows teams
+	ParticipationMode string   // "INDIVIDUAL" | "TEAM" | "MIXED"; defaults to "INDIVIDUAL"
+	TeamSizeMin       *int     // defaults to 2 when mode allows teams
+	TeamSizeMax       *int     // defaults to 5 when mode allows teams
 	Problems          []string // slugs; may be empty
 }
 
@@ -200,4 +200,3 @@ func (uc *CreateContestUseCase) Execute(ctx context.Context, in CreateContestInp
 
 	return buildOutput(c, group, owner, problemDisplays, now), nil
 }
-
