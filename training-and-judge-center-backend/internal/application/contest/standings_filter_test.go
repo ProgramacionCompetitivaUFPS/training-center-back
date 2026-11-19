@@ -171,3 +171,81 @@ func TestFilterStandingsByProfile_RanksRecomputedRelativeToFilteredSubset(t *tes
 		t.Fatalf("expected u3 to be rank 1 of the filtered subset, got %+v", filtered[0])
 	}
 }
+
+func TestFilterPostcompetitionByProfile_EmptyFiltersReturnsAllPostRows(t *testing.T) {
+	cached := &CachedStandings{
+		PostParticipants: []domainContest.ParticipantStanding{
+			standingOf("u8", "INDIVIDUAL"),
+			standingOf("u9", "INDIVIDUAL"),
+		},
+	}
+
+	out := FilterPostcompetitionByProfile(cached, "", "", "")
+
+	if len(out) != 2 {
+		t.Fatalf("expected all 2 post rows, got %d", len(out))
+	}
+}
+
+func TestFilterPostcompetitionByProfile_IndividualMatchesOwnProfile(t *testing.T) {
+	cached := &CachedStandings{
+		PostParticipants: []domainContest.ParticipantStanding{
+			standingOf("u8", "INDIVIDUAL"),
+			standingOf("u9", "INDIVIDUAL"),
+		},
+		Profiles: map[string]*ParticipantProfile{
+			"u8": {ID: "u8", Country: "mexico"},
+			"u9": {ID: "u9", Country: "colombia"},
+		},
+	}
+
+	out := FilterPostcompetitionByProfile(cached, "colombia", "", "")
+
+	if len(out) != 1 || out[0].ContestantID != "u9" {
+		t.Fatalf("expected only u9, got %+v", out)
+	}
+}
+
+func TestFilterPostcompetitionByProfile_TeamPassesIfAnyMemberMatches(t *testing.T) {
+	cached := &CachedStandings{
+		PostParticipants: []domainContest.ParticipantStanding{
+			standingOf("team1", "TEAM"),
+		},
+		TeamMembers: map[string][]string{"team1": {"m1", "m2"}},
+		Profiles: map[string]*ParticipantProfile{
+			"m1": {ID: "m1", Country: "mexico"},
+			"m2": {ID: "m2", Country: "colombia"},
+		},
+	}
+
+	out := FilterPostcompetitionByProfile(cached, "colombia", "", "")
+
+	if len(out) != 1 || out[0].ContestantID != "team1" {
+		t.Fatalf("expected team1 to pass via m2, got %+v", out)
+	}
+}
+
+func TestFilterPostcompetitionByProfile_IgnoresOfficialParticipants(t *testing.T) {
+	cached := &CachedStandings{
+		Participants: []domainContest.ParticipantStanding{
+			standingOf("u1", "INDIVIDUAL"),
+		},
+		PostParticipants: []domainContest.ParticipantStanding{
+			standingOf("u9", "INDIVIDUAL"),
+		},
+		Profiles: map[string]*ParticipantProfile{
+			"u1": {ID: "u1", Country: "colombia"},
+			"u9": {ID: "u9", Country: "peru"},
+		},
+	}
+
+	post := FilterPostcompetitionByProfile(cached, "colombia", "", "")
+	official := FilterStandingsByProfile(cached, "colombia", "", "")
+
+	if len(post) != 0 {
+		t.Errorf("post filter returned %+v, want none", post)
+	}
+	if len(official) != 1 || official[0].ContestantID != "u1" {
+		t.Errorf("official filter returned %+v, want only u1", official)
+	}
+}
