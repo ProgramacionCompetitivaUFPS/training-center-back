@@ -112,7 +112,7 @@ func toGetStandingsResponse(out *appContest.GetStandingsOutput, country, city, i
 
 	problems := make([]standingsProblemHeader, len(out.Problems))
 	for i, p := range out.Problems {
-		problems[i] = standingsProblemHeader{Position: p.Position, Slug: p.Slug, Title: p.Title, Color: p.Color, Accepted: p.Accepted, Tried: p.Tried}
+		problems[i] = standingsProblemHeader{Position: p.Position, Slug: p.Slug, Title: p.Title, Color: p.Color, Accepted: p.Accepted, Tried: p.Tried, PostAccepted: p.PostAccepted, PostTried: p.PostTried}
 	}
 
 	totalPages := 1

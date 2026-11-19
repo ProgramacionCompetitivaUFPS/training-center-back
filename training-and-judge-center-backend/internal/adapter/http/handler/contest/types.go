@@ -238,12 +238,14 @@ type standingsContestDisplay struct {
 }
 
 type standingsProblemHeader struct {
-	Position int     `json:"position"`
-	Slug     string  `json:"slug"`
-	Title    string  `json:"title"`
-	Color    *string `json:"color"`
-	Accepted int     `json:"accepted"`
-	Tried    int     `json:"tried"`
+	Position     int     `json:"position"`
+	Slug         string  `json:"slug"`
+	Title        string  `json:"title"`
+	Color        *string `json:"color"`
+	Accepted     int     `json:"accepted"`
+	Tried        int     `json:"tried"`
+	PostAccepted int     `json:"postAccepted"`
+	PostTried    int     `json:"postTried"`
 }
 
 type standingParticipant struct {

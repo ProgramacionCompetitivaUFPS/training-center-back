@@ -775,3 +775,64 @@ func TestGetStandings_SolvedBeforeTheFreeze_StaysAccepted(t *testing.T) {
 		t.Errorf("pending = %v, want 0", cell["pending"])
 	}
 }
+
+func decodeStandingsHeaders(t *testing.T, w *httptest.ResponseRecorder) []map[string]any {
+	t.Helper()
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+	var raw struct {
+		Problems []map[string]any `json:"problems"`
+	}
+	if err := json.NewDecoder(w.Body).Decode(&raw); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	return raw.Problems
+}
+
+func TestGetStandings_Headers_CarryThePostCountersApartFromTheOfficialOnes(t *testing.T) {
+	early := time.Now().Add(-2 * time.Hour)
+	late := time.Now().Add(-30 * time.Minute)
+	w := serveStandings(t,
+		postStandingsUC(
+			[]domainContest.ParticipantStanding{{ContestantID: "u1", ParticipantType: "INDIVIDUAL", Problems: map[string]domainContest.ProblemAttempt{"prob-A": {AcceptedAt: &early}}}},
+			[]domainContest.ParticipantStanding{
+				{ContestantID: "p1", ParticipantType: "INDIVIDUAL", Problems: map[string]domainContest.ProblemAttempt{"prob-A": {AcceptedAt: &late}}},
+				{ContestantID: "p2", ParticipantType: "INDIVIDUAL", Problems: map[string]domainContest.ProblemAttempt{"prob-A": {WrongAttemptTimes: []time.Time{late}}}},
+			},
+		),
+		"/groups/g1/contests/c1/standings?phase=all",
+	)
+
+	headers := decodeStandingsHeaders(t, w)
+
+	if len(headers) != 1 {
+		t.Fatalf("headers = %v, want one problem", headers)
+	}
+	h := headers[0]
+	if h["accepted"] != float64(1) || h["tried"] != float64(1) {
+		t.Errorf("accepted/tried = %v/%v, want the official 1/1", h["accepted"], h["tried"])
+	}
+	if h["postAccepted"] != float64(1) || h["postTried"] != float64(2) {
+		t.Errorf("postAccepted/postTried = %v/%v, want 1/2", h["postAccepted"], h["postTried"])
+	}
+}
+
+func TestGetStandings_Headers_PostCountersAreAlwaysPresent(t *testing.T) {
+	early := time.Now().Add(-2 * time.Hour)
+	w := serveStandings(t,
+		postStandingsUC(
+			[]domainContest.ParticipantStanding{{ContestantID: "u1", ParticipantType: "INDIVIDUAL", Problems: map[string]domainContest.ProblemAttempt{"prob-A": {AcceptedAt: &early}}}},
+			nil,
+		),
+		"/groups/g1/contests/c1/standings?phase=competition",
+	)
+
+	headers := decodeStandingsHeaders(t, w)
+
+	for _, key := range []string{"postAccepted", "postTried"} {
+		if v, present := headers[0][key]; !present || v != float64(0) {
+			t.Errorf("%s = %v (present=%v), want an explicit 0", key, v, present)
+		}
+	}
+}
