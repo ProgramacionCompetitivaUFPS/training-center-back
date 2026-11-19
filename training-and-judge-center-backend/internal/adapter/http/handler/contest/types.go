@@ -52,19 +52,19 @@ type problemOrderRequest struct {
 }
 
 type updateContestRequest struct {
-	Name              *string               `json:"name"`
-	Description       nullableString        `json:"description"`
-	StartTime         *time.Time            `json:"startTime"`
-	EndTime           *time.Time            `json:"endTime"`
-	Penalty           *int                  `json:"penalty"`
-	FreezeMinutes     *int                  `json:"freezeMinutes"`
-	EnablePostContest *bool                 `json:"enablePostContest"`
+	Name              *string                `json:"name"`
+	Description       nullableString         `json:"description"`
+	StartTime         *time.Time             `json:"startTime"`
+	EndTime           *time.Time             `json:"endTime"`
+	Penalty           *int                   `json:"penalty"`
+	FreezeMinutes     *int                   `json:"freezeMinutes"`
+	EnablePostContest *bool                  `json:"enablePostContest"`
 	Problems          *[]problemOrderRequest `json:"problems"`
-	Locked            *bool                 `json:"locked"`
-	ParticipationMode *string               `json:"participationMode"`
-	TeamSizeMin       *int                  `json:"teamSizeMin"`
-	TeamSizeMax       *int                  `json:"teamSizeMax"`
-	ShowTeamMembers   *bool                 `json:"showTeamMembers"`
+	Locked            *bool                  `json:"locked"`
+	ParticipationMode *string                `json:"participationMode"`
+	TeamSizeMin       *int                   `json:"teamSizeMin"`
+	TeamSizeMax       *int                   `json:"teamSizeMax"`
+	ShowTeamMembers   *bool                  `json:"showTeamMembers"`
 }
 
 // ── Response types ───────────────────────────────────────────────────────────
@@ -99,28 +99,28 @@ type problemDetail struct {
 }
 
 type getContestResponse struct {
-	ID                string                  `json:"id"`
-	Name              string                  `json:"name"`
-	Description       *string                 `json:"description,omitempty"`
-	StartTime         string                  `json:"startTime"`
-	EndTime           string                  `json:"endTime"`
-	Duration          int                     `json:"duration"`
-	Penalty           int                     `json:"penalty"`
-	FreezeMinutes     int                     `json:"freezeMinutes"`
-	EnablePostContest bool                    `json:"enablePostContest"`
-	Locked            *bool                   `json:"locked,omitempty"`
-	ShowTeamMembers   bool                    `json:"showTeamMembers"`
-	ParticipationMode string                  `json:"participationMode"`
-	TeamSizeMin       int                     `json:"teamSizeMin"`
-	TeamSizeMax       int                     `json:"teamSizeMax"`
-	ParticipantCount  int                     `json:"participantCount"`
-	IsRegistered      bool                    `json:"isRegistered"`
-	Group             groupDisplay            `json:"group"`
-	Owner             ownerDisplay            `json:"owner"`
+	ID                string          `json:"id"`
+	Name              string          `json:"name"`
+	Description       *string         `json:"description,omitempty"`
+	StartTime         string          `json:"startTime"`
+	EndTime           string          `json:"endTime"`
+	Duration          int             `json:"duration"`
+	Penalty           int             `json:"penalty"`
+	FreezeMinutes     int             `json:"freezeMinutes"`
+	EnablePostContest bool            `json:"enablePostContest"`
+	Locked            *bool           `json:"locked,omitempty"`
+	ShowTeamMembers   bool            `json:"showTeamMembers"`
+	ParticipationMode string          `json:"participationMode"`
+	TeamSizeMin       int             `json:"teamSizeMin"`
+	TeamSizeMax       int             `json:"teamSizeMax"`
+	ParticipantCount  int             `json:"participantCount"`
+	IsRegistered      bool            `json:"isRegistered"`
+	Group             groupDisplay    `json:"group"`
+	Owner             ownerDisplay    `json:"owner"`
 	Problems          []problemDetail `json:"problems"`
-	Status            string                  `json:"status"`
-	CreatedAt         string                  `json:"createdAt"`
-	UpdatedAt         *string                 `json:"updatedAt,omitempty"`
+	Status            string          `json:"status"`
+	CreatedAt         string          `json:"createdAt"`
+	UpdatedAt         *string         `json:"updatedAt,omitempty"`
 }
 
 // ── GET /contests response ───────────────────────────────────────────────────

@@ -19,8 +19,12 @@ type mockSubmissionsContestRepo struct {
 	contest *domainContest.Contest
 }
 
-func (m *mockSubmissionsContestRepo) Create(_ context.Context, _ *domainContest.Contest) error { return nil }
-func (m *mockSubmissionsContestRepo) Update(_ context.Context, _ *domainContest.Contest) error { return nil }
+func (m *mockSubmissionsContestRepo) Create(_ context.Context, _ *domainContest.Contest) error {
+	return nil
+}
+func (m *mockSubmissionsContestRepo) Update(_ context.Context, _ *domainContest.Contest) error {
+	return nil
+}
 func (m *mockSubmissionsContestRepo) FindByID(_ context.Context, _ string) (*domainContest.Contest, error) {
 	return m.contest, nil
 }
@@ -133,13 +137,13 @@ func TestListContestSubmissions_Pagination_Returns200(t *testing.T) {
 	subs := make([]appcontest.RichSubmissionData, 5)
 	for i := range subs {
 		subs[i] = appcontest.RichSubmissionData{
-			ID:         "sub-" + string(rune('1'+i)),
+			ID:          "sub-" + string(rune('1'+i)),
 			ProblemSlug: "sum",
-			UserID:     "u1",
-			StandingID: "u1",
-			Nickname:   "john_doe",
-			Language:   "cpp20",
-			Status:     "ACCEPTED",
+			UserID:      "u1",
+			StandingID:  "u1",
+			Nickname:    "john_doe",
+			Language:    "cpp20",
+			Status:      "ACCEPTED",
 			SubmittedAt: time.Now().Add(-time.Duration(i+1) * 10 * time.Minute),
 		}
 	}
