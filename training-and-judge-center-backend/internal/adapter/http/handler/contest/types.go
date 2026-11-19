@@ -262,6 +262,7 @@ type standingProblemResult struct {
 	Position     int    `json:"position"`
 	Status       string `json:"status"`
 	Attempts     int    `json:"attempts"`
+	Pending      int    `json:"pending"`
 	Time         *int   `json:"time"`
 	Penalty      int    `json:"penalty"`
 	IsFirstSolve bool   `json:"isFirstSolve"`

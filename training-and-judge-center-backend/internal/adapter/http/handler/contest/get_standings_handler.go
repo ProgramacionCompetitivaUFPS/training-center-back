@@ -192,6 +192,7 @@ func toStandingProblemResults(
 		result := standingProblemResult{Position: cp.Position, Status: "NOT_ATTEMPTED"}
 		if attempted {
 			result.Attempts = rp.Attempts
+			result.Pending = rp.Pending
 			result.Penalty = rp.Penalty
 			result.IsFirstSolve = rp.IsFirstSolve
 			if rp.AcceptedAt != nil {
@@ -200,6 +201,8 @@ func toStandingProblemResults(
 					minutes := int(rp.AcceptedAt.Sub(contestStart).Minutes())
 					result.Time = &minutes
 				}
+			} else if rp.Pending > 0 {
+				result.Status = "PENDING"
 			} else if rp.Attempts > 0 {
 				result.Status = "WRONG_ANSWER"
 			}
