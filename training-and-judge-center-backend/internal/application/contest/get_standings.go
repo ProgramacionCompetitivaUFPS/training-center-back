@@ -393,33 +393,25 @@ func (uc *GetStandingsUseCase) rebuild(ctx context.Context, contest *domainConte
 		}
 		p := standings[contestantID]
 		attempt := p.Problems[sub.ProblemID]
-		if attempt.AcceptedAt != nil {
-			continue // already solved; ignore later submissions
+		if next := recordAttempt(attempt, sub); attemptChanged(attempt, next) {
+			p.Problems[sub.ProblemID] = next
 		}
-		switch sub.Status {
-		case "ACCEPTED":
-			t := sub.SubmittedAt
-			attempt.AcceptedAt = &t
-			p.Problems[sub.ProblemID] = attempt
-		// Literal strings rather than the domain type, so a verdict added there
-		// does not reach this list on its own — see the test that pins them.
-		case "WRONG_ANSWER", "TIME_LIMIT_EXCEEDED", "MEMORY_LIMIT_EXCEEDED",
-			"OUTPUT_LIMIT_EXCEEDED", "RUNTIME_ERROR":
-			attempt.WrongAttemptTimes = append(attempt.WrongAttemptTimes, sub.SubmittedAt)
-			p.Problems[sub.ProblemID] = attempt
-		}
-		// COMPILATION_ERROR and SYSTEM_ERROR don't count as wrong attempts (ICPC rules)
 	}
 
 	participants := make([]domainContest.ParticipantStanding, 0, len(standings))
-	for _, p := range standings {
+	participantTypeOf := make(map[string]string, len(standings))
+	for id, p := range standings {
 		participants = append(participants, *p)
+		participantTypeOf[id] = p.ParticipantType
 	}
 
-	profileIDs := make([]string, 0, len(userToContestant))
+	postParticipants, extraUserIDs := buildPostcompetition(subs, endTime, inContest, userToContestant, participantTypeOf)
+
+	profileIDs := make([]string, 0, len(userToContestant)+len(extraUserIDs))
 	for userID := range userToContestant {
 		profileIDs = append(profileIDs, userID)
 	}
+	profileIDs = append(profileIDs, extraUserIDs...)
 	profiles, err := uc.profileProvider.GetProfiles(ctx, profileIDs)
 	if err != nil {
 		slog.WarnContext(ctx, "rebuild: profile enrichment degraded", "error", err)
@@ -441,11 +433,12 @@ func (uc *GetStandingsUseCase) rebuild(ctx context.Context, contest *domainConte
 	}
 
 	cached := &CachedStandings{
-		Participants: participants,
-		TeamMembers:  teamMembers,
-		Profiles:     profiles,
-		TeamNames:    teamNames,
-		LastUpdated:  time.Now(),
+		Participants:     participants,
+		PostParticipants: postParticipants,
+		TeamMembers:      teamMembers,
+		Profiles:         profiles,
+		TeamNames:        teamNames,
+		LastUpdated:      time.Now(),
 	}
 	if err := uc.standingsCache.Set(ctx, contestID, cached); err != nil {
 		slog.ErrorContext(ctx, "standings cache set failed after rebuild", "contest_id", contestID, "error", err)
