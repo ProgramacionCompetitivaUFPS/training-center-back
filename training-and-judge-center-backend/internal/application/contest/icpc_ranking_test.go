@@ -1,37 +1,13 @@
-package contest_test
+package contest
 
 import (
 	"testing"
 	"time"
 
-	appContest "github.com/training-judge-center/backend/internal/application/contest"
 	domainContest "github.com/training-judge-center/backend/internal/domain/contest"
 )
 
-var (
-	contestStart   = time.Date(2026, 1, 1, 10, 0, 0, 0, time.UTC)
-	contestPenalty = 20 // minutes per wrong attempt
-)
-
-func tp(h, m int) *time.Time {
-	t := time.Date(2026, 1, 1, h, m, 0, 0, time.UTC)
-	return &t
-}
-
-func participant(id string, problems map[string]domainContest.ProblemAttempt) domainContest.ParticipantStanding {
-	return domainContest.ParticipantStanding{ContestantID: id, Problems: problems}
-}
-
-// attempt builds a ProblemAttempt with n wrong attempts at arbitrary pre-contest
-// timestamps (safe to use in tests that don't exercise freeze logic).
-func attempt(wrongAttempts int, acceptedAt *time.Time) domainContest.ProblemAttempt {
-	times := make([]time.Time, wrongAttempts)
-	for i := range times {
-		// Place each WA well before contestStart so they're always pre-freeze.
-		times[i] = contestStart.Add(-time.Duration(wrongAttempts-i) * time.Minute)
-	}
-	return domainContest.ProblemAttempt{WrongAttemptTimes: times, AcceptedAt: acceptedAt}
-}
+const contestPenalty = 20 // minutes per wrong attempt
 
 func TestRankStandings(t *testing.T) {
 	tests := []struct {
@@ -222,7 +198,7 @@ func TestRankStandings(t *testing.T) {
 				tc.wantOrder = []string{"u2", "u1"}
 			}
 
-			got := appContest.RankStandings(tc.participants, contestStart, contestPenalty, tc.freezeTime)
+			got := RankStandings(tc.participants, contestStart, contestPenalty, tc.freezeTime)
 
 			if len(got) != len(tc.wantOrder) {
 				t.Fatalf("len(got)=%d, want %d", len(got), len(tc.wantOrder))
@@ -262,7 +238,7 @@ func TestRankStandings_FreezeHidesPostFreezeAttempts(t *testing.T) {
 		}),
 	}
 
-	got := appContest.RankStandings(participants, contestStart, contestPenalty, freeze)
+	got := RankStandings(participants, contestStart, contestPenalty, freeze)
 
 	prob := got[0].Problems["B"]
 	if prob.Attempts != 2 {

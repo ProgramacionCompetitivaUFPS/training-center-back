@@ -486,7 +486,7 @@ func (uc *GetStandingsUseCase) buildOutput(
 		effectiveFreezeTime = freezeTime
 	}
 
-	stats := ComputeProblemStats(cached.Participants, effectiveFreezeTime)
+	stats := computeProblemStats(cached.Participants, effectiveFreezeTime)
 	participants := FilterStandingsByProfile(cached, in.Country, in.City, in.Institution)
 	entries := RankStandings(participants, contest.StartTime(), contest.Penalty().Value(), effectiveFreezeTime)
 	for i := range entries {
@@ -588,7 +588,7 @@ func nilIfEmpty(s string) *string {
 
 // buildProblemsDisplay resolves the contest's problem list into the
 // slug/title pairs the standings header needs, in contest position order.
-func (uc *GetStandingsUseCase) buildProblemsDisplay(ctx context.Context, contest *domainContest.Contest, stats map[string]ProblemStats) ([]StandingsProblemDisplay, error) {
+func (uc *GetStandingsUseCase) buildProblemsDisplay(ctx context.Context, contest *domainContest.Contest, stats map[string]problemStats) ([]StandingsProblemDisplay, error) {
 	cps := contest.Problems()
 	if len(cps) == 0 {
 		return []StandingsProblemDisplay{}, nil

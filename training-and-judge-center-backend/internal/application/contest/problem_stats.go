@@ -6,8 +6,8 @@ import (
 	domainContest "github.com/training-judge-center/backend/internal/domain/contest"
 )
 
-// ProblemStats are the board totals of one problem over every participant.
-type ProblemStats struct {
+// problemStats are the board totals of one problem over every participant.
+type problemStats struct {
 	Accepted      int
 	Tried         int
 	FirstSolverID string
@@ -24,9 +24,9 @@ func visibleAttempt(attempt domainContest.ProblemAttempt, freezeTime *time.Time)
 	return wrong, solved
 }
 
-// ComputeProblemStats counts per problem who tried, who solved and who solved first (a time tie goes to the smaller ID).
-func ComputeProblemStats(participants []domainContest.ParticipantStanding, freezeTime *time.Time) map[string]ProblemStats {
-	stats := make(map[string]ProblemStats)
+// computeProblemStats counts per problem who tried, who solved and who solved first (a time tie goes to the smaller ID).
+func computeProblemStats(participants []domainContest.ParticipantStanding, freezeTime *time.Time) map[string]problemStats {
+	stats := make(map[string]problemStats)
 	firstAt := make(map[string]time.Time)
 
 	for _, p := range participants {
@@ -52,7 +52,7 @@ func ComputeProblemStats(participants []domainContest.ParticipantStanding, freez
 	return stats
 }
 
-func markFirstSolves(entries []RankedEntry, stats map[string]ProblemStats) {
+func markFirstSolves(entries []RankedEntry, stats map[string]problemStats) {
 	for _, e := range entries {
 		for problemID, rp := range e.Problems {
 			if rp.AcceptedAt != nil && stats[problemID].FirstSolverID == e.ContestantID {

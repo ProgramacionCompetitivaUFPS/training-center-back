@@ -1,10 +1,9 @@
-package contest_test
+package contest
 
 import (
 	"testing"
 	"time"
 
-	appContest "github.com/training-judge-center/backend/internal/application/contest"
 	domainContest "github.com/training-judge-center/backend/internal/domain/contest"
 )
 
@@ -18,12 +17,12 @@ func TestComputeProblemStats(t *testing.T) {
 		participants []domainContest.ParticipantStanding
 		freezeTime   *time.Time
 		problem      string
-		want         appContest.ProblemStats
+		want         problemStats
 	}{
 		{
 			name:    "no participants",
 			problem: "A",
-			want:    appContest.ProblemStats{},
+			want:    problemStats{},
 		},
 		{
 			name: "a problem nobody touched has no stats",
@@ -31,7 +30,7 @@ func TestComputeProblemStats(t *testing.T) {
 				participant("u1", map[string]domainContest.ProblemAttempt{"B": attempt(0, tp(10, 30))}),
 			},
 			problem: "A",
-			want:    appContest.ProblemStats{},
+			want:    problemStats{},
 		},
 		{
 			name: "solved counts as accepted and tried, failed only as tried",
@@ -41,7 +40,7 @@ func TestComputeProblemStats(t *testing.T) {
 				participant("u3", map[string]domainContest.ProblemAttempt{}),
 			},
 			problem: "A",
-			want:    appContest.ProblemStats{Accepted: 1, Tried: 2, FirstSolverID: "u1"},
+			want:    problemStats{Accepted: 1, Tried: 2, FirstSolverID: "u1"},
 		},
 		{
 			name: "a solve after failed attempts counts once",
@@ -49,7 +48,7 @@ func TestComputeProblemStats(t *testing.T) {
 				participant("u1", map[string]domainContest.ProblemAttempt{"A": attempt(3, tp(10, 40))}),
 			},
 			problem: "A",
-			want:    appContest.ProblemStats{Accepted: 1, Tried: 1, FirstSolverID: "u1"},
+			want:    problemStats{Accepted: 1, Tried: 1, FirstSolverID: "u1"},
 		},
 		{
 			name: "first solver is the earliest acceptance, not the first listed",
@@ -59,7 +58,7 @@ func TestComputeProblemStats(t *testing.T) {
 				participant("u3", map[string]domainContest.ProblemAttempt{"A": attempt(0, tp(10, 35))}),
 			},
 			problem: "A",
-			want:    appContest.ProblemStats{Accepted: 3, Tried: 3, FirstSolverID: "u2"},
+			want:    problemStats{Accepted: 3, Tried: 3, FirstSolverID: "u2"},
 		},
 		{
 			name: "a tie on the acceptance time goes to the smaller contestant id",
@@ -68,7 +67,25 @@ func TestComputeProblemStats(t *testing.T) {
 				participant("u2", map[string]domainContest.ProblemAttempt{"A": attempt(0, tp(10, 30))}),
 			},
 			problem: "A",
-			want:    appContest.ProblemStats{Accepted: 2, Tried: 2, FirstSolverID: "u2"},
+			want:    problemStats{Accepted: 2, Tried: 2, FirstSolverID: "u2"},
+		},
+		{
+			name: "a tie on the acceptance time goes to the smaller id whatever the order",
+			participants: []domainContest.ParticipantStanding{
+				participant("u2", map[string]domainContest.ProblemAttempt{"A": attempt(0, tp(10, 30))}),
+				participant("u9", map[string]domainContest.ProblemAttempt{"A": attempt(0, tp(10, 30))}),
+			},
+			problem: "A",
+			want:    problemStats{Accepted: 2, Tried: 2, FirstSolverID: "u2"},
+		},
+		{
+			name: "an earlier failed attempt of someone else does not take the first solve",
+			participants: []domainContest.ParticipantStanding{
+				participant("u1", map[string]domainContest.ProblemAttempt{"A": {WrongAttemptTimes: wrongAt(10, 0)}}),
+				participant("u2", map[string]domainContest.ProblemAttempt{"A": attempt(0, tp(10, 30))}),
+			},
+			problem: "A",
+			want:    problemStats{Accepted: 1, Tried: 2, FirstSolverID: "u2"},
 		},
 		{
 			name: "a solve after the freeze is hidden",
@@ -78,7 +95,7 @@ func TestComputeProblemStats(t *testing.T) {
 			},
 			freezeTime: freeze,
 			problem:    "A",
-			want:       appContest.ProblemStats{Accepted: 1, Tried: 1, FirstSolverID: "u1"},
+			want:       problemStats{Accepted: 1, Tried: 1, FirstSolverID: "u1"},
 		},
 		{
 			name: "attempts after the freeze are hidden",
@@ -88,7 +105,7 @@ func TestComputeProblemStats(t *testing.T) {
 			},
 			freezeTime: freeze,
 			problem:    "A",
-			want:       appContest.ProblemStats{Tried: 1},
+			want:       problemStats{Tried: 1},
 		},
 		{
 			name: "a failed attempt before the freeze still counts when the solve is hidden",
@@ -97,7 +114,7 @@ func TestComputeProblemStats(t *testing.T) {
 			},
 			freezeTime: freeze,
 			problem:    "A",
-			want:       appContest.ProblemStats{Tried: 1},
+			want:       problemStats{Tried: 1},
 		},
 		{
 			name: "a solve exactly at the freeze is still visible",
@@ -106,13 +123,13 @@ func TestComputeProblemStats(t *testing.T) {
 			},
 			freezeTime: freeze,
 			problem:    "A",
-			want:       appContest.ProblemStats{Accepted: 1, Tried: 1, FirstSolverID: "u1"},
+			want:       problemStats{Accepted: 1, Tried: 1, FirstSolverID: "u1"},
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := appContest.ComputeProblemStats(tt.participants, tt.freezeTime)[tt.problem]
+			got := computeProblemStats(tt.participants, tt.freezeTime)[tt.problem]
 
 			if got != tt.want {
 				t.Errorf("stats for %s = %+v, want %+v", tt.problem, got, tt.want)
@@ -127,12 +144,12 @@ func TestComputeProblemStats_ProblemsAreIndependent(t *testing.T) {
 		participant("u2", map[string]domainContest.ProblemAttempt{"B": attempt(0, tp(10, 20))}),
 	}
 
-	got := appContest.ComputeProblemStats(participants, nil)
+	got := computeProblemStats(participants, nil)
 
-	if want := (appContest.ProblemStats{Accepted: 1, Tried: 1, FirstSolverID: "u1"}); got["A"] != want {
+	if want := (problemStats{Accepted: 1, Tried: 1, FirstSolverID: "u1"}); got["A"] != want {
 		t.Errorf("A = %+v, want %+v", got["A"], want)
 	}
-	if want := (appContest.ProblemStats{Accepted: 1, Tried: 2, FirstSolverID: "u2"}); got["B"] != want {
+	if want := (problemStats{Accepted: 1, Tried: 2, FirstSolverID: "u2"}); got["B"] != want {
 		t.Errorf("B = %+v, want %+v", got["B"], want)
 	}
 }

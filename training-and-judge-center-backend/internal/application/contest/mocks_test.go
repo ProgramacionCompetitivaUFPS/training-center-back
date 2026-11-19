@@ -656,3 +656,27 @@ func (m *mockRegistrationLocker) Lock(_ context.Context, contestID string) error
 	m.lockedContests = append(m.lockedContests, contestID)
 	return m.err
 }
+
+// ── Standings fixtures ───────────────────────────────────────────────────────
+
+var contestStart = time.Date(2026, 1, 1, 10, 0, 0, 0, time.UTC)
+
+func tp(h, m int) *time.Time {
+	t := time.Date(2026, 1, 1, h, m, 0, 0, time.UTC)
+	return &t
+}
+
+func participant(id string, problems map[string]domainContest.ProblemAttempt) domainContest.ParticipantStanding {
+	return domainContest.ParticipantStanding{ContestantID: id, Problems: problems}
+}
+
+// attempt builds a ProblemAttempt with n wrong attempts at arbitrary pre-contest
+// timestamps (safe to use in tests that don't exercise freeze logic).
+func attempt(wrongAttempts int, acceptedAt *time.Time) domainContest.ProblemAttempt {
+	times := make([]time.Time, wrongAttempts)
+	for i := range times {
+		// Place each WA well before contestStart so they're always pre-freeze.
+		times[i] = contestStart.Add(-time.Duration(wrongAttempts-i) * time.Minute)
+	}
+	return domainContest.ProblemAttempt{WrongAttemptTimes: times, AcceptedAt: acceptedAt}
+}
