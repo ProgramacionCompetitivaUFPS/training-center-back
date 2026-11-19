@@ -1227,3 +1227,34 @@ func TestGetStandingsUseCase_PostRowsAreNotOfficialAndUnranked(t *testing.T) {
 		t.Errorf("post problem A = %+v, want accepted with penalty 0", rp)
 	}
 }
+
+func TestGetStandingsUseCase_PostRowsAreOrderedByTheNameShownForTeamsAndIndividuals(t *testing.T) {
+	failedA := map[string]domainContest.ProblemAttempt{boardProblemA: postFailedAt()}
+	cached := &CachedStandings{
+		PostParticipants: []domainContest.ParticipantStanding{
+			{ContestantID: "a-team", ParticipantType: "TEAM", Problems: failedA},
+			{ContestantID: "b-user", ParticipantType: "INDIVIDUAL", Problems: failedA},
+			{ContestantID: "c-user", ParticipantType: "INDIVIDUAL", Problems: failedA},
+		},
+		TeamNames: map[string]string{"a-team": "Zeta Team"},
+		Profiles: map[string]*ParticipantProfile{
+			"b-user": {Nickname: "mike"},
+			"c-user": {Nickname: "Alpha"},
+		},
+		LastUpdated: time.Now(),
+	}
+	cache := &mockStandingsCache{
+		getFn: func(_ context.Context, _ string) (*CachedStandings, error) { return cached, nil },
+	}
+
+	out := executeBoard(t, boardContest(postEnabledFinishedContest()), cache, func(in *GetStandingsInput) { in.Phase = StandingsPhasePostcompetition })
+
+	var got []string
+	for _, e := range out.Entries {
+		got = append(got, e.Participant.DisplayName)
+	}
+	want := []string{"Alpha", "mike", "Zeta Team"}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("post rows ordered as %v, want %v", got, want)
+	}
+}
