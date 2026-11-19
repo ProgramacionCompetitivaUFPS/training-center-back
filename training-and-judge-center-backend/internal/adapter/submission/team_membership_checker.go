@@ -16,7 +16,12 @@ func NewTeamMembershipChecker(db infraPostgres.Querier) *TeamMembershipChecker {
 	return &TeamMembershipChecker{db: db}
 }
 
-// empty selected_members means all team members count; non-empty restricts to listed UUIDs
+// IsTeammate reports whether viewer and author played the contest together: both are selected in the
+// same team registration, and the viewer is still on the team.
+//
+// The author's team membership is deliberately not required. selected_members is the roster of the
+// contest; the author may no longer be on the team (a deactivated account is taken off its teams), and
+// the people they played with must keep seeing the code they wrote together.
 func (c *TeamMembershipChecker) IsTeammate(ctx context.Context, contestID, viewerID, authorID string) (bool, error) {
 	q := infraPostgres.GetQuerier(ctx, c.db)
 
@@ -26,7 +31,6 @@ func (c *TeamMembershipChecker) IsTeammate(ctx context.Context, contestID, viewe
 			SELECT 1
 			FROM contest_team_participants ctp
 			JOIN team_members tm1 ON tm1.team_id = ctp.team_id AND tm1.user_id = $2
-			JOIN team_members tm2 ON tm2.team_id = ctp.team_id AND tm2.user_id = $3
 			WHERE ctp.contest_id = $1
 			  AND ctp.selected_members @> ARRAY[$2::uuid]
 			  AND ctp.selected_members @> ARRAY[$3::uuid]
