@@ -226,9 +226,9 @@ Retrieve the standings of a contest.
     "frozenAt": "2026-01-25T16:00:00Z"
   },
   "problems": [
-    { "position": 1, "slug": "sum-two-numbers", "title": "Sum Two Numbers", "color": "#e53935", "accepted": 2, "tried": 2 },
-    { "position": 2, "slug": "binary-search", "title": "Binary Search", "color": null, "accepted": 1, "tried": 2 },
-    { "position": 3, "slug": "dijkstra", "title": "Dijkstra", "color": "#1e88e5", "accepted": 2, "tried": 2 }
+    { "position": 1, "slug": "sum-two-numbers", "title": "Sum Two Numbers", "color": "#e53935", "accepted": 2, "tried": 2, "postAccepted": 0, "postTried": 0 },
+    { "position": 2, "slug": "binary-search", "title": "Binary Search", "color": null, "accepted": 1, "tried": 2, "postAccepted": 0, "postTried": 0 },
+    { "position": 3, "slug": "dijkstra", "title": "Dijkstra", "color": "#1e88e5", "accepted": 2, "tried": 2, "postAccepted": 0, "postTried": 0 }
   ],
   "standings": [
     {
@@ -323,6 +323,8 @@ Retrieve the standings of a contest.
 | problems[].color | string | The balloon color of the problem in the contest as `#rrggbb`, or `null` when none was set |
 | problems[].accepted | integer | Participants who solved the problem, over every participant (not only the filtered ones), as visible at the freeze |
 | problems[].tried | integer | Participants with at least one visible counted attempt or solve on the problem, over every participant (solvers included) |
+| problems[].postAccepted | integer | Post-competition rows that solved the problem, over every post-competition row (not only the filtered ones); `0` when the contest has no post-competition phase. Always present, whatever `phase` is (FR-044) |
+| problems[].postTried | integer | Post-competition rows with at least one counted attempt or solve on the problem, over every post-competition row (solvers included); `0` when the contest has no post-competition phase. Always present (FR-044) |
 | standings | array | Ranked list of participants (current page) |
 | standings[].rank | integer or null | Rank within the filtered official set (1-indexed; ties share a rank). `null` on post-competition rows, which are not ranked |
 | standings[].isOfficial | boolean | `true` for official rows; `false` for post-competition rows (FR-035). Always present |
@@ -492,7 +494,7 @@ List the distinct values available for the standings filters. Same authenticatio
 - **FR-035**: Post-competition rows are unofficial: `isOfficial` is `false`, `rank` is `null`, `totalPenalty` is `0`, each problem's `penalty` is `0`, `time` is `null` and `isFirstSolve` is `false`.
 - **FR-036**: Post-competition rows are ordered by problems solved (descending), then by last accepted submission (ascending; rows with no accepted submission go last), then by name (case-insensitive), then by ID.
 - **FR-037**: On a post-competition row, `attempts` counts the counted wrong attempts before the first accepted submission, not the accepted one, as on official rows. After a problem's first accepted submission, later submissions of that problem do not count. Problems the contest no longer has are ignored.
-- **FR-038**: The problem headers `accepted` and `tried` follow the phase. With `competition` or `all` they are the official ones (FR-029). With `postcompetition` they are computed over the post-competition rows of every participant, regardless of the profile filters. Only official cells can carry `isFirstSolve` (FR-030, FR-031), so none does under `postcompetition`.
+- **FR-038**: The problem headers `accepted` and `tried` follow the phase. With `competition` or `all` they are the official ones (FR-029). With `postcompetition` they are computed over the post-competition rows of every participant, regardless of the profile filters, and equal `postAccepted` and `postTried` (FR-044). Only official cells can carry `isFirstSolve` (FR-030, FR-031), so none does under `postcompetition`.
 - **FR-039**: The profile filters (FR-014 to FR-018) apply to both sections with the same rule.
 
 ### Pending Cells
@@ -501,6 +503,10 @@ List the distinct values available for the standings filters. Same authenticatio
 - **FR-041**: `pending` = wrong attempts made after the freeze time + 1 if the first accepted submission is after the freeze time. Submissions made after that first accepted submission are not counted (see FR-037).
 - **FR-042**: A `PENDING` cell has `time: null`, `penalty: 0`, `attempts` = wrong attempts before the freeze time, and `isFirstSolve: false`. It does not change `problemsSolved`, `totalPenalty` or the order.
 - **FR-043**: With `realtime=true` (lead/admin) or outside a freeze, `pending` is `0` and no cell is `PENDING`. Post-competition rows always have `pending: 0`.
+
+### Post-competition Counters
+
+- **FR-044**: Each problem header carries `postAccepted` and `postTried`, the same counts as `accepted` and `tried` but over the post-competition rows. They are always present, in every `phase`, and are `0` when post-competition rows do not exist (FR-033). They are computed over every post-competition row, regardless of the profile filters, in the same response as the rows, so a client needs no second request. `accepted` and `tried` keep counting official rows only (FR-038), so a participant with an official row and a post-competition row is counted once in each pair.
 
 ### Filtering
 
