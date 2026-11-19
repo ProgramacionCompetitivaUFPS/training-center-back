@@ -23,9 +23,10 @@ const (
 
 // RankedProblem is the per-problem view returned in a RankedEntry.
 type RankedProblem struct {
-	Attempts   int
-	AcceptedAt *time.Time // nil if not solved (or solved after freeze, which is hidden)
-	Penalty    int        // 0 if not solved
+	Attempts     int
+	AcceptedAt   *time.Time // nil if not solved (or solved after freeze, which is hidden)
+	Penalty      int        // 0 if not solved
+	IsFirstSolve bool
 }
 
 // RankedEntry is one row in the standings table.
@@ -63,6 +64,9 @@ type StandingsProblemDisplay struct {
 	Position int
 	Slug     string
 	Title    string
+	Color    *string
+	Accepted int
+	Tried    int
 }
 
 // ContestSummaryDisplay is the standings-facing summary of the contest itself.
@@ -482,6 +486,7 @@ func (uc *GetStandingsUseCase) buildOutput(
 		effectiveFreezeTime = freezeTime
 	}
 
+	stats := ComputeProblemStats(cached.Participants, effectiveFreezeTime)
 	participants := FilterStandingsByProfile(cached, in.Country, in.City, in.Institution)
 	entries := RankStandings(participants, contest.StartTime(), contest.Penalty().Value(), effectiveFreezeTime)
 	for i := range entries {
@@ -507,10 +512,13 @@ func (uc *GetStandingsUseCase) buildOutput(
 		meta.FrozenAt = freezeTime
 	}
 
-	problems, err := uc.buildProblemsDisplay(ctx, contest)
+	problems, err := uc.buildProblemsDisplay(ctx, contest, stats)
 	if err != nil {
 		return nil, err
 	}
+
+	page := entries[start:end]
+	markFirstSolves(page, stats)
 
 	return &GetStandingsOutput{
 		Contest: ContestSummaryDisplay{
@@ -525,7 +533,7 @@ func (uc *GetStandingsUseCase) buildOutput(
 			FrozenAt:      meta.FrozenAt,
 		},
 		Problems: problems,
-		Entries:  entries[start:end],
+		Entries:  page,
 		Total:    total,
 		Page:     in.Page,
 		Limit:    in.Limit,
@@ -580,7 +588,7 @@ func nilIfEmpty(s string) *string {
 
 // buildProblemsDisplay resolves the contest's problem list into the
 // slug/title pairs the standings header needs, in contest position order.
-func (uc *GetStandingsUseCase) buildProblemsDisplay(ctx context.Context, contest *domainContest.Contest) ([]StandingsProblemDisplay, error) {
+func (uc *GetStandingsUseCase) buildProblemsDisplay(ctx context.Context, contest *domainContest.Contest, stats map[string]ProblemStats) ([]StandingsProblemDisplay, error) {
 	cps := contest.Problems()
 	if len(cps) == 0 {
 		return []StandingsProblemDisplay{}, nil
@@ -608,6 +616,9 @@ func (uc *GetStandingsUseCase) buildProblemsDisplay(ctx context.Context, contest
 			Position: cp.Order(),
 			Slug:     info.Slug,
 			Title:    info.Title,
+			Color:    colorString(cp.Color()),
+			Accepted: stats[cp.ProblemID()].Accepted,
+			Tried:    stats[cp.ProblemID()].Tried,
 		})
 	}
 	return displays, nil

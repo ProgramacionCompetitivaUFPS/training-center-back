@@ -95,7 +95,7 @@ func toGetStandingsResponse(out *appContest.GetStandingsOutput, country, city, i
 
 	problems := make([]standingsProblemHeader, len(out.Problems))
 	for i, p := range out.Problems {
-		problems[i] = standingsProblemHeader{Position: p.Position, Slug: p.Slug, Title: p.Title}
+		problems[i] = standingsProblemHeader{Position: p.Position, Slug: p.Slug, Title: p.Title, Color: p.Color, Accepted: p.Accepted, Tried: p.Tried}
 	}
 
 	totalPages := 1
@@ -175,6 +175,7 @@ func toStandingProblemResults(
 		if attempted {
 			result.Attempts = rp.Attempts
 			result.Penalty = rp.Penalty
+			result.IsFirstSolve = rp.IsFirstSolve
 			if rp.AcceptedAt != nil {
 				result.Status = "ACCEPTED"
 				minutes := int(rp.AcceptedAt.Sub(contestStart).Minutes())

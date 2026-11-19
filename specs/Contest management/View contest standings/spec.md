@@ -225,9 +225,9 @@ Retrieve the standings of a contest.
     "frozenAt": "2026-01-25T16:00:00Z"
   },
   "problems": [
-    { "position": 1, "slug": "sum-two-numbers", "title": "Sum Two Numbers" },
-    { "position": 2, "slug": "binary-search", "title": "Binary Search" },
-    { "position": 3, "slug": "dijkstra", "title": "Dijkstra" }
+    { "position": 1, "slug": "sum-two-numbers", "title": "Sum Two Numbers", "color": "#e53935", "accepted": 2, "tried": 2 },
+    { "position": 2, "slug": "binary-search", "title": "Binary Search", "color": null, "accepted": 1, "tried": 2 },
+    { "position": 3, "slug": "dijkstra", "title": "Dijkstra", "color": "#1e88e5", "accepted": 2, "tried": 2 }
   ],
   "standings": [
     {
@@ -241,9 +241,9 @@ Retrieve the standings of a contest.
       "problemsSolved": 3,
       "totalPenalty": 205,
       "problems": [
-        { "position": 1, "status": "ACCEPTED", "attempts": 1, "time": 45, "penalty": 65 },
-        { "position": 2, "status": "ACCEPTED", "attempts": 0, "time": 60, "penalty": 60 },
-        { "position": 3, "status": "ACCEPTED", "attempts": 0, "time": 80, "penalty": 80 }
+        { "position": 1, "status": "ACCEPTED", "attempts": 1, "time": 45, "penalty": 65, "isFirstSolve": false },
+        { "position": 2, "status": "ACCEPTED", "attempts": 0, "time": 60, "penalty": 60, "isFirstSolve": true },
+        { "position": 3, "status": "ACCEPTED", "attempts": 0, "time": 80, "penalty": 80, "isFirstSolve": false }
       ]
     },
     {
@@ -261,9 +261,9 @@ Retrieve the standings of a contest.
       "problemsSolved": 2,
       "totalPenalty": 90,
       "problems": [
-        { "position": 1, "status": "ACCEPTED", "attempts": 0, "time": 30, "penalty": 30 },
-        { "position": 2, "status": "WRONG_ANSWER", "attempts": 3, "time": null, "penalty": 0 },
-        { "position": 3, "status": "ACCEPTED", "attempts": 0, "time": 60, "penalty": 60 }
+        { "position": 1, "status": "ACCEPTED", "attempts": 0, "time": 30, "penalty": 30, "isFirstSolve": true },
+        { "position": 2, "status": "WRONG_ANSWER", "attempts": 3, "time": null, "penalty": 0, "isFirstSolve": false },
+        { "position": 3, "status": "ACCEPTED", "attempts": 0, "time": 60, "penalty": 60, "isFirstSolve": true }
       ]
     }
   ],
@@ -294,6 +294,9 @@ Retrieve the standings of a contest.
 | contest.frozenAt | timestamp | When the freeze started (`null` if not frozen) |
 | problems | array | The contest's current problems in position order |
 | problems[].title | string | The problem's title |
+| problems[].color | string | The balloon color of the problem in the contest as `#rrggbb`, or `null` when none was set |
+| problems[].accepted | integer | Participants who solved the problem, over every participant (not only the filtered ones), as visible at the freeze |
+| problems[].tried | integer | Participants with at least one visible counted attempt or solve on the problem, over every participant (solvers included) |
 | standings | array | Ranked list of participants (current page) |
 | standings[].rank | integer | Rank within the filtered set (1-indexed; ties share a rank) |
 | standings[].participant | object | Participant info (team or individual) |
@@ -311,6 +314,7 @@ Retrieve the standings of a contest.
 | standings[].problems[].attempts | integer | Wrong attempts before the first accepted submission (the accepted submission itself is not counted); all wrong attempts if unsolved |
 | standings[].problems[].time | integer | Minutes from contest start to the accepted submission (`null` if not solved) |
 | standings[].problems[].penalty | integer | `time + attempts × contest penalty` for solved problems, `0` otherwise |
+| standings[].problems[].isFirstSolve | boolean | `true` on the cell of the participant who solved the problem first among every participant (not only the filtered ones); `false` on every other cell. Always present |
 | pagination | object | Pagination metadata |
 | filters | object | Applied filters; `filteredTotal` is the number of participants after filtering |
 
@@ -430,6 +434,16 @@ List the distinct values available for the standings filters. Same authenticatio
 - **FR-012**: A projection older than 5 seconds is still served, and a background refresh is triggered (guarded by the lock `lock:standings:{contestId}`). The refresh is triggered by a request and the stale data is what that request receives, so a later request is needed to see the refreshed data; changes to the contest's problems are reflected only after such a refresh, and a failed refresh delays them further. A rebuild is limited to 30 seconds and the refresh lock lasts 45 seconds, so a second refresh cannot start while one is running. When there is no projection, concurrent requests for the same contest in one instance share a single rebuild and wait for it.
 
 - **FR-013**: The projection is removed when the contest is deleted or when its group is deleted. There is no final snapshot of the standings.
+
+### Board Fields
+
+- **FR-028**: Each problem header MUST carry the problem's balloon color in the contest (`color`, `null` when none) and the totals `accepted` and `tried`.
+
+- **FR-029**: `accepted` and `tried` MUST be computed over every participant of the contest, whatever the `country`, `city` and `institution` filters, and MUST count only what is visible: while the standings are frozen, solves and attempts after the freeze count in neither. A participant counts in `tried` if they have at least one counted wrong attempt (FR-004.1) or a solve on the problem. With `?realtime=true` during the freeze nothing is hidden.
+
+- **FR-030**: `isFirstSolve` MUST be `true` only on the cell of the participant with the earliest visible `ACCEPTED` time on that problem, among every participant. A tie on that time goes to the smaller participant ID. A problem nobody has solved has no first solve, and a solve hidden by the freeze cannot be one.
+
+- **FR-031**: When the filters leave out the first solver, no cell of the response carries `isFirstSolve = true` for that problem.
 
 ### Filtering
 

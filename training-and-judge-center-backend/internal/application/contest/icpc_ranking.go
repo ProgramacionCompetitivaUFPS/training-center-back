@@ -31,17 +31,11 @@ func RankStandings(
 		var lastAccepted *time.Time
 
 		for problemID, attempt := range p.Problems {
-			// Count only pre-freeze wrong attempts; post-freeze ones are invisible.
-			preFreeze := 0
-			for _, t := range attempt.WrongAttemptTimes {
-				if freezeTime == nil || !t.After(*freezeTime) {
-					preFreeze++
-				}
-			}
+			preFreeze, solved := visibleAttempt(attempt, freezeTime)
 
 			rp := RankedProblem{Attempts: preFreeze}
 
-			if attempt.AcceptedAt != nil && (freezeTime == nil || !attempt.AcceptedAt.After(*freezeTime)) {
+			if solved {
 				minutes := int(attempt.AcceptedAt.Sub(contestStart).Minutes())
 				rp.Penalty = minutes + preFreeze*contestPenalty
 				rp.AcceptedAt = attempt.AcceptedAt
