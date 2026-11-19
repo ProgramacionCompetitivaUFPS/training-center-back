@@ -24,6 +24,26 @@ func visibleAttempt(attempt domainContest.ProblemAttempt, freezeTime *time.Time)
 	return wrong, solved
 }
 
+// pendingSubmissions counts the counted submissions hidden by the freeze on a problem that is not visibly solved.
+func pendingSubmissions(attempt domainContest.ProblemAttempt, freezeTime *time.Time) int {
+	if freezeTime == nil {
+		return 0
+	}
+	if _, solved := visibleAttempt(attempt, freezeTime); solved {
+		return 0
+	}
+	pending := 0
+	for _, t := range attempt.WrongAttemptTimes {
+		if t.After(*freezeTime) {
+			pending++
+		}
+	}
+	if attempt.AcceptedAt != nil {
+		pending++
+	}
+	return pending
+}
+
 // computeProblemStats counts per problem who tried, who solved and who solved first (a time tie goes to the smaller ID).
 func computeProblemStats(participants []domainContest.ParticipantStanding, freezeTime *time.Time) map[string]problemStats {
 	stats := make(map[string]problemStats)

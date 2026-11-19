@@ -644,3 +644,134 @@ func TestGetStandings_PhaseCompetition_ReturnsOnlyOfficialRows(t *testing.T) {
 		t.Errorf("standings = %+v, want only u1", resp.Standings)
 	}
 }
+
+// ── pending cells ─────────────────────────────────────────────────────────────
+
+func frozenBoardStandingsUC(participants ...domainContest.ParticipantStanding) *appcontest.GetStandingsUseCase {
+	contest := domainContest.RestoreContest(
+		"c1",
+		domainContest.RestoreContestName("Frozen Contest"),
+		nil,
+		time.Now().Add(-2*time.Hour),
+		time.Now().Add(30*time.Minute),
+		domainContest.RestorePenalty(20),
+		60, false, false, false,
+		shared.RestoreGroupID("g1"),
+		shared.RestoreUserID("u1"),
+		domainContest.RestoreParticipationMode("INDIVIDUAL"), domainContest.RestoreTeamSize(2, 5),
+		[]domainContest.ContestProblem{
+			domainContest.RestoreContestProblem("cp1", "prob-A", 1, nil),
+			domainContest.RestoreContestProblem("cp2", "prob-B", 2, nil),
+		},
+		time.Now(),
+		nil,
+	)
+	cached := &appcontest.CachedStandings{Participants: participants, LastUpdated: time.Now()}
+	return appcontest.NewGetStandingsUseCase(
+		&mockStandingsContestRepo{contest: contest},
+		&mockRegistrationRepository{},
+		&mockSubmissionProvider{},
+		&mockTeamParticipantProvider{},
+		&mockParticipantProfileProvider{},
+		&mockTeamDisplayProvider{},
+		&mockProblemProvider{},
+		&mockGroupProvider{},
+		&mockMemberProvider{isLead: true, isMember: true},
+		&mockStandingsCache{data: cached},
+		30*time.Second,
+	)
+}
+
+func firstStandingCells(t *testing.T, w *httptest.ResponseRecorder) []map[string]any {
+	t.Helper()
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+	var body struct {
+		Standings []struct {
+			Problems []map[string]any `json:"problems"`
+		} `json:"standings"`
+	}
+	if err := json.NewDecoder(w.Body).Decode(&body); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if len(body.Standings) == 0 {
+		t.Fatal("no standings")
+	}
+	return body.Standings[0].Problems
+}
+
+func TestGetStandings_FrozenCell_IsPendingWithTheCount(t *testing.T) {
+	now := time.Now()
+	accepted := now.Add(-10 * time.Minute)
+	uc := frozenBoardStandingsUC(domainContest.ParticipantStanding{ContestantID: "u1", ParticipantType: "INDIVIDUAL", Problems: map[string]domainContest.ProblemAttempt{
+		"prob-A": {WrongAttemptTimes: []time.Time{now.Add(-100 * time.Minute), now.Add(-20 * time.Minute)}, AcceptedAt: &accepted},
+	}})
+
+	cell := firstStandingCells(t, serveStandings(t, uc, "/groups/g1/contests/c1/standings"))[0]
+
+	want := map[string]any{"status": "PENDING", "attempts": float64(1), "pending": float64(2), "time": nil, "penalty": float64(0), "isFirstSolve": false}
+	for k, v := range want {
+		if cell[k] != v {
+			t.Errorf("%s = %v, want %v", k, cell[k], v)
+		}
+	}
+}
+
+func TestGetStandings_PendingKeyIsAlwaysPresent(t *testing.T) {
+	accepted := time.Now().Add(-60 * time.Minute)
+	uc := frozenBoardStandingsUC(domainContest.ParticipantStanding{ContestantID: "u1", ParticipantType: "INDIVIDUAL", Problems: map[string]domainContest.ProblemAttempt{
+		"prob-A": {AcceptedAt: &accepted},
+	}})
+
+	cells := firstStandingCells(t, serveStandings(t, uc, "/groups/g1/contests/c1/standings"))
+
+	if cells[0]["status"] != "ACCEPTED" {
+		t.Errorf("prob-A status = %v, want ACCEPTED", cells[0]["status"])
+	}
+	if cells[1]["status"] != "NOT_ATTEMPTED" {
+		t.Errorf("prob-B status = %v, want NOT_ATTEMPTED", cells[1]["status"])
+	}
+	for i, cell := range cells {
+		if v, present := cell["pending"]; !present || v != float64(0) {
+			t.Errorf("cell %d pending = %v (present=%v), want an explicit 0", i, v, present)
+		}
+	}
+}
+
+func TestGetStandings_RealtimeLead_HasNoPendingCells(t *testing.T) {
+	now := time.Now()
+	accepted := now.Add(-10 * time.Minute)
+	uc := frozenBoardStandingsUC(domainContest.ParticipantStanding{ContestantID: "u1", ParticipantType: "INDIVIDUAL", Problems: map[string]domainContest.ProblemAttempt{
+		"prob-A": {WrongAttemptTimes: []time.Time{now.Add(-100 * time.Minute), now.Add(-20 * time.Minute)}, AcceptedAt: &accepted},
+	}})
+
+	cell := firstStandingCells(t, serveStandings(t, uc, "/groups/g1/contests/c1/standings?realtime=true"))[0]
+
+	if cell["status"] != "ACCEPTED" {
+		t.Errorf("status = %v, want ACCEPTED in real time", cell["status"])
+	}
+	if cell["time"] == nil {
+		t.Error("time is null, want the official solve minute in real time")
+	}
+	if cell["pending"] != float64(0) {
+		t.Errorf("pending = %v, want 0 in real time", cell["pending"])
+	}
+}
+
+func TestGetStandings_SolvedBeforeTheFreeze_StaysAccepted(t *testing.T) {
+	now := time.Now()
+	accepted := now.Add(-60 * time.Minute)
+	uc := frozenBoardStandingsUC(domainContest.ParticipantStanding{ContestantID: "u1", ParticipantType: "INDIVIDUAL", Problems: map[string]domainContest.ProblemAttempt{
+		"prob-A": {WrongAttemptTimes: []time.Time{now.Add(-20 * time.Minute)}, AcceptedAt: &accepted},
+	}})
+
+	cell := firstStandingCells(t, serveStandings(t, uc, "/groups/g1/contests/c1/standings"))[0]
+
+	if cell["status"] != "ACCEPTED" {
+		t.Errorf("status = %v, want ACCEPTED", cell["status"])
+	}
+	if cell["pending"] != float64(0) {
+		t.Errorf("pending = %v, want 0", cell["pending"])
+	}
+}

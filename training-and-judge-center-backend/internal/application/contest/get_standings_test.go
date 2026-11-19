@@ -1258,3 +1258,117 @@ func TestGetStandingsUseCase_PostRowsAreOrderedByTheNameShownForTeamsAndIndividu
 		t.Errorf("post rows ordered as %v, want %v", got, want)
 	}
 }
+
+// ── pending cells ─────────────────────────────────────────────────────────────
+
+// hiddenSolveAttempt: two failures and an acceptance, all after a freeze that started 30 minutes ago.
+func hiddenSolveAttempt() domainContest.ProblemAttempt {
+	accepted := time.Now().Add(-10 * time.Minute)
+	return domainContest.ProblemAttempt{
+		WrongAttemptTimes: []time.Time{time.Now().Add(-20 * time.Minute), time.Now().Add(-15 * time.Minute)},
+		AcceptedAt:        &accepted,
+	}
+}
+
+func TestGetStandingsUseCase_FrozenCellCountsTheHiddenSubmissionsAsPending(t *testing.T) {
+	cache := boardCache(nil, boardParticipant("u1", map[string]domainContest.ProblemAttempt{boardProblemA: hiddenSolveAttempt()}))
+
+	out := executeBoard(t, boardContest(frozenContest()), cache, nil)
+
+	cell := entryFor(t, out, "u1").Problems[boardProblemA]
+	if cell.Pending != 3 {
+		t.Errorf("pending = %d, want 3 (two failures and the acceptance after the freeze)", cell.Pending)
+	}
+	if cell.AcceptedAt != nil {
+		t.Error("the acceptance after the freeze must stay hidden")
+	}
+	if cell.Attempts != 0 {
+		t.Errorf("attempts = %d, want 0 (nothing visible before the freeze)", cell.Attempts)
+	}
+}
+
+func TestGetStandingsUseCase_PendingCellsDoNotCountInTheHeadersNorFirstSolve(t *testing.T) {
+	cache := boardCache(nil, boardParticipant("u1", map[string]domainContest.ProblemAttempt{boardProblemA: hiddenSolveAttempt()}))
+
+	out := executeBoard(t, boardContest(frozenContest()), cache, nil)
+
+	if a := headerFor(t, out, boardProblemA); a.Accepted != 0 || a.Tried != 0 {
+		t.Errorf("problem A accepted/tried = %d/%d, want 0/0 (pending submissions are not counted)", a.Accepted, a.Tried)
+	}
+	if entryFor(t, out, "u1").Problems[boardProblemA].IsFirstSolve {
+		t.Error("a pending cell cannot be a first solve")
+	}
+}
+
+func TestGetStandingsUseCase_PendingCellsApplyToTeamRows(t *testing.T) {
+	team := domainContest.ParticipantStanding{
+		ContestantID:    "t1",
+		ParticipantType: "TEAM",
+		Problems:        map[string]domainContest.ProblemAttempt{boardProblemA: hiddenSolveAttempt()},
+	}
+	cache := boardCache(nil, team)
+
+	out := executeBoard(t, boardContest(frozenContest()), cache, nil)
+
+	e := entryFor(t, out, "t1")
+	if e.Participant.Type != "TEAM" {
+		t.Fatalf("participant type = %q, want TEAM", e.Participant.Type)
+	}
+	if rp := e.Problems[boardProblemA]; rp.Pending != 3 || rp.AcceptedAt != nil {
+		t.Errorf("team cell = %+v, want pending 3 (two failures and the accept) and no visible solve", rp)
+	}
+}
+
+func TestGetStandingsUseCase_RealtimeShowsNoPendingCells(t *testing.T) {
+	cache := boardCache(nil, boardParticipant("u1", map[string]domainContest.ProblemAttempt{boardProblemA: hiddenSolveAttempt()}))
+	uc := newGetStandingsUseCase(boardContest(frozenContest()), nil, nil, cache, visibleGroup(), isLead())
+
+	out, err := uc.Execute(context.Background(), GetStandingsInput{
+		CurrentUser: asCoach(callerID),
+		GroupID:     testGroupID,
+		ContestID:   testContestID,
+		Realtime:    true,
+		Page:        1,
+		Limit:       50,
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	cell := entryFor(t, out, "u1").Problems[boardProblemA]
+	if cell.Pending != 0 {
+		t.Errorf("pending = %d, want 0 in real time", cell.Pending)
+	}
+	if cell.AcceptedAt == nil {
+		t.Error("in real time the acceptance is visible")
+	}
+}
+
+func TestGetStandingsUseCase_PendingIsZeroWhenThereIsNoFreeze(t *testing.T) {
+	cache := boardCache(nil, boardParticipant("u1", map[string]domainContest.ProblemAttempt{boardProblemA: hiddenSolveAttempt()}))
+
+	out := executeBoard(t, boardContest(activeContest()), cache, nil)
+
+	if got := entryFor(t, out, "u1").Problems[boardProblemA].Pending; got != 0 {
+		t.Errorf("pending = %d, want 0 without freeze", got)
+	}
+}
+
+func TestGetStandingsUseCase_PostcompetitionRowsHaveNoPending(t *testing.T) {
+	cache := phaseCache(nil, nil, []domainContest.ParticipantStanding{
+		boardParticipant("p1", map[string]domainContest.ProblemAttempt{boardProblemA: postSolvedAt(), boardProblemB: postFailedAt()}),
+	})
+
+	out := executeBoard(t, boardContest(postEnabledFinishedContest()), cache, func(in *GetStandingsInput) { in.Phase = StandingsPhasePostcompetition })
+
+	if len(out.Entries) == 0 {
+		t.Fatal("expected postcompetition rows")
+	}
+	for _, e := range out.Entries {
+		for problemID, rp := range e.Problems {
+			if rp.Pending != 0 {
+				t.Errorf("%s problem %s pending = %d, want 0", e.ContestantID, problemID, rp.Pending)
+			}
+		}
+	}
+}

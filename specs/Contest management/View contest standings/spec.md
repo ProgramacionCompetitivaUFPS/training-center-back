@@ -243,9 +243,9 @@ Retrieve the standings of a contest.
       "problemsSolved": 3,
       "totalPenalty": 205,
       "problems": [
-        { "position": 1, "status": "ACCEPTED", "attempts": 1, "time": 45, "penalty": 65, "isFirstSolve": false },
-        { "position": 2, "status": "ACCEPTED", "attempts": 0, "time": 60, "penalty": 60, "isFirstSolve": true },
-        { "position": 3, "status": "ACCEPTED", "attempts": 0, "time": 80, "penalty": 80, "isFirstSolve": false }
+        { "position": 1, "status": "ACCEPTED", "attempts": 1, "pending": 0, "time": 45, "penalty": 65, "isFirstSolve": false },
+        { "position": 2, "status": "ACCEPTED", "attempts": 0, "pending": 0, "time": 60, "penalty": 60, "isFirstSolve": true },
+        { "position": 3, "status": "ACCEPTED", "attempts": 0, "pending": 0, "time": 80, "penalty": 80, "isFirstSolve": false }
       ]
     },
     {
@@ -264,9 +264,9 @@ Retrieve the standings of a contest.
       "problemsSolved": 2,
       "totalPenalty": 90,
       "problems": [
-        { "position": 1, "status": "ACCEPTED", "attempts": 0, "time": 30, "penalty": 30, "isFirstSolve": true },
-        { "position": 2, "status": "WRONG_ANSWER", "attempts": 3, "time": null, "penalty": 0, "isFirstSolve": false },
-        { "position": 3, "status": "ACCEPTED", "attempts": 0, "time": 60, "penalty": 60, "isFirstSolve": true }
+        { "position": 1, "status": "ACCEPTED", "attempts": 0, "pending": 0, "time": 30, "penalty": 30, "isFirstSolve": true },
+        { "position": 2, "status": "WRONG_ANSWER", "attempts": 3, "pending": 0, "time": null, "penalty": 0, "isFirstSolve": false },
+        { "position": 3, "status": "ACCEPTED", "attempts": 0, "pending": 0, "time": 60, "penalty": 60, "isFirstSolve": true }
       ]
     }
   ],
@@ -303,9 +303,9 @@ Retrieve the standings of a contest.
   "problemsSolved": 1,
   "totalPenalty": 0,
   "problems": [
-    { "position": 1, "status": "ACCEPTED", "attempts": 2, "time": null, "penalty": 0, "isFirstSolve": false },
-    { "position": 2, "status": "NOT_ATTEMPTED", "attempts": 0, "time": null, "penalty": 0, "isFirstSolve": false },
-    { "position": 3, "status": "WRONG_ANSWER", "attempts": 1, "time": null, "penalty": 0, "isFirstSolve": false }
+    { "position": 1, "status": "ACCEPTED", "attempts": 2, "pending": 0, "time": null, "penalty": 0, "isFirstSolve": false },
+    { "position": 2, "status": "NOT_ATTEMPTED", "attempts": 0, "pending": 0, "time": null, "penalty": 0, "isFirstSolve": false },
+    { "position": 3, "status": "WRONG_ANSWER", "attempts": 1, "pending": 0, "time": null, "penalty": 0, "isFirstSolve": false }
   ]
 }
 ```
@@ -337,8 +337,9 @@ Retrieve the standings of a contest.
 | standings[].problemsSolved | integer | Number of problems solved |
 | standings[].totalPenalty | integer | Sum of the penalty of each solved problem, in minutes |
 | standings[].problems | array | One element per contest problem, in position order |
-| standings[].problems[].status | enum | `ACCEPTED`, `WRONG_ANSWER`, `NOT_ATTEMPTED` |
-| standings[].problems[].attempts | integer | Wrong attempts before the first accepted submission (the accepted submission itself is not counted); all wrong attempts if unsolved |
+| standings[].problems[].status | enum | `ACCEPTED`, `WRONG_ANSWER`, `PENDING`, `NOT_ATTEMPTED`. `PENDING` is set when the standings are frozen and the problem has submissions hidden by the freeze (FR-040 to FR-043) |
+| standings[].problems[].attempts | integer | Visible wrong attempts before the first visible accepted submission (the accepted submission itself is not counted); all visible wrong attempts if unsolved. Submissions hidden by the freeze are not counted here (see `pending`) |
+| standings[].problems[].pending | integer | Submissions hidden by the freeze on a problem not yet visibly solved, up to and including the first accepted one (FR-041); `0` otherwise. Always present |
 | standings[].problems[].time | integer | Minutes from contest start to the accepted submission (`null` if not solved, and always `null` on post-competition rows) |
 | standings[].problems[].penalty | integer | `time + attempts × contest penalty` for solved problems, `0` otherwise |
 | standings[].problems[].isFirstSolve | boolean | `true` on the cell of the participant who solved the problem first among every participant (not only the filtered ones); `false` on every other cell. Always present |
@@ -453,7 +454,7 @@ List the distinct values available for the standings filters. Same authenticatio
 
 - **FR-005**: If `freezeMinutes > 0`, standings MUST freeze at `endTime - freezeMinutes` while the contest is ACTIVE.
 
-- **FR-006**: While frozen, submissions made after the freeze time MUST be hidden from non-privileged users: they count neither as attempts nor as solves, and do not influence rank or penalty.
+- **FR-006**: While frozen, submissions made after the freeze time MUST be hidden from non-privileged users: they count neither as attempts nor as solves, do not influence rank, penalty, `accepted`, `tried` or `isFirstSolve`, and are shown as a `PENDING` cell with their count in `pending` (see FR-040 to FR-043).
 
 - **FR-007**: Leads and Admin MUST be able to view real-time standings during freeze with `?realtime=true`; any other user requesting it during freeze MUST receive 403 `INSUFFICIENT_PERMISSIONS`.
 
@@ -493,6 +494,13 @@ List the distinct values available for the standings filters. Same authenticatio
 - **FR-037**: On a post-competition row, `attempts` counts the counted wrong attempts before the first accepted submission, not the accepted one, as on official rows. After a problem's first accepted submission, later submissions of that problem do not count. Problems the contest no longer has are ignored.
 - **FR-038**: The problem headers `accepted` and `tried` follow the phase. With `competition` or `all` they are the official ones (FR-029). With `postcompetition` they are computed over the post-competition rows of every participant, regardless of the profile filters. Only official cells can carry `isFirstSolve` (FR-030, FR-031), so none does under `postcompetition`.
 - **FR-039**: The profile filters (FR-014 to FR-018) apply to both sections with the same rule.
+
+### Pending Cells
+
+- **FR-040**: A cell is `PENDING` when the standings have an effective freeze (FR-005), the problem is not visibly solved, and the participant has at least one submission made after the freeze time.
+- **FR-041**: `pending` = wrong attempts made after the freeze time + 1 if the first accepted submission is after the freeze time. Submissions made after that first accepted submission are not counted (see FR-037).
+- **FR-042**: A `PENDING` cell has `time: null`, `penalty: 0`, `attempts` = wrong attempts before the freeze time, and `isFirstSolve: false`. It does not change `problemsSolved`, `totalPenalty` or the order.
+- **FR-043**: With `realtime=true` (lead/admin) or outside a freeze, `pending` is `0` and no cell is `PENDING`. Post-competition rows always have `pending: 0`.
 
 ### Filtering
 
@@ -571,7 +579,6 @@ List the distinct values available for the standings filters. Same authenticatio
 These behaviours appeared in earlier drafts of this spec and are not part of the current system:
 
 - Real-time updates over SSE (`standings/stream`) and the events `snapshot`, `update`, `freeze`, `contest_ended`, `ping`.
-- A `PENDING` problem status for submissions made during the freeze (they are currently hidden).
 - A final standings snapshot (`contest_{contestId}_standings_final`) and a NoSQL collection per contest.
 - Export of standings (CSV, PDF, Excel).
 - A maximum page size.

@@ -34,7 +34,7 @@ func RankStandings(
 		for problemID, attempt := range p.Problems {
 			preFreeze, solved := visibleAttempt(attempt, freezeTime)
 
-			rp := RankedProblem{Attempts: preFreeze}
+			rp := RankedProblem{Attempts: preFreeze, Pending: pendingSubmissions(attempt, freezeTime)}
 
 			if solved {
 				minutes := int(attempt.AcceptedAt.Sub(contestStart).Minutes())
