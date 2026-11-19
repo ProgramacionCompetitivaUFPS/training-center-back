@@ -27,9 +27,7 @@ func attemptChanged(before, after domainContest.ProblemAttempt) bool {
 	return after.AcceptedAt != before.AcceptedAt || len(after.WrongAttemptTimes) != len(before.WrongAttemptTimes)
 }
 
-// buildPostcompetition projects the submissions made after endTime. Unknown
-// submitters are individual rows keyed by their own user ID and are returned
-// in extraUserIDs so their profiles get loaded.
+// buildPostcompetition projects submissions made after endTime; unknown submitters become INDIVIDUAL rows listed in extraUserIDs.
 func buildPostcompetition(
 	subs []ContestSubmissionData,
 	endTime time.Time,

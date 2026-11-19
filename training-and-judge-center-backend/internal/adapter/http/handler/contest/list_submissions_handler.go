@@ -23,6 +23,7 @@ import (
 // @Param        page         query  int    false "Page number (default 1)"
 // @Param        limit        query  int    false "Items per page (default 50, max 100)"
 // @Success      200 {object} listSubmissionsResponse
+// @Failure      400 {object} apperror.AppError
 // @Failure      401 {object} apperror.AppError
 // @Failure      403 {object} apperror.AppError
 // @Failure      404 {object} apperror.AppError

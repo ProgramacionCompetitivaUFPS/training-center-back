@@ -7,9 +7,7 @@ import (
 	domainContest "github.com/training-judge-center/backend/internal/domain/contest"
 )
 
-// RankPostcompetition orders post-competition rows: problemsSolved DESC,
-// lastAcceptedAt ASC (rows without an accept last), name, then contestantID.
-// Rows are unofficial: no rank, no penalty.
+// RankPostcompetition orders unofficial rows by solved, last accept, name, then ID.
 func RankPostcompetition(participants []domainContest.ParticipantStanding, nameOf func(contestantID, participantType string) string) []RankedEntry {
 	entries := make([]RankedEntry, 0, len(participants))
 	names := make(map[string]string, len(participants))
