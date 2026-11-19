@@ -24,6 +24,7 @@ const (
 // RankedProblem is the per-problem view returned in a RankedEntry.
 type RankedProblem struct {
 	Attempts     int
+	Pending      int
 	AcceptedAt   *time.Time // nil if not solved (or solved after freeze, which is hidden)
 	Penalty      int        // 0 if not solved
 	IsFirstSolve bool
