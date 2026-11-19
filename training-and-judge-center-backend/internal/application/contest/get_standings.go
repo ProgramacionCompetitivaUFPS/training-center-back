@@ -93,6 +93,7 @@ type GetStandingsInput struct {
 	Institution string
 	Page        int
 	Limit       int
+	Phase       StandingsPhase
 }
 
 type StandingsMeta struct {
@@ -480,11 +481,31 @@ func (uc *GetStandingsUseCase) buildOutput(
 		effectiveFreezeTime = freezeTime
 	}
 
+	showTeamMembers := contest.ShowTeamMembers()
+	postAvailable := status == domainContest.StatusFinished && contest.EnablePostContest()
+
 	stats := computeProblemStats(cached.Participants, effectiveFreezeTime)
-	participants := FilterStandingsByProfile(cached, in.Country, in.City, in.Institution)
-	entries := RankStandings(participants, contest.StartTime(), contest.Penalty().Value(), effectiveFreezeTime)
+	if !in.Phase.withCompetition() {
+		var postRows []domainContest.ParticipantStanding
+		if postAvailable {
+			postRows = cached.PostParticipants
+		}
+		stats = computeProblemStats(postRows, nil)
+	}
+
+	var entries []RankedEntry
+	if in.Phase.withCompetition() {
+		participants := FilterStandingsByProfile(cached, in.Country, in.City, in.Institution)
+		entries = RankStandings(participants, contest.StartTime(), contest.Penalty().Value(), effectiveFreezeTime)
+	}
+	if in.Phase.withPostcompetition() && postAvailable {
+		nameOf := func(contestantID, participantType string) string {
+			return buildParticipantDisplay(RankedEntry{ContestantID: contestantID, ParticipantType: participantType}, cached, showTeamMembers).DisplayName
+		}
+		entries = append(entries, RankPostcompetition(FilterPostcompetitionByProfile(cached, in.Country, in.City, in.Institution), nameOf)...)
+	}
 	for i := range entries {
-		entries[i].Participant = buildParticipantDisplay(entries[i], cached, contest.ShowTeamMembers())
+		entries[i].Participant = buildParticipantDisplay(entries[i], cached, showTeamMembers)
 	}
 
 	total := len(entries)
@@ -512,7 +533,9 @@ func (uc *GetStandingsUseCase) buildOutput(
 	}
 
 	page := entries[start:end]
-	markFirstSolves(page, stats)
+	if in.Phase.withCompetition() {
+		markFirstSolves(page, stats)
+	}
 
 	return &GetStandingsOutput{
 		Contest: ContestSummaryDisplay{
