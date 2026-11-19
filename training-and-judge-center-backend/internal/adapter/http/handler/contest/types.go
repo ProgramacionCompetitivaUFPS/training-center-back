@@ -268,7 +268,8 @@ type standingProblemResult struct {
 }
 
 type standingEntry struct {
-	Rank           int                     `json:"rank"`
+	Rank           *int                    `json:"rank"`
+	IsOfficial     bool                    `json:"isOfficial"`
 	Participant    standingParticipant     `json:"participant"`
 	ProblemsSolved int                     `json:"problemsSolved"`
 	TotalPenalty   int                     `json:"totalPenalty"`

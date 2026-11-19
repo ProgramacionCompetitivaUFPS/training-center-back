@@ -494,3 +494,153 @@ func TestGetStandings_BoardFields_ColorCountsAndFirstSolve(t *testing.T) {
 		t.Errorf("isFirstSolve on A = %v, want u2 true and u1 false", firstSolve)
 	}
 }
+
+func finishedPostStandingsContest() *domainContest.Contest {
+	return domainContest.RestoreContest(
+		"c1",
+		domainContest.RestoreContestName("Test Contest"),
+		nil,
+		time.Now().Add(-4*time.Hour),
+		time.Now().Add(-time.Hour),
+		domainContest.RestorePenalty(20),
+		0, true, false, false,
+		shared.RestoreGroupID("g1"),
+		shared.RestoreUserID("u1"),
+		domainContest.RestoreParticipationMode("INDIVIDUAL"), domainContest.RestoreTeamSize(2, 5),
+		[]domainContest.ContestProblem{
+			domainContest.RestoreContestProblem("cp1", "prob-A", 1, nil),
+		},
+		time.Now(),
+		nil,
+	)
+}
+
+func postStandingsUC(official, post []domainContest.ParticipantStanding) *appcontest.GetStandingsUseCase {
+	cached := &appcontest.CachedStandings{Participants: official, PostParticipants: post, LastUpdated: time.Now()}
+	return appcontest.NewGetStandingsUseCase(
+		&mockStandingsContestRepo{contest: finishedPostStandingsContest()},
+		&mockRegistrationRepository{},
+		&mockSubmissionProvider{},
+		&mockTeamParticipantProvider{},
+		&mockParticipantProfileProvider{},
+		&mockTeamDisplayProvider{},
+		&mockProblemProvider{},
+		&mockGroupProvider{},
+		&mockMemberProvider{isLead: true, isMember: true},
+		&mockStandingsCache{data: cached},
+		30*time.Second,
+	)
+}
+
+func serveStandings(t *testing.T, uc *appcontest.GetStandingsUseCase, target string) *httptest.ResponseRecorder {
+	t.Helper()
+	h := newHandlerWithGetStandings(uc)
+	r := authedRequest(http.MethodGet, target, nil)
+	r.SetPathValue("groupId", "g1")
+	r.SetPathValue("contestId", "c1")
+	w := httptest.NewRecorder()
+	wrapAuth(http.HandlerFunc(h.GetStandings)).ServeHTTP(w, r)
+	return w
+}
+
+func TestGetStandings_InvalidPhase_Returns400(t *testing.T) {
+	w := serveStandings(t, postStandingsUC(nil, nil), "/groups/g1/contests/c1/standings?phase=bogus")
+
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400, got %d: %s", w.Code, w.Body.String())
+	}
+	var body map[string]any
+	if err := json.NewDecoder(w.Body).Decode(&body); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if body["error"] != "BAD_REQUEST" {
+		t.Errorf("error = %v, want BAD_REQUEST in key \"error\"", body["error"])
+	}
+}
+
+func TestGetStandings_PhaseOmitted_ListsOfficialThenPostRows(t *testing.T) {
+	early := time.Now().Add(-2 * time.Hour)
+	late := time.Now().Add(-30 * time.Minute)
+	w := serveStandings(t,
+		postStandingsUC(
+			[]domainContest.ParticipantStanding{{ContestantID: "u1", ParticipantType: "INDIVIDUAL", Problems: map[string]domainContest.ProblemAttempt{"prob-A": {AcceptedAt: &early}}}},
+			[]domainContest.ParticipantStanding{{ContestantID: "p1", ParticipantType: "INDIVIDUAL", Problems: map[string]domainContest.ProblemAttempt{"prob-A": {AcceptedAt: &late}}}},
+		),
+		"/groups/g1/contests/c1/standings",
+	)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+	var raw struct {
+		Standings []map[string]any `json:"standings"`
+	}
+	if err := json.NewDecoder(w.Body).Decode(&raw); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if len(raw.Standings) != 2 {
+		t.Fatalf("standings = %d rows, want 2 (official then post)", len(raw.Standings))
+	}
+	if raw.Standings[0]["isOfficial"] != true || raw.Standings[0]["rank"] != float64(1) {
+		t.Errorf("first row = %v, want official with numeric rank 1", raw.Standings[0])
+	}
+	if raw.Standings[1]["isOfficial"] != false {
+		t.Errorf("second row isOfficial = %v, want false", raw.Standings[1]["isOfficial"])
+	}
+	if rank, present := raw.Standings[1]["rank"]; !present || rank != nil {
+		t.Errorf("post row rank = %v (present=%v), want explicit null", rank, present)
+	}
+}
+
+func TestGetStandings_PostRow_HasNullTimeZeroPenaltyAndNoFirstSolve(t *testing.T) {
+	late := time.Now().Add(-30 * time.Minute)
+	w := serveStandings(t,
+		postStandingsUC(nil,
+			[]domainContest.ParticipantStanding{{ContestantID: "p1", ParticipantType: "INDIVIDUAL", Problems: map[string]domainContest.ProblemAttempt{"prob-A": {AcceptedAt: &late}}}},
+		),
+		"/groups/g1/contests/c1/standings?phase=postcompetition",
+	)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+	var raw struct {
+		Standings []struct {
+			IsOfficial bool             `json:"isOfficial"`
+			Problems   []map[string]any `json:"problems"`
+		} `json:"standings"`
+	}
+	if err := json.NewDecoder(w.Body).Decode(&raw); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if len(raw.Standings) != 1 || raw.Standings[0].IsOfficial {
+		t.Fatalf("standings = %+v, want one unofficial row", raw.Standings)
+	}
+	cell := raw.Standings[0].Problems[0]
+	if cell["status"] != "ACCEPTED" || cell["time"] != nil || cell["penalty"] != float64(0) || cell["isFirstSolve"] != false {
+		t.Errorf("post cell = %v, want ACCEPTED with time null, penalty 0, isFirstSolve false", cell)
+	}
+}
+
+func TestGetStandings_PhaseCompetition_ReturnsOnlyOfficialRows(t *testing.T) {
+	early := time.Now().Add(-2 * time.Hour)
+	late := time.Now().Add(-30 * time.Minute)
+	w := serveStandings(t,
+		postStandingsUC(
+			[]domainContest.ParticipantStanding{{ContestantID: "u1", ParticipantType: "INDIVIDUAL", Problems: map[string]domainContest.ProblemAttempt{"prob-A": {AcceptedAt: &early}}}},
+			[]domainContest.ParticipantStanding{{ContestantID: "p1", ParticipantType: "INDIVIDUAL", Problems: map[string]domainContest.ProblemAttempt{"prob-A": {AcceptedAt: &late}}}},
+		),
+		"/groups/g1/contests/c1/standings?phase=competition",
+	)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+	var resp getStandingsResponse
+	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if len(resp.Standings) != 1 || resp.Standings[0].Participant.ID != "u1" {
+		t.Errorf("standings = %+v, want only u1", resp.Standings)
+	}
+}
