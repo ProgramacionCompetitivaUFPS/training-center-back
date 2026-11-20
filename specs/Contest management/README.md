@@ -129,6 +129,7 @@ Contests support different participation configurations:
 | `teamSizeMin` | integer | Minimum selectedMembers required (nullable) |
 | `teamSizeMax` | integer | Maximum selectedMembers allowed (nullable) |
 | `showTeamMembers` | boolean | Show member names in standings (default: false) |
+| `allowLateRegistration` | boolean | Allow new registrations while the contest is ACTIVE (default: false). Registered participants can never unregister once it starts |
 
 ### Individual Registration
 

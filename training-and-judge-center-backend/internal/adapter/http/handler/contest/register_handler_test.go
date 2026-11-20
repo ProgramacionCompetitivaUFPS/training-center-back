@@ -148,7 +148,7 @@ func TestRegister_AlreadyRegistered_Returns204(t *testing.T) {
 	}
 }
 
-func TestRegister_ContestAlreadyStarted_Returns400(t *testing.T) {
+func TestRegister_ContestFinished_Returns409NotOpenForRegistration(t *testing.T) {
 	uc := appcontest.NewRegisterToContestUseCase(
 		&mockRepoReturning{contest: finishedContest()},
 		&mockRegistrationRepository{},
@@ -165,8 +165,8 @@ func TestRegister_ContestAlreadyStarted_Returns400(t *testing.T) {
 
 	wrapAuth(http.HandlerFunc(h.Register)).ServeHTTP(w, r)
 
-	if w.Code != http.StatusBadRequest {
-		t.Fatalf("expected 400, got %d: %s", w.Code, w.Body.String())
+	if w.Code != http.StatusConflict {
+		t.Fatalf("expected 409, got %d: %s", w.Code, w.Body.String())
 	}
 	var errResp struct {
 		Code string `json:"error"`
@@ -174,7 +174,7 @@ func TestRegister_ContestAlreadyStarted_Returns400(t *testing.T) {
 	if err := json.NewDecoder(w.Body).Decode(&errResp); err != nil {
 		t.Fatalf("could not decode error body: %v", err)
 	}
-	if errResp.Code != domainContest.ErrCodeContestAlreadyStarted {
-		t.Errorf("expected error code %q, got %q", domainContest.ErrCodeContestAlreadyStarted, errResp.Code)
+	if errResp.Code != domainContest.ErrCodeContestNotOpenForRegistration {
+		t.Errorf("expected error code %q, got %q", domainContest.ErrCodeContestNotOpenForRegistration, errResp.Code)
 	}
 }

@@ -26,28 +26,29 @@ type ProblemDetailDisplay struct {
 }
 
 type GetContestOutput struct {
-	ID                string
-	Name              string
-	Description       *string
-	StartTime         time.Time
-	EndTime           time.Time
-	Duration          int // seconds; domain Duration() returns minutes, multiplied here
-	Penalty           int
-	FreezeMinutes     int
-	EnablePostContest bool
-	Locked            *bool // nil when caller is not Lead or Admin (omitted from JSON)
-	ShowTeamMembers   bool
-	ParticipationMode string
-	TeamSizeMin       int
-	TeamSizeMax       int
-	ParticipantCount  int
-	IsRegistered      bool
-	Group             GroupDisplay
-	Owner             UserDisplay
-	Problems          []ProblemDetailDisplay
-	Status            string
-	CreatedAt         time.Time
-	UpdatedAt         *time.Time
+	ID                    string
+	Name                  string
+	Description           *string
+	StartTime             time.Time
+	EndTime               time.Time
+	Duration              int // seconds; domain Duration() returns minutes, multiplied here
+	Penalty               int
+	FreezeMinutes         int
+	EnablePostContest     bool
+	Locked                *bool // nil when caller is not Lead or Admin (omitted from JSON)
+	ShowTeamMembers       bool
+	AllowLateRegistration bool
+	ParticipationMode     string
+	TeamSizeMin           int
+	TeamSizeMax           int
+	ParticipantCount      int
+	IsRegistered          bool
+	Group                 GroupDisplay
+	Owner                 UserDisplay
+	Problems              []ProblemDetailDisplay
+	Status                string
+	CreatedAt             time.Time
+	UpdatedAt             *time.Time
 }
 
 type GetContestUseCase struct {
@@ -173,27 +174,28 @@ func (uc *GetContestUseCase) Execute(ctx context.Context, in GetContestInput) (*
 	}
 
 	return &GetContestOutput{
-		ID:                c.ID(),
-		Name:              c.Name().Value(),
-		Description:       c.Description(),
-		StartTime:         c.StartTime(),
-		EndTime:           c.EndTime(),
-		Duration:          c.Duration() * 60,
-		Penalty:           c.Penalty().Value(),
-		FreezeMinutes:     c.FreezeMinutes(),
-		EnablePostContest: c.EnablePostContest(),
-		Locked:            locked,
-		ShowTeamMembers:   c.ShowTeamMembers(),
-		ParticipationMode: c.ParticipationMode().String(),
-		TeamSizeMin:       c.TeamSize().Min(),
-		TeamSizeMax:       c.TeamSize().Max(),
-		ParticipantCount:  participantCount,
-		IsRegistered:      isRegistered,
-		Group:             GroupDisplay{ID: group.ID, Name: group.Name},
-		Owner:             *owner,
-		Problems:          problemDisplays,
-		Status:            status.String(),
-		CreatedAt:         c.CreatedAt(),
-		UpdatedAt:         c.UpdatedAt(),
+		ID:                    c.ID(),
+		Name:                  c.Name().Value(),
+		Description:           c.Description(),
+		StartTime:             c.StartTime(),
+		EndTime:               c.EndTime(),
+		Duration:              c.Duration() * 60,
+		Penalty:               c.Penalty().Value(),
+		FreezeMinutes:         c.FreezeMinutes(),
+		EnablePostContest:     c.EnablePostContest(),
+		Locked:                locked,
+		ShowTeamMembers:       c.ShowTeamMembers(),
+		AllowLateRegistration: c.AllowLateRegistration(),
+		ParticipationMode:     c.ParticipationMode().String(),
+		TeamSizeMin:           c.TeamSize().Min(),
+		TeamSizeMax:           c.TeamSize().Max(),
+		ParticipantCount:      participantCount,
+		IsRegistered:          isRegistered,
+		Group:                 GroupDisplay{ID: group.ID, Name: group.Name},
+		Owner:                 *owner,
+		Problems:              problemDisplays,
+		Status:                status.String(),
+		CreatedAt:             c.CreatedAt(),
+		UpdatedAt:             c.UpdatedAt(),
 	}, nil
 }

@@ -89,9 +89,9 @@ func (uc *RegisterTeamToContestUseCase) Execute(ctx context.Context, in Register
 		return nil, apperror.NewBadRequest(ErrCodeTeamsNotAllowed, "this contest does not allow team registrations")
 	}
 
-	// 3. Contest must be SCHEDULED.
-	if contest.Status != "SCHEDULED" {
-		return nil, apperror.NewConflict(ErrCodeContestNotOpenForRegistration, "contest is not open for registration")
+	// 3. Contest must be open for registration.
+	if err := contest.CheckRegistrationOpen(); err != nil {
+		return nil, err
 	}
 
 	// Reject duplicate selected members.

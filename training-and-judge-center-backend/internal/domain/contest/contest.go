@@ -10,24 +10,25 @@ import (
 const MaxDescriptionLength = 5000
 
 type Contest struct {
-	id                string
-	name              ContestName
-	description       *string
-	startTime         time.Time
-	endTime           time.Time
-	penalty           Penalty
-	freezeMinutes     int
-	enablePostContest bool
-	locked            bool
-	showTeamMembers   bool
-	groupID           shared.GroupID
-	ownerID           shared.UserID
-	participationMode ParticipationMode
-	teamSize          TeamSize
-	problems          []ContestProblem
-	createdAt         time.Time
-	updatedAt         *time.Time
-	loadedUpdatedAt   *time.Time
+	id                    string
+	name                  ContestName
+	description           *string
+	startTime             time.Time
+	endTime               time.Time
+	penalty               Penalty
+	freezeMinutes         int
+	enablePostContest     bool
+	locked                bool
+	showTeamMembers       bool
+	allowLateRegistration bool
+	groupID               shared.GroupID
+	ownerID               shared.UserID
+	participationMode     ParticipationMode
+	teamSize              TeamSize
+	problems              []ContestProblem
+	createdAt             time.Time
+	updatedAt             *time.Time
+	loadedUpdatedAt       *time.Time
 }
 
 func NewContest(
@@ -39,6 +40,7 @@ func NewContest(
 	freezeMinutes int,
 	enablePostContest bool,
 	showTeamMembers bool,
+	allowLateRegistration bool,
 	groupID shared.GroupID,
 	ownerID shared.UserID,
 	participationMode ParticipationMode,
@@ -63,22 +65,23 @@ func NewContest(
 	}
 
 	return &Contest{
-		id:                id,
-		name:              name,
-		description:       description,
-		startTime:         startTime.UTC(),
-		endTime:           endTime.UTC(),
-		penalty:           penalty,
-		freezeMinutes:     freezeMinutes,
-		enablePostContest: enablePostContest,
-		locked:            false,
-		showTeamMembers:   showTeamMembers,
-		groupID:           groupID,
-		ownerID:           ownerID,
-		participationMode: participationMode,
-		teamSize:          teamSize,
-		problems:          []ContestProblem{},
-		createdAt:         t,
+		id:                    id,
+		name:                  name,
+		description:           description,
+		startTime:             startTime.UTC(),
+		endTime:               endTime.UTC(),
+		penalty:               penalty,
+		freezeMinutes:         freezeMinutes,
+		enablePostContest:     enablePostContest,
+		locked:                false,
+		showTeamMembers:       showTeamMembers,
+		allowLateRegistration: allowLateRegistration,
+		groupID:               groupID,
+		ownerID:               ownerID,
+		participationMode:     participationMode,
+		teamSize:              teamSize,
+		problems:              []ContestProblem{},
+		createdAt:             t,
 	}, nil
 }
 
@@ -92,6 +95,7 @@ func RestoreContest(
 	enablePostContest bool,
 	locked bool,
 	showTeamMembers bool,
+	allowLateRegistration bool,
 	groupID shared.GroupID,
 	ownerID shared.UserID,
 	participationMode ParticipationMode,
@@ -109,24 +113,25 @@ func RestoreContest(
 		loadedUpdatedAt = &t
 	}
 	return &Contest{
-		id:                id,
-		name:              name,
-		description:       description,
-		startTime:         startTime,
-		endTime:           endTime,
-		penalty:           penalty,
-		freezeMinutes:     freezeMinutes,
-		enablePostContest: enablePostContest,
-		locked:            locked,
-		showTeamMembers:   showTeamMembers,
-		groupID:           groupID,
-		ownerID:           ownerID,
-		participationMode: participationMode,
-		teamSize:          teamSize,
-		problems:          problems,
-		createdAt:         createdAt,
-		updatedAt:         updatedAt,
-		loadedUpdatedAt:   loadedUpdatedAt,
+		id:                    id,
+		name:                  name,
+		description:           description,
+		startTime:             startTime,
+		endTime:               endTime,
+		penalty:               penalty,
+		freezeMinutes:         freezeMinutes,
+		enablePostContest:     enablePostContest,
+		locked:                locked,
+		showTeamMembers:       showTeamMembers,
+		allowLateRegistration: allowLateRegistration,
+		groupID:               groupID,
+		ownerID:               ownerID,
+		participationMode:     participationMode,
+		teamSize:              teamSize,
+		problems:              problems,
+		createdAt:             createdAt,
+		updatedAt:             updatedAt,
+		loadedUpdatedAt:       loadedUpdatedAt,
 	}
 }
 
@@ -282,6 +287,28 @@ func (c *Contest) SetShowTeamMembers(showTeamMembers bool, now time.Time) {
 	c.updatedAt = &t
 }
 
+// SetAllowLateRegistration sets the allow-late-registration flag and touches updatedAt.
+func (c *Contest) SetAllowLateRegistration(allow bool, now time.Time) {
+	c.allowLateRegistration = allow
+	t := now.UTC()
+	c.updatedAt = &t
+}
+
+// CheckRegistrationOpen returns nil when new registrations are accepted at now.
+func (c *Contest) CheckRegistrationOpen(now time.Time) error {
+	switch c.Status(now) {
+	case StatusScheduled:
+		return nil
+	case StatusActive:
+		if c.allowLateRegistration {
+			return nil
+		}
+		return apperror.NewConflict(ErrCodeContestAlreadyStarted, "registration is closed because the contest has already started")
+	default:
+		return apperror.NewConflict(ErrCodeContestNotOpenForRegistration, "the contest has finished and is not open for registration")
+	}
+}
+
 // SetProblems replaces the entire problem list atomically.
 func (c *Contest) SetProblems(problems []ContestProblem, now time.Time) {
 	if problems == nil {
@@ -302,6 +329,7 @@ func (c *Contest) FreezeMinutes() int                   { return c.freezeMinutes
 func (c *Contest) EnablePostContest() bool              { return c.enablePostContest }
 func (c *Contest) Locked() bool                         { return c.locked }
 func (c *Contest) ShowTeamMembers() bool                { return c.showTeamMembers }
+func (c *Contest) AllowLateRegistration() bool          { return c.allowLateRegistration }
 func (c *Contest) GroupID() shared.GroupID              { return c.groupID }
 func (c *Contest) OwnerID() shared.UserID               { return c.ownerID }
 func (c *Contest) ParticipationMode() ParticipationMode { return c.participationMode }

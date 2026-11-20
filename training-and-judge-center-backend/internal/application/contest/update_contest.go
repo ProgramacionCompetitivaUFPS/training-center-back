@@ -26,12 +26,13 @@ type UpdateContestInput struct {
 	EnablePostContest *bool
 	// Problems, when non-nil, replaces the entire problem list.
 	// Each entry is (slug, order, color).
-	Problems          *[]ProblemOrderInput
-	Locked            *bool
-	ParticipationMode *string // "INDIVIDUAL" | "TEAM" | "MIXED"
-	TeamSizeMin       *int
-	TeamSizeMax       *int
-	ShowTeamMembers   *bool
+	Problems              *[]ProblemOrderInput
+	Locked                *bool
+	ParticipationMode     *string // "INDIVIDUAL" | "TEAM" | "MIXED"
+	TeamSizeMin           *int
+	TeamSizeMax           *int
+	ShowTeamMembers       *bool
+	AllowLateRegistration *bool
 }
 
 type ProblemOrderInput struct {
@@ -193,6 +194,10 @@ func (uc *UpdateContestUseCase) Execute(ctx context.Context, in UpdateContestInp
 
 	if in.ShowTeamMembers != nil {
 		c.SetShowTeamMembers(*in.ShowTeamMembers, now)
+	}
+
+	if in.AllowLateRegistration != nil {
+		c.SetAllowLateRegistration(*in.AllowLateRegistration, now)
 	}
 
 	if err := uc.txManager.WithTx(ctx, func(txCtx context.Context) error {
@@ -374,7 +379,7 @@ func hasAnyField(in UpdateContestInput) bool {
 		in.EndTime != nil || in.Penalty != nil || in.FreezeMinutes != nil ||
 		in.EnablePostContest != nil || in.Problems != nil || in.Locked != nil ||
 		in.ParticipationMode != nil || in.TeamSizeMin != nil || in.TeamSizeMax != nil ||
-		in.ShowTeamMembers != nil
+		in.ShowTeamMembers != nil || in.AllowLateRegistration != nil
 }
 
 func deduplicateBySlug(entries []ProblemOrderInput) []ProblemOrderInput {

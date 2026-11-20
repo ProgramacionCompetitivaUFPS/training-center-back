@@ -582,7 +582,7 @@ func newTestContest(ownerID string) *domainContest.Contest {
 		0,
 		false,
 		false,
-		false,
+		false, false,
 		shared.RestoreGroupID(testGroupID),
 		shared.RestoreUserID(ownerID),
 		domainContest.RestoreParticipationMode("INDIVIDUAL"), domainContest.RestoreTeamSize(2, 5),
@@ -627,7 +627,7 @@ func newFinishedContest(ownerID string) *domainContest.Contest {
 		0,
 		false,
 		false,
-		false,
+		false, false,
 		shared.RestoreGroupID(testGroupID),
 		shared.RestoreUserID(ownerID),
 		domainContest.RestoreParticipationMode("INDIVIDUAL"), domainContest.RestoreTeamSize(2, 5),
@@ -679,4 +679,26 @@ func attempt(wrongAttempts int, acceptedAt *time.Time) domainContest.ProblemAtte
 		times[i] = contestStart.Add(-time.Duration(wrongAttempts-i) * time.Minute)
 	}
 	return domainContest.ProblemAttempt{WrongAttemptTimes: times, AcceptedAt: acceptedAt}
+}
+
+func newActiveContest(ownerID string, allowLateRegistration bool) *domainContest.Contest {
+	return domainContest.RestoreContest(
+		testContestID,
+		domainContest.RestoreContestName("Active Contest"),
+		nil,
+		time.Now().Add(-time.Hour),
+		time.Now().Add(time.Hour),
+		domainContest.RestorePenalty(20),
+		0,
+		false,
+		false,
+		false,
+		allowLateRegistration,
+		shared.RestoreGroupID(testGroupID),
+		shared.RestoreUserID(ownerID),
+		domainContest.RestoreParticipationMode("INDIVIDUAL"), domainContest.RestoreTeamSize(2, 5),
+		[]domainContest.ContestProblem{},
+		testNow.Add(-2*time.Hour),
+		nil,
+	)
 }

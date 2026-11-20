@@ -488,3 +488,24 @@ func TestUpdateContest_ConflictFromTheRepositoryIsReturnedAndNothingIsAnswered(t
 		t.Errorf("expected no output on conflict, got %+v", out)
 	}
 }
+
+func TestUpdateContest_AllowLateRegistrationCanBeToggledWhileActive(t *testing.T) {
+	contest := newActiveContest(callerID, false)
+	uc := newUpdateContestUseCase(repoWith(contest), groupFound(), isLead(), defaultProblemProvider())
+
+	for _, allow := range []bool{true, false} {
+		out, err := uc.Execute(context.Background(), UpdateContestInput{
+			CurrentUser:           asCoach(callerID),
+			GroupID:               testGroupID,
+			ContestID:             testContestID,
+			AllowLateRegistration: &allow,
+		})
+
+		if err != nil {
+			t.Fatalf("allow=%v: unexpected error: %v", allow, err)
+		}
+		if out.AllowLateRegistration != allow {
+			t.Errorf("AllowLateRegistration = %v, want %v", out.AllowLateRegistration, allow)
+		}
+	}
+}

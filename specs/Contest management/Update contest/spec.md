@@ -531,6 +531,7 @@ Update an existing contest within a group.
 | penalty | integer | No* | Penalty in minutes for wrong submission (min: 0, max: 1440) |
 | freezeMinutes | integer | No* | Minutes before endTime to freeze standings (null = no freeze). Cannot exceed contest duration. |
 | enablePostContest | boolean | No* | Enable post-competition phase. Cannot be changed from true to false if submissions exist after endTime. |
+| allowLateRegistration | boolean | No | Allow new registrations while the contest is ACTIVE. Can be changed at any time, including while the contest is running; turning it off does not remove anyone already registered |
 | problems | array | No* | Array of problem objects with slug and order. If provided, replaces entire problem list. To add/remove, include all problems you want to keep plus new ones. |
 | locked | boolean | No* | Lock status. Only owner or admin can change this. When locked, contest cannot be modified (except lock/unlock by owner or admin). |
 
