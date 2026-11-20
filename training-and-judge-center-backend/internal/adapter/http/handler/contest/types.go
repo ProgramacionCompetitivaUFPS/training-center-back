@@ -28,6 +28,26 @@ func (n *nullableString) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
+// nullableInt is nullableString for integers: omitted, null and a number are three different requests.
+type nullableInt struct {
+	Present bool
+	Value   *int
+}
+
+func (n *nullableInt) UnmarshalJSON(data []byte) error {
+	n.Present = true
+	if string(data) == "null" {
+		n.Value = nil
+		return nil
+	}
+	var v int
+	if err := json.Unmarshal(data, &v); err != nil {
+		return err
+	}
+	n.Value = &v
+	return nil
+}
+
 // ── Request types ────────────────────────────────────────────────────────────
 
 type createContestRequest struct {
@@ -40,6 +60,7 @@ type createContestRequest struct {
 	EnablePostContest     bool      `json:"enablePostContest"`
 	ShowTeamMembers       bool      `json:"showTeamMembers"`
 	AllowLateRegistration bool      `json:"allowLateRegistration"`
+	AutoRevealMinutes     *int      `json:"autoRevealMinutes"`
 	ParticipationMode     string    `json:"participationMode"`
 	TeamSizeMin           *int      `json:"teamSizeMin"`
 	TeamSizeMax           *int      `json:"teamSizeMax"`
@@ -67,6 +88,7 @@ type updateContestRequest struct {
 	TeamSizeMax           *int                   `json:"teamSizeMax"`
 	ShowTeamMembers       *bool                  `json:"showTeamMembers"`
 	AllowLateRegistration *bool                  `json:"allowLateRegistration"`
+	AutoRevealMinutes     nullableInt            `json:"autoRevealMinutes"`
 }
 
 // ── Response types ───────────────────────────────────────────────────────────
@@ -113,6 +135,7 @@ type getContestResponse struct {
 	Locked                *bool           `json:"locked,omitempty"`
 	ShowTeamMembers       bool            `json:"showTeamMembers"`
 	AllowLateRegistration bool            `json:"allowLateRegistration"`
+	AutoRevealMinutes     *int            `json:"autoRevealMinutes"`
 	ParticipationMode     string          `json:"participationMode"`
 	TeamSizeMin           int             `json:"teamSizeMin"`
 	TeamSizeMax           int             `json:"teamSizeMax"`
@@ -238,6 +261,10 @@ type standingsContestDisplay struct {
 	FreezeMinutes *int    `json:"freezeMinutes"`
 	IsFrozen      bool    `json:"isFrozen"`
 	FrozenAt      *string `json:"frozenAt"`
+	// ResultsRevealedAt is when the final results were unfrozen; null until then.
+	ResultsRevealedAt *string `json:"resultsRevealedAt"`
+	// AutoRevealAt is when the results open by themselves; null when they only open by hand.
+	AutoRevealAt *string `json:"autoRevealAt"`
 }
 
 type standingsProblemHeader struct {
@@ -360,6 +387,7 @@ type contestResponse struct {
 	Locked                bool             `json:"locked"`
 	ShowTeamMembers       bool             `json:"showTeamMembers"`
 	AllowLateRegistration bool             `json:"allowLateRegistration"`
+	AutoRevealMinutes     *int             `json:"autoRevealMinutes"`
 	ParticipationMode     string           `json:"participationMode"`
 	TeamSizeMin           int              `json:"teamSizeMin"`
 	TeamSizeMax           int              `json:"teamSizeMax"`

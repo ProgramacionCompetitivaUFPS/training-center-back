@@ -88,17 +88,24 @@ As a user, I want to view the final standings of a finished contest so that I ca
 
 **Why this priority**: Final standings must remain accessible for historical records.
 
-**Independent Test**: Request standings for a FINISHED contest. Verify the freeze is lifted and later submissions are ignored.
+**Independent Test**: Request standings for a FINISHED contest. Verify the freeze is lifted only once the results are revealed and later submissions are ignored.
 
 **Acceptance Scenarios**:
 
 1. **Scenario**: View final standings of FINISHED contest
 
-* **Given** a contest is FINISHED
+* **Given** a contest is FINISHED and it has no freeze, or its results were revealed
 * **And** the authenticated user has view access (member, participant, or non-member of VISIBLE group)
 * **When** they request the standings
 * **Then** the system returns the full standings (the freeze no longer applies)
 * **And** the result is stable across requests unless a submission with `submittedAt <= endTime` is judged after `endTime`; its verdict then changes the standings the next time the projection is rebuilt. The problem list of a finished contest cannot be changed
+
+1.1. **Scenario**: View standings of a FINISHED contest whose results are not revealed
+
+* **Given** a contest is FINISHED, has `freezeMinutes > 0` and a Lead or Admin has not revealed the results
+* **When** a participant requests the standings
+* **Then** the system still returns the frozen standings (`isFrozen = true`, `resultsRevealedAt = null`) and no postcompetition rows
+* **And** Leads and Admin can still read the real standings with `?realtime=true`
 
 2. **Scenario**: View standings during postcompetition
 
@@ -223,7 +230,9 @@ Retrieve the standings of a contest.
     "penalty": 20,
     "freezeMinutes": 60,
     "isFrozen": true,
-    "frozenAt": "2026-01-25T16:00:00Z"
+    "frozenAt": "2026-01-25T16:00:00Z",
+    "resultsRevealedAt": null,
+    "autoRevealAt": null
   },
   "problems": [
     { "position": 1, "slug": "sum-two-numbers", "title": "Sum Two Numbers", "color": "#e53935", "accepted": 2, "tried": 2, "postAccepted": 0, "postTried": 0 },
@@ -318,6 +327,8 @@ Retrieve the standings of a contest.
 | contest.freezeMinutes | integer | Freeze length in minutes. A contest without freeze stores `0`, and this response returns `null` in that case |
 | contest.isFrozen | boolean | Whether standings are currently frozen for this response |
 | contest.frozenAt | timestamp | When the freeze started (`null` if not frozen) |
+| contest.resultsRevealedAt | timestamp | When a Lead or Admin revealed the final results (`null` until then; always `null` for a contest without freeze) |
+| contest.autoRevealAt | timestamp | When the results open by themselves (`endTime + autoRevealMinutes`); `null` when they only open by hand or the contest has no freeze |
 | problems | array | The contest's current problems in position order |
 | problems[].title | string | The problem's title |
 | problems[].color | string | The balloon color of the problem in the contest as `#rrggbb`, or `null` when none was set |
@@ -454,7 +465,7 @@ List the distinct values available for the standings filters. Same authenticatio
 
 ### Freeze Behavior
 
-- **FR-005**: If `freezeMinutes > 0`, standings MUST freeze at `endTime - freezeMinutes` while the contest is ACTIVE.
+- **FR-005**: If `freezeMinutes > 0`, standings MUST freeze at `endTime - freezeMinutes`.
 
 - **FR-006**: While frozen, submissions made after the freeze time MUST be hidden from non-privileged users: they count neither as attempts nor as solves, do not influence rank, penalty, `accepted`, `tried` or `isFirstSolve`, and are shown as a `PENDING` cell with their count in `pending` (see FR-040 to FR-043).
 
@@ -464,7 +475,11 @@ List the distinct values available for the standings filters. Same authenticatio
 
 - **FR-009**: Default `freezeMinutes` for new contests MUST be 60.
 
-- **FR-009.1**: Once the contest is no longer ACTIVE the freeze no longer applies.
+- **FR-009.1**: A finished contest with `freezeMinutes > 0` MUST stay frozen until its results are revealed; a contest with `freezeMinutes = 0` is never frozen. Postcompetition rows MUST NOT be returned while the contest is frozen.
+
+- **FR-009.2**: The response MUST include `contest.resultsRevealedAt` (`null` until revealed).
+
+- **FR-009.3**: A finished contest with `autoRevealMinutes` set MUST stop being frozen once `endTime + autoRevealMinutes` is reached, with no action from a Lead; `contest.autoRevealAt` exposes that instant.
 
 ### Data Sources and Caching
 

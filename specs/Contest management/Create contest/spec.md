@@ -210,6 +210,7 @@ Create a new contest within a group.
 | freezeMinutes | integer | No | Minutes before endTime to freeze standings (default: 60, null = no freeze) |
 | enablePostContest | boolean | No | Enable post-competition phase (default: false). If enabled, registered users can submit after endTime but submissions won't affect standings |
 | allowLateRegistration | boolean | No | Allow new registrations while the contest is ACTIVE (default: false) |
+| autoRevealMinutes | integer | No | Minutes after `endTime` at which the frozen results open by themselves (`0` = at the end). Omitted or `null` = they only open by hand ([Reveal contest results](../Reveal%20contest%20results/spec.md)). Must be >= 0; ignored when `freezeMinutes = 0` |
 | problems | string[] | No | Array of problem slugs to add to the contest. They start without a balloon color (`color: null` in the response); set it later with Update contest |
 
 **Responses**:

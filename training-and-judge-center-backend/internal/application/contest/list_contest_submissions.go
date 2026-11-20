@@ -129,13 +129,7 @@ func (uc *ListContestSubmissionsUseCase) Execute(ctx context.Context, in ListCon
 	status := contest.Status(now)
 	endTime := contest.EndTime()
 
-	var freezeTime *time.Time
-	if contest.FreezeMinutes() > 0 && status == domainContest.StatusActive {
-		ft := endTime.Add(-time.Duration(contest.FreezeMinutes()) * time.Minute)
-		if now.After(ft) {
-			freezeTime = &ft
-		}
-	}
+	freezeTime := contest.FreezeTime(now)
 
 	callerStandingID := in.CurrentUser.ID
 	if !isAdmin && !isLead {
@@ -167,7 +161,7 @@ func (uc *ListContestSubmissionsUseCase) Execute(ctx context.Context, in ListCon
 		return nil, err
 	}
 
-	showFullDetails := status == domainContest.StatusFinished || isLead || isAdmin
+	showFullDetails := (status == domainContest.StatusFinished && freezeTime == nil) || isLead || isAdmin
 	showMembers := contest.ShowTeamMembers()
 
 	result := make([]SubmissionDisplay, 0, len(subs))

@@ -37,6 +37,8 @@ func frozenActiveContest() *domainContest.Contest {
 		domainContest.RestorePenalty(20),
 		60,
 		false, false, false, false,
+		nil,
+		nil,
 		shared.RestoreGroupID(testGroupID),
 		shared.RestoreUserID(callerID),
 		domainContest.RestoreParticipationMode("INDIVIDUAL"), domainContest.RestoreTeamSize(2, 5),
@@ -431,6 +433,8 @@ func TestListContestSubmissions_TeamSubmission_ShowsMembersWhenEnabled(t *testin
 		time.Now().Add(2*time.Hour),
 		domainContest.RestorePenalty(20),
 		0, false, false, true, false, // showTeamMembers=true
+		nil,
+		nil,
 		shared.RestoreGroupID(testGroupID),
 		shared.RestoreUserID(callerID),
 		domainContest.RestoreParticipationMode("TEAM"), domainContest.RestoreTeamSize(2, 5),

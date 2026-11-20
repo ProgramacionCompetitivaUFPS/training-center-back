@@ -85,6 +85,10 @@ type ContestSummaryDisplay struct {
 	FreezeMinutes int
 	IsFrozen      bool
 	FrozenAt      *time.Time
+	// ResultsRevealedAt is when a lead or admin unfroze the final results; nil until then.
+	ResultsRevealedAt *time.Time
+	// AutoRevealAt is when the results open by themselves; nil when they only open by hand.
+	AutoRevealAt *time.Time
 }
 
 type GetStandingsInput struct {
@@ -205,13 +209,7 @@ func (uc *GetStandingsUseCase) Execute(ctx context.Context, in GetStandingsInput
 	now := time.Now()
 	status := contest.Status(now)
 
-	var freezeTime *time.Time
-	if contest.FreezeMinutes() > 0 && status == domainContest.StatusActive {
-		ft := contest.EndTime().Add(-time.Duration(contest.FreezeMinutes()) * time.Minute)
-		if now.After(ft) {
-			freezeTime = &ft
-		}
-	}
+	freezeTime := contest.FreezeTime(now)
 
 	applyFreeze := freezeTime != nil
 	if in.Realtime && applyFreeze {
@@ -486,7 +484,7 @@ func (uc *GetStandingsUseCase) buildOutput(
 	}
 
 	showTeamMembers := contest.ShowTeamMembers()
-	postAvailable := status == domainContest.StatusFinished && contest.EnablePostContest()
+	postAvailable := status == domainContest.StatusFinished && freezeTime == nil && contest.EnablePostContest()
 
 	var postRows []domainContest.ParticipantStanding
 	if postAvailable {
@@ -554,6 +552,9 @@ func (uc *GetStandingsUseCase) buildOutput(
 			FreezeMinutes: contest.FreezeMinutes(),
 			IsFrozen:      meta.IsFrozen,
 			FrozenAt:      meta.FrozenAt,
+
+			ResultsRevealedAt: contest.ResultsRevealedAt(),
+			AutoRevealAt:      contest.AutoRevealAt(),
 		},
 		Problems: problems,
 		Entries:  page,

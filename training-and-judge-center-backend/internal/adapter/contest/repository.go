@@ -28,14 +28,14 @@ func (r *Repository) Create(ctx context.Context, c *domainContest.Contest) error
 
 	_, err := q.Exec(ctx, `
 		INSERT INTO contests (id, name, description, start_time, end_time,
-			penalty, freeze_minutes, enable_post_contest, locked, show_team_members, allow_late_registration,
+			penalty, freeze_minutes, enable_post_contest, locked, show_team_members, allow_late_registration, auto_reveal_minutes,
 			group_id, owner_id, participation_mode, team_size_min, team_size_max,
 			created_at, updated_at)
-		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18)`,
+		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19)`,
 		c.ID(), c.Name().Value(), c.Description(),
 		c.StartTime(), c.EndTime(),
 		c.Penalty().Value(), c.FreezeMinutes(), c.EnablePostContest(), c.Locked(), c.ShowTeamMembers(),
-		c.AllowLateRegistration(),
+		c.AllowLateRegistration(), c.AutoRevealMinutes(),
 		c.GroupID().Value(), c.OwnerID().Value(),
 		c.ParticipationMode().String(), c.TeamSize().Min(), c.TeamSize().Max(),
 		c.CreatedAt(), c.UpdatedAt(),
@@ -59,14 +59,14 @@ func (r *Repository) Update(ctx context.Context, c *domainContest.Contest) error
 			name=$2, description=$3, start_time=$4, end_time=$5,
 			penalty=$6, freeze_minutes=$7, enable_post_contest=$8, locked=$9,
 			show_team_members=$10, participation_mode=$11, team_size_min=$12, team_size_max=$13,
-			allow_late_registration=$14,
-			updated_at=$15
-		WHERE id=$1 AND updated_at IS NOT DISTINCT FROM $16::timestamptz`,
+			allow_late_registration=$14, results_revealed_at=$15, auto_reveal_minutes=$16,
+			updated_at=$17
+		WHERE id=$1 AND updated_at IS NOT DISTINCT FROM $18::timestamptz`,
 		c.ID(), c.Name().Value(), c.Description(),
 		c.StartTime(), c.EndTime(),
 		c.Penalty().Value(), c.FreezeMinutes(), c.EnablePostContest(), c.Locked(),
 		c.ShowTeamMembers(), c.ParticipationMode().String(), c.TeamSize().Min(), c.TeamSize().Max(),
-		c.AllowLateRegistration(),
+		c.AllowLateRegistration(), c.ResultsRevealedAt(), c.AutoRevealMinutes(),
 		c.UpdatedAt(), c.ConcurrencyToken(),
 	)
 	if err != nil {
@@ -96,7 +96,8 @@ func (r *Repository) FindByID(ctx context.Context, id string) (*domainContest.Co
 		participationMode                                                 string
 		description                                                       *string
 		startTime, endTime, createdAt                                     time.Time
-		updatedAt                                                         *time.Time
+		updatedAt, resultsRevealedAt                                      *time.Time
+		autoRevealMinutes                                                 *int
 		penalty, freezeMinutes                                            int
 		teamSizeMin, teamSizeMax                                          int
 		enablePostContest, locked, showTeamMembers, allowLateRegistration bool
@@ -104,11 +105,13 @@ func (r *Repository) FindByID(ctx context.Context, id string) (*domainContest.Co
 	err := q.QueryRow(ctx, `
 		SELECT id, name, description, start_time, end_time,
 		       penalty, freeze_minutes, enable_post_contest, locked, show_team_members, allow_late_registration,
+		       results_revealed_at, auto_reveal_minutes,
 		       group_id, owner_id, participation_mode, team_size_min, team_size_max,
 		       created_at, updated_at
 		FROM contests WHERE id=$1`, id).Scan(
 		&cID, &name, &description, &startTime, &endTime,
 		&penalty, &freezeMinutes, &enablePostContest, &locked, &showTeamMembers, &allowLateRegistration,
+		&resultsRevealedAt, &autoRevealMinutes,
 		&groupID, &ownerID, &participationMode, &teamSizeMin, &teamSizeMax,
 		&createdAt, &updatedAt,
 	)
@@ -136,6 +139,7 @@ func (r *Repository) FindByID(ctx context.Context, id string) (*domainContest.Co
 		locked,
 		showTeamMembers,
 		allowLateRegistration,
+		resultsRevealedAt, autoRevealMinutes,
 		shared.RestoreGroupID(groupID),
 		shared.RestoreUserID(ownerID),
 		domainContest.RestoreParticipationMode(participationMode),
@@ -229,6 +233,7 @@ func (r *Repository) listContests(ctx context.Context, baseCond string, baseArgs
 
 	query := `SELECT id, name, description, start_time, end_time,
 		       penalty, freeze_minutes, enable_post_contest, locked, show_team_members, allow_late_registration,
+		       results_revealed_at, auto_reveal_minutes,
 		       group_id, owner_id, participation_mode, team_size_min, team_size_max,
 		       created_at, updated_at
 		FROM contests ` + where +
@@ -255,7 +260,8 @@ func (r *Repository) listContests(ctx context.Context, baseCond string, baseArgs
 			participationMode                                                 string
 			description                                                       *string
 			startTime, endTime, createdAt                                     time.Time
-			updatedAt                                                         *time.Time
+			updatedAt, resultsRevealedAt                                      *time.Time
+			autoRevealMinutes                                                 *int
 			penalty, freezeMinutes                                            int
 			teamSizeMin, teamSizeMax                                          int
 			enablePostContest, locked, showTeamMembers, allowLateRegistration bool
@@ -263,6 +269,7 @@ func (r *Repository) listContests(ctx context.Context, baseCond string, baseArgs
 		if err := rows.Scan(
 			&cID, &name, &description, &startTime, &endTime,
 			&penalty, &freezeMinutes, &enablePostContest, &locked, &showTeamMembers, &allowLateRegistration,
+			&resultsRevealedAt, &autoRevealMinutes,
 			&groupID, &ownerID, &participationMode, &teamSizeMin, &teamSizeMax,
 			&createdAt, &updatedAt,
 		); err != nil {
@@ -282,6 +289,7 @@ func (r *Repository) listContests(ctx context.Context, baseCond string, baseArgs
 				locked,
 				showTeamMembers,
 				allowLateRegistration,
+				resultsRevealedAt, autoRevealMinutes,
 				shared.RestoreGroupID(groupID),
 				shared.RestoreUserID(ownerID),
 				domainContest.RestoreParticipationMode(participationMode),

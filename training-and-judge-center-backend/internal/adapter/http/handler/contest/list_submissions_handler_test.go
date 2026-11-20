@@ -47,6 +47,8 @@ func activeContestForSubmissions() *domainContest.Contest {
 		time.Now().Add(2*time.Hour),
 		domainContest.RestorePenalty(20),
 		0, false, false, false, false,
+		nil,
+		nil,
 		shared.RestoreGroupID("g1"),
 		shared.RestoreUserID("u1"),
 		domainContest.RestoreParticipationMode("INDIVIDUAL"), domainContest.RestoreTeamSize(2, 5),
