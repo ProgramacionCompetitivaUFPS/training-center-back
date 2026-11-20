@@ -64,6 +64,11 @@ func (h *Handler) Update(w http.ResponseWriter, r *http.Request) {
 		AllowLateRegistration: body.AllowLateRegistration,
 	}
 
+	// autoRevealMinutes: three-state — omitted=no-op, null=back to manual, number=set.
+	if body.AutoRevealMinutes.Present {
+		in.AutoRevealMinutes = &body.AutoRevealMinutes.Value
+	}
+
 	// description: three-state — omitted=no-op, null=clear, string=set.
 	if body.Description.Present {
 		in.Description = &body.Description.Value
@@ -108,6 +113,7 @@ func toContestResponse(out *appContest.ContestOutput) contestResponse {
 		Locked:                out.Locked,
 		ShowTeamMembers:       out.ShowTeamMembers,
 		AllowLateRegistration: out.AllowLateRegistration,
+		AutoRevealMinutes:     out.AutoRevealMinutes,
 		ParticipationMode:     out.ParticipationMode,
 		TeamSizeMin:           out.TeamSizeMin,
 		TeamSizeMax:           out.TeamSizeMax,

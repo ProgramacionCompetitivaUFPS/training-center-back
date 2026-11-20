@@ -21,6 +21,8 @@ type Contest struct {
 	locked                bool
 	showTeamMembers       bool
 	allowLateRegistration bool
+	resultsRevealedAt     *time.Time
+	autoRevealMinutes     *int
 	groupID               shared.GroupID
 	ownerID               shared.UserID
 	participationMode     ParticipationMode
@@ -96,6 +98,8 @@ func RestoreContest(
 	locked bool,
 	showTeamMembers bool,
 	allowLateRegistration bool,
+	resultsRevealedAt *time.Time,
+	autoRevealMinutes *int,
 	groupID shared.GroupID,
 	ownerID shared.UserID,
 	participationMode ParticipationMode,
@@ -124,6 +128,8 @@ func RestoreContest(
 		locked:                locked,
 		showTeamMembers:       showTeamMembers,
 		allowLateRegistration: allowLateRegistration,
+		resultsRevealedAt:     resultsRevealedAt,
+		autoRevealMinutes:     autoRevealMinutes,
 		groupID:               groupID,
 		ownerID:               ownerID,
 		participationMode:     participationMode,
@@ -294,6 +300,80 @@ func (c *Contest) SetAllowLateRegistration(allow bool, now time.Time) {
 	c.updatedAt = &t
 }
 
+// FreezeTime returns the instant the scoreboard froze when it is frozen at now, nil otherwise.
+// It stays frozen after the contest ends until the results are revealed (by hand, or automatically
+// once AutoRevealAt passes); a contest without a freeze is never frozen.
+func (c *Contest) FreezeTime(now time.Time) *time.Time {
+	if c.freezeMinutes <= 0 {
+		return nil
+	}
+	ft := c.endTime.Add(-time.Duration(c.freezeMinutes) * time.Minute)
+	switch c.Status(now) {
+	case StatusActive:
+		if now.After(ft) {
+			return &ft
+		}
+	case StatusFinished:
+		if !c.resultsVisible(now) {
+			return &ft
+		}
+	}
+	return nil
+}
+
+// resultsVisible reports whether a finished contest's results are already open: revealed by hand or
+// past their automatic reveal time.
+func (c *Contest) resultsVisible(now time.Time) bool {
+	if c.resultsRevealedAt != nil {
+		return true
+	}
+	at := c.AutoRevealAt()
+	return at != nil && !now.Before(*at)
+}
+
+// AutoRevealAt returns when the results open by themselves, nil when they only open by hand.
+func (c *Contest) AutoRevealAt() *time.Time {
+	if c.freezeMinutes <= 0 || c.autoRevealMinutes == nil {
+		return nil
+	}
+	at := c.endTime.Add(time.Duration(*c.autoRevealMinutes) * time.Minute)
+	return &at
+}
+
+// SetAutoRevealMinutes sets how long after the end the results open by themselves; nil means only by hand.
+func (c *Contest) SetAutoRevealMinutes(minutes *int, now time.Time) error {
+	if minutes != nil && *minutes < 0 {
+		return apperror.NewValidation([]apperror.FieldError{
+			{Field: "autoRevealMinutes", Message: "auto reveal minutes cannot be negative"},
+		})
+	}
+	c.autoRevealMinutes = nil
+	if minutes != nil {
+		m := *minutes
+		c.autoRevealMinutes = &m
+	}
+	t := now.UTC()
+	c.updatedAt = &t
+	return nil
+}
+
+// RevealResults unfreezes the scoreboard for everyone. Revealing twice keeps the first instant.
+func (c *Contest) RevealResults(now time.Time) error {
+	if c.freezeMinutes <= 0 {
+		return apperror.NewConflict(ErrCodeContestHasNoFreeze, "the contest has no freeze, so there are no results to reveal")
+	}
+	if c.Status(now) != StatusFinished {
+		return apperror.NewConflict(ErrCodeContestNotFinished, "results can only be revealed once the contest has finished")
+	}
+	if c.resultsVisible(now) {
+		return nil
+	}
+	t := now.UTC()
+	c.resultsRevealedAt = &t
+	c.updatedAt = &t
+	return nil
+}
+
 // CheckRegistrationOpen returns nil when new registrations are accepted at now.
 func (c *Contest) CheckRegistrationOpen(now time.Time) error {
 	switch c.Status(now) {
@@ -330,6 +410,8 @@ func (c *Contest) EnablePostContest() bool              { return c.enablePostCon
 func (c *Contest) Locked() bool                         { return c.locked }
 func (c *Contest) ShowTeamMembers() bool                { return c.showTeamMembers }
 func (c *Contest) AllowLateRegistration() bool          { return c.allowLateRegistration }
+func (c *Contest) ResultsRevealedAt() *time.Time        { return c.resultsRevealedAt }
+func (c *Contest) AutoRevealMinutes() *int              { return c.autoRevealMinutes }
 func (c *Contest) GroupID() shared.GroupID              { return c.groupID }
 func (c *Contest) OwnerID() shared.UserID               { return c.ownerID }
 func (c *Contest) ParticipationMode() ParticipationMode { return c.participationMode }

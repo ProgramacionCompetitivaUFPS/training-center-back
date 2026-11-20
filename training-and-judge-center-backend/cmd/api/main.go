@@ -426,12 +426,16 @@ func main() {
 	deleteContestUseCase := appcontest.NewDeleteContestUseCase(
 		contestRepo, contestMemberProvider, contestStandingsCache,
 	)
+	revealContestResultsUseCase := appcontest.NewRevealContestResultsUseCase(
+		contestRepo, contestMemberProvider, txManager,
+	)
 	contestHandler := handlercontest.NewHandler(
 		createContestUseCase, updateContestUseCase, deleteContestUseCase,
 		getContestUseCase, listContestsUseCase, listMyContestsUseCase,
 		registerToContestUseCase, unregisterFromContestUseCase,
 		getRegistrationStatusUseCase, listContestRegistrationsUseCase,
 		getStandingsUseCase, listContestSubmissionsUseCase,
+		revealContestResultsUseCase,
 	)
 
 	// team adapters

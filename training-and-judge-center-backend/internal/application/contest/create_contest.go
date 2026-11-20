@@ -23,6 +23,7 @@ type CreateContestInput struct {
 	EnablePostContest     bool
 	ShowTeamMembers       bool
 	AllowLateRegistration bool
+	AutoRevealMinutes     *int     // nil = the results open only by hand
 	ParticipationMode     string   // "INDIVIDUAL" | "TEAM" | "MIXED"; defaults to "INDIVIDUAL"
 	TeamSizeMin           *int     // defaults to 2 when mode allows teams
 	TeamSizeMax           *int     // defaults to 5 when mode allows teams
@@ -169,6 +170,9 @@ func (uc *CreateContestUseCase) Execute(ctx context.Context, in CreateContestInp
 		now,
 	)
 	if err != nil {
+		return nil, err
+	}
+	if err := c.SetAutoRevealMinutes(in.AutoRevealMinutes, now); err != nil {
 		return nil, err
 	}
 

@@ -19,4 +19,6 @@ const (
 	ErrCodeFreezeTooLong                 = "FREEZE_TOO_LONG"
 	ErrCodeRegistrationBusy              = "REGISTRATION_BUSY"
 	ErrCodeInvalidProblemColor           = "INVALID_PROBLEM_COLOR"
+	ErrCodeContestHasNoFreeze            = "CONTEST_HAS_NO_FREEZE"
+	ErrCodeContestNotFinished            = "CONTEST_NOT_FINISHED"
 )

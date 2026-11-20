@@ -31,6 +31,7 @@ type ContestOutput struct {
 	Locked                bool
 	ShowTeamMembers       bool
 	AllowLateRegistration bool
+	AutoRevealMinutes     *int
 	ParticipationMode     string
 	TeamSizeMin           int
 	TeamSizeMax           int
@@ -57,6 +58,7 @@ func buildOutput(c *domainContest.Contest, group *GroupInfo, owner *UserDisplay,
 		Locked:                c.Locked(),
 		ShowTeamMembers:       c.ShowTeamMembers(),
 		AllowLateRegistration: c.AllowLateRegistration(),
+		AutoRevealMinutes:     c.AutoRevealMinutes(),
 		ParticipationMode:     c.ParticipationMode().String(),
 		TeamSizeMin:           c.TeamSize().Min(),
 		TeamSizeMax:           c.TeamSize().Max(),

@@ -33,6 +33,7 @@ type UpdateContestInput struct {
 	TeamSizeMax           *int
 	ShowTeamMembers       *bool
 	AllowLateRegistration *bool
+	AutoRevealMinutes     **int // nil = no change; non-nil pointer-to-nil = back to manual reveal
 }
 
 type ProblemOrderInput struct {
@@ -198,6 +199,12 @@ func (uc *UpdateContestUseCase) Execute(ctx context.Context, in UpdateContestInp
 
 	if in.AllowLateRegistration != nil {
 		c.SetAllowLateRegistration(*in.AllowLateRegistration, now)
+	}
+
+	if in.AutoRevealMinutes != nil {
+		if err := c.SetAutoRevealMinutes(*in.AutoRevealMinutes, now); err != nil {
+			return nil, err
+		}
 	}
 
 	if err := uc.txManager.WithTx(ctx, func(txCtx context.Context) error {
@@ -379,7 +386,7 @@ func hasAnyField(in UpdateContestInput) bool {
 		in.EndTime != nil || in.Penalty != nil || in.FreezeMinutes != nil ||
 		in.EnablePostContest != nil || in.Problems != nil || in.Locked != nil ||
 		in.ParticipationMode != nil || in.TeamSizeMin != nil || in.TeamSizeMax != nil ||
-		in.ShowTeamMembers != nil || in.AllowLateRegistration != nil
+		in.ShowTeamMembers != nil || in.AllowLateRegistration != nil || in.AutoRevealMinutes != nil
 }
 
 func deduplicateBySlug(entries []ProblemOrderInput) []ProblemOrderInput {

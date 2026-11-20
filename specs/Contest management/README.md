@@ -130,6 +130,7 @@ Contests support different participation configurations:
 | `teamSizeMax` | integer | Maximum selectedMembers allowed (nullable) |
 | `showTeamMembers` | boolean | Show member names in standings (default: false) |
 | `allowLateRegistration` | boolean | Allow new registrations while the contest is ACTIVE (default: false). Registered participants can never unregister once it starts |
+| `autoRevealMinutes` | integer, nullable | Minutes after `endTime` at which a frozen contest opens its results by itself (`0` = at the end, `null` = only by hand, default). Ignored without freeze |
 
 ### Individual Registration
 
@@ -213,7 +214,7 @@ Contests support different participation configurations:
 ### Updates
 
 * Standings reflect judged submissions made at or before `endTime`; a stale projection is served while a background refresh runs, so a later request is needed to see refreshed data (and a failed refresh delays it further)
-* Standings are **frozen** at `endTime - freezeMinutes` while the contest is `ACTIVE`; the freeze is lifted when the contest ends
+* Standings are **frozen** at `endTime - freezeMinutes` and stay frozen after the contest ends until a Lead or Admin reveals the results ([Reveal contest results](Reveal%20contest%20results/spec.md)); a contest without freeze is never frozen
 * Submissions during postcompetition do NOT affect standings
 * Only the contest's current problems count: a removed problem stops counting (its submissions keep their `contest_id`) and counts again if put back
 * Penalty changes apply on the next request (no recalculation needed)
@@ -227,7 +228,8 @@ Contests support different participation configurations:
   * Submissions made after the freeze time are hidden from regular users (not shown as pending)
   * Leads and Admin can view real-time standings with `?realtime=true`; other users receive 403
 * When `freezeMinutes = 0`, no freeze is applied
-* After contest ends, full standings are revealed (freeze lifted)
+* After the contest ends the standings stay frozen until a Lead or Admin reveals the results (`POST /groups/{groupId}/contests/{contestId}/reveal-results`); a contest with `freezeMinutes = 0` shows its full standings as soon as it ends; with `autoRevealMinutes` the results also open by themselves that many minutes after `endTime`
+* Postcompetition rows and the full details of the submissions list (time, memory, phase) are also withheld from participants until the results are revealed
 
 ### Real-Time Updates
 
@@ -313,6 +315,7 @@ A locked contest cannot be deleted (403 `CONTEST_LOCKED`) and neither can an `AC
 5. **[View contest](View%20contest/spec.md)** - Contest details, problem list, and contest listing with filters
 6. **[View contest standings](View%20contest%20standings/spec.md)** - ICPC-style rankings with freeze support and filter options
 7. **[View contest submissions](View%20contest%20submissions/spec.md)** - List all submissions in a contest with visibility rules, freeze support, and filtering by phase/problem/user
+8. **[Reveal contest results](Reveal%20contest%20results/spec.md)** - Lead or Admin unfreezes the final standings after a contest with freeze ends
 
 ### Future Specs (Planned)
 

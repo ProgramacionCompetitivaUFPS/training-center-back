@@ -234,6 +234,8 @@ func TestContest_Status(t *testing.T) {
 		false,
 		false,
 		false, false,
+		nil,
+		nil,
 		shared.RestoreGroupID("g"),
 		shared.RestoreUserID("o"),
 		contest.RestoreParticipationMode("INDIVIDUAL"), contest.RestoreTeamSize(2, 5),
@@ -270,7 +272,9 @@ func TestContest_Duration(t *testing.T) {
 	}
 }
 
-func mustAddProblem(t *testing.T, c interface{ AddProblem(string, string, time.Time) error }, id, problemID string) {
+func mustAddProblem(t *testing.T, c interface {
+	AddProblem(string, string, time.Time) error
+}, id, problemID string) {
 	t.Helper()
 	if err := c.AddProblem(id, problemID, fixedNow); err != nil {
 		t.Fatalf("AddProblem(%q, %q): unexpected error: %v", id, problemID, err)
@@ -318,9 +322,9 @@ func TestContest_AddProblem_EmptyID(t *testing.T) {
 
 func TestContest_RemoveProblem(t *testing.T) {
 	cases := []struct {
-		name        string
-		remove      string
-		wantOrders  []int
+		name       string
+		remove     string
+		wantOrders []int
 	}{
 		{"middle element", "problem-b", []int{1, 2}},
 		{"first element", "problem-a", []int{1, 2}},
@@ -399,6 +403,8 @@ func TestProblemsNeverNil(t *testing.T) {
 		false,
 		false,
 		false, false,
+		nil,
+		nil,
 		shared.RestoreGroupID("g"),
 		shared.RestoreUserID("o"),
 		contest.RestoreParticipationMode("INDIVIDUAL"), contest.RestoreTeamSize(2, 5),
@@ -425,6 +431,8 @@ func restoredContestUpdatedAt(t *testing.T, updatedAt *time.Time) *contest.Conte
 		false,
 		false,
 		false, false,
+		nil,
+		nil,
 		shared.RestoreGroupID("g"),
 		shared.RestoreUserID("o"),
 		contest.RestoreParticipationMode("INDIVIDUAL"), contest.RestoreTeamSize(2, 5),
@@ -491,6 +499,8 @@ func restoredContestWithWindow(t *testing.T, start, end time.Time, allowLate boo
 		false,
 		false,
 		allowLate,
+		nil,
+		nil,
 		shared.RestoreGroupID("g"),
 		shared.RestoreUserID("o"),
 		contest.RestoreParticipationMode("INDIVIDUAL"), contest.RestoreTeamSize(2, 5),

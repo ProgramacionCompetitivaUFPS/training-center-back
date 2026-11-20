@@ -71,6 +71,7 @@ func toGetContestResponse(out *appContest.GetContestOutput) getContestResponse {
 		Locked:                out.Locked,
 		ShowTeamMembers:       out.ShowTeamMembers,
 		AllowLateRegistration: out.AllowLateRegistration,
+		AutoRevealMinutes:     out.AutoRevealMinutes,
 		ParticipationMode:     out.ParticipationMode,
 		TeamSizeMin:           out.TeamSizeMin,
 		TeamSizeMax:           out.TeamSizeMax,

@@ -38,6 +38,8 @@ func (s *mockListMyContestsRepo) ListByGroupIDs(_ context.Context, _ []string, _
 		time.Now().Add(24*time.Hour), time.Now().Add(29*time.Hour),
 		domainContest.RestorePenalty(20),
 		0, false, false, false, false,
+		nil,
+		nil,
 		shared.RestoreGroupID("g1"),
 		shared.RestoreUserID("u1"),
 		domainContest.RestoreParticipationMode("INDIVIDUAL"), domainContest.RestoreTeamSize(2, 5),

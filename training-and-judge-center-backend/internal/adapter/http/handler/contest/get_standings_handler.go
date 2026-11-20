@@ -132,6 +132,18 @@ func toGetStandingsResponse(out *appContest.GetStandingsOutput, country, city, i
 		freezeMinutes = &fm
 	}
 
+	var resultsRevealedAt *string
+	if out.Contest.ResultsRevealedAt != nil {
+		s := out.Contest.ResultsRevealedAt.UTC().Format(time.RFC3339)
+		resultsRevealedAt = &s
+	}
+
+	var autoRevealAt *string
+	if out.Contest.AutoRevealAt != nil {
+		s := out.Contest.AutoRevealAt.UTC().Format(time.RFC3339)
+		autoRevealAt = &s
+	}
+
 	return getStandingsResponse{
 		Contest: standingsContestDisplay{
 			ID:            out.Contest.ID,
@@ -143,6 +155,9 @@ func toGetStandingsResponse(out *appContest.GetStandingsOutput, country, city, i
 			FreezeMinutes: freezeMinutes,
 			IsFrozen:      out.Contest.IsFrozen,
 			FrozenAt:      frozenAt,
+
+			ResultsRevealedAt: resultsRevealedAt,
+			AutoRevealAt:      autoRevealAt,
 		},
 		Problems:  problems,
 		Standings: standings,

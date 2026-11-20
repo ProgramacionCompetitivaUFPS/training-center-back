@@ -38,6 +38,7 @@ type GetContestOutput struct {
 	Locked                *bool // nil when caller is not Lead or Admin (omitted from JSON)
 	ShowTeamMembers       bool
 	AllowLateRegistration bool
+	AutoRevealMinutes     *int
 	ParticipationMode     string
 	TeamSizeMin           int
 	TeamSizeMax           int
@@ -186,6 +187,7 @@ func (uc *GetContestUseCase) Execute(ctx context.Context, in GetContestInput) (*
 		Locked:                locked,
 		ShowTeamMembers:       c.ShowTeamMembers(),
 		AllowLateRegistration: c.AllowLateRegistration(),
+		AutoRevealMinutes:     c.AutoRevealMinutes(),
 		ParticipationMode:     c.ParticipationMode().String(),
 		TeamSizeMin:           c.TeamSize().Min(),
 		TeamSizeMax:           c.TeamSize().Max(),
