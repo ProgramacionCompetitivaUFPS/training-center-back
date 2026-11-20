@@ -1,6 +1,7 @@
 package problem
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"strings"
@@ -28,7 +29,7 @@ func TestUploadProblemFiles_ActiveValidation_ReturnsConflict(t *testing.T) {
 		Slug:        testSlug,
 		FileType:    FileTypeSolution,
 		FileName:    "sol.cpp",
-		FileData:    []byte("int main(){}"),
+		File:        bytes.NewReader([]byte("int main(){}")),
 		CurrentUser: asCoach(authorID),
 	})
 	var appErr *apperror.AppError
@@ -80,7 +81,7 @@ func TestUploadProblemFiles_VerifierIsStoredUnderItsFixedName(t *testing.T) {
 				Slug:        testSlug,
 				FileType:    tt.fileType,
 				FileName:    tt.uploadedAs,
-				FileData:    []byte("int main(){}"),
+				File:        bytes.NewReader([]byte("int main(){}")),
 				CurrentUser: asCoach(authorID),
 			})
 
@@ -115,7 +116,7 @@ func TestUploadProblemFiles_TestCasesZipSitsInsideTheStoredPrefix(t *testing.T) 
 		},
 	}
 	parser := &mockZipParser{
-		parseTestCasesZipFn: func(_ context.Context, _ []byte) ([]ParsedFile, error) {
+		parseTestCasesZipFn: func(_ context.Context, _ StagedFile) ([]ParsedFile, error) {
 			return []ParsedFile{{Path: "data/sample/01.in", Content: []byte("1 2")}}, nil
 		},
 	}
@@ -126,7 +127,7 @@ func TestUploadProblemFiles_TestCasesZipSitsInsideTheStoredPrefix(t *testing.T) 
 		Slug:        testSlug,
 		FileType:    FileTypeTestCases,
 		FileName:    "tc.zip",
-		FileData:    []byte("PK"),
+		File:        bytes.NewReader([]byte("PK")),
 		CurrentUser: asCoach(authorID),
 	})
 	if err != nil {
@@ -177,7 +178,7 @@ func TestUploadProblemFiles_VerifierExtensions(t *testing.T) {
 				Slug:        testSlug,
 				FileType:    tt.fileType,
 				FileName:    tt.fileName,
-				FileData:    []byte("code"),
+				File:        bytes.NewReader([]byte("code")),
 				CurrentUser: asCoach(authorID),
 			})
 
@@ -229,7 +230,7 @@ func newLiveUploadFixture(p *domainProblem.Problem, inActiveContest bool) *liveU
 			return nil
 		},
 	}
-	zipParser := &mockZipParser{parseTestCasesZipFn: func(context.Context, []byte) ([]ParsedFile, error) {
+	zipParser := &mockZipParser{parseTestCasesZipFn: func(context.Context, StagedFile) ([]ParsedFile, error) {
 		return []ParsedFile{{Path: "data/secret/1.in", Content: []byte("1")}}, nil
 	}}
 	contests := &mockAffectedContestsProvider{contests: []ContestRef{{ID: "c1", Name: "Round 1"}}}
@@ -243,7 +244,7 @@ func liveInput(fileType, fileName string) UploadProblemFilesInput {
 		Slug:        testSlug,
 		FileType:    fileType,
 		FileName:    fileName,
-		FileData:    []byte("data"),
+		File:        bytes.NewReader([]byte("data")),
 		ConfirmSlug: testSlug,
 		CurrentUser: asCoach(authorID),
 	}

@@ -3,6 +3,7 @@ package judge
 import (
 	"context"
 	"fmt"
+	"io"
 	"log/slog"
 
 	appjudge "github.com/training-judge-center/backend/internal/application/judge"
@@ -24,13 +25,13 @@ type CheckerSession struct {
 // Check runs the checker over the input and the output the paired session left
 // in the judging directory. A non-zero exit is the checker rejecting the
 // output, which is a verdict, not a failure of ours.
-func (s *CheckerSession) Check(ctx context.Context, expectedOutput []byte) (appjudge.CheckResult, error) {
+func (s *CheckerSession) Check(ctx context.Context, expected io.Reader, size int64) (appjudge.CheckResult, error) {
 	if s.container == nil {
 		slog.ErrorContext(ctx, "checker_session: check called on a discarded session")
 		return appjudge.CheckResult{}, apperror.NewInternal()
 	}
 
-	if err := s.writeFile(ctx, checkerAnswerPath, expectedOutput); err != nil {
+	if err := s.writeStream(ctx, checkerAnswerPath, expected, size); err != nil {
 		return appjudge.CheckResult{}, err
 	}
 

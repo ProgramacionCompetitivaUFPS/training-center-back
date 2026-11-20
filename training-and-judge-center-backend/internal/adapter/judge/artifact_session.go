@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"io"
 	"log/slog"
 	"path"
 	"strings"
@@ -43,11 +44,12 @@ type artifactSession struct {
 	runCmd    string // the artifact's run command, role name already substituted
 }
 
-// writeFile puts one file inside the sandbox, overwriting whatever was there.
-func (s *artifactSession) writeFile(ctx context.Context, filePath string, content []byte) error {
+// writeStream puts one file inside the sandbox, overwriting whatever was there. The
+// content is read as it is sent, and size must be its exact length.
+func (s *artifactSession) writeStream(ctx context.Context, filePath string, content io.Reader, size int64) error {
 	if _, err := s.docker.CopyToContainer(ctx, s.container.ID(), client.CopyToContainerOptions{
 		DestinationPath: path.Dir(filePath),
-		Content:         buildTar(path.Base(filePath), content, modeSource),
+		Content:         buildTarFrom(path.Base(filePath), content, size, modeSource),
 	}); err != nil {
 		slog.ErrorContext(ctx, "artifact_session: copy file failed", "role", s.role, "container_id", s.container.ID(), "path", filePath, "error", err)
 		return apperror.NewInternal()

@@ -20,7 +20,7 @@ func newUpdateUseCase(
 ) *UpdateTeamRegistrationUseCase {
 	return NewUpdateTeamRegistrationUseCase(
 		memberRepo, teamRepo, contestProv, participRepo,
-		indivChecker, groupChecker, &mockUserProvider{}, &mockTxManager{},
+		indivChecker, groupChecker, &mockUserProvider{}, &mockRegistrationLocker{}, &mockTxManager{},
 	)
 }
 
@@ -88,4 +88,30 @@ func TestUpdateTeamRegistration_RequesterNotTeamMember(t *testing.T) {
 	ae := err.(*apperror.AppError)
 	assert.Equal(t, apperror.KindForbidden, ae.Kind)
 	assert.Equal(t, domainTeam.ErrCodeNotTeamMember, ae.Code)
+}
+
+func TestUpdateTeamRegistration_LockFailure_DoesNotUpdate(t *testing.T) {
+	updated := false
+	uc := NewUpdateTeamRegistrationUseCase(
+		memberRepoWithUsers(memberA, memberB, memberC), teamRepoWithTeam(), &mockContestProvider{},
+		&mockTeamParticipRepo{updateFn: func(_ *domainContest.ContestTeamParticipation) error { updated = true; return nil }},
+		&mockIndivChecker{}, &mockGroupChecker{}, &mockUserProvider{},
+		&mockRegistrationLocker{err: apperror.NewServiceUnavailable("REGISTRATION_BUSY", "busy")}, &mockTxManager{},
+	)
+
+	_, err := uc.Execute(ctx(), defaultUpdateInput())
+	require.Error(t, err)
+	assert.False(t, updated)
+}
+
+func TestUpdateTeamRegistration_LocksTheContest(t *testing.T) {
+	locker := &mockRegistrationLocker{}
+	uc := NewUpdateTeamRegistrationUseCase(
+		memberRepoWithUsers(memberA, memberB, memberC), teamRepoWithTeam(), &mockContestProvider{}, &mockTeamParticipRepo{},
+		&mockIndivChecker{}, &mockGroupChecker{}, &mockUserProvider{}, locker, &mockTxManager{},
+	)
+
+	_, err := uc.Execute(ctx(), defaultUpdateInput())
+	require.NoError(t, err)
+	assert.Equal(t, []string{testContestID}, locker.lockedContests)
 }

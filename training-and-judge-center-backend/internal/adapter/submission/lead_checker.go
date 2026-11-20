@@ -37,3 +37,27 @@ func (c *LeadChecker) IsLeadOfContestGroup(ctx context.Context, contestID, userI
 
 	return exists, nil
 }
+
+func (c *LeadChecker) IsLeadOfMember(ctx context.Context, leadID, memberID string) (bool, error) {
+	q := infraPostgres.GetQuerier(ctx, c.db)
+
+	var exists bool
+	err := q.QueryRow(ctx, `
+		SELECT EXISTS(
+			SELECT 1
+			FROM group_members lead
+			JOIN group_members member ON member.group_id = lead.group_id
+			JOIN groups g ON g.id = lead.group_id
+			WHERE lead.user_id = $1
+			  AND lead.member_role = 'LEAD'
+			  AND member.user_id = $2
+			  AND g.is_default = FALSE
+		)
+	`, leadID, memberID).Scan(&exists)
+	if err != nil {
+		slog.ErrorContext(ctx, "submission: failed to check lead of member", "lead_id", leadID, "member_id", memberID, "error", err)
+		return false, apperror.NewInternal()
+	}
+
+	return exists, nil
+}

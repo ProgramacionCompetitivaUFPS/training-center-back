@@ -80,7 +80,7 @@ func TestValidatorSession_Validate_RunsTheArtifactOnTheInput(t *testing.T) {
 	r, _ := newTestValidatorRunner(t, docker, storedArtifact("ELF binary"))
 	s := beginTestValidating(t, r)
 
-	result, err := s.Validate(context.Background(), []byte("5 7"))
+	result, err := s.Validate(context.Background(), strings.NewReader("5 7"), int64(len("5 7")))
 
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -114,7 +114,7 @@ func TestValidatorSession_Validate_RejectionIsAResultNotAnError(t *testing.T) {
 	r, _ := newTestValidatorRunner(t, docker, storedArtifact("ELF binary"))
 	s := beginTestValidating(t, r)
 
-	result, err := s.Validate(context.Background(), []byte("999999"))
+	result, err := s.Validate(context.Background(), strings.NewReader("999999"), int64(len("999999")))
 
 	if err != nil {
 		t.Fatalf("expected no error, got: %v", err)
@@ -141,7 +141,7 @@ func TestValidatorSession_Validate_ReusesOneContainerForEveryInput(t *testing.T)
 	s := beginTestValidating(t, r)
 
 	for range 3 {
-		if _, err := s.Validate(context.Background(), []byte("1")); err != nil {
+		if _, err := s.Validate(context.Background(), strings.NewReader("1"), int64(len("1"))); err != nil {
 			t.Fatalf("Validate: %v", err)
 		}
 	}
@@ -204,7 +204,7 @@ func TestValidatorSession_Validate_KilledValidatorIsNotARejection(t *testing.T) 
 	r, _ := newTestValidatorRunner(t, docker, storedArtifact("ELF binary"))
 	s := beginTestValidating(t, r)
 
-	result, err := s.Validate(context.Background(), []byte("999999"))
+	result, err := s.Validate(context.Background(), strings.NewReader("999999"), int64(len("999999")))
 	if err == nil {
 		t.Fatal("expected an error for a killed validator, got a result")
 	}

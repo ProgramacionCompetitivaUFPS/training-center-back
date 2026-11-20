@@ -209,7 +209,9 @@ Create a new contest within a group.
 | penalty | integer | No | Penalty in minutes for wrong submission (default: 20, min: 0, max: 1440) |
 | freezeMinutes | integer | No | Minutes before endTime to freeze standings (default: 60, null = no freeze) |
 | enablePostContest | boolean | No | Enable post-competition phase (default: false). If enabled, registered users can submit after endTime but submissions won't affect standings |
-| problems | string[] | No | Array of problem slugs to add to the contest |
+| allowLateRegistration | boolean | No | Allow new registrations while the contest is ACTIVE (default: false) |
+| autoRevealMinutes | integer | No | Minutes after `endTime` at which the frozen results open by themselves (`0` = at the end). Omitted or `null` = they only open by hand ([Reveal contest results](../Reveal%20contest%20results/spec.md)). Must be >= 0; ignored when `freezeMinutes = 0` |
+| problems | string[] | No | Array of problem slugs to add to the contest. They start without a balloon color (`color: null` in the response); set it later with Update contest |
 
 **Responses**:
 
@@ -239,17 +241,20 @@ Contest created successfully.
     {
       "slug": "sum-of-two-numbers",
       "title": "Sum of Two Numbers",
-      "order": 1
+      "order": 1,
+      "color": null
     },
     {
       "slug": "longest-path",
       "title": "Longest Path in DAG",
-      "order": 2
+      "order": 2,
+      "color": null
     },
     {
       "slug": "matrix-multiplication",
       "title": "Matrix Chain Multiplication",
-      "order": 3
+      "order": 3,
+      "color": null
     }
   ],
   "problemCount": 3,
@@ -410,6 +415,7 @@ Group or problem not found.
   * `contest_id` (string, UUID, FK to Contest)
   * `problem_id` (string, UUID, FK to Problem)
   * `order` (integer, sequential starting from 1)
+  * `color` (string, nullable) - balloon color; always `null` at creation
 
 > **Contest Status** (computed, not stored):
 > * `SCHEDULED`: current time < startTime

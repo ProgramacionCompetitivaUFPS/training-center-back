@@ -43,20 +43,22 @@ func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
 	}
 
 	out, err := h.createContest.Execute(r.Context(), appContest.CreateContestInput{
-		CurrentUser:       *caller,
-		GroupID:           groupID,
-		Name:              body.Name,
-		Description:       body.Description,
-		StartTime:         body.StartTime,
-		EndTime:           body.EndTime,
-		Penalty:           body.Penalty,
-		FreezeMinutes:     body.FreezeMinutes,
-		EnablePostContest: body.EnablePostContest,
-		ShowTeamMembers:   body.ShowTeamMembers,
-		ParticipationMode: body.ParticipationMode,
-		TeamSizeMin:       body.TeamSizeMin,
-		TeamSizeMax:       body.TeamSizeMax,
-		Problems:          body.Problems,
+		CurrentUser:           *caller,
+		GroupID:               groupID,
+		Name:                  body.Name,
+		Description:           body.Description,
+		StartTime:             body.StartTime,
+		EndTime:               body.EndTime,
+		Penalty:               body.Penalty,
+		FreezeMinutes:         body.FreezeMinutes,
+		EnablePostContest:     body.EnablePostContest,
+		ShowTeamMembers:       body.ShowTeamMembers,
+		AllowLateRegistration: body.AllowLateRegistration,
+		AutoRevealMinutes:     body.AutoRevealMinutes,
+		ParticipationMode:     body.ParticipationMode,
+		TeamSizeMin:           body.TeamSizeMin,
+		TeamSizeMax:           body.TeamSizeMax,
+		Problems:              body.Problems,
 	})
 	if err != nil {
 		handler.WriteError(r.Context(), w, err)

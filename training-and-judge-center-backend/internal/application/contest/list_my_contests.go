@@ -36,17 +36,20 @@ type ListMyContestsInput struct {
 type ListMyContestsUseCase struct {
 	repo                domainContest.Repository
 	groupProvider       GroupProvider
+	memberProvider      GroupMemberProvider
 	participantProvider ContestParticipantProvider
 }
 
 func NewListMyContestsUseCase(
 	repo domainContest.Repository,
 	groupProvider GroupProvider,
+	memberProvider GroupMemberProvider,
 	participantProvider ContestParticipantProvider,
 ) *ListMyContestsUseCase {
 	return &ListMyContestsUseCase{
 		repo:                repo,
 		groupProvider:       groupProvider,
+		memberProvider:      memberProvider,
 		participantProvider: participantProvider,
 	}
 }
@@ -94,11 +97,23 @@ func (uc *ListMyContestsUseCase) Execute(ctx context.Context, in ListMyContestsI
 		return nil, err
 	}
 
+	var roleMap map[string]*string
+	if !in.CurrentUser.IsAdmin() {
+		roleMap, err = uc.memberProvider.GetMemberRoleBulk(ctx, in.CurrentUser.ID, distinctGroupIDs)
+		if err != nil {
+			return nil, err
+		}
+	}
+
 	now := time.Now()
 	items := make([]MyContestListItem, 0, len(contests))
 	for _, c := range contests {
+		var role *string
+		if roleMap != nil {
+			role = roleMap[c.GroupID().Value()]
+		}
 		item := MyContestListItem{
-			ContestListItem: toContestListItem(c, now, participantCounts[c.ID()], registeredMap[c.ID()]),
+			ContestListItem: toContestListItem(c, now, participantCounts[c.ID()], registeredMap[c.ID()], role),
 			Group:           GroupSummary{ID: c.GroupID().Value()},
 		}
 		if info, ok := groupInfos[c.GroupID().Value()]; ok {

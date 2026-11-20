@@ -32,6 +32,7 @@ type ConfirmDeactivationUseCase struct {
 	sessionInvalidator user.SessionInvalidator
 	txManager          appshared.TransactionManager
 	refreshTokenRepo   user.RefreshTokenRepository
+	teamCleaner        TeamMembershipCleaner
 }
 
 func NewConfirmDeactivationUseCase(
@@ -42,6 +43,7 @@ func NewConfirmDeactivationUseCase(
 	sessionInvalidator user.SessionInvalidator,
 	txManager appshared.TransactionManager,
 	refreshTokenRepo user.RefreshTokenRepository,
+	teamCleaner TeamMembershipCleaner,
 ) *ConfirmDeactivationUseCase {
 	return &ConfirmDeactivationUseCase{
 		userRepo:           userRepo,
@@ -51,6 +53,7 @@ func NewConfirmDeactivationUseCase(
 		sessionInvalidator: sessionInvalidator,
 		txManager:          txManager,
 		refreshTokenRepo:   refreshTokenRepo,
+		teamCleaner:        teamCleaner,
 	}
 }
 
@@ -134,7 +137,8 @@ func (uc *ConfirmDeactivationUseCase) Execute(ctx context.Context, input Confirm
 		if err := uc.deactRepo.Update(txCtx, req); err != nil {
 			return err
 		}
-		return nil
+		// The person can no longer sign in, so nobody could ever take them off a team.
+		return uc.teamCleaner.RemoveUserFromAllTeams(txCtx, foundUser.ID())
 	}); err != nil {
 		return nil, err
 	}

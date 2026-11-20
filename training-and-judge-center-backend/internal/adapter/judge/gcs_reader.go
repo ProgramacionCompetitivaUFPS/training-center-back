@@ -23,3 +23,15 @@ func (r *gcsClientReader) readObject(ctx context.Context, object string) (io.Rea
 func newGCSReader(client *storage.Client, bucket string) gcsReader {
 	return &gcsClientReader{client: client, bucket: bucket}
 }
+
+func (r *gcsClientReader) objectSize(ctx context.Context, object string) (int64, error) {
+	attrs, err := r.client.Bucket(r.bucket).Object(object).Attrs(ctx)
+	if err != nil {
+		return 0, err
+	}
+	return attrs.Size, nil
+}
+
+func newSizedGCSReader(client *storage.Client, bucket string) sizedObjectReader {
+	return &gcsClientReader{client: client, bucket: bucket}
+}

@@ -42,7 +42,9 @@ func (s *mockGetRepo) FindByID(_ context.Context, _ string) (*domainContest.Cont
 		nil,
 		start, end,
 		domainContest.RestorePenalty(20),
-		0, false, false, false,
+		0, false, false, false, false,
+		nil,
+		nil,
 		shared.RestoreGroupID("g1"),
 		shared.RestoreUserID("u1"),
 		domainContest.RestoreParticipationMode("INDIVIDUAL"), domainContest.RestoreTeamSize(2, 5),
@@ -120,5 +122,56 @@ func TestGetContest_NotFound_Returns404(t *testing.T) {
 
 	if w.Code != http.StatusNotFound {
 		t.Fatalf("expected 404, got %d: %s", w.Code, w.Body.String())
+	}
+}
+
+type mockColoredGetRepo struct{ mockGetRepo }
+
+func (s *mockColoredGetRepo) FindByID(ctx context.Context, id string) (*domainContest.Contest, error) {
+	c, err := s.mockGetRepo.FindByID(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+	red := "#aabbcc"
+	c.SetProblems([]domainContest.ContestProblem{
+		domainContest.RestoreContestProblem("cp1", "p1", 1, &red),
+		domainContest.RestoreContestProblem("cp2", "p2", 2, nil),
+	}, time.Now())
+	return c, nil
+}
+
+func TestGetContest_ProblemsIncludeColorOrNull(t *testing.T) {
+	uc := appcontest.NewGetContestUseCase(
+		&mockColoredGetRepo{},
+		&mockGroupProvider{},
+		&mockMemberProvider{isLead: true, isMember: true},
+		&mockProblemProvider{},
+		&mockOwnerProvider{},
+		&mockContestParticipantProvider{},
+	)
+	r := authedRequest(http.MethodGet, "/groups/g1/contests/c1", nil)
+	r.SetPathValue("groupId", "g1")
+	r.SetPathValue("contestId", "c1")
+	w := httptest.NewRecorder()
+
+	wrapAuth(http.HandlerFunc(newHandlerWithGet(uc).Get)).ServeHTTP(w, r)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+	var raw struct {
+		Problems []map[string]interface{} `json:"problems"`
+	}
+	if err := json.NewDecoder(w.Body).Decode(&raw); err != nil {
+		t.Fatalf("could not decode response: %v", err)
+	}
+	if len(raw.Problems) != 2 {
+		t.Fatalf("expected 2 problems, got %d", len(raw.Problems))
+	}
+	if got := raw.Problems[0]["color"]; got != "#aabbcc" {
+		t.Errorf("problem 1 color = %v, want #aabbcc", got)
+	}
+	if got, present := raw.Problems[1]["color"]; !present || got != nil {
+		t.Errorf("problem 2 color = %v (present=%v), want an explicit null", got, present)
 	}
 }

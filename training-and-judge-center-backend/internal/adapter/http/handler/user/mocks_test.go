@@ -194,6 +194,13 @@ func (m *mockHandlerTxManager) WithTx(ctx context.Context, fn func(context.Conte
 	return fn(ctx)
 }
 
+// mockHandlerTeamCleaner implements appuser.TeamMembershipCleaner for handler tests.
+type mockHandlerTeamCleaner struct{}
+
+func (m *mockHandlerTeamCleaner) RemoveUserFromAllTeams(_ context.Context, _ string) error {
+	return nil
+}
+
 // mockHandlerRefreshTokenRepo implements domainuser.RefreshTokenRepository for handler tests.
 type mockHandlerRefreshTokenRepo struct {
 	revokeAllByUserIDFn func(ctx context.Context, userID string, now time.Time) error

@@ -25,18 +25,21 @@ type UpdateContestInput struct {
 	FreezeMinutes     *int
 	EnablePostContest *bool
 	// Problems, when non-nil, replaces the entire problem list.
-	// Each entry is (slug, order).
-	Problems          *[]ProblemOrderInput
-	Locked            *bool
-	ParticipationMode *string // "INDIVIDUAL" | "TEAM" | "MIXED"
-	TeamSizeMin       *int
-	TeamSizeMax       *int
-	ShowTeamMembers   *bool
+	// Each entry is (slug, order, color).
+	Problems              *[]ProblemOrderInput
+	Locked                *bool
+	ParticipationMode     *string // "INDIVIDUAL" | "TEAM" | "MIXED"
+	TeamSizeMin           *int
+	TeamSizeMax           *int
+	ShowTeamMembers       *bool
+	AllowLateRegistration *bool
+	AutoRevealMinutes     **int // nil = no change; non-nil pointer-to-nil = back to manual reveal
 }
 
 type ProblemOrderInput struct {
 	Slug  string
 	Order int
+	Color **string // nil = keep; pointer to nil = clear
 }
 
 type problemEntry struct {
@@ -128,7 +131,12 @@ func (uc *UpdateContestUseCase) Execute(ctx context.Context, in UpdateContestInp
 
 	problemsChanged := in.Problems != nil
 	var newProblemEntries []problemEntry
+	var colorChanges map[string]*domainContest.ProblemColor
 	if problemsChanged {
+		colorChanges, err = parseProblemColors(*in.Problems)
+		if err != nil {
+			return nil, err
+		}
 		newProblemEntries, err = uc.resolveProblems(ctx, *in.Problems, in.CurrentUser.ID, in.CurrentUser.IsAdmin(), c.Problems())
 		if err != nil {
 			return nil, err
@@ -158,18 +166,25 @@ func (uc *UpdateContestUseCase) Execute(ctx context.Context, in UpdateContestInp
 		c.SetTeamSize(*scalars.teamSize, now)
 	}
 
+	var problemDisplays []ProblemDisplay
 	if problemsChanged {
 		existingByProblemID := make(map[string]domainContest.ContestProblem, len(c.Problems()))
 		for _, cp := range c.Problems() {
 			existingByProblemID[cp.ProblemID()] = cp
 		}
 		newProblems := make([]domainContest.ContestProblem, 0, len(newProblemEntries))
+		problemDisplays = make([]ProblemDisplay, 0, len(newProblemEntries))
 		for _, pe := range newProblemEntries {
+			id := uuid.New().String()
+			var color *domainContest.ProblemColor
 			if existing, ok := existingByProblemID[pe.id]; ok {
-				newProblems = append(newProblems, domainContest.RestoreContestProblem(existing.ID(), pe.id, pe.order))
-			} else {
-				newProblems = append(newProblems, domainContest.RestoreContestProblem(uuid.New().String(), pe.id, pe.order))
+				id, color = existing.ID(), existing.Color()
 			}
+			if change, ok := colorChanges[pe.slug]; ok {
+				color = change
+			}
+			newProblems = append(newProblems, domainContest.RestoreContestProblem(id, pe.id, pe.order, colorString(color)))
+			problemDisplays = append(problemDisplays, ProblemDisplay{Slug: pe.slug, Title: pe.title, Order: pe.order, Color: colorString(color)})
 		}
 		c.SetProblems(newProblems, now)
 	}
@@ -180,6 +195,16 @@ func (uc *UpdateContestUseCase) Execute(ctx context.Context, in UpdateContestInp
 
 	if in.ShowTeamMembers != nil {
 		c.SetShowTeamMembers(*in.ShowTeamMembers, now)
+	}
+
+	if in.AllowLateRegistration != nil {
+		c.SetAllowLateRegistration(*in.AllowLateRegistration, now)
+	}
+
+	if in.AutoRevealMinutes != nil {
+		if err := c.SetAutoRevealMinutes(*in.AutoRevealMinutes, now); err != nil {
+			return nil, err
+		}
 	}
 
 	if err := uc.txManager.WithTx(ctx, func(txCtx context.Context) error {
@@ -204,13 +229,7 @@ func (uc *UpdateContestUseCase) Execute(ctx context.Context, in UpdateContestInp
 		owner = &UserDisplay{}
 	}
 
-	var problemDisplays []ProblemDisplay
-	if problemsChanged {
-		problemDisplays = make([]ProblemDisplay, 0, len(newProblemEntries))
-		for _, pe := range newProblemEntries {
-			problemDisplays = append(problemDisplays, ProblemDisplay{Slug: pe.slug, Title: pe.title, Order: pe.order})
-		}
-	} else {
+	if !problemsChanged {
 		problemDisplays, err = uc.enrichProblems(ctx, c.Problems())
 		if err != nil {
 			return nil, err
@@ -356,7 +375,7 @@ func (uc *UpdateContestUseCase) enrichProblems(ctx context.Context, cps []domain
 	displays := make([]ProblemDisplay, 0, len(cps))
 	for _, cp := range cps {
 		if b, ok := basics[cp.ProblemID()]; ok {
-			displays = append(displays, ProblemDisplay{Slug: b.Slug, Title: b.Title, Order: cp.Order()})
+			displays = append(displays, ProblemDisplay{Slug: b.Slug, Title: b.Title, Order: cp.Order(), Color: colorString(cp.Color())})
 		}
 	}
 	return displays, nil
@@ -367,7 +386,7 @@ func hasAnyField(in UpdateContestInput) bool {
 		in.EndTime != nil || in.Penalty != nil || in.FreezeMinutes != nil ||
 		in.EnablePostContest != nil || in.Problems != nil || in.Locked != nil ||
 		in.ParticipationMode != nil || in.TeamSizeMin != nil || in.TeamSizeMax != nil ||
-		in.ShowTeamMembers != nil
+		in.ShowTeamMembers != nil || in.AllowLateRegistration != nil || in.AutoRevealMinutes != nil
 }
 
 func deduplicateBySlug(entries []ProblemOrderInput) []ProblemOrderInput {

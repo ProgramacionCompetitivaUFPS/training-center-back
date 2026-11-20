@@ -50,6 +50,8 @@ type Session struct {
 	docker     dockerExecClient
 	langCfg    LanguageExecConfig
 	judgingDir string
+	// stackLimitKb is the solution's stack ceiling: the container's memory, which still bounds it.
+	stackLimitKb int64
 }
 
 // SolutionBaseName is a solution's source filename inside the sandbox; judge_config.yaml must spell it the same.
@@ -106,7 +108,7 @@ func (s *Session) Compile(ctx context.Context, req appjudge.CompileRequest) (app
 func (s *Session) RunTestCase(ctx context.Context, req appjudge.RunRequest) (appjudge.RunResult, error) {
 	// Straight to the shared volume: the sandbox reads it from there, and so
 	// does the checker, instead of each getting its own copy through the API.
-	if err := os.WriteFile(judgingInputPath(s.judgingDir), req.Input, judgingFileMode); err != nil {
+	if err := writeJudgingInput(judgingInputPath(s.judgingDir), req.Input); err != nil {
 		slog.ErrorContext(ctx, "executor: write input failed", "error", err)
 		return appjudge.RunResult{}, apperror.NewInternal()
 	}
@@ -124,8 +126,8 @@ func (s *Session) RunTestCase(ctx context.Context, req appjudge.RunRequest) (app
 	// GNU time prints on a non-zero exit out of the file, which is every TLE and
 	// every MLE.
 	cmd := fmt.Sprintf(
-		"ulimit -c 0; ulimit -f %d; /usr/bin/time -q -f %%M -o %s timeout --kill-after=1s %ds %s < %s > %s 2>/dev/null",
-		outputLimitBlocks, judgingMemPath(s.judgingDir), wallBackstopSecs, s.langCfg.RunCmd,
+		"ulimit -c 0; ulimit -f %d; ulimit -s %s; /usr/bin/time -q -f %%M -o %s timeout --kill-after=1s %ds %s < %s > %s 2>/dev/null",
+		outputLimitBlocks, s.stackLimit(), judgingMemPath(s.judgingDir), wallBackstopSecs, s.langCfg.RunCmd,
 		judgingInputPath(s.judgingDir), judgingOutputPath(s.judgingDir),
 	)
 
@@ -192,6 +194,14 @@ func (s *Session) RunTestCase(ctx context.Context, req appjudge.RunRequest) (app
 	// No per-case cleanup: the shell redirection truncates output.txt before the
 	// program starts, the worker overwrites input.txt, and Close removes both.
 	return result, nil
+}
+
+// stackLimit is the argument of ulimit -s; an unknown limit means the container's own ceiling applies.
+func (s *Session) stackLimit() string {
+	if s.stackLimitKb <= 0 {
+		return "unlimited"
+	}
+	return strconv.FormatInt(s.stackLimitKb, 10)
 }
 
 func (s *Session) Close(ctx context.Context) error {

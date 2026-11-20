@@ -198,6 +198,10 @@ func (m *mockTransactionManager) WithTx(ctx context.Context, fn func(txCtx conte
 	return fn(ctx)
 }
 
+type mockGlobalGroupJoiner struct{}
+
+func (m *mockGlobalGroupJoiner) AddToGlobalGroup(_ context.Context, _ string) error { return nil }
+
 type mockOAuthIdentityRepo struct {
 	saveFn           func(ctx context.Context, identity *domainuser.OAuthIdentity) error
 	findByProviderFn func(ctx context.Context, provider domainuser.OAuthProvider, providerUserID string) (*domainuser.OAuthIdentity, error)

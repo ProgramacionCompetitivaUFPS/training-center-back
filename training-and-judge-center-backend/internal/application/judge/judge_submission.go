@@ -24,6 +24,8 @@ const (
 
 type JudgeSubmissionInput struct {
 	SubmissionID submission.SubmissionID
+	// EnqueuedAt is when the message was published, to log how long it waited. Zero means unknown.
+	EnqueuedAt time.Time
 }
 
 type JudgeSubmissionUseCase struct {
@@ -87,23 +89,12 @@ func (uc *JudgeSubmissionUseCase) Execute(ctx context.Context, in JudgeSubmissio
 		return nil
 	}
 
+	claimedAt := uc.now()
+	defer func() { uc.logJudged(ctx, sub, in.EnqueuedAt, claimedAt) }()
+
 	sourceCode, err := uc.sourceCodeDownloader.Download(ctx, sub.SourceCodePath())
 	if err != nil {
 		slog.ErrorContext(ctx, "failed to download source code", "error", err)
-		_ = sub.MarkSystemError(uc.now())
-		return uc.persistVerdict(ctx, sub)
-	}
-
-	limits, err := uc.problemProvider.GetLimits(ctx, sub.ProblemID())
-	if err != nil {
-		slog.ErrorContext(ctx, "failed to get problem limits", "error", err)
-		_ = sub.MarkSystemError(uc.now())
-		return uc.persistVerdict(ctx, sub)
-	}
-
-	testCases, err := uc.testCaseProvider.GetTestCases(ctx, sub.ProblemID())
-	if err != nil {
-		slog.ErrorContext(ctx, "failed to get test cases", "error", err)
 		_ = sub.MarkSystemError(uc.now())
 		return uc.persistVerdict(ctx, sub)
 	}
@@ -113,7 +104,7 @@ func (uc *JudgeSubmissionUseCase) Execute(ctx context.Context, in JudgeSubmissio
 		if attempt > 0 {
 			uc.sleep(uc.retry.BackoffBase * time.Duration(1<<uint(attempt-1)))
 		}
-		shouldRetry, err := uc.judgeAttempt(ctx, sub, sourceCode, limits, testCases)
+		shouldRetry, err := uc.judgeAttempt(ctx, sub, sourceCode)
 		if !shouldRetry {
 			judgeErr = err
 			break
@@ -137,9 +128,18 @@ func (uc *JudgeSubmissionUseCase) judgeAttempt(
 	ctx context.Context,
 	sub *submission.Submission,
 	sourceCode []byte,
-	limits ProblemLimits,
-	testCases []TestCase,
 ) (bool, error) {
+	// Read on every attempt: a judging update may replace these files between attempts.
+	limits, err := uc.problemProvider.GetLimits(ctx, sub.ProblemID())
+	if err != nil {
+		return true, err
+	}
+	testCases, err := uc.testCaseProvider.Open(ctx, sub.ProblemID())
+	if err != nil {
+		return true, err
+	}
+	defer testCases.Close()
+
 	// A fresh unguessable name per attempt. Never the submission id: that one is
 	// public over the API, and the name is what isolates one judging from another.
 	judgingID := uuid.NewString()
@@ -173,11 +173,8 @@ func (uc *JudgeSubmissionUseCase) judgeAttempt(
 	maxTimeMs := 0
 	// nil until some test case reports one: the maximum of nothing is not zero.
 	var maxMemoryKb *int
-	for _, tc := range testCases {
-		runResult, err := session.RunTestCase(ctx, RunRequest{
-			Input:       tc.Input,
-			TimeLimitMs: limits.TimeLimitMs,
-		})
+	for _, tc := range testCases.Cases() {
+		runResult, err := runCase(ctx, session, testCases, tc, limits.TimeLimitMs)
 		if err != nil {
 			return true, err
 		}
@@ -203,7 +200,7 @@ func (uc *JudgeSubmissionUseCase) judgeAttempt(
 				_ = sub.MarkTimeLimitExceeded(runResult.TimeMs, uc.now())
 				return false, nil
 			}
-			checkResult, err := checkerSession.Check(ctx, tc.ExpectedOutput)
+			checkResult, err := checkCase(ctx, checkerSession, testCases, tc)
 			if err != nil {
 				return true, err
 			}
@@ -235,4 +232,20 @@ func (uc *JudgeSubmissionUseCase) persistVerdict(ctx context.Context, sub *submi
 		}
 		return nil
 	})
+}
+
+// logJudged is the one line a judging leaves: what it ended as, how long it waited in the queue and
+// how long it took. The database keeps neither, and they are what says whether contest submissions
+// are waiting behind something.
+func (uc *JudgeSubmissionUseCase) logJudged(ctx context.Context, sub *submission.Submission, enqueuedAt, claimedAt time.Time) {
+	attrs := []any{
+		"submission_id", sub.ID(),
+		"verdict", sub.Status().String(),
+		"language", sub.Language().String(),
+		"judged_in", uc.now().Sub(claimedAt).Round(time.Millisecond),
+	}
+	if !enqueuedAt.IsZero() {
+		attrs = append(attrs, "queue_wait", claimedAt.Sub(enqueuedAt).Round(time.Millisecond))
+	}
+	slog.InfoContext(ctx, "judge: submission judged", attrs...)
 }

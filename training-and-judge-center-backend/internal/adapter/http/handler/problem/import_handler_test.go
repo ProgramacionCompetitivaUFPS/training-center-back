@@ -57,3 +57,31 @@ func TestImport_BodyOverTheCap_Returns413(t *testing.T) {
 		t.Fatalf("expected 413, got %d: %s", w.Code, w.Body.String())
 	}
 }
+
+func TestImport_ZipOverUploadCap_Returns400WithCode(t *testing.T) {
+	h := newHandlerWithImportCap(1)
+
+	var buf bytes.Buffer
+	mw := multipart.NewWriter(&buf)
+	_ = mw.WriteField("slug", "test-slug")
+	part, _ := mw.CreateFormFile("file", "big.zip")
+	_, _ = part.Write(bytes.Repeat([]byte("a"), 1*1024*1024+1))
+	_ = mw.Close()
+
+	r := authedRequest(http.MethodPost, "/problems/import", buf.Bytes())
+	r.Header.Set("Content-Type", mw.FormDataContentType())
+	w := httptest.NewRecorder()
+
+	wrapAuth(http.HandlerFunc(h.Import)).ServeHTTP(w, r)
+
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400, got %d: %s", w.Code, w.Body.String())
+	}
+	var body apperror.AppError
+	if err := json.Unmarshal(w.Body.Bytes(), &body); err != nil {
+		t.Fatalf("invalid JSON: %v", err)
+	}
+	if len(body.Details) == 0 || body.Details[0].Code != "ZIP_TOO_LARGE" {
+		t.Errorf("expected Details[0].Code=ZIP_TOO_LARGE, got details: %+v", body.Details)
+	}
+}

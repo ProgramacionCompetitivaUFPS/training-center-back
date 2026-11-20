@@ -49,7 +49,7 @@ SCHEDULED ──(startTime reached)──> ACTIVE ──(endTime reached)──>
 * **Contest Owner**: Can lock/unlock their contest
 * **Group Lead**: Can manage contests in their group (all Leads can update and delete, including in global group)
 * **Admin**: Can manage any contest (can lock/unlock and delete any contest, has implicit Lead permissions)
-* **Locked Contests**: Cannot be modified or deleted except by owner or admin (who can lock/unlock)
+* **Locked Contests**: Cannot be modified except by owner or admin (who can lock/unlock). Nobody can delete a locked contest, not even an Admin: it must be unlocked first
 
 ---
 
@@ -129,6 +129,8 @@ Contests support different participation configurations:
 | `teamSizeMin` | integer | Minimum selectedMembers required (nullable) |
 | `teamSizeMax` | integer | Maximum selectedMembers allowed (nullable) |
 | `showTeamMembers` | boolean | Show member names in standings (default: false) |
+| `allowLateRegistration` | boolean | Allow new registrations while the contest is ACTIVE (default: false). Registered participants can never unregister once it starts |
+| `autoRevealMinutes` | integer, nullable | Minutes after `endTime` at which a frozen contest opens its results by itself (`0` = at the end, `null` = only by hand, default). Ignored without freeze |
 
 ### Individual Registration
 
@@ -194,49 +196,45 @@ Contests support different participation configurations:
 
 ### Data Architecture
 
-* **NoSQL Document Storage**: Registration and Standing data are stored together in NoSQL documents
-* **One Collection Per Contest**: Each contest has its own collection `contest_{contestId}_standings` for optimal performance
-* **Document Structure**: Each document contains registration info and standing data for one participant
-* **Final Snapshot**: When contest ends, a snapshot collection `contest_{contestId}_standings_final` is created for historical records
+* **Redis projection**: Each contest has a cached projection `standings:{contestId}` with the raw attempt timestamps per participant and problem, plus team members, team names and profiles
+* **Computed on request**: Ranking, penalty, freeze and filters are applied in memory on every request from that projection
+* **Rebuild**: The projection is rebuilt from registrations, selected team members and judged submissions when it is missing; a projection older than 5 seconds is still served while a background refresh runs
+* **No snapshot**: There is no final snapshot collection; standings of a finished contest stay stable because later submissions are ignored and the problem list is locked (a submission made before `endTime` and judged afterwards can still change them)
 
 ### Calculation
 
 * **ICPC-style ranking**:
   1. Primary: Number of problems solved (descending)
   2. Secondary: Total time including penalties (ascending)
+  3. Tertiary: Earliest last accepted submission (ascending); full ties share a rank
 * Time is calculated from contest start to accepted submission
-* Penalties added for each wrong submission before acceptance
-* **Penalty calculation**: Only added when problem is first accepted = (attempts - 1) * contestPenalty
+* **Penalty calculation**: Only added for solved problems = minutes to accepted submission + (wrong attempts before it) * contestPenalty
+* `COMPILATION_ERROR` and `SYSTEM_ERROR` do not count as wrong attempts
 
 ### Updates
 
-* Standings are updated in real-time during `ACTIVE` contests using atomic operations
-* Standings are **frozen** at `endTime` (when contest ends)
-* Standings remain visible but immutable during postcompetition phase
-* Standings are recalculated when:
-  * Problems are removed during ACTIVE contests (their submissions stop counting; they keep their `contest_id`)
-  * Penalty is changed during ACTIVE contests
-* When a problem is added to a contest, standings are NOT recalculated (no submissions exist yet)
-* Submissions during postcompetition do NOT affect standings (standing is frozen at endTime)
-* If a contest is deleted, the standings collection is deleted (final snapshot also deleted if exists, submissions preserved)
+* Standings reflect judged submissions made at or before `endTime`; a stale projection is served while a background refresh runs, so a later request is needed to see refreshed data (and a failed refresh delays it further)
+* Standings are **frozen** at `endTime - freezeMinutes` and stay frozen after the contest ends until a Lead or Admin reveals the results ([Reveal contest results](Reveal%20contest%20results/spec.md)); a contest without freeze is never frozen
+* Submissions during postcompetition do NOT affect standings
+* Only the contest's current problems count: a removed problem stops counting (its submissions keep their `contest_id`) and counts again if put back
+* Penalty changes apply on the next request (no recalculation needed)
+* If a contest is deleted, removal of its cached projection is attempted on a best-effort basis (submissions preserved)
 
 ### Freeze (Optional)
 
 * **`freezeMinutes`** (integer, nullable, default: 60) - Minutes before `endTime` to freeze standings
 * When `freezeMinutes` is set, standings freeze at `endTime - freezeMinutes`
 * During freeze:
-  * Regular users see submissions after freeze time as "pending" (?)
-  * Leads and Admin can view real-time standings with `?realtime=true`
-* When `freezeMinutes = null`, no freeze is applied
-* After contest ends, full standings are revealed (freeze lifted)
+  * Submissions made after the freeze time are hidden from regular users (not shown as pending)
+  * Leads and Admin can view real-time standings with `?realtime=true`; other users receive 403
+* When `freezeMinutes = 0`, no freeze is applied
+* After the contest ends the standings stay frozen until a Lead or Admin reveals the results (`POST /groups/{groupId}/contests/{contestId}/reveal-results`); a contest with `freezeMinutes = 0` shows its full standings as soon as it ends; with `autoRevealMinutes` the results also open by themselves that many minutes after `endTime`
+* Postcompetition rows and the full details of the submissions list (time, memory, phase) are also withheld from participants until the results are revealed
 
-### Real-Time Updates (SSE)
+### Real-Time Updates
 
-* **Server-Sent Events** endpoint: `GET /contests/{id}/standings/stream`
-* Sends incremental updates when standings change
-* Event types: `snapshot`, `update`, `freeze`, `contest_ended`, `ping`
-* Only available for ACTIVE contests
-* Respects freeze rules (unless Leads/Admin with `?realtime=true`)
+* Not implemented: there is no SSE endpoint. Clients fetch `GET /groups/{groupId}/contests/{contestId}/standings` periodically
+* `GET .../standings/filters` lists the available country, city and institution filter values
 
 ---
 
@@ -261,16 +259,17 @@ Contests support different participation configurations:
 
 ### When a Contest is Deleted
 
+A locked contest cannot be deleted (403 `CONTEST_LOCKED`) and neither can an `ACTIVE` one (409 `CONTEST_IS_ACTIVE`); `SCHEDULED` and `FINISHED` contests that are not locked can.
+
 | Entity | Action |
 |--------|--------|
 | Contest | Hard delete |
-| Contest_Problem | Hard delete (cascade) |
-| Standing Collection | Hard delete (`contest_{contestId}_standings`) |
-| Final Snapshot | Deleted (`contest_{contestId}_standings_final` deleted if exists) |
+| Contest_Problem, registrations, team participations | Hard delete (cascade) |
+| Standings cache | Removal attempted, best effort (Redis key `standings:{contestId}`); a failure does not fail the request and the key may remain |
 | Submission | Preserved with `contest_id = NULL` (orphaned) |
 | Problem | NOT deleted (global entities) |
 
-> **Note**: Both the NoSQL collection `contest_{contestId}_standings` and the final snapshot `contest_{contestId}_standings_final` are deleted when the contest is deleted (if they exist).
+> **Note**: Removal of the cached standings projection is attempted when the contest is deleted; if Redis fails the contest is still deleted and the key may remain.
 
 ### When the Parent Group is Deleted
 
@@ -295,7 +294,6 @@ Contests support different participation configurations:
 ### Concurrency
 
 * Optimistic locking for contest updates
-* Atomic operations for standings updates
 * Handle race conditions in registration
 
 ### Performance
@@ -315,8 +313,9 @@ Contests support different participation configurations:
 3. **[Delete contest](Delete%20contest/spec.md)** - Remove contest and handle associated data (Contest_Problem, Standing, Register deleted; submissions orphaned)
 4. **[Register to contest](Register%20to%20contest/spec.md)** - Participant registration and unregistration (Members only, before contest starts)
 5. **[View contest](View%20contest/spec.md)** - Contest details, problem list, and contest listing with filters
-6. **[View contest standings](View%20contest%20standings/spec.md)** - ICPC-style rankings with freeze support and SSE real-time updates
+6. **[View contest standings](View%20contest%20standings/spec.md)** - ICPC-style rankings with freeze support and filter options
 7. **[View contest submissions](View%20contest%20submissions/spec.md)** - List all submissions in a contest with visibility rules, freeze support, and filtering by phase/problem/user
+8. **[Reveal contest results](Reveal%20contest%20results/spec.md)** - Lead or Admin unfreezes the final standings after a contest with freeze ends
 
 ### Future Specs (Planned)
 
@@ -329,7 +328,6 @@ Contests support different participation configurations:
 * **Standing Freeze Visualizer**
   - Animated "unfreeze" replay after contest ends
   - Shows how standings evolved during freeze period
-  - Data already available in `contest_{contestId}_standings_final` with full history
 
 ### Implementation Dependencies
 
@@ -344,7 +342,7 @@ Register to Contest (P1) ✅ ← (participant registration and unregistration)
     ↓
 View Contest (P1) ✅ ← (contest details, problem list, listing)
     ↓
-View Contest Standings (P1) ✅ ← (ICPC rankings, freeze, SSE)
+View Contest Standings (P1) ✅ ← (ICPC rankings, freeze, filters)
     ↓
 View Contest Submissions (P1) ✅ ← (submission list, visibility, freeze, filters)
     ↓
@@ -413,7 +411,11 @@ Export Standings (P2) ← (CSV, PDF, Excel export)
 
 * **Safety**: Prevents accidental deletion of important contests
 * **Explicit action**: Requires intentional unlock before deletion
-* **Audit trail**: Ensures deletion is a deliberate action, not accidental
+
+### Why can't active contests be deleted?
+
+* **Safety**: Participants are submitting and standings are live; deleting would orphan work in progress
+* **Explicit action**: Wait for the contest to end before deleting it
 
 ### Why postcompetition phase?
 

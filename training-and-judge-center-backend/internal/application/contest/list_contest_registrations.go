@@ -26,9 +26,9 @@ type ListContestRegistrationsInput struct {
 // A team is always a single entry, regardless of its roster size — it
 // counts as one participant, matching how standings rank it.
 type RegistrationEntry struct {
-	Type         string // "INDIVIDUAL" or "TEAM"
-	Nickname     string // INDIVIDUAL only
-	TeamName     string // TEAM only
+	Type         string   // "INDIVIDUAL" or "TEAM"
+	Nickname     string   // INDIVIDUAL only
+	TeamName     string   // TEAM only
 	Members      []string // TEAM only; member nicknames
 	RegisteredAt time.Time
 }

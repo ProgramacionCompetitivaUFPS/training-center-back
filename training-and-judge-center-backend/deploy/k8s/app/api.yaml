@@ -8,6 +8,7 @@ metadata:
   namespace: training-center
   annotations:
     cloud.google.com/neg: '{"ingress": true}'
+    cloud.google.com/backend-config: '{"default": "api-backend-config"}'
 spec:
   selector:
     app: api
@@ -66,6 +67,12 @@ spec:
                   key: RABBITMQ_PASSWORD
             - name: RABBITMQ_URL
               value: amqp://judge:$(RABBITMQ_PASSWORD)@rabbitmq:5672/
+            # Where uploaded ZIPs are spooled (os.CreateTemp): the capped volume below, not the container layer.
+            - name: TMPDIR
+              value: /uploads
+            # Safety net under the 512Mi limit: the GC works harder before the kernel kills the pod.
+            - name: GOMEMLIMIT
+              value: 400MiB
           resources:
             requests:
               cpu: 250m
@@ -73,6 +80,9 @@ spec:
             limits:
               cpu: 500m
               memory: 512Mi
+          volumeMounts:
+            - name: uploads
+              mountPath: /uploads
           readinessProbe:
             httpGet:
               path: /ping
@@ -87,3 +97,9 @@ spec:
             initialDelaySeconds: 15
             periodSeconds: 10
             timeoutSeconds: 3
+      volumes:
+        # At most maxConcurrentZipUploads (2) ZIPs of up to 150MB are on it at once; the limit is the last line
+        # of defence, since going over evicts the pod.
+        - name: uploads
+          emptyDir:
+            sizeLimit: 1Gi

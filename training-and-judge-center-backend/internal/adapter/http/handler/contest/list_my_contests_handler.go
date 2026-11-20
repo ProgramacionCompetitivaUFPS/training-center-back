@@ -85,6 +85,7 @@ func toListMyContestsResponse(out *appContest.ListMyContestsOutput) listMyContes
 			IsRegistered:      item.IsRegistered,
 			ProblemCount:      item.ProblemCount,
 			Group:             groupDisplay{ID: item.Group.ID, Name: item.Group.Name},
+			UserGroupRole:     item.UserGroupRole,
 		}
 	}
 	return listMyContestsResponse{

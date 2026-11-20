@@ -1,37 +1,13 @@
-package contest_test
+package contest
 
 import (
 	"testing"
 	"time"
 
-	appContest "github.com/training-judge-center/backend/internal/application/contest"
 	domainContest "github.com/training-judge-center/backend/internal/domain/contest"
 )
 
-var (
-	contestStart   = time.Date(2026, 1, 1, 10, 0, 0, 0, time.UTC)
-	contestPenalty = 20 // minutes per wrong attempt
-)
-
-func tp(h, m int) *time.Time {
-	t := time.Date(2026, 1, 1, h, m, 0, 0, time.UTC)
-	return &t
-}
-
-func participant(id string, problems map[string]domainContest.ProblemAttempt) domainContest.ParticipantStanding {
-	return domainContest.ParticipantStanding{ContestantID: id, Problems: problems}
-}
-
-// attempt builds a ProblemAttempt with n wrong attempts at arbitrary pre-contest
-// timestamps (safe to use in tests that don't exercise freeze logic).
-func attempt(wrongAttempts int, acceptedAt *time.Time) domainContest.ProblemAttempt {
-	times := make([]time.Time, wrongAttempts)
-	for i := range times {
-		// Place each WA well before contestStart so they're always pre-freeze.
-		times[i] = contestStart.Add(-time.Duration(wrongAttempts-i) * time.Minute)
-	}
-	return domainContest.ProblemAttempt{WrongAttemptTimes: times, AcceptedAt: acceptedAt}
-}
+const contestPenalty = 20 // minutes per wrong attempt
 
 func TestRankStandings(t *testing.T) {
 	tests := []struct {
@@ -121,7 +97,7 @@ func TestRankStandings(t *testing.T) {
 			participants: []domainContest.ParticipantStanding{
 				participant("u1", map[string]domainContest.ProblemAttempt{
 					"A": attempt(0, tp(10, 30)), // solved
-					"B": attempt(5, nil),         // not solved — 5 wrong attempts, no penalty
+					"B": attempt(5, nil),        // not solved — 5 wrong attempts, no penalty
 				}),
 			},
 			wantOrder:   []string{"u1"},
@@ -222,7 +198,7 @@ func TestRankStandings(t *testing.T) {
 				tc.wantOrder = []string{"u2", "u1"}
 			}
 
-			got := appContest.RankStandings(tc.participants, contestStart, contestPenalty, tc.freezeTime)
+			got := RankStandings(tc.participants, contestStart, contestPenalty, tc.freezeTime)
 
 			if len(got) != len(tc.wantOrder) {
 				t.Fatalf("len(got)=%d, want %d", len(got), len(tc.wantOrder))
@@ -262,7 +238,7 @@ func TestRankStandings_FreezeHidesPostFreezeAttempts(t *testing.T) {
 		}),
 	}
 
-	got := appContest.RankStandings(participants, contestStart, contestPenalty, freeze)
+	got := RankStandings(participants, contestStart, contestPenalty, freeze)
 
 	prob := got[0].Problems["B"]
 	if prob.Attempts != 2 {
@@ -270,5 +246,131 @@ func TestRankStandings_FreezeHidesPostFreezeAttempts(t *testing.T) {
 	}
 	if got[0].ProblemsSolved != 0 {
 		t.Errorf("problemsSolved=%d, want 0", got[0].ProblemsSolved)
+	}
+}
+
+func TestRankStandings_PendingCountsFailedAndAcceptedAfterTheFreeze(t *testing.T) {
+	freeze := tp(11, 0)
+	participants := []domainContest.ParticipantStanding{
+		participant("u1", map[string]domainContest.ProblemAttempt{
+			"B": {
+				WrongAttemptTimes: []time.Time{
+					time.Date(2026, 1, 1, 10, 30, 0, 0, time.UTC),
+					time.Date(2026, 1, 1, 10, 45, 0, 0, time.UTC),
+					time.Date(2026, 1, 1, 11, 10, 0, 0, time.UTC),
+				},
+				AcceptedAt: tp(11, 20),
+			},
+		}),
+	}
+
+	got := RankStandings(participants, contestStart, contestPenalty, freeze)
+
+	prob := got[0].Problems["B"]
+	if prob.Attempts != 2 {
+		t.Errorf("attempts=%d, want 2", prob.Attempts)
+	}
+	if prob.Pending != 2 {
+		t.Errorf("pending=%d, want 2 (one failure and the acceptance after the freeze)", prob.Pending)
+	}
+	if prob.AcceptedAt != nil {
+		t.Errorf("acceptedAt=%v, want nil while the freeze hides it", prob.AcceptedAt)
+	}
+}
+
+func TestRankStandings_PendingIsZeroWithoutFreeze(t *testing.T) {
+	participants := []domainContest.ParticipantStanding{
+		participant("u1", map[string]domainContest.ProblemAttempt{
+			"B": {
+				WrongAttemptTimes: []time.Time{
+					time.Date(2026, 1, 1, 10, 30, 0, 0, time.UTC),
+					time.Date(2026, 1, 1, 10, 45, 0, 0, time.UTC),
+					time.Date(2026, 1, 1, 11, 10, 0, 0, time.UTC),
+				},
+				AcceptedAt: tp(11, 20),
+			},
+		}),
+	}
+
+	got := RankStandings(participants, contestStart, contestPenalty, nil)
+
+	prob := got[0].Problems["B"]
+	if prob.Pending != 0 {
+		t.Errorf("pending=%d, want 0 without freeze", prob.Pending)
+	}
+	if prob.AcceptedAt == nil {
+		t.Error("acceptedAt is nil, want the solve visible without freeze")
+	}
+}
+
+func TestRankStandings_PendingIsZeroWhenSolvedBeforeTheFreeze(t *testing.T) {
+	freeze := tp(11, 0)
+	participants := []domainContest.ParticipantStanding{
+		participant("u1", map[string]domainContest.ProblemAttempt{
+			"B": {
+				WrongAttemptTimes: []time.Time{time.Date(2026, 1, 1, 11, 10, 0, 0, time.UTC)},
+				AcceptedAt:        tp(10, 30),
+			},
+		}),
+	}
+
+	got := RankStandings(participants, contestStart, contestPenalty, freeze)
+
+	prob := got[0].Problems["B"]
+	if prob.Pending != 0 {
+		t.Errorf("pending=%d, want 0 when solved before the freeze", prob.Pending)
+	}
+	if prob.AcceptedAt == nil {
+		t.Error("acceptedAt is nil, want the pre-freeze solve visible")
+	}
+}
+
+func TestRankStandings_PendingDoesNotChangeTheRanking(t *testing.T) {
+	freeze := tp(11, 0)
+	solvedA := func() domainContest.ProblemAttempt { return attempt(0, tp(10, 30)) }
+	pendingB := domainContest.ProblemAttempt{
+		WrongAttemptTimes: []time.Time{time.Date(2026, 1, 1, 11, 10, 0, 0, time.UTC)},
+		AcceptedAt:        tp(11, 20),
+	}
+
+	base := []domainContest.ParticipantStanding{
+		participant("u1", map[string]domainContest.ProblemAttempt{"A": solvedA()}),
+		participant("u2", map[string]domainContest.ProblemAttempt{"A": solvedA()}),
+	}
+	withPending := []domainContest.ParticipantStanding{
+		participant("u1", map[string]domainContest.ProblemAttempt{"A": solvedA()}),
+		participant("u2", map[string]domainContest.ProblemAttempt{"A": solvedA(), "B": pendingB}),
+	}
+
+	want := RankStandings(base, contestStart, contestPenalty, freeze)
+	got := RankStandings(withPending, contestStart, contestPenalty, freeze)
+
+	for i := range want {
+		w := want[i]
+		var g RankedEntry
+		for _, e := range got {
+			if e.ContestantID == w.ContestantID {
+				g = e
+			}
+		}
+		if g.ProblemsSolved != w.ProblemsSolved || g.TotalPenalty != w.TotalPenalty || g.Rank != w.Rank {
+			t.Errorf("%s: solved=%d penalty=%d rank=%d, want solved=%d penalty=%d rank=%d",
+				w.ContestantID, g.ProblemsSolved, g.TotalPenalty, g.Rank, w.ProblemsSolved, w.TotalPenalty, w.Rank)
+		}
+	}
+	for _, e := range got {
+		if e.ContestantID == "u2" && e.Problems["B"].Pending != 2 {
+			t.Errorf("u2 pending on B=%d, want 2", e.Problems["B"].Pending)
+		}
+	}
+}
+
+func TestRankStandings_RowsAreOfficial(t *testing.T) {
+	participants := []domainContest.ParticipantStanding{
+		participant("u1", map[string]domainContest.ProblemAttempt{"A": attempt(0, tp(10, 5))}),
+	}
+	got := RankStandings(participants, contestStart, contestPenalty, nil)
+	if !got[0].IsOfficial {
+		t.Error("IsOfficial = false, want true")
 	}
 }

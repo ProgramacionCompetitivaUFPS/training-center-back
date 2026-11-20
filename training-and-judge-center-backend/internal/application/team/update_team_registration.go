@@ -35,6 +35,7 @@ type UpdateTeamRegistrationUseCase struct {
 	indivChecker     IndividualRegistrationChecker
 	groupChecker     GroupMemberChecker
 	userProvider     UserProvider
+	locker           RegistrationLocker
 	txManager        appShared.TransactionManager
 }
 
@@ -46,6 +47,7 @@ func NewUpdateTeamRegistrationUseCase(
 	indivChecker IndividualRegistrationChecker,
 	groupChecker GroupMemberChecker,
 	userProvider UserProvider,
+	locker RegistrationLocker,
 	txManager appShared.TransactionManager,
 ) *UpdateTeamRegistrationUseCase {
 	return &UpdateTeamRegistrationUseCase{
@@ -56,6 +58,7 @@ func NewUpdateTeamRegistrationUseCase(
 		indivChecker:     indivChecker,
 		groupChecker:     groupChecker,
 		userProvider:     userProvider,
+		locker:           locker,
 		txManager:        txManager,
 	}
 }
@@ -129,6 +132,10 @@ func (uc *UpdateTeamRegistrationUseCase) Execute(ctx context.Context, in UpdateT
 	var participationID string
 	var registeredAt time.Time
 	if err := uc.txManager.WithTx(ctx, func(txCtx context.Context) error {
+		if err := uc.locker.Lock(txCtx, in.ContestID); err != nil {
+			return err
+		}
+
 		existing, err := uc.teamParticipRepo.FindByContestAndTeam(txCtx, in.ContestID, in.TeamID)
 		if err != nil {
 			return err

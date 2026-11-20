@@ -15,7 +15,9 @@ import (
 
 const (
 	submissionQueueName = "submissions"
-	maxPriority         = 5 // must be >= appproblem.QueuePriorityPublishValidation, the highest tier on the queue
+	// maxPriority must stay 5 though the highest tier in use is 4: the live queue was declared with it,
+	// and RabbitMQ refuses to declare an existing queue again with other arguments.
+	maxPriority = 5
 )
 
 // queueEnvelope wraps every message published to the submissions queue so a

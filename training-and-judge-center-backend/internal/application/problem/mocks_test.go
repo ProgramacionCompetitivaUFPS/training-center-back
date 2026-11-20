@@ -2,11 +2,13 @@ package problem
 
 import (
 	"context"
+	"io"
 	"time"
 
 	domainProblem "github.com/training-judge-center/backend/internal/domain/problem"
 	"github.com/training-judge-center/backend/internal/domain/shared"
 	"github.com/training-judge-center/backend/internal/testutil"
+	"github.com/training-judge-center/backend/pkg/apperror"
 )
 
 var testNow = time.Date(2024, 1, 15, 10, 0, 0, 0, time.UTC)
@@ -142,12 +144,12 @@ func (m *mockFileStorage) DownloadFile(ctx context.Context, path string) ([]byte
 // ── ZipParser mock ───────────────────────────────────────────────────────────
 
 type mockZipParser struct {
-	parseTestCasesZipFn func(ctx context.Context, zipData []byte) ([]ParsedFile, error)
+	parseTestCasesZipFn func(ctx context.Context, zip StagedFile) ([]ParsedFile, error)
 }
 
-func (m *mockZipParser) ParseTestCasesZip(ctx context.Context, zipData []byte) ([]ParsedFile, error) {
+func (m *mockZipParser) ParseTestCasesZip(ctx context.Context, zip StagedFile) ([]ParsedFile, error) {
 	if m.parseTestCasesZipFn != nil {
-		return m.parseTestCasesZipFn(ctx, zipData)
+		return m.parseTestCasesZipFn(ctx, zip)
 	}
 	return nil, nil
 }
@@ -502,10 +504,33 @@ func (m *mockAffectedContestsProvider) ListOpenContestsOfProblem(_ context.Conte
 
 type mockStagedFileCleaner struct {
 	deletedPrefixes []string
+	deletedFiles    []string
+	deleteErr       error
+	deleteAttempts  int
+	onDelete        func()
 }
 
 func (m *mockStagedFileCleaner) DeleteFilesWithPrefix(_ context.Context, prefix string) error {
+	m.deleteAttempts++
+	if m.onDelete != nil {
+		m.onDelete()
+	}
+	if m.deleteErr != nil {
+		return m.deleteErr
+	}
 	m.deletedPrefixes = append(m.deletedPrefixes, prefix)
+	return nil
+}
+
+func (m *mockStagedFileCleaner) DeleteFile(_ context.Context, path string) error {
+	m.deleteAttempts++
+	if m.onDelete != nil {
+		m.onDelete()
+	}
+	if m.deleteErr != nil {
+		return m.deleteErr
+	}
+	m.deletedFiles = append(m.deletedFiles, path)
 	return nil
 }
 
@@ -527,4 +552,67 @@ func newCppPythonJavaSettings() domainProblem.PlatformSettings {
 		panic(err)
 	}
 	return s
+}
+
+const (
+	ownedValidatorKey     = "problems/" + testSlug + "/validator/Validator.cpp"
+	ownedValidatorCompKey = "problems/" + testSlug + "/validator/compiled"
+	ownedSolutionKey      = "problems/" + testSlug + "/solution/Solution.cpp"
+	ownedAltSolutionKey   = "problems/" + testSlug + "/solution/Alt.py"
+)
+
+func newDraftProblemOwningFiles() *domainProblem.Problem {
+	testCases := liveTestCasesKey
+	checkerCompiled, validatorCompiled := liveCheckerCompKey, ownedValidatorCompKey
+	solutions := []domainProblem.JudgingFile{
+		domainProblem.RestoreJudgingFile("Solution.cpp", ownedSolutionKey, "cpp20", nil, nil),
+		domainProblem.RestoreJudgingFile("Alt.py", ownedAltSolutionKey, "python310", nil, nil),
+	}
+	checker := domainProblem.RestoreJudgingFile("Checker.cpp", liveCheckerKey, "cpp20", &checkerCompiled, &testNow)
+	validator := domainProblem.RestoreJudgingFile("Validator.cpp", ownedValidatorKey, "cpp20", &validatorCompiled, &testNow)
+	return domainProblem.RestoreProblem(
+		testProbID, testSlug, "Test Problem",
+		nil, nil, nil, []string{},
+		"DRAFT", "PUBLIC",
+		shared.RestoreUserID(authorID),
+		[]shared.UserID{},
+		[]domainProblem.LanguageOverride{},
+		&testCases, solutions, &checker, &validator,
+		nil, testNow, testNow,
+	)
+}
+
+type recordingStorage struct {
+	*mockFileStorage
+	deletedFiles    []string
+	deletedPrefixes []string
+	attempts        int
+}
+
+func newRecordingStorage() *recordingStorage {
+	r := &recordingStorage{mockFileStorage: &mockFileStorage{}}
+	r.deleteFileFn = func(_ context.Context, path string) error {
+		r.attempts++
+		r.deletedFiles = append(r.deletedFiles, path)
+		return nil
+	}
+	r.deleteFilesWithPrefixFn = func(_ context.Context, prefix string) error {
+		r.attempts++
+		r.deletedPrefixes = append(r.deletedPrefixes, prefix)
+		return nil
+	}
+	return r
+}
+
+func (r *recordingStorage) failEveryDeletion() {
+	r.deleteFileFn = func(context.Context, string) error { r.attempts++; return apperror.NewInternal() }
+	r.deleteFilesWithPrefixFn = func(context.Context, string) error { r.attempts++; return apperror.NewInternal() }
+}
+
+func (m *mockFileStorage) UploadFileStream(ctx context.Context, path string, content io.Reader) error {
+	data, err := io.ReadAll(content)
+	if err != nil {
+		return err
+	}
+	return m.UploadFile(ctx, path, data)
 }

@@ -28,9 +28,14 @@ type GetSubmissionOutput struct {
 	Compiler      string
 	ExecutionTime *int
 	MemoryKb      *int
+	CompileLog    *string // compiler output; only set when the submission failed to compile
 	SourceCode    *string // nil when the stored source file no longer exists
 	IsBlockly     bool
 	WorkspaceXML  *string // block editor workspace; nil for regular submissions or when the file is gone
+
+	// ProblemPosition is the slot (1 = A, 2 = B…) the problem occupies in Contest; nil outside a
+	// contest, or when the problem was later dropped from it.
+	ProblemPosition *int
 }
 
 type GetSubmissionUseCase struct {
@@ -94,6 +99,15 @@ func (uc *GetSubmissionUseCase) Execute(ctx context.Context, in GetSubmissionInp
 				}
 			}
 		}
+		// A group lead may review the submissions of the members of their groups,
+		// also outside a contest (e.g. to help with a problem they assigned).
+		if !allowed {
+			isLeadOfAuthor, err := uc.leadChecker.IsLeadOfMember(ctx, viewerID, authorID)
+			if err != nil {
+				return nil, err
+			}
+			allowed = isLeadOfAuthor
+		}
 		if !allowed {
 			return nil, apperror.NewForbidden(domainSubmission.ErrCodeAccessDenied, "access denied")
 		}
@@ -132,12 +146,20 @@ func (uc *GetSubmissionUseCase) Execute(ctx context.Context, in GetSubmissionInp
 	}
 
 	var contest *ContestDisplay
+	var problemPosition *int
 	if cid := sub.ContestID(); cid != nil {
 		cd, err := uc.contestDisplay.GetContestByID(ctx, *cid)
 		if err != nil {
 			return nil, err
 		}
 		contest = cd
+
+		if pid := sub.ProblemID(); pid != "" {
+			problemPosition, err = uc.contestDisplay.GetProblemPosition(ctx, *cid, pid)
+			if err != nil {
+				return nil, err
+			}
+		}
 	}
 
 	return &GetSubmissionOutput{
@@ -153,8 +175,11 @@ func (uc *GetSubmissionUseCase) Execute(ctx context.Context, in GetSubmissionInp
 		Compiler:      sub.Compiler(),
 		ExecutionTime: sub.TimeMs(),
 		MemoryKb:      sub.MemoryKb(),
+		CompileLog:    sub.CompileLog(),
 		SourceCode:    sourceCode,
 		IsBlockly:     sub.IsBlockly(),
 		WorkspaceXML:  workspaceXML,
+
+		ProblemPosition: problemPosition,
 	}, nil
 }

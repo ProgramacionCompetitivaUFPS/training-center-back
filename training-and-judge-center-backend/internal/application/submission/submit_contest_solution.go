@@ -45,19 +45,21 @@ type SubmitContestSolutionOutput struct {
 }
 
 type SubmitContestSolutionUseCase struct {
-	contestProvider  ContestSubmissionProvider
-	standingResolver StandingIDResolver
-	problemProvider  ProblemProvider
-	submissionRepo   domainSubmission.Repository
-	sourceStorage    SourceStorage
-	submissionQueue  SubmissionQueue
-	maxFileSizeBytes int64
-	rateLimitSeconds int
+	contestProvider   ContestSubmissionProvider
+	standingResolver  StandingIDResolver
+	membershipChecker GroupMembershipChecker
+	problemProvider   ProblemProvider
+	submissionRepo    domainSubmission.Repository
+	sourceStorage     SourceStorage
+	submissionQueue   SubmissionQueue
+	maxFileSizeBytes  int64
+	rateLimitSeconds  int
 }
 
 func NewSubmitContestSolutionUseCase(
 	contestProvider ContestSubmissionProvider,
 	standingResolver StandingIDResolver,
+	membershipChecker GroupMembershipChecker,
 	problemProvider ProblemProvider,
 	submissionRepo domainSubmission.Repository,
 	sourceStorage SourceStorage,
@@ -66,14 +68,15 @@ func NewSubmitContestSolutionUseCase(
 	rateLimitSeconds int,
 ) *SubmitContestSolutionUseCase {
 	return &SubmitContestSolutionUseCase{
-		contestProvider:  contestProvider,
-		standingResolver: standingResolver,
-		problemProvider:  problemProvider,
-		submissionRepo:   submissionRepo,
-		sourceStorage:    sourceStorage,
-		submissionQueue:  submissionQueue,
-		maxFileSizeBytes: maxFileSizeBytes,
-		rateLimitSeconds: rateLimitSeconds,
+		contestProvider:   contestProvider,
+		standingResolver:  standingResolver,
+		membershipChecker: membershipChecker,
+		problemProvider:   problemProvider,
+		submissionRepo:    submissionRepo,
+		sourceStorage:     sourceStorage,
+		submissionQueue:   submissionQueue,
+		maxFileSizeBytes:  maxFileSizeBytes,
+		rateLimitSeconds:  rateLimitSeconds,
 	}
 }
 
@@ -101,14 +104,27 @@ func (uc *SubmitContestSolutionUseCase) Execute(ctx context.Context, in SubmitCo
 		return nil, err
 	}
 
-	// 5. Resolve standingID (validates registration)
+	// 5. Resolve standingID. Registration is only required while the contest is running:
+	// after it ends with postcompetition enabled, any group member may practice, and
+	// their standing is their own user ID (the official standings ignore these anyway).
 	standingID, registered, err := uc.standingResolver.ResolveStandingID(ctx, in.ContestID, in.CurrentUser.ID)
 	if err != nil {
 		return nil, err
 	}
 	if !registered {
-		return nil, apperror.NewForbidden(ErrCodeNotRegistered,
-			"you must be registered to the contest to submit solutions")
+		if !(contest.EnablePostContest && in.SubmittedAt.After(contest.EndTime)) {
+			return nil, apperror.NewForbidden(ErrCodeNotRegistered,
+				"you must be registered to the contest to submit solutions")
+		}
+		isMember, err := uc.membershipChecker.IsGroupMember(ctx, in.GroupID, in.CurrentUser.ID)
+		if err != nil {
+			return nil, err
+		}
+		if !isMember {
+			return nil, apperror.NewForbidden(ErrCodeNotRegistered,
+				"only group members can submit to this contest")
+		}
+		standingID = in.CurrentUser.ID
 	}
 
 	// 6. Validate contest status using the captured submittedAt timestamp

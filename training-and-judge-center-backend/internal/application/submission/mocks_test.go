@@ -305,6 +305,7 @@ func (m *mockUserProvider) GetUsersByIDs(ctx context.Context, ids []string) (map
 
 type mockContestProvider struct {
 	fn         func(contestID string) (*ContestDisplay, error)
+	positionFn func(contestID, problemID string) (*int, error)
 	batchCalls int
 }
 
@@ -312,7 +313,15 @@ func (m *mockContestProvider) GetContestByID(_ context.Context, id string) (*Con
 	if m.fn != nil {
 		return m.fn(id)
 	}
-	return &ContestDisplay{ID: id, Name: "Test Contest"}, nil
+	return &ContestDisplay{ID: id, Name: "Test Contest", GroupID: "group-1"}, nil
+}
+
+func (m *mockContestProvider) GetProblemPosition(_ context.Context, contestID, problemID string) (*int, error) {
+	if m.positionFn != nil {
+		return m.positionFn(contestID, problemID)
+	}
+	position := 1
+	return &position, nil
 }
 
 // GetContestsByIDs mirrors the real adapter (WHERE id = ANY($1)): a single missing/failing
@@ -346,7 +355,15 @@ func (m *mockTeamMembershipChecker) IsTeammate(_ context.Context, contestID, vie
 // ── mockLeadChecker ───────────────────────────────────────────────────────────
 
 type mockLeadChecker struct {
-	fn func(contestID, userID string) (bool, error)
+	fn       func(contestID, userID string) (bool, error)
+	memberFn func(leadID, memberID string) (bool, error)
+}
+
+func (m *mockLeadChecker) IsLeadOfMember(_ context.Context, leadID, memberID string) (bool, error) {
+	if m.memberFn != nil {
+		return m.memberFn(leadID, memberID)
+	}
+	return false, nil
 }
 
 func (m *mockLeadChecker) IsLeadOfContestGroup(_ context.Context, contestID, userID string) (bool, error) {
@@ -452,4 +469,17 @@ func (m *mockStandingIDResolver) ResolveStandingID(_ context.Context, contestID,
 		return m.fn(contestID, userID)
 	}
 	return "standing-001", true, nil
+}
+
+// ── mockGroupMembershipChecker ────────────────────────────────────────────────
+
+type mockGroupMembershipChecker struct {
+	fn func(groupID, userID string) (bool, error)
+}
+
+func (m *mockGroupMembershipChecker) IsGroupMember(_ context.Context, groupID, userID string) (bool, error) {
+	if m.fn != nil {
+		return m.fn(groupID, userID)
+	}
+	return true, nil
 }

@@ -3,6 +3,7 @@ package contest
 import (
 	"context"
 	"errors"
+	"reflect"
 	"testing"
 	"time"
 
@@ -68,7 +69,9 @@ func activeContest() *domainContest.Contest {
 		time.Now().Add(2*time.Hour),
 		domainContest.RestorePenalty(20),
 		0,
-		false, false, false,
+		false, false, false, false,
+		nil,
+		nil,
 		shared.RestoreGroupID(testGroupID),
 		shared.RestoreUserID(callerID),
 		domainContest.RestoreParticipationMode("INDIVIDUAL"), domainContest.RestoreTeamSize(2, 5),
@@ -79,7 +82,7 @@ func activeContest() *domainContest.Contest {
 
 // withProblem puts a problem in the contest: standings count only the problems the contest has.
 func withProblem(c *domainContest.Contest, problemID string) *domainContest.Contest {
-	c.SetProblems([]domainContest.ContestProblem{domainContest.RestoreContestProblem("cp-"+problemID, problemID, 1)}, testNow)
+	c.SetProblems([]domainContest.ContestProblem{domainContest.RestoreContestProblem("cp-"+problemID, problemID, 1, nil)}, testNow)
 	return c
 }
 
@@ -91,7 +94,9 @@ func finishedContest() *domainContest.Contest {
 		time.Now().Add(-4*time.Hour),
 		time.Now().Add(-1*time.Hour),
 		domainContest.RestorePenalty(20),
-		0, false, false, false,
+		0, false, false, false, false,
+		nil,
+		nil,
 		shared.RestoreGroupID(testGroupID),
 		shared.RestoreUserID(callerID),
 		domainContest.RestoreParticipationMode("INDIVIDUAL"), domainContest.RestoreTeamSize(2, 5),
@@ -110,7 +115,9 @@ func frozenContest() *domainContest.Contest {
 		time.Now().Add(30*time.Minute),
 		domainContest.RestorePenalty(20),
 		60,
-		false, false, false,
+		false, false, false, false,
+		nil,
+		nil,
 		shared.RestoreGroupID(testGroupID),
 		shared.RestoreUserID(callerID),
 		domainContest.RestoreParticipationMode("INDIVIDUAL"), domainContest.RestoreTeamSize(2, 5),
@@ -780,5 +787,701 @@ func TestGetStandingsUseCase_ExecuteFilterOptions_NotFoundForNonMemberOfHiddenGr
 	})
 	if err == nil {
 		t.Fatal("expected not found error, got nil")
+	}
+}
+
+// ── board fields ──────────────────────────────────────────────────────────────
+
+const (
+	boardProblemA = "A"
+	boardProblemB = "B"
+)
+
+func boardContest(base *domainContest.Contest) *domainContest.Contest {
+	base.SetProblems([]domainContest.ContestProblem{
+		problemWithColor("cp-a", boardProblemA, 1, "#aabbcc"),
+		domainContest.RestoreContestProblem("cp-b", boardProblemB, 2, nil),
+	}, testNow)
+	return base
+}
+
+func solvedAt(ago time.Duration) domainContest.ProblemAttempt {
+	t := time.Now().Add(-ago)
+	return domainContest.ProblemAttempt{AcceptedAt: &t}
+}
+
+func boardParticipant(id string, problems map[string]domainContest.ProblemAttempt) domainContest.ParticipantStanding {
+	return domainContest.ParticipantStanding{ContestantID: id, ParticipantType: "INDIVIDUAL", Problems: problems}
+}
+
+func boardCache(profiles map[string]*ParticipantProfile, participants ...domainContest.ParticipantStanding) *mockStandingsCache {
+	cached := &CachedStandings{Participants: participants, Profiles: profiles, LastUpdated: time.Now()}
+	return &mockStandingsCache{
+		getFn: func(_ context.Context, _ string) (*CachedStandings, error) { return cached, nil },
+	}
+}
+
+func executeBoard(t *testing.T, contest *domainContest.Contest, cache *mockStandingsCache, mutate func(*GetStandingsInput)) *GetStandingsOutput {
+	t.Helper()
+	uc := newGetStandingsUseCase(contest, nil, nil, cache, visibleGroup(), isMemberNotLead())
+	in := GetStandingsInput{
+		CurrentUser: asContestant(callerID),
+		GroupID:     testGroupID,
+		ContestID:   testContestID,
+		Page:        1,
+		Limit:       50,
+	}
+	if mutate != nil {
+		mutate(&in)
+	}
+	out, err := uc.Execute(context.Background(), in)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	return out
+}
+
+func entryFor(t *testing.T, out *GetStandingsOutput, contestantID string) RankedEntry {
+	t.Helper()
+	for _, e := range out.Entries {
+		if e.ContestantID == contestantID {
+			return e
+		}
+	}
+	t.Fatalf("no entry for %s in %+v", contestantID, out.Entries)
+	return RankedEntry{}
+}
+
+func headerFor(t *testing.T, out *GetStandingsOutput, problemID string) StandingsProblemDisplay {
+	t.Helper()
+	for _, p := range out.Problems {
+		if p.ID == problemID {
+			return p
+		}
+	}
+	t.Fatalf("no header for %s in %+v", problemID, out.Problems)
+	return StandingsProblemDisplay{}
+}
+
+func TestGetStandingsUseCase_ProblemHeadersCarryColorAndCounts(t *testing.T) {
+	cache := boardCache(nil,
+		boardParticipant("u1", map[string]domainContest.ProblemAttempt{boardProblemA: solvedAt(90 * time.Minute)}),
+		boardParticipant("u2", map[string]domainContest.ProblemAttempt{boardProblemA: {WrongAttemptTimes: []time.Time{time.Now().Add(-80 * time.Minute)}}}),
+		boardParticipant("u3", map[string]domainContest.ProblemAttempt{}),
+	)
+
+	out := executeBoard(t, boardContest(activeContest()), cache, nil)
+
+	a, b := headerFor(t, out, boardProblemA), headerFor(t, out, boardProblemB)
+	assertColor(t, "problem A", a.Color, "#aabbcc")
+	assertNoColor(t, "problem B", b.Color)
+	if a.Accepted != 1 || a.Tried != 2 {
+		t.Errorf("problem A accepted/tried = %d/%d, want 1/2", a.Accepted, a.Tried)
+	}
+	if b.Accepted != 0 || b.Tried != 0 {
+		t.Errorf("problem B accepted/tried = %d/%d, want 0/0", b.Accepted, b.Tried)
+	}
+}
+
+func TestGetStandingsUseCase_OnlyTheEarliestSolveIsMarkedFirst(t *testing.T) {
+	cache := boardCache(nil,
+		boardParticipant("u1", map[string]domainContest.ProblemAttempt{boardProblemA: solvedAt(60 * time.Minute)}),
+		boardParticipant("u2", map[string]domainContest.ProblemAttempt{boardProblemA: solvedAt(100 * time.Minute), boardProblemB: solvedAt(70 * time.Minute)}),
+	)
+
+	out := executeBoard(t, boardContest(activeContest()), cache, nil)
+
+	if !entryFor(t, out, "u2").Problems[boardProblemA].IsFirstSolve {
+		t.Error("u2 solved A first and must be marked")
+	}
+	if entryFor(t, out, "u1").Problems[boardProblemA].IsFirstSolve {
+		t.Error("u1 solved A later and must not be marked")
+	}
+	if !entryFor(t, out, "u2").Problems[boardProblemB].IsFirstSolve {
+		t.Error("each problem has its own first solve: u2 is also first on B")
+	}
+}
+
+func TestGetStandingsUseCase_AnEarlierFailedAttemptDoesNotTakeTheFirstSolve(t *testing.T) {
+	cache := boardCache(nil,
+		boardParticipant("u1", map[string]domainContest.ProblemAttempt{boardProblemA: {WrongAttemptTimes: []time.Time{time.Now().Add(-100 * time.Minute)}}}),
+		boardParticipant("u2", map[string]domainContest.ProblemAttempt{boardProblemA: solvedAt(60 * time.Minute)}),
+	)
+
+	out := executeBoard(t, boardContest(activeContest()), cache, nil)
+
+	if entryFor(t, out, "u1").Problems[boardProblemA].IsFirstSolve {
+		t.Error("u1 only failed and must not be marked")
+	}
+	if !entryFor(t, out, "u2").Problems[boardProblemA].IsFirstSolve {
+		t.Error("u2 is the only solver and must be marked")
+	}
+}
+
+func TestGetStandingsUseCase_CountsAndFirstSolveIgnoreTheProfileFilter(t *testing.T) {
+	profiles := map[string]*ParticipantProfile{
+		"u1": {ID: "u1", Country: "Colombia"},
+		"u2": {ID: "u2", Country: "Peru"},
+	}
+	cache := boardCache(profiles,
+		boardParticipant("u1", map[string]domainContest.ProblemAttempt{boardProblemA: solvedAt(60 * time.Minute)}),
+		boardParticipant("u2", map[string]domainContest.ProblemAttempt{boardProblemA: solvedAt(100 * time.Minute)}),
+	)
+
+	out := executeBoard(t, boardContest(activeContest()), cache, func(in *GetStandingsInput) { in.Country = "Colombia" })
+
+	if len(out.Entries) != 1 || out.Entries[0].ContestantID != "u1" {
+		t.Fatalf("entries = %+v, want only u1", out.Entries)
+	}
+	if a := headerFor(t, out, boardProblemA); a.Accepted != 2 || a.Tried != 2 {
+		t.Errorf("problem A accepted/tried = %d/%d, want 2/2 over every participant", a.Accepted, a.Tried)
+	}
+	if out.Entries[0].Problems[boardProblemA].IsFirstSolve {
+		t.Error("the first solver is outside the filter: u1 must not be marked")
+	}
+}
+
+func TestGetStandingsUseCase_FrozenBoardHidesCountsAndFirstSolveAfterTheFreeze(t *testing.T) {
+	cache := boardCache(nil,
+		boardParticipant("u1", map[string]domainContest.ProblemAttempt{boardProblemA: solvedAt(20 * time.Minute)}),
+		boardParticipant("u2", map[string]domainContest.ProblemAttempt{boardProblemA: solvedAt(100 * time.Minute)}),
+	)
+
+	out := executeBoard(t, boardContest(frozenContest()), cache, nil)
+
+	if a := headerFor(t, out, boardProblemA); a.Accepted != 1 || a.Tried != 1 {
+		t.Errorf("problem A accepted/tried = %d/%d, want 1/1 (the solve after the freeze is hidden)", a.Accepted, a.Tried)
+	}
+	if entryFor(t, out, "u1").Problems[boardProblemA].IsFirstSolve {
+		t.Error("a hidden solve cannot be a first solve")
+	}
+	if !entryFor(t, out, "u2").Problems[boardProblemA].IsFirstSolve {
+		t.Error("u2 solved before the freeze and is the first visible solve")
+	}
+}
+
+func TestGetStandingsUseCase_RealtimeShowsTheSolvesHiddenByTheFreeze(t *testing.T) {
+	cache := boardCache(nil,
+		boardParticipant("u1", map[string]domainContest.ProblemAttempt{boardProblemA: solvedAt(20 * time.Minute)}),
+	)
+	uc := newGetStandingsUseCase(boardContest(frozenContest()), nil, nil, cache, visibleGroup(), isLead())
+
+	out, err := uc.Execute(context.Background(), GetStandingsInput{
+		CurrentUser: asCoach(callerID),
+		GroupID:     testGroupID,
+		ContestID:   testContestID,
+		Realtime:    true,
+		Page:        1,
+		Limit:       50,
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if a := headerFor(t, out, boardProblemA); a.Accepted != 1 {
+		t.Errorf("problem A accepted = %d, want 1 in real time", a.Accepted)
+	}
+	if !entryFor(t, out, "u1").Problems[boardProblemA].IsFirstSolve {
+		t.Error("in real time the post-freeze solve is the first solve")
+	}
+}
+
+// ── phase ─────────────────────────────────────────────────────────────────────
+
+func postEnabledFinishedContest() *domainContest.Contest {
+	return domainContest.RestoreContest(
+		testContestID,
+		domainContest.RestoreContestName("Finished Contest"),
+		nil,
+		time.Now().Add(-4*time.Hour),
+		time.Now().Add(-1*time.Hour),
+		domainContest.RestorePenalty(20),
+		0, true, false, false, false,
+		nil,
+		nil,
+		shared.RestoreGroupID(testGroupID),
+		shared.RestoreUserID(callerID),
+		domainContest.RestoreParticipationMode("INDIVIDUAL"), domainContest.RestoreTeamSize(2, 5),
+		[]domainContest.ContestProblem{},
+		testNow, nil,
+	)
+}
+
+func postSolvedAt() domainContest.ProblemAttempt {
+	t := time.Now().Add(-30 * time.Minute)
+	return domainContest.ProblemAttempt{AcceptedAt: &t}
+}
+
+func postFailedAt() domainContest.ProblemAttempt {
+	return domainContest.ProblemAttempt{WrongAttemptTimes: []time.Time{time.Now().Add(-30 * time.Minute)}}
+}
+
+func phaseCache(profiles map[string]*ParticipantProfile, official, post []domainContest.ParticipantStanding) *mockStandingsCache {
+	cached := &CachedStandings{Participants: official, PostParticipants: post, Profiles: profiles, LastUpdated: time.Now()}
+	return &mockStandingsCache{
+		getFn: func(_ context.Context, _ string) (*CachedStandings, error) { return cached, nil },
+	}
+}
+
+func TestGetStandingsUseCase_PhaseEmptyEqualsAll(t *testing.T) {
+	cache := phaseCache(nil,
+		[]domainContest.ParticipantStanding{boardParticipant("u1", map[string]domainContest.ProblemAttempt{boardProblemA: solvedAt(2 * time.Hour)})},
+		[]domainContest.ParticipantStanding{boardParticipant("p1", map[string]domainContest.ProblemAttempt{boardProblemA: postSolvedAt()})},
+	)
+	contest := boardContest(postEnabledFinishedContest())
+
+	empty := executeBoard(t, contest, cache, nil)
+	all := executeBoard(t, contest, cache, func(in *GetStandingsInput) { in.Phase = StandingsPhaseAll })
+
+	if !reflect.DeepEqual(empty.Entries, all.Entries) || empty.Total != all.Total {
+		t.Errorf("phase omitted returned %+v, phase=all returned %+v", empty.Entries, all.Entries)
+	}
+}
+
+func TestGetStandingsUseCase_PhaseAllOnActiveContestEqualsCompetition(t *testing.T) {
+	cache := phaseCache(nil,
+		[]domainContest.ParticipantStanding{boardParticipant("u1", map[string]domainContest.ProblemAttempt{boardProblemA: solvedAt(60 * time.Minute)})},
+		[]domainContest.ParticipantStanding{boardParticipant("p1", map[string]domainContest.ProblemAttempt{boardProblemA: postSolvedAt()})},
+	)
+	contest := boardContest(activeContest())
+
+	competition := executeBoard(t, contest, cache, func(in *GetStandingsInput) { in.Phase = StandingsPhaseCompetition })
+	all := executeBoard(t, contest, cache, func(in *GetStandingsInput) { in.Phase = StandingsPhaseAll })
+
+	if !reflect.DeepEqual(competition.Entries, all.Entries) || competition.Total != all.Total {
+		t.Errorf("phase=all differs from competition on an active contest: %+v vs %+v", all.Entries, competition.Entries)
+	}
+	for _, e := range all.Entries {
+		if !e.IsOfficial {
+			t.Errorf("active contest must not list post rows, got %+v", e)
+		}
+	}
+}
+
+func TestGetStandingsUseCase_PhaseAllListsOfficialThenPostInOnePage(t *testing.T) {
+	cache := phaseCache(nil,
+		[]domainContest.ParticipantStanding{
+			boardParticipant("u1", map[string]domainContest.ProblemAttempt{boardProblemA: solvedAt(2 * time.Hour)}),
+			boardParticipant("u2", map[string]domainContest.ProblemAttempt{boardProblemA: solvedAt(3 * time.Hour)}),
+		},
+		[]domainContest.ParticipantStanding{
+			boardParticipant("p1", map[string]domainContest.ProblemAttempt{boardProblemA: postSolvedAt()}),
+			boardParticipant("p2", map[string]domainContest.ProblemAttempt{boardProblemB: postFailedAt()}),
+		},
+	)
+	contest := boardContest(postEnabledFinishedContest())
+
+	first := executeBoard(t, contest, cache, func(in *GetStandingsInput) { in.Phase = StandingsPhaseAll; in.Limit = 3 })
+	second := executeBoard(t, contest, cache, func(in *GetStandingsInput) { in.Phase = StandingsPhaseAll; in.Limit = 3; in.Page = 2 })
+
+	if first.Total != 4 || second.Total != 4 {
+		t.Fatalf("total = %d / %d, want 4 (2 official + 2 post)", first.Total, second.Total)
+	}
+	if len(first.Entries) != 3 || !first.Entries[0].IsOfficial || !first.Entries[1].IsOfficial || first.Entries[2].IsOfficial {
+		t.Errorf("page 1 = %+v, want two official rows then one post row", first.Entries)
+	}
+	if len(second.Entries) != 1 || second.Entries[0].IsOfficial {
+		t.Errorf("page 2 = %+v, want the last post row", second.Entries)
+	}
+}
+
+func TestGetStandingsUseCase_PhasePostcompetitionOnActiveContestIsEmpty(t *testing.T) {
+	cache := phaseCache(nil, nil,
+		[]domainContest.ParticipantStanding{boardParticipant("p1", map[string]domainContest.ProblemAttempt{boardProblemA: postSolvedAt()})},
+	)
+
+	out := executeBoard(t, boardContest(activeContest()), cache, func(in *GetStandingsInput) { in.Phase = StandingsPhasePostcompetition })
+
+	if out.Total != 0 || len(out.Entries) != 0 {
+		t.Errorf("post rows on an active contest: total=%d entries=%+v, want none", out.Total, out.Entries)
+	}
+}
+
+func TestGetStandingsUseCase_PhasePostcompetitionWithoutEnablePostIsEmpty(t *testing.T) {
+	cache := phaseCache(nil, nil,
+		[]domainContest.ParticipantStanding{boardParticipant("p1", map[string]domainContest.ProblemAttempt{boardProblemA: postSolvedAt()})},
+	)
+
+	out := executeBoard(t, boardContest(finishedContest()), cache, func(in *GetStandingsInput) { in.Phase = StandingsPhasePostcompetition })
+
+	if out.Total != 0 || len(out.Entries) != 0 {
+		t.Errorf("post rows without enablePostContest: total=%d entries=%+v, want none", out.Total, out.Entries)
+	}
+}
+
+func TestGetStandingsUseCase_PhaseAllWithoutEnablePostEqualsCompetition(t *testing.T) {
+	cache := phaseCache(nil,
+		[]domainContest.ParticipantStanding{boardParticipant("u1", map[string]domainContest.ProblemAttempt{boardProblemA: solvedAt(2 * time.Hour)})},
+		[]domainContest.ParticipantStanding{boardParticipant("p1", map[string]domainContest.ProblemAttempt{boardProblemA: postSolvedAt()})},
+	)
+	contest := boardContest(finishedContest())
+
+	competition := executeBoard(t, contest, cache, func(in *GetStandingsInput) { in.Phase = StandingsPhaseCompetition })
+	all := executeBoard(t, contest, cache, func(in *GetStandingsInput) { in.Phase = StandingsPhaseAll })
+
+	if !reflect.DeepEqual(competition.Entries, all.Entries) || competition.Total != all.Total {
+		t.Errorf("phase=all differs from competition without enablePostContest: %+v vs %+v", all.Entries, competition.Entries)
+	}
+}
+
+func TestGetStandingsUseCase_PhasePostcompetitionHeadersCountPostRows(t *testing.T) {
+	cache := phaseCache(nil,
+		[]domainContest.ParticipantStanding{boardParticipant("u1", map[string]domainContest.ProblemAttempt{boardProblemA: solvedAt(2 * time.Hour)})},
+		[]domainContest.ParticipantStanding{
+			boardParticipant("p1", map[string]domainContest.ProblemAttempt{boardProblemA: postSolvedAt()}),
+			boardParticipant("p2", map[string]domainContest.ProblemAttempt{boardProblemA: postFailedAt()}),
+		},
+	)
+
+	out := executeBoard(t, boardContest(postEnabledFinishedContest()), cache, func(in *GetStandingsInput) { in.Phase = StandingsPhasePostcompetition })
+
+	if a := headerFor(t, out, boardProblemA); a.Accepted != 1 || a.Tried != 2 {
+		t.Errorf("problem A accepted/tried = %d/%d, want 1/2 over the post rows", a.Accepted, a.Tried)
+	}
+	if b := headerFor(t, out, boardProblemB); b.Accepted != 0 || b.Tried != 0 {
+		t.Errorf("problem B accepted/tried = %d/%d, want 0/0", b.Accepted, b.Tried)
+	}
+	for _, e := range out.Entries {
+		for problemID, rp := range e.Problems {
+			if rp.IsFirstSolve {
+				t.Errorf("%s %s must not carry isFirstSolve in postcompetition", e.ContestantID, problemID)
+			}
+		}
+	}
+}
+
+func TestGetStandingsUseCase_PhaseAllHeadersCountOfficialRowsOnly(t *testing.T) {
+	cache := phaseCache(nil,
+		[]domainContest.ParticipantStanding{boardParticipant("u1", map[string]domainContest.ProblemAttempt{boardProblemA: solvedAt(2 * time.Hour)})},
+		[]domainContest.ParticipantStanding{boardParticipant("p1", map[string]domainContest.ProblemAttempt{boardProblemA: postSolvedAt()})},
+	)
+
+	out := executeBoard(t, boardContest(postEnabledFinishedContest()), cache, func(in *GetStandingsInput) { in.Phase = StandingsPhaseAll })
+
+	if a := headerFor(t, out, boardProblemA); a.Accepted != 1 || a.Tried != 1 {
+		t.Errorf("problem A accepted/tried = %d/%d, want 1/1 (official rows only)", a.Accepted, a.Tried)
+	}
+}
+
+func TestGetStandingsUseCase_PhaseAllMarksFirstSolveOnlyOnOfficialRows(t *testing.T) {
+	cache := phaseCache(nil,
+		[]domainContest.ParticipantStanding{boardParticipant("u1", map[string]domainContest.ProblemAttempt{boardProblemA: solvedAt(2 * time.Hour)})},
+		[]domainContest.ParticipantStanding{
+			boardParticipant("u1", map[string]domainContest.ProblemAttempt{boardProblemA: postSolvedAt()}),
+			boardParticipant("p1", map[string]domainContest.ProblemAttempt{boardProblemA: postSolvedAt()}),
+		},
+	)
+
+	out := executeBoard(t, boardContest(postEnabledFinishedContest()), cache, func(in *GetStandingsInput) { in.Phase = StandingsPhaseAll })
+
+	marked := 0
+	for _, e := range out.Entries {
+		if e.IsOfficial && e.Problems[boardProblemA].IsFirstSolve {
+			marked++
+		}
+		if !e.IsOfficial && e.Problems[boardProblemA].IsFirstSolve {
+			t.Errorf("post row %s must not be marked first solve", e.ContestantID)
+		}
+	}
+	if marked != 1 {
+		t.Errorf("official first solves marked = %d, want 1", marked)
+	}
+}
+
+func TestGetStandingsUseCase_PhaseFilterAppliesToBothSections(t *testing.T) {
+	profiles := map[string]*ParticipantProfile{
+		"u1": {ID: "u1", Country: "Colombia"},
+		"u2": {ID: "u2", Country: "Peru"},
+		"p1": {ID: "p1", Country: "Colombia"},
+		"p2": {ID: "p2", Country: "Peru"},
+	}
+	cache := phaseCache(profiles,
+		[]domainContest.ParticipantStanding{
+			boardParticipant("u1", map[string]domainContest.ProblemAttempt{boardProblemA: solvedAt(2 * time.Hour)}),
+			boardParticipant("u2", map[string]domainContest.ProblemAttempt{boardProblemA: solvedAt(3 * time.Hour)}),
+		},
+		[]domainContest.ParticipantStanding{
+			boardParticipant("p1", map[string]domainContest.ProblemAttempt{boardProblemA: postSolvedAt()}),
+			boardParticipant("p2", map[string]domainContest.ProblemAttempt{boardProblemA: postSolvedAt()}),
+		},
+	)
+
+	out := executeBoard(t, boardContest(postEnabledFinishedContest()), cache, func(in *GetStandingsInput) {
+		in.Phase = StandingsPhaseAll
+		in.Country = "Colombia"
+	})
+
+	got := map[string]bool{}
+	for _, e := range out.Entries {
+		got[e.ContestantID] = true
+	}
+	if out.Total != 2 || !got["u1"] || !got["p1"] || len(got) != 2 {
+		t.Errorf("filtered entries = %+v (total %d), want u1 and p1 only", out.Entries, out.Total)
+	}
+}
+
+func TestGetStandingsUseCase_PostRowsAreNotOfficialAndUnranked(t *testing.T) {
+	cache := phaseCache(nil, nil,
+		[]domainContest.ParticipantStanding{boardParticipant("p1", map[string]domainContest.ProblemAttempt{boardProblemA: postSolvedAt()})},
+	)
+
+	out := executeBoard(t, boardContest(postEnabledFinishedContest()), cache, func(in *GetStandingsInput) { in.Phase = StandingsPhasePostcompetition })
+
+	e := entryFor(t, out, "p1")
+	if e.IsOfficial || e.Rank != 0 || e.TotalPenalty != 0 || e.ProblemsSolved != 1 {
+		t.Errorf("post row = %+v, want unofficial, rank 0, penalty 0, 1 solved", e)
+	}
+	if rp := e.Problems[boardProblemA]; rp.Penalty != 0 || rp.AcceptedAt == nil {
+		t.Errorf("post problem A = %+v, want accepted with penalty 0", rp)
+	}
+}
+
+func TestGetStandingsUseCase_PostRowsAreOrderedByTheNameShownForTeamsAndIndividuals(t *testing.T) {
+	failedA := map[string]domainContest.ProblemAttempt{boardProblemA: postFailedAt()}
+	cached := &CachedStandings{
+		PostParticipants: []domainContest.ParticipantStanding{
+			{ContestantID: "a-team", ParticipantType: "TEAM", Problems: failedA},
+			{ContestantID: "b-user", ParticipantType: "INDIVIDUAL", Problems: failedA},
+			{ContestantID: "c-user", ParticipantType: "INDIVIDUAL", Problems: failedA},
+		},
+		TeamNames: map[string]string{"a-team": "Zeta Team"},
+		Profiles: map[string]*ParticipantProfile{
+			"b-user": {Nickname: "mike"},
+			"c-user": {Nickname: "Alpha"},
+		},
+		LastUpdated: time.Now(),
+	}
+	cache := &mockStandingsCache{
+		getFn: func(_ context.Context, _ string) (*CachedStandings, error) { return cached, nil },
+	}
+
+	out := executeBoard(t, boardContest(postEnabledFinishedContest()), cache, func(in *GetStandingsInput) { in.Phase = StandingsPhasePostcompetition })
+
+	var got []string
+	for _, e := range out.Entries {
+		got = append(got, e.Participant.DisplayName)
+	}
+	want := []string{"Alpha", "mike", "Zeta Team"}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("post rows ordered as %v, want %v", got, want)
+	}
+}
+
+// ── pending cells ─────────────────────────────────────────────────────────────
+
+// hiddenSolveAttempt: two failures and an acceptance, all after a freeze that started 30 minutes ago.
+func hiddenSolveAttempt() domainContest.ProblemAttempt {
+	accepted := time.Now().Add(-10 * time.Minute)
+	return domainContest.ProblemAttempt{
+		WrongAttemptTimes: []time.Time{time.Now().Add(-20 * time.Minute), time.Now().Add(-15 * time.Minute)},
+		AcceptedAt:        &accepted,
+	}
+}
+
+func TestGetStandingsUseCase_FrozenCellCountsTheHiddenSubmissionsAsPending(t *testing.T) {
+	cache := boardCache(nil, boardParticipant("u1", map[string]domainContest.ProblemAttempt{boardProblemA: hiddenSolveAttempt()}))
+
+	out := executeBoard(t, boardContest(frozenContest()), cache, nil)
+
+	cell := entryFor(t, out, "u1").Problems[boardProblemA]
+	if cell.Pending != 3 {
+		t.Errorf("pending = %d, want 3 (two failures and the acceptance after the freeze)", cell.Pending)
+	}
+	if cell.AcceptedAt != nil {
+		t.Error("the acceptance after the freeze must stay hidden")
+	}
+	if cell.Attempts != 0 {
+		t.Errorf("attempts = %d, want 0 (nothing visible before the freeze)", cell.Attempts)
+	}
+}
+
+func TestGetStandingsUseCase_PendingCellsDoNotCountInTheHeadersNorFirstSolve(t *testing.T) {
+	cache := boardCache(nil, boardParticipant("u1", map[string]domainContest.ProblemAttempt{boardProblemA: hiddenSolveAttempt()}))
+
+	out := executeBoard(t, boardContest(frozenContest()), cache, nil)
+
+	if a := headerFor(t, out, boardProblemA); a.Accepted != 0 || a.Tried != 0 {
+		t.Errorf("problem A accepted/tried = %d/%d, want 0/0 (pending submissions are not counted)", a.Accepted, a.Tried)
+	}
+	if entryFor(t, out, "u1").Problems[boardProblemA].IsFirstSolve {
+		t.Error("a pending cell cannot be a first solve")
+	}
+}
+
+func TestGetStandingsUseCase_PendingCellsApplyToTeamRows(t *testing.T) {
+	team := domainContest.ParticipantStanding{
+		ContestantID:    "t1",
+		ParticipantType: "TEAM",
+		Problems:        map[string]domainContest.ProblemAttempt{boardProblemA: hiddenSolveAttempt()},
+	}
+	cache := boardCache(nil, team)
+
+	out := executeBoard(t, boardContest(frozenContest()), cache, nil)
+
+	e := entryFor(t, out, "t1")
+	if e.Participant.Type != "TEAM" {
+		t.Fatalf("participant type = %q, want TEAM", e.Participant.Type)
+	}
+	if rp := e.Problems[boardProblemA]; rp.Pending != 3 || rp.AcceptedAt != nil {
+		t.Errorf("team cell = %+v, want pending 3 (two failures and the accept) and no visible solve", rp)
+	}
+}
+
+func TestGetStandingsUseCase_RealtimeShowsNoPendingCells(t *testing.T) {
+	cache := boardCache(nil, boardParticipant("u1", map[string]domainContest.ProblemAttempt{boardProblemA: hiddenSolveAttempt()}))
+	uc := newGetStandingsUseCase(boardContest(frozenContest()), nil, nil, cache, visibleGroup(), isLead())
+
+	out, err := uc.Execute(context.Background(), GetStandingsInput{
+		CurrentUser: asCoach(callerID),
+		GroupID:     testGroupID,
+		ContestID:   testContestID,
+		Realtime:    true,
+		Page:        1,
+		Limit:       50,
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	cell := entryFor(t, out, "u1").Problems[boardProblemA]
+	if cell.Pending != 0 {
+		t.Errorf("pending = %d, want 0 in real time", cell.Pending)
+	}
+	if cell.AcceptedAt == nil {
+		t.Error("in real time the acceptance is visible")
+	}
+}
+
+func TestGetStandingsUseCase_PendingIsZeroWhenThereIsNoFreeze(t *testing.T) {
+	cache := boardCache(nil, boardParticipant("u1", map[string]domainContest.ProblemAttempt{boardProblemA: hiddenSolveAttempt()}))
+
+	out := executeBoard(t, boardContest(activeContest()), cache, nil)
+
+	if got := entryFor(t, out, "u1").Problems[boardProblemA].Pending; got != 0 {
+		t.Errorf("pending = %d, want 0 without freeze", got)
+	}
+}
+
+func TestGetStandingsUseCase_PostcompetitionRowsHaveNoPending(t *testing.T) {
+	cache := phaseCache(nil, nil, []domainContest.ParticipantStanding{
+		boardParticipant("p1", map[string]domainContest.ProblemAttempt{boardProblemA: postSolvedAt(), boardProblemB: postFailedAt()}),
+	})
+
+	out := executeBoard(t, boardContest(postEnabledFinishedContest()), cache, func(in *GetStandingsInput) { in.Phase = StandingsPhasePostcompetition })
+
+	if len(out.Entries) == 0 {
+		t.Fatal("expected postcompetition rows")
+	}
+	for _, e := range out.Entries {
+		for problemID, rp := range e.Problems {
+			if rp.Pending != 0 {
+				t.Errorf("%s problem %s pending = %d, want 0", e.ContestantID, problemID, rp.Pending)
+			}
+		}
+	}
+}
+
+// ── post counters ─────────────────────────────────────────────────────────────
+
+func TestGetStandingsUseCase_PostCountersCountThePostRowsWhateverThePhase(t *testing.T) {
+	for _, phase := range []StandingsPhase{"", StandingsPhaseCompetition, StandingsPhaseAll, StandingsPhasePostcompetition} {
+		t.Run(string(phase), func(t *testing.T) {
+			cache := phaseCache(nil,
+				[]domainContest.ParticipantStanding{boardParticipant("u1", map[string]domainContest.ProblemAttempt{boardProblemA: solvedAt(2 * time.Hour)})},
+				[]domainContest.ParticipantStanding{
+					boardParticipant("p1", map[string]domainContest.ProblemAttempt{boardProblemA: postSolvedAt()}),
+					boardParticipant("p2", map[string]domainContest.ProblemAttempt{boardProblemA: postFailedAt()}),
+				},
+			)
+
+			out := executeBoard(t, boardContest(postEnabledFinishedContest()), cache, func(in *GetStandingsInput) { in.Phase = phase })
+
+			a := headerFor(t, out, boardProblemA)
+			if a.PostAccepted != 1 || a.PostTried != 2 {
+				t.Errorf("problem A postAccepted/postTried = %d/%d, want 1/2", a.PostAccepted, a.PostTried)
+			}
+			if b := headerFor(t, out, boardProblemB); b.PostAccepted != 0 || b.PostTried != 0 {
+				t.Errorf("problem B postAccepted/postTried = %d/%d, want 0/0", b.PostAccepted, b.PostTried)
+			}
+		})
+	}
+}
+
+func TestGetStandingsUseCase_PostCountersDoNotReplaceTheOfficialOnes(t *testing.T) {
+	cache := phaseCache(nil,
+		[]domainContest.ParticipantStanding{boardParticipant("u1", map[string]domainContest.ProblemAttempt{boardProblemA: solvedAt(2 * time.Hour)})},
+		[]domainContest.ParticipantStanding{
+			boardParticipant("u1", map[string]domainContest.ProblemAttempt{boardProblemA: postSolvedAt()}),
+			boardParticipant("p1", map[string]domainContest.ProblemAttempt{boardProblemA: postSolvedAt()}),
+		},
+	)
+
+	out := executeBoard(t, boardContest(postEnabledFinishedContest()), cache, func(in *GetStandingsInput) { in.Phase = StandingsPhaseAll })
+
+	a := headerFor(t, out, boardProblemA)
+	if a.Accepted != 1 || a.Tried != 1 {
+		t.Errorf("problem A accepted/tried = %d/%d, want the official 1/1", a.Accepted, a.Tried)
+	}
+	if a.PostAccepted != 2 || a.PostTried != 2 {
+		t.Errorf("problem A postAccepted/postTried = %d/%d, want 2/2 (one row per post participant)", a.PostAccepted, a.PostTried)
+	}
+}
+
+func TestGetStandingsUseCase_PostcompetitionPhaseKeepsAcceptedAndTriedAsThePostCounters(t *testing.T) {
+	cache := phaseCache(nil, nil,
+		[]domainContest.ParticipantStanding{
+			boardParticipant("p1", map[string]domainContest.ProblemAttempt{boardProblemA: postSolvedAt()}),
+			boardParticipant("p2", map[string]domainContest.ProblemAttempt{boardProblemA: postFailedAt()}),
+		},
+	)
+
+	out := executeBoard(t, boardContest(postEnabledFinishedContest()), cache, func(in *GetStandingsInput) { in.Phase = StandingsPhasePostcompetition })
+
+	a := headerFor(t, out, boardProblemA)
+	if a.Accepted != a.PostAccepted || a.Tried != a.PostTried {
+		t.Errorf("accepted/tried = %d/%d, postAccepted/postTried = %d/%d, want them equal under postcompetition", a.Accepted, a.Tried, a.PostAccepted, a.PostTried)
+	}
+}
+
+func TestGetStandingsUseCase_PostCountersAreZeroWithoutAPostPhase(t *testing.T) {
+	cases := map[string]*domainContest.Contest{
+		"contest still running":        activeContest(),
+		"finished without postcontest": finishedContest(),
+	}
+	for name, contest := range cases {
+		t.Run(name, func(t *testing.T) {
+			cache := phaseCache(nil, nil,
+				[]domainContest.ParticipantStanding{boardParticipant("p1", map[string]domainContest.ProblemAttempt{boardProblemA: postSolvedAt()})},
+			)
+
+			out := executeBoard(t, boardContest(contest), cache, func(in *GetStandingsInput) { in.Phase = StandingsPhaseAll })
+
+			if a := headerFor(t, out, boardProblemA); a.PostAccepted != 0 || a.PostTried != 0 {
+				t.Errorf("postAccepted/postTried = %d/%d, want 0/0", a.PostAccepted, a.PostTried)
+			}
+		})
+	}
+}
+
+func TestGetStandingsUseCase_PostCountersIgnoreTheProfileFilter(t *testing.T) {
+	profiles := map[string]*ParticipantProfile{
+		"u1": {Nickname: "u1", Country: "Colombia"},
+		"p1": {Nickname: "p1", Country: "Mexico"},
+	}
+	cache := phaseCache(profiles,
+		[]domainContest.ParticipantStanding{boardParticipant("u1", map[string]domainContest.ProblemAttempt{boardProblemA: solvedAt(2 * time.Hour)})},
+		[]domainContest.ParticipantStanding{boardParticipant("p1", map[string]domainContest.ProblemAttempt{boardProblemA: postSolvedAt()})},
+	)
+
+	out := executeBoard(t, boardContest(postEnabledFinishedContest()), cache, func(in *GetStandingsInput) {
+		in.Phase = StandingsPhaseAll
+		in.Country = "Colombia"
+	})
+
+	if len(out.Entries) != 1 {
+		t.Fatalf("entries = %+v, want only the Colombian official row", out.Entries)
+	}
+	if a := headerFor(t, out, boardProblemA); a.PostAccepted != 1 || a.PostTried != 1 {
+		t.Errorf("postAccepted/postTried = %d/%d, want 1/1 over every post participant", a.PostAccepted, a.PostTried)
 	}
 }

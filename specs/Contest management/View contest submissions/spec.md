@@ -192,7 +192,7 @@ Retrieve the list of submissions for a contest.
 > - To view source code, use the individual submission endpoint: `GET /api/submissions/{id}`
 > - During competition (ACTIVE): Only verdict is visible to participants (no execution details)
 > - During freeze: Participants see their own submissions (real verdict) + others' pre-freeze submissions only. Leads/Admin see all with real verdicts.
-> - After competition (FINISHED): Full details (verdict, time, memory) visible
+> - After competition (FINISHED): Full details (verdict, time, memory) visible, once the results are revealed when the contest has a freeze (until then the freeze filtering above keeps applying to participants)
 
 **Headers**:
 

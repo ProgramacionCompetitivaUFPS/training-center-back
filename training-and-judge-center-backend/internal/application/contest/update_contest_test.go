@@ -470,3 +470,42 @@ func TestUpdateContest_DeduplicatesProblems(t *testing.T) {
 		t.Errorf("expected 2 deduplicated problems, got %d", len(out.Problems))
 	}
 }
+
+func TestUpdateContest_ConflictFromTheRepositoryIsReturnedAndNothingIsAnswered(t *testing.T) {
+	repo := repoWith(newTestContest(callerID))
+	repo.updateFn = func(_ context.Context, _ *domainContest.Contest) error {
+		return apperror.NewConflict(domainContest.ErrCodeContestConflict, "contest was modified")
+	}
+	uc := newUpdateContestUseCase(repo, groupFound(), isLead(), defaultProblemProvider())
+
+	out, err := uc.Execute(context.Background(), validUpdateInput())
+
+	var appErr *apperror.AppError
+	if !errors.As(err, &appErr) || appErr.Code != domainContest.ErrCodeContestConflict {
+		t.Fatalf("expected %s, got %v", domainContest.ErrCodeContestConflict, err)
+	}
+	if out != nil {
+		t.Errorf("expected no output on conflict, got %+v", out)
+	}
+}
+
+func TestUpdateContest_AllowLateRegistrationCanBeToggledWhileActive(t *testing.T) {
+	contest := newActiveContest(callerID, false)
+	uc := newUpdateContestUseCase(repoWith(contest), groupFound(), isLead(), defaultProblemProvider())
+
+	for _, allow := range []bool{true, false} {
+		out, err := uc.Execute(context.Background(), UpdateContestInput{
+			CurrentUser:           asCoach(callerID),
+			GroupID:               testGroupID,
+			ContestID:             testContestID,
+			AllowLateRegistration: &allow,
+		})
+
+		if err != nil {
+			t.Fatalf("allow=%v: unexpected error: %v", allow, err)
+		}
+		if out.AllowLateRegistration != allow {
+			t.Errorf("AllowLateRegistration = %v, want %v", out.AllowLateRegistration, allow)
+		}
+	}
+}

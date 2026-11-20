@@ -1,6 +1,8 @@
 package http
 
 import (
+	"time"
+
 	"github.com/go-chi/chi/v5"
 	chimw "github.com/go-chi/chi/v5/middleware"
 	"github.com/go-chi/cors"
@@ -22,6 +24,13 @@ import (
 // Largest legitimate JSON body is a 150,000-character statement (~600 KB in UTF-8).
 const maxJSONBodyBytes = 1 << 20
 
+// A submission body is at most 2 MiB and is held in memory (twice, once parsed and once read), so 20
+// at a time is about 90 MiB of a 512Mi pod; a contest burst is served in milliseconds, so it never waits.
+const (
+	maxConcurrentSubmissions = 20
+	submissionQueueWait      = 5 * time.Second
+)
+
 type Handlers struct {
 	Problem    *problem.Handler
 	User       *handlerUser.Handler
@@ -40,6 +49,7 @@ type Services struct {
 
 func NewRouter(h *Handlers, s *Services, allowedOrigins []string) *chi.Mux {
 	r := chi.NewRouter()
+	limitSubmissions := middleware.LimitConcurrency(maxConcurrentSubmissions, submissionQueueWait)
 
 	r.Use(cors.Handler(cors.Options{
 		AllowedOrigins:   allowedOrigins,
@@ -120,6 +130,7 @@ func NewRouter(h *Handlers, s *Services, allowedOrigins []string) *chi.Mux {
 				r.Get("/{contestId}/standings", h.Contest.GetStandings)
 				r.Get("/{contestId}/standings/filters", h.Contest.GetStandingsFilterOptions)
 				r.Get("/{contestId}/submissions", h.Contest.ListContestSubmissions)
+				r.Post("/{contestId}/reveal-results", h.Contest.RevealResults)
 				r.Route("/{contestId}/team-registrations", func(r chi.Router) {
 					r.Get("/", h.Team.ListTeamRegistrations)
 					r.Post("/{teamId}", h.Team.RegisterTeamToContest)
@@ -128,7 +139,7 @@ func NewRouter(h *Handlers, s *Services, allowedOrigins []string) *chi.Mux {
 					r.Get("/{teamId}/eligibility", h.Team.GetTeamRegistrationEligibility)
 				})
 
-				r.Post("/{contestId}/problems/{problemSlug}/submissions", h.Submission.SubmitContest)
+				r.With(limitSubmissions).Post("/{contestId}/problems/{problemSlug}/submissions", h.Submission.SubmitContest)
 				r.Post("/{contestId}/problems/{problemSlug}/rejudge", h.Problem.RejudgeContest)
 			})
 
@@ -181,7 +192,7 @@ func NewRouter(h *Handlers, s *Services, allowedOrigins []string) *chi.Mux {
 				r.Get("/export", h.Problem.Export)
 
 				r.Get("/submissions", h.Submission.ListProblemSubmissions)
-				r.Post("/submissions", h.Submission.Submit)
+				r.With(limitSubmissions).Post("/submissions", h.Submission.Submit)
 
 				r.Route("/files", func(r chi.Router) {
 					r.Post("/", h.Problem.UploadFiles)
@@ -201,10 +212,12 @@ func NewRouter(h *Handlers, s *Services, allowedOrigins []string) *chi.Mux {
 		r.Route("/teams", func(r chi.Router) {
 			r.Post("/", h.Team.Create)
 			r.Get("/{teamId}", h.Team.GetTeam)
+			r.Patch("/{teamId}", h.Team.RenameTeam)
 			r.Route("/{teamId}/invitations", func(r chi.Router) {
 				r.Post("/", h.Team.InviteToTeam)
 			})
 			r.Delete("/{teamId}/members/me", h.Team.LeaveTeam)
+			r.Delete("/{teamId}/members/{userId}", h.Team.RemoveTeamMember)
 			r.Get("/{teamId}/leave-impact", h.Team.GetLeaveImpact)
 		})
 

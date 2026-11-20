@@ -16,6 +16,7 @@ type ListFilters struct {
 	// Blockly narrows to block editor submissions (true) or excludes them (false).
 	Blockly         *bool
 	Visibility      *string
+	OwnerID         *shared.UserID
 	ExcludeContest  bool
 	SubmittedFrom   *time.Time
 	SubmittedBefore *time.Time

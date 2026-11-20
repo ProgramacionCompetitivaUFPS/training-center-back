@@ -10,4 +10,6 @@ const (
 	ErrCodeNotYourInvitation             = "NOT_YOUR_INVITATION"
 	ErrCodeCannotLeaveDuringActiveContest = "CANNOT_LEAVE_DURING_ACTIVE_CONTEST"
 	ErrCodeUserNotFound                  = "USER_NOT_FOUND"
+	ErrCodeCannotRemoveSelf              = "CANNOT_REMOVE_SELF"
+	ErrCodeCannotRemoveDuringActiveContest = "CANNOT_REMOVE_DURING_ACTIVE_CONTEST"
 )

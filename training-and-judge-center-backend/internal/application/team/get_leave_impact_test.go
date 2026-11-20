@@ -55,3 +55,30 @@ func TestGetLeaveImpact_NothingAtRisk_ReturnsEmpty(t *testing.T) {
 		t.Errorf("expected nothing at risk, got %+v", out.RegistrationsToCancel)
 	}
 }
+
+func TestGetLeaveImpact_PreviewingAnotherMember_UsesThatMember(t *testing.T) {
+	// Arrange
+	_, memberRepo := teamWithMembers(memberA, memberB)
+	cleaner := &mockScheduledParticipationCleaner{}
+	uc := NewGetLeaveImpactUseCase(memberRepo, cleaner)
+
+	// Act
+	_, err := uc.Execute(ctx(), GetLeaveImpactInput{CurrentUser: asContestant(memberA), TeamID: testTeamID, TargetUserID: memberB})
+
+	// Assert
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if cleaner.impactUserID != memberB {
+		t.Errorf("expected the impact to be computed for %s, got %q", memberB, cleaner.impactUserID)
+	}
+}
+
+func TestGetLeaveImpact_PreviewingSomeoneNotOnTheTeam_ReturnsNotFound(t *testing.T) {
+	_, memberRepo := teamWithMembers(memberA)
+	uc := NewGetLeaveImpactUseCase(memberRepo, &mockScheduledParticipationCleaner{})
+
+	_, err := uc.Execute(ctx(), GetLeaveImpactInput{CurrentUser: asContestant(memberA), TeamID: testTeamID, TargetUserID: strangerID})
+
+	assertAppError(t, err, apperror.KindNotFound, domainTeam.ErrCodeNotTeamMember)
+}

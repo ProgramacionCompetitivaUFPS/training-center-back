@@ -380,7 +380,7 @@ As an Admin, I want to update contests in any group so that I can assist with ad
 ### Edge Cases
 
 * Contest update with all fields provided (partial updates should be supported).
-* Contest update during high-traffic period (concurrent updates).
+* Contest update during high-traffic period (concurrent updates): the first one to be saved wins and the other returns 409 `CONTEST_CONFLICT` without saving anything.
 * Adding duplicate problem slugs in the same update request (should deduplicate silently).
 * Reordering problems with invalid order positions (should validate and reject).
 * Adding problem at order position beyond current problem count (should append to end).
@@ -447,7 +447,8 @@ Update an existing contest within a group.
   "problems": [
     {
       "slug": "sum-of-two-numbers",
-      "order": 1
+      "order": 1,
+      "color": "#e53935"
     },
     {
       "slug": "new-problem",
@@ -530,6 +531,8 @@ Update an existing contest within a group.
 | penalty | integer | No* | Penalty in minutes for wrong submission (min: 0, max: 1440) |
 | freezeMinutes | integer | No* | Minutes before endTime to freeze standings (null = no freeze). Cannot exceed contest duration. |
 | enablePostContest | boolean | No* | Enable post-competition phase. Cannot be changed from true to false if submissions exist after endTime. |
+| allowLateRegistration | boolean | No | Allow new registrations while the contest is ACTIVE. Can be changed at any time, including while the contest is running; turning it off does not remove anyone already registered |
+| autoRevealMinutes | integer | null | No | Same meaning as on creation. `null` goes back to revealing only by hand; omitting the field leaves it unchanged. Can be changed at any time |
 | problems | array | No* | Array of problem objects with slug and order. If provided, replaces entire problem list. To add/remove, include all problems you want to keep plus new ones. |
 | locked | boolean | No* | Lock status. Only owner or admin can change this. When locked, contest cannot be modified (except lock/unlock by owner or admin). |
 
@@ -541,6 +544,7 @@ Update an existing contest within a group.
 |-------|------|----------|-------------|
 | slug | string | Yes | Problem slug |
 | order | integer | Yes | Order position (1-based, sequential) |
+| color | string or null | No | Balloon color of the problem as `#RRGGBB` (stored lowercase). Omitted: a problem already in the contest keeps its current color and a new problem has none. `null`: removes the color. A malformed value is rejected with `INVALID_PROBLEM_COLOR`. |
 
 **Responses**:
 
@@ -570,12 +574,14 @@ Contest updated successfully.
     {
       "slug": "sum-of-two-numbers",
       "title": "Sum of Two Numbers",
-      "order": 1
+      "order": 1,
+      "color": "#e53935"
     },
     {
       "slug": "new-problem",
       "title": "New Problem",
-      "order": 2
+      "order": 2,
+      "color": null
     }
   ],
   "problemCount": 2,
@@ -639,6 +645,13 @@ Validation errors.
   "error": "PROBLEM_NOT_PUBLISHED",
   "message": "Cannot add problem 'draft-problem' - problem is not published",
   "problemSlug": "draft-problem"
+}
+```
+
+```json
+{
+  "error": "INVALID_PROBLEM_COLOR",
+  "message": "problem color must be a hex color in the form #RRGGBB"
 }
 ```
 
@@ -755,6 +768,30 @@ Group or contest not found.
 }
 ```
 
+#### 409 Conflict
+The update cannot be applied in the current state.
+
+```json
+{
+  "error": "CONTEST_PROBLEMS_LOCKED",
+  "message": "the problems of a finished contest cannot be changed: its standings are the official result"
+}
+```
+
+```json
+{
+  "error": "CONTEST_HAS_TEAM_REGISTRATIONS",
+  "message": "cannot change participation settings while team registrations exist"
+}
+```
+
+```json
+{
+  "error": "CONTEST_CONFLICT",
+  "message": "the contest was modified by someone else; reload it and try again"
+}
+```
+
 ---
 
 ## Requirements *(mandatory)*
@@ -768,6 +805,7 @@ Group or contest not found.
 * **FR-UC-004**: The system MUST support partial updates (only provided fields are updated).
 * **FR-UC-005**: The system MUST require at least one field in the update request.
 * **FR-UC-006**: The system MUST update the `updatedAt` timestamp on every successful modification.
+* **FR-UC-006.1**: The system MUST apply an update only if the contest was not modified by another request since it was read (optimistic concurrency, using the contest's `updatedAt` as the token). Otherwise it MUST reject the request with 409 `CONTEST_CONFLICT` and save nothing, problems included, so a stale copy never overwrites newer data. The client reloads the contest and retries. A contest that was never updated counts as unmodified.
 
 **Locking Mechanism**
 * **FR-UC-007**: The system MUST allow contest owner or Admin to lock the contest (set `locked = true`).
@@ -811,7 +849,11 @@ Group or contest not found.
 * **FR-UC-027**: When problems array is provided, it MUST replace the entire problem list (not merge).
 * **FR-UC-028**: The system MUST allow removing problems that have submissions.
 * **FR-UC-028.1**: When a problem is removed from a contest, its submissions MUST keep their `contest_id`; the standings MUST count only the problems the contest has now.
-* **FR-UC-028.2**: The problem list of a FINISHED contest MUST NOT be changed: the request MUST be rejected with HTTP 409 (CONTEST_PROBLEMS_LOCKED), because the final standings are the official result and count only the problems the contest has. Every other field can still be edited.
+* **FR-UC-028.2**: The problem list of a FINISHED contest MUST NOT be changed: the request MUST be rejected with HTTP 409 (CONTEST_PROBLEMS_LOCKED), because the final standings are the official result and count only the problems the contest has. Every other field can still be edited. A request that only changes colors is also rejected, since it includes `problems`.
+* **FR-UC-028.3**: Each element of `problems` MAY carry a `color` (balloon color) in the form `#RRGGBB`. The system MUST store it in lowercase.
+* **FR-UC-028.4**: When `color` is omitted for a slug that was already in the contest, the system MUST keep its current color; for a new slug the problem has no color. When `color` is `null`, the system MUST remove the color.
+* **FR-UC-028.5**: A `color` that is not `#RRGGBB` MUST be rejected with HTTP 400 (INVALID_PROBLEM_COLOR) and nothing is saved. When the same slug appears more than once, the first occurrence (including its color) is the one that counts.
+* **FR-UC-028.6**: The color is presentation only: it MUST NOT affect submissions, standings or rejudging. A problem that is removed from the contest loses its color, and adding it again later starts without one.
 
 **Standing Recalculation**
 * **FR-UC-029**: When a problem is added to a contest, the system MUST NOT recalculate Standing (no submissions exist yet).
@@ -863,6 +905,7 @@ Group or contest not found.
   * `contest_id` (string, UUID, FK to Contest)
   * `problem_id` (string, UUID, FK to Problem)
   * `order` (integer, sequential starting from 1, **mutable**)
+  * `color` (string, nullable, `#rrggbb` in lowercase, **mutable**) - balloon color shown in the standings
 
 > **Contest Status** (computed, not stored):
 > * `SCHEDULED`: current time < startTime
@@ -951,7 +994,7 @@ When problems are removed from ACTIVE contests:
 ## Optional Notes
 
 * **Idempotency**: Consider making update requests idempotent - submitting the same update twice should have the same effect.
-* **Concurrent Updates**: Consider implementing optimistic locking to handle concurrent update requests.
+* **Concurrent Updates**: Updates use optimistic concurrency (FR-UC-006.1). The check covers the time between reading the contest and saving it; it does not detect an edit form that was opened earlier. Removing a problem from the system also changes the contest's problem list without touching its `updatedAt`, so that path is not covered by the token.
 * **Problem List Management**: The `problems` array replaces the entire list. To add problems, include all existing problems plus new ones. To remove, include only problems you want to keep.
 * **Future enhancements**:
   * Bulk problem operations (add/remove multiple problems in separate endpoints)

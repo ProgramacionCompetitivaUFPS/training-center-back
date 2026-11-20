@@ -43,7 +43,7 @@ func (uc *UnregisterFromContestUseCase) Execute(ctx context.Context, in Unregist
 	}
 
 	if c.Status(time.Now()) != domainContest.StatusScheduled {
-		return apperror.NewBadRequest(domainContest.ErrCodeCannotUnregisterAfterStart, "unregistration is only allowed before the contest starts")
+		return apperror.NewConflict(domainContest.ErrCodeCannotUnregisterAfterStart, "unregistration is only allowed before the contest starts")
 	}
 
 	role, err := uc.memberProvider.GetMemberRole(ctx, in.CurrentUser.ID, in.GroupID)

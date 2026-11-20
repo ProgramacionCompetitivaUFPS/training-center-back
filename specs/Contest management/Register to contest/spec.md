@@ -31,12 +31,23 @@ As a Member of a group, I want to register to a contest in my group so that I ca
    * **Then** the system returns 204 No Content (idempotent)
    * **And** no duplicate registration is created
 
-3. **Scenario**: Registration fails - contest already started
-   * **Given** a contest exists with status ACTIVE or FINISHED
+3. **Scenario**: Registration fails - contest already started and late registration is not allowed
+   * **Given** a contest exists with status ACTIVE and `allowLateRegistration` is false
    * **And** the authenticated user is a Member of the group
    * **When** they attempt to register
-   * **Then** the system rejects with 400 Bad Request (CONTEST_ALREADY_STARTED)
-   * **And** indicates that registration is only allowed before contest starts
+   * **Then** the system rejects with 409 Conflict (CONTEST_ALREADY_STARTED)
+
+3b. **Scenario**: Registration succeeds after the contest started (late registration)
+   * **Given** a contest exists with status ACTIVE and `allowLateRegistration` is true
+   * **And** the authenticated user is a Member of the group and is not registered
+   * **When** they register
+   * **Then** the system registers them as in a SCHEDULED contest
+   * **And** they can unregister no more: unregistering still requires a SCHEDULED contest
+
+3c. **Scenario**: Registration fails - contest finished
+   * **Given** a contest exists with status FINISHED (whatever `allowLateRegistration` is)
+   * **When** they attempt to register
+   * **Then** the system rejects with 409 Conflict (CONTEST_NOT_OPEN_FOR_REGISTRATION)
 
 4. **Scenario**: Registration fails - Lead attempts registration
    * **Given** a contest exists in a group with status SCHEDULED
@@ -99,7 +110,7 @@ As a Member registered to a contest, I want to unregister before the contest sta
    * **And** the authenticated user is a Member of the group
    * **And** the user is registered to the contest
    * **When** they attempt to unregister
-   * **Then** the system rejects with 400 Bad Request (CANNOT_UNREGISTER_AFTER_START)
+   * **Then** the system rejects with 409 Conflict (CANNOT_UNREGISTER_AFTER_START)
    * **And** indicates that unregistration is only allowed before contest starts
 
 3. **Scenario**: Unregistration fails - not registered
@@ -235,13 +246,13 @@ Registration successful. User is now registered to the contest.
 
 (No body)
 
-#### 400 Bad Request
-Contest has already started.
+#### 409 Conflict
+Contest already started and late registration is not allowed, or contest finished (`CONTEST_NOT_OPEN_FOR_REGISTRATION`).
 
 ```json
 {
   "error": "CONTEST_ALREADY_STARTED",
-  "message": "Registration is only allowed before the contest starts"
+  "message": "registration is closed because the contest has already started"
 }
 ```
 
@@ -327,7 +338,7 @@ Unregistration successful. User is no longer registered to the contest.
 
 (No body)
 
-#### 400 Bad Request
+#### 409 Conflict
 Contest has already started.
 
 ```json
