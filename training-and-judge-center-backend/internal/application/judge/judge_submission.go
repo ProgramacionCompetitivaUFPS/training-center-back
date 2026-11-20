@@ -24,6 +24,8 @@ const (
 
 type JudgeSubmissionInput struct {
 	SubmissionID submission.SubmissionID
+	// EnqueuedAt is when the message was published, to log how long it waited. Zero means unknown.
+	EnqueuedAt time.Time
 }
 
 type JudgeSubmissionUseCase struct {
@@ -86,6 +88,9 @@ func (uc *JudgeSubmissionUseCase) Execute(ctx context.Context, in JudgeSubmissio
 		slog.WarnContext(ctx, "judge: another worker already took the submission", "submission_id", sub.ID())
 		return nil
 	}
+
+	claimedAt := uc.now()
+	defer func() { uc.logJudged(ctx, sub, in.EnqueuedAt, claimedAt) }()
 
 	sourceCode, err := uc.sourceCodeDownloader.Download(ctx, sub.SourceCodePath())
 	if err != nil {
@@ -227,4 +232,20 @@ func (uc *JudgeSubmissionUseCase) persistVerdict(ctx context.Context, sub *submi
 		}
 		return nil
 	})
+}
+
+// logJudged is the one line a judging leaves: what it ended as, how long it waited in the queue and
+// how long it took. The database keeps neither, and they are what says whether contest submissions
+// are waiting behind something.
+func (uc *JudgeSubmissionUseCase) logJudged(ctx context.Context, sub *submission.Submission, enqueuedAt, claimedAt time.Time) {
+	attrs := []any{
+		"submission_id", sub.ID(),
+		"verdict", sub.Status().String(),
+		"language", sub.Language().String(),
+		"judged_in", uc.now().Sub(claimedAt).Round(time.Millisecond),
+	}
+	if !enqueuedAt.IsZero() {
+		attrs = append(attrs, "queue_wait", claimedAt.Sub(enqueuedAt).Round(time.Millisecond))
+	}
+	slog.InfoContext(ctx, "judge: submission judged", attrs...)
 }

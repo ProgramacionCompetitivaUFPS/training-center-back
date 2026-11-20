@@ -5,10 +5,14 @@ import (
 	"time"
 )
 
-// QueuePriorityPublishValidation is the highest tier on the queue (above
-// contest=4): it's the only place in the system where someone is blocked on
-// the same HTTP connection waiting for the result.
-const QueuePriorityPublishValidation = 5
+// QueuePriorityPublishValidation is the same tier as a contest submission, so the two are served in
+// the order they arrive. It used to sit above it (5), which let a validation jump ahead of every
+// contest submission already waiting. It still beats practice, post-contest and rejudging, which is
+// where someone is blocked on the same HTTP connection waiting for the result.
+//
+// Keep it equal to submission.QueuePriorityContest: the problem package cannot import that one, and
+// a test in adapter/queue holds the two together.
+const QueuePriorityPublishValidation = 4
 
 type ValidationQueueMessage struct {
 	ValidationID string

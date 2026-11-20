@@ -401,6 +401,7 @@ func main() {
 		adapterqueue.NewSubmissionPayloadHandler(func(ctx context.Context, msg appsubmission.SubmissionQueueMessage) error {
 			if err := judgeSubmissionUseCase.Execute(ctx, appjudge.JudgeSubmissionInput{
 				SubmissionID: msg.SubmissionID,
+				EnqueuedAt:   msg.EnqueuedAt,
 			}); err != nil {
 				slog.ErrorContext(ctx, "worker: judge execution failed", "error", err, "submission_id", msg.SubmissionID)
 				// Acked either way; if it never started, let the recoverer re-publish it.
@@ -411,6 +412,7 @@ func main() {
 		adapterqueue.NewValidationPayloadHandler(func(ctx context.Context, msg appproblem.ValidationQueueMessage) error {
 			if err := validateProblemUseCase.Execute(ctx, appproblem.ValidateProblemInput{
 				ValidationID: msg.ValidationID,
+				EnqueuedAt:   msg.EnqueuedAt,
 				Slug:         msg.Slug,
 			}); err != nil {
 				slog.ErrorContext(ctx, "worker: problem validation failed", "error", err, "validation_id", msg.ValidationID)
