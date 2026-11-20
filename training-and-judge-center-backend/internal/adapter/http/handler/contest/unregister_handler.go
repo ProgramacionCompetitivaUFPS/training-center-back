@@ -18,6 +18,7 @@ import (
 // @Failure      401 {object} apperror.AppError
 // @Failure      403 {object} apperror.AppError
 // @Failure      404 {object} apperror.AppError
+// @Failure      409 {object} apperror.AppError
 // @Router       /groups/{groupId}/contests/{contestId}/register [delete]
 func (h *Handler) Unregister(w http.ResponseWriter, r *http.Request) {
 	caller, ok := handler.RequireCurrentUser(w, r)

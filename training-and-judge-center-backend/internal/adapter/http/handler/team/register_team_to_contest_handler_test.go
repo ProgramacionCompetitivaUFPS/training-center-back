@@ -155,8 +155,8 @@ func TestRegisterTeamToContest_ContestNotScheduledReturns409(t *testing.T) {
 	if err := json.NewDecoder(w.Body).Decode(&body); err != nil {
 		t.Fatalf("decode error: %v", err)
 	}
-	if body.Code != appTeam.ErrCodeContestNotOpenForRegistration {
-		t.Errorf("expected %s, got %s", appTeam.ErrCodeContestNotOpenForRegistration, body.Code)
+	if body.Code != domainContest.ErrCodeContestAlreadyStarted {
+		t.Errorf("expected %s, got %s", domainContest.ErrCodeContestAlreadyStarted, body.Code)
 	}
 }
 

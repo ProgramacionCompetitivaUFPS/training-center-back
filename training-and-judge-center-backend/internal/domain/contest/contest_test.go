@@ -42,7 +42,7 @@ func validContest(t *testing.T) *contest.Contest {
 		mustPenalty(t, 20),
 		60,
 		false,
-		false,
+		false, false,
 		shared.RestoreGroupID("group-id"),
 		shared.RestoreUserID("owner-id"),
 		contest.RestoreParticipationMode("INDIVIDUAL"), contest.RestoreTeamSize(2, 5),
@@ -83,7 +83,7 @@ func TestNewContest_StartTimeInPast(t *testing.T) {
 		mustPenalty(t, 20),
 		60,
 		false,
-		false,
+		false, false,
 		shared.RestoreGroupID("group-id"),
 		shared.RestoreUserID("owner-id"),
 		contest.RestoreParticipationMode("INDIVIDUAL"), contest.RestoreTeamSize(2, 5),
@@ -111,7 +111,7 @@ func TestNewContest_EndBeforeStart(t *testing.T) {
 		mustPenalty(t, 20),
 		60,
 		false,
-		false,
+		false, false,
 		shared.RestoreGroupID("group-id"),
 		shared.RestoreUserID("owner-id"),
 		contest.RestoreParticipationMode("INDIVIDUAL"), contest.RestoreTeamSize(2, 5),
@@ -140,7 +140,7 @@ func TestNewContest_EndEqualStart(t *testing.T) {
 		mustPenalty(t, 20),
 		60,
 		false,
-		false,
+		false, false,
 		shared.RestoreGroupID("group-id"),
 		shared.RestoreUserID("owner-id"),
 		contest.RestoreParticipationMode("INDIVIDUAL"), contest.RestoreTeamSize(2, 5),
@@ -169,7 +169,7 @@ func TestNewContest_DescriptionTooLong(t *testing.T) {
 		mustPenalty(t, 20),
 		60,
 		false,
-		false,
+		false, false,
 		shared.RestoreGroupID("group-id"),
 		shared.RestoreUserID("owner-id"),
 		contest.RestoreParticipationMode("INDIVIDUAL"), contest.RestoreTeamSize(2, 5),
@@ -188,7 +188,7 @@ func TestNewContest_NegativeFreezeMinutes(t *testing.T) {
 		mustPenalty(t, 20),
 		-1,
 		false,
-		false,
+		false, false,
 		shared.RestoreGroupID("group-id"),
 		shared.RestoreUserID("owner-id"),
 		contest.RestoreParticipationMode("INDIVIDUAL"), contest.RestoreTeamSize(2, 5),
@@ -207,7 +207,7 @@ func TestNewContest_FreezeMinutesExceedsDuration(t *testing.T) {
 		mustPenalty(t, 20),
 		60, // freeze == duration → invalid
 		false,
-		false,
+		false, false,
 		shared.RestoreGroupID("group-id"),
 		shared.RestoreUserID("owner-id"),
 		contest.RestoreParticipationMode("INDIVIDUAL"), contest.RestoreTeamSize(2, 5),
@@ -233,7 +233,7 @@ func TestContest_Status(t *testing.T) {
 		60,
 		false,
 		false,
-		false,
+		false, false,
 		shared.RestoreGroupID("g"),
 		shared.RestoreUserID("o"),
 		contest.RestoreParticipationMode("INDIVIDUAL"), contest.RestoreTeamSize(2, 5),
@@ -398,7 +398,7 @@ func TestProblemsNeverNil(t *testing.T) {
 		0,
 		false,
 		false,
-		false,
+		false, false,
 		shared.RestoreGroupID("g"),
 		shared.RestoreUserID("o"),
 		contest.RestoreParticipationMode("INDIVIDUAL"), contest.RestoreTeamSize(2, 5),
@@ -424,7 +424,7 @@ func restoredContestUpdatedAt(t *testing.T, updatedAt *time.Time) *contest.Conte
 		0,
 		false,
 		false,
-		false,
+		false, false,
 		shared.RestoreGroupID("g"),
 		shared.RestoreUserID("o"),
 		contest.RestoreParticipationMode("INDIVIDUAL"), contest.RestoreTeamSize(2, 5),
@@ -475,5 +475,83 @@ func TestConcurrencyToken_IsNotSharedWithTheCallerThroughTheReturnedPointer(t *t
 
 	if got := c.ConcurrencyToken(); !got.Equal(loaded) {
 		t.Errorf("ConcurrencyToken() = %v after the caller changed the returned value, want %v", got, loaded)
+	}
+}
+
+func restoredContestWithWindow(t *testing.T, start, end time.Time, allowLate bool) *contest.Contest {
+	t.Helper()
+	return contest.RestoreContest(
+		"id",
+		mustName(t, "Test"),
+		nil,
+		start, end,
+		mustPenalty(t, 20),
+		0,
+		false,
+		false,
+		false,
+		allowLate,
+		shared.RestoreGroupID("g"),
+		shared.RestoreUserID("o"),
+		contest.RestoreParticipationMode("INDIVIDUAL"), contest.RestoreTeamSize(2, 5),
+		nil,
+		start.Add(-time.Hour),
+		nil,
+	)
+}
+
+func TestCheckRegistrationOpen(t *testing.T) {
+	start := fixedNow.Add(-time.Hour)
+	end := fixedNow.Add(time.Hour)
+
+	tests := []struct {
+		name      string
+		now       time.Time
+		allowLate bool
+		wantCode  string
+	}{
+		{"scheduled", start.Add(-time.Minute), false, ""},
+		{"scheduled with late registration", start.Add(-time.Minute), true, ""},
+		{"active without late registration", fixedNow, false, contest.ErrCodeContestAlreadyStarted},
+		{"active with late registration", fixedNow, true, ""},
+		{"finished", end.Add(time.Minute), false, contest.ErrCodeContestNotOpenForRegistration},
+		{"finished with late registration", end.Add(time.Minute), true, contest.ErrCodeContestNotOpenForRegistration},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			c := restoredContestWithWindow(t, start, end, tt.allowLate)
+
+			err := c.CheckRegistrationOpen(tt.now)
+
+			if tt.wantCode == "" {
+				if err != nil {
+					t.Fatalf("expected registration to be open, got %v", err)
+				}
+				return
+			}
+			var appErr *apperror.AppError
+			if !errors.As(err, &appErr) {
+				t.Fatalf("expected *apperror.AppError, got %v", err)
+			}
+			if appErr.Code != tt.wantCode || appErr.Kind != apperror.KindConflict {
+				t.Errorf("got %s/%v, want 409 %s", appErr.Code, appErr.Kind, tt.wantCode)
+			}
+		})
+	}
+}
+
+func TestSetAllowLateRegistration(t *testing.T) {
+	c := validContest(t)
+	if c.AllowLateRegistration() {
+		t.Fatal("a new contest must not allow late registration by default")
+	}
+
+	c.SetAllowLateRegistration(true, fixedNow)
+
+	if !c.AllowLateRegistration() {
+		t.Error("AllowLateRegistration() = false after enabling it")
+	}
+	if c.UpdatedAt() == nil || !c.UpdatedAt().Equal(fixedNow) {
+		t.Errorf("UpdatedAt() = %v, want %v", c.UpdatedAt(), fixedNow)
 	}
 }

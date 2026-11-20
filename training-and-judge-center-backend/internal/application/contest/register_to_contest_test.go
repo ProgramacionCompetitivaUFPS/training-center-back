@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"testing"
+	"time"
 
 	domainContest "github.com/training-judge-center/backend/internal/domain/contest"
 	"github.com/training-judge-center/backend/pkg/apperror"
@@ -101,14 +102,46 @@ func TestRegisterToContest_Lead_Returns403(t *testing.T) {
 	}
 }
 
-func TestRegisterToContest_FinishedContest_Returns400(t *testing.T) {
-	uc := newRegisterUseCase(repoWith(newFinishedContest(otherID)), mockRegistrations(), isMemberNotLead())
+func TestRegisterToContest_FinishedContest_ReturnsNotOpenForRegistration(t *testing.T) {
+	for _, allowLate := range []bool{false, true} {
+		c := newFinishedContest(otherID)
+		c.SetAllowLateRegistration(allowLate, time.Now())
+		uc := newRegisterUseCase(repoWith(c), mockRegistrations(), isMemberNotLead())
+
+		err := uc.Execute(context.Background(), validRegisterInput())
+
+		var appErr *apperror.AppError
+		if !errors.As(err, &appErr) || appErr.Code != domainContest.ErrCodeContestNotOpenForRegistration || appErr.Kind != apperror.KindConflict {
+			t.Errorf("allowLate=%v: expected 409 CONTEST_NOT_OPEN_FOR_REGISTRATION, got %v", allowLate, err)
+		}
+	}
+}
+
+func TestRegisterToContest_ActiveContestWithoutLateRegistration_ReturnsAlreadyStarted(t *testing.T) {
+	uc := newRegisterUseCase(repoWith(newActiveContest(otherID, false)), mockRegistrations(), isMemberNotLead())
 
 	err := uc.Execute(context.Background(), validRegisterInput())
 
 	var appErr *apperror.AppError
-	if !errors.As(err, &appErr) || appErr.Code != domainContest.ErrCodeContestAlreadyStarted {
-		t.Errorf("expected CONTEST_ALREADY_STARTED, got %v", err)
+	if !errors.As(err, &appErr) || appErr.Code != domainContest.ErrCodeContestAlreadyStarted || appErr.Kind != apperror.KindConflict {
+		t.Errorf("expected 409 CONTEST_ALREADY_STARTED, got %v", err)
+	}
+}
+
+func TestRegisterToContest_ActiveContestWithLateRegistration_Succeeds(t *testing.T) {
+	saved := false
+	reg := mockRegistrations()
+	reg.saveFn = func(_ context.Context, _ *domainContest.ContestRegistration) error {
+		saved = true
+		return nil
+	}
+	uc := newRegisterUseCase(repoWith(newActiveContest(otherID, true)), reg, isMemberNotLead())
+
+	if err := uc.Execute(context.Background(), validRegisterInput()); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !saved {
+		t.Error("expected the registration to be saved")
 	}
 }
 

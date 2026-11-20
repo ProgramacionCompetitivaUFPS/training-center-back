@@ -12,20 +12,21 @@ import (
 )
 
 type CreateContestInput struct {
-	CurrentUser       appshared.CurrentUser
-	GroupID           string
-	Name              string
-	Description       *string
-	StartTime         time.Time
-	EndTime           time.Time
-	Penalty           *int
-	FreezeMinutes     *int
-	EnablePostContest bool
-	ShowTeamMembers   bool
-	ParticipationMode string   // "INDIVIDUAL" | "TEAM" | "MIXED"; defaults to "INDIVIDUAL"
-	TeamSizeMin       *int     // defaults to 2 when mode allows teams
-	TeamSizeMax       *int     // defaults to 5 when mode allows teams
-	Problems          []string // slugs; may be empty
+	CurrentUser           appshared.CurrentUser
+	GroupID               string
+	Name                  string
+	Description           *string
+	StartTime             time.Time
+	EndTime               time.Time
+	Penalty               *int
+	FreezeMinutes         *int
+	EnablePostContest     bool
+	ShowTeamMembers       bool
+	AllowLateRegistration bool
+	ParticipationMode     string   // "INDIVIDUAL" | "TEAM" | "MIXED"; defaults to "INDIVIDUAL"
+	TeamSizeMin           *int     // defaults to 2 when mode allows teams
+	TeamSizeMax           *int     // defaults to 5 when mode allows teams
+	Problems              []string // slugs; may be empty
 }
 
 type CreateContestUseCase struct {
@@ -160,6 +161,7 @@ func (uc *CreateContestUseCase) Execute(ctx context.Context, in CreateContestInp
 		freezeMinutes,
 		in.EnablePostContest,
 		in.ShowTeamMembers,
+		in.AllowLateRegistration,
 		shared.RestoreGroupID(in.GroupID),
 		shared.RestoreUserID(in.CurrentUser.ID),
 		mode,

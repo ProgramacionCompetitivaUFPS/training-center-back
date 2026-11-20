@@ -53,8 +53,8 @@ func (uc *RegisterToContestUseCase) Execute(ctx context.Context, in RegisterToCo
 	}
 
 	now := time.Now()
-	if c.Status(now) != domainContest.StatusScheduled {
-		return apperror.NewBadRequest(domainContest.ErrCodeContestAlreadyStarted, "registration is only allowed before the contest starts")
+	if err := c.CheckRegistrationOpen(now); err != nil {
+		return err
 	}
 
 	if in.CurrentUser.IsAdmin() {

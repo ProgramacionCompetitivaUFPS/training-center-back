@@ -120,27 +120,63 @@ func TestRegisterTeamToContest_TeamsNotAllowed(t *testing.T) {
 	assert.Equal(t, ErrCodeTeamsNotAllowed, ae.Code)
 }
 
-func TestRegisterTeamToContest_ContestNotScheduled(t *testing.T) {
+func TestRegisterTeamToContest_RegistrationNotOpen(t *testing.T) {
+	tests := []struct {
+		name      string
+		status    string
+		allowLate bool
+		wantCode  string
+	}{
+		{"active without late registration", "ACTIVE", false, domainContest.ErrCodeContestAlreadyStarted},
+		{"finished", "FINISHED", false, domainContest.ErrCodeContestNotOpenForRegistration},
+		{"finished with late registration", "FINISHED", true, domainContest.ErrCodeContestNotOpenForRegistration},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			uc := newRegisterUseCase(
+				memberRepoWithUsers(memberA, memberB),
+				teamRepoWithTeam(),
+				&mockContestProvider{infoFn: func(_ string) (*ContestInfo, error) {
+					return &ContestInfo{
+						ID: testContestID, GroupID: testGroupID,
+						ParticipationMode: "TEAM", TeamSizeMin: 2, TeamSizeMax: 3,
+						Status: tt.status, AllowLateRegistration: tt.allowLate,
+					}, nil
+				}},
+				&mockTeamParticipRepo{},
+				&mockIndivChecker{},
+				&mockGroupChecker{},
+			)
+
+			_, err := uc.Execute(ctx(), defaultRegisterInput())
+			require.Error(t, err)
+			ae := err.(*apperror.AppError)
+			assert.Equal(t, apperror.KindConflict, ae.Kind)
+			assert.Equal(t, tt.wantCode, ae.Code)
+		})
+	}
+}
+
+func TestRegisterTeamToContest_ActiveWithLateRegistration_Succeeds(t *testing.T) {
+	saved := false
 	uc := newRegisterUseCase(
-		memberRepoWithUsers(memberA, memberB),
+		memberRepoWithUsers(memberA, memberB, memberC),
 		teamRepoWithTeam(),
 		&mockContestProvider{infoFn: func(_ string) (*ContestInfo, error) {
 			return &ContestInfo{
 				ID: testContestID, GroupID: testGroupID,
 				ParticipationMode: "TEAM", TeamSizeMin: 2, TeamSizeMax: 3,
-				Status: "ACTIVE",
+				Status: "ACTIVE", AllowLateRegistration: true,
 			}, nil
 		}},
-		&mockTeamParticipRepo{},
+		&mockTeamParticipRepo{saveFn: func(_ *domainContest.ContestTeamParticipation) error { saved = true; return nil }},
 		&mockIndivChecker{},
 		&mockGroupChecker{},
 	)
 
 	_, err := uc.Execute(ctx(), defaultRegisterInput())
-	require.Error(t, err)
-	ae := err.(*apperror.AppError)
-	assert.Equal(t, apperror.KindConflict, ae.Kind)
-	assert.Equal(t, ErrCodeContestNotOpenForRegistration, ae.Code)
+	require.NoError(t, err)
+	assert.True(t, saved)
 }
 
 func TestRegisterTeamToContest_InvalidSelectedMember(t *testing.T) {

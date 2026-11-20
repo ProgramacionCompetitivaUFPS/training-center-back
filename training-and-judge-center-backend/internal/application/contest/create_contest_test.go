@@ -307,3 +307,32 @@ func TestCreateContest_InvalidPenalty(t *testing.T) {
 		t.Errorf("expected VALIDATION_ERROR for negative penalty, got %v", err)
 	}
 }
+
+func TestCreateContest_AllowLateRegistrationDefaultsToFalse(t *testing.T) {
+	uc := newCreateContestUseCase(&mockContestRepository{}, groupFound(), isLead(), defaultProblemProvider())
+
+	out, err := uc.Execute(context.Background(), validCreateInput())
+
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if out.AllowLateRegistration {
+		t.Error("a contest created without the flag must not allow late registration")
+	}
+}
+
+func TestCreateContest_AllowLateRegistrationIsPersisted(t *testing.T) {
+	uc := newCreateContestUseCase(&mockContestRepository{}, groupFound(), isLead(), defaultProblemProvider())
+
+	in := validCreateInput()
+	in.AllowLateRegistration = true
+
+	out, err := uc.Execute(context.Background(), in)
+
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !out.AllowLateRegistration {
+		t.Error("AllowLateRegistration=true on input produced false on output")
+	}
+}

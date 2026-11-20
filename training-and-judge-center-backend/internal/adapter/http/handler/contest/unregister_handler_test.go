@@ -86,7 +86,7 @@ func TestUnregister_NonMember_Returns403(t *testing.T) {
 	}
 }
 
-func TestUnregister_ContestAlreadyStarted_Returns400(t *testing.T) {
+func TestUnregister_ContestAlreadyStarted_Returns409(t *testing.T) {
 	uc := appcontest.NewUnregisterFromContestUseCase(
 		&mockRepoReturning{contest: finishedContest()},
 		&mockRegistrationRepository{},
@@ -100,7 +100,7 @@ func TestUnregister_ContestAlreadyStarted_Returns400(t *testing.T) {
 
 	wrapAuth(http.HandlerFunc(h.Unregister)).ServeHTTP(w, r)
 
-	if w.Code != http.StatusBadRequest {
-		t.Fatalf("expected 400, got %d: %s", w.Code, w.Body.String())
+	if w.Code != http.StatusConflict {
+		t.Fatalf("expected 409, got %d: %s", w.Code, w.Body.String())
 	}
 }
