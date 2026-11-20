@@ -5,7 +5,7 @@ import (
 	"time"
 )
 
-// Single "submissions" queue with x-max-priority: 4 instead of separate per-type queues — avoids per-queue workers and manual routing.
+// Single "submissions" queue with x-max-priority: 5 (the highest tier in use is 4) instead of separate per-type queues — avoids per-queue workers and manual routing.
 const (
 	QueuePriorityContest     = 4
 	QueuePriorityPostContest = 3

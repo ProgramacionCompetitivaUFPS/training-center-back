@@ -13,6 +13,8 @@ import (
 
 type ValidateProblemInput struct {
 	ValidationID string
+	// EnqueuedAt is when the message was published, to log how long it waited. Zero means unknown.
+	EnqueuedAt time.Time
 	// Slug is only used to build a readable storage path for compiled
 	// checker/validator artifacts — never to look up the ticket itself.
 	Slug string
@@ -72,6 +74,8 @@ func (uc *ValidateProblemUseCase) Execute(ctx context.Context, in ValidateProble
 	if err := uc.validationRepo.Save(ctx, v); err != nil {
 		return err
 	}
+
+	defer func() { logValidated(ctx, v, in.EnqueuedAt, now) }()
 
 	if v.IsJudgingUpdate() {
 		return uc.executeJudgingUpdate(ctx, v, in.Slug, now)
@@ -343,4 +347,18 @@ func logPreviousJudging(ctx context.Context, p *problem.Problem, validationID st
 	slog.InfoContext(ctx, "validate_problem: judging update replaces",
 		"validation_id", validationID, "problem_id", p.ID(),
 		"previous_test_cases", previousTestCases, "previous_checker", previousChecker)
+}
+
+// logValidated is the one line a validation leaves: what it ended as, how long it waited in the queue
+// and how long it ran, which the stored ticket does not say (its times are stamped when it starts).
+func logValidated(ctx context.Context, v *problem.ProblemValidation, enqueuedAt, startedAt time.Time) {
+	attrs := []any{
+		"validation_id", v.ID(),
+		"outcome", v.Status().String(),
+		"ran_for", time.Since(startedAt).Round(time.Millisecond),
+	}
+	if !enqueuedAt.IsZero() {
+		attrs = append(attrs, "queue_wait", startedAt.Sub(enqueuedAt).Round(time.Millisecond))
+	}
+	slog.InfoContext(ctx, "validate_problem: validation finished", attrs...)
 }
