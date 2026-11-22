@@ -66,7 +66,7 @@ func NewDB(t *testing.T) *pgxpool.Pool {
 
 func startServer(ctx context.Context) (string, func(), error) {
 	if url := os.Getenv(envURL); url != "" {
-		return url, func() {}, nil
+		return url, func() { /* external server, nothing to stop */ }, nil
 	}
 	container, err := tcpostgres.Run(ctx, image,
 		tcpostgres.WithUsername("postgres"),

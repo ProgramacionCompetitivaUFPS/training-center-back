@@ -23,3 +23,9 @@ nginx
 
 # documentación — innecesaria dentro de la imagen
 *.md
+
+# salida local de análisis y cobertura
+.scannerwork
+cover.out
+sonar-project.properties
+tmp
