@@ -229,8 +229,12 @@ func (c *Contest) Update(
 		return apperror.NewBadRequest(ErrCodeInvalidTimeRange, "end time must be after start time")
 	}
 
-	if freezeMinutes != nil {
-		if err := validateFreezeMinutes(*freezeMinutes, effEnd.Sub(effStart)); err != nil {
+	if freezeMinutes != nil || startTime != nil || endTime != nil {
+		effFreeze := c.freezeMinutes
+		if freezeMinutes != nil {
+			effFreeze = *freezeMinutes
+		}
+		if err := validateFreezeMinutes(effFreeze, effEnd.Sub(effStart)); err != nil {
 			return err
 		}
 	}

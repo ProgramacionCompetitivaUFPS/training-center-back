@@ -1,6 +1,7 @@
 package contest_test
 
 import (
+	"errors"
 	"testing"
 
 	"github.com/training-judge-center/backend/pkg/apperror"
@@ -24,5 +25,25 @@ func assertValidationField(t *testing.T, label string, err error, wantField stri
 	}
 	if appErr.Details[0].Field != wantField {
 		t.Errorf("%s: Details[0].Field = %q, want %q", label, appErr.Details[0].Field, wantField)
+	}
+}
+
+func assertErrorCode(t *testing.T, label string, err error, wantCode string) {
+	t.Helper()
+	var appErr *apperror.AppError
+	if !errors.As(err, &appErr) {
+		t.Errorf("%s: expected *apperror.AppError, got %T: %v", label, err, err)
+		return
+	}
+	if appErr.Code != wantCode {
+		t.Errorf("%s: Code = %q, want %q", label, appErr.Code, wantCode)
+	}
+}
+
+func assertInternalError(t *testing.T, label string, err error) {
+	t.Helper()
+	var appErr *apperror.AppError
+	if !errors.As(err, &appErr) || appErr.Kind != apperror.KindInternal {
+		t.Errorf("%s: expected an internal apperror, got %v", label, err)
 	}
 }
