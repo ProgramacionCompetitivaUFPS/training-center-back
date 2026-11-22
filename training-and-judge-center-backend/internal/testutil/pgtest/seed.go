@@ -63,3 +63,59 @@ func SeedSubmission(t *testing.T, pool *pgxpool.Pool, s Submission) {
 		t.Fatalf("pgtest: seed submission %s: %v", s.ID, err)
 	}
 }
+
+func SeedGroup(t *testing.T, pool *pgxpool.Pool, id, name, createdBy string) {
+	t.Helper()
+	_, err := pool.Exec(context.Background(), `
+		INSERT INTO groups (id, name, visibility, join_policy, created_by)
+		VALUES ($1, $2, 'VISIBLE', 'OPEN', $3)`,
+		id, name, createdBy)
+	if err != nil {
+		t.Fatalf("pgtest: seed group %s: %v", name, err)
+	}
+}
+
+func SeedGroupMember(t *testing.T, pool *pgxpool.Pool, memberID, groupID, userID, role string) {
+	t.Helper()
+	_, err := pool.Exec(context.Background(), `
+		INSERT INTO group_members (id, group_id, user_id, member_role)
+		VALUES ($1, $2, $3, $4)`,
+		memberID, groupID, userID, role)
+	if err != nil {
+		t.Fatalf("pgtest: seed group member %s: %v", memberID, err)
+	}
+}
+
+type Contest struct {
+	ID      string
+	GroupID string
+	OwnerID string
+	Name    string
+	Start   time.Time
+	End     time.Time
+}
+
+func SeedContest(t *testing.T, pool *pgxpool.Pool, c Contest) {
+	t.Helper()
+	if c.Name == "" {
+		c.Name = "Contest " + c.ID
+	}
+	_, err := pool.Exec(context.Background(), `
+		INSERT INTO contests (id, name, start_time, end_time, group_id, owner_id)
+		VALUES ($1, $2, $3, $4, $5, $6)`,
+		c.ID, c.Name, c.Start, c.End, c.GroupID, c.OwnerID)
+	if err != nil {
+		t.Fatalf("pgtest: seed contest %s: %v", c.ID, err)
+	}
+}
+
+func SeedContestProblem(t *testing.T, pool *pgxpool.Pool, id, contestID, problemID string, order int) {
+	t.Helper()
+	_, err := pool.Exec(context.Background(), `
+		INSERT INTO contest_problems (id, contest_id, problem_id, "order")
+		VALUES ($1, $2, $3, $4)`,
+		id, contestID, problemID, order)
+	if err != nil {
+		t.Fatalf("pgtest: seed contest problem %s: %v", id, err)
+	}
+}
