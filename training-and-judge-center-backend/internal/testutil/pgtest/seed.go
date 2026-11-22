@@ -42,6 +42,8 @@ type Submission struct {
 	Status      string
 	Language    string
 	SubmittedAt time.Time
+	ContestID   string
+	StandingID  string
 }
 
 func SeedSubmission(t *testing.T, pool *pgxpool.Pool, s Submission) {
@@ -56,9 +58,9 @@ func SeedSubmission(t *testing.T, pool *pgxpool.Pool, s Submission) {
 		s.SubmittedAt = time.Date(2026, 8, 8, 12, 0, 0, 0, time.UTC)
 	}
 	_, err := pool.Exec(context.Background(), `
-		INSERT INTO submissions (id, problem_id, user_id, language, status, source_code_path, submitted_at)
-		VALUES ($1, $2, $3, $4, $5, 'src/' || $1, $6)`,
-		s.ID, s.ProblemID, s.UserID, s.Language, s.Status, s.SubmittedAt)
+		INSERT INTO submissions (id, problem_id, user_id, language, status, source_code_path, submitted_at, contest_id, standing_id)
+		VALUES ($1, $2, $3, $4, $5, 'src/' || $1, $6, NULLIF($7, '')::uuid, NULLIF($8, '')::uuid)`,
+		s.ID, s.ProblemID, s.UserID, s.Language, s.Status, s.SubmittedAt, s.ContestID, s.StandingID)
 	if err != nil {
 		t.Fatalf("pgtest: seed submission %s: %v", s.ID, err)
 	}
