@@ -13,6 +13,8 @@ import (
 	"github.com/training-judge-center/backend/pkg/apperror"
 )
 
+const msgTeamRegistrationNotFound = "team registration not found"
+
 type TeamParticipationRepository struct {
 	db infraPostgres.Querier
 }
@@ -53,7 +55,7 @@ func (r *TeamParticipationRepository) FindByContestAndTeam(ctx context.Context, 
 	).Scan(&id, &cID, &tID, &selectedMembers, &registeredAt)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			return nil, apperror.NewNotFound(domainContest.ErrCodeTeamRegistrationNotFound, "team registration not found")
+			return nil, apperror.NewNotFound(domainContest.ErrCodeTeamRegistrationNotFound, msgTeamRegistrationNotFound)
 		}
 		slog.ErrorContext(ctx, "failed to find team participation",
 			"contest_id", contestID, "team_id", teamID, "error", err)
@@ -75,7 +77,7 @@ func (r *TeamParticipationRepository) Update(ctx context.Context, p *domainConte
 		return apperror.NewInternal()
 	}
 	if tag.RowsAffected() == 0 {
-		return apperror.NewNotFound(domainContest.ErrCodeTeamRegistrationNotFound, "team registration not found")
+		return apperror.NewNotFound(domainContest.ErrCodeTeamRegistrationNotFound, msgTeamRegistrationNotFound)
 	}
 	return nil
 }
@@ -92,7 +94,7 @@ func (r *TeamParticipationRepository) Delete(ctx context.Context, contestID, tea
 		return apperror.NewInternal()
 	}
 	if tag.RowsAffected() == 0 {
-		return apperror.NewNotFound(domainContest.ErrCodeTeamRegistrationNotFound, "team registration not found")
+		return apperror.NewNotFound(domainContest.ErrCodeTeamRegistrationNotFound, msgTeamRegistrationNotFound)
 	}
 	return nil
 }

@@ -11,6 +11,8 @@ import (
 	"github.com/training-judge-center/backend/internal/domain/user"
 )
 
+const msgInvalidAuthToken = "Invalid or missing authentication token"
+
 type contextKey string
 
 const currentUserKey contextKey = "current_user"
@@ -20,7 +22,7 @@ func Auth(tokenService user.TokenService, sessionInvalidator user.SessionInvalid
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			authHeader := r.Header.Get("Authorization")
 			if authHeader == "" || !strings.HasPrefix(authHeader, "Bearer ") {
-				writeError(w, http.StatusUnauthorized, "UNAUTHORIZED", "Invalid or missing authentication token")
+				writeError(w, http.StatusUnauthorized, "UNAUTHORIZED", msgInvalidAuthToken)
 				return
 			}
 
@@ -28,7 +30,7 @@ func Auth(tokenService user.TokenService, sessionInvalidator user.SessionInvalid
 
 			claims, err := tokenService.ValidateToken(tokenString)
 			if err != nil {
-				writeError(w, http.StatusUnauthorized, "UNAUTHORIZED", "Invalid or missing authentication token")
+				writeError(w, http.StatusUnauthorized, "UNAUTHORIZED", msgInvalidAuthToken)
 				return
 			}
 
@@ -39,7 +41,7 @@ func Auth(tokenService user.TokenService, sessionInvalidator user.SessionInvalid
 				return
 			}
 			if revoked {
-				writeError(w, http.StatusUnauthorized, "UNAUTHORIZED", "Invalid or missing authentication token")
+				writeError(w, http.StatusUnauthorized, "UNAUTHORIZED", msgInvalidAuthToken)
 				return
 			}
 
@@ -51,7 +53,7 @@ func Auth(tokenService user.TokenService, sessionInvalidator user.SessionInvalid
 					return
 				}
 				if sessionRevoked {
-					writeError(w, http.StatusUnauthorized, "UNAUTHORIZED", "Invalid or missing authentication token")
+					writeError(w, http.StatusUnauthorized, "UNAUTHORIZED", msgInvalidAuthToken)
 					return
 				}
 			}

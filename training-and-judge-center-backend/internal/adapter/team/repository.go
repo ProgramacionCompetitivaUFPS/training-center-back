@@ -14,6 +14,8 @@ import (
 	"github.com/training-judge-center/backend/pkg/apperror"
 )
 
+const msgTeamNotFound = "team not found"
+
 type Repository struct {
 	db infraPostgres.Querier
 }
@@ -50,7 +52,7 @@ func (r *Repository) UpdateName(ctx context.Context, t *domainTeam.Team) error {
 		return apperror.NewInternal()
 	}
 	if tag.RowsAffected() == 0 {
-		return apperror.NewNotFound(domainTeam.ErrCodeTeamNotFound, "team not found")
+		return apperror.NewNotFound(domainTeam.ErrCodeTeamNotFound, msgTeamNotFound)
 	}
 	return nil
 }
@@ -60,7 +62,7 @@ func (r *Repository) LockByID(ctx context.Context, id string) error {
 	var one int
 	if err := infraPostgres.GetQuerier(ctx, r.db).QueryRow(ctx, q, id).Scan(&one); err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			return apperror.NewNotFound(domainTeam.ErrCodeTeamNotFound, "team not found")
+			return apperror.NewNotFound(domainTeam.ErrCodeTeamNotFound, msgTeamNotFound)
 		}
 		slog.ErrorContext(ctx, "failed to lock team", "error", err, "team_id", id)
 		return apperror.NewInternal()
@@ -75,7 +77,7 @@ func (r *Repository) FindByID(ctx context.Context, id string) (*domainTeam.Team,
 	err := infraPostgres.GetQuerier(ctx, r.db).QueryRow(ctx, q, id).Scan(&tid, &name, &createdBy, &createdAt)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			return nil, apperror.NewNotFound(domainTeam.ErrCodeTeamNotFound, "team not found")
+			return nil, apperror.NewNotFound(domainTeam.ErrCodeTeamNotFound, msgTeamNotFound)
 		}
 		slog.ErrorContext(ctx, "failed to find team by ID", "error", err, "team_id", id)
 		return nil, apperror.NewInternal()

@@ -38,7 +38,7 @@ func writeZipDownload(w http.ResponseWriter, fileName string, data []byte) {
 	w.Header().Set("Content-Type", "application/zip")
 	w.Header().Set("Content-Disposition", fmt.Sprintf(`attachment; filename="%s"`, fileName))
 	w.Header().Set("Content-Length", strconv.Itoa(len(data)))
-	w.Header().Set("Cache-Control", "no-store")
+	setNoStore(w)
 	w.WriteHeader(http.StatusOK)
 	_, _ = w.Write(data)
 }
@@ -113,7 +113,7 @@ func (h *Handler) GetTestCase(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// secret test data: never to be cached by the browser or a proxy
-	w.Header().Set("Cache-Control", "no-store")
+	setNoStore(w)
 	handler.WriteJSON(r.Context(), w, http.StatusOK, testCaseResponse{
 		Kind:            out.Kind,
 		Name:            out.Name,
@@ -187,9 +187,13 @@ func (h *Handler) GetTestCasePart(w http.ResponseWriter, r *http.Request) {
 
 	// Secret test data: never cached, and never sniffed into something executable.
 	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
-	w.Header().Set("Cache-Control", "no-store")
+	setNoStore(w)
 	w.Header().Set("X-Content-Type-Options", "nosniff")
 	w.Header().Set("Content-Length", strconv.Itoa(len(content)))
 	w.WriteHeader(http.StatusOK)
 	_, _ = w.Write(content)
+}
+
+func setNoStore(w http.ResponseWriter) {
+	w.Header().Set("Cache-Control", "no-store")
 }

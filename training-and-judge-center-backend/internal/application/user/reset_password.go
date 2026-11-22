@@ -11,6 +11,8 @@ import (
 	"github.com/training-judge-center/backend/pkg/apperror"
 )
 
+const msgInvalidRecoveryAttempt = "Invalid email or recovery code"
+
 type ResetPasswordInput struct {
 	Email       string
 	Code        string
@@ -58,7 +60,7 @@ func (uc *ResetPasswordUseCase) Execute(ctx context.Context, input ResetPassword
 		return nil, err
 	}
 	if foundUser == nil || foundUser.Status() == user.StatusDeactivated {
-		return nil, apperror.NewBadRequest(ErrCodeInvalidRecoveryAttempt, "Invalid email or recovery code")
+		return nil, apperror.NewBadRequest(ErrCodeInvalidRecoveryAttempt, msgInvalidRecoveryAttempt)
 	}
 
 	req, err := uc.recoveryRepo.FindPendingByUserID(ctx, foundUser.ID())
@@ -66,12 +68,12 @@ func (uc *ResetPasswordUseCase) Execute(ctx context.Context, input ResetPassword
 		return nil, err
 	}
 	if req == nil {
-		return nil, apperror.NewBadRequest(ErrCodeInvalidRecoveryAttempt, "Invalid email or recovery code")
+		return nil, apperror.NewBadRequest(ErrCodeInvalidRecoveryAttempt, msgInvalidRecoveryAttempt)
 	}
 
 	now := time.Now()
 	if req.IsExpired(now) || subtle.ConstantTimeCompare([]byte(req.Code()), []byte(input.Code)) != 1 {
-		return nil, apperror.NewBadRequest(ErrCodeInvalidRecoveryAttempt, "Invalid email or recovery code")
+		return nil, apperror.NewBadRequest(ErrCodeInvalidRecoveryAttempt, msgInvalidRecoveryAttempt)
 	}
 
 	newPassword, err := user.NewPassword(input.NewPassword)
