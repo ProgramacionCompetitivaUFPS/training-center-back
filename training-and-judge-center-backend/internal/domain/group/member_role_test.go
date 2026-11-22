@@ -35,3 +35,12 @@ func TestNewMemberRole(t *testing.T) {
 		})
 	}
 }
+
+func TestMemberRole_StringAndRestore(t *testing.T) {
+	if group.MemberRoleLead.String() != "LEAD" || group.MemberRoleMember.String() != "MEMBER" {
+		t.Errorf("String() = %s/%s, want LEAD/MEMBER", group.MemberRoleLead, group.MemberRoleMember)
+	}
+	if got := group.RestoreMemberRole("LEGACY").String(); got != "LEGACY" {
+		t.Errorf("RestoreMemberRole().String() = %q, want LEGACY: no validation on restore", got)
+	}
+}
