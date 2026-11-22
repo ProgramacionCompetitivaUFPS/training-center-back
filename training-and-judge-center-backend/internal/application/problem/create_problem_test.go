@@ -2,6 +2,8 @@ package problem
 
 import (
 	"context"
+	"reflect"
+	"strings"
 	"testing"
 
 	domainProblem "github.com/training-judge-center/backend/internal/domain/problem"
@@ -173,5 +175,119 @@ func TestCreateProblem_RepositoryError(t *testing.T) {
 	}
 	if appErr.Code != apperror.ErrCodeInternalError {
 		t.Errorf("expected INTERNAL_ERROR, got %q", appErr.Code)
+	}
+}
+
+func TestCreateProblem_SavesEveryField(t *testing.T) {
+	repo := &mockProblemRepository{}
+	uc := NewCreateProblemUseCase(repo, newDefaultSettings())
+
+	statement := "A statement"
+	timeLimit := 2000
+	memoryLimit := 256
+	overrideTime := 1500
+	input := validCreateInput()
+	input.Statement = &statement
+	input.TimeLimit = &timeLimit
+	input.MemoryLimit = &memoryLimit
+	input.LangOverrides = []LanguageOverrideInput{{Language: "cpp", TimeLimit: &overrideTime}}
+	input.Tags = []string{"dp", "graphs"}
+
+	result, err := uc.Execute(context.Background(), input)
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+
+	got := result.Problem
+	if got.Statement == nil || *got.Statement != statement {
+		t.Errorf("statement: got %v, want %q", got.Statement, statement)
+	}
+	if got.TimeLimit == nil || *got.TimeLimit != timeLimit {
+		t.Errorf("time limit: got %v, want %d", got.TimeLimit, timeLimit)
+	}
+	if got.MemoryLimit == nil || *got.MemoryLimit != memoryLimit {
+		t.Errorf("memory limit: got %v, want %d", got.MemoryLimit, memoryLimit)
+	}
+	if len(got.LangOverrides) != 1 || got.LangOverrides[0].Language != "cpp" ||
+		got.LangOverrides[0].TimeLimit == nil || *got.LangOverrides[0].TimeLimit != overrideTime {
+		t.Errorf("language overrides: got %+v", got.LangOverrides)
+	}
+	if !reflect.DeepEqual(got.Tags, []string{"dp", "graphs"}) {
+		t.Errorf("tags: got %v", got.Tags)
+	}
+}
+
+func TestCreateProblem_RejectsInvalidFields(t *testing.T) {
+	zero := 0
+	tooHigh := 999999
+	tooLong := strings.Repeat("a", 150001)
+
+	tests := []struct {
+		name   string
+		mutate func(in *CreateProblemInput)
+		want   []string
+	}{
+		{"statement too long", func(in *CreateProblemInput) { in.Statement = &tooLong }, []string{"statement: Statement must not exceed 150,000 characters"}},
+		{"time limit above the global maximum", func(in *CreateProblemInput) { in.TimeLimit = &tooHigh }, []string{"timeLimit: Exceeds global maximum time limit"}},
+		{"memory limit above the global maximum", func(in *CreateProblemInput) { in.MemoryLimit = &tooHigh }, []string{"memoryLimit: Exceeds global maximum memory limit"}},
+		{"override without language", func(in *CreateProblemInput) {
+			in.LangOverrides = []LanguageOverrideInput{{Language: ""}}
+		}, []string{"languageOverrides: Language must not be empty"}},
+		{"override with unsupported language", func(in *CreateProblemInput) {
+			in.LangOverrides = []LanguageOverrideInput{{Language: "ruby"}}
+		}, []string{"languageOverrides.language: Unsupported language: ruby"}},
+		{"duplicated override", func(in *CreateProblemInput) {
+			in.LangOverrides = []LanguageOverrideInput{{Language: "cpp"}, {Language: "cpp"}}
+		}, []string{"languageOverrides.language: Duplicate language override: cpp"}},
+		{"override with a non-positive time limit", func(in *CreateProblemInput) {
+			in.LangOverrides = []LanguageOverrideInput{{Language: "cpp", TimeLimit: &zero}}
+		}, []string{"languageOverrides.timeLimit: Time limit must be positive"}},
+		{"override above the global time limit", func(in *CreateProblemInput) {
+			in.LangOverrides = []LanguageOverrideInput{{Language: "cpp", TimeLimit: &tooHigh}}
+		}, []string{"languageOverrides.timeLimit: Exceeds global maximum time limit for cpp"}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			uc := NewCreateProblemUseCase(&mockProblemRepository{}, newDefaultSettings())
+			input := validCreateInput()
+			tt.mutate(&input)
+
+			_, err := uc.Execute(context.Background(), input)
+
+			if err == nil {
+				t.Fatal("expected a validation error, got nil")
+			}
+			if got := validationDetails(t, err); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("got %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestCreateProblem_ReportsEveryFieldErrorInOrder(t *testing.T) {
+	uc := NewCreateProblemUseCase(&mockProblemRepository{}, newDefaultSettings())
+	tooHigh := 999999
+	tooLong := strings.Repeat("a", 150001)
+
+	input := validCreateInput()
+	input.Title = "   "
+	input.Statement = &tooLong
+	input.TimeLimit = &tooHigh
+	input.MemoryLimit = &tooHigh
+	input.LangOverrides = []LanguageOverrideInput{{Language: "ruby"}}
+	input.Tags = []string{"nope"}
+
+	_, err := uc.Execute(context.Background(), input)
+
+	want := []string{
+		"title: Title is required",
+		"statement: Statement must not exceed 150,000 characters",
+		"timeLimit: Exceeds global maximum time limit",
+		"memoryLimit: Exceeds global maximum memory limit",
+		"languageOverrides.language: Unsupported language: ruby",
+		"tags: Invalid tag: nope",
+	}
+	if got := validationDetails(t, err); !reflect.DeepEqual(got, want) {
+		t.Errorf("got  %v\nwant %v", got, want)
 	}
 }

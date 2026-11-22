@@ -3,6 +3,7 @@ package problem
 import (
 	"context"
 	"io"
+	"testing"
 	"time"
 
 	domainProblem "github.com/training-judge-center/backend/internal/domain/problem"
@@ -615,4 +616,20 @@ func (m *mockFileStorage) UploadFileStream(ctx context.Context, path string, con
 		return err
 	}
 	return m.UploadFile(ctx, path, data)
+}
+
+func validationDetails(t *testing.T, err error) []string {
+	t.Helper()
+	appErr, ok := err.(*apperror.AppError)
+	if !ok {
+		t.Fatalf("expected *apperror.AppError, got %T (%v)", err, err)
+	}
+	if appErr.Code != apperror.ErrCodeValidationError {
+		t.Fatalf("expected VALIDATION_ERROR, got %q", appErr.Code)
+	}
+	details := make([]string, 0, len(appErr.Details))
+	for _, d := range appErr.Details {
+		details = append(details, d.Field+": "+d.Message)
+	}
+	return details
 }
