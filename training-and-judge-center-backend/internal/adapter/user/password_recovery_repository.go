@@ -53,7 +53,7 @@ func (r *PasswordRecoveryRepository) FindByID(ctx context.Context, id string) (*
 	var updatedAt *time.Time
 	var statusStr string
 
-	err := r.querier.QueryRow(ctx, query, id).Scan(
+	err := infraPostgres.GetQuerier(ctx, r.querier).QueryRow(ctx, query, id).Scan(
 		&returnedID,
 		&userID,
 		&code,
@@ -110,7 +110,7 @@ func (r *PasswordRecoveryRepository) FindPendingByUserID(ctx context.Context, us
 	var updatedAt *time.Time
 	var statusStr string
 
-	err := r.querier.QueryRow(ctx, query, userID, domainUser.RequestStatusPending.String()).Scan(
+	err := infraPostgres.GetQuerier(ctx, r.querier).QueryRow(ctx, query, userID, domainUser.RequestStatusPending.String()).Scan(
 		&id,
 		&returnedUserID,
 		&code,

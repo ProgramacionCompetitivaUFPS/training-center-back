@@ -157,7 +157,7 @@ func scanUser(row pgx.Row) (*domainUser.User, error) {
 func (r *Repository) FindByEmail(ctx context.Context, email domainUser.Email) (*domainUser.User, error) {
 	query := `SELECT ` + userColumns + ` FROM users WHERE email = $1`
 
-	u, err := scanUser(r.querier.QueryRow(ctx, query, email.String()))
+	u, err := scanUser(infraPostgres.GetQuerier(ctx, r.querier).QueryRow(ctx, query, email.String()))
 	if err != nil {
 		slog.ErrorContext(ctx, "database error in FindByEmail", "error", err)
 		return nil, apperror.NewInternal()
@@ -168,7 +168,7 @@ func (r *Repository) FindByEmail(ctx context.Context, email domainUser.Email) (*
 func (r *Repository) FindByID(ctx context.Context, id string) (*domainUser.User, error) {
 	query := `SELECT ` + userColumns + ` FROM users WHERE id = $1`
 
-	u, err := scanUser(r.querier.QueryRow(ctx, query, id))
+	u, err := scanUser(infraPostgres.GetQuerier(ctx, r.querier).QueryRow(ctx, query, id))
 	if err != nil {
 		slog.ErrorContext(ctx, "database error in FindByID", "error", err)
 		return nil, apperror.NewInternal()
@@ -179,7 +179,7 @@ func (r *Repository) FindByID(ctx context.Context, id string) (*domainUser.User,
 func (r *Repository) FindByNickname(ctx context.Context, nickname domainUser.Nickname) (*domainUser.User, error) {
 	query := `SELECT ` + userColumns + ` FROM users WHERE nickname = LOWER($1)`
 
-	u, err := scanUser(r.querier.QueryRow(ctx, query, nickname.String()))
+	u, err := scanUser(infraPostgres.GetQuerier(ctx, r.querier).QueryRow(ctx, query, nickname.String()))
 	if err != nil {
 		slog.ErrorContext(ctx, "database error in FindByNickname", "error", err)
 		return nil, apperror.NewInternal()
@@ -288,7 +288,7 @@ func (r *Repository) FindAll(ctx context.Context, filter domainUser.UserFilter) 
 	// COUNT query for pagination metadata
 	countQuery := fmt.Sprintf(`SELECT COUNT(*) FROM users %s`, whereClause)
 	var totalCount int
-	if err := r.querier.QueryRow(ctx, countQuery, args...).Scan(&totalCount); err != nil {
+	if err := infraPostgres.GetQuerier(ctx, r.querier).QueryRow(ctx, countQuery, args...).Scan(&totalCount); err != nil {
 		slog.ErrorContext(ctx, "database error counting users", "error", err)
 		return nil, 0, apperror.NewInternal()
 	}
@@ -301,7 +301,7 @@ func (r *Repository) FindAll(ctx context.Context, filter domainUser.UserFilter) 
 	)
 	args = append(args, filter.Limit, offset)
 
-	rows, err := r.querier.Query(ctx, dataQuery, args...)
+	rows, err := infraPostgres.GetQuerier(ctx, r.querier).Query(ctx, dataQuery, args...)
 	if err != nil {
 		slog.ErrorContext(ctx, "database error listing users", "error", err)
 		return nil, 0, apperror.NewInternal()
@@ -338,7 +338,7 @@ func (r *Repository) SearchActive(ctx context.Context, term string, limit int) (
 		userColumns,
 	)
 
-	rows, err := r.querier.Query(ctx, query, domainUser.StatusActive.String(), pattern, limit)
+	rows, err := infraPostgres.GetQuerier(ctx, r.querier).Query(ctx, query, domainUser.StatusActive.String(), pattern, limit)
 	if err != nil {
 		slog.ErrorContext(ctx, "database error searching active users", "error", err)
 		return nil, apperror.NewInternal()
