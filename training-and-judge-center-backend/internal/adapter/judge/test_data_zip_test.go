@@ -398,3 +398,75 @@ func TestFileTestCaseSet_CloseReleasesOnce(t *testing.T) {
 		t.Errorf("released %d times, want exactly 1", *releases)
 	}
 }
+
+func TestExtractTestCases_UnsupportedCompressionMethod_IsInvalidTestData(t *testing.T) {
+	data := zipBytes(t, map[string]string{"data/secret/1.in": "1", "data/secret/1.ans": "1"}, true)
+	central := []byte{'P', 'K', 0x01, 0x02}
+	patched := bytes.Clone(data)
+	patchedAny := false
+	for i := 0; i+12 <= len(patched); i++ {
+		if bytes.Equal(patched[i:i+4], central) {
+			// The method is the two bytes at offset 10 of every central directory header.
+			patched[i+10], patched[i+11] = 99, 0
+			patchedAny = true
+		}
+	}
+	if !patchedAny {
+		t.Fatal("test setup: no central directory header found")
+	}
+
+	_, _, err := extract(t, patched, testLimits())
+
+	if !errors.Is(err, errInvalidTestData) {
+		t.Fatalf("expected errInvalidTestData for an entry that cannot be decompressed, got %v", err)
+	}
+}
+
+func TestExtractTestCases_ScratchFileAlreadyThere_IsOurDiskAndNotTheArchive(t *testing.T) {
+	plan, err := planOf(t, zipBytes(t, map[string]string{"data/secret/1.in": "1", "data/secret/1.ans": "1"}, false), testLimits())
+	if err != nil {
+		t.Fatal(err)
+	}
+	dir := filepath.Join(t.TempDir(), "problem")
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "00000.in"), []byte("leftover"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	_, err = extractTestCases(context.Background(), plan, dir, dir)
+
+	if !errors.Is(err, os.ErrExist) {
+		t.Fatalf("expected the file-exists error, got %v", err)
+	}
+	if errors.Is(err, errInvalidTestData) {
+		t.Error("a failure of our own disk was blamed on the archive")
+	}
+}
+
+type failingWriter struct{ err error }
+
+func (f failingWriter) Write([]byte) (int, error) { return 0, f.err }
+
+func TestFailureWriter_MarksItsOwnWriteErrorsAndPassesSuccessThrough(t *testing.T) {
+	boom := errors.New("no space left on device")
+
+	_, err := failureWriter{failingWriter{boom}}.Write([]byte("data"))
+	var wf *writeFailure
+	if !errors.As(err, &wf) {
+		t.Fatalf("expected a *writeFailure, got %T: %v", err, err)
+	}
+	if !errors.Is(err, boom) {
+		t.Error("the write failure does not unwrap to the underlying error")
+	}
+	if err.Error() != "no space left on device" {
+		t.Errorf("message: got %q, want %q", err.Error(), "no space left on device")
+	}
+
+	var buf bytes.Buffer
+	n, err := failureWriter{&buf}.Write([]byte("data"))
+	if err != nil || n != 4 || buf.String() != "data" {
+		t.Errorf("pass-through: n=%d err=%v buf=%q, want 4, nil, %q", n, err, buf.String(), "data")
+	}
+}

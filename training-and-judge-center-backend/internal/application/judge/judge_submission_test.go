@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/training-judge-center/backend/internal/domain/submission"
+	"github.com/training-judge-center/backend/pkg/apperror"
 )
 
 func newJudgeSubmissionUseCase(
@@ -1014,5 +1015,133 @@ func TestJudgeSubmission_JudgedAtIsTheVerdictInstant(t *testing.T) {
 	took := start.Add(time.Minute)
 	if !judgedAt.After(took) {
 		t.Errorf("judgedAt = %v, want after the instant the submission was taken (%v)", judgedAt, took)
+	}
+}
+
+func TestJudgeSubmission_SubmissionLookupFails_ReturnsTheErrorWithoutClaiming(t *testing.T) {
+	updater := &mockSubmissionUpdater{
+		getByIDFn: func(_ context.Context, _ submission.SubmissionID) (*submission.Submission, error) {
+			return nil, errTransient
+		},
+	}
+	executor := &mockExecutor{}
+	uc := newJudgeSubmissionUseCase(
+		updater, &mockSourceCodeDownloader{}, &mockProblemProvider{}, &mockTestCaseProvider{}, executor, &mockOutputChecker{},
+	)
+
+	err := uc.Execute(context.Background(), JudgeSubmissionInput{SubmissionID: submissionID})
+
+	if !errors.Is(err, errTransient) {
+		t.Errorf("expected the lookup error, got %v", err)
+	}
+	if updater.claims != 0 {
+		t.Errorf("claims = %d, want 0", updater.claims)
+	}
+	if executor.calls != 0 {
+		t.Errorf("executor sessions = %d, want 0", executor.calls)
+	}
+}
+
+func TestJudgeSubmission_ClaimFails_ReturnsTheErrorWithoutJudging(t *testing.T) {
+	updater := &mockSubmissionUpdater{
+		claimFn: func(_ context.Context, _ submission.SubmissionID) (bool, error) {
+			return false, errTransient
+		},
+	}
+	executor := &mockExecutor{}
+	uc := newJudgeSubmissionUseCase(
+		updater, &mockSourceCodeDownloader{}, &mockProblemProvider{}, &mockTestCaseProvider{}, executor, &mockOutputChecker{},
+	)
+
+	err := uc.Execute(context.Background(), JudgeSubmissionInput{SubmissionID: submissionID})
+
+	if !errors.Is(err, errTransient) {
+		t.Errorf("expected the claim error, got %v", err)
+	}
+	if executor.calls != 0 {
+		t.Errorf("executor sessions = %d, want 0", executor.calls)
+	}
+}
+
+func TestJudgeSubmission_CompileInfraError_MarksSystemError(t *testing.T) {
+	var updatedStatus string
+	uc := newJudgeSubmissionUseCase(
+		&mockSubmissionUpdater{
+			updateFn: func(_ context.Context, s *submission.Submission) error {
+				updatedStatus = s.Status().String()
+				return nil
+			},
+		},
+		&mockSourceCodeDownloader{},
+		&mockProblemProvider{},
+		&mockTestCaseProvider{},
+		&mockExecutor{
+			beginSessionFn: func(_ context.Context, _ submission.Language, _ int, _ string) (ExecutionSession, error) {
+				return &mockExecutionSession{
+					compileFn: func(_ context.Context, _ CompileRequest) (CompileResult, error) {
+						return CompileResult{}, errTransient
+					},
+				}, nil
+			},
+		},
+		&mockOutputChecker{},
+	)
+
+	err := uc.Execute(context.Background(), JudgeSubmissionInput{SubmissionID: submissionID})
+
+	if err != nil {
+		t.Errorf("expected nil (ACK) once the verdict is persisted, got %v", err)
+	}
+	if updatedStatus != "SYSTEM_ERROR" {
+		t.Errorf("expected SYSTEM_ERROR, got %s", updatedStatus)
+	}
+}
+
+func TestJudgeSubmission_CheckerInfraError_MarksSystemError(t *testing.T) {
+	var updatedStatus string
+	uc := newJudgeSubmissionUseCase(
+		&mockSubmissionUpdater{
+			updateFn: func(_ context.Context, s *submission.Submission) error {
+				updatedStatus = s.Status().String()
+				return nil
+			},
+		},
+		&mockSourceCodeDownloader{},
+		&mockProblemProvider{},
+		&mockTestCaseProvider{},
+		&mockExecutor{},
+		&mockOutputChecker{
+			checkFn: func(_ context.Context, _ []byte) (CheckResult, error) {
+				return CheckResult{}, errTransient
+			},
+		},
+	)
+
+	err := uc.Execute(context.Background(), JudgeSubmissionInput{SubmissionID: submissionID})
+
+	if err != nil {
+		t.Errorf("expected nil (ACK) once the verdict is persisted, got %v", err)
+	}
+	if updatedStatus != "SYSTEM_ERROR" {
+		t.Errorf("expected SYSTEM_ERROR, got %s", updatedStatus)
+	}
+}
+
+func TestJudgeSubmission_PersistingTheVerdictFails_ReturnsAnInternalErrorWithoutTheCause(t *testing.T) {
+	uc := newJudgeSubmissionUseCase(
+		&mockSubmissionUpdater{
+			updateFn: func(_ context.Context, _ *submission.Submission) error { return errTransient },
+		},
+		&mockSourceCodeDownloader{}, &mockProblemProvider{}, &mockTestCaseProvider{}, &mockExecutor{}, &mockOutputChecker{},
+	)
+
+	err := uc.Execute(context.Background(), JudgeSubmissionInput{SubmissionID: submissionID})
+
+	var appErr *apperror.AppError
+	if !errors.As(err, &appErr) || appErr.Kind != apperror.KindInternal {
+		t.Fatalf("expected an internal apperror, got %v", err)
+	}
+	if errors.Is(err, errTransient) {
+		t.Error("the storage error leaked through the internal error")
 	}
 }

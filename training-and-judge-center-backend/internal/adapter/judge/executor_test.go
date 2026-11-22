@@ -3,8 +3,11 @@ package judge
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
+	"io"
 	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -646,4 +649,226 @@ func TestSession_RunTestCase_ExecStillRunningAfterAttachIsAnError(t *testing.T) 
 		Input: strings.NewReader("1\n"), TimeLimitMs: 1000,
 	})
 	assertAppErrorKind(t, err, apperror.KindInternal)
+}
+
+func TestSession_Compile_DockerFailure_ReturnsInternal(t *testing.T) {
+	tests := []struct {
+		name string
+		fail func(m *mockDockerExecClient)
+	}{
+		{"copying the source fails", func(m *mockDockerExecClient) {
+			m.copyToContainerFn = func(context.Context, string, client.CopyToContainerOptions) (client.CopyToContainerResult, error) {
+				return client.CopyToContainerResult{}, errors.New("daemon unavailable")
+			}
+		}},
+		{"creating the exec fails", func(m *mockDockerExecClient) {
+			m.execCreateFn = func(context.Context, string, client.ExecCreateOptions) (client.ExecCreateResult, error) {
+				return client.ExecCreateResult{}, errors.New("daemon unavailable")
+			}
+		}},
+		{"attaching to the exec fails", func(m *mockDockerExecClient) {
+			m.execAttachFn = func(context.Context, string, client.ExecAttachOptions) (client.ExecAttachResult, error) {
+				return client.ExecAttachResult{}, errors.New("daemon unavailable")
+			}
+		}},
+		{"inspecting the exec fails", func(m *mockDockerExecClient) {
+			m.execInspectFn = func(context.Context, string, client.ExecInspectOptions) (client.ExecInspectResult, error) {
+				return client.ExecInspectResult{}, errors.New("daemon unavailable")
+			}
+		}},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			mock := &mockDockerExecClient{}
+			tt.fail(mock)
+			s, _ := newTestSession(t, mock)
+			defer s.Close(context.Background())
+
+			result, err := s.Compile(context.Background(), appjudge.CompileRequest{SourceCode: []byte("int main(){}")})
+
+			assertAppErrorKind(t, err, apperror.KindInternal)
+			if result.Success {
+				t.Error("a compile that could not run must not report success")
+			}
+		})
+	}
+}
+
+func TestSession_RunTestCase_DockerFailure_ReturnsInternal(t *testing.T) {
+	tests := []struct {
+		name string
+		fail func(m *mockDockerExecClient)
+	}{
+		{"creating the exec fails", func(m *mockDockerExecClient) {
+			m.execCreateFn = func(context.Context, string, client.ExecCreateOptions) (client.ExecCreateResult, error) {
+				return client.ExecCreateResult{}, errors.New("daemon unavailable")
+			}
+		}},
+		{"attaching to the exec fails", func(m *mockDockerExecClient) {
+			m.execAttachFn = func(context.Context, string, client.ExecAttachOptions) (client.ExecAttachResult, error) {
+				return client.ExecAttachResult{}, errors.New("daemon unavailable")
+			}
+		}},
+		{"inspecting the exec fails", func(m *mockDockerExecClient) {
+			m.execInspectFn = func(context.Context, string, client.ExecInspectOptions) (client.ExecInspectResult, error) {
+				return client.ExecInspectResult{}, errors.New("daemon unavailable")
+			}
+		}},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			mock := &mockDockerExecClient{}
+			tt.fail(mock)
+			s, _ := newTestSession(t, mock)
+			defer s.Close(context.Background())
+
+			_, err := s.RunTestCase(context.Background(), appjudge.RunRequest{Input: strings.NewReader("1\n"), TimeLimitMs: 1000})
+
+			assertAppErrorKind(t, err, apperror.KindInternal)
+		})
+	}
+}
+
+func TestSession_RunTestCase_InputCannotBeWritten_ReturnsInternalWithoutRunning(t *testing.T) {
+	mock := &mockDockerExecClient{}
+	s, _ := newTestSession(t, mock)
+	defer s.Close(context.Background())
+	s.judgingDir = filepath.Join(t.TempDir(), "absent")
+
+	_, err := s.RunTestCase(context.Background(), appjudge.RunRequest{Input: strings.NewReader("1\n"), TimeLimitMs: 1000})
+
+	assertAppErrorKind(t, err, apperror.KindInternal)
+	if mock.execCreateCnt.Load() != 0 {
+		t.Errorf("execCreateCnt = %d, want 0: nothing may run without its input", mock.execCreateCnt.Load())
+	}
+}
+
+func TestSession_RunTestCase_TimeIsTheContainersCPUUsageDelta(t *testing.T) {
+	tests := []struct {
+		name          string
+		before, after uint64
+		wantTimeMs    int
+	}{
+		{"usage grew during the run", 1_000_000_000, 1_250_000_000, 250},
+		{"a counter that went backwards counts as zero", 5_000_000_000, 1_000_000_000, 0},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			calls := 0
+			mock := &mockDockerExecClient{
+				containerStatsFn: func(context.Context, string, client.ContainerStatsOptions) (client.ContainerStatsResult, error) {
+					calls++
+					if calls == 1 {
+						return client.ContainerStatsResult{Body: cpuStatsBody(tt.before)}, nil
+					}
+					return client.ContainerStatsResult{Body: cpuStatsBody(tt.after)}, nil
+				},
+			}
+			s, _ := newTestSession(t, mock)
+			defer s.Close(context.Background())
+
+			result, err := s.RunTestCase(context.Background(), appjudge.RunRequest{Input: strings.NewReader("1\n"), TimeLimitMs: 1000})
+
+			if err != nil {
+				t.Fatalf("RunTestCase: %v", err)
+			}
+			if result.TimeMs != tt.wantTimeMs {
+				t.Errorf("TimeMs = %d, want %d", result.TimeMs, tt.wantTimeMs)
+			}
+		})
+	}
+}
+
+func TestSession_ReadCPUNanos_AnUnreadableMeasurementIsZero(t *testing.T) {
+	tests := []struct {
+		name  string
+		stats func(context.Context, string, client.ContainerStatsOptions) (client.ContainerStatsResult, error)
+	}{
+		{"the daemon refuses", func(context.Context, string, client.ContainerStatsOptions) (client.ContainerStatsResult, error) {
+			return client.ContainerStatsResult{}, errors.New("daemon unavailable")
+		}},
+		{"the body is not JSON", func(context.Context, string, client.ContainerStatsOptions) (client.ContainerStatsResult, error) {
+			return client.ContainerStatsResult{Body: io.NopCloser(strings.NewReader("not json"))}, nil
+		}},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			s, _ := newTestSession(t, &mockDockerExecClient{containerStatsFn: tt.stats})
+			defer s.Close(context.Background())
+
+			got := s.readCPUNanos(context.Background())
+
+			if got != 0 {
+				t.Errorf("readCPUNanos = %d, want 0", got)
+			}
+		})
+	}
+}
+
+func TestSession_RunTestCase_MissingOutputFile_YieldsNoPreviewAndNoLimitBreach(t *testing.T) {
+	s, _ := newTestSession(t, &mockDockerExecClient{})
+	defer s.Close(context.Background())
+	if err := os.Remove(judgingOutputPath(s.judgingDir)); err != nil {
+		t.Fatal(err)
+	}
+
+	result, err := s.RunTestCase(context.Background(), appjudge.RunRequest{Input: strings.NewReader("1\n"), TimeLimitMs: 1000})
+
+	if err != nil {
+		t.Fatalf("RunTestCase: %v", err)
+	}
+	if result.OutputPreview != nil || result.OutputLimitExceeded {
+		t.Errorf("preview = %q, exceeded = %v, want nil and false", result.OutputPreview, result.OutputLimitExceeded)
+	}
+}
+
+func TestSession_RunTestCase_UnreadableOutput_YieldsNoPreview(t *testing.T) {
+	s, _ := newTestSession(t, &mockDockerExecClient{})
+	defer s.Close(context.Background())
+	outputPath := judgingOutputPath(s.judgingDir)
+	if err := os.Remove(outputPath); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Mkdir(outputPath, 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	result, err := s.RunTestCase(context.Background(), appjudge.RunRequest{Input: strings.NewReader("1\n"), TimeLimitMs: 1000})
+
+	if err != nil {
+		t.Fatalf("RunTestCase: %v", err)
+	}
+	if result.OutputPreview != nil {
+		t.Errorf("preview = %q, want nil when the output cannot be read", result.OutputPreview)
+	}
+}
+
+func TestSession_Close_SandboxCleanupFails_StillReleasesTheContainer(t *testing.T) {
+	poolMock := &mockPoolDockerClient{}
+	p := judgepool.NewPool(testPoolCfg(), poolMock)
+	p.Start()
+	t.Cleanup(p.Stop)
+	c, _ := p.Claim(context.Background(), testLang, judgepool.LanguageCeiling)
+	docker := &mockDockerExecClient{
+		execCreateFn: func(context.Context, string, client.ExecCreateOptions) (client.ExecCreateResult, error) {
+			return client.ExecCreateResult{}, errors.New("daemon unavailable")
+		},
+	}
+	s := &Session{container: c, pool: p, docker: docker, langCfg: testExecCfg().Languages[testLang]}
+
+	err := s.Close(context.Background())
+
+	if err != nil {
+		t.Errorf("Close: %v, want nil: a failed cleanup must not fail the judging", err)
+	}
+	if _, claimErr := p.Claim(context.Background(), testLang, judgepool.LanguageCeiling); claimErr != nil {
+		t.Fatalf("Claim after Close: %v", claimErr)
+	}
+	if poolMock.idCounter.Load() != 1 {
+		t.Errorf("containers created = %d, want 1 (the failed cleanup must still release it)", poolMock.idCounter.Load())
+	}
 }
