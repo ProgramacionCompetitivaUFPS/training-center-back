@@ -33,6 +33,18 @@ Para eliminar tambiÃ©n los datos de PostgreSQL:
 docker-compose --env-file .env.example down -v
 ```
 
+### Actualizar un servidor que ya tiene archivos subidos
+
+La imagen corre como usuario sin privilegios (UID 65532). Un volumen `problem_uploads` creado por una versión anterior pertenece a root y la API no podría escribir en él. Solo aplica si `STORAGE_BACKEND=local`; con `gcs` el volumen no se usa.
+
+Ejecuta esto **una vez**, antes de levantar la imagen nueva:
+
+```bash
+docker run --rm -v <proyecto>_problem_uploads:/data/uploads alpine chown -R 65532:65532 /data/uploads
+```
+
+`<proyecto>` es el prefijo que muestra `docker volume ls`, normalmente el nombre de la carpeta del compose. Los volúmenes nuevos no necesitan este paso.
+
 ## EjecuciÃ³n local (sin Docker para el backend)
 
 1. Levantar solo PostgreSQL:

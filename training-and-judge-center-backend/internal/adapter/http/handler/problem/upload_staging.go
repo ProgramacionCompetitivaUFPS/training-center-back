@@ -138,7 +138,7 @@ func newUploadGate(n int) *uploadGate {
 
 func (g *uploadGate) acquire(ctx context.Context) (func(), error) {
 	if g == nil || g.slots == nil {
-		return func() {}, nil
+		return func() { /* no limit configured, nothing to release */ }, nil
 	}
 	timer := time.NewTimer(g.wait)
 	defer timer.Stop()
