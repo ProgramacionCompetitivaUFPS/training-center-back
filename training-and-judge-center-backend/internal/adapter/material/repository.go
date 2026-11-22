@@ -17,6 +17,11 @@ import (
 	"github.com/training-judge-center/backend/pkg/apperror"
 )
 
+const (
+	sqlGroupFilter = "group_id = %s"
+	sqlStatusFilter = "status = ANY(%s)"
+)
+
 type Repository struct {
 	db infraPostgres.Querier
 }
@@ -97,14 +102,14 @@ func (r *Repository) List(ctx context.Context, groupID string, filters material.
 		return s
 	}
 
-	conds = append(conds, fmt.Sprintf("group_id = %s", nextArg(groupID)))
+	conds = append(conds, fmt.Sprintf(sqlGroupFilter, nextArg(groupID)))
 
 	if len(filters.Statuses) > 0 {
 		statusStrings := make([]string, len(filters.Statuses))
 		for i, s := range filters.Statuses {
 			statusStrings[i] = s.String()
 		}
-		conds = append(conds, fmt.Sprintf("status = ANY(%s)", nextArg(statusStrings)))
+		conds = append(conds, fmt.Sprintf(sqlStatusFilter, nextArg(statusStrings)))
 	}
 
 	if filters.ViewerID != nil {
@@ -250,13 +255,13 @@ func (r *Repository) DistinctTags(ctx context.Context, groupID string, statuses 
 		return s
 	}
 
-	conds = append(conds, fmt.Sprintf("group_id = %s", nextArg(groupID)))
+	conds = append(conds, fmt.Sprintf(sqlGroupFilter, nextArg(groupID)))
 	if len(statuses) > 0 {
 		statusStrings := make([]string, len(statuses))
 		for i, s := range statuses {
 			statusStrings[i] = s.String()
 		}
-		conds = append(conds, fmt.Sprintf("status = ANY(%s)", nextArg(statusStrings)))
+		conds = append(conds, fmt.Sprintf(sqlStatusFilter, nextArg(statusStrings)))
 	}
 	limitArg := nextArg(sampleSize)
 
@@ -311,13 +316,13 @@ func (r *Repository) DistinctAuthorIDs(ctx context.Context, groupID string, stat
 		return s
 	}
 
-	conds = append(conds, fmt.Sprintf("group_id = %s", nextArg(groupID)))
+	conds = append(conds, fmt.Sprintf(sqlGroupFilter, nextArg(groupID)))
 	if len(statuses) > 0 {
 		statusStrings := make([]string, len(statuses))
 		for i, s := range statuses {
 			statusStrings[i] = s.String()
 		}
-		conds = append(conds, fmt.Sprintf("status = ANY(%s)", nextArg(statusStrings)))
+		conds = append(conds, fmt.Sprintf(sqlStatusFilter, nextArg(statusStrings)))
 	}
 	limitArg := nextArg(sampleSize)
 

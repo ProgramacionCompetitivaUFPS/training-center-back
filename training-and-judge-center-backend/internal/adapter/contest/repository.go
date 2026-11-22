@@ -15,6 +15,8 @@ import (
 	"github.com/training-judge-center/backend/pkg/apperror"
 )
 
+const msgContestNotFound = "contest not found"
+
 type Repository struct {
 	db infraPostgres.Querier
 }
@@ -117,7 +119,7 @@ func (r *Repository) FindByID(ctx context.Context, id string) (*domainContest.Co
 	)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			return nil, apperror.NewNotFound(domainContest.ErrCodeContestNotFound, "contest not found")
+			return nil, apperror.NewNotFound(domainContest.ErrCodeContestNotFound, msgContestNotFound)
 		}
 		slog.ErrorContext(ctx, "failed to find contest", "error", err, "contest_id", id)
 		return nil, apperror.NewInternal()
@@ -427,7 +429,7 @@ func (r *Repository) explainRefusedUpdate(ctx context.Context, q infraPostgres.Q
 		return apperror.NewInternal()
 	}
 	if !exists {
-		return apperror.NewNotFound(domainContest.ErrCodeContestNotFound, "contest not found")
+		return apperror.NewNotFound(domainContest.ErrCodeContestNotFound, msgContestNotFound)
 	}
 	return apperror.NewConflict(domainContest.ErrCodeContestConflict, "the contest was modified by someone else; reload it and try again")
 }
@@ -436,7 +438,7 @@ func (r *Repository) explainRefusedDelete(ctx context.Context, q infraPostgres.Q
 	var locked bool
 	err := q.QueryRow(ctx, `SELECT locked FROM contests WHERE id=$1`, id).Scan(&locked)
 	if errors.Is(err, pgx.ErrNoRows) {
-		return apperror.NewNotFound(domainContest.ErrCodeContestNotFound, "contest not found")
+		return apperror.NewNotFound(domainContest.ErrCodeContestNotFound, msgContestNotFound)
 	}
 	if err != nil {
 		slog.ErrorContext(ctx, "failed to read the lock of a contest that was not deleted", "error", err, "contest_id", id)

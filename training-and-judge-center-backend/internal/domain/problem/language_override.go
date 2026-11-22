@@ -2,6 +2,11 @@ package problem
 
 import "github.com/training-judge-center/backend/pkg/apperror"
 
+const (
+	fieldOverrideTimeLimit = "languageOverrides.timeLimit"
+	fieldOverrideMemoryLimit = "languageOverrides.memoryLimit"
+)
+
 type LanguageOverride struct {
 	language    string
 	timeLimit   *int
@@ -27,14 +32,14 @@ func NewLanguageOverride(
 
 	if timeLimit != nil && *timeLimit <= 0 {
 		fieldErrs = append(fieldErrs, apperror.FieldError{
-			Field:   "languageOverrides.timeLimit",
+			Field:   fieldOverrideTimeLimit,
 			Message: "Time limit must be positive",
 		})
 	}
 
 	if memoryLimit != nil && *memoryLimit <= 0 {
 		fieldErrs = append(fieldErrs, apperror.FieldError{
-			Field:   "languageOverrides.memoryLimit",
+			Field:   fieldOverrideMemoryLimit,
 			Message: "Memory limit must be positive",
 		})
 	}
@@ -42,26 +47,26 @@ func NewLanguageOverride(
 	if langLimit != nil {
 		if timeLimit != nil && *timeLimit > 0 && *timeLimit > langLimit.MaxTimeLimit() {
 			fieldErrs = append(fieldErrs, apperror.FieldError{
-				Field:   "languageOverrides.timeLimit",
+				Field:   fieldOverrideTimeLimit,
 				Message: "Exceeds maximum time limit for " + language,
 			})
 		}
 		if memoryLimit != nil && *memoryLimit > 0 && *memoryLimit > langLimit.MaxMemoryLimit() {
 			fieldErrs = append(fieldErrs, apperror.FieldError{
-				Field:   "languageOverrides.memoryLimit",
+				Field:   fieldOverrideMemoryLimit,
 				Message: "Exceeds maximum memory limit for " + language,
 			})
 		}
 	} else if language != "" {
 		if timeLimit != nil && *timeLimit > 0 && *timeLimit > globalMaxTime {
 			fieldErrs = append(fieldErrs, apperror.FieldError{
-				Field:   "languageOverrides.timeLimit",
+				Field:   fieldOverrideTimeLimit,
 				Message: "Exceeds global maximum time limit for " + language,
 			})
 		}
 		if memoryLimit != nil && *memoryLimit > 0 && *memoryLimit > globalMaxMemory {
 			fieldErrs = append(fieldErrs, apperror.FieldError{
-				Field:   "languageOverrides.memoryLimit",
+				Field:   fieldOverrideMemoryLimit,
 				Message: "Exceeds global maximum memory limit for " + language,
 			})
 		}
