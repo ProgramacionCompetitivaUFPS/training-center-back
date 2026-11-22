@@ -70,3 +70,9 @@ func TestStatus_IsValid(t *testing.T) {
 		})
 	}
 }
+
+func TestStatus_String(t *testing.T) {
+	if user.StatusActive.String() != "ACTIVE" || user.StatusDeactivated.String() != "DEACTIVATED" {
+		t.Errorf("String() = %s/%s, want ACTIVE/DEACTIVATED", user.StatusActive, user.StatusDeactivated)
+	}
+}

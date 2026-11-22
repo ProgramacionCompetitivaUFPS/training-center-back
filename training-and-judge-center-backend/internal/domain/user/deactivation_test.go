@@ -123,3 +123,104 @@ func TestRegisterFailure(t *testing.T) {
 		})
 	}
 }
+
+func TestNewDeactivationRequest_StartsPendingAndExpiresInFifteenMinutes(t *testing.T) {
+	req, err := user.NewDeactivationRequest("req-1", "user-1", "123456", localNow)
+
+	if err != nil {
+		t.Fatalf("NewDeactivationRequest: %v", err)
+	}
+	if req.ID() != "req-1" || req.UserID() != "user-1" || req.VerificationCode() != "123456" {
+		t.Errorf("fields = %s/%s/%s, want req-1/user-1/123456", req.ID(), req.UserID(), req.VerificationCode())
+	}
+	if req.Status() != user.DeactivationStatusPending || req.Attempts() != 0 || req.BlockedUntil() != nil {
+		t.Errorf("state = %s/%d/%v, want PENDING with no attempts and no block", req.Status(), req.Attempts(), req.BlockedUntil())
+	}
+	assertInUTC(t, "CreatedAt", req.CreatedAt(), testNow)
+	assertInUTC(t, "UpdatedAt", req.UpdatedAt(), testNow)
+	assertInUTC(t, "ExpiresAt", req.ExpiresAt(), time.Date(2024, 1, 15, 12, 15, 0, 0, time.UTC))
+}
+
+func TestNewDeactivationRequest_EmptyID_IsAnInternalError(t *testing.T) {
+	req, err := user.NewDeactivationRequest("", "user-1", "123456", testNow)
+
+	assertInternalError(t, "empty id", err)
+	if req != nil {
+		t.Errorf("expected no request, got %+v", req)
+	}
+}
+
+func TestDeactivationRequest_IsExpired(t *testing.T) {
+	expiresAt := testNow.Add(15 * time.Minute)
+	tests := []struct {
+		name   string
+		now    time.Time
+		status user.DeactivationStatus
+		want   bool
+	}{
+		{"well before the expiry", testNow, user.DeactivationStatusPending, false},
+		{"well after the expiry", expiresAt.Add(time.Minute), user.DeactivationStatusPending, true},
+		{"marked as expired even before the time", testNow, user.DeactivationStatusExpired, true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			req := user.RestoreDeactivationRequest("req-1", "user-1", "123456", expiresAt, 0, nil, tt.status, testNow, testNow)
+
+			if got := req.IsExpired(tt.now); got != tt.want {
+				t.Errorf("IsExpired() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestDeactivationRequest_MarkAsExpiredAndConfirm_SetTheStatusAndTheInstantInUTC(t *testing.T) {
+	tests := []struct {
+		name string
+		call func(r *user.DeactivationRequest)
+		want user.DeactivationStatus
+	}{
+		{"marking it as expired", func(r *user.DeactivationRequest) { r.MarkAsExpired(localNow) }, user.DeactivationStatusExpired},
+		{"confirming it", func(r *user.DeactivationRequest) { r.Confirm(localNow) }, user.DeactivationStatusConfirmed},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			req, err := user.NewDeactivationRequest("req-1", "user-1", "123456", testNow.Add(-time.Hour))
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			tt.call(req)
+
+			if req.Status() != tt.want {
+				t.Errorf("Status() = %s, want %s", req.Status(), tt.want)
+			}
+			assertInUTC(t, "UpdatedAt", req.UpdatedAt(), testNow)
+		})
+	}
+}
+
+func TestDeactivationRequest_IsBlocked_FollowsTheStatusOnly(t *testing.T) {
+	blockedUntil := testNow.Add(-time.Hour)
+	blocked := user.RestoreDeactivationRequest("req-1", "user-1", "123456", testNow, 5, &blockedUntil, user.DeactivationStatusBlocked, testNow, testNow)
+	pending := user.RestoreDeactivationRequest("req-2", "user-1", "123456", testNow, 0, nil, user.DeactivationStatusPending, testNow, testNow)
+
+	if !blocked.IsBlocked() {
+		t.Error("IsBlocked() = false for a BLOCKED request, want true even once the block period has passed")
+	}
+	if pending.IsBlocked() {
+		t.Error("IsBlocked() = true for a PENDING request, want false")
+	}
+}
+
+func TestDeactivationRequest_BlockedUntil_ReturnsACopy(t *testing.T) {
+	blockedUntil := testNow.Add(time.Hour)
+	req := user.RestoreDeactivationRequest("req-1", "user-1", "123456", testNow, 5, &blockedUntil, user.DeactivationStatusBlocked, testNow, testNow)
+
+	*req.BlockedUntil() = testNow
+
+	if got := req.BlockedUntil(); got == nil || !got.Equal(testNow.Add(time.Hour)) {
+		t.Errorf("BlockedUntil() = %v, want %v: writing through the returned pointer must not change the request", got, testNow.Add(time.Hour))
+	}
+}
