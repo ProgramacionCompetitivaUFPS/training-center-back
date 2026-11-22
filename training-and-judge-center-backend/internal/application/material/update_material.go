@@ -1,4 +1,4 @@
-﻿package material
+package material
 
 import (
 	"context"

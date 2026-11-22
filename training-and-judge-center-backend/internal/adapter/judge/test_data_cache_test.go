@@ -665,3 +665,89 @@ func TestTestDataCache_LogsWhenItGivesUpWaitingForDisk(t *testing.T) {
 		t.Errorf("giving up must be logged, or the SYSTEM_ERROR that follows has no explanation:\n%s", logs)
 	}
 }
+
+func TestResetDir_EmptiesADirectoryButKeepsIt(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(dir, "old-problem", "nested"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "leftover.in"), []byte("x"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	// An open handle keeps the old inode allocated, so a recreated directory cannot reuse its number.
+	handle, err := os.Open(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer handle.Close()
+	before, err := handle.Stat()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if err := resetDir(dir); err != nil {
+		t.Fatalf("resetDir: %v", err)
+	}
+
+	items, _ := os.ReadDir(dir)
+	if len(items) != 0 {
+		t.Errorf("directory still holds %d entries, want 0", len(items))
+	}
+	after, err := os.Stat(dir)
+	if err != nil || !os.SameFile(before, after) {
+		t.Errorf("the directory itself must survive (it may be a mount point): err=%v", err)
+	}
+}
+
+func TestResetDir_CreatesAMissingDirectory(t *testing.T) {
+	dir := filepath.Join(t.TempDir(), "a", "b")
+
+	if err := resetDir(dir); err != nil {
+		t.Fatalf("resetDir: %v", err)
+	}
+
+	if info, err := os.Stat(dir); err != nil || !info.IsDir() {
+		t.Errorf("expected the directory to exist, got info=%v err=%v", info, err)
+	}
+}
+
+func TestResetDir_PathUnderAFile_ReturnsAnError(t *testing.T) {
+	file := filepath.Join(t.TempDir(), "plain.txt")
+	if err := os.WriteFile(file, []byte("x"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := resetDir(filepath.Join(file, "sub")); err == nil {
+		t.Error("expected an error when the path goes through a regular file")
+	}
+}
+
+func TestNewTestDataCache_UnpreparableDir_ReturnsAnErrorNamingIt(t *testing.T) {
+	file := filepath.Join(t.TempDir(), "plain.txt")
+	if err := os.WriteFile(file, []byte("x"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	limits := testLimits()
+	limits.MaxZipBytes, limits.MaxExtractedBytes = 4096, 4096
+
+	_, err := newTestDataCache(TestDataConfig{Dir: filepath.Join(file, "sub"), BudgetBytes: 8192, Limits: limits}, &fakeSource{})
+
+	if err == nil || !strings.Contains(err.Error(), "prepare test data dir") {
+		t.Errorf("expected an error naming the directory preparation, got %v", err)
+	}
+}
+
+func TestRoomWait_Begin_KeepsTheInstantTheWaitStarted(t *testing.T) {
+	first := time.Date(2025, 1, 15, 12, 0, 0, 0, time.UTC)
+	current := first
+	cache := &testDataCache{budget: 100, now: func() time.Time { return current }}
+	w := &roomWait{cache: cache, what: "download", key: "problems/a/tests.zip", need: 50}
+
+	w.begin(context.Background(), 80)
+	current = first.Add(3 * time.Second)
+	w.begin(context.Background(), 90)
+
+	if !w.since.Equal(first) {
+		t.Errorf("since = %v, want %v: a second begin must not restart the wait", w.since, first)
+	}
+}

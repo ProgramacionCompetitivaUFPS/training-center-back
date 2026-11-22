@@ -47,3 +47,12 @@ func TestNewJoinRequestStatus_Invalid(t *testing.T) {
 		})
 	}
 }
+
+func TestJoinRequestStatus_StringAndRestore(t *testing.T) {
+	if group.JoinRequestStatusApproved.String() != "APPROVED" {
+		t.Errorf("String() = %q, want APPROVED", group.JoinRequestStatusApproved.String())
+	}
+	if got := group.RestoreJoinRequestStatus("LEGACY").String(); got != "LEGACY" {
+		t.Errorf("RestoreJoinRequestStatus().String() = %q, want LEGACY: no validation on restore", got)
+	}
+}

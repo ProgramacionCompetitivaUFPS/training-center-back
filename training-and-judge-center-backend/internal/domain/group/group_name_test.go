@@ -103,3 +103,11 @@ func TestRestoreGroupName(t *testing.T) {
 		t.Errorf("RestoreGroupName Value() = %q, want %q", n.Value(), "My Group")
 	}
 }
+
+func TestGroupName_String_IsTheValue(t *testing.T) {
+	n := group.RestoreGroupName("Team Alpha")
+
+	if n.String() != "Team Alpha" || n.Value() != "Team Alpha" {
+		t.Errorf("String()/Value() = %q/%q, want Team Alpha", n.String(), n.Value())
+	}
+}

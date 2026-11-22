@@ -39,6 +39,7 @@ func TestMessageKind_UnmarshalJSON(t *testing.T) {
 		{"unknown kind returns error", `"BANANA"`, messageKind{}, true},
 		{"empty string returns error", `""`, messageKind{}, true},
 		{"malformed JSON returns error", `not-json`, messageKind{}, true},
+		{"a number is not a kind", `123`, messageKind{}, true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

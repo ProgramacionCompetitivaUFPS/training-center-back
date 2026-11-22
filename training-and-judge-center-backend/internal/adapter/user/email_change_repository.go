@@ -54,7 +54,7 @@ func (r *EmailChangeRepository) FindByID(ctx context.Context, id string) (*domai
 	var updatedAt *time.Time
 	var statusStr, emailStr string
 
-	err := r.querier.QueryRow(ctx, query, id).Scan(
+	err := infraPostgres.GetQuerier(ctx, r.querier).QueryRow(ctx, query, id).Scan(
 		&returnedID,
 		&userID,
 		&emailStr,
@@ -114,7 +114,7 @@ func (r *EmailChangeRepository) FindByCodeAndUserID(ctx context.Context, code st
 	var updatedAt *time.Time
 	var statusStr, emailStr string
 
-	err := r.querier.QueryRow(ctx, query, code, userID).Scan(
+	err := infraPostgres.GetQuerier(ctx, r.querier).QueryRow(ctx, query, code, userID).Scan(
 		&id,
 		&returnedUserID,
 		&emailStr,

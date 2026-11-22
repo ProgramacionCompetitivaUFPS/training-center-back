@@ -59,7 +59,7 @@ func (r *DeactivationRequestRepository) FindPendingByUserID(ctx context.Context,
 	var blockedUntil *time.Time
 	var status string
 
-	err := r.querier.QueryRow(ctx, query, userID, domainUser.DeactivationStatusPending.String(), domainUser.DeactivationStatusBlocked.String()).Scan(
+	err := infraPostgres.GetQuerier(ctx, r.querier).QueryRow(ctx, query, userID, domainUser.DeactivationStatusPending.String(), domainUser.DeactivationStatusBlocked.String()).Scan(
 		&id,
 		&returnedUserID,
 		&verificationCode,
@@ -95,7 +95,7 @@ func (r *DeactivationRequestRepository) FindByID(ctx context.Context, id string)
 	var blockedUntil *time.Time
 	var status string
 
-	err := r.querier.QueryRow(ctx, query, id).Scan(
+	err := infraPostgres.GetQuerier(ctx, r.querier).QueryRow(ctx, query, id).Scan(
 		&returnedID,
 		&returnedUserID,
 		&verificationCode,

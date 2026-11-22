@@ -3,7 +3,10 @@ package auth_test
 import (
 	"bytes"
 	"context"
+	"crypto/aes"
+	"crypto/cipher"
 	"encoding/json"
+	"errors"
 	"strings"
 	"testing"
 	"time"
@@ -12,6 +15,7 @@ import (
 	"github.com/redis/go-redis/v9"
 	"github.com/training-judge-center/backend/internal/adapter/auth"
 	appuser "github.com/training-judge-center/backend/internal/application/user"
+	"github.com/training-judge-center/backend/pkg/apperror"
 )
 
 var testEncryptionKey = bytes.Repeat([]byte("a"), 32)
@@ -228,5 +232,51 @@ func TestSave_AAD_PreventsCiphertextSwapAcrossKeys(t *testing.T) {
 
 	if _, err := cache.Get(ctx, "hash-b"); err == nil {
 		t.Error("expected Get to fail when the ciphertext was swapped to a different Redis key")
+	}
+}
+
+func assertInternal(t *testing.T, err error) {
+	t.Helper()
+	var appErr *apperror.AppError
+	if !errors.As(err, &appErr) || appErr.Kind != apperror.KindInternal {
+		t.Errorf("expected an internal apperror, got %v", err)
+	}
+}
+
+func TestGet_PayloadShorterThanTheNonce_ReturnsInternal(t *testing.T) {
+	cache, mr := newTestCache(t)
+	if err := mr.Set("rotation:old-hash", "short"); err != nil {
+		t.Fatal(err)
+	}
+
+	got, err := cache.Get(context.Background(), "old-hash")
+
+	assertInternal(t, err)
+	if got != nil {
+		t.Errorf("expected no output for a truncated payload, got %+v", *got)
+	}
+}
+
+func TestGet_AuthenticPayloadThatIsNotJSON_ReturnsInternal(t *testing.T) {
+	cache, mr := newTestCache(t)
+	block, err := aes.NewCipher(testEncryptionKey)
+	if err != nil {
+		t.Fatal(err)
+	}
+	gcm, err := cipher.NewGCM(block)
+	if err != nil {
+		t.Fatal(err)
+	}
+	nonce := bytes.Repeat([]byte{1}, gcm.NonceSize())
+	sealed := gcm.Seal(nonce, nonce, []byte("not json"), []byte("old-hash"))
+	if err := mr.Set("rotation:old-hash", string(sealed)); err != nil {
+		t.Fatal(err)
+	}
+
+	got, err := cache.Get(context.Background(), "old-hash")
+
+	assertInternal(t, err)
+	if got != nil {
+		t.Errorf("expected no output for an undecodable payload, got %+v", *got)
 	}
 }

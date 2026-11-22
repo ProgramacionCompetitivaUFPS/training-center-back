@@ -565,3 +565,66 @@ func TestSetAllowLateRegistration(t *testing.T) {
 		t.Errorf("UpdatedAt() = %v, want %v", c.UpdatedAt(), fixedNow)
 	}
 }
+
+func TestNewContest_EmptyID_IsAnInternalError(t *testing.T) {
+	c, err := contest.NewContest(
+		"",
+		mustName(t, "Weekly Contest"),
+		nil,
+		fixedNow.Add(time.Hour),
+		fixedNow.Add(4*time.Hour),
+		mustPenalty(t, 20),
+		60,
+		false,
+		false, false,
+		shared.RestoreGroupID("group-id"),
+		shared.RestoreUserID("owner-id"),
+		contest.RestoreParticipationMode("INDIVIDUAL"), contest.RestoreTeamSize(2, 5),
+		fixedNow,
+	)
+
+	assertInternalError(t, "empty id", err)
+	if c != nil {
+		t.Errorf("expected no contest, got %+v", c)
+	}
+}
+
+func TestNewContest_StoresItsOwnerGroupAndCreationInstantInUTC(t *testing.T) {
+	c, err := contest.NewContest(
+		"contest-id",
+		mustName(t, "Weekly Contest"),
+		nil,
+		fixedNow.Add(time.Hour),
+		fixedNow.Add(4*time.Hour),
+		mustPenalty(t, 20),
+		60,
+		false,
+		false, false,
+		shared.RestoreGroupID("group-id"),
+		shared.RestoreUserID("owner-id"),
+		contest.RestoreParticipationMode("INDIVIDUAL"), contest.RestoreTeamSize(2, 5),
+		fixedNow.In(time.FixedZone("UTC+2", 2*3600)),
+	)
+
+	if err != nil {
+		t.Fatalf("NewContest: %v", err)
+	}
+	if c.GroupID().String() != "group-id" || c.OwnerID().String() != "owner-id" {
+		t.Errorf("group/owner = %s/%s, want group-id/owner-id", c.GroupID(), c.OwnerID())
+	}
+	if !c.CreatedAt().Equal(fixedNow) || c.CreatedAt().Location() != time.UTC {
+		t.Errorf("CreatedAt = %v, want %v in UTC", c.CreatedAt(), fixedNow)
+	}
+}
+
+func TestContest_AddProblem_StoresTheIdentifiersAndTheOrder(t *testing.T) {
+	c := validContest(t)
+
+	mustAddProblem(t, c, "cp-1", "problem-a")
+	mustAddProblem(t, c, "cp-2", "problem-b")
+
+	got := c.Problems()
+	if len(got) != 2 || got[0].ID() != "cp-1" || got[0].ProblemID() != "problem-a" || got[1].ID() != "cp-2" || got[1].ProblemID() != "problem-b" {
+		t.Errorf("problems = %+v, want cp-1/problem-a then cp-2/problem-b", got)
+	}
+}

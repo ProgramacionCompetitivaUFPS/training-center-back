@@ -35,3 +35,12 @@ func TestNewVisibility(t *testing.T) {
 		})
 	}
 }
+
+func TestVisibility_StringAndRestore(t *testing.T) {
+	if group.VisibilityVisible.String() != "VISIBLE" || group.VisibilityNotVisible.String() != "NOT_VISIBLE" {
+		t.Errorf("String() = %s/%s, want VISIBLE/NOT_VISIBLE", group.VisibilityVisible, group.VisibilityNotVisible)
+	}
+	if got := group.RestoreVisibility("LEGACY").String(); got != "LEGACY" {
+		t.Errorf("RestoreVisibility().String() = %q, want LEGACY: no validation on restore", got)
+	}
+}

@@ -407,3 +407,11 @@ func writeMemoryMeasurement(t *testing.T, judgingDir, content string) {
 		t.Fatalf("writing the memory measurement: %v", err)
 	}
 }
+
+// cpuStatsBody returns JSON-encoded StatsResponse with the given cumulative CPU time in nanoseconds.
+func cpuStatsBody(totalUsageNs uint64) io.ReadCloser {
+	var stats container.StatsResponse
+	stats.CPUStats.CPUUsage.TotalUsage = totalUsageNs
+	data, _ := json.Marshal(stats)
+	return io.NopCloser(bytes.NewReader(data))
+}

@@ -30,3 +30,12 @@ func TestNewContent(t *testing.T) {
 		})
 	}
 }
+
+func TestRestoreContent_KeepsValueWithoutValidating(t *testing.T) {
+	if got := material.RestoreContent("").String(); got != "" {
+		t.Errorf("String() = %q, want the empty content kept as stored", got)
+	}
+	if got := material.RestoreContent("stored").String(); got != "stored" {
+		t.Errorf("String() = %q, want stored", got)
+	}
+}

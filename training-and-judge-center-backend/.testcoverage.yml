@@ -1,0 +1,14 @@
+profile: cover.out
+
+threshold:
+  total: 80
+
+exclude:
+  paths:
+    - ^cmd/api/
+    - ^cmd/seed/
+    - ^cmd/cleanup-sessions/
+    - ^cmd/worker/main\.go$
+    - ^docs/
+    - ^internal/testutil/
+    - ^tests/zipdir/

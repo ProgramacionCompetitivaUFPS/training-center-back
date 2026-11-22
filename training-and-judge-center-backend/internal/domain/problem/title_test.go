@@ -79,3 +79,23 @@ func TestNewTitle(t *testing.T) {
 		})
 	}
 }
+
+func TestNewTitle_OnlyInvisibleCharacters_IsRequired(t *testing.T) {
+	// U+200B is a format character: it is not whitespace, so only the second check catches it.
+	_, err := problem.NewTitle("​​")
+
+	if got := detailFields(t, err); len(got) != 1 || got[0] != "title" {
+		t.Errorf("fields = %v, want [title]", got)
+	}
+}
+
+func TestNewTitle_InvisibleCharactersAtTheEdgesAreTrimmed(t *testing.T) {
+	title, err := problem.NewTitle("​Sum of Two Numbers​")
+
+	if err != nil {
+		t.Fatalf("NewTitle: %v", err)
+	}
+	if title.String() != "Sum of Two Numbers" {
+		t.Errorf("String() = %q, want Sum of Two Numbers", title.String())
+	}
+}
