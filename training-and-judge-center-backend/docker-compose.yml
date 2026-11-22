@@ -121,6 +121,8 @@ services:
     # container labelled com.trainingcenter.role=judge-sandbox. Do not run two workers
     # against the same daemon.
     entrypoint: ["/bin/worker"]
+    # the host's docker.sock belongs to root
+    user: root
     # the worker exits when the broker drops; Kubernetes restarts it, Compose needs this
     restart: unless-stopped
     environment:
