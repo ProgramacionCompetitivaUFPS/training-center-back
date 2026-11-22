@@ -81,3 +81,28 @@ func TestRestoreTeamName(t *testing.T) {
 		t.Errorf("RestoreTeamName Value() = %q, want %q", n.Value(), "My Team")
 	}
 }
+
+func TestNewTeamName_LimitCountsTheNormalizedText(t *testing.T) {
+	// Each ligature expands to two characters under NFKC.
+	accepted, err := team.NewTeamName(strings.Repeat("ﬁ", 50))
+	if err != nil {
+		t.Fatalf("100 characters once normalized should be valid, got: %v", err)
+	}
+	if accepted.Value() != strings.Repeat("fi", 50) {
+		t.Errorf("Value() = %q, want the normalized text", accepted.Value())
+	}
+
+	_, err = team.NewTeamName(strings.Repeat("ﬁ", 51))
+	ae, ok := err.(*apperror.AppError)
+	if !ok || ae.Code != apperror.ErrCodeValidationError {
+		t.Errorf("102 characters once normalized should be rejected with VALIDATION_ERROR, got %v", err)
+	}
+}
+
+func TestTeamName_String_IsTheValue(t *testing.T) {
+	n := team.RestoreTeamName("My Team")
+
+	if n.String() != "My Team" {
+		t.Errorf("String() = %q, want %q", n.String(), "My Team")
+	}
+}
