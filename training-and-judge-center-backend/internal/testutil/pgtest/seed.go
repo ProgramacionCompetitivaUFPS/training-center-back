@@ -119,3 +119,25 @@ func SeedContestProblem(t *testing.T, pool *pgxpool.Pool, id, contestID, problem
 		t.Fatalf("pgtest: seed contest problem %s: %v", id, err)
 	}
 }
+
+func SeedTeam(t *testing.T, pool *pgxpool.Pool, id, name, createdBy string) {
+	t.Helper()
+	_, err := pool.Exec(context.Background(), `
+		INSERT INTO teams (id, name, created_by, created_at)
+		VALUES ($1, $2, $3, now())`,
+		id, name, createdBy)
+	if err != nil {
+		t.Fatalf("pgtest: seed team %s: %v", name, err)
+	}
+}
+
+func SeedTeamMember(t *testing.T, pool *pgxpool.Pool, id, teamID, userID string) {
+	t.Helper()
+	_, err := pool.Exec(context.Background(), `
+		INSERT INTO team_members (id, team_id, user_id, joined_at)
+		VALUES ($1, $2, $3, now())`,
+		id, teamID, userID)
+	if err != nil {
+		t.Fatalf("pgtest: seed team member %s: %v", id, err)
+	}
+}
