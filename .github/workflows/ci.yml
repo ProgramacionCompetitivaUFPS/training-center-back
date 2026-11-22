@@ -2,11 +2,33 @@ name: CI
 
 on:
   pull_request:
+    branches: [develop, main]
 
 jobs:
   test:
-    name: Test
+    name: Test, integration & coverage
     runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      TEST_DATABASE_URL: postgres://postgres:postgres@localhost:5432/postgres?sslmode=disable
+
+    defaults:
+      run:
+        working-directory: ./training-and-judge-center-backend
 
     steps:
       - uses: actions/checkout@v4
@@ -15,21 +37,28 @@ jobs:
         with:
           go-version-file: ./training-and-judge-center-backend/go.mod
 
-      - name: Run tests
-        run: go test ./...
-        working-directory: ./training-and-judge-center-backend
+      - name: Reject Go sources that start with a UTF-8 BOM
+        run: |
+          files=$(LC_ALL=C grep -rlI $'^\xEF\xBB\xBF' --include=*.go . || true)
+          if [ -n "$files" ]; then
+            echo "These files start with a UTF-8 BOM (go test fails on them):"
+            echo "$files"
+            exit 1
+          fi
 
-  migration-test:
-    name: Migration Test
-    runs-on: ubuntu-latest
+      - name: Unit and integration tests with coverage
+        run: go test -tags integration ./... -count=1 -timeout 20m -coverprofile=cover.out
 
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-go@v5
+      - name: Enforce the coverage threshold (see .testcoverage.yml)
+        uses: vladopajic/go-test-coverage@def194de52e1f1a32b000fab870ffa05a66c4258 # v2.22.0
         with:
-          go-version-file: ./training-and-judge-center-backend/go.mod
+          config: ./training-and-judge-center-backend/.testcoverage.yml
+          profile: training-and-judge-center-backend/cover.out
+          source-dir: ./training-and-judge-center-backend
 
-      - name: Run migration tests
-        run: go test -tags integration -v ./cmd/migrate/...
-        working-directory: ./training-and-judge-center-backend
+      - name: Upload the coverage profile
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage
+          path: training-and-judge-center-backend/cover.out
