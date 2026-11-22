@@ -23,7 +23,10 @@ func startRabbitMQ(t *testing.T) string {
 		ContainerRequest: testcontainers.ContainerRequest{
 			Image:        "rabbitmq:3-alpine",
 			ExposedPorts: []string{"5672/tcp"},
-			WaitingFor:   wait.ForListeningPort("5672/tcp").WithStartupTimeout(60 * time.Second),
+			WaitingFor: wait.ForAll(
+				wait.ForLog("Server startup complete"),
+				wait.ForListeningPort("5672/tcp"),
+			).WithStartupTimeout(60 * time.Second),
 		},
 		Started: true,
 	})
