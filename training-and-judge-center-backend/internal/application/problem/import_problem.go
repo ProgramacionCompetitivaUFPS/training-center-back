@@ -2,7 +2,6 @@ package problem
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"log/slog"
 	"path/filepath"
@@ -34,6 +33,24 @@ type ImportProblemUseCase struct {
 	platformSettings problem.PlatformSettings
 }
 
+type importUploads struct {
+	storage ProblemFileRepository
+	slug    string
+	keys    []string
+}
+
+func (u *importUploads) cleanup(ctx context.Context) {
+	var left []string
+	for _, key := range u.keys {
+		if err := u.storage.DeleteFile(ctx, key); err != nil {
+			left = append(left, key)
+		}
+	}
+	if len(left) > 0 {
+		slog.ErrorContext(ctx, "import_problem: import failed and the files it had uploaded were left in storage", "slug", u.slug, "keys", left)
+	}
+}
+
 func NewImportProblemUseCase(
 	repo problem.Repository,
 	storage ProblemFileRepository,
@@ -49,21 +66,9 @@ func NewImportProblemUseCase(
 }
 
 func (uc *ImportProblemUseCase) Execute(ctx context.Context, input ImportProblemInput) (*ImportProblemOutput, error) {
-	if input.CurrentUser.Role != shared.RoleCoach && !input.CurrentUser.IsAdmin() {
-		return nil, apperror.NewForbidden(ErrCodeInsufficientPermissions, "Only Coach and Admin users can import problems")
-	}
-
-	slug, err := problem.NewSlug(input.Slug)
+	slug, err := uc.validateRequest(ctx, input)
 	if err != nil {
 		return nil, err
-	}
-
-	exists, err := uc.repo.ExistsBySlug(ctx, slug)
-	if err != nil {
-		return nil, err
-	}
-	if exists {
-		return nil, apperror.NewConflict(problem.ErrCodeSlugAlreadyExists, "A problem with slug '"+slug.String()+"' already exists")
 	}
 
 	pkg, err := uc.packageParser.ParsePackageZip(ctx, input.Zip)
@@ -71,67 +76,14 @@ func (uc *ImportProblemUseCase) Execute(ctx context.Context, input ImportProblem
 		return nil, err
 	}
 
-	var fieldErrs []apperror.FieldError
-
-	title, err := problem.NewTitle(pkg.Title)
+	title, timeLimit, memoryLimit, err := uc.validatePackage(pkg)
 	if err != nil {
-		var valErr *apperror.AppError
-		if errors.As(err, &valErr) {
-			fieldErrs = append(fieldErrs, valErr.Details...)
-		} else {
-			return nil, apperror.NewInternal()
-		}
-	}
-
-	globalMaxTime, globalMaxMemory := uc.platformSettings.GlobalLimits()
-
-	var timeLimit *problem.TimeLimit
-	if pkg.TimeLimitMs != nil {
-		tl, err := problem.NewTimeLimit(*pkg.TimeLimitMs, globalMaxTime)
-		if err != nil {
-			var valErr *apperror.AppError
-			if errors.As(err, &valErr) {
-				fieldErrs = append(fieldErrs, valErr.Details...)
-			}
-		} else {
-			timeLimit = &tl
-		}
-	}
-
-	var memoryLimit *problem.MemoryLimit
-	if pkg.MemoryLimit != nil {
-		ml, err := problem.NewMemoryLimit(*pkg.MemoryLimit, globalMaxMemory)
-		if err != nil {
-			var valErr *apperror.AppError
-			if errors.As(err, &valErr) {
-				fieldErrs = append(fieldErrs, valErr.Details...)
-			}
-		} else {
-			memoryLimit = &ml
-		}
-	}
-
-	if len(fieldErrs) > 0 {
-		return nil, apperror.NewValidation(fieldErrs)
-	}
-
-	var uploadedKeys []string
-	cleanup := func() {
-		var left []string
-		for _, key := range uploadedKeys {
-			if err := uc.storage.DeleteFile(ctx, key); err != nil {
-				left = append(left, key)
-			}
-		}
-		if len(left) > 0 {
-			slog.ErrorContext(ctx, "import_problem: import failed and the files it had uploaded were left in storage", "slug", slug.String(), "keys", left)
-		}
+		return nil, err
 	}
 
 	now := time.Now()
-	newID := uuid.New().String()
 	newProblem, err := problem.NewProblem(
-		newID,
+		uuid.New().String(),
 		slug,
 		title,
 		problem.RestoreStatement(pkg.Statement),
@@ -146,86 +98,152 @@ func (uc *ImportProblemUseCase) Execute(ctx context.Context, input ImportProblem
 		return nil, err
 	}
 
-	if pkg.Zip != nil {
-		uploadInstanceID := uuid.New().String()
-		basePath := fmt.Sprintf("problems/%s/%s/%s", slug.String(), FileTypeTestCases, uploadInstanceID)
-		zipKey := TestCasesZipKey(basePath)
-
-		if err := uc.storage.UploadFileStream(ctx, zipKey, stagedReader(pkg.Zip)); err != nil {
-			cleanup()
-			return nil, err
-		}
-		uploadedKeys = append(uploadedKeys, zipKey)
-
-		g, gCtx := errgroup.WithContext(ctx)
-		g.SetLimit(uc.platformSettings.UploadMaxConcurrency())
-
-		for _, file := range pkg.SampleFiles {
-			file := file
-			destPath := fmt.Sprintf("%s/%s", basePath, file.Path)
-			uploadedKeys = append(uploadedKeys, destPath)
-			g.Go(func() error {
-				if err := uc.storage.UploadFile(gCtx, destPath, file.Content); err != nil {
-					return err
-				}
-				return nil
-			})
-		}
-		if err := g.Wait(); err != nil {
-			cleanup()
-			return nil, err
-		}
-
-		newProblem.SetTestCases(basePath, now)
-	}
-
-	for _, sol := range pkg.Solutions {
-		cleanName := filepath.Base(sol.Path)
-		lang, ok := uc.platformSettings.LanguageByExtension(strings.ToLower(filepath.Ext(cleanName)))
-		if !ok {
-			continue
-		}
-		fileKey := fmt.Sprintf("problems/%s/%s/%s", slug.String(), FileTypeSolution, cleanName)
-		solutionObj, err := problem.NewSolutionFile(cleanName, fileKey, lang)
-		if err != nil {
-			cleanup()
-			return nil, err
-		}
-		if err := uc.storage.UploadFile(ctx, fileKey, sol.Content); err != nil {
-			cleanup()
-			return nil, err
-		}
-		uploadedKeys = append(uploadedKeys, fileKey)
-		newProblem.AddSolution(solutionObj, now)
-	}
-
-	if pkg.Checker != nil {
-		if err := uc.uploadVerifier(ctx, slug.String(), FileTypeChecker, verifierBaseNameChecker, pkg.Checker, newProblem, &uploadedKeys, cleanup, now); err != nil {
-			return nil, err
-		}
-	}
-
-	if pkg.Validator != nil {
-		if err := uc.uploadVerifier(ctx, slug.String(), FileTypeValidator, verifierBaseNameValidator, pkg.Validator, newProblem, &uploadedKeys, cleanup, now); err != nil {
-			return nil, err
-		}
+	uploads := &importUploads{storage: uc.storage, slug: slug.String()}
+	if err := uc.uploadPackage(ctx, uploads, pkg, newProblem, now); err != nil {
+		return nil, err
 	}
 
 	if err := uc.repo.Save(ctx, newProblem); err != nil {
-		cleanup()
+		uploads.cleanup(ctx)
 		return nil, err
 	}
 
 	return &ImportProblemOutput{Problem: problemToDTO(newProblem)}, nil
 }
 
+func (uc *ImportProblemUseCase) validateRequest(ctx context.Context, input ImportProblemInput) (problem.Slug, error) {
+	if input.CurrentUser.Role != shared.RoleCoach && !input.CurrentUser.IsAdmin() {
+		return problem.Slug{}, apperror.NewForbidden(ErrCodeInsufficientPermissions, "Only Coach and Admin users can import problems")
+	}
+
+	slug, err := problem.NewSlug(input.Slug)
+	if err != nil {
+		return problem.Slug{}, err
+	}
+
+	exists, err := uc.repo.ExistsBySlug(ctx, slug)
+	if err != nil {
+		return problem.Slug{}, err
+	}
+	if exists {
+		return problem.Slug{}, apperror.NewConflict(problem.ErrCodeSlugAlreadyExists, "A problem with slug '"+slug.String()+"' already exists")
+	}
+
+	return slug, nil
+}
+
+func (uc *ImportProblemUseCase) validatePackage(pkg *ParsedPackage) (problem.Title, *problem.TimeLimit, *problem.MemoryLimit, error) {
+	var fieldErrs []apperror.FieldError
+
+	title, titleErr := problem.NewTitle(pkg.Title)
+	if err := apperror.AccumulateFieldErrors(titleErr, &fieldErrs); err != nil {
+		return problem.Title{}, nil, nil, err
+	}
+
+	timeLimit, memoryLimit, err := validateLimits(uc.platformSettings, pkg.TimeLimitMs, pkg.MemoryLimit, &fieldErrs)
+	if err != nil {
+		return problem.Title{}, nil, nil, err
+	}
+
+	if len(fieldErrs) > 0 {
+		return problem.Title{}, nil, nil, apperror.NewValidation(fieldErrs)
+	}
+
+	return title, timeLimit, memoryLimit, nil
+}
+
+func (uc *ImportProblemUseCase) uploadPackage(ctx context.Context, uploads *importUploads, pkg *ParsedPackage, p *problem.Problem, now time.Time) error {
+	if pkg.Zip != nil {
+		if err := uc.uploadTestCases(ctx, uploads, pkg, p, now); err != nil {
+			return err
+		}
+	}
+
+	if err := uc.uploadSolutions(ctx, uploads, pkg.Solutions, p, now); err != nil {
+		return err
+	}
+
+	if pkg.Checker != nil {
+		if err := uc.uploadVerifier(ctx, uploads, FileTypeChecker, verifierBaseNameChecker, pkg.Checker, p, now); err != nil {
+			return err
+		}
+	}
+
+	if pkg.Validator != nil {
+		if err := uc.uploadVerifier(ctx, uploads, FileTypeValidator, verifierBaseNameValidator, pkg.Validator, p, now); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func (uc *ImportProblemUseCase) uploadTestCases(ctx context.Context, uploads *importUploads, pkg *ParsedPackage, p *problem.Problem, now time.Time) error {
+	basePath := fmt.Sprintf("problems/%s/%s/%s", uploads.slug, FileTypeTestCases, uuid.New().String())
+	zipKey := TestCasesZipKey(basePath)
+
+	if err := uc.storage.UploadFileStream(ctx, zipKey, stagedReader(pkg.Zip)); err != nil {
+		uploads.cleanup(ctx)
+		return err
+	}
+	uploads.keys = append(uploads.keys, zipKey)
+
+	if err := uc.uploadSamples(ctx, uploads, basePath, pkg.SampleFiles); err != nil {
+		uploads.cleanup(ctx)
+		return err
+	}
+
+	p.SetTestCases(basePath, now)
+	return nil
+}
+
+func (uc *ImportProblemUseCase) uploadSamples(ctx context.Context, uploads *importUploads, basePath string, samples []ParsedFile) error {
+	g, gCtx := errgroup.WithContext(ctx)
+	g.SetLimit(uc.platformSettings.UploadMaxConcurrency())
+
+	for _, file := range samples {
+		destPath := fmt.Sprintf("%s/%s", basePath, file.Path)
+		uploads.keys = append(uploads.keys, destPath)
+		content := file.Content
+		g.Go(func() error {
+			return uc.storage.UploadFile(gCtx, destPath, content)
+		})
+	}
+
+	return g.Wait()
+}
+
+func (uc *ImportProblemUseCase) uploadSolutions(ctx context.Context, uploads *importUploads, solutions []ParsedFile, p *problem.Problem, now time.Time) error {
+	for _, sol := range solutions {
+		cleanName := filepath.Base(sol.Path)
+		lang, ok := uc.platformSettings.LanguageByExtension(strings.ToLower(filepath.Ext(cleanName)))
+		if !ok {
+			continue
+		}
+
+		fileKey := fmt.Sprintf("problems/%s/%s/%s", uploads.slug, FileTypeSolution, cleanName)
+		solutionObj, err := problem.NewSolutionFile(cleanName, fileKey, lang)
+		if err != nil {
+			uploads.cleanup(ctx)
+			return err
+		}
+		if err := uc.storage.UploadFile(ctx, fileKey, sol.Content); err != nil {
+			uploads.cleanup(ctx)
+			return err
+		}
+		uploads.keys = append(uploads.keys, fileKey)
+		p.AddSolution(solutionObj, now)
+	}
+
+	return nil
+}
+
 func (uc *ImportProblemUseCase) uploadVerifier(
 	ctx context.Context,
-	slugStr, fileType, baseName string,
+	uploads *importUploads,
+	fileType, baseName string,
 	f *ParsedFile,
 	p *problem.Problem,
-	uploadedKeys *[]string,
-	cleanup func(),
 	now time.Time,
 ) error {
 	cleanName := filepath.Base(f.Path)
@@ -234,19 +252,19 @@ func (uc *ImportProblemUseCase) uploadVerifier(
 	if !ok {
 		return apperror.NewBadRequest(ErrCodeProblemUnsupportedFileExt, fmt.Sprintf("Unsupported %s file extension: %s", fileType, ext))
 	}
-	fileKey := fmt.Sprintf("problems/%s/%s/%s%s", slugStr, fileType, baseName, ext)
+	fileKey := fmt.Sprintf("problems/%s/%s/%s%s", uploads.slug, fileType, baseName, ext)
 
 	verifierObj, err := problem.NewVerifierFile(cleanName, fileKey, lang)
 	if err != nil {
-		cleanup()
+		uploads.cleanup(ctx)
 		return err
 	}
 
 	if err := uc.storage.UploadFile(ctx, fileKey, f.Content); err != nil {
-		cleanup()
+		uploads.cleanup(ctx)
 		return err
 	}
-	*uploadedKeys = append(*uploadedKeys, fileKey)
+	uploads.keys = append(uploads.keys, fileKey)
 
 	switch fileType {
 	case FileTypeChecker:
