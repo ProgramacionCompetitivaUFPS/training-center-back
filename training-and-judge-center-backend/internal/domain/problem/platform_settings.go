@@ -11,7 +11,7 @@ type PlatformSettings struct {
 	allowedTags           map[string]struct{}
 	uploadMaxConcurrency  int
 	maxFileCountSample    int
-	maxFileSizeTestCaseMB int
+	maxZipUploadSizeMB int
 	maxFileCountTestCase  int
 	maxFileSizeDefaultMB  int
 }
@@ -25,7 +25,7 @@ func NewPlatformSettings(
 	allowedTags map[string]struct{},
 	uploadMaxConcurrency int,
 	maxFileCountSample int,
-	maxFileSizeTestCaseMB int,
+	maxZipUploadSizeMB int,
 	maxFileCountTestCase int,
 	maxFileSizeDefaultMB int,
 ) (PlatformSettings, error) {
@@ -43,8 +43,8 @@ func NewPlatformSettings(
 	if maxFileCountSample <= 0 {
 		fieldErrs = append(fieldErrs, apperror.FieldError{Field: "maxFileCountSample", Message: "Max file count for samples must be positive"})
 	}
-	if maxFileSizeTestCaseMB <= 0 {
-		fieldErrs = append(fieldErrs, apperror.FieldError{Field: "maxFileSizeTestCaseMB", Message: "Max file size for test cases must be positive"})
+	if maxZipUploadSizeMB <= 0 {
+		fieldErrs = append(fieldErrs, apperror.FieldError{Field: "maxZipUploadSizeMB", Message: "Max file size for test cases must be positive"})
 	}
 	if maxFileCountTestCase <= 0 {
 		fieldErrs = append(fieldErrs, apperror.FieldError{Field: "maxFileCountTestCase", Message: "Max file count for test cases must be positive"})
@@ -57,7 +57,7 @@ func NewPlatformSettings(
 	}
 
 	// cross-field: default file size must not exceed test case file size
-	if maxFileSizeDefaultMB > 0 && maxFileSizeTestCaseMB > 0 && maxFileSizeDefaultMB > maxFileSizeTestCaseMB {
+	if maxFileSizeDefaultMB > 0 && maxZipUploadSizeMB > 0 && maxFileSizeDefaultMB > maxZipUploadSizeMB {
 		fieldErrs = append(fieldErrs, apperror.FieldError{Field: "maxFileSizeDefaultMB", Message: "Default file size limit cannot exceed test case file size limit"})
 	}
 
@@ -91,7 +91,7 @@ func NewPlatformSettings(
 		allowedTags:           allowedTags,
 		uploadMaxConcurrency:  uploadMaxConcurrency,
 		maxFileCountSample:    maxFileCountSample,
-		maxFileSizeTestCaseMB: maxFileSizeTestCaseMB,
+		maxZipUploadSizeMB: maxZipUploadSizeMB,
 		maxFileCountTestCase:  maxFileCountTestCase,
 		maxFileSizeDefaultMB:  maxFileSizeDefaultMB,
 	}, nil
@@ -127,7 +127,7 @@ func (s PlatformSettings) AllowedTags() map[string]struct{} {
 func (s PlatformSettings) UploadMaxConcurrency() int  { return s.uploadMaxConcurrency }
 func (s PlatformSettings) MaxFileCountSample() int    { return s.maxFileCountSample }
 func (s PlatformSettings) MaxFileSizeDefaultMB() int  { return s.maxFileSizeDefaultMB }
-func (s PlatformSettings) MaxFileSizeTestCaseMB() int { return s.maxFileSizeTestCaseMB }
+func (s PlatformSettings) MaxZipUploadSizeMB() int { return s.maxZipUploadSizeMB }
 func (s PlatformSettings) MaxFileCountTestCase() int  { return s.maxFileCountTestCase }
 
 func (s PlatformSettings) IsValidTag(tag string) bool {

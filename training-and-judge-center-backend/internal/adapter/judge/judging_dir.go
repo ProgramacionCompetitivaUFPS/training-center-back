@@ -1,6 +1,8 @@
 package judge
 
 import (
+	"errors"
+	"io"
 	"os"
 	"path"
 )
@@ -59,4 +61,14 @@ func createJudgingDir(judgingDir string) error {
 func removeJudgingDir(judgingDir string) error {
 	_ = os.Chmod(judgingDir, 0o700)
 	return os.RemoveAll(judgingDir)
+}
+
+// writeJudgingInput replaces the case's input with whatever r yields, as it is read.
+func writeJudgingInput(inputPath string, r io.Reader) error {
+	f, err := os.OpenFile(inputPath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, judgingFileMode)
+	if err != nil {
+		return err
+	}
+	_, copyErr := io.Copy(f, r)
+	return errors.Join(copyErr, f.Close())
 }

@@ -29,3 +29,15 @@ func assertValidationField(t *testing.T, label string, err error, wantField stri
 		t.Errorf("%s: Details[0].Field = %q, want %q", label, appErr.Details[0].Field, wantField)
 	}
 }
+
+var (
+	plusTwo  = time.FixedZone("UTC+2", 2*3600)
+	localNow = time.Date(2024, 1, 15, 14, 0, 0, 0, plusTwo)
+)
+
+func assertInUTC(t *testing.T, label string, got, want time.Time) {
+	t.Helper()
+	if !got.Equal(want) || got.Location() != time.UTC {
+		t.Errorf("%s = %v, want %v in UTC", label, got, want)
+	}
+}

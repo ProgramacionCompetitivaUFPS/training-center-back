@@ -18,6 +18,38 @@ func NewGroupMemberProvider(db infraPostgres.Querier) *GroupMemberProvider {
 	return &GroupMemberProvider{db: db}
 }
 
+func (p *GroupMemberProvider) GetMemberRoleBulk(ctx context.Context, userID string, groupIDs []string) (map[string]*string, error) {
+	if len(groupIDs) == 0 {
+		return map[string]*string{}, nil
+	}
+	q := infraPostgres.GetQuerier(ctx, p.db)
+	rows, err := q.Query(ctx,
+		`SELECT group_id, member_role FROM group_members WHERE user_id = $1 AND group_id = ANY($2)`,
+		userID, groupIDs,
+	)
+	if err != nil {
+		slog.ErrorContext(ctx, "failed to bulk get member roles", "error", err, "user_id", userID)
+		return nil, apperror.NewInternal()
+	}
+	defer rows.Close()
+
+	result := make(map[string]*string, len(groupIDs))
+	for rows.Next() {
+		var groupID, role string
+		if err := rows.Scan(&groupID, &role); err != nil {
+			slog.ErrorContext(ctx, "failed to scan member role row", "error", err, "user_id", userID)
+			return nil, apperror.NewInternal()
+		}
+		r := role
+		result[groupID] = &r
+	}
+	if err := rows.Err(); err != nil {
+		slog.ErrorContext(ctx, "row iteration error in bulk member roles", "error", err, "user_id", userID)
+		return nil, apperror.NewInternal()
+	}
+	return result, nil
+}
+
 func (p *GroupMemberProvider) GetMemberRole(ctx context.Context, userID, groupID string) (*string, error) {
 	q := infraPostgres.GetQuerier(ctx, p.db)
 	var role string

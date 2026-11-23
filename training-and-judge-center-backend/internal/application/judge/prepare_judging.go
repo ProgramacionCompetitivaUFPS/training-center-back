@@ -102,10 +102,11 @@ func (uc *PrepareJudgingUseCase) Execute(ctx context.Context, in PrepareJudgingI
 	}
 	out.ValidatorCompiledKey = validator.compiledKey
 
-	testCases, err := uc.loadTestCases(ctx, in)
+	testCases, err := uc.openTestCases(ctx, in)
 	if err != nil {
 		return nil, err
 	}
+	defer testCases.Close()
 
 	session, err := uc.runner.BeginValidating(ctx, validator.compiledKey, validator.language)
 	if err != nil {
@@ -113,8 +114,8 @@ func (uc *PrepareJudgingUseCase) Execute(ctx context.Context, in PrepareJudgingI
 	}
 	defer session.Close(ctx)
 
-	for _, tc := range testCases {
-		result, err := session.Validate(ctx, tc.Input)
+	for _, tc := range testCases.Cases() {
+		result, err := validateCase(ctx, session, testCases, tc)
 		if err != nil {
 			return nil, err
 		}
@@ -223,9 +224,9 @@ func (uc *PrepareJudgingUseCase) checkerToCompile(ctx context.Context, in Prepar
 	return source, fmt.Sprintf("problems/%s/checker/compiled", in.Slug), nil
 }
 
-func (uc *PrepareJudgingUseCase) loadTestCases(ctx context.Context, in PrepareJudgingInput) ([]TestCase, error) {
+func (uc *PrepareJudgingUseCase) openTestCases(ctx context.Context, in PrepareJudgingInput) (TestCaseSet, error) {
 	if in.Candidate != nil && in.Candidate.TestCasesKey != "" {
-		return uc.testCaseProvider.GetTestCasesAt(ctx, in.Candidate.TestCasesKey)
+		return uc.testCaseProvider.OpenAt(ctx, in.Candidate.TestCasesKey)
 	}
-	return uc.testCaseProvider.GetTestCases(ctx, in.ProblemID)
+	return uc.testCaseProvider.Open(ctx, in.ProblemID)
 }

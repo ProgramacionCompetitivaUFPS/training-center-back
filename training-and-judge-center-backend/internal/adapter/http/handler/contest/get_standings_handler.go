@@ -17,12 +17,14 @@ import (
 // @Param        groupId     path   string true  "Group ID"
 // @Param        contestId   path   string true  "Contest ID"
 // @Param        realtime    query  bool   false "Bypass freeze (lead/admin only)"
+// @Param        phase       query  string false "competition, postcompetition or all (default: all)"
 // @Param        country     query  string false "Filter by participant country (case-insensitive exact match)"
 // @Param        city        query  string false "Filter by participant city (case-insensitive exact match)"
 // @Param        institution query  string false "Filter by participant institution (case-insensitive exact match)"
 // @Param        page        query  int    false "Page number (default 1)"
 // @Param        limit       query  int    false "Items per page (default 50)"
 // @Success      200 {object} getStandingsResponse
+// @Failure      400 {object} apperror.AppError
 // @Failure      401 {object} apperror.AppError
 // @Failure      403 {object} apperror.AppError
 // @Failure      404 {object} apperror.AppError
@@ -43,6 +45,14 @@ func (h *Handler) GetStandings(w http.ResponseWriter, r *http.Request) {
 	q := r.URL.Query()
 
 	realtime := q.Get("realtime") == "true"
+
+	phase := appContest.StandingsPhase(q.Get("phase"))
+	switch phase {
+	case "", appContest.StandingsPhaseCompetition, appContest.StandingsPhasePostcompetition, appContest.StandingsPhaseAll:
+	default:
+		handler.WriteError(r.Context(), w, apperror.NewBadRequest(apperror.ErrCodeBadRequest, "phase must be 'competition', 'postcompetition' or 'all'"))
+		return
+	}
 
 	page := defaultPage
 	if v := q.Get("page"); v != "" {
@@ -70,6 +80,7 @@ func (h *Handler) GetStandings(w http.ResponseWriter, r *http.Request) {
 		Country:     country,
 		City:        city,
 		Institution: institution,
+		Phase:       phase,
 		Page:        page,
 		Limit:       limit,
 	})
@@ -84,18 +95,24 @@ func (h *Handler) GetStandings(w http.ResponseWriter, r *http.Request) {
 func toGetStandingsResponse(out *appContest.GetStandingsOutput, country, city, institution string) getStandingsResponse {
 	standings := make([]standingEntry, len(out.Entries))
 	for i, e := range out.Entries {
+		var rank *int
+		if e.IsOfficial {
+			r := e.Rank
+			rank = &r
+		}
 		standings[i] = standingEntry{
-			Rank:           e.Rank,
+			Rank:           rank,
+			IsOfficial:     e.IsOfficial,
 			Participant:    toStandingParticipant(e.Participant),
 			ProblemsSolved: e.ProblemsSolved,
 			TotalPenalty:   e.TotalPenalty,
-			Problems:       toStandingProblemResults(e.Problems, out.Problems, out.Contest.StartTime),
+			Problems:       toStandingProblemResults(e.Problems, out.Problems, out.Contest.StartTime, e.IsOfficial),
 		}
 	}
 
 	problems := make([]standingsProblemHeader, len(out.Problems))
 	for i, p := range out.Problems {
-		problems[i] = standingsProblemHeader{Position: p.Position, Slug: p.Slug, Title: p.Title}
+		problems[i] = standingsProblemHeader{Position: p.Position, Slug: p.Slug, Title: p.Title, Color: p.Color, Accepted: p.Accepted, Tried: p.Tried, PostAccepted: p.PostAccepted, PostTried: p.PostTried}
 	}
 
 	totalPages := 1
@@ -115,6 +132,18 @@ func toGetStandingsResponse(out *appContest.GetStandingsOutput, country, city, i
 		freezeMinutes = &fm
 	}
 
+	var resultsRevealedAt *string
+	if out.Contest.ResultsRevealedAt != nil {
+		s := out.Contest.ResultsRevealedAt.UTC().Format(time.RFC3339)
+		resultsRevealedAt = &s
+	}
+
+	var autoRevealAt *string
+	if out.Contest.AutoRevealAt != nil {
+		s := out.Contest.AutoRevealAt.UTC().Format(time.RFC3339)
+		autoRevealAt = &s
+	}
+
 	return getStandingsResponse{
 		Contest: standingsContestDisplay{
 			ID:            out.Contest.ID,
@@ -126,6 +155,9 @@ func toGetStandingsResponse(out *appContest.GetStandingsOutput, country, city, i
 			FreezeMinutes: freezeMinutes,
 			IsFrozen:      out.Contest.IsFrozen,
 			FrozenAt:      frozenAt,
+
+			ResultsRevealedAt: resultsRevealedAt,
+			AutoRevealAt:      autoRevealAt,
 		},
 		Problems:  problems,
 		Standings: standings,
@@ -167,6 +199,7 @@ func toStandingProblemResults(
 	entryProblems map[string]appContest.RankedProblem,
 	contestProblems []appContest.StandingsProblemDisplay,
 	contestStart time.Time,
+	isOfficial bool,
 ) []standingProblemResult {
 	results := make([]standingProblemResult, len(contestProblems))
 	for i, cp := range contestProblems {
@@ -174,11 +207,17 @@ func toStandingProblemResults(
 		result := standingProblemResult{Position: cp.Position, Status: "NOT_ATTEMPTED"}
 		if attempted {
 			result.Attempts = rp.Attempts
+			result.Pending = rp.Pending
 			result.Penalty = rp.Penalty
+			result.IsFirstSolve = rp.IsFirstSolve
 			if rp.AcceptedAt != nil {
 				result.Status = "ACCEPTED"
-				minutes := int(rp.AcceptedAt.Sub(contestStart).Minutes())
-				result.Time = &minutes
+				if isOfficial {
+					minutes := int(rp.AcceptedAt.Sub(contestStart).Minutes())
+					result.Time = &minutes
+				}
+			} else if rp.Pending > 0 {
+				result.Status = "PENDING"
 			} else if rp.Attempts > 0 {
 				result.Status = "WRONG_ANSWER"
 			}

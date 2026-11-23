@@ -43,6 +43,14 @@ spec:
           # directories a failed Close would leave behind.
           emptyDir:
             sizeLimit: 2Gi
+        # Test cases, extracted and cached so a judging copies them from local files and never holds a
+        # problem's data in memory. Only the worker mounts it: the sandboxes cannot reach it. The code
+        # keeps it under testDataBudgetBytes (3Gi, judge_config.yaml), counting an archive while it is
+        # being extracted; the sizeLimit is above that for the filesystem's own overhead. Together with
+        # the other two it is 15.5Gi, under the 17.53Gi the node allocates.
+        - name: test-data
+          emptyDir:
+            sizeLimit: 3584Mi
       initContainers:
         - name: dind
           image: docker:27-dind
@@ -159,9 +167,12 @@ spec:
                   containerName: dind
                   resource: limits.cpu
                   divisor: 1m
-          # 1 core: decompressing a 100 MB test case ZIP is the worker's
-          # dominant CPU cost, and 500m halved its throughput. 2Gi holds
-          # maxConcurrent judgings worth of test data.
+            # Safety net under the 2Gi limit: the GC works harder before the kernel kills the pod.
+            - name: GOMEMLIMIT
+              value: 1536MiB
+          # 1 core: checking a test case ZIP when it is cached is the worker's dominant CPU
+          # cost, and 500m halved its throughput. Memory no longer depends on the size of the
+          # test data: the cases stream from the cached file, one at a time.
           resources:
             requests:
               cpu: "1"
@@ -172,3 +183,5 @@ spec:
           volumeMounts:
             - name: judging
               mountPath: /judging
+            - name: test-data
+              mountPath: /test-data

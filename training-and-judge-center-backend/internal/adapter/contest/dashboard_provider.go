@@ -139,16 +139,18 @@ func (p *DashboardProvider) GetFinishedContestResults(ctx context.Context, userI
 			GROUP BY f.id, f.name, f.end_time, f.contest_penalty
 		),
 		positions AS (
-			-- Count participants with strictly more problems solved (simplified ranking)
+			-- Participants with strictly more problems solved than the user (simplified ranking)
 			SELECT us.contest_id,
-			       COUNT(DISTINCT s2.user_id)::INTEGER + 1 AS position
+			       (SELECT COUNT(*) FROM (
+			           SELECT s2.user_id
+			           FROM submissions s2
+			           WHERE s2.contest_id = us.contest_id
+			             AND s2.status      = 'ACCEPTED'
+			             AND s2.user_id    != $1
+			           GROUP BY s2.user_id
+			           HAVING COUNT(DISTINCT s2.problem_id) > us.problems_solved
+			       ) ahead)::INTEGER + 1 AS position
 			FROM user_score us
-			LEFT JOIN submissions s2 ON s2.contest_id = us.contest_id
-			                        AND s2.status      = 'ACCEPTED'
-			                        AND s2.user_id    != $1
-			GROUP BY us.contest_id, us.problems_solved
-			HAVING COUNT(DISTINCT s2.problem_id) > us.problems_solved
-			   OR  us.problems_solved = 0
 		)
 		SELECT us.contest_id,
 		       us.name,

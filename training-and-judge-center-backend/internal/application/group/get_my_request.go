@@ -1,12 +1,11 @@
-﻿package group
+package group
 
 import (
 	"context"
 
+	appshared "github.com/training-judge-center/backend/internal/application/shared"
 	domainGroup "github.com/training-judge-center/backend/internal/domain/group"
 	"github.com/training-judge-center/backend/internal/domain/shared"
-	appshared "github.com/training-judge-center/backend/internal/application/shared"
-	"github.com/training-judge-center/backend/pkg/apperror"
 )
 
 type GetMyRequestInput struct {
@@ -15,7 +14,7 @@ type GetMyRequestInput struct {
 }
 
 type GetMyRequestOutput struct {
-	Request JoinRequestDTO
+	Request *JoinRequestDTO
 }
 
 type GetMyRequestUseCase struct {
@@ -34,8 +33,9 @@ func (uc *GetMyRequestUseCase) Execute(ctx context.Context, input GetMyRequestIn
 		return nil, err
 	}
 	if req == nil {
-		return nil, apperror.NewNotFound(domainGroup.ErrCodeRequestNotFound, "you have not requested to join this group")
+		return &GetMyRequestOutput{Request: nil}, nil
 	}
 
-	return &GetMyRequestOutput{Request: joinRequestToDTO(req)}, nil
+	dto := joinRequestToDTO(req)
+	return &GetMyRequestOutput{Request: &dto}, nil
 }

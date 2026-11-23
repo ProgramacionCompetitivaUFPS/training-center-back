@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"testing"
+	"time"
 
 	domainContest "github.com/training-judge-center/backend/internal/domain/contest"
 	"github.com/training-judge-center/backend/pkg/apperror"
@@ -14,7 +15,7 @@ func newRegisterUseCase(
 	reg *mockRegistrationRepository,
 	member *mockGroupMemberProvider,
 ) *RegisterToContestUseCase {
-	return NewRegisterToContestUseCase(repo, reg, member, mockTeamSelection())
+	return NewRegisterToContestUseCase(repo, reg, member, mockTeamSelection(), &mockRegistrationLocker{}, &mockTransactionManager{})
 }
 
 func validRegisterInput() RegisterToContestInput {
@@ -101,14 +102,46 @@ func TestRegisterToContest_Lead_Returns403(t *testing.T) {
 	}
 }
 
-func TestRegisterToContest_FinishedContest_Returns400(t *testing.T) {
-	uc := newRegisterUseCase(repoWith(newFinishedContest(otherID)), mockRegistrations(), isMemberNotLead())
+func TestRegisterToContest_FinishedContest_ReturnsNotOpenForRegistration(t *testing.T) {
+	for _, allowLate := range []bool{false, true} {
+		c := newFinishedContest(otherID)
+		c.SetAllowLateRegistration(allowLate, time.Now())
+		uc := newRegisterUseCase(repoWith(c), mockRegistrations(), isMemberNotLead())
+
+		err := uc.Execute(context.Background(), validRegisterInput())
+
+		var appErr *apperror.AppError
+		if !errors.As(err, &appErr) || appErr.Code != domainContest.ErrCodeContestNotOpenForRegistration || appErr.Kind != apperror.KindConflict {
+			t.Errorf("allowLate=%v: expected 409 CONTEST_NOT_OPEN_FOR_REGISTRATION, got %v", allowLate, err)
+		}
+	}
+}
+
+func TestRegisterToContest_ActiveContestWithoutLateRegistration_ReturnsAlreadyStarted(t *testing.T) {
+	uc := newRegisterUseCase(repoWith(newActiveContest(otherID, false)), mockRegistrations(), isMemberNotLead())
 
 	err := uc.Execute(context.Background(), validRegisterInput())
 
 	var appErr *apperror.AppError
-	if !errors.As(err, &appErr) || appErr.Code != domainContest.ErrCodeContestAlreadyStarted {
-		t.Errorf("expected CONTEST_ALREADY_STARTED, got %v", err)
+	if !errors.As(err, &appErr) || appErr.Code != domainContest.ErrCodeContestAlreadyStarted || appErr.Kind != apperror.KindConflict {
+		t.Errorf("expected 409 CONTEST_ALREADY_STARTED, got %v", err)
+	}
+}
+
+func TestRegisterToContest_ActiveContestWithLateRegistration_Succeeds(t *testing.T) {
+	saved := false
+	reg := mockRegistrations()
+	reg.saveFn = func(_ context.Context, _ *domainContest.ContestRegistration) error {
+		saved = true
+		return nil
+	}
+	uc := newRegisterUseCase(repoWith(newActiveContest(otherID, true)), reg, isMemberNotLead())
+
+	if err := uc.Execute(context.Background(), validRegisterInput()); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !saved {
+		t.Error("expected the registration to be saved")
 	}
 }
 
@@ -176,7 +209,7 @@ func TestRegisterToContest_AlreadyInTeam_Returns409(t *testing.T) {
 	checker := &mockTeamSelectionChecker{
 		fn: func(_, _ string) (bool, error) { return true, nil },
 	}
-	uc := NewRegisterToContestUseCase(repoWith(newTestContest(otherID)), mockRegistrations(), isMemberNotLead(), checker)
+	uc := NewRegisterToContestUseCase(repoWith(newTestContest(otherID)), mockRegistrations(), isMemberNotLead(), checker, &mockRegistrationLocker{}, &mockTransactionManager{})
 
 	err := uc.Execute(context.Background(), validRegisterInput())
 
@@ -190,7 +223,7 @@ func TestRegisterToContest_TeamSelectionCheckerError_Propagates(t *testing.T) {
 	checker := &mockTeamSelectionChecker{
 		fn: func(_, _ string) (bool, error) { return false, apperror.NewInternal() },
 	}
-	uc := NewRegisterToContestUseCase(repoWith(newTestContest(otherID)), mockRegistrations(), isMemberNotLead(), checker)
+	uc := NewRegisterToContestUseCase(repoWith(newTestContest(otherID)), mockRegistrations(), isMemberNotLead(), checker, &mockRegistrationLocker{}, &mockTransactionManager{})
 
 	err := uc.Execute(context.Background(), validRegisterInput())
 
@@ -211,5 +244,42 @@ func TestRegisterToContest_SaveError_Propagates(t *testing.T) {
 
 	if err == nil {
 		t.Fatal("expected error from failed Save")
+	}
+}
+
+func TestRegisterToContest_LocksTheContestBeforeSaving(t *testing.T) {
+	locker := &mockRegistrationLocker{}
+	saved := false
+	reg := &mockRegistrationRepository{saveFn: func(_ context.Context, _ *domainContest.ContestRegistration) error {
+		saved = len(locker.lockedContests) == 1
+		return nil
+	}}
+	uc := NewRegisterToContestUseCase(repoWith(newTestContest(otherID)), reg, isMemberNotLead(), mockTeamSelection(), locker, &mockTransactionManager{})
+
+	if err := uc.Execute(context.Background(), validRegisterInput()); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !saved || locker.lockedContests[0] != testContestID {
+		t.Errorf("expected the contest %q to be locked before the registration was saved, locked=%v saved=%v", testContestID, locker.lockedContests, saved)
+	}
+}
+
+func TestRegisterToContest_LockFailure_DoesNotRegister(t *testing.T) {
+	lockErr := apperror.NewServiceUnavailable(domainContest.ErrCodeRegistrationBusy, "busy")
+	saved := false
+	reg := &mockRegistrationRepository{saveFn: func(_ context.Context, _ *domainContest.ContestRegistration) error {
+		saved = true
+		return nil
+	}}
+	uc := NewRegisterToContestUseCase(repoWith(newTestContest(otherID)), reg, isMemberNotLead(), mockTeamSelection(), &mockRegistrationLocker{err: lockErr}, &mockTransactionManager{})
+
+	err := uc.Execute(context.Background(), validRegisterInput())
+
+	var appErr *apperror.AppError
+	if !errors.As(err, &appErr) || appErr.Code != domainContest.ErrCodeRegistrationBusy {
+		t.Errorf("expected REGISTRATION_BUSY, got %v", err)
+	}
+	if saved {
+		t.Error("the registration must not be saved when the lock could not be taken")
 	}
 }

@@ -1,6 +1,7 @@
 package problem
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"io"
@@ -25,10 +26,14 @@ func NewGCSFileRepository(client *storage.Client, bucketName string) *GCSFileRep
 }
 
 func (r *GCSFileRepository) UploadFile(ctx context.Context, path string, content []byte) error {
+	return r.UploadFileStream(ctx, path, bytes.NewReader(content))
+}
+
+func (r *GCSFileRepository) UploadFileStream(ctx context.Context, path string, content io.Reader) error {
 	obj := r.client.Bucket(r.bucket).Object(path)
 	writer := obj.NewWriter(ctx)
 
-	if _, err := writer.Write(content); err != nil {
+	if _, err := io.Copy(writer, content); err != nil {
 		if closeErr := writer.Close(); closeErr != nil {
 			slog.ErrorContext(ctx, "GCS writer close failed after write error", "close_error", closeErr, "path", path)
 		}

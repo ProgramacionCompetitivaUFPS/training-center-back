@@ -3,8 +3,10 @@ package contest
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"testing"
 	"time"
 
 	"github.com/training-judge-center/backend/internal/adapter/http/middleware"
@@ -42,10 +44,22 @@ func wrapAuth(h http.Handler) http.Handler {
 	return middleware.Auth(&mockTokenSvc{}, noopSessionInvalidator{})(h)
 }
 
+func assertErrorCode(t *testing.T, body []byte, want string) {
+	t.Helper()
+	var resp apperror.AppError
+	if err := json.Unmarshal(body, &resp); err != nil {
+		t.Fatalf("could not decode error body %s: %v", body, err)
+	}
+	if resp.Code != want {
+		t.Errorf("error = %q, want %q", resp.Code, want)
+	}
+}
+
 // ── Mock dependencies ────────────────────────────────────────────────────────
 
 type mockContestRepo struct {
 	createFn func(ctx context.Context, c *domainContest.Contest) error
+	listFn   func(ctx context.Context, f domainContest.ListFilters) ([]*domainContest.Contest, int, error)
 }
 
 func (s *mockContestRepo) Create(ctx context.Context, c *domainContest.Contest) error {
@@ -59,7 +73,10 @@ func (s *mockContestRepo) FindByID(_ context.Context, _ string) (*domainContest.
 	return nil, apperror.NewNotFound(domainContest.ErrCodeContestNotFound, "not found")
 }
 func (s *mockContestRepo) Delete(_ context.Context, _ string) error { return nil }
-func (s *mockContestRepo) List(_ context.Context, _ domainContest.ListFilters) ([]*domainContest.Contest, int, error) {
+func (s *mockContestRepo) List(ctx context.Context, f domainContest.ListFilters) ([]*domainContest.Contest, int, error) {
+	if s.listFn != nil {
+		return s.listFn(ctx, f)
+	}
 	return nil, 0, nil
 }
 func (s *mockContestRepo) ListByGroupIDs(_ context.Context, _ []string, _ domainContest.ListFilters) ([]*domainContest.Contest, int, error) {
@@ -100,6 +117,20 @@ func (s *mockMemberProvider) GetMemberRole(_ context.Context, _, _ string) (*str
 		return &role, nil
 	}
 	return nil, nil
+}
+
+func (s *mockMemberProvider) GetMemberRoleBulk(_ context.Context, _ string, groupIDs []string) (map[string]*string, error) {
+	result := make(map[string]*string, len(groupIDs))
+	for _, id := range groupIDs {
+		if s.isLead {
+			role := "LEAD"
+			result[id] = &role
+		} else if s.isMember {
+			role := "MEMBER"
+			result[id] = &role
+		}
+	}
+	return result, nil
 }
 
 type mockProblemProvider struct{}
@@ -321,7 +352,9 @@ func scheduledContest() *domainContest.Contest {
 		nil,
 		start, end,
 		domainContest.RestorePenalty(20),
-		0, false, false, false,
+		0, false, false, false, false,
+		nil,
+		nil,
 		shared.RestoreGroupID("g1"),
 		shared.RestoreUserID("u1"),
 		domainContest.RestoreParticipationMode("INDIVIDUAL"), domainContest.RestoreTeamSize(2, 5),
@@ -339,7 +372,9 @@ func finishedContest() *domainContest.Contest {
 		time.Now().Add(-48*time.Hour),
 		time.Now().Add(-24*time.Hour),
 		domainContest.RestorePenalty(20),
-		0, false, false, false,
+		0, false, false, false, false,
+		nil,
+		nil,
 		shared.RestoreGroupID("g1"),
 		shared.RestoreUserID("u1"),
 		domainContest.RestoreParticipationMode("INDIVIDUAL"), domainContest.RestoreTeamSize(2, 5),
@@ -365,3 +400,7 @@ func (noopSessionInvalidator) InvalidateSession(context.Context, string, time.Ti
 func (noopSessionInvalidator) IsSessionInvalidated(context.Context, string) (bool, error) {
 	return false, nil
 }
+
+type noopRegistrationLocker struct{}
+
+func (n *noopRegistrationLocker) Lock(_ context.Context, _ string) error { return nil }

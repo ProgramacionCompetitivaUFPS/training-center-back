@@ -43,3 +43,5 @@ tmp_dummy_*
 # docs
 docs/swagger.json
 docs/swagger.yaml
+# Sonar
+.scannerwork/

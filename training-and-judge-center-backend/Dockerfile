@@ -17,7 +17,9 @@ RUN CGO_ENABLED=0 GOOS=linux go build -o /bin/cleanup-sessions ./cmd/cleanup-ses
 
 FROM alpine:3.21
 
-RUN apk --no-cache add ca-certificates tzdata
+RUN apk --no-cache add ca-certificates tzdata \
+    && mkdir -p /data/uploads \
+    && chown 65532:65532 /data/uploads
 
 COPY --from=builder /bin/api /bin/api
 COPY --from=builder /bin/migrate /bin/migrate
@@ -25,6 +27,8 @@ COPY --from=builder /bin/seed /bin/seed
 COPY --from=builder /bin/worker /bin/worker
 COPY --from=builder /bin/cleanup-sessions /bin/cleanup-sessions
 COPY --from=builder /app/config /config
+
+USER 65532:65532
 
 EXPOSE 8080
 

@@ -3,6 +3,7 @@ package auth
 import (
 	"context"
 	"encoding/base64"
+	"errors"
 	"fmt"
 	"strings"
 	"testing"
@@ -10,6 +11,7 @@ import (
 
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/training-judge-center/backend/internal/domain/user"
+	"github.com/training-judge-center/backend/pkg/apperror"
 )
 
 func testUser() *user.User {
@@ -243,5 +245,49 @@ func TestValidateToken_TamperedPayload(t *testing.T) {
 	// Assert
 	if err == nil {
 		t.Error("expected error for tampered payload, got nil")
+	}
+}
+
+func TestValidateToken_TokenWithAnInvalidClaim_IsUnauthorized(t *testing.T) {
+	tests := []struct {
+		name        string
+		email, role string
+		wantMessage string
+	}{
+		{"a malformed email", "not-an-email", "CONTESTANT", "invalid token: bad email claim"},
+		{"an unknown role", "test@example.com", "SUPERHERO", "invalid token: bad role claim"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			svc := NewJWTService("test-secret", 1)
+			claims := jwtCustomClaims{
+				Email:     tt.email,
+				Role:      tt.role,
+				SessionID: "family-abc",
+				RegisteredClaims: jwt.RegisteredClaims{
+					Subject:   "user-id-123",
+					IssuedAt:  jwt.NewNumericDate(time.Now()),
+					ExpiresAt: jwt.NewNumericDate(time.Now().Add(time.Hour)),
+				},
+			}
+			tokenStr, err := jwt.NewWithClaims(jwt.SigningMethodHS256, claims).SignedString([]byte("test-secret"))
+			if err != nil {
+				t.Fatalf("could not sign token: %v", err)
+			}
+
+			got, err := svc.ValidateToken(tokenStr)
+
+			var appErr *apperror.AppError
+			if !errors.As(err, &appErr) || appErr.Kind != apperror.KindUnauthorized {
+				t.Fatalf("expected an unauthorized apperror, got %v", err)
+			}
+			if appErr.Message != tt.wantMessage {
+				t.Errorf("message: got %q, want %q", appErr.Message, tt.wantMessage)
+			}
+			if got != nil {
+				t.Errorf("expected no claims for an invalid token, got %+v", got)
+			}
+		})
 	}
 }

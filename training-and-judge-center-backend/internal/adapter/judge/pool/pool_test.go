@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -668,5 +669,256 @@ func TestPool_CreatesContainersWithInit(t *testing.T) {
 	}
 	if hostCfg == nil || hostCfg.Init == nil || !*hostCfg.Init {
 		t.Errorf("HostConfig.Init = %v, want true", hostCfg)
+	}
+}
+
+func TestNewPool_NonPositiveMemoryBytes_Panics(t *testing.T) {
+	tests := []struct {
+		name        string
+		memoryBytes int64
+	}{
+		{"zero", 0},
+		{"negative", -1},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cfg := PoolConfig{Languages: map[string]LanguageConfig{"cpp20": {Image: "judge:cpp20", MemoryBytes: tt.memoryBytes}}}
+
+			defer func() {
+				got := recover()
+				if got == nil {
+					t.Fatal("expected NewPool to panic")
+				}
+				if !strings.Contains(fmt.Sprint(got), `language "cpp20" has non-positive MemoryBytes`) {
+					t.Errorf("panic message: got %v", got)
+				}
+			}()
+			NewPool(cfg, &mockDockerClient{})
+		})
+	}
+}
+
+func TestClaim_UnknownLanguage_ReturnsAnErrorWithoutCreating(t *testing.T) {
+	mock := &mockDockerClient{}
+	p := newTestPool(t, testCfg(1), mock)
+
+	got, err := p.Claim(context.Background(), "cobol", LanguageCeiling)
+
+	if err == nil || !strings.Contains(err.Error(), `unknown language "cobol"`) {
+		t.Fatalf("expected an unknown-language error, got %v", err)
+	}
+	if got != nil {
+		t.Error("expected no container for an unknown language")
+	}
+	if mock.createCnt.Load() != 0 {
+		t.Errorf("createCnt = %d, want 0", mock.createCnt.Load())
+	}
+}
+
+func TestClaim_ContainerCreateFails_ReturnsTheErrorAndHoldsNoBudget(t *testing.T) {
+	mock := &mockDockerClient{
+		createFn: func(context.Context, client.ContainerCreateOptions) (client.ContainerCreateResult, error) {
+			return client.ContainerCreateResult{}, errors.New("image not found")
+		},
+	}
+	p := newTestPool(t, testCfg(1), mock)
+
+	got, err := p.Claim(context.Background(), "cpp20", LanguageCeiling)
+
+	if err == nil || !strings.Contains(err.Error(), "image not found") {
+		t.Fatalf("expected the create error, got %v", err)
+	}
+	if got != nil {
+		t.Error("expected no container when creation fails")
+	}
+	assertAllocatedBytes(t, p, 0)
+	if len(p.containers) != 0 {
+		t.Errorf("pool tracks %d containers, want 0", len(p.containers))
+	}
+}
+
+func TestClaim_ContainerStartFails_RemovesTheDanglingContainer(t *testing.T) {
+	var removedIDs []string
+	mock := &mockDockerClient{
+		createFn: func(context.Context, client.ContainerCreateOptions) (client.ContainerCreateResult, error) {
+			return client.ContainerCreateResult{ID: "ctr-dangling"}, nil
+		},
+		startFn: func(context.Context, string, client.ContainerStartOptions) (client.ContainerStartResult, error) {
+			return client.ContainerStartResult{}, errors.New("oci runtime error")
+		},
+		removeFn: func(_ context.Context, id string, _ client.ContainerRemoveOptions) (client.ContainerRemoveResult, error) {
+			removedIDs = append(removedIDs, id)
+			return client.ContainerRemoveResult{}, nil
+		},
+	}
+	p := newTestPool(t, testCfg(1), mock)
+
+	got, err := p.Claim(context.Background(), "cpp20", LanguageCeiling)
+
+	if err == nil || !strings.Contains(err.Error(), "ctr-dangling") {
+		t.Fatalf("expected a start error naming the container, got %v", err)
+	}
+	if got != nil {
+		t.Error("expected no container when it cannot start")
+	}
+	if len(removedIDs) != 1 || removedIDs[0] != "ctr-dangling" {
+		t.Errorf("removed containers = %v, want [ctr-dangling]", removedIDs)
+	}
+	assertAllocatedBytes(t, p, 0)
+}
+
+func TestParseCPUNanos(t *testing.T) {
+	tests := []struct {
+		cpu  string
+		want int64
+	}{
+		{"", 0},
+		{"abc", 0},
+		{"0", 0},
+		{"-1", 0},
+		{"0.5", 500000000},
+		{"1", 1000000000},
+		{"2", 2000000000},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.cpu, func(t *testing.T) {
+			got := parseCPUNanos(tt.cpu)
+
+			if got != tt.want {
+				t.Errorf("parseCPUNanos(%q) = %d, want %d", tt.cpu, got, tt.want)
+			}
+		})
+	}
+}
+
+func TestClaim_CreatesContainersLockedDownAndLabelled(t *testing.T) {
+	var created client.ContainerCreateOptions
+	mock := &mockDockerClient{
+		createFn: func(_ context.Context, opts client.ContainerCreateOptions) (client.ContainerCreateResult, error) {
+			created = opts
+			return client.ContainerCreateResult{ID: "ctr-1"}, nil
+		},
+	}
+	cfg := testCfg(1)
+	cfg.Languages["cpp20"] = LanguageConfig{Image: "judge:cpp20", MemoryBytes: smallMemBytes, CPU: "0.5"}
+	p := newTestPool(t, cfg, mock)
+
+	if _, err := p.Claim(context.Background(), "cpp20", LanguageCeiling); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if created.Config.Image != "judge:cpp20" {
+		t.Errorf("image: got %q, want judge:cpp20", created.Config.Image)
+	}
+	if got := created.Config.Labels[SandboxLabelKey]; got != SandboxLabelValue {
+		t.Errorf("sandbox label: got %q, want %q", got, SandboxLabelValue)
+	}
+	if got := created.HostConfig.NetworkMode; got != container.NetworkMode("none") {
+		t.Errorf("network mode: got %q, want none", got)
+	}
+	res := created.HostConfig.Resources
+	if res.Memory != smallMemBytes || res.MemorySwap != smallMemBytes {
+		t.Errorf("memory/swap: got %d/%d, want %d/%d (swap equal to memory disables swap)", res.Memory, res.MemorySwap, smallMemBytes, smallMemBytes)
+	}
+	if res.NanoCPUs != 500000000 {
+		t.Errorf("NanoCPUs: got %d, want 500000000", res.NanoCPUs)
+	}
+}
+
+func TestDiscard_RemoveFails_KeepsTheContainerDrainingAndTheBudget(t *testing.T) {
+	mock := &mockDockerClient{
+		removeFn: func(context.Context, string, client.ContainerRemoveOptions) (client.ContainerRemoveResult, error) {
+			return client.ContainerRemoveResult{}, errors.New("daemon unavailable")
+		},
+	}
+	p := newTestPool(t, testCfg(2), mock)
+	c := putIdleContainer(t, p, "cpp20", 0)
+
+	p.Discard(context.Background(), c)
+
+	assertState(t, p, c, stateDraining)
+	assertAllocatedBytes(t, p, smallMemBytes)
+	if len(p.containers) != 1 {
+		t.Errorf("pool tracks %d containers, want 1 so the reaper can retry", len(p.containers))
+	}
+}
+
+func TestEvictExpired_DrainingContainerThatNowRemoves_FreesTheBudget(t *testing.T) {
+	mock := &mockDockerClient{}
+	p := newTestPool(t, testCfg(2), mock)
+	c := putIdleContainer(t, p, "cpp20", 0)
+	p.mu.Lock()
+	c.state = stateDraining
+	p.mu.Unlock()
+
+	p.evictExpired(context.Background())
+
+	if mock.removeCnt.Load() != 1 {
+		t.Errorf("removeCnt = %d, want 1", mock.removeCnt.Load())
+	}
+	assertAllocatedBytes(t, p, 0)
+	if len(p.containers) != 0 {
+		t.Errorf("pool tracks %d containers, want 0", len(p.containers))
+	}
+}
+
+func TestEvictExpired_DrainingContainerThatStillCannotBeRemoved_StaysDraining(t *testing.T) {
+	mock := &mockDockerClient{
+		removeFn: func(context.Context, string, client.ContainerRemoveOptions) (client.ContainerRemoveResult, error) {
+			return client.ContainerRemoveResult{}, errors.New("daemon unavailable")
+		},
+	}
+	p := newTestPool(t, testCfg(2), mock)
+	c := putIdleContainer(t, p, "cpp20", 0)
+	p.mu.Lock()
+	c.state = stateDraining
+	p.mu.Unlock()
+
+	p.evictExpired(context.Background())
+
+	assertState(t, p, c, stateDraining)
+	assertAllocatedBytes(t, p, smallMemBytes)
+}
+
+func TestRemoveFromSlice(t *testing.T) {
+	a, b, c := &Container{id: "a"}, &Container{id: "b"}, &Container{id: "c"}
+
+	t.Run("removes the target and keeps the order of the rest", func(t *testing.T) {
+		got := removeFromSlice([]*Container{a, b, c}, b)
+
+		if len(got) != 2 || got[0] != a || got[1] != c {
+			t.Errorf("got %v, want [a c]", got)
+		}
+	})
+	t.Run("leaves the slice alone when the target is not in it", func(t *testing.T) {
+		got := removeFromSlice([]*Container{a, b}, c)
+
+		if len(got) != 2 || got[0] != a || got[1] != b {
+			t.Errorf("got %v, want [a b]", got)
+		}
+	})
+}
+
+func TestRelease_WhenASignalIsAlreadyPending_DoesNotBlock(t *testing.T) {
+	p := newTestPool(t, testCfg(2), &mockDockerClient{})
+	first := putIdleContainer(t, p, "cpp20", 0)
+	second := putIdleContainer(t, p, "cpp20", 0)
+
+	done := make(chan struct{})
+	go func() {
+		p.Release(first)
+		p.Release(second)
+		close(done)
+	}()
+
+	select {
+	case <-done:
+	case <-time.After(time.Second):
+		t.Fatal("Release blocked on a second signal")
+	}
+	if len(p.released) != 1 {
+		t.Errorf("pending signals = %d, want 1", len(p.released))
 	}
 }

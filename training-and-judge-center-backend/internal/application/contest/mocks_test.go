@@ -2,6 +2,7 @@ package contest
 
 import (
 	"context"
+	"testing"
 	"time"
 
 	domainContest "github.com/training-judge-center/backend/internal/domain/contest"
@@ -119,7 +120,8 @@ func groupNotFound() *mockGroupProvider {
 // ── GroupMemberProvider mock ─────────────────────────────────────────────────
 
 type mockGroupMemberProvider struct {
-	getRoleFn func(ctx context.Context, userID, groupID string) (*string, error)
+	getRoleFn     func(ctx context.Context, userID, groupID string) (*string, error)
+	getRoleBulkFn func(ctx context.Context, userID string, groupIDs []string) (map[string]*string, error)
 }
 
 func (m *mockGroupMemberProvider) GetMemberRole(ctx context.Context, userID, groupID string) (*string, error) {
@@ -127,6 +129,21 @@ func (m *mockGroupMemberProvider) GetMemberRole(ctx context.Context, userID, gro
 		return m.getRoleFn(ctx, userID, groupID)
 	}
 	return nil, nil
+}
+
+func (m *mockGroupMemberProvider) GetMemberRoleBulk(ctx context.Context, userID string, groupIDs []string) (map[string]*string, error) {
+	if m.getRoleBulkFn != nil {
+		return m.getRoleBulkFn(ctx, userID, groupIDs)
+	}
+	return map[string]*string{}, nil
+}
+
+func bulkRoles(roles map[string]*string) *mockGroupMemberProvider {
+	return &mockGroupMemberProvider{
+		getRoleBulkFn: func(_ context.Context, _ string, _ []string) (map[string]*string, error) {
+			return roles, nil
+		},
+	}
 }
 
 func isLead() *mockGroupMemberProvider {
@@ -547,6 +564,9 @@ const (
 	testGroupID   = "bbbbbbbb-0000-0000-0000-000000000001"
 	testContestID = "cccccccc-0000-0000-0000-000000000001"
 	testProblemID = "dddddddd-0000-0000-0000-000000000001"
+
+	colorProblemA = "dddddddd-0000-0000-0000-00000000000a"
+	colorProblemB = "dddddddd-0000-0000-0000-00000000000b"
 )
 
 // ── Contest fixture ──────────────────────────────────────────────────────────
@@ -562,7 +582,9 @@ func newTestContest(ownerID string) *domainContest.Contest {
 		0,
 		false,
 		false,
-		false,
+		false, false,
+		nil,
+		nil,
 		shared.RestoreGroupID(testGroupID),
 		shared.RestoreUserID(ownerID),
 		domainContest.RestoreParticipationMode("INDIVIDUAL"), domainContest.RestoreTeamSize(2, 5),
@@ -570,6 +592,30 @@ func newTestContest(ownerID string) *domainContest.Contest {
 		testNow.Add(-time.Hour),
 		nil,
 	)
+}
+
+func problemWithColor(id, problemID string, order int, color string) domainContest.ContestProblem {
+	return domainContest.RestoreContestProblem(id, problemID, order, &color)
+}
+
+func contestHolding(problems ...domainContest.ContestProblem) *domainContest.Contest {
+	c := newTestContest(callerID)
+	c.SetProblems(problems, testNow)
+	return c
+}
+
+func assertColor(t *testing.T, label string, got *string, want string) {
+	t.Helper()
+	if got == nil || *got != want {
+		t.Errorf("%s: color = %v, want %q", label, got, want)
+	}
+}
+
+func assertNoColor(t *testing.T, label string, got *string) {
+	t.Helper()
+	if got != nil {
+		t.Errorf("%s: color = %q, want none", label, *got)
+	}
 }
 
 func newFinishedContest(ownerID string) *domainContest.Contest {
@@ -583,7 +629,9 @@ func newFinishedContest(ownerID string) *domainContest.Contest {
 		0,
 		false,
 		false,
-		false,
+		false, false,
+		nil,
+		nil,
 		shared.RestoreGroupID(testGroupID),
 		shared.RestoreUserID(ownerID),
 		domainContest.RestoreParticipationMode("INDIVIDUAL"), domainContest.RestoreTeamSize(2, 5),
@@ -599,4 +647,64 @@ func repoWith(c *domainContest.Contest) *mockContestRepository {
 			return c, nil
 		},
 	}
+}
+
+// ── RegistrationLocker mock ──────────────────────────────────────────────────
+
+type mockRegistrationLocker struct {
+	lockedContests []string
+	err            error
+}
+
+func (m *mockRegistrationLocker) Lock(_ context.Context, contestID string) error {
+	m.lockedContests = append(m.lockedContests, contestID)
+	return m.err
+}
+
+// ── Standings fixtures ───────────────────────────────────────────────────────
+
+var contestStart = time.Date(2026, 1, 1, 10, 0, 0, 0, time.UTC)
+
+func tp(h, m int) *time.Time {
+	t := time.Date(2026, 1, 1, h, m, 0, 0, time.UTC)
+	return &t
+}
+
+func participant(id string, problems map[string]domainContest.ProblemAttempt) domainContest.ParticipantStanding {
+	return domainContest.ParticipantStanding{ContestantID: id, Problems: problems}
+}
+
+// attempt builds a ProblemAttempt with n wrong attempts at arbitrary pre-contest
+// timestamps (safe to use in tests that don't exercise freeze logic).
+func attempt(wrongAttempts int, acceptedAt *time.Time) domainContest.ProblemAttempt {
+	times := make([]time.Time, wrongAttempts)
+	for i := range times {
+		// Place each WA well before contestStart so they're always pre-freeze.
+		times[i] = contestStart.Add(-time.Duration(wrongAttempts-i) * time.Minute)
+	}
+	return domainContest.ProblemAttempt{WrongAttemptTimes: times, AcceptedAt: acceptedAt}
+}
+
+func newActiveContest(ownerID string, allowLateRegistration bool) *domainContest.Contest {
+	return domainContest.RestoreContest(
+		testContestID,
+		domainContest.RestoreContestName("Active Contest"),
+		nil,
+		time.Now().Add(-time.Hour),
+		time.Now().Add(time.Hour),
+		domainContest.RestorePenalty(20),
+		0,
+		false,
+		false,
+		false,
+		allowLateRegistration,
+		nil,
+		nil,
+		shared.RestoreGroupID(testGroupID),
+		shared.RestoreUserID(ownerID),
+		domainContest.RestoreParticipationMode("INDIVIDUAL"), domainContest.RestoreTeamSize(2, 5),
+		[]domainContest.ContestProblem{},
+		testNow.Add(-2*time.Hour),
+		nil,
+	)
 }

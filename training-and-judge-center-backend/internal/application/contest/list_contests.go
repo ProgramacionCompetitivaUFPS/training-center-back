@@ -13,7 +13,6 @@ import (
 
 const maxPageLimit = 100
 
-
 type ContestListItem struct {
 	ID                string
 	Name              string
@@ -29,6 +28,7 @@ type ContestListItem struct {
 	ParticipantCount  int
 	IsRegistered      bool
 	ProblemCount      int
+	UserGroupRole     *string // "LEAD" | "MEMBER" | nil when caller is platform admin
 }
 
 type PaginationOutput struct {
@@ -105,12 +105,14 @@ func (uc *ListContestsUseCase) Execute(ctx context.Context, in ListContestsInput
 
 	isAdmin := in.CurrentUser.IsAdmin()
 
+	var role *string
 	isMember := false
 	if !isAdmin {
-		role, err := uc.memberProvider.GetMemberRole(ctx, in.CurrentUser.ID, in.GroupID)
+		r, err := uc.memberProvider.GetMemberRole(ctx, in.CurrentUser.ID, in.GroupID)
 		if err != nil {
 			return nil, err
 		}
+		role = r
 		isMember = role != nil
 	}
 
@@ -143,7 +145,7 @@ func (uc *ListContestsUseCase) Execute(ctx context.Context, in ListContestsInput
 	now := time.Now()
 	items := make([]ContestListItem, 0, len(contests))
 	for _, c := range contests {
-		items = append(items, toContestListItem(c, now, participantCounts[c.ID()], registeredMap[c.ID()]))
+		items = append(items, toContestListItem(c, now, participantCounts[c.ID()], registeredMap[c.ID()], role))
 	}
 
 	totalPages := appshared.CalcTotalPages(total, limit)

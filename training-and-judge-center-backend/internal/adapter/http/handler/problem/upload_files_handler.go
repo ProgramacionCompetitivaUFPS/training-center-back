@@ -1,8 +1,8 @@
-﻿package problem
+package problem
 
 import (
 	"context"
-	"io"
+	"errors"
 	"log/slog"
 	"net/http"
 	"strings"
@@ -16,8 +16,7 @@ import (
 )
 
 const (
-	multipartMemoryPaddingBytes = 50 << 20 // 50 MB extra for form fields and metadata
-	uploadContextTimeout        = 2 * time.Minute
+	uploadContextTimeout = 2 * time.Minute
 )
 
 // @Summary      Upload problem files
@@ -48,45 +47,42 @@ func (h *Handler) UploadFiles(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	maxTestCaseBytes := int64(h.settings.MaxFileSizeTestCaseMB()) << 20
-	maxDefaultBytes := int64(h.settings.MaxFileSizeDefaultMB()) << 20
-
-	// Parse form with dynamic memory logic (TestCase limit + 50MB padding)
-	maxMemory := maxTestCaseBytes + multipartMemoryPaddingBytes
-	err := r.ParseMultipartForm(maxMemory)
+	release, err := h.uploads.acquire(r.Context())
 	if err != nil {
-		handler.WriteError(r.Context(), w, multipartParseError(err))
+		handler.WriteError(r.Context(), w, uploadFailure(w, err))
 		return
 	}
+	defer release()
 
-	fileType := r.FormValue("fileType")
-	if fileType == "" {
-		fileType = r.FormValue("type")
-	}
-	file, fileHeader, err := r.FormFile("file")
+	maxTestCaseBytes := int64(h.settings.MaxZipUploadSizeMB()) << 20
+	maxDefaultBytes := int64(h.settings.MaxFileSizeDefaultMB()) << 20
+
+	upload, err := receiveUpload(w, r, maxTestCaseBytes)
 	if err != nil {
+		if errors.Is(err, errFileTooLarge) {
+			handler.WriteError(r.Context(), w, apperror.NewPayloadTooLarge("File size exceeds allowed limit"))
+			return
+		}
+		slog.WarnContext(r.Context(), "upload files: upload rejected", "error", err, "slug", slug)
+		handler.WriteError(r.Context(), w, uploadFailure(w, err))
+		return
+	}
+	defer upload.Close()
+
+	fileType := upload.fields["fileType"]
+	if fileType == "" {
+		fileType = upload.fields["type"]
+	}
+	if upload.file == nil {
 		handler.WriteJSON(r.Context(), w, http.StatusBadRequest, apperror.AppError{Code: apperror.ErrCodeBadRequest, Message: "File missing in form-data"})
 		return
 	}
-	defer file.Close()
 
 	limitBytes := maxDefaultBytes
 	if strings.EqualFold(fileType, appProblem.FileTypeTestCases) {
 		limitBytes = maxTestCaseBytes
 	}
-
-	if fileHeader.Size > limitBytes {
-		handler.WriteError(r.Context(), w, apperror.NewPayloadTooLarge("File size exceeds allowed limit"))
-		return
-	}
-
-	fileData, err := io.ReadAll(io.LimitReader(file, limitBytes+1))
-	if err != nil {
-		slog.ErrorContext(r.Context(), "Failed to read uploaded file", "error", err, "slug", slug)
-		handler.WriteJSON(r.Context(), w, http.StatusInternalServerError, apperror.NewInternal())
-		return
-	}
-	if int64(len(fileData)) > limitBytes {
+	if upload.file.Size() > limitBytes {
 		handler.WriteError(r.Context(), w, apperror.NewPayloadTooLarge("File size exceeds allowed limit"))
 		return
 	}
@@ -99,9 +95,9 @@ func (h *Handler) UploadFiles(w http.ResponseWriter, r *http.Request) {
 	out, ucErr := h.uploadProblemFiles.Execute(ctx, appProblem.UploadProblemFilesInput{
 		Slug:        slug,
 		FileType:    fileType,
-		FileName:    fileHeader.Filename,
-		FileData:    fileData,
-		ConfirmSlug: r.FormValue("confirmSlug"),
+		FileName:    upload.fileName,
+		File:        upload.file,
+		ConfirmSlug: upload.fields["confirmSlug"],
 		CurrentUser: currentUser,
 	})
 

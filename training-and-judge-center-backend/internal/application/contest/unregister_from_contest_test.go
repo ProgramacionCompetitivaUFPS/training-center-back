@@ -65,8 +65,19 @@ func TestUnregisterFromContest_GroupMismatch_Returns404(t *testing.T) {
 	}
 }
 
-func TestUnregisterFromContest_FinishedContest_Returns400(t *testing.T) {
+func TestUnregisterFromContest_FinishedContest_Returns409(t *testing.T) {
 	uc := newUnregisterUseCase(repoWith(newFinishedContest(otherID)), mockRegistrations(), isMemberNotLead())
+
+	err := uc.Execute(context.Background(), validUnregisterInput())
+
+	var appErr *apperror.AppError
+	if !errors.As(err, &appErr) || appErr.Code != domainContest.ErrCodeCannotUnregisterAfterStart || appErr.Kind != apperror.KindConflict {
+		t.Errorf("expected 409 CANNOT_UNREGISTER_AFTER_START, got %v", err)
+	}
+}
+
+func TestUnregisterFromContest_ActiveContestWithLateRegistration_StillBlocked(t *testing.T) {
+	uc := newUnregisterUseCase(repoWith(newActiveContest(otherID, true)), mockRegistrations(), isMemberNotLead())
 
 	err := uc.Execute(context.Background(), validUnregisterInput())
 

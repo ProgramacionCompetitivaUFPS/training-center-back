@@ -19,8 +19,12 @@ type mockSubmissionsContestRepo struct {
 	contest *domainContest.Contest
 }
 
-func (m *mockSubmissionsContestRepo) Create(_ context.Context, _ *domainContest.Contest) error { return nil }
-func (m *mockSubmissionsContestRepo) Update(_ context.Context, _ *domainContest.Contest) error { return nil }
+func (m *mockSubmissionsContestRepo) Create(_ context.Context, _ *domainContest.Contest) error {
+	return nil
+}
+func (m *mockSubmissionsContestRepo) Update(_ context.Context, _ *domainContest.Contest) error {
+	return nil
+}
 func (m *mockSubmissionsContestRepo) FindByID(_ context.Context, _ string) (*domainContest.Contest, error) {
 	return m.contest, nil
 }
@@ -42,7 +46,9 @@ func activeContestForSubmissions() *domainContest.Contest {
 		time.Now().Add(-2*time.Hour),
 		time.Now().Add(2*time.Hour),
 		domainContest.RestorePenalty(20),
-		0, false, false, false,
+		0, false, false, false, false,
+		nil,
+		nil,
 		shared.RestoreGroupID("g1"),
 		shared.RestoreUserID("u1"),
 		domainContest.RestoreParticipationMode("INDIVIDUAL"), domainContest.RestoreTeamSize(2, 5),
@@ -133,13 +139,13 @@ func TestListContestSubmissions_Pagination_Returns200(t *testing.T) {
 	subs := make([]appcontest.RichSubmissionData, 5)
 	for i := range subs {
 		subs[i] = appcontest.RichSubmissionData{
-			ID:         "sub-" + string(rune('1'+i)),
+			ID:          "sub-" + string(rune('1'+i)),
 			ProblemSlug: "sum",
-			UserID:     "u1",
-			StandingID: "u1",
-			Nickname:   "john_doe",
-			Language:   "cpp20",
-			Status:     "ACCEPTED",
+			UserID:      "u1",
+			StandingID:  "u1",
+			Nickname:    "john_doe",
+			Language:    "cpp20",
+			Status:      "ACCEPTED",
 			SubmittedAt: time.Now().Add(-time.Duration(i+1) * 10 * time.Minute),
 		}
 	}
@@ -166,5 +172,37 @@ func TestListContestSubmissions_Pagination_Returns200(t *testing.T) {
 	}
 	if len(resp.Submissions) != 2 {
 		t.Errorf("page entries=%d, want 2", len(resp.Submissions))
+	}
+}
+
+func TestListContestSubmissions_PhaseAll_SameAsOmitted(t *testing.T) {
+	subs := []appcontest.RichSubmissionData{{
+		ID:          "sub-1",
+		ProblemSlug: "sum",
+		UserID:      "u1",
+		StandingID:  "u1",
+		Nickname:    "john_doe",
+		Language:    "cpp20",
+		Status:      "ACCEPTED",
+		SubmittedAt: time.Now().Add(-10 * time.Minute),
+	}}
+	h := newHandlerWithListSubmissions(defaultListSubmissionsUC(subs))
+
+	bodies := make([]string, 0, 2)
+	for _, target := range []string{"/groups/g1/contests/c1/submissions", "/groups/g1/contests/c1/submissions?phase=all"} {
+		r := authedRequest(http.MethodGet, target, nil)
+		r.SetPathValue("groupId", "g1")
+		r.SetPathValue("contestId", "c1")
+		w := httptest.NewRecorder()
+
+		wrapAuth(http.HandlerFunc(h.ListContestSubmissions)).ServeHTTP(w, r)
+
+		if w.Code != http.StatusOK {
+			t.Fatalf("%s: expected 200, got %d: %s", target, w.Code, w.Body.String())
+		}
+		bodies = append(bodies, w.Body.String())
+	}
+	if bodies[0] != bodies[1] {
+		t.Errorf("phase=all body differs from omitted phase:\nomitted: %s\nall:     %s", bodies[0], bodies[1])
 	}
 }

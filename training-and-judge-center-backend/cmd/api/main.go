@@ -162,7 +162,7 @@ func main() {
 	}
 
 	icpcParser := problem.NewICPCParser(problem.ICPCParserConfig{
-		MaxUncompressedSizeMB: settingsProvider.MaxFileSizeTestCaseMB(),
+		MaxUncompressedSizeMB: cfg.VirtualObject.MaxExtractedSizeMB,
 		MaxTestCaseInputMB:    cfg.VirtualObject.MaxFileSizeTestCaseInputMB,
 		MaxTestCaseAnswerMB:   cfg.VirtualObject.MaxFileSizeTestCaseAnswerMB,
 		MaxMetadataFileSizeMB: settingsProvider.MaxFileSizeDefaultMB(),
@@ -192,7 +192,7 @@ func main() {
 	listProblemsUseCase := appProblem.NewListProblemsUseCase(problemRepo, userProvider)
 	unpublishProblemUseCase := appProblem.NewUnpublishProblemUseCase(problemRepo, problemActiveContestChecker)
 	changeAccessibilityUseCase := appProblem.NewChangeAccessibilityUseCase(problemRepo)
-	deleteProblemUseCase := appProblem.NewDeleteProblemUseCase(problemRepo, fileStorage, problemActiveContestChecker, problemContestAssociationRemover, txManager)
+	deleteProblemUseCase := appProblem.NewDeleteProblemUseCase(problemRepo, problemValidationRepo, fileStorage, problemActiveContestChecker, problemContestAssociationRemover, txManager)
 	getProblemStatisticsUseCase := appProblem.NewGetProblemStatisticsUseCase(problemRepo, problemStatisticsProvider)
 	listTestCasesUseCase := appProblem.NewListTestCasesUseCase(problemRepo, fileStorage)
 	getTestCaseUseCase := appProblem.NewGetTestCaseUseCase(problemRepo, fileStorage)
@@ -227,7 +227,7 @@ func main() {
 	// User use cases
 	createUserUseCase := appuser.NewCreateUserUseCase(userRepo, globalGroupJoiner, txManager)
 	loginUseCase := appuser.NewLoginUseCase(userRepo, refreshTokenRepo, jwtService, refreshTokenCodec, redisRateLimiter)
-	loginWithGoogleUseCase := appuser.NewLoginWithGoogleUseCase(userRepo, oauthIdentityRepo, refreshTokenRepo, jwtService, refreshTokenCodec, googleVerifier, txManager)
+	loginWithGoogleUseCase := appuser.NewLoginWithGoogleUseCase(userRepo, oauthIdentityRepo, refreshTokenRepo, jwtService, refreshTokenCodec, googleVerifier, globalGroupJoiner, txManager)
 	linkGoogleIdentityUseCase := appuser.NewLinkGoogleIdentityUseCase(userRepo, oauthIdentityRepo, googleVerifier, emailSender)
 	unlinkGoogleIdentityUseCase := appuser.NewUnlinkGoogleIdentityUseCase(userRepo, oauthIdentityRepo, emailSender)
 	refreshUseCase := appuser.NewRefreshUseCase(refreshTokenRepo, userRepo, jwtService, refreshTokenCodec, redisRateLimiter, rotationCache)
@@ -238,7 +238,8 @@ func main() {
 	updatePasswordUseCase := appuser.NewUpdatePasswordUseCase(userRepo, emailSender, sessionInvalidator, redisRateLimiter, refreshTokenRepo)
 	setPasswordUseCase := appuser.NewSetPasswordUseCase(userRepo, emailSender)
 	adminUpdateUserUseCase := appuser.NewAdminUpdateUserUseCase(userRepo)
-	adminDeactivateUserUseCase := appuser.NewAdminDeactivateUserUseCase(userRepo, sessionInvalidator, refreshTokenRepo)
+	teamMembershipCleaner := adapterteam.NewMembershipCleaner(dbPool)
+	adminDeactivateUserUseCase := appuser.NewAdminDeactivateUserUseCase(userRepo, sessionInvalidator, refreshTokenRepo, txManager, teamMembershipCleaner)
 	listUsersUseCase := appuser.NewListUsersUseCase(userRepo)
 	listUserFilterOptionsUseCase := appuser.NewListUserFilterOptionsUseCase(userRepo)
 	searchUsersUseCase := appuser.NewSearchUsersUseCase(userRepo)
@@ -247,7 +248,7 @@ func main() {
 	requestPasswordRecoveryUseCase := appuser.NewRequestPasswordRecoveryUseCase(userRepo, passwordRecoveryRepo, emailSender, redisRateLimiter)
 	resetPasswordUseCase := appuser.NewResetPasswordUseCase(userRepo, passwordRecoveryRepo, sessionInvalidator, txManager, refreshTokenRepo)
 	requestDeactivationUseCase := appuser.NewRequestDeactivationUseCase(userRepo, deactivationRequestRepo, emailSender, redisRateLimiter)
-	confirmDeactivationUseCase := appuser.NewConfirmDeactivationUseCase(userRepo, deactivationRequestRepo, deactivationAuditLogRepo, emailSender, sessionInvalidator, txManager, refreshTokenRepo)
+	confirmDeactivationUseCase := appuser.NewConfirmDeactivationUseCase(userRepo, deactivationRequestRepo, deactivationAuditLogRepo, emailSender, sessionInvalidator, txManager, refreshTokenRepo, teamMembershipCleaner)
 
 	// user dashboard adapters
 	dashboardSubmissionProvider := adaptersubmission.NewDashboardProvider(dbPool)
@@ -261,9 +262,9 @@ func main() {
 	// user profile stats adapters
 	rankingSource := user.NewRankingProvider(dbPool)
 	rankingCache := user.NewRankingCache(redisClient)
-	// Same 30s staleness as standings — nothing in HU-USR-21 requires this to be
+	// 30s staleness — nothing in HU-USR-21 requires this to be
 	// real-time (it tracks "progreso a largo plazo", explicitly not the live Dashboard),
-	// but there is no reason for it to be staler than standings either, and 30s keeps a
+	// but 30s keeps a
 	// live demo (solve something, immediately check the profile) from ever showing a
 	// visibly outdated number. See Validacion/rendimiento/resultados.md (tesis repo) for
 	// why this needed a cache at all: GetRanking aggregates every ACCEPTED submission
@@ -393,11 +394,13 @@ func main() {
 		contestRepo, contestGroupProvider, contestMemberProvider, contestParticipantProvider,
 	)
 	listMyContestsUseCase := appcontest.NewListMyContestsUseCase(
-		contestRepo, contestGroupProvider, contestParticipantProvider,
+		contestRepo, contestGroupProvider, contestMemberProvider, contestParticipantProvider,
 	)
 	contestTeamSelectionChecker := adaptercontest.NewTeamSelectionChecker(dbPool)
+	contestRegistrationLocker := adaptercontest.NewRegistrationLocker(dbPool)
 	registerToContestUseCase := appcontest.NewRegisterToContestUseCase(
 		contestRepo, contestRegistrationRepo, contestMemberProvider, contestTeamSelectionChecker,
+		contestRegistrationLocker, txManager,
 	)
 	unregisterFromContestUseCase := appcontest.NewUnregisterFromContestUseCase(
 		contestRepo, contestRegistrationRepo, contestMemberProvider,
@@ -414,7 +417,7 @@ func main() {
 		contestTeamDisplayProvider, contestProblemProvider,
 		contestGroupProvider, contestMemberProvider,
 		contestStandingsCache,
-		30*time.Second,
+		5*time.Second,
 	)
 	listContestSubmissionsUseCase := appcontest.NewListContestSubmissionsUseCase(
 		contestRepo, contestGroupProvider, contestMemberProvider,
@@ -423,12 +426,16 @@ func main() {
 	deleteContestUseCase := appcontest.NewDeleteContestUseCase(
 		contestRepo, contestMemberProvider, contestStandingsCache,
 	)
+	revealContestResultsUseCase := appcontest.NewRevealContestResultsUseCase(
+		contestRepo, contestMemberProvider, txManager,
+	)
 	contestHandler := handlercontest.NewHandler(
 		createContestUseCase, updateContestUseCase, deleteContestUseCase,
 		getContestUseCase, listContestsUseCase, listMyContestsUseCase,
 		registerToContestUseCase, unregisterFromContestUseCase,
 		getRegistrationStatusUseCase, listContestRegistrationsUseCase,
 		getStandingsUseCase, listContestSubmissionsUseCase,
+		revealContestResultsUseCase,
 	)
 
 	// team adapters
@@ -451,13 +458,15 @@ func main() {
 	teamScheduledCleaner := adapterteam.NewScheduledParticipationCleaner(dbPool)
 	leaveTeamUseCase := appteam.NewLeaveTeamUseCase(teamMemberRepo, teamContestParticipationChecker, teamScheduledCleaner, txManager)
 	getLeaveImpactUseCase := appteam.NewGetLeaveImpactUseCase(teamMemberRepo, teamScheduledCleaner)
+	renameTeamUseCase := appteam.NewRenameTeamUseCase(teamRepo, teamMemberRepo)
+	removeTeamMemberUseCase := appteam.NewRemoveTeamMemberUseCase(teamRepo, teamMemberRepo, teamContestParticipationChecker, teamScheduledCleaner, txManager)
 	registerTeamToContestUseCase := appteam.NewRegisterTeamToContestUseCase(
 		teamMemberRepo, teamRepo, teamContestProvider, contestTeamParticipationRepo,
-		teamIndivChecker, teamGroupMemberChecker, teamUserProvider, txManager,
+		teamIndivChecker, teamGroupMemberChecker, teamUserProvider, contestRegistrationLocker, txManager,
 	)
 	updateTeamRegistrationUseCase := appteam.NewUpdateTeamRegistrationUseCase(
 		teamMemberRepo, teamRepo, teamContestProvider, contestTeamParticipationRepo,
-		teamIndivChecker, teamGroupMemberChecker, teamUserProvider, txManager,
+		teamIndivChecker, teamGroupMemberChecker, teamUserProvider, contestRegistrationLocker, txManager,
 	)
 	unregisterTeamFromContestUseCase := appteam.NewUnregisterTeamFromContestUseCase(
 		teamMemberRepo, teamContestProvider, contestTeamParticipationRepo,
@@ -485,6 +494,8 @@ func main() {
 		unregisterTeamFromContestUseCase,
 		listTeamRegistrationsUseCase,
 		getTeamRegistrationEligibilityUseCase,
+		renameTeamUseCase,
+		removeTeamMemberUseCase,
 	)
 
 	// submission adapters
@@ -499,6 +510,7 @@ func main() {
 	submissionTeamChecker := adaptersubmission.NewTeamMembershipChecker(dbPool)
 	submissionContestSubmissionProvider := adaptersubmission.NewContestSubmissionProvider(dbPool)
 	submissionStandingIDResolver := adaptersubmission.NewStandingIDResolver(dbPool)
+	submissionGroupMembershipChecker := adaptersubmission.NewGroupMembershipChecker(dbPool)
 
 	// submission queue — RabbitMQ when URL is set, no-op otherwise
 	var submissionQueue appsubmission.SubmissionQueue
@@ -579,6 +591,7 @@ func main() {
 	submitContestSolutionUseCase := appsubmission.NewSubmitContestSolutionUseCase(
 		submissionContestSubmissionProvider,
 		submissionStandingIDResolver,
+		submissionGroupMembershipChecker,
 		submissionProblemProvider,
 		submissionRepo,
 		submissionStorage,
@@ -643,7 +656,20 @@ func main() {
 	}, cfg.AllowedOrigins)
 
 	slog.Info("http starting", "port", cfg.Port)
-	if err := http.ListenAndServe(fmt.Sprintf(":%s", cfg.Port), router); err != nil {
+	if removed, err := handlerProblem.RemoveStaleUploads(os.TempDir()); err != nil {
+		slog.Warn("api: could not clean up leftover uploads", "error", err)
+	} else if removed > 0 {
+		slog.Info("api: leftover uploads removed", "count", removed)
+	}
+
+	// No overall Read/WriteTimeout: uploads set their own read deadline and a publish answers only after its validation.
+	server := &http.Server{
+		Addr:              fmt.Sprintf(":%s", cfg.Port),
+		Handler:           router,
+		ReadHeaderTimeout: 10 * time.Second,
+		IdleTimeout:       2 * time.Minute,
+	}
+	if err := server.ListenAndServe(); err != nil {
 		slog.Error("http failed to start", "error", err)
 		os.Exit(1)
 	}

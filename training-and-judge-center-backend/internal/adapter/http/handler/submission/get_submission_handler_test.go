@@ -139,4 +139,10 @@ func TestGetSubmission_ContestSubmission_ContestIncludedInResponse(t *testing.T)
 	if body.Contest == nil {
 		t.Fatal("expected contest in response, got nil")
 	}
+	if body.Contest.GroupID != "group-1" {
+		t.Errorf("contest.groupId = %q, want group-1", body.Contest.GroupID)
+	}
+	if body.Contest.ProblemPosition == nil || *body.Contest.ProblemPosition != 1 {
+		t.Errorf("contest.problemPosition = %v, want 1", body.Contest.ProblemPosition)
+	}
 }

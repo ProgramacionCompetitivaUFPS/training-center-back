@@ -2,6 +2,7 @@ package judge
 
 import (
 	"context"
+	"io"
 
 	"github.com/training-judge-center/backend/internal/domain/submission"
 )
@@ -21,6 +22,6 @@ type ValidatorRunner interface {
 // ValidatorSession follows the testlib convention: the input arrives on stdin
 // and exit code 0 means accepted.
 type ValidatorSession interface {
-	Validate(ctx context.Context, input []byte) (ValidatorRunResult, error)
+	Validate(ctx context.Context, input io.Reader, size int64) (ValidatorRunResult, error)
 	Close(ctx context.Context) error
 }

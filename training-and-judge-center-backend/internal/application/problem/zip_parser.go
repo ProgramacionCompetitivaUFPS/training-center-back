@@ -8,5 +8,5 @@ type ParsedFile struct {
 }
 
 type ZipParser interface {
-	ParseTestCasesZip(ctx context.Context, zipData []byte) ([]ParsedFile, error)
+	ParseTestCasesZip(ctx context.Context, zip StagedFile) ([]ParsedFile, error)
 }

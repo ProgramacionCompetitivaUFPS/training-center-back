@@ -2,16 +2,17 @@ package problem
 
 import (
 	"archive/zip"
-	"bytes"
 	"context"
 	"fmt"
 	"io"
 	"log/slog"
 	"math"
 	"os"
+	"path"
 	"path/filepath"
 	"strings"
 
+	domainproblem "github.com/training-judge-center/backend/internal/domain/problem"
 	"github.com/training-judge-center/backend/pkg/apperror"
 	"gopkg.in/yaml.v3"
 )
@@ -73,15 +74,15 @@ type ExtractedFile struct {
 }
 
 type ParsedPackage struct {
-	Title       string
-	TimeLimitMs *int
-	MemoryLimit *int
-	Statement   *string
-	SampleFiles []ExtractedFile
-	ZipData     []byte
-	Solutions   []ExtractedFile
-	Checker     *ExtractedFile
-	Validator   *ExtractedFile
+	Title        string
+	TimeLimitMs  *int
+	MemoryLimit  *int
+	Statement    *string
+	SampleFiles  []ExtractedFile
+	HasTestCases bool
+	Solutions    []ExtractedFile
+	Checker      *ExtractedFile
+	Validator    *ExtractedFile
 }
 
 type problemYAML struct {
@@ -90,8 +91,8 @@ type problemYAML struct {
 	MemoryLimit int     `yaml:"memory_limit"`
 }
 
-func (p *ICPCParser) ParseTestCasesZip(ctx context.Context, zipData []byte) ([]ExtractedFile, error) {
-	pz, err := p.prepareZip(zipData)
+func (p *ICPCParser) ParseTestCasesZip(ctx context.Context, src io.ReaderAt, size int64) ([]ExtractedFile, error) {
+	pz, err := p.prepareZip(src, size)
 	if err != nil {
 		return nil, err
 	}
@@ -121,11 +122,15 @@ func (p *ICPCParser) ParseTestCasesZip(ctx context.Context, zipData []byte) ([]E
 		})
 	}
 
+	if err := p.verifyContents(ctx, pz); err != nil {
+		return nil, err
+	}
+
 	return sampleFiles, nil
 }
 
-func (p *ICPCParser) ParsePackageZip(ctx context.Context, zipData []byte) (*ParsedPackage, error) {
-	pz, err := p.prepareZip(zipData)
+func (p *ICPCParser) ParsePackageZip(ctx context.Context, src io.ReaderAt, size int64) (*ParsedPackage, error) {
+	pz, err := p.prepareZip(src, size)
 	if err != nil {
 		return nil, err
 	}
@@ -152,13 +157,17 @@ func (p *ICPCParser) ParsePackageZip(ctx context.Context, zipData []byte) (*Pars
 	}
 	var meta problemYAML
 	if err := yaml.Unmarshal(yamlContent, &meta); err != nil {
-		return nil, apperror.NewBadRequest(apperror.ErrCodeInvalidPackage, "Failed to parse problem.yaml: "+err.Error())
+		return nil, apperror.NewValidation([]apperror.FieldError{
+			{Field: "file", Code: domainproblem.ErrCodeInvalidProblemYAML, Message: "Failed to parse problem.yaml: " + err.Error()},
+		})
 	}
 	if meta.Title == "" {
 		errorLogs = append(errorLogs, "problem.yaml is missing required field: name")
 	}
 	if len(errorLogs) > 0 {
-		return nil, invalidPackage(errorLogs)
+		return nil, apperror.NewValidation([]apperror.FieldError{
+			{Field: "file", Code: domainproblem.ErrCodeInvalidProblemYAML, Message: "problem.yaml is missing required field: name"},
+		})
 	}
 
 	pkg := &ParsedPackage{
@@ -189,7 +198,7 @@ func (p *ICPCParser) ParsePackageZip(ctx context.Context, zipData []byte) (*Pars
 	}
 	if validCount > 0 {
 		pkg.SampleFiles = sampleFiles
-		pkg.ZipData = zipData
+		pkg.HasTestCases = true
 	}
 
 	var solutions []ExtractedFile
@@ -222,7 +231,39 @@ func (p *ICPCParser) ParsePackageZip(ctx context.Context, zipData []byte) (*Pars
 	}
 	pkg.Validator = validator
 
+	if err := p.verifyContents(ctx, pz); err != nil {
+		return nil, err
+	}
+
 	return pkg, nil
+}
+
+// verifyContents decompresses every entry once, so a ZIP whose data disagrees with its
+// directory (declared size, CRC, truncated stream) is refused here and not mid-judging.
+func (p *ICPCParser) verifyContents(ctx context.Context, pz *ParsedZip) error {
+	corrupt := func(name string) error {
+		return apperror.NewValidation([]apperror.FieldError{
+			{Field: "file", Message: fmt.Sprintf("ZIP entry '%s' is corrupt or does not match its declared size", name)},
+		})
+	}
+	for _, czf := range pz.Files {
+		if czf.IsDir {
+			continue
+		}
+		if err := ctx.Err(); err != nil {
+			return err
+		}
+		rc, err := czf.File.Open()
+		if err != nil {
+			return corrupt(czf.CleanPath)
+		}
+		_, copyErr := io.Copy(io.Discard, rc)
+		rc.Close()
+		if copyErr != nil {
+			return corrupt(czf.CleanPath)
+		}
+	}
+	return nil
 }
 
 func (p *ICPCParser) parseTestCases(
@@ -281,7 +322,7 @@ func (p *ICPCParser) parseTestCases(
 	}
 
 	for _, f := range sampleZipFiles {
-		cleanPath := filepath.ToSlash(filepath.Clean(f.Name))
+		cleanPath := path.Clean(strings.ReplaceAll(f.Name, "\\", "/"))
 		content, extractErr := p.extractFileContent(f)
 		if extractErr != nil {
 			slog.ErrorContext(ctx, "failed to extract file from ZIP", "error", extractErr, "file", cleanPath)
@@ -377,11 +418,10 @@ func (p *ICPCParser) detectRootPrefix(pz *ParsedZip, anchor AnchorType) (string,
 	}
 
 	if len(candidates) == 0 {
-		msg := "problem.yaml not found (required)"
 		if anchor == AnchorData {
-			msg = "Valid test case files (.in/.ans) in data/sample/ or data/secret/ not found"
+			return "", nil, apperror.NewValidation([]apperror.FieldError{{Field: "file", Message: "Valid test case files (.in/.ans) in data/sample/ or data/secret/ not found"}})
 		}
-		return "", nil, apperror.NewValidation([]apperror.FieldError{{Field: "file", Message: msg}})
+		return "", nil, apperror.NewValidation([]apperror.FieldError{{Field: "file", Code: domainproblem.ErrCodeMissingProblemYAML, Message: "problem.yaml not found (required)"}})
 	}
 
 	if len(candidates) > 1 {
@@ -417,25 +457,22 @@ func (p *ICPCParser) validateFileSizes(pz *ParsedZip, prefix string) error {
 
 		if czf.File.UncompressedSize64 > uint64(limit) {
 			return apperror.NewValidation([]apperror.FieldError{
-				{Field: "file", Message: fmt.Sprintf("%s '%s' exceeds the allowed limit of %d bytes.", kind, czf.CleanPath, limit)},
+				{Field: "file", Code: domainproblem.ErrCodeFileTooLarge, Message: fmt.Sprintf("%s '%s' exceeds the allowed limit of %d bytes.", kind, czf.CleanPath, limit)},
 			})
 		}
 	}
 	return nil
 }
 
-func invalidPackage(logs []string) error {
-	return apperror.NewBadRequest(apperror.ErrCodeInvalidPackage, fmt.Sprintf("Invalid ICPC problem package: %s", strings.Join(logs, "; ")))
-}
-
-func (p *ICPCParser) prepareZip(zipData []byte) (*ParsedZip, error) {
-	reader, err := zip.NewReader(bytes.NewReader(zipData), int64(len(zipData)))
+func (p *ICPCParser) prepareZip(src io.ReaderAt, size int64) (*ParsedZip, error) {
+	reader, err := zip.NewReader(src, size)
 	if err != nil {
 		return nil, apperror.NewValidation([]apperror.FieldError{{Field: "file", Message: "Invalid ZIP file format"}})
 	}
 
 	var totalSize uint64
 	var fileCount int
+	var tooLarge bool
 	maxLimit := uint64(p.maxUncompressedSizeMB) * 1024 * 1024
 
 	parsed := &ParsedZip{
@@ -445,7 +482,9 @@ func (p *ICPCParser) prepareZip(zipData []byte) (*ParsedZip, error) {
 	}
 
 	for _, f := range reader.File {
-		cleanPath := filepath.ToSlash(filepath.Clean(f.Name))
+		// Normalize backslashes: ZIP entries from Windows tooling use \ as separator,
+		// but filepath.Clean on Linux treats \ as a literal character, not a separator.
+		cleanPath := path.Clean(strings.ReplaceAll(f.Name, "\\", "/"))
 		if strings.HasPrefix(cleanPath, "../") || filepath.IsAbs(cleanPath) {
 			return nil, apperror.NewValidation([]apperror.FieldError{{Field: "file", Message: "Invalid malicious path detected in ZIP"}})
 		}
@@ -462,12 +501,17 @@ func (p *ICPCParser) prepareZip(zipData []byte) (*ParsedZip, error) {
 		if !isDir {
 			fileCount++
 			if fileCount > p.maxFiles {
-				return nil, apperror.NewValidation([]apperror.FieldError{{Field: "file", Message: "ZIP contains too many files"}})
+				return nil, apperror.NewValidation([]apperror.FieldError{{Field: "file", Message: fmt.Sprintf("ZIP contains too many files (the limit is %d)", p.maxFiles)}})
 			}
 			if f.UncompressedSize64 > maxLimit || totalSize > maxLimit-f.UncompressedSize64 {
-				return nil, apperror.NewValidation([]apperror.FieldError{{Field: "file", Message: "Extracted ZIP size exceeds safe limit"}})
+				tooLarge = true
 			}
-			totalSize += f.UncompressedSize64
+			// Kept adding past the limit so the message can say how far over the package is.
+			if totalSize > math.MaxUint64-f.UncompressedSize64 {
+				totalSize = math.MaxUint64
+			} else {
+				totalSize += f.UncompressedSize64
+			}
 		}
 
 		czf := &CleanZipFile{
@@ -479,5 +523,20 @@ func (p *ICPCParser) prepareZip(zipData []byte) (*ParsedZip, error) {
 		parsed.FileIndex[cleanPath] = czf
 		parsed.Files = append(parsed.Files, czf)
 	}
+	if tooLarge {
+		return nil, apperror.NewValidation([]apperror.FieldError{{
+			Field:   "file",
+			Code:    domainproblem.ErrCodeExtractedSizeTooLarge,
+			Message: fmt.Sprintf("Extracted ZIP size (%s) exceeds the limit (%d MiB)", describeMiB(totalSize), p.maxUncompressedSizeMB),
+		}})
+	}
 	return parsed, nil
+}
+
+// describeMiB rounds up to a tenth, so a package a few bytes over its limit never reads as equal to it.
+func describeMiB(bytes uint64) string {
+	if bytes == math.MaxUint64 {
+		return "more than 16 EiB"
+	}
+	return fmt.Sprintf("%.1f MiB", math.Ceil(float64(bytes)/(1<<20)*10)/10)
 }

@@ -8,11 +8,12 @@ import (
 )
 
 type CachedStandings struct {
-	Participants []domainContest.ParticipantStanding
-	TeamMembers  map[string][]string            // teamID -> member userIDs
-	Profiles     map[string]*ParticipantProfile // userID -> profile, for individual contestants and every team member
-	TeamNames    map[string]string              // teamID -> team name
-	LastUpdated  time.Time
+	Participants     []domainContest.ParticipantStanding
+	PostParticipants []domainContest.ParticipantStanding
+	TeamMembers      map[string][]string            // teamID -> member userIDs
+	Profiles         map[string]*ParticipantProfile // userID -> profile, for individual contestants and every team member
+	TeamNames        map[string]string              // teamID -> team name
+	LastUpdated      time.Time
 }
 
 // StandingsCache is the port for reading and writing the precomputed standings projection.

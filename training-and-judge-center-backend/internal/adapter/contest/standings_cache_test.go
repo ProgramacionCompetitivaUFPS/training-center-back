@@ -185,3 +185,61 @@ func TestSet_RedisUnreachable_ReturnsError(t *testing.T) {
 		t.Fatal("expected an error when Redis is unreachable, got nil")
 	}
 }
+
+func TestSetThenGet_RoundTripsPostParticipants(t *testing.T) {
+	cache, _ := newTestStandingsCache(t)
+	ctx := context.Background()
+	acceptedAt := time.Now().Add(-time.Minute).Truncate(time.Second)
+
+	data := &appContest.CachedStandings{
+		Participants: []domainContest.ParticipantStanding{},
+		PostParticipants: []domainContest.ParticipantStanding{
+			{ContestantID: "p1", ParticipantType: "INDIVIDUAL", Problems: map[string]domainContest.ProblemAttempt{
+				"prob-A": {AcceptedAt: &acceptedAt, WrongAttemptTimes: []time.Time{acceptedAt.Add(-time.Second)}},
+			}},
+		},
+		LastUpdated: time.Now().Truncate(time.Second),
+	}
+
+	if err := cache.Set(ctx, "contest-1", data); err != nil {
+		t.Fatalf("unexpected error on Set: %v", err)
+	}
+	got, err := cache.Get(ctx, "contest-1")
+	if err != nil {
+		t.Fatalf("unexpected error on Get: %v", err)
+	}
+
+	if len(got.PostParticipants) != 1 {
+		t.Fatalf("PostParticipants = %+v, want one row", got.PostParticipants)
+	}
+	p := got.PostParticipants[0]
+	if p.ContestantID != "p1" || p.ParticipantType != "INDIVIDUAL" {
+		t.Errorf("post row = %s/%s, want p1/INDIVIDUAL", p.ContestantID, p.ParticipantType)
+	}
+	a := p.Problems["prob-A"]
+	if a.AcceptedAt == nil || !a.AcceptedAt.Equal(acceptedAt) {
+		t.Errorf("AcceptedAt = %v, want %v", a.AcceptedAt, acceptedAt)
+	}
+	if len(a.WrongAttemptTimes) != 1 {
+		t.Errorf("WrongAttemptTimes = %v, want one attempt", a.WrongAttemptTimes)
+	}
+}
+
+func TestGet_LegacyEntryWithoutPostParticipants_Decodes(t *testing.T) {
+	cache, mr := newTestStandingsCache(t)
+	ctx := context.Background()
+	legacy := `{"Participants":[{"ContestantID":"u1","ParticipantType":"INDIVIDUAL","Problems":{}}],"TeamMembers":null,"Profiles":null,"TeamNames":null,"LastUpdated":"2026-01-01T00:00:00Z"}`
+	mr.Set("standings:contest-1", legacy)
+
+	got, err := cache.Get(ctx, "contest-1")
+
+	if err != nil {
+		t.Fatalf("unexpected error decoding a pre-postcompetition entry: %v", err)
+	}
+	if got == nil || len(got.Participants) != 1 || got.Participants[0].ContestantID != "u1" {
+		t.Fatalf("participants not decoded from legacy entry: %+v", got)
+	}
+	if got.PostParticipants != nil {
+		t.Errorf("PostParticipants = %+v, want nil for a legacy entry", got.PostParticipants)
+	}
+}

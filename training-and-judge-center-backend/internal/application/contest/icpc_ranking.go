@@ -25,23 +25,18 @@ func RankStandings(
 		entry := RankedEntry{
 			ContestantID:    p.ContestantID,
 			ParticipantType: p.ParticipantType,
+			IsOfficial:      true,
 			Problems:        make(map[string]RankedProblem, len(p.Problems)),
 		}
 
 		var lastAccepted *time.Time
 
 		for problemID, attempt := range p.Problems {
-			// Count only pre-freeze wrong attempts; post-freeze ones are invisible.
-			preFreeze := 0
-			for _, t := range attempt.WrongAttemptTimes {
-				if freezeTime == nil || !t.After(*freezeTime) {
-					preFreeze++
-				}
-			}
+			preFreeze, solved := visibleAttempt(attempt, freezeTime)
 
-			rp := RankedProblem{Attempts: preFreeze}
+			rp := RankedProblem{Attempts: preFreeze, Pending: pendingSubmissions(attempt, freezeTime)}
 
-			if attempt.AcceptedAt != nil && (freezeTime == nil || !attempt.AcceptedAt.After(*freezeTime)) {
+			if solved {
 				minutes := int(attempt.AcceptedAt.Sub(contestStart).Minutes())
 				rp.Penalty = minutes + preFreeze*contestPenalty
 				rp.AcceptedAt = attempt.AcceptedAt

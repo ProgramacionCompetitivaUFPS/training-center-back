@@ -519,3 +519,107 @@ func TestValidateSolutions_Candidate_UsesItsTestCasesAndCheckerPath(t *testing.T
 		t.Errorf("checker path: got %q, want %q", checkerPath, candidateChecker().CompiledKey)
 	}
 }
+
+type validateSolutionsMocks struct {
+	solutions  *mockSolutionProvider
+	downloader *mockSourceCodeDownloader
+	problems   *mockProblemProvider
+	testCases  *mockTestCaseProvider
+	executor   *mockExecutor
+	checker    *mockOutputChecker
+}
+
+func TestValidateSolutions_InfraFailure_IsReturnedWithoutAVerdict(t *testing.T) {
+	tests := []struct {
+		name string
+		fail func(m *validateSolutionsMocks)
+	}{
+		{"the solutions cannot be listed", func(m *validateSolutionsMocks) {
+			m.solutions.getSolutionsFn = func(_ context.Context, _ string) ([]Solution, error) { return nil, errTransient }
+		}},
+		{"the limits cannot be read", func(m *validateSolutionsMocks) {
+			m.problems.getLimitsFn = func(_ context.Context, _ string) (ProblemLimits, error) { return ProblemLimits{}, errTransient }
+		}},
+		{"the test cases cannot be opened", func(m *validateSolutionsMocks) {
+			m.testCases.getTestCasesFn = func(_ context.Context, _ string) ([]TestCase, error) { return nil, errTransient }
+		}},
+		{"the solution cannot be downloaded", func(m *validateSolutionsMocks) {
+			m.downloader.downloadFn = func(_ context.Context, _ string) ([]byte, error) { return nil, errTransient }
+		}},
+		{"compiling fails for infra reasons", func(m *validateSolutionsMocks) {
+			m.executor.beginSessionFn = func(_ context.Context, _ submission.Language, _ int, _ string) (ExecutionSession, error) {
+				return &mockExecutionSession{
+					compileFn: func(_ context.Context, _ CompileRequest) (CompileResult, error) {
+						return CompileResult{}, errTransient
+					},
+				}, nil
+			}
+		}},
+		{"the checker session cannot be opened", func(m *validateSolutionsMocks) {
+			m.checker.beginCheckingFn = func(_ context.Context, _ string, _ submission.Language, _ string) (CheckerSession, error) {
+				return nil, errTransient
+			}
+		}},
+		{"running a test case fails for infra reasons", func(m *validateSolutionsMocks) {
+			m.executor.beginSessionFn = func(_ context.Context, _ submission.Language, _ int, _ string) (ExecutionSession, error) {
+				return &mockExecutionSession{
+					runTestCaseFn: func(_ context.Context, _ RunRequest) (RunResult, error) {
+						return RunResult{}, errTransient
+					},
+				}, nil
+			}
+		}},
+		{"the checker fails for infra reasons", func(m *validateSolutionsMocks) {
+			m.checker.checkFn = func(_ context.Context, _ []byte) (CheckResult, error) { return CheckResult{}, errTransient }
+		}},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			m := &validateSolutionsMocks{
+				solutions:  &mockSolutionProvider{},
+				downloader: &mockSourceCodeDownloader{},
+				problems:   &mockProblemProvider{},
+				testCases:  &mockTestCaseProvider{},
+				executor:   &mockExecutor{},
+				checker:    &mockOutputChecker{},
+			}
+			tt.fail(m)
+			uc := newValidateSolutionsUseCase(m.solutions, m.downloader, m.problems, m.testCases, m.executor, m.checker)
+
+			out, err := uc.Execute(context.Background(), ValidateSolutionsInput{ProblemID: problemID})
+
+			if !errors.Is(err, errTransient) {
+				t.Errorf("expected the infra error, got %v", err)
+			}
+			if out != nil {
+				t.Errorf("expected no output alongside an error, got %+v", out)
+			}
+		})
+	}
+}
+
+func TestValidateSolutions_OutputLimitExceeded_WinsOverTheExitCode(t *testing.T) {
+	executor := &mockExecutor{
+		beginSessionFn: func(_ context.Context, _ submission.Language, _ int, _ string) (ExecutionSession, error) {
+			return &mockExecutionSession{
+				runTestCaseFn: func(_ context.Context, _ RunRequest) (RunResult, error) {
+					return RunResult{ExitCode: 0, TimeMs: 10, OutputLimitExceeded: true}, nil
+				},
+			}, nil
+		},
+	}
+	uc := newValidateSolutionsUseCase(&mockSolutionProvider{}, &mockSourceCodeDownloader{}, &mockProblemProvider{}, &mockTestCaseProvider{}, executor, &mockOutputChecker{})
+
+	out, err := uc.Execute(context.Background(), ValidateSolutionsInput{ProblemID: problemID})
+
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if out.Passed || out.Failure == nil || out.Failure.Kind != FailureOutputLimitExceeded {
+		t.Fatalf("expected an output-limit failure, got %+v", out)
+	}
+	if out.Failure.TestCase != "secret/1" {
+		t.Errorf("TestCase: got %q, want secret/1", out.Failure.TestCase)
+	}
+}

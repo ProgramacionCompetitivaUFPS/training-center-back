@@ -1,0 +1,753 @@
+package judge
+
+import (
+	"bytes"
+	"context"
+	"errors"
+	"fmt"
+	"io"
+	"log/slog"
+	"os"
+	"path/filepath"
+	"strings"
+	"sync"
+	"testing"
+	"time"
+
+	"cloud.google.com/go/storage"
+)
+
+// fakeSource is storage with a download counter and a gate to hold downloads open.
+type fakeSource struct {
+	mu      sync.Mutex
+	objects map[string][]byte
+	reads   map[string]int
+	// reported overrides the size the object claims, to simulate a stale or lying one.
+	reported map[string]int64
+	readErr  error
+	gate     chan struct{}
+}
+
+func newFakeSource() *fakeSource {
+	return &fakeSource{objects: map[string][]byte{}, reads: map[string]int{}, reported: map[string]int64{}}
+}
+
+func (f *fakeSource) objectSize(_ context.Context, key string) (int64, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	data, ok := f.objects[key]
+	if !ok {
+		return 0, storage.ErrObjectNotExist
+	}
+	if size, ok := f.reported[key]; ok {
+		return size, nil
+	}
+	return int64(len(data)), nil
+}
+
+func (f *fakeSource) readObject(ctx context.Context, key string) (io.ReadCloser, error) {
+	f.mu.Lock()
+	f.reads[key]++
+	data, ok := f.objects[key]
+	gate, readErr := f.gate, f.readErr
+	f.mu.Unlock()
+
+	if gate != nil {
+		select {
+		case <-gate:
+		case <-ctx.Done():
+			return nil, ctx.Err()
+		}
+	}
+	if readErr != nil {
+		return nil, readErr
+	}
+	if !ok {
+		return nil, storage.ErrObjectNotExist
+	}
+	return io.NopCloser(bytes.NewReader(data)), nil
+}
+
+func (f *fakeSource) readCount(key string) int {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return f.reads[key]
+}
+
+// extractedOf is what an archive made by archive() takes once extracted, and what the cache counts for it.
+const extractedOf = 3000 + 20
+
+// archive makes a valid archive of a predictable size: same-length contents give same-length archives.
+func archive(t *testing.T, fill string) []byte {
+	t.Helper()
+	return zipBytes(t, map[string]string{
+		"data/secret/1.in":  strings.Repeat(fill, 3000),
+		"data/secret/1.ans": strings.Repeat(fill, 20),
+	}, true)
+}
+
+func newCache(t *testing.T, src *fakeSource, budget int64) *testDataCache {
+	t.Helper()
+	limits := testLimits()
+	limits.MaxZipBytes = 4096
+	limits.MaxExtractedBytes = 4096 // the cache refuses a budget under the two together: 8192
+	cache, err := newTestDataCache(TestDataConfig{
+		Dir:         t.TempDir(),
+		BudgetBytes: budget,
+		Limits:      limits,
+		ReserveWait: 300 * time.Millisecond,
+	}, src)
+	if err != nil {
+		t.Fatalf("newTestDataCache: %v", err)
+	}
+	return cache
+}
+
+func (c *testDataCache) usedBytes() int64 {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return c.used
+}
+
+func TestTestDataCache_SecondAcquireReusesTheDownload(t *testing.T) {
+	src := newFakeSource()
+	src.objects["a.zip"] = archive(t, "a")
+	cache := newCache(t, src, 1<<20)
+
+	first, err := cache.acquire(context.Background(), "a.zip")
+	if err != nil {
+		t.Fatalf("first acquire: %v", err)
+	}
+	cache.release(first)
+	second, err := cache.acquire(context.Background(), "a.zip")
+	if err != nil {
+		t.Fatalf("second acquire: %v", err)
+	}
+	defer cache.release(second)
+
+	if got := src.readCount("a.zip"); got != 1 {
+		t.Errorf("downloaded %d times, want once", got)
+	}
+	if first.dir != second.dir {
+		t.Errorf("the problem moved: %s then %s", first.dir, second.dir)
+	}
+}
+
+func TestTestDataCache_ConcurrentAcquiresOfOneKeyShareOneDownload(t *testing.T) {
+	src := newFakeSource()
+	src.objects["a.zip"] = archive(t, "a")
+	src.gate = make(chan struct{})
+	cache := newCache(t, src, 1<<20)
+
+	const callers = 8
+	entries := make([]*cacheEntry, callers)
+	errs := make([]error, callers)
+	var wg sync.WaitGroup
+	for i := 0; i < callers; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			entries[i], errs[i] = cache.acquire(context.Background(), "a.zip")
+		}()
+	}
+	time.Sleep(100 * time.Millisecond) // let every caller reach the held download
+	close(src.gate)
+	wg.Wait()
+
+	for i := range entries {
+		if errs[i] != nil {
+			t.Fatalf("caller %d: %v", i, errs[i])
+		}
+		if entries[i] != entries[0] {
+			t.Errorf("caller %d got another entry", i)
+		}
+	}
+	if got := src.readCount("a.zip"); got != 1 {
+		t.Errorf("downloaded %d times for %d callers, want once", got, callers)
+	}
+	if got := cache.usedBytes(); got != extractedOf {
+		t.Errorf("used = %d, want the extracted size of one problem (%d): the shared download was counted more than once, or the archive was not released", got, extractedOf)
+	}
+	for _, e := range entries {
+		cache.release(e)
+	}
+}
+
+func TestTestDataCache_FailedDownloadFailsEveryWaiterAndIsNotKept(t *testing.T) {
+	src := newFakeSource()
+	src.objects["a.zip"] = archive(t, "a")
+	src.gate = make(chan struct{})
+	src.readErr = errors.New("storage down")
+	cache := newCache(t, src, 1<<20)
+
+	errs := make([]error, 4)
+	var wg sync.WaitGroup
+	for i := range errs {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			_, errs[i] = cache.acquire(context.Background(), "a.zip")
+		}()
+	}
+	time.Sleep(100 * time.Millisecond)
+	close(src.gate)
+	wg.Wait()
+
+	for i, err := range errs {
+		if err == nil {
+			t.Errorf("caller %d: expected the failure to reach every waiter", i)
+		}
+	}
+	if got := cache.usedBytes(); got != 0 {
+		t.Errorf("used = %d after a failed download, want 0: the reservation leaked", got)
+	}
+
+	// Not kept: once storage is back the next caller downloads again and succeeds.
+	src.mu.Lock()
+	src.readErr = nil
+	src.mu.Unlock()
+	entry, err := cache.acquire(context.Background(), "a.zip")
+	if err != nil {
+		t.Fatalf("expected a retry to succeed once storage is back, got %v", err)
+	}
+	cache.release(entry)
+}
+
+func TestTestDataCache_InvalidArchiveIsRefusedAndLeavesNothing(t *testing.T) {
+	src := newFakeSource()
+	src.objects["bad.zip"] = bytes.Repeat([]byte("not a zip "), 20)
+	cache := newCache(t, src, 1<<20)
+
+	_, err := cache.acquire(context.Background(), "bad.zip")
+
+	if !errors.Is(err, errInvalidTestData) {
+		t.Fatalf("expected errInvalidTestData, got %v", err)
+	}
+	if got := cache.usedBytes(); got != 0 {
+		t.Errorf("used = %d, want 0", got)
+	}
+	if files, _ := os.ReadDir(cache.dir); len(files) != 0 {
+		t.Errorf("a refused archive left %d files on disk", len(files))
+	}
+}
+
+func TestTestDataCache_ObjectOverTheLimitIsRefusedWithoutDownloading(t *testing.T) {
+	src := newFakeSource()
+	src.objects["big.zip"] = bytes.Repeat([]byte("x"), 5000) // the test limit is 4096
+	cache := newCache(t, src, 1<<20)
+
+	_, err := cache.acquire(context.Background(), "big.zip")
+
+	if !errors.Is(err, errInvalidTestData) {
+		t.Fatalf("expected errInvalidTestData, got %v", err)
+	}
+	if got := src.readCount("big.zip"); got != 0 {
+		t.Errorf("downloaded %d times: an object over the limit must not be read at all", got)
+	}
+}
+
+func TestTestDataCache_ObjectThatDoesNotMatchItsReportedSizeIsRefused(t *testing.T) {
+	src := newFakeSource()
+	data := archive(t, "a")
+	src.objects["a.zip"] = data
+	src.reported["a.zip"] = int64(len(data)) - 10 // storage says smaller than what arrives
+	cache := newCache(t, src, 1<<20)
+
+	_, err := cache.acquire(context.Background(), "a.zip")
+
+	if !errors.Is(err, errInvalidTestData) {
+		t.Fatalf("expected errInvalidTestData, got %v", err)
+	}
+	if got := cache.usedBytes(); got != 0 {
+		t.Errorf("used = %d, want 0", got)
+	}
+}
+
+func TestTestDataCache_MissingObjectIsReportedAsNotFound(t *testing.T) {
+	cache := newCache(t, newFakeSource(), 1<<20)
+
+	_, err := cache.acquire(context.Background(), "nope.zip")
+
+	if !errors.Is(err, storage.ErrObjectNotExist) {
+		t.Fatalf("expected storage.ErrObjectNotExist, got %v", err)
+	}
+}
+
+func TestTestDataCache_EvictsTheLeastRecentlyUsedIdleArchive(t *testing.T) {
+	src := newFakeSource()
+	for _, k := range []string{"a", "b", "c"} {
+		src.objects[k+".zip"] = archive(t, k)
+	}
+	size := int64(len(src.objects["a.zip"]))
+	// Room for two extracted problems and, while a third is extracted, its archive.
+	budget := 2*extractedOf + size + 10
+	cache := newCache(t, src, budget)
+
+	for _, k := range []string{"a.zip", "b.zip"} {
+		e, err := cache.acquire(context.Background(), k)
+		if err != nil {
+			t.Fatalf("acquire %s: %v", k, err)
+		}
+		cache.release(e)
+		time.Sleep(5 * time.Millisecond) // distinct last-used times
+	}
+	e, err := cache.acquire(context.Background(), "c.zip")
+	if err != nil {
+		t.Fatalf("acquire c.zip: %v", err)
+	}
+	cache.release(e)
+
+	for _, k := range []string{"b.zip", "c.zip"} {
+		e, err := cache.acquire(context.Background(), k)
+		if err != nil {
+			t.Fatalf("re-acquire %s: %v", k, err)
+		}
+		cache.release(e)
+	}
+	if got := src.readCount("b.zip"); got != 1 {
+		t.Errorf("b.zip downloaded %d times, want 1: it was recent and must have stayed", got)
+	}
+	e, _ = cache.acquire(context.Background(), "a.zip")
+	cache.release(e)
+	if got := src.readCount("a.zip"); got != 2 {
+		t.Errorf("a.zip downloaded %d times, want 2: it was the oldest and must have been evicted", got)
+	}
+	if got := cache.usedBytes(); got > budget {
+		t.Errorf("used = %d, over the budget %d", got, budget)
+	}
+}
+
+func TestTestDataCache_NeverEvictsAnArchiveSomeoneHolds_AndWaitsForRoom(t *testing.T) {
+	src := newFakeSource()
+	src.objects["a.zip"] = archive(t, "a")
+	src.objects["b.zip"] = archive(t, "b")
+	cache := newCache(t, src, 8192) // the floor: one archive and one extraction, so a second problem has to wait
+	cache.maxWait = 5 * time.Second
+
+	held, err := cache.acquire(context.Background(), "a.zip")
+	if err != nil {
+		t.Fatalf("acquire a.zip: %v", err)
+	}
+
+	done := make(chan error, 1)
+	go func() {
+		e, err := cache.acquire(context.Background(), "b.zip")
+		if err == nil {
+			cache.release(e)
+		}
+		done <- err
+	}()
+
+	select {
+	case err := <-done:
+		t.Fatalf("b.zip returned (%v) while a.zip was held and the budget fits one", err)
+	case <-time.After(150 * time.Millisecond):
+	}
+	if _, err := os.Stat(held.dir); err != nil {
+		t.Fatalf("the held problem was removed from disk: %v", err)
+	}
+
+	cache.release(held)
+
+	select {
+	case err := <-done:
+		if err != nil {
+			t.Fatalf("b.zip should proceed once a.zip is released, got %v", err)
+		}
+	case <-time.After(3 * time.Second):
+		t.Fatal("b.zip never proceeded after a.zip was released")
+	}
+}
+
+func TestTestDataCache_WaitForRoomTimesOutAsBusy(t *testing.T) {
+	src := newFakeSource()
+	src.objects["a.zip"] = archive(t, "a")
+	src.objects["b.zip"] = archive(t, "b")
+	cache := newCache(t, src, 8192) // the floor, so a second problem has to wait; maxWait is 300ms
+
+	held, err := cache.acquire(context.Background(), "a.zip")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer cache.release(held)
+
+	_, err = cache.acquire(context.Background(), "b.zip")
+
+	if !errors.Is(err, errTestDataBusy) {
+		t.Fatalf("expected errTestDataBusy, got %v", err)
+	}
+	if got := cache.usedBytes(); got != extractedOf {
+		t.Errorf("used = %d, want %d: the waiter must give back what it reserved", got, extractedOf)
+	}
+}
+
+func TestTestDataCache_WaitForRoomEndsWhenTheContextIsCancelled(t *testing.T) {
+	src := newFakeSource()
+	src.objects["a.zip"] = archive(t, "a")
+	src.objects["b.zip"] = archive(t, "b")
+	cache := newCache(t, src, 8192)
+	cache.maxWait = 5 * time.Second
+
+	held, _ := cache.acquire(context.Background(), "a.zip")
+	defer cache.release(held)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
+	defer cancel()
+	_, err := cache.acquire(ctx, "b.zip")
+
+	if !errors.Is(err, context.DeadlineExceeded) {
+		t.Fatalf("expected the context's error, got %v", err)
+	}
+}
+
+func TestTestDataCache_ACancelledWaiterOfASharedDownloadDoesNotBreakTheOthers(t *testing.T) {
+	src := newFakeSource()
+	src.objects["a.zip"] = archive(t, "a")
+	src.gate = make(chan struct{})
+	cache := newCache(t, src, 1<<20)
+
+	owner := make(chan error, 1)
+	go func() {
+		e, err := cache.acquire(context.Background(), "a.zip")
+		if err == nil {
+			cache.release(e)
+		}
+		owner <- err
+	}()
+	time.Sleep(50 * time.Millisecond)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
+	defer cancel()
+	if _, err := cache.acquire(ctx, "a.zip"); !errors.Is(err, context.DeadlineExceeded) {
+		t.Fatalf("expected the waiter to give up, got %v", err)
+	}
+
+	close(src.gate)
+	if err := <-owner; err != nil {
+		t.Fatalf("the download's owner must be unaffected by a waiter leaving, got %v", err)
+	}
+}
+
+func TestNewTestDataCache_WipesLeftoversAndKeepsTheDirectory(t *testing.T) {
+	dir := t.TempDir()
+	leftover := filepath.Join(dir, "deadbeef.zip.tmp")
+	if err := os.WriteFile(leftover, []byte("half a download"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	_, err := newTestDataCache(TestDataConfig{Dir: dir, BudgetBytes: 12 << 20, Limits: testLimits()}, newFakeSource())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if _, err := os.Stat(leftover); !os.IsNotExist(err) {
+		t.Errorf("a leftover of a dead process must be removed, stat err = %v", err)
+	}
+	if _, err := os.Stat(dir); err != nil {
+		t.Errorf("the directory itself (a mount point in production) must stay: %v", err)
+	}
+}
+
+func TestNewTestDataCache_BudgetUnderTheLargestArchiveIsRefused(t *testing.T) {
+	limits := testLimits()
+	limits.MaxZipBytes = 1000
+
+	_, err := newTestDataCache(TestDataConfig{Dir: t.TempDir(), BudgetBytes: 999, Limits: limits}, newFakeSource())
+
+	if err == nil {
+		t.Fatal("a budget that cannot hold one archive must be refused")
+	}
+}
+
+// What the worker relies on: judgings of different problems, in the numbers the pod runs
+// them, all get through a budget that fits them and none waits on another.
+func TestTestDataCache_ConcurrentJudgingsOfDifferentProblemsAllProceed(t *testing.T) {
+	const judgings = 5
+	src := newFakeSource()
+	var size int64
+	for i := 0; i < judgings; i++ {
+		src.objects[fmt.Sprintf("p%d.zip", i)] = archive(t, fmt.Sprintf("%d", i))
+		size = int64(len(src.objects["p0.zip"]))
+	}
+	// Every fill can hold its archive and its extraction at once, which is the worst case.
+	cache := newCache(t, src, judgings*(size+extractedOf)+100)
+	cache.maxWait = 5 * time.Second
+
+	var wg sync.WaitGroup
+	errs := make(chan error, judgings)
+	for i := 0; i < judgings; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			e, err := cache.acquire(context.Background(), fmt.Sprintf("p%d.zip", i))
+			if err != nil {
+				errs <- err
+				return
+			}
+			time.Sleep(20 * time.Millisecond)
+			cache.release(e)
+		}()
+	}
+	wg.Wait()
+	close(errs)
+
+	for err := range errs {
+		t.Errorf("a judging failed: %v", err)
+	}
+}
+
+// The cases are extracted in a scratch directory that is renamed into place, so what a judging is given
+// has to point at the final one. A path left pointing at the scratch directory only shows up when read.
+func TestTestDataCache_TheCasesItGivesPointAtFilesThatExist(t *testing.T) {
+	src := newFakeSource()
+	src.objects["a.zip"] = archive(t, "a")
+	cache := newCache(t, src, 1<<20)
+
+	e, err := cache.acquire(context.Background(), "a.zip")
+	if err != nil {
+		t.Fatalf("acquire: %v", err)
+	}
+	defer cache.release(e)
+
+	if len(e.cases) != 1 {
+		t.Fatalf("expected 1 case, got %d", len(e.cases))
+	}
+	for _, path := range []string{e.cases[0].inputPath, e.cases[0].answerPath} {
+		if filepath.Dir(path) != e.dir {
+			t.Errorf("%s is not inside the problem's directory %s", path, e.dir)
+		}
+		if _, err := os.Stat(path); err != nil {
+			t.Errorf("a case file does not exist: %v", err)
+		}
+	}
+}
+
+func TestTestDataCache_OnceCachedTheArchiveItselfIsGone(t *testing.T) {
+	src := newFakeSource()
+	src.objects["a.zip"] = archive(t, "a")
+	cache := newCache(t, src, 1<<20)
+
+	e, err := cache.acquire(context.Background(), "a.zip")
+	if err != nil {
+		t.Fatalf("acquire: %v", err)
+	}
+	defer cache.release(e)
+
+	items, _ := os.ReadDir(cache.dir)
+	if len(items) != 1 || items[0].Name() != filepath.Base(e.dir) {
+		names := make([]string, len(items))
+		for i, it := range items {
+			names[i] = it.Name()
+		}
+		t.Errorf("only the extracted problem should remain on disk, found %v", names)
+	}
+}
+
+// captureLogs swaps the default logger for one that writes to a buffer.
+func captureLogs(t *testing.T) *bytes.Buffer {
+	t.Helper()
+	var buf bytes.Buffer
+	previous := slog.Default()
+	slog.SetDefault(slog.New(slog.NewTextHandler(&buf, &slog.HandlerOptions{Level: slog.LevelDebug})))
+	t.Cleanup(func() { slog.SetDefault(previous) })
+	return &buf
+}
+
+func TestTestDataCache_LogsEachProblemItCaches(t *testing.T) {
+	logs := captureLogs(t)
+	src := newFakeSource()
+	src.objects["a.zip"] = archive(t, "a")
+	cache := newCache(t, src, 1<<20)
+
+	e, err := cache.acquire(context.Background(), "a.zip")
+	if err != nil {
+		t.Fatal(err)
+	}
+	cache.release(e)
+	e, _ = cache.acquire(context.Background(), "a.zip") // a hit: nothing to cache
+	cache.release(e)
+
+	if got := strings.Count(logs.String(), "problem cached"); got != 1 {
+		t.Errorf("logged %d times that a problem was cached, want 1 (a hit caches nothing):\n%s", got, logs)
+	}
+	for _, field := range []string{"key=a.zip", "archive_bytes=", "extracted_bytes=3020", "cases=1", "took="} {
+		if !strings.Contains(logs.String(), field) {
+			t.Errorf("the line must carry %q:\n%s", field, logs)
+		}
+	}
+}
+
+// Evictions are how an undersized budget shows: a problem evicted and then asked for again costs a
+// download and an extraction.
+func TestTestDataCache_LogsWhatItEvictsToMakeRoom(t *testing.T) {
+	logs := captureLogs(t)
+	src := newFakeSource()
+	for _, k := range []string{"a", "b", "c"} {
+		src.objects[k+".zip"] = archive(t, k)
+	}
+	size := int64(len(src.objects["a.zip"]))
+	cache := newCache(t, src, 2*extractedOf+size+10) // room for two extracted problems
+
+	for _, k := range []string{"a.zip", "b.zip", "c.zip"} {
+		e, err := cache.acquire(context.Background(), k)
+		if err != nil {
+			t.Fatalf("acquire %s: %v", k, err)
+		}
+		cache.release(e)
+		time.Sleep(5 * time.Millisecond)
+	}
+
+	out := logs.String()
+	if got := strings.Count(out, "evicted an idle problem"); got != 1 {
+		t.Fatalf("logged %d evictions, want 1:\n%s", got, out)
+	}
+	if !strings.Contains(out, "key=a.zip") || !strings.Contains(out, "freed_bytes=3020") {
+		t.Errorf("the eviction line must say which problem and how much it freed:\n%s", out)
+	}
+}
+
+func TestTestDataCache_LogsOnceWhenAJudgingWaitsForDiskAndOnceWhenItGetsIt(t *testing.T) {
+	logs := captureLogs(t)
+	src := newFakeSource()
+	src.objects["a.zip"] = archive(t, "a")
+	src.objects["b.zip"] = archive(t, "b")
+	cache := newCache(t, src, 8192) // the floor, so b has to wait for a
+	cache.maxWait = 5 * time.Second
+
+	held, err := cache.acquire(context.Background(), "a.zip")
+	if err != nil {
+		t.Fatal(err)
+	}
+	done := make(chan error, 1)
+	go func() {
+		e, err := cache.acquire(context.Background(), "b.zip")
+		if err == nil {
+			cache.release(e)
+		}
+		done <- err
+	}()
+	time.Sleep(200 * time.Millisecond)
+	cache.release(held)
+	if err := <-done; err != nil {
+		t.Fatalf("b.zip should proceed once a.zip is released, got %v", err)
+	}
+
+	out := logs.String()
+	if got := strings.Count(out, "waiting for disk"); got != 1 {
+		t.Errorf("logged %d times that it was waiting, want exactly 1 however many times it woke up:\n%s", got, out)
+	}
+	if got := strings.Count(out, "got the disk it waited for"); got != 1 {
+		t.Errorf("logged %d times that the wait ended, want 1:\n%s", got, out)
+	}
+	if !strings.Contains(out, "key=b.zip") || !strings.Contains(out, "budget_bytes=8192") {
+		t.Errorf("the wait line must say which problem and the budget:\n%s", out)
+	}
+}
+
+func TestTestDataCache_LogsWhenItGivesUpWaitingForDisk(t *testing.T) {
+	logs := captureLogs(t)
+	src := newFakeSource()
+	src.objects["a.zip"] = archive(t, "a")
+	src.objects["b.zip"] = archive(t, "b")
+	cache := newCache(t, src, 8192) // maxWait is 300ms
+
+	held, err := cache.acquire(context.Background(), "a.zip")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer cache.release(held)
+
+	if _, err := cache.acquire(context.Background(), "b.zip"); !errors.Is(err, errTestDataBusy) {
+		t.Fatalf("expected errTestDataBusy, got %v", err)
+	}
+
+	if !strings.Contains(logs.String(), "gave up waiting for disk") {
+		t.Errorf("giving up must be logged, or the SYSTEM_ERROR that follows has no explanation:\n%s", logs)
+	}
+}
+
+func TestResetDir_EmptiesADirectoryButKeepsIt(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(dir, "old-problem", "nested"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "leftover.in"), []byte("x"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	// An open handle keeps the old inode allocated, so a recreated directory cannot reuse its number.
+	handle, err := os.Open(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer handle.Close()
+	before, err := handle.Stat()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if err := resetDir(dir); err != nil {
+		t.Fatalf("resetDir: %v", err)
+	}
+
+	items, _ := os.ReadDir(dir)
+	if len(items) != 0 {
+		t.Errorf("directory still holds %d entries, want 0", len(items))
+	}
+	after, err := os.Stat(dir)
+	if err != nil || !os.SameFile(before, after) {
+		t.Errorf("the directory itself must survive (it may be a mount point): err=%v", err)
+	}
+}
+
+func TestResetDir_CreatesAMissingDirectory(t *testing.T) {
+	dir := filepath.Join(t.TempDir(), "a", "b")
+
+	if err := resetDir(dir); err != nil {
+		t.Fatalf("resetDir: %v", err)
+	}
+
+	if info, err := os.Stat(dir); err != nil || !info.IsDir() {
+		t.Errorf("expected the directory to exist, got info=%v err=%v", info, err)
+	}
+}
+
+func TestResetDir_PathUnderAFile_ReturnsAnError(t *testing.T) {
+	file := filepath.Join(t.TempDir(), "plain.txt")
+	if err := os.WriteFile(file, []byte("x"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := resetDir(filepath.Join(file, "sub")); err == nil {
+		t.Error("expected an error when the path goes through a regular file")
+	}
+}
+
+func TestNewTestDataCache_UnpreparableDir_ReturnsAnErrorNamingIt(t *testing.T) {
+	file := filepath.Join(t.TempDir(), "plain.txt")
+	if err := os.WriteFile(file, []byte("x"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	limits := testLimits()
+	limits.MaxZipBytes, limits.MaxExtractedBytes = 4096, 4096
+
+	_, err := newTestDataCache(TestDataConfig{Dir: filepath.Join(file, "sub"), BudgetBytes: 8192, Limits: limits}, &fakeSource{})
+
+	if err == nil || !strings.Contains(err.Error(), "prepare test data dir") {
+		t.Errorf("expected an error naming the directory preparation, got %v", err)
+	}
+}
+
+func TestRoomWait_Begin_KeepsTheInstantTheWaitStarted(t *testing.T) {
+	first := time.Date(2025, 1, 15, 12, 0, 0, 0, time.UTC)
+	current := first
+	cache := &testDataCache{budget: 100, now: func() time.Time { return current }}
+	w := &roomWait{cache: cache, what: "download", key: "problems/a/tests.zip", need: 50}
+
+	w.begin(context.Background(), 80)
+	current = first.Add(3 * time.Second)
+	w.begin(context.Background(), 90)
+
+	if !w.since.Equal(first) {
+		t.Errorf("since = %v, want %v: a second begin must not restart the wait", w.since, first)
+	}
+}

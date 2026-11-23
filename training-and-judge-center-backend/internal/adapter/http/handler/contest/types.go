@@ -28,42 +28,67 @@ func (n *nullableString) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
+// nullableInt is nullableString for integers: omitted, null and a number are three different requests.
+type nullableInt struct {
+	Present bool
+	Value   *int
+}
+
+func (n *nullableInt) UnmarshalJSON(data []byte) error {
+	n.Present = true
+	if string(data) == "null" {
+		n.Value = nil
+		return nil
+	}
+	var v int
+	if err := json.Unmarshal(data, &v); err != nil {
+		return err
+	}
+	n.Value = &v
+	return nil
+}
+
 // ── Request types ────────────────────────────────────────────────────────────
 
 type createContestRequest struct {
-	Name              string    `json:"name"`
-	Description       *string   `json:"description"`
-	StartTime         time.Time `json:"startTime"`
-	EndTime           time.Time `json:"endTime"`
-	Penalty           *int      `json:"penalty"`
-	FreezeMinutes     *int      `json:"freezeMinutes"`
-	EnablePostContest bool      `json:"enablePostContest"`
-	ShowTeamMembers   bool      `json:"showTeamMembers"`
-	ParticipationMode string    `json:"participationMode"`
-	TeamSizeMin       *int      `json:"teamSizeMin"`
-	TeamSizeMax       *int      `json:"teamSizeMax"`
-	Problems          []string  `json:"problems"`
+	Name                  string    `json:"name"`
+	Description           *string   `json:"description"`
+	StartTime             time.Time `json:"startTime"`
+	EndTime               time.Time `json:"endTime"`
+	Penalty               *int      `json:"penalty"`
+	FreezeMinutes         *int      `json:"freezeMinutes"`
+	EnablePostContest     bool      `json:"enablePostContest"`
+	ShowTeamMembers       bool      `json:"showTeamMembers"`
+	AllowLateRegistration bool      `json:"allowLateRegistration"`
+	AutoRevealMinutes     *int      `json:"autoRevealMinutes"`
+	ParticipationMode     string    `json:"participationMode"`
+	TeamSizeMin           *int      `json:"teamSizeMin"`
+	TeamSizeMax           *int      `json:"teamSizeMax"`
+	Problems              []string  `json:"problems"`
 }
 
 type problemOrderRequest struct {
-	Slug  string `json:"slug"`
-	Order int    `json:"order"`
+	Slug  string         `json:"slug"`
+	Order int            `json:"order"`
+	Color nullableString `json:"color"`
 }
 
 type updateContestRequest struct {
-	Name              *string               `json:"name"`
-	Description       nullableString        `json:"description"`
-	StartTime         *time.Time            `json:"startTime"`
-	EndTime           *time.Time            `json:"endTime"`
-	Penalty           *int                  `json:"penalty"`
-	FreezeMinutes     *int                  `json:"freezeMinutes"`
-	EnablePostContest *bool                 `json:"enablePostContest"`
-	Problems          *[]problemOrderRequest `json:"problems"`
-	Locked            *bool                 `json:"locked"`
-	ParticipationMode *string               `json:"participationMode"`
-	TeamSizeMin       *int                  `json:"teamSizeMin"`
-	TeamSizeMax       *int                  `json:"teamSizeMax"`
-	ShowTeamMembers   *bool                 `json:"showTeamMembers"`
+	Name                  *string                `json:"name"`
+	Description           nullableString         `json:"description"`
+	StartTime             *time.Time             `json:"startTime"`
+	EndTime               *time.Time             `json:"endTime"`
+	Penalty               *int                   `json:"penalty"`
+	FreezeMinutes         *int                   `json:"freezeMinutes"`
+	EnablePostContest     *bool                  `json:"enablePostContest"`
+	Problems              *[]problemOrderRequest `json:"problems"`
+	Locked                *bool                  `json:"locked"`
+	ParticipationMode     *string                `json:"participationMode"`
+	TeamSizeMin           *int                   `json:"teamSizeMin"`
+	TeamSizeMax           *int                   `json:"teamSizeMax"`
+	ShowTeamMembers       *bool                  `json:"showTeamMembers"`
+	AllowLateRegistration *bool                  `json:"allowLateRegistration"`
+	AutoRevealMinutes     nullableInt            `json:"autoRevealMinutes"`
 }
 
 // ── Response types ───────────────────────────────────────────────────────────
@@ -80,44 +105,48 @@ type ownerDisplay struct {
 }
 
 type problemDisplay struct {
-	Slug  string `json:"slug"`
-	Title string `json:"title"`
-	Order int    `json:"order"`
+	Slug  string  `json:"slug"`
+	Title string  `json:"title"`
+	Order int     `json:"order"`
+	Color *string `json:"color"`
 }
 
 // ── GET /contests/:id response ───────────────────────────────────────────────
 
 type problemDetail struct {
-	Position    int    `json:"position"`
-	Slug        string `json:"slug"`
-	Title       string `json:"title"`
-	TimeLimit   int    `json:"timeLimit"`
-	MemoryLimit int    `json:"memoryLimit"`
+	Position    int     `json:"position"`
+	Slug        string  `json:"slug"`
+	Title       string  `json:"title"`
+	Color       *string `json:"color"`
+	TimeLimit   int     `json:"timeLimit"`
+	MemoryLimit int     `json:"memoryLimit"`
 }
 
 type getContestResponse struct {
-	ID                string                  `json:"id"`
-	Name              string                  `json:"name"`
-	Description       *string                 `json:"description,omitempty"`
-	StartTime         string                  `json:"startTime"`
-	EndTime           string                  `json:"endTime"`
-	Duration          int                     `json:"duration"`
-	Penalty           int                     `json:"penalty"`
-	FreezeMinutes     int                     `json:"freezeMinutes"`
-	EnablePostContest bool                    `json:"enablePostContest"`
-	Locked            *bool                   `json:"locked,omitempty"`
-	ShowTeamMembers   bool                    `json:"showTeamMembers"`
-	ParticipationMode string                  `json:"participationMode"`
-	TeamSizeMin       int                     `json:"teamSizeMin"`
-	TeamSizeMax       int                     `json:"teamSizeMax"`
-	ParticipantCount  int                     `json:"participantCount"`
-	IsRegistered      bool                    `json:"isRegistered"`
-	Group             groupDisplay            `json:"group"`
-	Owner             ownerDisplay            `json:"owner"`
-	Problems          []problemDetail `json:"problems"`
-	Status            string                  `json:"status"`
-	CreatedAt         string                  `json:"createdAt"`
-	UpdatedAt         *string                 `json:"updatedAt,omitempty"`
+	ID                    string          `json:"id"`
+	Name                  string          `json:"name"`
+	Description           *string         `json:"description,omitempty"`
+	StartTime             string          `json:"startTime"`
+	EndTime               string          `json:"endTime"`
+	Duration              int             `json:"duration"`
+	Penalty               int             `json:"penalty"`
+	FreezeMinutes         int             `json:"freezeMinutes"`
+	EnablePostContest     bool            `json:"enablePostContest"`
+	Locked                *bool           `json:"locked,omitempty"`
+	ShowTeamMembers       bool            `json:"showTeamMembers"`
+	AllowLateRegistration bool            `json:"allowLateRegistration"`
+	AutoRevealMinutes     *int            `json:"autoRevealMinutes"`
+	ParticipationMode     string          `json:"participationMode"`
+	TeamSizeMin           int             `json:"teamSizeMin"`
+	TeamSizeMax           int             `json:"teamSizeMax"`
+	ParticipantCount      int             `json:"participantCount"`
+	IsRegistered          bool            `json:"isRegistered"`
+	Group                 groupDisplay    `json:"group"`
+	Owner                 ownerDisplay    `json:"owner"`
+	Problems              []problemDetail `json:"problems"`
+	Status                string          `json:"status"`
+	CreatedAt             string          `json:"createdAt"`
+	UpdatedAt             *string         `json:"updatedAt,omitempty"`
 }
 
 // ── GET /contests response ───────────────────────────────────────────────────
@@ -137,6 +166,7 @@ type contestListItem struct {
 	ParticipantCount  int     `json:"participantCount"`
 	IsRegistered      bool    `json:"isRegistered"`
 	ProblemCount      int     `json:"problemCount"`
+	UserGroupRole     *string `json:"userGroupRole"`
 }
 
 type pagination struct {
@@ -171,6 +201,7 @@ type myContestListItem struct {
 	IsRegistered      bool         `json:"isRegistered"`
 	ProblemCount      int          `json:"problemCount"`
 	Group             groupDisplay `json:"group"`
+	UserGroupRole     *string      `json:"userGroupRole"`
 }
 
 type listMyContestsResponse struct {
@@ -230,12 +261,21 @@ type standingsContestDisplay struct {
 	FreezeMinutes *int    `json:"freezeMinutes"`
 	IsFrozen      bool    `json:"isFrozen"`
 	FrozenAt      *string `json:"frozenAt"`
+	// ResultsRevealedAt is when the final results were unfrozen; null until then.
+	ResultsRevealedAt *string `json:"resultsRevealedAt"`
+	// AutoRevealAt is when the results open by themselves; null when they only open by hand.
+	AutoRevealAt *string `json:"autoRevealAt"`
 }
 
 type standingsProblemHeader struct {
-	Position int    `json:"position"`
-	Slug     string `json:"slug"`
-	Title    string `json:"title"`
+	Position     int     `json:"position"`
+	Slug         string  `json:"slug"`
+	Title        string  `json:"title"`
+	Color        *string `json:"color"`
+	Accepted     int     `json:"accepted"`
+	Tried        int     `json:"tried"`
+	PostAccepted int     `json:"postAccepted"`
+	PostTried    int     `json:"postTried"`
 }
 
 type standingParticipant struct {
@@ -251,15 +291,18 @@ type standingParticipant struct {
 }
 
 type standingProblemResult struct {
-	Position int    `json:"position"`
-	Status   string `json:"status"`
-	Attempts int    `json:"attempts"`
-	Time     *int   `json:"time"`
-	Penalty  int    `json:"penalty"`
+	Position     int    `json:"position"`
+	Status       string `json:"status"`
+	Attempts     int    `json:"attempts"`
+	Pending      int    `json:"pending"`
+	Time         *int   `json:"time"`
+	Penalty      int    `json:"penalty"`
+	IsFirstSolve bool   `json:"isFirstSolve"`
 }
 
 type standingEntry struct {
-	Rank           int                     `json:"rank"`
+	Rank           *int                    `json:"rank"`
+	IsOfficial     bool                    `json:"isOfficial"`
 	Participant    standingParticipant     `json:"participant"`
 	ProblemsSolved int                     `json:"problemsSolved"`
 	TotalPenalty   int                     `json:"totalPenalty"`
@@ -332,25 +375,27 @@ type listSubmissionsResponse struct {
 // ── Create/Update response ───────────────────────────────────────────────────
 
 type contestResponse struct {
-	ID                string           `json:"id"`
-	Name              string           `json:"name"`
-	Description       *string          `json:"description,omitempty"`
-	StartTime         string           `json:"startTime"`
-	EndTime           string           `json:"endTime"`
-	Duration          int              `json:"duration"`
-	Penalty           int              `json:"penalty"`
-	FreezeMinutes     int              `json:"freezeMinutes"`
-	EnablePostContest bool             `json:"enablePostContest"`
-	Locked            bool             `json:"locked"`
-	ShowTeamMembers   bool             `json:"showTeamMembers"`
-	ParticipationMode string           `json:"participationMode"`
-	TeamSizeMin       int              `json:"teamSizeMin"`
-	TeamSizeMax       int              `json:"teamSizeMax"`
-	Group             groupDisplay     `json:"group"`
-	Owner             ownerDisplay     `json:"owner"`
-	Problems          []problemDisplay `json:"problems"`
-	ProblemCount      int              `json:"problemCount"`
-	Status            string           `json:"status"`
-	CreatedAt         string           `json:"createdAt"`
-	UpdatedAt         *string          `json:"updatedAt,omitempty"`
+	ID                    string           `json:"id"`
+	Name                  string           `json:"name"`
+	Description           *string          `json:"description,omitempty"`
+	StartTime             string           `json:"startTime"`
+	EndTime               string           `json:"endTime"`
+	Duration              int              `json:"duration"`
+	Penalty               int              `json:"penalty"`
+	FreezeMinutes         int              `json:"freezeMinutes"`
+	EnablePostContest     bool             `json:"enablePostContest"`
+	Locked                bool             `json:"locked"`
+	ShowTeamMembers       bool             `json:"showTeamMembers"`
+	AllowLateRegistration bool             `json:"allowLateRegistration"`
+	AutoRevealMinutes     *int             `json:"autoRevealMinutes"`
+	ParticipationMode     string           `json:"participationMode"`
+	TeamSizeMin           int              `json:"teamSizeMin"`
+	TeamSizeMax           int              `json:"teamSizeMax"`
+	Group                 groupDisplay     `json:"group"`
+	Owner                 ownerDisplay     `json:"owner"`
+	Problems              []problemDisplay `json:"problems"`
+	ProblemCount          int              `json:"problemCount"`
+	Status                string           `json:"status"`
+	CreatedAt             string           `json:"createdAt"`
+	UpdatedAt             *string          `json:"updatedAt,omitempty"`
 }

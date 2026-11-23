@@ -50,7 +50,7 @@ func buildContestFilters(status *string, sortBy, order string, page, limit int) 
 
 // toContestListItem maps a domain Contest plus its resolved display data into
 // the shared ContestListItem output shape.
-func toContestListItem(c *domainContest.Contest, now time.Time, participantCount int, isRegistered bool) ContestListItem {
+func toContestListItem(c *domainContest.Contest, now time.Time, participantCount int, isRegistered bool, userGroupRole *string) ContestListItem {
 	return ContestListItem{
 		ID:                c.ID(),
 		Name:              c.Name().Value(),
@@ -66,5 +66,6 @@ func toContestListItem(c *domainContest.Contest, now time.Time, participantCount
 		ParticipantCount:  participantCount,
 		IsRegistered:      isRegistered,
 		ProblemCount:      len(c.Problems()),
+		UserGroupRole:     userGroupRole,
 	}
 }

@@ -23,6 +23,8 @@ func defaultRegisterUC() *appcontest.RegisterToContestUseCase {
 		&mockRegistrationRepository{},
 		&mockMemberProvider{isLead: false, isMember: true},
 		&noopTeamSelectionChecker{},
+		&noopRegistrationLocker{},
+		&mockTransactionManager{},
 	)
 }
 
@@ -84,6 +86,8 @@ func TestRegister_ContestNotFound_Returns404(t *testing.T) {
 		&mockRegistrationRepository{},
 		&mockMemberProvider{isMember: true},
 		&noopTeamSelectionChecker{},
+		&noopRegistrationLocker{},
+		&mockTransactionManager{},
 	)
 	h := newHandlerWithRegister(uc)
 	r := authedRequest(http.MethodPost, "/groups/g1/contests/missing/register", nil)
@@ -104,6 +108,8 @@ func TestRegister_NonMember_Returns403(t *testing.T) {
 		&mockRegistrationRepository{},
 		&mockMemberProvider{isLead: false, isMember: false},
 		&noopTeamSelectionChecker{},
+		&noopRegistrationLocker{},
+		&mockTransactionManager{},
 	)
 	h := newHandlerWithRegister(uc)
 	r := authedRequest(http.MethodPost, "/groups/g1/contests/c1/register", nil)
@@ -126,6 +132,8 @@ func TestRegister_AlreadyRegistered_Returns204(t *testing.T) {
 		},
 		&mockMemberProvider{isMember: true},
 		&noopTeamSelectionChecker{},
+		&noopRegistrationLocker{},
+		&mockTransactionManager{},
 	)
 	h := newHandlerWithRegister(uc)
 	r := authedRequest(http.MethodPost, "/groups/g1/contests/c1/register", nil)
@@ -140,12 +148,14 @@ func TestRegister_AlreadyRegistered_Returns204(t *testing.T) {
 	}
 }
 
-func TestRegister_ContestAlreadyStarted_Returns400(t *testing.T) {
+func TestRegister_ContestFinished_Returns409NotOpenForRegistration(t *testing.T) {
 	uc := appcontest.NewRegisterToContestUseCase(
 		&mockRepoReturning{contest: finishedContest()},
 		&mockRegistrationRepository{},
 		&mockMemberProvider{isMember: true},
 		&noopTeamSelectionChecker{},
+		&noopRegistrationLocker{},
+		&mockTransactionManager{},
 	)
 	h := newHandlerWithRegister(uc)
 	r := authedRequest(http.MethodPost, "/groups/g1/contests/c1/register", nil)
@@ -155,8 +165,8 @@ func TestRegister_ContestAlreadyStarted_Returns400(t *testing.T) {
 
 	wrapAuth(http.HandlerFunc(h.Register)).ServeHTTP(w, r)
 
-	if w.Code != http.StatusBadRequest {
-		t.Fatalf("expected 400, got %d: %s", w.Code, w.Body.String())
+	if w.Code != http.StatusConflict {
+		t.Fatalf("expected 409, got %d: %s", w.Code, w.Body.String())
 	}
 	var errResp struct {
 		Code string `json:"error"`
@@ -164,7 +174,7 @@ func TestRegister_ContestAlreadyStarted_Returns400(t *testing.T) {
 	if err := json.NewDecoder(w.Body).Decode(&errResp); err != nil {
 		t.Fatalf("could not decode error body: %v", err)
 	}
-	if errResp.Code != domainContest.ErrCodeContestAlreadyStarted {
-		t.Errorf("expected error code %q, got %q", domainContest.ErrCodeContestAlreadyStarted, errResp.Code)
+	if errResp.Code != domainContest.ErrCodeContestNotOpenForRegistration {
+		t.Errorf("expected error code %q, got %q", domainContest.ErrCodeContestNotOpenForRegistration, errResp.Code)
 	}
 }

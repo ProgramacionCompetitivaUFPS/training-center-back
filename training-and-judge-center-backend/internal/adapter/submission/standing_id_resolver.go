@@ -45,10 +45,7 @@ func (r *StandingIDResolver) ResolveStandingID(ctx context.Context, contestID, u
 		FROM contest_team_participants ctp
 		JOIN team_members tm ON tm.team_id = ctp.team_id AND tm.user_id = $2
 		WHERE ctp.contest_id = $1
-		  AND (
-		    array_length(ctp.selected_members, 1) IS NULL
-		    OR ctp.selected_members @> ARRAY[$2::uuid]
-		  )
+		  AND ctp.selected_members @> ARRAY[$2::uuid]
 		LIMIT 1
 	`, contestID, userID).Scan(&teamID)
 	if err != nil {

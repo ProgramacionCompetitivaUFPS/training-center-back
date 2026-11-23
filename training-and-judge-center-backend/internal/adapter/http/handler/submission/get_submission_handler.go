@@ -9,6 +9,15 @@ import (
 	"github.com/training-judge-center/backend/pkg/apperror"
 )
 
+// contestDetails adds, on top of contestSummary, what a client needs to link from a submission
+// back to its problem inside the contest (/groups/{groupId}/contests/{id}/problems/{letter}).
+type contestDetails struct {
+	ID              string `json:"id"`
+	Name            string `json:"name"`
+	GroupID         string `json:"groupId"`
+	ProblemPosition *int   `json:"problemPosition"` // 1 = A, 2 = B…; null when the problem was later dropped from the contest
+}
+
 type getSubmissionResponse struct {
 	ID            string          `json:"id"`
 	Status        string          `json:"status"`
@@ -16,12 +25,13 @@ type getSubmissionResponse struct {
 	SubmittedAt   string          `json:"submittedAt"`
 	JudgedAt      *string         `json:"judgedAt"`
 	Problem       problemSummary  `json:"problem"`
-	Contest       *contestSummary `json:"contest"`
+	Contest       *contestDetails `json:"contest"`
 	SubmittedBy   userSummary     `json:"submittedBy"`
 	Language      string          `json:"language"`
 	Compiler      string          `json:"compiler"`
 	ExecutionTime *int            `json:"executionTime"`
 	MemoryKb      *int            `json:"memoryKb"`
+	CompileLog    *string         `json:"compileLog"` // compiler output; null unless the submission failed to compile
 	SourceCode    *string         `json:"sourceCode"` // null when the stored source file no longer exists
 	IsBlockly     bool            `json:"isBlocklySubmission"`
 	WorkspaceXML  *string         `json:"workspaceXml"` // block editor workspace; null for regular submissions
@@ -71,6 +81,7 @@ func (h *Handler) GetSubmission(w http.ResponseWriter, r *http.Request) {
 		Compiler:      out.Compiler,
 		ExecutionTime: out.ExecutionTime,
 		MemoryKb:      out.MemoryKb,
+		CompileLog:    out.CompileLog,
 		SourceCode:    out.SourceCode,
 		IsBlockly:     out.IsBlockly,
 		WorkspaceXML:  out.WorkspaceXML,
@@ -82,7 +93,12 @@ func (h *Handler) GetSubmission(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if out.Contest != nil {
-		resp.Contest = &contestSummary{ID: out.Contest.ID, Name: out.Contest.Name}
+		resp.Contest = &contestDetails{
+			ID:              out.Contest.ID,
+			Name:            out.Contest.Name,
+			GroupID:         out.Contest.GroupID,
+			ProblemPosition: out.ProblemPosition,
+		}
 	}
 
 	handler.WriteJSON(r.Context(), w, http.StatusOK, resp)

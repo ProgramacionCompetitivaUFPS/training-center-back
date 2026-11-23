@@ -732,7 +732,7 @@ Dato que explica por qué `500m` frena tanto: **Go 1.25 nunca baja `GOMAXPROCS` 
 
 #### El tope de datos de prueba baja de 200 a 100 MB
 
-`maxFileSizeTestCaseMB` en `config/virtual_object.json`, que acota el total descomprimido del ZIP. **Con 200 MB el worker no aguantaba ni un solo judging** (ver la sección de bugs). Los 100 MB dejan 3.5× de aire sobre el problema real más pesado, que son 28.8 MB.
+`maxZipUploadSizeMB` en `config/virtual_object.json` (en ese momento actuaba como tope descomprimido; hoy ese rol lo tiene `maxExtractedSizeMB` — ver sección de bugs D14). **Con 200 MB el worker no aguantaba ni un solo judging** (ver la sección de bugs). Los 100 MB dejaban 3.5× de aire sobre el problema real más pesado, que son 28.8 MB. Esta decisión fue revisada posteriormente: `maxZipUploadSizeMB` subió a 200 MB (solo ZIP comprimido) y se introdujo `maxExtractedSizeMB: 500` para el contenido descomprimido, desacoplando ambos límites.
 
 #### Alternativas descartadas, todas medidas
 
@@ -817,7 +817,7 @@ Ninguno bloquea el diseño; son elecciones que conviene hacer con el código del
 
 - **`github.com/rabbitmq/amqp091-go` está marcado `// indirect` en `go.mod` y no lo es** — `internal/adapter/queue/rabbitmq_queue.go` lo importa directamente. Apareció al correr los tests con `-mod=mod`, que lo movió solo; se revirtió por no ser de esta tarea. Un `go mod tidy` lo corrige. Sin efecto funcional: es exactitud del manifiesto de dependencias.
 
-- **Un tope por archivo individual de caso de prueba**, separado del total. Hoy solo existe el total (`maxFileSizeTestCaseMB`, 100 MB tras D14), aplicado además como tope por archivo, así que **un solo archivo puede ocupar los 100 MB completos**. Eso importa por dos motivos distintos que conviene no mezclar:
+- **Un tope por archivo individual de caso de prueba**, separado del total. Hoy solo existe el total (`maxZipUploadSizeMB`, 100 MB tras D14), aplicado además como tope por archivo, así que **un solo archivo puede ocupar los 100 MB completos**. Eso importa por dos motivos distintos que conviene no mezclar:
 
   - **Para el worker**, es lo que hace que el streaming de casos de prueba no sirva: convertir `O(suma)` en `O(caso mayor)` no ayuda si un archivo es el 99% del peso, que es exactamente la forma de los paquetes BOCA (28.75 de 28.8 MB en el problema B).
   - **Para el container del pool liviano**, es el ítem que ya estaba anotado más arriba: el pico de un checker **personalizado** escala con la **suma** de los tres archivos que recibe, y `maxOutputBytes` solo acota uno de ellos. Para `compare` no aplica (ver el punto 14 del Paso 7).
@@ -853,11 +853,11 @@ Ninguno bloquea el diseño; son elecciones que conviene hacer con el código del
   - **Tres formatos y tres estilos de carga** (env, JSON, YAML), con tres niveles de rigor distintos: el YAML rechaza claves desconocidas, el JSON no valida nada.
   - **`virtual_object` no dice qué contiene.** El nombre no describe ni límites de problema ni lenguajes ni tags.
 
-  - **El default de `maxFileSizeTestCaseMB` quedó en el número que D14 quitó** (encontrado al ejecutar A2). `internal/adapter/config/config_service.go` hace `defaultIfZero(cfg.MaxFileSizeTestCaseMB, 200)`, y D14 bajó ese tope de 200 a 100 MB justamente porque *"el worker no aguantaba su propio tope"* (ver la sección de bugs). Si alguien borra la clave del JSON, la plataforma vuelve sola al valor que se quitó y nada avisa, porque el JSON no valida nada. El arreglo del número es una línea; lo que no es de una línea es revisar los otros cuatro `defaultIfZero` del mismo bloque, que nadie volvió a mirar desde que se escribieron.
+  - **El default de `maxZipUploadSizeMB` quedó en el número que D14 quitó** (encontrado al ejecutar A2). `internal/adapter/config/config_service.go` hace `defaultIfZero(cfg.MaxZipUploadSizeMB, 200)`, y D14 bajó ese tope de 200 a 100 MB justamente porque *"el worker no aguantaba su propio tope"* (ver la sección de bugs). Si alguien borra la clave del JSON, la plataforma vuelve sola al valor que se quitó y nada avisa, porque el JSON no valida nada. El arreglo del número es una línea; lo que no es de una línea es revisar los otros cuatro `defaultIfZero` del mismo bloque, que nadie volvió a mirar desde que se escribieron.
 
   - **`config_service.go` no está donde ARCHITECTURE.md dice que va** (encontrado al ejecutar A2). Ese documento tiene una entrada propia al respecto —*"Where does `platform/config/config_service.go` go?"*— y responde: *"It belongs in `adapter/problem/platform_settings.go`"*, porque construye un tipo de dominio (`problem.PlatformSettings`) a partir de config cruda. Hoy vive en `internal/adapter/config/config_service.go`. Es deriva puramente de ubicación: el archivo hace exactamente lo que ARCHITECTURE.md describe, sólo que en otro lado.
 
-  - **`PlatformSettings` transporta cinco campos que el dominio nunca lee** (encontrado al ejecutar A2). Verificado con grep: `MaxFileSizeTestCaseMB`, `MaxFileSizeDefaultMB`, `MaxFileCountTestCase`, `MaxFileCountSample` y `UploadMaxConcurrency` sólo los consumen `adapter/http/handler/problem/` y `cmd/api`; ningún archivo de `internal/domain/` los usa. El efecto concreto es que `NewPlatformSettings` toma **11 parámetros posicionales con 5 `int` seguidos**, donde transponer dos compila perfecto — la misma forma de bug que `RunRequest.MemoryKb` y `CheckerLanguage`. Fue el motivo por el que A2 decidió que los dos topes nuevos por archivo **no** viajaran por ahí (ver el Paso 8, A2). Si esos cinco campos salieran del dominio, el constructor bajaría a seis parámetros y el chequeo cross-field de tamaños de archivo (`platform_settings.go:60`) se mudaría con ellos.
+  - **`PlatformSettings` transporta cinco campos que el dominio nunca lee** (encontrado al ejecutar A2). Verificado con grep: `MaxZipUploadSizeMB`, `MaxFileSizeDefaultMB`, `MaxFileCountTestCase`, `MaxFileCountSample` y `UploadMaxConcurrency` sólo los consumen `adapter/http/handler/problem/` y `cmd/api`; ningún archivo de `internal/domain/` los usa. El efecto concreto es que `NewPlatformSettings` toma **11 parámetros posicionales con 5 `int` seguidos**, donde transponer dos compila perfecto — la misma forma de bug que `RunRequest.MemoryKb` y `CheckerLanguage`. Fue el motivo por el que A2 decidió que los dos topes nuevos por archivo **no** viajaran por ahí (ver el Paso 8, A2). Si esos cinco campos salieran del dominio, el constructor bajaría a seis parámetros y el chequeo cross-field de tamaños de archivo (`platform_settings.go:60`) se mudaría con ellos.
 
 ## Consecuencias
 
@@ -1112,7 +1112,7 @@ Un checker o validator escrito con testlib —que es el caso normal en programac
 
 Encontrado al dimensionar el worker para el Paso 6. **Estaba activo hoy**, con `maxConcurrent = 2`, sin necesidad de ningún cambio de este rediseño.
 
-`config/virtual_object.json` declaraba `maxFileSizeTestCaseMB: 200`, que `icpc_parser.go` aplica como **total descomprimido** del ZIP de casos de prueba, y también como tope por archivo individual. O sea que un problema legal podía traer 200 MB de datos.
+`config/virtual_object.json` declaraba `maxZipUploadSizeMB: 200`, que `icpc_parser.go` aplicaba como **total descomprimido** del ZIP de casos de prueba y como tope por archivo individual — los dos roles los tenía una sola variable. O sea que un problema legal podía traer 200 MB de datos. (Hoy estos roles están separados: `maxZipUploadSizeMB` limita el ZIP comprimido que llega por HTTP, y `maxExtractedSizeMB` limita el contenido descomprimido; ambos son configurables sin tocar código.)
 
 El worker, por judging, sostiene:
 
@@ -2303,7 +2303,7 @@ Con el tope del `.ans` en 8 MiB el token legítimo más grande pasa a ser 8 MiB,
 
 **5. Los topes viven en `virtual_object.json`, y no viajan por `PlatformSettings`.** Lo primero porque hay **dos puntos de aplicación** —el upload (`cmd/api` → `icpc_parser`, donde el setter recibe el mensaje) y el judging (`cmd/worker` → `test_case_provider`, la defensa contra una entrada que descomprime más de lo que declara)— y el primero es el que decide dónde vive la política. Lo segundo porque `NewPlatformSettings` habría pasado a **13 parámetros posicionales con 7 `int` seguidos**, donde transponer dos compila perfecto; el detalle está en la revisión de configuración de la plataforma, junto con el dato de que el dominio no lee ninguno de esos cinco campos.
 
-**Sin default: un tope ausente hace que la API no arranque.** `defaultIfZero(cfg.MaxFileSizeTestCaseMB, 200)` es exactamente cómo un default silencioso restauró el número que D14 había quitado. La validación quedó en `validateVirtualObject`, una función propia que devuelve `error` —precedente del Paso 3 con `validateJudgeConfig`—, con el invariante **`answer ≤ input ≤ total`**.
+**Sin default: un tope ausente hace que la API no arranque.** `defaultIfZero(cfg.MaxZipUploadSizeMB, 200)` es exactamente cómo un default silencioso restauró el número que D14 había quitado. La validación quedó en `validateVirtualObject`, una función propia que devuelve `error` —precedente del Paso 3 con `validateJudgeConfig`—, con el invariante **`answer ≤ input ≤ total`**.
 
 **6. `NewICPCParser` pasa a recibir un `ICPCParserConfig`**, con el precedente de `adapter/judge/config.go`. Tenía cuatro `int` seguidos en orden `size, size, count, count`; los dos topes nuevos lo habrían llevado a seis. La verificación por mutación lo confirmó de la peor manera: **intercambiar los dos campos no rompe el test del tope del `.in`**, porque el mensaje lo elige la extensión y no el número. Sólo lo mata el test que fija que los dos topes **no son intercambiables**.
 

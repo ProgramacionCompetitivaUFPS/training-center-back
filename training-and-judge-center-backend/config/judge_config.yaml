@@ -10,6 +10,14 @@ judge:
   stalePendingAfterMinutes: 2     # grace before a PENDING submission whose message the broker never confirmed is re-published (5 times at most)
   staleValidationAfterMinutes: 20 # same for publish validations; above the client's 9 min HTTP timeout
 
+  # Test cases are cached on disk, extracted, on a volume of the worker pod (not the dind one), so a
+  # judging copies its cases from local files and neither decompresses anything nor holds a problem's
+  # data in memory. The budget counts a problem's archive while it is being extracted. It must cover
+  # maxConcurrent archives plus the extraction of the largest package (the worker refuses to start
+  # otherwise), and stay under the emptyDir's sizeLimit.
+  testDataDir: /test-data
+  testDataBudgetBytes: 3221225472 # 3 GiB: twelve problems like the largest one in use, six at the extracted size limit
+
   # Language properties: true no matter which pool runs the container.
   # In the artifact* fields, {name} is replaced with Checker or Validator.
   languages:

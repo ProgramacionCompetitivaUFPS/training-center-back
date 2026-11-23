@@ -34,14 +34,15 @@ type RegisterTeamToContestOutput struct {
 }
 
 type RegisterTeamToContestUseCase struct {
-	memberRepo      domainTeam.MemberRepository
-	teamRepo        domainTeam.Repository
-	contestProvider ContestProvider
+	memberRepo       domainTeam.MemberRepository
+	teamRepo         domainTeam.Repository
+	contestProvider  ContestProvider
 	teamParticipRepo domainContest.TeamParticipationRepository
-	indivChecker    IndividualRegistrationChecker
-	groupChecker    GroupMemberChecker
-	userProvider    UserProvider
-	txManager       appShared.TransactionManager
+	indivChecker     IndividualRegistrationChecker
+	groupChecker     GroupMemberChecker
+	userProvider     UserProvider
+	locker           RegistrationLocker
+	txManager        appShared.TransactionManager
 }
 
 func NewRegisterTeamToContestUseCase(
@@ -52,6 +53,7 @@ func NewRegisterTeamToContestUseCase(
 	indivChecker IndividualRegistrationChecker,
 	groupChecker GroupMemberChecker,
 	userProvider UserProvider,
+	locker RegistrationLocker,
 	txManager appShared.TransactionManager,
 ) *RegisterTeamToContestUseCase {
 	return &RegisterTeamToContestUseCase{
@@ -62,6 +64,7 @@ func NewRegisterTeamToContestUseCase(
 		indivChecker:     indivChecker,
 		groupChecker:     groupChecker,
 		userProvider:     userProvider,
+		locker:           locker,
 		txManager:        txManager,
 	}
 }
@@ -86,9 +89,9 @@ func (uc *RegisterTeamToContestUseCase) Execute(ctx context.Context, in Register
 		return nil, apperror.NewBadRequest(ErrCodeTeamsNotAllowed, "this contest does not allow team registrations")
 	}
 
-	// 3. Contest must be SCHEDULED.
-	if contest.Status != "SCHEDULED" {
-		return nil, apperror.NewConflict(ErrCodeContestNotOpenForRegistration, "contest is not open for registration")
+	// 3. Contest must be open for registration.
+	if err := contest.CheckRegistrationOpen(); err != nil {
+		return nil, err
 	}
 
 	// Reject duplicate selected members.
@@ -142,6 +145,10 @@ func (uc *RegisterTeamToContestUseCase) Execute(ctx context.Context, in Register
 	}
 
 	if err := uc.txManager.WithTx(ctx, func(txCtx context.Context) error {
+		if err := uc.locker.Lock(txCtx, in.ContestID); err != nil {
+			return err
+		}
+
 		// 7a. No individual registration for any selectedMember.
 		indivMap, err := uc.indivChecker.AreUsersRegisteredIndividually(txCtx, in.ContestID, in.SelectedMembers)
 		if err != nil {

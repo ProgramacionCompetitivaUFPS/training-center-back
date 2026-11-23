@@ -403,11 +403,115 @@ func TestValidateProblem_JudgingUpdate_Passes_AppliesTheStagedFiles(t *testing.T
 	if p.JudgingUpdatedAt() == nil {
 		t.Error("JudgingUpdatedAt must move so the affected submissions can be rejudged")
 	}
-	if len(f.staged.deletedPrefixes) != 0 {
-		t.Errorf("nothing staged should be dropped on success, got %v", f.staged.deletedPrefixes)
+	for _, prefix := range f.staged.deletedPrefixes {
+		if prefix == stagedTestCasesKey || prefix == "problems/"+testSlug+"/checker/validation-1/" {
+			t.Errorf("the staged files now in use must not be dropped, got %q", prefix)
+		}
 	}
 	if f.published.calls != 0 {
 		t.Error("a judging update must not run the publish step")
+	}
+}
+
+const (
+	liveTestCasesKey   = "problems/" + testSlug + "/testcases/xyz"
+	liveCheckerKey     = "problems/" + testSlug + "/checker/Checker.cpp"
+	liveCheckerCompKey = "problems/" + testSlug + "/checker/compiled"
+)
+
+func newPublishedProblemWithChecker() *domainProblem.Problem {
+	key := liveTestCasesKey
+	compiled := liveCheckerCompKey
+	checker := domainProblem.RestoreJudgingFile("Checker.cpp", liveCheckerKey, "cpp20", &compiled, &testNow)
+	return domainProblem.RestoreProblem(
+		testProbID, testSlug, "Test Problem",
+		nil, nil, nil, []string{},
+		"PUBLISHED", "PUBLIC",
+		shared.RestoreUserID(authorID),
+		[]shared.UserID{},
+		[]domainProblem.LanguageOverride{},
+		&key, []domainProblem.JudgingFile{},
+		&checker, nil, nil,
+		testNow, testNow,
+	)
+}
+
+func TestValidateProblem_JudgingUpdate_Passes_DropsTheReplacedTestCases(t *testing.T) {
+	key := stagedTestCasesKey
+	f := newJudgingUpdateFixture(newJudgingUpdateTicket(&key, nil))
+
+	f.run(t)
+
+	if len(f.staged.deletedPrefixes) != 1 || f.staged.deletedPrefixes[0] != liveTestCasesKey {
+		t.Errorf("dropped prefixes: got %v, want only the replaced %s", f.staged.deletedPrefixes, liveTestCasesKey)
+	}
+	if len(f.staged.deletedFiles) != 0 {
+		t.Errorf("a test-cases-only update must leave the checker files alone, got %v", f.staged.deletedFiles)
+	}
+}
+
+func TestValidateProblem_JudgingUpdate_Passes_DropsTheReplacedCheckerAndItsBinary(t *testing.T) {
+	f := newJudgingUpdateFixture(newJudgingUpdateTicket(nil, stagedChecker()))
+	f.problem = newPublishedProblemWithChecker()
+	f.uc.problemRepo = repoWith(f.problem)
+
+	f.run(t)
+
+	want := []string{liveCheckerKey, liveCheckerCompKey}
+	if len(f.staged.deletedFiles) != 2 || f.staged.deletedFiles[0] != want[0] || f.staged.deletedFiles[1] != want[1] {
+		t.Errorf("dropped files: got %v, want %v", f.staged.deletedFiles, want)
+	}
+	if len(f.staged.deletedPrefixes) != 0 {
+		t.Errorf("a checker-only update must leave the test cases alone, got %v", f.staged.deletedPrefixes)
+	}
+}
+
+func TestValidateProblem_JudgingUpdate_DropsTheReplacedFilesOnlyAfterTheSwapIsSaved(t *testing.T) {
+	key := stagedTestCasesKey
+	f := newJudgingUpdateFixture(newJudgingUpdateTicket(&key, nil))
+	savedWhenDropping := -1
+	f.staged.onDelete = func() { savedWhenDropping = len(f.saved) }
+
+	f.run(t)
+
+	if savedWhenDropping != 1 {
+		t.Errorf("problems saved when the old files were dropped: got %d, want 1 — a judging still reading them must find the new ones in the database", savedWhenDropping)
+	}
+}
+
+func TestValidateProblem_JudgingUpdate_DropFails_RetriesAndStillApplies(t *testing.T) {
+	key := stagedTestCasesKey
+	f := newJudgingUpdateFixture(newJudgingUpdateTicket(&key, nil))
+	f.staged.deleteErr = errors.New("storage unavailable")
+
+	f.run(t)
+
+	if f.ticket.Status().String() != "PASSED" {
+		t.Errorf("ticket status: got %v, want PASSED — leftover files must not undo an applied update", f.ticket.Status())
+	}
+	if f.staged.deleteAttempts != maxRetries {
+		t.Errorf("delete attempts: got %d, want %d", f.staged.deleteAttempts, maxRetries)
+	}
+}
+
+func TestValidateProblem_JudgingUpdate_Fails_KeepsTheLiveFiles(t *testing.T) {
+	key := stagedTestCasesKey
+	f := newJudgingUpdateFixture(newJudgingUpdateTicket(&key, stagedChecker()))
+	f.problem = newPublishedProblemWithChecker()
+	f.uc.problemRepo = repoWith(f.problem)
+	f.validator.validateFn = func(context.Context, string) (*SolutionValidationResult, error) {
+		return &SolutionValidationResult{
+			Passed:  false,
+			Failure: &SolutionValidationFailure{Kind: SolutionFailureWrongAnswer, TestCase: "secret/1"},
+		}, nil
+	}
+
+	f.run(t)
+
+	for _, dropped := range append(append([]string{}, f.staged.deletedPrefixes...), f.staged.deletedFiles...) {
+		if dropped == liveTestCasesKey || dropped == liveCheckerKey || dropped == liveCheckerCompKey {
+			t.Errorf("a failed update must keep the live file %q", dropped)
+		}
 	}
 }
 

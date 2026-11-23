@@ -13,7 +13,7 @@ import (
 
 func TestDeleteProblem_Success_Author(t *testing.T) {
 	repo := repoWith(newDraftProblem())
-	uc := NewDeleteProblemUseCase(repo, &mockFileStorage{}, &mockActiveContestChecker{}, &mockContestAssociationRemover{}, &mockTxManager{})
+	uc := NewDeleteProblemUseCase(repo, &mockValidationRepository{}, &mockFileStorage{}, &mockActiveContestChecker{}, &mockContestAssociationRemover{}, &mockTxManager{})
 
 	err := uc.Execute(context.Background(), DeleteProblemInput{
 		Slug:        testSlug,
@@ -27,7 +27,7 @@ func TestDeleteProblem_Success_Author(t *testing.T) {
 
 func TestDeleteProblem_Success_Admin(t *testing.T) {
 	repo := repoWith(newDraftProblem())
-	uc := NewDeleteProblemUseCase(repo, &mockFileStorage{}, &mockActiveContestChecker{}, &mockContestAssociationRemover{}, &mockTxManager{})
+	uc := NewDeleteProblemUseCase(repo, &mockValidationRepository{}, &mockFileStorage{}, &mockActiveContestChecker{}, &mockContestAssociationRemover{}, &mockTxManager{})
 
 	err := uc.Execute(context.Background(), DeleteProblemInput{
 		Slug:        testSlug,
@@ -41,7 +41,7 @@ func TestDeleteProblem_Success_Admin(t *testing.T) {
 
 func TestDeleteProblem_ProblemInActiveContest(t *testing.T) {
 	repo := repoWith(newPublishedProblem())
-	uc := NewDeleteProblemUseCase(repo, &mockFileStorage{}, &mockActiveContestChecker{inActive: true}, &mockContestAssociationRemover{}, &mockTxManager{})
+	uc := NewDeleteProblemUseCase(repo, &mockValidationRepository{}, &mockFileStorage{}, &mockActiveContestChecker{inActive: true}, &mockContestAssociationRemover{}, &mockTxManager{})
 
 	err := uc.Execute(context.Background(), DeleteProblemInput{
 		Slug:        testSlug,
@@ -62,7 +62,7 @@ func TestDeleteProblem_ProblemInActiveContest(t *testing.T) {
 
 func TestDeleteProblem_Forbidden_Stranger(t *testing.T) {
 	repo := repoWith(newDraftProblem())
-	uc := NewDeleteProblemUseCase(repo, &mockFileStorage{}, &mockActiveContestChecker{}, &mockContestAssociationRemover{}, &mockTxManager{})
+	uc := NewDeleteProblemUseCase(repo, &mockValidationRepository{}, &mockFileStorage{}, &mockActiveContestChecker{}, &mockContestAssociationRemover{}, &mockTxManager{})
 
 	err := uc.Execute(context.Background(), DeleteProblemInput{
 		Slug:        testSlug,
@@ -84,7 +84,7 @@ func TestDeleteProblem_Forbidden_Stranger(t *testing.T) {
 
 func TestDeleteProblem_ConfirmSlugMismatch(t *testing.T) {
 	repo := repoWith(newDraftProblem())
-	uc := NewDeleteProblemUseCase(repo, &mockFileStorage{}, &mockActiveContestChecker{}, &mockContestAssociationRemover{}, &mockTxManager{})
+	uc := NewDeleteProblemUseCase(repo, &mockValidationRepository{}, &mockFileStorage{}, &mockActiveContestChecker{}, &mockContestAssociationRemover{}, &mockTxManager{})
 
 	err := uc.Execute(context.Background(), DeleteProblemInput{
 		Slug:        testSlug,
@@ -106,7 +106,7 @@ func TestDeleteProblem_ConfirmSlugMismatch(t *testing.T) {
 
 func TestDeleteProblem_EmptyConfirmSlug(t *testing.T) {
 	repo := repoWith(newDraftProblem())
-	uc := NewDeleteProblemUseCase(repo, &mockFileStorage{}, &mockActiveContestChecker{}, &mockContestAssociationRemover{}, &mockTxManager{})
+	uc := NewDeleteProblemUseCase(repo, &mockValidationRepository{}, &mockFileStorage{}, &mockActiveContestChecker{}, &mockContestAssociationRemover{}, &mockTxManager{})
 
 	err := uc.Execute(context.Background(), DeleteProblemInput{
 		Slug:        testSlug,
@@ -132,7 +132,7 @@ func TestDeleteProblem_NotFound(t *testing.T) {
 			return nil, apperror.NewNotFound(apperror.ErrCodeNotFound, "problem not found")
 		},
 	}
-	uc := NewDeleteProblemUseCase(repo, &mockFileStorage{}, &mockActiveContestChecker{}, &mockContestAssociationRemover{}, &mockTxManager{})
+	uc := NewDeleteProblemUseCase(repo, &mockValidationRepository{}, &mockFileStorage{}, &mockActiveContestChecker{}, &mockContestAssociationRemover{}, &mockTxManager{})
 
 	err := uc.Execute(context.Background(), DeleteProblemInput{
 		Slug:        testSlug,
@@ -155,7 +155,7 @@ func TestDeleteProblem_RemovesContestAssociationsInTransaction(t *testing.T) {
 	}
 	remover := &mockContestAssociationRemover{}
 	tx := &mockTxManager{}
-	uc := NewDeleteProblemUseCase(repo, &mockFileStorage{}, &mockActiveContestChecker{}, remover, tx)
+	uc := NewDeleteProblemUseCase(repo, &mockValidationRepository{}, &mockFileStorage{}, &mockActiveContestChecker{}, remover, tx)
 
 	err := uc.Execute(context.Background(), DeleteProblemInput{
 		Slug:        testSlug,
@@ -184,7 +184,7 @@ func TestDeleteProblem_ContestRemovalFails_ProblemNotDeleted(t *testing.T) {
 		return nil
 	}
 	remover := &mockContestAssociationRemover{err: apperror.NewInternal()}
-	uc := NewDeleteProblemUseCase(repo, &mockFileStorage{}, &mockActiveContestChecker{}, remover, &mockTxManager{})
+	uc := NewDeleteProblemUseCase(repo, &mockValidationRepository{}, &mockFileStorage{}, &mockActiveContestChecker{}, remover, &mockTxManager{})
 
 	err := uc.Execute(context.Background(), DeleteProblemInput{
 		Slug:        testSlug,
@@ -208,7 +208,7 @@ func TestDeleteProblem_RefusedWhenItHasSubmissionsInAContest(t *testing.T) {
 			repo := repoWith(newPublishedProblem())
 			repo.deleteFn = func(context.Context, string) error { deleted = true; return nil }
 			removed := &mockContestAssociationRemover{}
-			uc := NewDeleteProblemUseCase(repo, &mockFileStorage{}, &mockActiveContestChecker{hasContestHistory: true}, removed, &mockTxManager{})
+			uc := NewDeleteProblemUseCase(repo, &mockValidationRepository{}, &mockFileStorage{}, &mockActiveContestChecker{hasContestHistory: true}, removed, &mockTxManager{})
 
 			err := uc.Execute(context.Background(), DeleteProblemInput{Slug: testSlug, ConfirmSlug: testSlug, CurrentUser: user})
 
@@ -228,7 +228,7 @@ func TestDeleteProblem_PublishedCanBeDeletedByTheAuthorAndAdmin(t *testing.T) {
 			deleted := false
 			repo := repoWith(newPublishedProblem())
 			repo.deleteFn = func(context.Context, string) error { deleted = true; return nil }
-			uc := NewDeleteProblemUseCase(repo, &mockFileStorage{}, &mockActiveContestChecker{}, &mockContestAssociationRemover{}, &mockTxManager{})
+			uc := NewDeleteProblemUseCase(repo, &mockValidationRepository{}, &mockFileStorage{}, &mockActiveContestChecker{}, &mockContestAssociationRemover{}, &mockTxManager{})
 
 			err := uc.Execute(context.Background(), DeleteProblemInput{Slug: testSlug, ConfirmSlug: testSlug, CurrentUser: user})
 

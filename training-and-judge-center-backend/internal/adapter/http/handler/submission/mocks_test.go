@@ -187,14 +187,23 @@ func (m *mockUserDisplayProvider) GetUsersByIDs(ctx context.Context, ids []strin
 }
 
 type mockContestDisplayProvider struct {
-	fn func(id string) (*appsubmission.ContestDisplay, error)
+	fn         func(id string) (*appsubmission.ContestDisplay, error)
+	positionFn func(contestID, problemID string) (*int, error)
 }
 
 func (m *mockContestDisplayProvider) GetContestByID(_ context.Context, id string) (*appsubmission.ContestDisplay, error) {
 	if m.fn != nil {
 		return m.fn(id)
 	}
-	return &appsubmission.ContestDisplay{ID: id, Name: "Test Contest"}, nil
+	return &appsubmission.ContestDisplay{ID: id, Name: "Test Contest", GroupID: "group-1"}, nil
+}
+
+func (m *mockContestDisplayProvider) GetProblemPosition(_ context.Context, contestID, problemID string) (*int, error) {
+	if m.positionFn != nil {
+		return m.positionFn(contestID, problemID)
+	}
+	position := 1
+	return &position, nil
 }
 
 func (m *mockContestDisplayProvider) GetContestsByIDs(ctx context.Context, ids []string) (map[string]*appsubmission.ContestDisplay, error) {
@@ -221,7 +230,15 @@ func (m *mockTeamChecker) IsTeammate(_ context.Context, contestID, viewerID, aut
 }
 
 type mockLeadChecker struct {
-	fn func(contestID, userID string) (bool, error)
+	fn       func(contestID, userID string) (bool, error)
+	memberFn func(leadID, memberID string) (bool, error)
+}
+
+func (m *mockLeadChecker) IsLeadOfMember(_ context.Context, leadID, memberID string) (bool, error) {
+	if m.memberFn != nil {
+		return m.memberFn(leadID, memberID)
+	}
+	return false, nil
 }
 
 func (m *mockLeadChecker) IsLeadOfContestGroup(_ context.Context, contestID, userID string) (bool, error) {
@@ -271,7 +288,7 @@ func newHandlerWithSubmitContest(
 	repo domainsubmission.Repository,
 ) *Handler {
 	uc := appsubmission.NewSubmitContestSolutionUseCase(
-		contestProvider, standingResolver, problemProvider, repo,
+		contestProvider, standingResolver, &mockGroupMembershipChecker{}, problemProvider, repo,
 		&mockStorage{}, &mockQueue{}, 1<<20, 1,
 	)
 	return NewHandler(nil, uc, nil, nil, nil, nil, nil)
@@ -394,4 +411,10 @@ func (noopSessionInvalidator) InvalidateSession(context.Context, string, time.Ti
 }
 func (noopSessionInvalidator) IsSessionInvalidated(context.Context, string) (bool, error) {
 	return false, nil
+}
+
+type mockGroupMembershipChecker struct{}
+
+func (m *mockGroupMembershipChecker) IsGroupMember(_ context.Context, _, _ string) (bool, error) {
+	return true, nil
 }

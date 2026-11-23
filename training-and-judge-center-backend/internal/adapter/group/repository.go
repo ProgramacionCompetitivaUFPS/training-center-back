@@ -19,6 +19,8 @@ import (
 	"github.com/training-judge-center/backend/pkg/apperror"
 )
 
+const msgGroupNotFound = "group not found"
+
 type Repository struct {
 	db *pgxpool.Pool
 }
@@ -68,7 +70,7 @@ func (r *Repository) FindByID(ctx context.Context, id string) (*domainGroup.Grou
 	g, err := scanGroup(row)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			return nil, apperror.NewNotFound(domainGroup.ErrCodeGroupNotFound, "group not found")
+			return nil, apperror.NewNotFound(domainGroup.ErrCodeGroupNotFound, msgGroupNotFound)
 		}
 		slog.ErrorContext(ctx, "FindByID failed", "error", err, "group_id", id)
 		return nil, apperror.NewInternal()
@@ -100,7 +102,7 @@ func (r *Repository) FindDefault(ctx context.Context) (*domainGroup.Group, error
 	g, err := scanGroup(row)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			return nil, apperror.NewNotFound(domainGroup.ErrCodeGroupNotFound, "group not found")
+			return nil, apperror.NewNotFound(domainGroup.ErrCodeGroupNotFound, msgGroupNotFound)
 		}
 		slog.ErrorContext(ctx, "FindDefault failed", "error", err)
 		return nil, apperror.NewInternal()
@@ -140,7 +142,7 @@ func (r *Repository) Delete(ctx context.Context, id string) error {
 		return apperror.NewInternal()
 	}
 	if tag.RowsAffected() == 0 {
-		return apperror.NewNotFound(domainGroup.ErrCodeGroupNotFound, "group not found")
+		return apperror.NewNotFound(domainGroup.ErrCodeGroupNotFound, msgGroupNotFound)
 	}
 	return nil
 }

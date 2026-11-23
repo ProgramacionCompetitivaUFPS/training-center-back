@@ -7,6 +7,8 @@ import (
 	"github.com/training-judge-center/backend/pkg/apperror"
 )
 
+const msgInvitationAlreadyProcessed = "this invitation has already been processed"
+
 // InvitationExpiryDuration is the fixed TTL for a group invitation, evaluated
 // lazily (no background job) — see GroupInvitation.IsExpired.
 const InvitationExpiryDuration = 72 * time.Hour
@@ -69,7 +71,7 @@ func (i *GroupInvitation) IsExpired(now time.Time) bool { return now.After(i.exp
 
 func (i *GroupInvitation) Accept() error {
 	if !i.IsPending() {
-		return apperror.NewBadRequest(ErrCodeInvitationAlreadyProcessed, "this invitation has already been processed")
+		return apperror.NewBadRequest(ErrCodeInvitationAlreadyProcessed, msgInvitationAlreadyProcessed)
 	}
 	i.status = InvitationStatusAccepted
 	return nil
@@ -77,7 +79,7 @@ func (i *GroupInvitation) Accept() error {
 
 func (i *GroupInvitation) Revoke() error {
 	if !i.IsPending() {
-		return apperror.NewBadRequest(ErrCodeInvitationAlreadyProcessed, "this invitation has already been processed")
+		return apperror.NewBadRequest(ErrCodeInvitationAlreadyProcessed, msgInvitationAlreadyProcessed)
 	}
 	i.status = InvitationStatusRevoked
 	return nil
@@ -85,7 +87,7 @@ func (i *GroupInvitation) Revoke() error {
 
 func (i *GroupInvitation) Expire() error {
 	if !i.IsPending() {
-		return apperror.NewBadRequest(ErrCodeInvitationAlreadyProcessed, "this invitation has already been processed")
+		return apperror.NewBadRequest(ErrCodeInvitationAlreadyProcessed, msgInvitationAlreadyProcessed)
 	}
 	i.status = InvitationStatusExpired
 	return nil

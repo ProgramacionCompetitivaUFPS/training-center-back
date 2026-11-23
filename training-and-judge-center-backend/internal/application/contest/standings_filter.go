@@ -15,8 +15,16 @@ import (
 // if ANY member (per cached.TeamMembers) matches the combined filter, since a
 // team has no single country/city/institution of its own.
 func FilterStandingsByProfile(cached *CachedStandings, country, city, institution string) []domainContest.ParticipantStanding {
+	return filterByProfile(cached.Participants, cached, country, city, institution)
+}
+
+func FilterPostcompetitionByProfile(cached *CachedStandings, country, city, institution string) []domainContest.ParticipantStanding {
+	return filterByProfile(cached.PostParticipants, cached, country, city, institution)
+}
+
+func filterByProfile(participants []domainContest.ParticipantStanding, cached *CachedStandings, country, city, institution string) []domainContest.ParticipantStanding {
 	if country == "" && city == "" && institution == "" {
-		return cached.Participants
+		return participants
 	}
 
 	matches := func(p *ParticipantProfile) bool {
@@ -35,8 +43,8 @@ func FilterStandingsByProfile(cached *CachedStandings, country, city, institutio
 		return true
 	}
 
-	filtered := make([]domainContest.ParticipantStanding, 0, len(cached.Participants))
-	for _, p := range cached.Participants {
+	filtered := make([]domainContest.ParticipantStanding, 0, len(participants))
+	for _, p := range participants {
 		if p.ParticipantType == "TEAM" {
 			for _, memberID := range cached.TeamMembers[p.ContestantID] {
 				if matches(cached.Profiles[memberID]) {

@@ -54,6 +54,10 @@ func (uc *DeleteContestUseCase) Execute(ctx context.Context, in DeleteContestInp
 		}
 	}
 
+	if contest.Locked() {
+		return apperror.NewForbidden(domainContest.ErrCodeContestLocked, "contest is locked and cannot be deleted; unlock it first")
+	}
+
 	if contest.Status(in.Now) == domainContest.StatusActive {
 		return apperror.NewConflict(domainContest.ErrCodeContestIsActive, "cannot delete an active contest")
 	}

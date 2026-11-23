@@ -9,6 +9,8 @@ import (
 	"github.com/training-judge-center/backend/pkg/apperror"
 )
 
+const msgInvalidCredentials = "Invalid email or password"
+
 type LoginInput struct {
 	Email           string
 	Password        string
@@ -56,7 +58,7 @@ func (uc *LoginUseCase) Execute(ctx context.Context, input LoginInput) (*LoginOu
 
 	email, err := user.NewEmail(input.Email)
 	if err != nil {
-		return nil, apperror.NewUnauthorized(ErrCodeInvalidCredentials, "Invalid email or password")
+		return nil, apperror.NewUnauthorized(ErrCodeInvalidCredentials, msgInvalidCredentials)
 	}
 
 	foundUser, err := uc.repo.FindByEmail(ctx, email)
@@ -64,7 +66,7 @@ func (uc *LoginUseCase) Execute(ctx context.Context, input LoginInput) (*LoginOu
 		return nil, err
 	}
 	if foundUser == nil {
-		return nil, apperror.NewUnauthorized(ErrCodeInvalidCredentials, "Invalid email or password")
+		return nil, apperror.NewUnauthorized(ErrCodeInvalidCredentials, msgInvalidCredentials)
 	}
 
 	if foundUser.Status() != user.StatusActive {
@@ -72,7 +74,7 @@ func (uc *LoginUseCase) Execute(ctx context.Context, input LoginInput) (*LoginOu
 	}
 
 	if !foundUser.Password().Compare(input.Password) {
-		return nil, apperror.NewUnauthorized(ErrCodeInvalidCredentials, "Invalid email or password")
+		return nil, apperror.NewUnauthorized(ErrCodeInvalidCredentials, msgInvalidCredentials)
 	}
 
 	session, err := issueSession(ctx, foundUser, input.RememberSession, input.UserAgent, input.IPAddress,

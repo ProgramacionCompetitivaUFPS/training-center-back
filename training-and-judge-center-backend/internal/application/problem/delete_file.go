@@ -60,8 +60,7 @@ func (usecase *DeleteProblemFileUseCase) Execute(ctx context.Context, input Dele
 		return err
 	}
 
-	var storageKeyToDelete string
-	var deleteByPrefix bool
+	before := foundProblem.StorageKeys()
 
 	now := time.Now()
 	fileType := strings.ToLower(input.FileType)
@@ -73,8 +72,6 @@ func (usecase *DeleteProblemFileUseCase) Execute(ctx context.Context, input Dele
 		if foundProblem.TestCasesKey() == nil {
 			return apperror.NewNotFound(ErrCodeProblemFileNotFound, "This problem has no test cases to delete")
 		}
-		storageKeyToDelete = *foundProblem.TestCasesKey()
-		deleteByPrefix = true
 		foundProblem.RemoveTestCases(now)
 
 	case FileTypeSolution:
@@ -84,7 +81,6 @@ func (usecase *DeleteProblemFileUseCase) Execute(ctx context.Context, input Dele
 		found := false
 		for _, solution := range foundProblem.Solutions() {
 			if solution.Filename() == input.FileName {
-				storageKeyToDelete = solution.FileKey()
 				if err := foundProblem.RemoveSolution(solution.Filename(), now); err != nil {
 					return err
 				}
@@ -103,7 +99,6 @@ func (usecase *DeleteProblemFileUseCase) Execute(ctx context.Context, input Dele
 		if foundProblem.Checker() == nil {
 			return apperror.NewNotFound(ErrCodeProblemFileNotFound, "This problem has no checker to delete")
 		}
-		storageKeyToDelete = foundProblem.Checker().FileKey()
 		foundProblem.RemoveChecker(now)
 
 	case FileTypeValidator:
@@ -113,7 +108,6 @@ func (usecase *DeleteProblemFileUseCase) Execute(ctx context.Context, input Dele
 		if foundProblem.Validator() == nil {
 			return apperror.NewNotFound(ErrCodeProblemFileNotFound, "This problem has no validator to delete")
 		}
-		storageKeyToDelete = foundProblem.Validator().FileKey()
 		foundProblem.RemoveValidator(now)
 
 	default:
@@ -121,18 +115,14 @@ func (usecase *DeleteProblemFileUseCase) Execute(ctx context.Context, input Dele
 		return apperror.NewBadRequest(ErrCodeProblemInvalidFileType, "Invalid file type. Allowed: testCases, solution, checker, validator")
 	}
 
-	if deleteByPrefix {
-		if err := usecase.fileStorage.DeleteFilesWithPrefix(ctx, storageKeyToDelete); err != nil {
-			return err
-		}
-	} else {
-		if err := usecase.fileStorage.DeleteFile(ctx, storageKeyToDelete); err != nil {
-			return err
-		}
-	}
-
 	if err := usecase.repo.Save(ctx, foundProblem); err != nil {
 		return err
+	}
+
+	gone := before.NoLongerIn(foundProblem.StorageKeys())
+	if failed := dropStorageKeys(ctx, usecase.fileStorage, gone); len(failed) > 0 {
+		slog.ErrorContext(ctx, "problem file removed from the problem but its storage cleanup failed", "slug", foundProblem.Slug().String(), "keys", failed)
+		return apperror.NewInternal()
 	}
 
 	return nil

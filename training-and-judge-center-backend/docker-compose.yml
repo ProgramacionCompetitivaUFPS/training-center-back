@@ -121,6 +121,8 @@ services:
     # container labelled com.trainingcenter.role=judge-sandbox. Do not run two workers
     # against the same daemon.
     entrypoint: ["/bin/worker"]
+    # the host's docker.sock belongs to root
+    user: root
     # the worker exits when the broker drops; Kubernetes restarts it, Compose needs this
     restart: unless-stopped
     environment:
@@ -136,6 +138,7 @@ services:
       POD_MEMORY_LIMIT: ${POD_MEMORY_LIMIT:-25769803776}
       POD_CPU_LIMIT: ${POD_CPU_LIMIT:-6000}
       JUDGE_CONFIG: /config/judge_config.yaml
+      VIRTUAL_OBJECT_CONFIG: /config/virtual_object.json
       # A volume name and not a path: here the daemon is the host's, so it
       # would resolve a path on the host and mount an empty directory.
       JUDGE_VOLUME_SOURCE: judging

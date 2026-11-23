@@ -1,8 +1,11 @@
 package problem
 
 import (
+	"bytes"
 	"context"
+	"errors"
 	"fmt"
+	"io"
 	"io/fs"
 	"log/slog"
 	"os"
@@ -29,6 +32,10 @@ func (r *LocalFileRepository) resolvePath(path string) string {
 }
 
 func (r *LocalFileRepository) UploadFile(ctx context.Context, path string, content []byte) error {
+	return r.UploadFileStream(ctx, path, bytes.NewReader(content))
+}
+
+func (r *LocalFileRepository) UploadFileStream(ctx context.Context, path string, content io.Reader) error {
 	fullPath := r.resolvePath(path)
 
 	dir := filepath.Dir(fullPath)
@@ -37,8 +44,15 @@ func (r *LocalFileRepository) UploadFile(ctx context.Context, path string, conte
 		return apperror.NewInternal()
 	}
 
-	if err := os.WriteFile(fullPath, content, 0644); err != nil {
+	f, err := os.OpenFile(fullPath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0644)
+	if err != nil {
 		slog.ErrorContext(ctx, "local: failed to write file", "path", fullPath, "error", err)
+		return apperror.NewInternal()
+	}
+	_, copyErr := io.Copy(f, content)
+	closeErr := f.Close()
+	if copyErr != nil || closeErr != nil {
+		slog.ErrorContext(ctx, "local: failed to write file", "path", fullPath, "error", errors.Join(copyErr, closeErr))
 		return apperror.NewInternal()
 	}
 

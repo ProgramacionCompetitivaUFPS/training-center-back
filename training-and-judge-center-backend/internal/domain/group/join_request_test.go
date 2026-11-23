@@ -2,6 +2,7 @@ package group_test
 
 import (
 	"testing"
+	"time"
 
 	"github.com/training-judge-center/backend/internal/domain/group"
 	"github.com/training-judge-center/backend/internal/domain/shared"
@@ -121,3 +122,35 @@ func TestReject_ApprovedReturnsError(t *testing.T) {
 	}
 }
 
+func TestNewJoinRequest_StoresTheFieldsAndTheInstantInUTC(t *testing.T) {
+	message := "please let me in"
+
+	req, err := group.NewJoinRequest("req-1", "g-1", shared.RestoreUserID("user-1"), &message, localNow)
+
+	if err != nil {
+		t.Fatalf("NewJoinRequest: %v", err)
+	}
+	if req.ID() != "req-1" || req.GroupID() != "g-1" || req.RequesterUserID().Value() != "user-1" {
+		t.Errorf("fields = %s/%s/%s, want req-1/g-1/user-1", req.ID(), req.GroupID(), req.RequesterUserID().Value())
+	}
+	if req.Message() == nil || *req.Message() != "please let me in" {
+		t.Errorf("Message() = %v, want the stored message", req.Message())
+	}
+	assertInUTC(t, "CreatedAt", req.CreatedAt(), time.Date(2024, 1, 15, 12, 0, 0, 0, time.UTC))
+}
+
+func TestRestoreJoinRequest_KeepsTheStoredValues(t *testing.T) {
+	message := "stored"
+
+	req := group.RestoreJoinRequest("req-1", "g-1", shared.RestoreUserID("user-1"), &message, group.JoinRequestStatusRejected, testNow)
+
+	if req.ID() != "req-1" || req.GroupID() != "g-1" || req.RequesterUserID().Value() != "user-1" || req.Status() != group.JoinRequestStatusRejected || !req.CreatedAt().Equal(testNow) {
+		t.Errorf("restored request = %s/%s/%s/%s/%v", req.ID(), req.GroupID(), req.RequesterUserID().Value(), req.Status(), req.CreatedAt())
+	}
+	if req.Message() == nil || *req.Message() != "stored" {
+		t.Errorf("Message() = %v, want stored", req.Message())
+	}
+	if req.IsPending() {
+		t.Error("IsPending() = true for a rejected request")
+	}
+}

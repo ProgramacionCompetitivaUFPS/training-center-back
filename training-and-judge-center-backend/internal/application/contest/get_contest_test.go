@@ -195,12 +195,14 @@ func TestGetContest_NonMemberSeesProblemsOnceStarted(t *testing.T) {
 		time.Now().Add(-2*time.Hour),
 		time.Now().Add(-time.Hour),
 		domainContest.RestorePenalty(20),
-		0, false, false, false,
+		0, false, false, false, false,
+		nil,
+		nil,
 		shared.RestoreGroupID(testGroupID),
 		shared.RestoreUserID(otherID),
 		domainContest.RestoreParticipationMode("INDIVIDUAL"), domainContest.RestoreTeamSize(2, 5),
 		[]domainContest.ContestProblem{
-			domainContest.RestoreContestProblem("cp-1", testProblemID, 1),
+			domainContest.RestoreContestProblem("cp-1", testProblemID, 1, nil),
 		},
 		testNow.Add(-time.Hour),
 		nil,
@@ -215,6 +217,25 @@ func TestGetContest_NonMemberSeesProblemsOnceStarted(t *testing.T) {
 	if len(out.Problems) != 1 {
 		t.Errorf("non-member of a visible group should see problems once started, got %d", len(out.Problems))
 	}
+}
+
+func TestGetContest_ProblemsCarryTheirColor(t *testing.T) {
+	c := contestHolding(
+		problemWithColor("cp-a", colorProblemA, 1, "#aabbcc"),
+		domainContest.RestoreContestProblem("cp-b", colorProblemB, 2, nil),
+	)
+	uc := newGetContestUseCase(repoWith(c), groupFound(), isLead(), defaultProblemProvider(), mockParticipants())
+
+	out, err := uc.Execute(context.Background(), validGetInput())
+
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(out.Problems) != 2 {
+		t.Fatalf("expected 2 problems, got %d", len(out.Problems))
+	}
+	assertColor(t, "problem a", out.Problems[0].Color, "#aabbcc")
+	assertNoColor(t, "problem b", out.Problems[1].Color)
 }
 
 func TestGetContest_DurationInSeconds(t *testing.T) {
@@ -265,12 +286,14 @@ func newTestContestWithProblems(ownerID string) *domainContest.Contest {
 		0,
 		false,
 		false,
-		false,
+		false, false,
+		nil,
+		nil,
 		shared.RestoreGroupID(testGroupID),
 		shared.RestoreUserID(ownerID),
 		domainContest.RestoreParticipationMode("INDIVIDUAL"), domainContest.RestoreTeamSize(2, 5),
 		[]domainContest.ContestProblem{
-			domainContest.RestoreContestProblem("cp-1", testProblemID, 1),
+			domainContest.RestoreContestProblem("cp-1", testProblemID, 1, nil),
 		},
 		testNow.Add(-time.Hour),
 		nil,

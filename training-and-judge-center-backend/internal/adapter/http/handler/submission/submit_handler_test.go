@@ -1,6 +1,7 @@
 package submission
 
 import (
+	"bytes"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -241,5 +242,16 @@ func TestSubmit_PrivateProblemModifierCanSubmit(t *testing.T) {
 	wrapWithAuth(http.HandlerFunc(h.Submit), &domainuser.TokenClaims{UserID: testAuthorID, Role: domainshared.RoleContestant}).ServeHTTP(w, r)
 	if w.Code != http.StatusCreated {
 		t.Fatalf("expected 201, got %d\nbody: %s", w.Code, w.Body.String())
+	}
+}
+
+func TestSubmit_BodyOverTheCap_Returns413(t *testing.T) {
+	h := newHandlerWithSubmit(&mockProblemProvider{}, &mockSubmissionRepo{})
+	w := httptest.NewRecorder()
+	r := multipartRequest("/problems/p/two-sum/submissions", "two-sum",
+		"cpp20", "g++", "solution.cpp", bytes.Repeat([]byte("a"), maxSubmissionBodyBytes+1))
+	wrapWithAuth(http.HandlerFunc(h.Submit), &domainuser.TokenClaims{UserID: testAuthorID, Role: domainshared.RoleContestant}).ServeHTTP(w, r)
+	if w.Code != http.StatusRequestEntityTooLarge {
+		t.Fatalf("expected 413, got %d\nbody: %s", w.Code, w.Body.String())
 	}
 }

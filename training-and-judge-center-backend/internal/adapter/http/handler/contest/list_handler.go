@@ -99,6 +99,7 @@ func toListContestsResponse(out *appContest.ListContestsOutput) listContestsResp
 			ParticipantCount:  item.ParticipantCount,
 			IsRegistered:      item.IsRegistered,
 			ProblemCount:      item.ProblemCount,
+			UserGroupRole:     item.UserGroupRole,
 		}
 	}
 	return listContestsResponse{

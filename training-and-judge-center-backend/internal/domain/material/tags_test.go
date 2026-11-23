@@ -73,3 +73,23 @@ func TestNewTags_Deduplication(t *testing.T) {
 		t.Errorf("expected 2 tags after dedup, got %d: %v", len(values), values)
 	}
 }
+
+func TestRestoreTags_NilBecomesAnEmptyNonNilList(t *testing.T) {
+	tags := material.RestoreTags(nil)
+
+	if tags.Values() == nil || len(tags.Values()) != 0 {
+		t.Errorf("Values() = %#v, want an empty non-nil slice", tags.Values())
+	}
+}
+
+func TestRestoreTags_AndValues_AreIsolatedFromTheCaller(t *testing.T) {
+	input := []string{"graphs", "dp"}
+	tags := material.RestoreTags(input)
+
+	input[0] = "tampered-input"
+	tags.Values()[1] = "tampered-output"
+
+	if got := tags.Values(); got[0] != "graphs" || got[1] != "dp" {
+		t.Errorf("Values() = %v, want [graphs dp]: the caller's slices must not alias the stored one", got)
+	}
+}

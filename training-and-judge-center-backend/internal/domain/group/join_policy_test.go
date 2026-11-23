@@ -36,3 +36,12 @@ func TestNewJoinPolicy(t *testing.T) {
 		})
 	}
 }
+
+func TestJoinPolicy_StringAndRestore(t *testing.T) {
+	if group.JoinPolicyRequest.String() != "REQUEST" {
+		t.Errorf("String() = %q, want REQUEST", group.JoinPolicyRequest.String())
+	}
+	if got := group.RestoreJoinPolicy("LEGACY").String(); got != "LEGACY" {
+		t.Errorf("RestoreJoinPolicy().String() = %q, want LEGACY: no validation on restore", got)
+	}
+}

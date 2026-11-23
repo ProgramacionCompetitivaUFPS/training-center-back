@@ -1,12 +1,10 @@
-path: "training-and-judge-center-backend"
 reviews:
   auto_review:
     enabled: true
+    drafts: false
+    base_branches:
+      - ^main$
+      - ^develop$
   tools:
     golangci-lint:
       enabled: true
-      config:
-        linters:
-          disable:
-            - revive
-            - godot

@@ -2,6 +2,7 @@ package material_test
 
 import (
 	"errors"
+	"reflect"
 	"testing"
 	"time"
 
@@ -262,5 +263,88 @@ func TestCanModifyPinStateBy(t *testing.T) {
 	}
 	if m.CanModifyPinStateBy(shared.RestoreUserID("other"), false, false) {
 		t.Error("regular member should not be able to pin")
+	}
+}
+
+func assertInternalError(t *testing.T, label string, err error) {
+	t.Helper()
+	var appErr *apperror.AppError
+	if !errors.As(err, &appErr) || appErr.Kind != apperror.KindInternal {
+		t.Errorf("%s: expected an internal apperror, got %v", label, err)
+	}
+}
+
+func TestNewMaterial_StartsAsAnUnpinnedDraftWithTheGivenFields(t *testing.T) {
+	localNow := time.Date(2024, 1, 15, 14, 0, 0, 0, time.FixedZone("UTC+2", 2*3600))
+	tags, err := material.NewTags([]string{"graphs"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	content, err := material.NewContent("body")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	m, err := material.NewMaterial("id-1", "group-1", shared.RestoreUserID("author-1"), material.RestoreTitle("Intro"), content, tags, localNow)
+
+	if err != nil {
+		t.Fatalf("NewMaterial: %v", err)
+	}
+	if m.ID() != "id-1" || m.GroupID() != "group-1" || m.AuthorID().Value() != "author-1" {
+		t.Errorf("ids = %s/%s/%s, want id-1/group-1/author-1", m.ID(), m.GroupID(), m.AuthorID().Value())
+	}
+	if m.Title().String() != "Intro" || m.Content().String() != "body" || len(m.Tags().Values()) != 1 {
+		t.Errorf("title/content/tags = %s/%s/%v", m.Title(), m.Content(), m.Tags().Values())
+	}
+	if !m.Status().IsDraft() || m.Pinned() || m.PinnedAt() != nil || m.PublishedAt() != nil {
+		t.Errorf("state = draft %v, pinned %v, pinnedAt %v, publishedAt %v, want an unpinned never-published draft", m.Status().IsDraft(), m.Pinned(), m.PinnedAt(), m.PublishedAt())
+	}
+	want := time.Date(2024, 1, 15, 12, 0, 0, 0, time.UTC)
+	if !m.CreatedAt().Equal(want) || m.CreatedAt().Location() != time.UTC || !m.UpdatedAt().Equal(want) || m.UpdatedAt().Location() != time.UTC {
+		t.Errorf("createdAt/updatedAt = %v/%v, want %v in UTC", m.CreatedAt(), m.UpdatedAt(), want)
+	}
+}
+
+func TestNewMaterial_MissingIdentifiers_IsAnInternalError(t *testing.T) {
+	tests := []struct {
+		name      string
+		id, group string
+		author    shared.UserID
+	}{
+		{"an empty id", "", "group-1", shared.RestoreUserID("author-1")},
+		{"an empty group id", "id-1", "", shared.RestoreUserID("author-1")},
+		{"an empty author", "id-1", "group-1", shared.RestoreUserID("")},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			m, err := material.NewMaterial(tt.id, tt.group, tt.author, material.RestoreTitle("Intro"), material.NewEmptyContent(), material.RestoreTags(nil), testNow)
+
+			assertInternalError(t, tt.name, err)
+			if m != nil {
+				t.Errorf("expected no material, got %+v", m)
+			}
+		})
+	}
+}
+
+func TestRestoreMaterial_KeepsEveryStoredValue(t *testing.T) {
+	pinnedAt := testNow.Add(time.Hour)
+	publishedAt := testNow.Add(30 * time.Minute)
+
+	m := material.RestoreMaterial(
+		"id-1", "group-1", shared.RestoreUserID("author-1"),
+		"Intro", "body", []string{"graphs", "dp"}, "PUBLISHED",
+		true, &pinnedAt, testNow, testNow.Add(2*time.Hour), &publishedAt,
+	)
+
+	if m.ID() != "id-1" || m.GroupID() != "group-1" || m.AuthorID().Value() != "author-1" || m.Title().String() != "Intro" || m.Content().String() != "body" {
+		t.Errorf("restored identity = %s/%s/%s/%s/%s", m.ID(), m.GroupID(), m.AuthorID().Value(), m.Title(), m.Content())
+	}
+	if !m.Status().IsPublished() || !m.Pinned() || m.PinnedAt() == nil || !m.PinnedAt().Equal(pinnedAt) || m.PublishedAt() == nil || !m.PublishedAt().Equal(publishedAt) {
+		t.Errorf("restored state = published %v, pinned %v, pinnedAt %v, publishedAt %v", m.Status().IsPublished(), m.Pinned(), m.PinnedAt(), m.PublishedAt())
+	}
+	if !reflect.DeepEqual(m.Tags().Values(), []string{"graphs", "dp"}) || !m.CreatedAt().Equal(testNow) || !m.UpdatedAt().Equal(testNow.Add(2*time.Hour)) {
+		t.Errorf("restored tags/createdAt/updatedAt = %v/%v/%v", m.Tags().Values(), m.CreatedAt(), m.UpdatedAt())
 	}
 }

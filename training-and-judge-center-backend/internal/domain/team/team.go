@@ -39,3 +39,7 @@ func (t *Team) ID() string               { return t.id }
 func (t *Team) Name() TeamName           { return t.name }
 func (t *Team) CreatedBy() shared.UserID { return t.createdBy }
 func (t *Team) CreatedAt() time.Time     { return t.createdAt }
+
+// Rename changes the team's name. Uniqueness is not checked here: the repository enforces it
+// when the new name is saved.
+func (t *Team) Rename(name TeamName) { t.name = name }

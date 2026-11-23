@@ -49,3 +49,28 @@ func TestNewRequestStatus_Invalid(t *testing.T) {
 		})
 	}
 }
+
+func TestRequestStatus_String(t *testing.T) {
+	tests := []struct {
+		status user.RequestStatus
+		want   string
+	}{
+		{user.RequestStatusPending, "PENDING"},
+		{user.RequestStatusUsed, "USED"},
+		{user.RequestStatusExpired, "EXPIRED"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.want, func(t *testing.T) {
+			if got := tt.status.String(); got != tt.want {
+				t.Errorf("String() = %q, want %q", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestRestoreRequestStatus_KeepsValueWithoutValidating(t *testing.T) {
+	if got := user.RestoreRequestStatus("LEGACY").String(); got != "LEGACY" {
+		t.Errorf("String() = %q, want LEGACY", got)
+	}
+}

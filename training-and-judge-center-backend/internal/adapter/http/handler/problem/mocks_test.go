@@ -3,6 +3,7 @@ package problem
 import (
 	"bytes"
 	"context"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"time"
@@ -83,7 +84,10 @@ type mockFileStorageH struct {
 	downloadFileFn func(ctx context.Context, path string) ([]byte, error)
 }
 
-func (m *mockFileStorageH) UploadFile(_ context.Context, _ string, _ []byte) error  { return nil }
+func (m *mockFileStorageH) UploadFile(_ context.Context, _ string, _ []byte) error { return nil }
+func (m *mockFileStorageH) UploadFileStream(_ context.Context, _ string, _ io.Reader) error {
+	return nil
+}
 func (m *mockFileStorageH) DeleteFile(_ context.Context, _ string) error            { return nil }
 func (m *mockFileStorageH) DeleteFilesWithPrefix(_ context.Context, _ string) error { return nil }
 func (m *mockFileStorageH) ListFiles(ctx context.Context, prefix string) ([]string, error) {
@@ -254,7 +258,7 @@ func newHandlerWithUnpublish(repo domainProblem.Repository, checker appProblem.A
 }
 
 func newHandlerWithDeleteProblem(repo domainProblem.Repository, checker appProblem.ActiveContestChecker) *Handler {
-	return &Handler{deleteProblem: appProblem.NewDeleteProblemUseCase(repo, &mockFileStorageH{}, checker, &mockContestAssociationRemoverH{}, &mockTxManagerH{})}
+	return &Handler{deleteProblem: appProblem.NewDeleteProblemUseCase(repo, &mockValidationRepositoryH{}, &mockFileStorageH{}, checker, &mockContestAssociationRemoverH{}, &mockTxManagerH{})}
 }
 
 func newHandlerWithChangeAccessibility(repo domainProblem.Repository) *Handler {
@@ -454,6 +458,21 @@ func newTestSettings() domainProblem.PlatformSettings {
 // The rejections these tests exercise happen before any use case runs.
 func newHandlerWithImport() *Handler {
 	return &Handler{settings: newTestSettings()}
+}
+
+func newHandlerWithImportCap(capMB int) *Handler {
+	s, err := domainProblem.NewPlatformSettings(
+		10000, 512,
+		map[string]domainProblem.LanguageLimit{},
+		map[string]struct{}{"cpp": {}},
+		map[string]string{".cpp": "cpp"},
+		map[string]struct{}{"dp": {}},
+		4, 10, capMB, 100, capMB,
+	)
+	if err != nil {
+		panic(err)
+	}
+	return &Handler{settings: s}
 }
 
 func newHandlerWithUploadFiles() *Handler {

@@ -5,18 +5,19 @@ import (
 )
 
 type Handler struct {
-	createContest             *appContest.CreateContestUseCase
-	updateContest             *appContest.UpdateContestUseCase
-	deleteContest             *appContest.DeleteContestUseCase
-	getContest                *appContest.GetContestUseCase
-	listContests              *appContest.ListContestsUseCase
-	listMyContests            *appContest.ListMyContestsUseCase
-	registerToContest         *appContest.RegisterToContestUseCase
-	unregisterFromContest     *appContest.UnregisterFromContestUseCase
-	getRegistrationStatus     *appContest.GetRegistrationStatusUseCase
-	listContestRegistrations  *appContest.ListContestRegistrationsUseCase
-	getStandings              *appContest.GetStandingsUseCase
-	listContestSubmissions    *appContest.ListContestSubmissionsUseCase
+	createContest            *appContest.CreateContestUseCase
+	updateContest            *appContest.UpdateContestUseCase
+	deleteContest            *appContest.DeleteContestUseCase
+	getContest               *appContest.GetContestUseCase
+	listContests             *appContest.ListContestsUseCase
+	listMyContests           *appContest.ListMyContestsUseCase
+	registerToContest        *appContest.RegisterToContestUseCase
+	unregisterFromContest    *appContest.UnregisterFromContestUseCase
+	getRegistrationStatus    *appContest.GetRegistrationStatusUseCase
+	listContestRegistrations *appContest.ListContestRegistrationsUseCase
+	getStandings             *appContest.GetStandingsUseCase
+	listContestSubmissions   *appContest.ListContestSubmissionsUseCase
+	revealContestResults     *appContest.RevealContestResultsUseCase
 }
 
 func NewHandler(
@@ -32,6 +33,7 @@ func NewHandler(
 	listContestRegistrations *appContest.ListContestRegistrationsUseCase,
 	getStandings *appContest.GetStandingsUseCase,
 	listContestSubmissions *appContest.ListContestSubmissionsUseCase,
+	revealContestResults *appContest.RevealContestResultsUseCase,
 ) *Handler {
 	return &Handler{
 		createContest:            createContest,
@@ -46,5 +48,6 @@ func NewHandler(
 		listContestRegistrations: listContestRegistrations,
 		getStandings:             getStandings,
 		listContestSubmissions:   listContestSubmissions,
+		revealContestResults:     revealContestResults,
 	}
 }

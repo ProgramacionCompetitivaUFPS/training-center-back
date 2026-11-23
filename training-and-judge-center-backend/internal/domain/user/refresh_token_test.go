@@ -320,3 +320,11 @@ func TestRestoreRefreshToken_NilMetadata(t *testing.T) {
 		t.Errorf("expected nil metadata to remain nil")
 	}
 }
+
+func TestRestoreRefreshToken_ExposesTheTokenHash(t *testing.T) {
+	token := user.RestoreRefreshToken("id", "user-id", "family-id", "stored-hash", testNow, testNow.Add(time.Hour), nil, nil, nil, nil)
+
+	if token.TokenHash() != "stored-hash" {
+		t.Errorf("TokenHash() = %q, want stored-hash", token.TokenHash())
+	}
+}

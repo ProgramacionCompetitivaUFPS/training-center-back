@@ -1,12 +1,14 @@
 package contest
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 
 	appcontest "github.com/training-judge-center/backend/internal/application/contest"
+	domainContest "github.com/training-judge-center/backend/internal/domain/contest"
 )
 
 func newHandlerWithList(uc *appcontest.ListContestsUseCase) *Handler {
@@ -64,6 +66,39 @@ func TestListContests_MissingGroupId_Returns400(t *testing.T) {
 
 	if w.Code != http.StatusBadRequest {
 		t.Fatalf("expected 400, got %d", w.Code)
+	}
+}
+
+func TestListContests_UserGroupRole_InResponse(t *testing.T) {
+	uc := appcontest.NewListContestsUseCase(
+		&mockContestRepo{
+			listFn: func(_ context.Context, _ domainContest.ListFilters) ([]*domainContest.Contest, int, error) {
+				return []*domainContest.Contest{scheduledContest()}, 1, nil
+			},
+		},
+		&mockGroupProvider{},
+		&mockMemberProvider{isLead: true},
+		&mockContestParticipantProvider{},
+	)
+	h := newHandlerWithList(uc)
+	r := authedRequest(http.MethodGet, "/groups/g1/contests", nil)
+	r.SetPathValue("groupId", "g1")
+	w := httptest.NewRecorder()
+
+	wrapAuth(http.HandlerFunc(h.List)).ServeHTTP(w, r)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+	var resp listContestsResponse
+	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
+		t.Fatalf("could not decode response: %v", err)
+	}
+	if len(resp.Items) != 1 {
+		t.Fatalf("expected 1 item, got %d", len(resp.Items))
+	}
+	if resp.Items[0].UserGroupRole == nil || *resp.Items[0].UserGroupRole != "LEAD" {
+		t.Errorf("expected userGroupRole LEAD, got %v", resp.Items[0].UserGroupRole)
 	}
 }
 

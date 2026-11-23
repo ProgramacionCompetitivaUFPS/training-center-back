@@ -36,16 +36,16 @@ func (p *ContestSubmissionProvider) ListByContest(
 		n++
 	}
 	if filters.Nickname != nil {
-		// individual registrant OR selected team member with given nickname
+		// individual registrant OR selected team member with given nickname. The roster is
+		// selected_members, not team_members: someone taken off the team (a deactivated account) is still
+		// the person who played the contest.
 		where += fmt.Sprintf(`
 			AND (
 				(s.standing_id::text = s.user_id::text AND u.nickname = $%d)
 				OR EXISTS (
 					SELECT 1 FROM contest_team_participants ctp2
-					JOIN team_members tm ON tm.team_id = ctp2.team_id
-					JOIN users u2 ON u2.id = tm.user_id AND u2.nickname = $%d
+					JOIN users u2 ON u2.id = ANY(ctp2.selected_members) AND u2.nickname = $%d
 					WHERE ctp2.contest_id = s.contest_id AND ctp2.team_id::text = s.standing_id::text
-					  AND (u2.id = ANY(ctp2.selected_members) OR array_length(ctp2.selected_members, 1) IS NULL)
 				)
 			)`, n, n)
 		args = append(args, *filters.Nickname)

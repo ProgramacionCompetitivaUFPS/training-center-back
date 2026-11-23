@@ -190,3 +190,16 @@ func TestRestoreGroupInvitation_PreservesFields(t *testing.T) {
 		t.Errorf("unexpected InviteeID(): %v", inv.InviteeID())
 	}
 }
+
+func TestNewGroupInvitation_StoresTheInviterAndTheInstantInUTC(t *testing.T) {
+	inv, err := group.NewGroupInvitation("inv-1", "g-1", testInvitee(), shared.RestoreUserID("lead-1"), localNow)
+
+	if err != nil {
+		t.Fatalf("NewGroupInvitation: %v", err)
+	}
+	if inv.InvitedBy().Value() != "lead-1" {
+		t.Errorf("InvitedBy() = %q, want lead-1", inv.InvitedBy().Value())
+	}
+	assertInUTC(t, "CreatedAt", inv.CreatedAt(), time.Date(2024, 1, 15, 12, 0, 0, 0, time.UTC))
+	assertInUTC(t, "ExpiresAt", inv.ExpiresAt(), time.Date(2024, 1, 18, 12, 0, 0, 0, time.UTC))
+}

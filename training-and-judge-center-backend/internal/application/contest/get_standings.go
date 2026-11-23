@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"golang.org/x/sync/errgroup"
+	"golang.org/x/sync/singleflight"
 
 	appshared "github.com/training-judge-center/backend/internal/application/shared"
 	domainContest "github.com/training-judge-center/backend/internal/domain/contest"
@@ -15,11 +16,18 @@ import (
 
 const maxStandingsParticipants = 10_000
 
+const (
+	standingsRebuildTimeout = 30 * time.Second
+	standingsRefreshLockTTL = 45 * time.Second
+)
+
 // RankedProblem is the per-problem view returned in a RankedEntry.
 type RankedProblem struct {
-	Attempts   int
-	AcceptedAt *time.Time // nil if not solved (or solved after freeze, which is hidden)
-	Penalty    int        // 0 if not solved
+	Attempts     int
+	Pending      int
+	AcceptedAt   *time.Time // nil if not solved (or solved after freeze, which is hidden)
+	Penalty      int        // 0 if not solved
+	IsFirstSolve bool
 }
 
 // RankedEntry is one row in the standings table.
@@ -27,6 +35,7 @@ type RankedEntry struct {
 	Rank            int
 	ContestantID    string
 	ParticipantType string // "INDIVIDUAL" or "TEAM"
+	IsOfficial      bool
 	ProblemsSolved  int
 	TotalPenalty    int
 	LastAcceptedAt  *time.Time
@@ -57,6 +66,12 @@ type StandingsProblemDisplay struct {
 	Position int
 	Slug     string
 	Title    string
+	Color    *string
+	Accepted int
+	Tried    int
+	// PostAccepted and PostTried count the postcompetition rows; zero when there is no postcompetition phase.
+	PostAccepted int
+	PostTried    int
 }
 
 // ContestSummaryDisplay is the standings-facing summary of the contest itself.
@@ -70,6 +85,10 @@ type ContestSummaryDisplay struct {
 	FreezeMinutes int
 	IsFrozen      bool
 	FrozenAt      *time.Time
+	// ResultsRevealedAt is when a lead or admin unfroze the final results; nil until then.
+	ResultsRevealedAt *time.Time
+	// AutoRevealAt is when the results open by themselves; nil when they only open by hand.
+	AutoRevealAt *time.Time
 }
 
 type GetStandingsInput struct {
@@ -82,6 +101,7 @@ type GetStandingsInput struct {
 	Institution string
 	Page        int
 	Limit       int
+	Phase       StandingsPhase
 }
 
 type StandingsMeta struct {
@@ -113,7 +133,7 @@ type GetStandingsUseCase struct {
 	memberProvider       GroupMemberProvider
 	standingsCache       StandingsCache
 	staleness            time.Duration
-	lockTTL              time.Duration
+	rebuilds             singleflight.Group
 }
 
 func NewGetStandingsUseCase(
@@ -141,7 +161,6 @@ func NewGetStandingsUseCase(
 		memberProvider:       memberProvider,
 		standingsCache:       standingsCache,
 		staleness:            staleness,
-		lockTTL:              staleness * 2,
 	}
 }
 
@@ -190,13 +209,7 @@ func (uc *GetStandingsUseCase) Execute(ctx context.Context, in GetStandingsInput
 	now := time.Now()
 	status := contest.Status(now)
 
-	var freezeTime *time.Time
-	if contest.FreezeMinutes() > 0 && status == domainContest.StatusActive {
-		ft := contest.EndTime().Add(-time.Duration(contest.FreezeMinutes()) * time.Minute)
-		if now.After(ft) {
-			freezeTime = &ft
-		}
-	}
+	freezeTime := contest.FreezeTime(now)
 
 	applyFreeze := freezeTime != nil
 	if in.Realtime && applyFreeze {
@@ -216,7 +229,7 @@ func (uc *GetStandingsUseCase) Execute(ctx context.Context, in GetStandingsInput
 
 	// Cache miss or cache error (already logged by the cache adapter): rebuild from the
 	// source. rebuild's Set also overwrites an entry that failed to unmarshal.
-	rebuilt, err := uc.rebuild(ctx, contest)
+	rebuilt, err := uc.rebuildOnce(ctx, contest)
 	if err != nil {
 		return nil, err
 	}
@@ -256,7 +269,7 @@ func (uc *GetStandingsUseCase) ExecuteFilterOptions(ctx context.Context, in GetS
 			go uc.backgroundRefresh(in.ContestID)
 		}
 	} else {
-		cached, err = uc.rebuild(ctx, contest)
+		cached, err = uc.rebuildOnce(ctx, contest)
 		if err != nil {
 			return nil, err
 		}
@@ -287,6 +300,20 @@ func distinctProfileField(profiles map[string]*ParticipantProfile, field func(*P
 	}
 	sort.Strings(values)
 	return values
+}
+
+// rebuildOnce makes concurrent rebuilds of one contest share a single run, bounded by
+// standingsRebuildTimeout and detached from any caller's cancellation.
+func (uc *GetStandingsUseCase) rebuildOnce(ctx context.Context, contest *domainContest.Contest) (*CachedStandings, error) {
+	v, err, _ := uc.rebuilds.Do(contest.ID(), func() (any, error) {
+		rebuildCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), standingsRebuildTimeout)
+		defer cancel()
+		return uc.rebuild(rebuildCtx, contest)
+	})
+	if err != nil {
+		return nil, err
+	}
+	return v.(*CachedStandings), nil
 }
 
 // rebuild counts only the submissions of the problems the contest has right now: a problem taken out
@@ -370,33 +397,25 @@ func (uc *GetStandingsUseCase) rebuild(ctx context.Context, contest *domainConte
 		}
 		p := standings[contestantID]
 		attempt := p.Problems[sub.ProblemID]
-		if attempt.AcceptedAt != nil {
-			continue // already solved; ignore later submissions
+		if next := recordAttempt(attempt, sub); attemptChanged(attempt, next) {
+			p.Problems[sub.ProblemID] = next
 		}
-		switch sub.Status {
-		case "ACCEPTED":
-			t := sub.SubmittedAt
-			attempt.AcceptedAt = &t
-			p.Problems[sub.ProblemID] = attempt
-		// Literal strings rather than the domain type, so a verdict added there
-		// does not reach this list on its own — see the test that pins them.
-		case "WRONG_ANSWER", "TIME_LIMIT_EXCEEDED", "MEMORY_LIMIT_EXCEEDED",
-			"OUTPUT_LIMIT_EXCEEDED", "RUNTIME_ERROR":
-			attempt.WrongAttemptTimes = append(attempt.WrongAttemptTimes, sub.SubmittedAt)
-			p.Problems[sub.ProblemID] = attempt
-		}
-		// COMPILATION_ERROR and SYSTEM_ERROR don't count as wrong attempts (ICPC rules)
 	}
 
 	participants := make([]domainContest.ParticipantStanding, 0, len(standings))
-	for _, p := range standings {
+	participantTypeOf := make(map[string]string, len(standings))
+	for id, p := range standings {
 		participants = append(participants, *p)
+		participantTypeOf[id] = p.ParticipantType
 	}
 
-	profileIDs := make([]string, 0, len(userToContestant))
+	postParticipants, extraUserIDs := buildPostcompetition(subs, endTime, inContest, userToContestant, participantTypeOf)
+
+	profileIDs := make([]string, 0, len(userToContestant)+len(extraUserIDs))
 	for userID := range userToContestant {
 		profileIDs = append(profileIDs, userID)
 	}
+	profileIDs = append(profileIDs, extraUserIDs...)
 	profiles, err := uc.profileProvider.GetProfiles(ctx, profileIDs)
 	if err != nil {
 		slog.WarnContext(ctx, "rebuild: profile enrichment degraded", "error", err)
@@ -418,11 +437,12 @@ func (uc *GetStandingsUseCase) rebuild(ctx context.Context, contest *domainConte
 	}
 
 	cached := &CachedStandings{
-		Participants: participants,
-		TeamMembers:  teamMembers,
-		Profiles:     profiles,
-		TeamNames:    teamNames,
-		LastUpdated:  time.Now(),
+		Participants:     participants,
+		PostParticipants: postParticipants,
+		TeamMembers:      teamMembers,
+		Profiles:         profiles,
+		TeamNames:        teamNames,
+		LastUpdated:      time.Now(),
 	}
 	if err := uc.standingsCache.Set(ctx, contestID, cached); err != nil {
 		slog.ErrorContext(ctx, "standings cache set failed after rebuild", "contest_id", contestID, "error", err)
@@ -432,7 +452,7 @@ func (uc *GetStandingsUseCase) rebuild(ctx context.Context, contest *domainConte
 
 func (uc *GetStandingsUseCase) backgroundRefresh(contestID string) {
 	ctx := context.Background()
-	acquired, err := uc.standingsCache.AcquireRefreshLock(ctx, contestID, uc.lockTTL)
+	acquired, err := uc.standingsCache.AcquireRefreshLock(ctx, contestID, standingsRefreshLockTTL)
 	if err != nil || !acquired {
 		return
 	}
@@ -444,7 +464,7 @@ func (uc *GetStandingsUseCase) backgroundRefresh(contestID string) {
 		return
 	}
 
-	if _, err := uc.rebuild(ctx, contest); err != nil {
+	if _, err := uc.rebuildOnce(ctx, contest); err != nil {
 		slog.ErrorContext(ctx, "standings background refresh failed", "contest_id", contestID, "error", err)
 	}
 }
@@ -463,10 +483,33 @@ func (uc *GetStandingsUseCase) buildOutput(
 		effectiveFreezeTime = freezeTime
 	}
 
-	participants := FilterStandingsByProfile(cached, in.Country, in.City, in.Institution)
-	entries := RankStandings(participants, contest.StartTime(), contest.Penalty().Value(), effectiveFreezeTime)
+	showTeamMembers := contest.ShowTeamMembers()
+	postAvailable := status == domainContest.StatusFinished && freezeTime == nil && contest.EnablePostContest()
+
+	var postRows []domainContest.ParticipantStanding
+	if postAvailable {
+		postRows = cached.PostParticipants
+	}
+	postStats := computeProblemStats(postRows, nil)
+
+	stats := computeProblemStats(cached.Participants, effectiveFreezeTime)
+	if !in.Phase.withCompetition() {
+		stats = postStats
+	}
+
+	var entries []RankedEntry
+	if in.Phase.withCompetition() {
+		participants := FilterStandingsByProfile(cached, in.Country, in.City, in.Institution)
+		entries = RankStandings(participants, contest.StartTime(), contest.Penalty().Value(), effectiveFreezeTime)
+	}
+	if in.Phase.withPostcompetition() && postAvailable {
+		nameOf := func(contestantID, participantType string) string {
+			return buildParticipantDisplay(RankedEntry{ContestantID: contestantID, ParticipantType: participantType}, cached, showTeamMembers).DisplayName
+		}
+		entries = append(entries, RankPostcompetition(FilterPostcompetitionByProfile(cached, in.Country, in.City, in.Institution), nameOf)...)
+	}
 	for i := range entries {
-		entries[i].Participant = buildParticipantDisplay(entries[i], cached, contest.ShowTeamMembers())
+		entries[i].Participant = buildParticipantDisplay(entries[i], cached, showTeamMembers)
 	}
 
 	total := len(entries)
@@ -488,9 +531,14 @@ func (uc *GetStandingsUseCase) buildOutput(
 		meta.FrozenAt = freezeTime
 	}
 
-	problems, err := uc.buildProblemsDisplay(ctx, contest)
+	problems, err := uc.buildProblemsDisplay(ctx, contest, stats, postStats)
 	if err != nil {
 		return nil, err
+	}
+
+	page := entries[start:end]
+	if in.Phase.withCompetition() {
+		markFirstSolves(page, stats)
 	}
 
 	return &GetStandingsOutput{
@@ -504,9 +552,12 @@ func (uc *GetStandingsUseCase) buildOutput(
 			FreezeMinutes: contest.FreezeMinutes(),
 			IsFrozen:      meta.IsFrozen,
 			FrozenAt:      meta.FrozenAt,
+
+			ResultsRevealedAt: contest.ResultsRevealedAt(),
+			AutoRevealAt:      contest.AutoRevealAt(),
 		},
 		Problems: problems,
-		Entries:  entries[start:end],
+		Entries:  page,
 		Total:    total,
 		Page:     in.Page,
 		Limit:    in.Limit,
@@ -561,7 +612,7 @@ func nilIfEmpty(s string) *string {
 
 // buildProblemsDisplay resolves the contest's problem list into the
 // slug/title pairs the standings header needs, in contest position order.
-func (uc *GetStandingsUseCase) buildProblemsDisplay(ctx context.Context, contest *domainContest.Contest) ([]StandingsProblemDisplay, error) {
+func (uc *GetStandingsUseCase) buildProblemsDisplay(ctx context.Context, contest *domainContest.Contest, stats, postStats map[string]problemStats) ([]StandingsProblemDisplay, error) {
 	cps := contest.Problems()
 	if len(cps) == 0 {
 		return []StandingsProblemDisplay{}, nil
@@ -585,10 +636,15 @@ func (uc *GetStandingsUseCase) buildProblemsDisplay(ctx context.Context, contest
 			continue
 		}
 		displays = append(displays, StandingsProblemDisplay{
-			ID:       cp.ProblemID(),
-			Position: cp.Order(),
-			Slug:     info.Slug,
-			Title:    info.Title,
+			ID:           cp.ProblemID(),
+			Position:     cp.Order(),
+			Slug:         info.Slug,
+			Title:        info.Title,
+			Color:        colorString(cp.Color()),
+			Accepted:     stats[cp.ProblemID()].Accepted,
+			Tried:        stats[cp.ProblemID()].Tried,
+			PostAccepted: postStats[cp.ProblemID()].Accepted,
+			PostTried:    postStats[cp.ProblemID()].Tried,
 		})
 	}
 	return displays, nil

@@ -48,3 +48,12 @@ func TestNewInvitationStatus_Invalid(t *testing.T) {
 		})
 	}
 }
+
+func TestInvitationStatus_StringAndRestore(t *testing.T) {
+	if group.InvitationStatusRevoked.String() != "REVOKED" {
+		t.Errorf("String() = %q, want REVOKED", group.InvitationStatusRevoked.String())
+	}
+	if got := group.RestoreInvitationStatus("LEGACY").String(); got != "LEGACY" {
+		t.Errorf("RestoreInvitationStatus().String() = %q, want LEGACY: no validation on restore", got)
+	}
+}

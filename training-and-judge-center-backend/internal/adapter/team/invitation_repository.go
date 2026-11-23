@@ -14,6 +14,8 @@ import (
 	"github.com/training-judge-center/backend/pkg/apperror"
 )
 
+const msgInvitationNotFound = "Invitation not found"
+
 type InvitationRepository struct {
 	db infraPostgres.Querier
 }
@@ -47,7 +49,7 @@ func (r *InvitationRepository) FindByID(ctx context.Context, id string) (*domain
 	err := infraPostgres.GetQuerier(ctx, r.db).QueryRow(ctx, q, id).Scan(&invID, &teamID, &inviteeID, &invitedBy, &createdAt)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			return nil, apperror.NewNotFound(domainTeam.ErrCodeInvitationNotFound, "Invitation not found")
+			return nil, apperror.NewNotFound(domainTeam.ErrCodeInvitationNotFound, msgInvitationNotFound)
 		}
 		slog.ErrorContext(ctx, "failed to find invitation by id", "error", err, "invitation_id", id)
 		return nil, apperror.NewInternal()
@@ -88,7 +90,7 @@ func (r *InvitationRepository) FindByTeamAndInvitee(ctx context.Context, teamID 
 	err := infraPostgres.GetQuerier(ctx, r.db).QueryRow(ctx, q, teamID, inviteeID.Value()).Scan(&invID, &tID, &iID, &invBy, &createdAt)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			return nil, apperror.NewNotFound(domainTeam.ErrCodeInvitationNotFound, "Invitation not found")
+			return nil, apperror.NewNotFound(domainTeam.ErrCodeInvitationNotFound, msgInvitationNotFound)
 		}
 		slog.ErrorContext(ctx, "failed to find invitation by team and invitee", "error", err)
 		return nil, apperror.NewInternal()
@@ -130,7 +132,7 @@ func (r *InvitationRepository) Delete(ctx context.Context, id string) error {
 		return apperror.NewInternal()
 	}
 	if tag.RowsAffected() == 0 {
-		return apperror.NewNotFound(domainTeam.ErrCodeInvitationNotFound, "Invitation not found")
+		return apperror.NewNotFound(domainTeam.ErrCodeInvitationNotFound, msgInvitationNotFound)
 	}
 	return nil
 }

@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/training-judge-center/backend/internal/domain/submission"
+	"github.com/training-judge-center/backend/pkg/apperror"
 )
 
 func newJudgeSubmissionUseCase(
@@ -482,6 +483,125 @@ func TestJudgeSubmission_RunTestCaseInfraError_Retries(t *testing.T) {
 	}
 }
 
+func TestJudgeSubmission_RetryReadsTheLimitsAgain_SoItUsesTheCheckerThatReplacedTheOldOne(t *testing.T) {
+	var updatedStatus string
+	limitsCalls := 0
+	problems := &mockProblemProvider{
+		getLimitsFn: func(context.Context, string) (ProblemLimits, error) {
+			limitsCalls++
+			path := "problems/p/checker/old/compiled"
+			if limitsCalls > 1 {
+				path = "problems/p/checker/new/compiled"
+			}
+			return ProblemLimits{TimeLimitMs: 1000, MemoryKb: 262144, CheckerPath: path}, nil
+		},
+	}
+	var openedPaths []string
+	checker := &mockOutputChecker{
+		beginCheckingFn: func(_ context.Context, path string, _ submission.Language, _ string) (CheckerSession, error) {
+			openedPaths = append(openedPaths, path)
+			if path == "problems/p/checker/old/compiled" {
+				return nil, errors.New("object deleted by the judging update")
+			}
+			return &mockCheckerSession{}, nil
+		},
+	}
+	uc := newJudgeSubmissionUseCase(
+		&mockSubmissionUpdater{
+			updateFn: func(_ context.Context, s *submission.Submission) error {
+				updatedStatus = s.Status().String()
+				return nil
+			},
+		},
+		&mockSourceCodeDownloader{}, problems, &mockTestCaseProvider{}, &mockExecutor{}, checker,
+	)
+	uc.retry = RetryConfig{MaxAttempts: 3, BackoffBase: 0}
+
+	if err := uc.Execute(context.Background(), JudgeSubmissionInput{SubmissionID: submissionID}); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if updatedStatus != "ACCEPTED" {
+		t.Errorf("status: got %s, want ACCEPTED", updatedStatus)
+	}
+	want := []string{"problems/p/checker/old/compiled", "problems/p/checker/new/compiled"}
+	if len(openedPaths) != 2 || openedPaths[0] != want[0] || openedPaths[1] != want[1] {
+		t.Errorf("checker paths opened: got %v, want %v", openedPaths, want)
+	}
+}
+
+func TestJudgeSubmission_TestCasesUnreadableOnce_RetriesAndSucceeds(t *testing.T) {
+	var updatedStatus string
+	reads := 0
+	testCases := &mockTestCaseProvider{
+		getTestCasesFn: func(context.Context, string) ([]TestCase, error) {
+			reads++
+			if reads == 1 {
+				return nil, errors.New("test cases not found")
+			}
+			return []TestCase{{Input: []byte("1 2"), ExpectedOutput: []byte("3")}}, nil
+		},
+	}
+	uc := newJudgeSubmissionUseCase(
+		&mockSubmissionUpdater{
+			updateFn: func(_ context.Context, s *submission.Submission) error {
+				updatedStatus = s.Status().String()
+				return nil
+			},
+		},
+		&mockSourceCodeDownloader{}, &mockProblemProvider{}, testCases, &mockExecutor{}, &mockOutputChecker{},
+	)
+	uc.retry = RetryConfig{MaxAttempts: 3, BackoffBase: 0}
+
+	if err := uc.Execute(context.Background(), JudgeSubmissionInput{SubmissionID: submissionID}); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if updatedStatus != "ACCEPTED" {
+		t.Errorf("status: got %s, want ACCEPTED", updatedStatus)
+	}
+	if reads != 2 {
+		t.Errorf("test cases read: got %d times, want 2 (one failed attempt, one good)", reads)
+	}
+}
+
+func TestJudgeSubmission_LimitsUnreadableOnEveryAttempt_MarksSystemError(t *testing.T) {
+	var updatedStatus string
+	limitsCalls := 0
+	executor := &mockExecutor{}
+	uc := newJudgeSubmissionUseCase(
+		&mockSubmissionUpdater{
+			updateFn: func(_ context.Context, s *submission.Submission) error {
+				updatedStatus = s.Status().String()
+				return nil
+			},
+		},
+		&mockSourceCodeDownloader{},
+		&mockProblemProvider{
+			getLimitsFn: func(context.Context, string) (ProblemLimits, error) {
+				limitsCalls++
+				return ProblemLimits{}, errTransient
+			},
+		},
+		&mockTestCaseProvider{}, executor, &mockOutputChecker{},
+	)
+	uc.retry = RetryConfig{MaxAttempts: 3, BackoffBase: 0}
+
+	if err := uc.Execute(context.Background(), JudgeSubmissionInput{SubmissionID: submissionID}); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if updatedStatus != "SYSTEM_ERROR" {
+		t.Errorf("status: got %s, want SYSTEM_ERROR", updatedStatus)
+	}
+	if limitsCalls != 3 {
+		t.Errorf("limits read: got %d times, want one per attempt", limitsCalls)
+	}
+	if executor.calls != 0 {
+		t.Errorf("no sandbox should open when the problem cannot be read, got %d", executor.calls)
+	}
+}
+
 func TestJudgeSubmission_CompilationError_DoesNotRetry(t *testing.T) {
 	var updatedStatus string
 	executor := &mockExecutor{
@@ -895,5 +1015,133 @@ func TestJudgeSubmission_JudgedAtIsTheVerdictInstant(t *testing.T) {
 	took := start.Add(time.Minute)
 	if !judgedAt.After(took) {
 		t.Errorf("judgedAt = %v, want after the instant the submission was taken (%v)", judgedAt, took)
+	}
+}
+
+func TestJudgeSubmission_SubmissionLookupFails_ReturnsTheErrorWithoutClaiming(t *testing.T) {
+	updater := &mockSubmissionUpdater{
+		getByIDFn: func(_ context.Context, _ submission.SubmissionID) (*submission.Submission, error) {
+			return nil, errTransient
+		},
+	}
+	executor := &mockExecutor{}
+	uc := newJudgeSubmissionUseCase(
+		updater, &mockSourceCodeDownloader{}, &mockProblemProvider{}, &mockTestCaseProvider{}, executor, &mockOutputChecker{},
+	)
+
+	err := uc.Execute(context.Background(), JudgeSubmissionInput{SubmissionID: submissionID})
+
+	if !errors.Is(err, errTransient) {
+		t.Errorf("expected the lookup error, got %v", err)
+	}
+	if updater.claims != 0 {
+		t.Errorf("claims = %d, want 0", updater.claims)
+	}
+	if executor.calls != 0 {
+		t.Errorf("executor sessions = %d, want 0", executor.calls)
+	}
+}
+
+func TestJudgeSubmission_ClaimFails_ReturnsTheErrorWithoutJudging(t *testing.T) {
+	updater := &mockSubmissionUpdater{
+		claimFn: func(_ context.Context, _ submission.SubmissionID) (bool, error) {
+			return false, errTransient
+		},
+	}
+	executor := &mockExecutor{}
+	uc := newJudgeSubmissionUseCase(
+		updater, &mockSourceCodeDownloader{}, &mockProblemProvider{}, &mockTestCaseProvider{}, executor, &mockOutputChecker{},
+	)
+
+	err := uc.Execute(context.Background(), JudgeSubmissionInput{SubmissionID: submissionID})
+
+	if !errors.Is(err, errTransient) {
+		t.Errorf("expected the claim error, got %v", err)
+	}
+	if executor.calls != 0 {
+		t.Errorf("executor sessions = %d, want 0", executor.calls)
+	}
+}
+
+func TestJudgeSubmission_CompileInfraError_MarksSystemError(t *testing.T) {
+	var updatedStatus string
+	uc := newJudgeSubmissionUseCase(
+		&mockSubmissionUpdater{
+			updateFn: func(_ context.Context, s *submission.Submission) error {
+				updatedStatus = s.Status().String()
+				return nil
+			},
+		},
+		&mockSourceCodeDownloader{},
+		&mockProblemProvider{},
+		&mockTestCaseProvider{},
+		&mockExecutor{
+			beginSessionFn: func(_ context.Context, _ submission.Language, _ int, _ string) (ExecutionSession, error) {
+				return &mockExecutionSession{
+					compileFn: func(_ context.Context, _ CompileRequest) (CompileResult, error) {
+						return CompileResult{}, errTransient
+					},
+				}, nil
+			},
+		},
+		&mockOutputChecker{},
+	)
+
+	err := uc.Execute(context.Background(), JudgeSubmissionInput{SubmissionID: submissionID})
+
+	if err != nil {
+		t.Errorf("expected nil (ACK) once the verdict is persisted, got %v", err)
+	}
+	if updatedStatus != "SYSTEM_ERROR" {
+		t.Errorf("expected SYSTEM_ERROR, got %s", updatedStatus)
+	}
+}
+
+func TestJudgeSubmission_CheckerInfraError_MarksSystemError(t *testing.T) {
+	var updatedStatus string
+	uc := newJudgeSubmissionUseCase(
+		&mockSubmissionUpdater{
+			updateFn: func(_ context.Context, s *submission.Submission) error {
+				updatedStatus = s.Status().String()
+				return nil
+			},
+		},
+		&mockSourceCodeDownloader{},
+		&mockProblemProvider{},
+		&mockTestCaseProvider{},
+		&mockExecutor{},
+		&mockOutputChecker{
+			checkFn: func(_ context.Context, _ []byte) (CheckResult, error) {
+				return CheckResult{}, errTransient
+			},
+		},
+	)
+
+	err := uc.Execute(context.Background(), JudgeSubmissionInput{SubmissionID: submissionID})
+
+	if err != nil {
+		t.Errorf("expected nil (ACK) once the verdict is persisted, got %v", err)
+	}
+	if updatedStatus != "SYSTEM_ERROR" {
+		t.Errorf("expected SYSTEM_ERROR, got %s", updatedStatus)
+	}
+}
+
+func TestJudgeSubmission_PersistingTheVerdictFails_ReturnsAnInternalErrorWithoutTheCause(t *testing.T) {
+	uc := newJudgeSubmissionUseCase(
+		&mockSubmissionUpdater{
+			updateFn: func(_ context.Context, _ *submission.Submission) error { return errTransient },
+		},
+		&mockSourceCodeDownloader{}, &mockProblemProvider{}, &mockTestCaseProvider{}, &mockExecutor{}, &mockOutputChecker{},
+	)
+
+	err := uc.Execute(context.Background(), JudgeSubmissionInput{SubmissionID: submissionID})
+
+	var appErr *apperror.AppError
+	if !errors.As(err, &appErr) || appErr.Kind != apperror.KindInternal {
+		t.Fatalf("expected an internal apperror, got %v", err)
+	}
+	if errors.Is(err, errTransient) {
+		t.Error("the storage error leaked through the internal error")
 	}
 }

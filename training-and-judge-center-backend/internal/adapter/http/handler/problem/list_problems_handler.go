@@ -1,4 +1,4 @@
-﻿package problem
+package problem
 
 import (
 	"net/http"
@@ -13,6 +13,8 @@ import (
 	"github.com/training-judge-center/backend/internal/application/shared"
 	"github.com/training-judge-center/backend/pkg/apperror"
 )
+
+const msgInvalidRequestParameters = "Invalid request parameters"
 
 // A title holds at most 200 characters, so a longer pattern can never match.
 const maxSearchLength = 200
@@ -43,7 +45,7 @@ func (h *Handler) ListProblems(w http.ResponseWriter, r *http.Request) {
 	if err != nil || page < 1 {
 		handler.WriteJSON(r.Context(), w, http.StatusBadRequest, apperror.AppError{
 			Code:    apperror.ErrCodeValidationError,
-			Message: "Invalid request parameters",
+			Message: msgInvalidRequestParameters,
 			Details: []apperror.FieldError{{Field: "page", Message: "Page must be a positive integer"}},
 		})
 		return
@@ -53,7 +55,7 @@ func (h *Handler) ListProblems(w http.ResponseWriter, r *http.Request) {
 	if err != nil || limit < 1 || limit > 100 {
 		handler.WriteJSON(r.Context(), w, http.StatusBadRequest, apperror.AppError{
 			Code:    apperror.ErrCodeValidationError,
-			Message: "Invalid request parameters",
+			Message: msgInvalidRequestParameters,
 			Details: []apperror.FieldError{{Field: "limit", Message: "Limit must be between 1 and 100"}},
 		})
 		return
@@ -63,7 +65,7 @@ func (h *Handler) ListProblems(w http.ResponseWriter, r *http.Request) {
 	if utf8.RuneCountInString(search) > maxSearchLength {
 		handler.WriteJSON(r.Context(), w, http.StatusBadRequest, apperror.AppError{
 			Code:    apperror.ErrCodeValidationError,
-			Message: "Invalid request parameters",
+			Message: msgInvalidRequestParameters,
 			Details: []apperror.FieldError{{Field: "search", Message: "Search must not exceed 200 characters"}},
 		})
 		return

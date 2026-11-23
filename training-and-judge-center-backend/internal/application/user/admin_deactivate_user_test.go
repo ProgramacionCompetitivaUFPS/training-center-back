@@ -1,4 +1,4 @@
-﻿package user
+package user
 
 import (
 	"context"
@@ -29,7 +29,7 @@ func TestAdminDeactivateUser_Success(t *testing.T) {
 			return nil
 		},
 	}
-	uc := NewAdminDeactivateUserUseCase(repo, invalidator, &mockRefreshTokenRepository{})
+	uc := NewAdminDeactivateUserUseCase(repo, invalidator, &mockRefreshTokenRepository{}, &mockTransactionManager{}, &mockTeamMembershipCleaner{})
 
 	err := uc.Execute(context.Background(), AdminDeactivateUserInput{RequesterID: "admin-1", TargetID: "target-1"})
 	if err != nil {
@@ -54,7 +54,7 @@ func TestAdminDeactivateUser_Success(t *testing.T) {
 
 func TestAdminDeactivateUser_SelfDeactivation(t *testing.T) {
 	repo := newNoConflictRepo()
-	uc := NewAdminDeactivateUserUseCase(repo, &mockSessionInvalidator{}, &mockRefreshTokenRepository{})
+	uc := NewAdminDeactivateUserUseCase(repo, &mockSessionInvalidator{}, &mockRefreshTokenRepository{}, &mockTransactionManager{}, &mockTeamMembershipCleaner{})
 
 	err := uc.Execute(context.Background(), AdminDeactivateUserInput{RequesterID: "admin-1", TargetID: "admin-1"})
 	if err == nil {
@@ -74,7 +74,7 @@ func TestAdminDeactivateUser_SelfDeactivation(t *testing.T) {
 
 func TestAdminDeactivateUser_TargetNotFound(t *testing.T) {
 	repo := newNoConflictRepo()
-	uc := NewAdminDeactivateUserUseCase(repo, &mockSessionInvalidator{}, &mockRefreshTokenRepository{})
+	uc := NewAdminDeactivateUserUseCase(repo, &mockSessionInvalidator{}, &mockRefreshTokenRepository{}, &mockTransactionManager{}, &mockTeamMembershipCleaner{})
 
 	err := uc.Execute(context.Background(), AdminDeactivateUserInput{RequesterID: "admin-1", TargetID: "nonexistent"})
 	if err == nil {
@@ -92,7 +92,7 @@ func TestAdminDeactivateUser_CannotDeactivateAdmin(t *testing.T) {
 	repo.findByIDFn = func(_ context.Context, _ string) (*domain.User, error) {
 		return adminTarget, nil
 	}
-	uc := NewAdminDeactivateUserUseCase(repo, &mockSessionInvalidator{}, &mockRefreshTokenRepository{})
+	uc := NewAdminDeactivateUserUseCase(repo, &mockSessionInvalidator{}, &mockRefreshTokenRepository{}, &mockTransactionManager{}, &mockTeamMembershipCleaner{})
 
 	err := uc.Execute(context.Background(), AdminDeactivateUserInput{RequesterID: "admin-1", TargetID: "admin-2"})
 	if err == nil {
@@ -121,7 +121,7 @@ func TestAdminDeactivateUser_AlreadyDeactivated_Idempotent(t *testing.T) {
 		updateCalled = true
 		return nil
 	}
-	uc := NewAdminDeactivateUserUseCase(repo, &mockSessionInvalidator{}, &mockRefreshTokenRepository{})
+	uc := NewAdminDeactivateUserUseCase(repo, &mockSessionInvalidator{}, &mockRefreshTokenRepository{}, &mockTransactionManager{}, &mockTeamMembershipCleaner{})
 
 	err := uc.Execute(context.Background(), AdminDeactivateUserInput{RequesterID: "admin-1", TargetID: "target-1"})
 	if err != nil {
@@ -137,7 +137,7 @@ func TestAdminDeactivateUser_RepositoryFindError(t *testing.T) {
 	repo.findByIDFn = func(_ context.Context, _ string) (*domain.User, error) {
 		return nil, apperror.NewInternal()
 	}
-	uc := NewAdminDeactivateUserUseCase(repo, &mockSessionInvalidator{}, &mockRefreshTokenRepository{})
+	uc := NewAdminDeactivateUserUseCase(repo, &mockSessionInvalidator{}, &mockRefreshTokenRepository{}, &mockTransactionManager{}, &mockTeamMembershipCleaner{})
 
 	err := uc.Execute(context.Background(), AdminDeactivateUserInput{RequesterID: "admin-1", TargetID: "target-1"})
 	if err == nil {
@@ -165,7 +165,7 @@ func TestAdminDeactivateUser_SessionInvalidationError_DoesNotPersist(t *testing.
 			return apperror.NewInternal()
 		},
 	}
-	uc := NewAdminDeactivateUserUseCase(repo, invalidator, &mockRefreshTokenRepository{})
+	uc := NewAdminDeactivateUserUseCase(repo, invalidator, &mockRefreshTokenRepository{}, &mockTransactionManager{}, &mockTeamMembershipCleaner{})
 
 	err := uc.Execute(context.Background(), AdminDeactivateUserInput{RequesterID: "admin-1", TargetID: "target-1"})
 	if err == nil {
@@ -196,7 +196,7 @@ func TestAdminDeactivateUser_RevokeRefreshTokensError_DoesNotPersist(t *testing.
 			return apperror.NewInternal()
 		},
 	}
-	uc := NewAdminDeactivateUserUseCase(repo, &mockSessionInvalidator{}, refreshTokenRepo)
+	uc := NewAdminDeactivateUserUseCase(repo, &mockSessionInvalidator{}, refreshTokenRepo, &mockTransactionManager{}, &mockTeamMembershipCleaner{})
 
 	err := uc.Execute(context.Background(), AdminDeactivateUserInput{RequesterID: "admin-1", TargetID: "target-1"})
 	if err == nil {
@@ -220,7 +220,7 @@ func TestAdminDeactivateUser_RepositoryUpdateError(t *testing.T) {
 	repo.updateFn = func(_ context.Context, _ *domain.User) error {
 		return apperror.NewInternal()
 	}
-	uc := NewAdminDeactivateUserUseCase(repo, &mockSessionInvalidator{}, &mockRefreshTokenRepository{})
+	uc := NewAdminDeactivateUserUseCase(repo, &mockSessionInvalidator{}, &mockRefreshTokenRepository{}, &mockTransactionManager{}, &mockTeamMembershipCleaner{})
 
 	err := uc.Execute(context.Background(), AdminDeactivateUserInput{RequesterID: "admin-1", TargetID: "target-1"})
 	if err == nil {
@@ -229,5 +229,64 @@ func TestAdminDeactivateUser_RepositoryUpdateError(t *testing.T) {
 	appErr := err.(*apperror.AppError)
 	if appErr.Code != apperror.ErrCodeInternalError {
 		t.Errorf("expected code INTERNAL_ERROR, got %q", appErr.Code)
+	}
+}
+
+func TestAdminDeactivateUser_RemovesTheUserFromTheirTeams(t *testing.T) {
+	// Arrange
+	repo := newNoConflictRepo()
+	target := newUserWithRole("target-1", shared.RoleContestant, domain.StatusActive)
+	repo.findByIDFn = func(_ context.Context, _ string) (*domain.User, error) { return target, nil }
+	repo.updateFn = func(_ context.Context, _ *domain.User) error { return nil }
+	cleaner := &mockTeamMembershipCleaner{}
+	uc := NewAdminDeactivateUserUseCase(repo, &mockSessionInvalidator{}, &mockRefreshTokenRepository{}, &mockTransactionManager{}, cleaner)
+
+	// Act
+	err := uc.Execute(context.Background(), AdminDeactivateUserInput{RequesterID: "admin-1", TargetID: "target-1"})
+
+	// Assert
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+	if len(cleaner.removedUserIDs) != 1 || cleaner.removedUserIDs[0] != "target-1" {
+		t.Errorf("expected the team cleanup to run once for target-1, got %v", cleaner.removedUserIDs)
+	}
+}
+
+func TestAdminDeactivateUser_TeamCleanupFails_ReturnsError(t *testing.T) {
+	// Arrange
+	repo := newNoConflictRepo()
+	target := newUserWithRole("target-1", shared.RoleContestant, domain.StatusActive)
+	repo.findByIDFn = func(_ context.Context, _ string) (*domain.User, error) { return target, nil }
+	repo.updateFn = func(_ context.Context, _ *domain.User) error { return nil }
+	cleaner := &mockTeamMembershipCleaner{err: apperror.NewInternal()}
+	uc := NewAdminDeactivateUserUseCase(repo, &mockSessionInvalidator{}, &mockRefreshTokenRepository{}, &mockTransactionManager{}, cleaner)
+
+	// Act
+	err := uc.Execute(context.Background(), AdminDeactivateUserInput{RequesterID: "admin-1", TargetID: "target-1"})
+
+	// Assert
+	if err == nil {
+		t.Fatal("expected an error, got nil")
+	}
+}
+
+func TestAdminDeactivateUser_AlreadyDeactivated_DoesNotTouchTeams(t *testing.T) {
+	// Arrange
+	repo := newNoConflictRepo()
+	target := newUserWithRole("target-1", shared.RoleContestant, domain.StatusDeactivated)
+	repo.findByIDFn = func(_ context.Context, _ string) (*domain.User, error) { return target, nil }
+	cleaner := &mockTeamMembershipCleaner{}
+	uc := NewAdminDeactivateUserUseCase(repo, &mockSessionInvalidator{}, &mockRefreshTokenRepository{}, &mockTransactionManager{}, cleaner)
+
+	// Act
+	err := uc.Execute(context.Background(), AdminDeactivateUserInput{RequesterID: "admin-1", TargetID: "target-1"})
+
+	// Assert
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+	if len(cleaner.removedUserIDs) != 0 {
+		t.Errorf("expected no team cleanup for an already deactivated user, got %v", cleaner.removedUserIDs)
 	}
 }

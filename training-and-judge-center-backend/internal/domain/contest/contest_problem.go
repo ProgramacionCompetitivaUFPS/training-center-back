@@ -8,19 +8,27 @@ type ContestProblem struct {
 	id        string
 	problemID string
 	order     int
+	color     *ProblemColor
 }
 
 func newContestProblem(id, problemID string, order int) ContestProblem {
 	return ContestProblem{id: id, problemID: problemID, order: order}
 }
 
-func RestoreContestProblem(id, problemID string, order int) ContestProblem {
-	return ContestProblem{id: id, problemID: problemID, order: order}
+func RestoreContestProblem(id, problemID string, order int, color *string) ContestProblem {
+	var restored *ProblemColor
+	if color != nil {
+		c := RestoreProblemColor(*color)
+		restored = &c
+	}
+	return ContestProblem{id: id, problemID: problemID, order: order, color: restored}
 }
 
 func (cp ContestProblem) ID() string        { return cp.id }
 func (cp ContestProblem) ProblemID() string { return cp.problemID }
 func (cp ContestProblem) Order() int        { return cp.order }
+
+func (cp ContestProblem) Color() *ProblemColor { return cp.color }
 
 // Letter returns the display alias for this problem slot using base-26
 // column labels: 1→A, 26→Z, 27→AA, 28→AB, …

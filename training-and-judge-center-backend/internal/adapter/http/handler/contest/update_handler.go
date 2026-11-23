@@ -23,6 +23,7 @@ import (
 // @Failure      401 {object} apperror.AppError
 // @Failure      403 {object} apperror.AppError
 // @Failure      404 {object} apperror.AppError
+// @Failure      409 {object} apperror.AppError
 // @Router       /groups/{groupId}/contests/{contestId} [put]
 func (h *Handler) Update(w http.ResponseWriter, r *http.Request) {
 	caller, ok := handler.RequireCurrentUser(w, r)
@@ -46,20 +47,26 @@ func (h *Handler) Update(w http.ResponseWriter, r *http.Request) {
 	}
 
 	in := appContest.UpdateContestInput{
-		CurrentUser:       *caller,
-		GroupID:           groupID,
-		ContestID:         contestID,
-		Name:              body.Name,
-		StartTime:         body.StartTime,
-		EndTime:           body.EndTime,
-		Penalty:           body.Penalty,
-		FreezeMinutes:     body.FreezeMinutes,
-		EnablePostContest: body.EnablePostContest,
-		Locked:            body.Locked,
-		ParticipationMode: body.ParticipationMode,
-		TeamSizeMin:       body.TeamSizeMin,
-		TeamSizeMax:       body.TeamSizeMax,
-		ShowTeamMembers:   body.ShowTeamMembers,
+		CurrentUser:           *caller,
+		GroupID:               groupID,
+		ContestID:             contestID,
+		Name:                  body.Name,
+		StartTime:             body.StartTime,
+		EndTime:               body.EndTime,
+		Penalty:               body.Penalty,
+		FreezeMinutes:         body.FreezeMinutes,
+		EnablePostContest:     body.EnablePostContest,
+		Locked:                body.Locked,
+		ParticipationMode:     body.ParticipationMode,
+		TeamSizeMin:           body.TeamSizeMin,
+		TeamSizeMax:           body.TeamSizeMax,
+		ShowTeamMembers:       body.ShowTeamMembers,
+		AllowLateRegistration: body.AllowLateRegistration,
+	}
+
+	// autoRevealMinutes: three-state — omitted=no-op, null=back to manual, number=set.
+	if body.AutoRevealMinutes.Present {
+		in.AutoRevealMinutes = &body.AutoRevealMinutes.Value
 	}
 
 	// description: three-state — omitted=no-op, null=clear, string=set.
@@ -71,6 +78,9 @@ func (h *Handler) Update(w http.ResponseWriter, r *http.Request) {
 		problems := make([]appContest.ProblemOrderInput, len(*body.Problems))
 		for i, p := range *body.Problems {
 			problems[i] = appContest.ProblemOrderInput{Slug: p.Slug, Order: p.Order}
+			if p.Color.Present {
+				problems[i].Color = &p.Color.Value
+			}
 		}
 		in.Problems = &problems
 	}
@@ -87,30 +97,32 @@ func (h *Handler) Update(w http.ResponseWriter, r *http.Request) {
 func toContestResponse(out *appContest.ContestOutput) contestResponse {
 	probs := make([]problemDisplay, len(out.Problems))
 	for i, p := range out.Problems {
-		probs[i] = problemDisplay{Slug: p.Slug, Title: p.Title, Order: p.Order}
+		probs[i] = problemDisplay{Slug: p.Slug, Title: p.Title, Order: p.Order, Color: p.Color}
 	}
 
 	resp := contestResponse{
-		ID:                out.ID,
-		Name:              out.Name,
-		Description:       out.Description,
-		StartTime:         out.StartTime.UTC().Format(time.RFC3339),
-		EndTime:           out.EndTime.UTC().Format(time.RFC3339),
-		Duration:          out.Duration,
-		Penalty:           out.Penalty,
-		FreezeMinutes:     out.FreezeMinutes,
-		EnablePostContest: out.EnablePostContest,
-		Locked:            out.Locked,
-		ShowTeamMembers:   out.ShowTeamMembers,
-		ParticipationMode: out.ParticipationMode,
-		TeamSizeMin:       out.TeamSizeMin,
-		TeamSizeMax:       out.TeamSizeMax,
-		Group:             groupDisplay{ID: out.Group.ID, Name: out.Group.Name},
-		Owner:             ownerDisplay{ID: out.Owner.ID, Nickname: out.Owner.Nickname, Name: out.Owner.Name},
-		Problems:          probs,
-		ProblemCount:      out.ProblemCount,
-		Status:            out.Status,
-		CreatedAt:         out.CreatedAt.UTC().Format(time.RFC3339),
+		ID:                    out.ID,
+		Name:                  out.Name,
+		Description:           out.Description,
+		StartTime:             out.StartTime.UTC().Format(time.RFC3339),
+		EndTime:               out.EndTime.UTC().Format(time.RFC3339),
+		Duration:              out.Duration,
+		Penalty:               out.Penalty,
+		FreezeMinutes:         out.FreezeMinutes,
+		EnablePostContest:     out.EnablePostContest,
+		Locked:                out.Locked,
+		ShowTeamMembers:       out.ShowTeamMembers,
+		AllowLateRegistration: out.AllowLateRegistration,
+		AutoRevealMinutes:     out.AutoRevealMinutes,
+		ParticipationMode:     out.ParticipationMode,
+		TeamSizeMin:           out.TeamSizeMin,
+		TeamSizeMax:           out.TeamSizeMax,
+		Group:                 groupDisplay{ID: out.Group.ID, Name: out.Group.Name},
+		Owner:                 ownerDisplay{ID: out.Owner.ID, Nickname: out.Owner.Nickname, Name: out.Owner.Name},
+		Problems:              probs,
+		ProblemCount:          out.ProblemCount,
+		Status:                out.Status,
+		CreatedAt:             out.CreatedAt.UTC().Format(time.RFC3339),
 	}
 	if out.UpdatedAt != nil {
 		s := out.UpdatedAt.UTC().Format(time.RFC3339)

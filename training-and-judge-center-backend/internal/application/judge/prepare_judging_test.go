@@ -2,6 +2,7 @@ package judge
 
 import (
 	"context"
+	"errors"
 	"testing"
 
 	"github.com/training-judge-center/backend/internal/domain/submission"
@@ -313,5 +314,148 @@ func TestPrepareJudging_CandidateTestCases_AreTheOnesTheValidatorChecks(t *testi
 
 	if len(testCases.readAtKeys) != 1 || testCases.readAtKeys[0] != "problems/abc/testcases/new" {
 		t.Errorf("test cases read at: got %v", testCases.readAtKeys)
+	}
+}
+
+type prepareJudgingDeps struct {
+	sources            *mockJudgingSourceProvider
+	downloader         *mockSourceCodeDownloader
+	compiler           *mockArtifactCompiler
+	uploader           *mockArtifactUploader
+	testCases          *mockTestCaseProvider
+	runner             *mockValidatorRunner
+	validatorConsulted bool
+}
+
+func newPrepareJudgingDeps() *prepareJudgingDeps {
+	d := &prepareJudgingDeps{
+		downloader: &mockSourceCodeDownloader{},
+		compiler:   &mockArtifactCompiler{},
+		uploader:   &mockArtifactUploader{},
+		testCases:  &mockTestCaseProvider{},
+		runner:     &mockValidatorRunner{},
+	}
+	d.sources = &mockJudgingSourceProvider{
+		getCheckerSourceFn: func(_ context.Context, _ string) (*JudgingSource, error) { return checkerSource(), nil },
+		getValidatorSourceFn: func(_ context.Context, _ string) (*JudgingSource, error) {
+			d.validatorConsulted = true
+			return validatorSource(), nil
+		},
+	}
+	return d
+}
+
+func TestPrepareJudging_InfraFailure_IsReturnedAndStopsTheRest(t *testing.T) {
+	tests := []struct {
+		name                   string
+		fail                   func(d *prepareJudgingDeps)
+		wantValidatorConsulted bool
+	}{
+		{"the checker source cannot be read", func(d *prepareJudgingDeps) {
+			d.sources.getCheckerSourceFn = func(_ context.Context, _ string) (*JudgingSource, error) { return nil, errTransient }
+		}, false},
+		{"the checker source cannot be downloaded", func(d *prepareJudgingDeps) {
+			d.downloader.downloadFn = func(_ context.Context, path string) ([]byte, error) {
+				if path == checkerSource().FileKey {
+					return nil, errTransient
+				}
+				return []byte("code"), nil
+			}
+		}, false},
+		{"the checker cannot be compiled", func(d *prepareJudgingDeps) {
+			d.compiler.compileFn = func(_ context.Context, req CompileArtifactRequest) (CompileArtifactResult, error) {
+				if req.Role == NewArtifactRoleChecker() {
+					return CompileArtifactResult{}, errTransient
+				}
+				return CompileArtifactResult{Success: true, Artifact: []byte("artifact")}, nil
+			}
+		}, false},
+		{"the compiled checker cannot be stored", func(d *prepareJudgingDeps) {
+			d.uploader.uploadFn = func(_ context.Context, path string, _ []byte) error {
+				if path == "problems/sum-of-two-numbers/checker/compiled" {
+					return errTransient
+				}
+				return nil
+			}
+		}, false},
+		{"the validator source cannot be read", func(d *prepareJudgingDeps) {
+			d.sources.getValidatorSourceFn = func(_ context.Context, _ string) (*JudgingSource, error) { return nil, errTransient }
+		}, false},
+		{"the validator source cannot be downloaded", func(d *prepareJudgingDeps) {
+			d.downloader.downloadFn = func(_ context.Context, path string) ([]byte, error) {
+				if path == validatorSource().FileKey {
+					return nil, errTransient
+				}
+				return []byte("code"), nil
+			}
+		}, true},
+		{"the validator cannot be compiled", func(d *prepareJudgingDeps) {
+			d.compiler.compileFn = func(_ context.Context, req CompileArtifactRequest) (CompileArtifactResult, error) {
+				if req.Role == NewArtifactRoleValidator() {
+					return CompileArtifactResult{}, errTransient
+				}
+				return CompileArtifactResult{Success: true, Artifact: []byte("artifact")}, nil
+			}
+		}, true},
+		{"the compiled validator cannot be stored", func(d *prepareJudgingDeps) {
+			d.uploader.uploadFn = func(_ context.Context, path string, _ []byte) error {
+				if path == "problems/sum-of-two-numbers/validator/compiled" {
+					return errTransient
+				}
+				return nil
+			}
+		}, true},
+		{"the test cases cannot be opened", func(d *prepareJudgingDeps) {
+			d.testCases.getTestCasesFn = func(_ context.Context, _ string) ([]TestCase, error) { return nil, errTransient }
+		}, true},
+		{"the validator session cannot be opened", func(d *prepareJudgingDeps) {
+			d.runner.beginValidatingFn = func(_ context.Context, _ string, _ submission.Language) (ValidatorSession, error) {
+				return nil, errTransient
+			}
+		}, true},
+		{"the validator cannot run on an input", func(d *prepareJudgingDeps) {
+			d.runner.session = &mockValidatorSession{
+				validateFn: func(_ context.Context, _ []byte) (ValidatorRunResult, error) {
+					return ValidatorRunResult{}, errTransient
+				},
+			}
+		}, true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			d := newPrepareJudgingDeps()
+			tt.fail(d)
+			uc := newPrepareJudgingUseCase(d.sources, d.downloader, d.compiler, d.uploader, d.testCases, d.runner)
+
+			out, err := uc.Execute(context.Background(), PrepareJudgingInput{ProblemID: problemID, Slug: "sum-of-two-numbers"})
+
+			if !errors.Is(err, errTransient) {
+				t.Errorf("expected the infra error, got %v", err)
+			}
+			if out != nil {
+				t.Errorf("expected no output alongside an error, got %+v", out)
+			}
+			if d.validatorConsulted != tt.wantValidatorConsulted {
+				t.Errorf("validator source consulted = %v, want %v", d.validatorConsulted, tt.wantValidatorConsulted)
+			}
+		})
+	}
+}
+
+func TestPrepareJudging_ValidatorInfraError_StillClosesTheSession(t *testing.T) {
+	d := newPrepareJudgingDeps()
+	session := &mockValidatorSession{
+		validateFn: func(_ context.Context, _ []byte) (ValidatorRunResult, error) {
+			return ValidatorRunResult{}, errTransient
+		},
+	}
+	d.runner.session = session
+	uc := newPrepareJudgingUseCase(d.sources, d.downloader, d.compiler, d.uploader, d.testCases, d.runner)
+
+	_, _ = uc.Execute(context.Background(), PrepareJudgingInput{ProblemID: problemID, Slug: "sum-of-two-numbers"})
+
+	if session.closeCalls != 1 {
+		t.Errorf("expected the session to be closed once, got %d", session.closeCalls)
 	}
 }

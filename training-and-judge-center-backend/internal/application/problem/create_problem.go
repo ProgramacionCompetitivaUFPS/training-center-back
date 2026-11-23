@@ -1,4 +1,4 @@
-﻿package problem
+package problem
 
 import (
 	"context"
@@ -60,77 +60,14 @@ func (usecase *CreateProblemUseCase) Execute(ctx context.Context, input CreatePr
 		return nil, err
 	}
 
-	globalMaxTime, globalMaxMemory := usecase.platformSettings.GlobalLimits()
-
-	var timeLimit *problem.TimeLimit
-	if input.TimeLimit != nil {
-		tl, tlErr := problem.NewTimeLimit(*input.TimeLimit, globalMaxTime)
-		if err := apperror.AccumulateFieldErrors(tlErr, &fieldErrs); err != nil {
-			return nil, err
-		}
-		if tlErr == nil {
-			timeLimit = &tl
-		}
+	timeLimit, memoryLimit, err := validateLimits(usecase.platformSettings, input.TimeLimit, input.MemoryLimit, &fieldErrs)
+	if err != nil {
+		return nil, err
 	}
 
-	var memoryLimit *problem.MemoryLimit
-	if input.MemoryLimit != nil {
-		ml, mlErr := problem.NewMemoryLimit(*input.MemoryLimit, globalMaxMemory)
-		if err := apperror.AccumulateFieldErrors(mlErr, &fieldErrs); err != nil {
-			return nil, err
-		}
-		if mlErr == nil {
-			memoryLimit = &ml
-		}
-	}
-
-	seenLangs := make(map[string]struct{}, len(input.LangOverrides))
-	var validOverrides []problem.LanguageOverride
-	for _, override := range input.LangOverrides {
-		if override.Language == "" {
-			fieldErrs = append(fieldErrs, apperror.FieldError{
-				Field:   "languageOverrides",
-				Message: "Language must not be empty",
-			})
-			continue
-		}
-		if !usecase.platformSettings.IsLanguageSupported(override.Language) {
-			fieldErrs = append(fieldErrs, apperror.FieldError{
-				Field:   "languageOverrides.language",
-				Message: "Unsupported language: " + override.Language,
-			})
-			continue
-		}
-
-		if _, exists := seenLangs[override.Language]; exists {
-			fieldErrs = append(fieldErrs, apperror.FieldError{
-				Field:   "languageOverrides.language",
-				Message: "Duplicate language override: " + override.Language,
-			})
-			continue
-		}
-		seenLangs[override.Language] = struct{}{}
-
-		ll, hasLL := usecase.platformSettings.LanguageLimit(override.Language)
-		var langLimit *problem.LanguageLimit
-		if hasLL {
-			langLimit = &ll
-		}
-		langOverride, loErr := problem.NewLanguageOverride(
-			override.Language,
-			override.TimeLimit,
-			override.MemoryLimit,
-			langLimit,
-			globalMaxTime,
-			globalMaxMemory,
-		)
-		if loErr != nil {
-			if err := apperror.AccumulateFieldErrors(loErr, &fieldErrs); err != nil {
-				return nil, err
-			}
-			continue
-		}
-		validOverrides = append(validOverrides, langOverride)
+	validOverrides, err := validateLanguageOverrides(usecase.platformSettings, input.LangOverrides, &fieldErrs)
+	if err != nil {
+		return nil, err
 	}
 
 	allowedTags := usecase.platformSettings.AllowedTags()

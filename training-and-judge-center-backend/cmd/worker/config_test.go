@@ -453,9 +453,9 @@ func TestJudgeConfig_JavaGetsItsShareOfEveryContainerSize(t *testing.T) {
 	}
 }
 
-// virtualObjectPath is the API's own config, and the worker never reads it at
-// runtime: both files ship baked into the same image, so they can only drift in
-// the repository, and a test catches that in CI before the image exists.
+// virtualObjectPath is the platform limits file. The API enforces it at upload and the
+// worker holds test data to the same limits, reading the copy baked into the same image,
+// so the two can only drift in the repository, and a test catches that in CI.
 const virtualObjectPath = "../../config/virtual_object.json"
 
 func decodeVirtualObject(t *testing.T) config.VirtualObject {

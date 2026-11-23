@@ -16,6 +16,8 @@ import (
 	"github.com/training-judge-center/backend/pkg/apperror"
 )
 
+const msgSubmissionNotFound = "submission not found"
+
 type Repository struct {
 	db infraPostgres.Querier
 }
@@ -72,7 +74,7 @@ func (r *Repository) FindByID(ctx context.Context, id string) (*domainSubmission
 	sub, err := scanRow(ctx, q.QueryRow(ctx, selectCols+` WHERE id = $1`, id))
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			return nil, apperror.NewNotFound(domainSubmission.ErrCodeSubmissionNotFound, "submission not found")
+			return nil, apperror.NewNotFound(domainSubmission.ErrCodeSubmissionNotFound, msgSubmissionNotFound)
 		}
 		return nil, err
 	}
@@ -160,7 +162,7 @@ func (r *Repository) Update(ctx context.Context, s *domainSubmission.Submission)
 		return apperror.NewInternal()
 	}
 	if tag.RowsAffected() == 0 {
-		return apperror.NewNotFound(domainSubmission.ErrCodeSubmissionNotFound, "submission not found")
+		return apperror.NewNotFound(domainSubmission.ErrCodeSubmissionNotFound, msgSubmissionNotFound)
 	}
 	return nil
 }
@@ -292,7 +294,7 @@ func (r *Repository) UpdateVisibility(ctx context.Context, s *domainSubmission.S
 		return apperror.NewInternal()
 	}
 	if tag.RowsAffected() == 0 {
-		return apperror.NewNotFound(domainSubmission.ErrCodeSubmissionNotFound, "submission not found")
+		return apperror.NewNotFound(domainSubmission.ErrCodeSubmissionNotFound, msgSubmissionNotFound)
 	}
 	return nil
 }
@@ -336,6 +338,11 @@ func buildWhere(f domainSubmission.ListFilters) (string, []any) {
 	if f.Visibility != nil {
 		where += fmt.Sprintf(" AND visibility = $%d", i)
 		args = append(args, *f.Visibility)
+		i++
+	}
+	if f.OwnerID != nil {
+		where += fmt.Sprintf(" AND (visibility = 'PUBLIC' OR user_id = $%d)", i)
+		args = append(args, f.OwnerID.String())
 		i++
 	}
 	if f.ExcludeContest {

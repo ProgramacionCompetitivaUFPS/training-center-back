@@ -5,20 +5,21 @@ import (
 	"testing"
 
 	domainGroup "github.com/training-judge-center/backend/internal/domain/group"
-	"github.com/training-judge-center/backend/pkg/apperror"
 )
 
 
-func TestGetMyRequest_NoRequestReturns404(t *testing.T) {
+func TestGetMyRequest_NoRequestReturnsNil(t *testing.T) {
 	uc := NewGetMyRequestUseCase(&mockJoinRequestRepository{})
 
-	_, err := uc.Execute(context.Background(), GetMyRequestInput{
+	out, err := uc.Execute(context.Background(), GetMyRequestInput{
 		GroupID:     "g1",
 		CurrentUser: asContestant("u1"),
 	})
-	ae, ok := err.(*apperror.AppError)
-	if !ok || ae.Code != domainGroup.ErrCodeRequestNotFound {
-		t.Fatalf("expected REQUEST_NOT_FOUND, got %v", err)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if out.Request != nil {
+		t.Errorf("expected nil request, got %+v", out.Request)
 	}
 }
 
@@ -34,8 +35,8 @@ func TestGetMyRequest_ReturnsOwnRequest(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if out.Request.ID != "r1" {
-		t.Errorf("expected request ID=r1, got %s", out.Request.ID)
+	if out.Request == nil || out.Request.ID != "r1" {
+		t.Errorf("expected request ID=r1, got %v", out.Request)
 	}
 }
 
@@ -44,12 +45,14 @@ func TestGetMyRequest_OtherUsersRequestNotReturned(t *testing.T) {
 	reqRepo := &mockJoinRequestRepository{requests: []*domainGroup.JoinRequest{req}}
 	uc := NewGetMyRequestUseCase(reqRepo)
 
-	_, err := uc.Execute(context.Background(), GetMyRequestInput{
+	out, err := uc.Execute(context.Background(), GetMyRequestInput{
 		GroupID:     "g1",
 		CurrentUser: asContestant("u1"),
 	})
-	ae, ok := err.(*apperror.AppError)
-	if !ok || ae.Code != domainGroup.ErrCodeRequestNotFound {
-		t.Fatalf("expected REQUEST_NOT_FOUND for another user's request, got %v", err)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if out.Request != nil {
+		t.Errorf("expected nil request for another user's request, got %+v", out.Request)
 	}
 }

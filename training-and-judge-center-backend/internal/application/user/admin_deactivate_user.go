@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	appshared "github.com/training-judge-center/backend/internal/application/shared"
 	"github.com/training-judge-center/backend/internal/domain/shared"
 	"github.com/training-judge-center/backend/internal/domain/user"
 	"github.com/training-judge-center/backend/pkg/apperror"
@@ -20,13 +21,17 @@ type AdminDeactivateUserUseCase struct {
 	repo               user.Repository
 	sessionInvalidator user.SessionInvalidator
 	refreshTokenRepo   user.RefreshTokenRepository
+	txManager          appshared.TransactionManager
+	teamCleaner        TeamMembershipCleaner
 }
 
-func NewAdminDeactivateUserUseCase(repo user.Repository, sessionInvalidator user.SessionInvalidator, refreshTokenRepo user.RefreshTokenRepository) *AdminDeactivateUserUseCase {
+func NewAdminDeactivateUserUseCase(repo user.Repository, sessionInvalidator user.SessionInvalidator, refreshTokenRepo user.RefreshTokenRepository, txManager appshared.TransactionManager, teamCleaner TeamMembershipCleaner) *AdminDeactivateUserUseCase {
 	return &AdminDeactivateUserUseCase{
 		repo:               repo,
 		sessionInvalidator: sessionInvalidator,
 		refreshTokenRepo:   refreshTokenRepo,
+		txManager:          txManager,
+		teamCleaner:        teamCleaner,
 	}
 }
 
@@ -70,9 +75,12 @@ func (uc *AdminDeactivateUserUseCase) Execute(ctx context.Context, input AdminDe
 		return err
 	}
 
-	if err := uc.repo.Update(ctx, foundUser); err != nil {
-		return err
-	}
-
-	return nil
+	// The account and its team memberships change together: a person who can no longer sign in
+	// could never be taken off a team by anyone else.
+	return uc.txManager.WithTx(ctx, func(txCtx context.Context) error {
+		if err := uc.repo.Update(txCtx, foundUser); err != nil {
+			return err
+		}
+		return uc.teamCleaner.RemoveUserFromAllTeams(txCtx, foundUser.ID())
+	})
 }

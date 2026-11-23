@@ -72,3 +72,33 @@ func TestRole_IsValid(t *testing.T) {
 		})
 	}
 }
+
+func TestRole_String(t *testing.T) {
+	tests := []struct {
+		role shared.Role
+		want string
+	}{
+		{shared.RoleAdmin, "ADMIN"},
+		{shared.RoleCoach, "COACH"},
+		{shared.RoleContestant, "CONTESTANT"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.want, func(t *testing.T) {
+			if got := tt.role.String(); got != tt.want {
+				t.Errorf("String() = %q, want %q", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestRestoreRole_KeepsValueWithoutValidating(t *testing.T) {
+	role := shared.RestoreRole("LEGACY")
+
+	if role.String() != "LEGACY" {
+		t.Errorf("String() = %q, want LEGACY", role.String())
+	}
+	if role.IsValid() {
+		t.Error("a restored unknown role must not report itself valid")
+	}
+}

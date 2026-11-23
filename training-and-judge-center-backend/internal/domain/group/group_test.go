@@ -253,3 +253,14 @@ func TestRestoreGroup(t *testing.T) {
 		t.Errorf("CreatedAt() = %v", g.CreatedAt())
 	}
 }
+
+func TestGroup_UpdateMetadata_NothingToChange_DoesNotTouchUpdatedAt(t *testing.T) {
+	g, _ := group.NewGroup("g-1", newGroupName(t, "Original Name"), nil, group.VisibilityVisible, group.JoinPolicyRequest, testCreator(), testNow)
+	before := g.UpdatedAt()
+
+	g.UpdateMetadata(nil, nil, testNow.Add(time.Hour))
+
+	if !g.UpdatedAt().Equal(before) {
+		t.Errorf("UpdatedAt() = %v, want %v: a no-op update must not look like a change", g.UpdatedAt(), before)
+	}
+}

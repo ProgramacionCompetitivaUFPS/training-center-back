@@ -19,10 +19,11 @@ import (
 // @Param        contestId    path   string true  "Contest ID"
 // @Param        problemSlug  query  string false "Filter by problem slug"
 // @Param        nickname     query  string false "Filter by participant nickname"
-// @Param        phase        query  string false "Filter by phase: competition, postcompetition (default: all)"
+// @Param        phase        query  string false "Filter by phase: competition, postcompetition or all (default: all)"
 // @Param        page         query  int    false "Page number (default 1)"
 // @Param        limit        query  int    false "Items per page (default 50, max 100)"
 // @Success      200 {object} listSubmissionsResponse
+// @Failure      400 {object} apperror.AppError
 // @Failure      401 {object} apperror.AppError
 // @Failure      403 {object} apperror.AppError
 // @Failure      404 {object} apperror.AppError
@@ -52,8 +53,12 @@ func (h *Handler) ListContestSubmissions(w http.ResponseWriter, r *http.Request)
 	}
 
 	phase := q.Get("phase")
-	if phase != "" && phase != "competition" && phase != "postcompetition" {
-		handler.WriteError(r.Context(), w, apperror.NewBadRequest(apperror.ErrCodeBadRequest, "phase must be 'competition' or 'postcompetition'"))
+	switch phase {
+	case "all":
+		phase = ""
+	case "", "competition", "postcompetition":
+	default:
+		handler.WriteError(r.Context(), w, apperror.NewBadRequest(apperror.ErrCodeBadRequest, "phase must be 'competition', 'postcompetition' or 'all'"))
 		return
 	}
 
